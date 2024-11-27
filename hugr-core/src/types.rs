@@ -364,7 +364,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
         Self::new(TypeEnum::Alias(alias))
     }
 
-    fn new(type_e: TypeEnum<RV>) -> Self {
+    pub(crate) fn new(type_e: TypeEnum<RV>) -> Self {
         let bound = type_e.least_upper_bound();
         Self(type_e, bound)
     }

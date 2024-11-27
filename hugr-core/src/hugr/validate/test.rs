@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
+use std::sync::Arc;
 
 use cool_asserts::assert_matches;
 
@@ -378,15 +379,17 @@ const_extension_ids! {
 }
 #[test]
 fn invalid_types() {
-    let mut e = Extension::new_test(EXT_ID);
-    e.add_type(
-        "MyContainer".into(),
-        vec![TypeBound::Copyable.into()],
-        "".into(),
-        TypeDefBound::any(),
-    )
-    .unwrap();
-    let reg = ExtensionRegistry::try_new([e.into(), PRELUDE.clone()]).unwrap();
+    let ext = Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
+        ext.add_type(
+            "MyContainer".into(),
+            vec![TypeBound::Copyable.into()],
+            "".into(),
+            TypeDefBound::any(),
+            extension_ref,
+        )
+        .unwrap();
+    });
+    let reg = ExtensionRegistry::try_new([ext, PRELUDE.clone()]).unwrap();
 
     let validate_to_sig_error = |t: CustomType| {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));
@@ -587,33 +590,33 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub(crate) fn extension_with_eval_parallel() -> Extension {
+pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
     let rowp = TypeParam::new_list(TypeBound::Any);
-    let mut e = Extension::new_test(EXT_ID);
+    Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
+        let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
+        let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
+        let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
+        let pf = PolyFuncTypeRV::new(
+            [rowp.clone(), rowp.clone()],
+            FuncValueType::new(vec![evaled_fn, inputs], outputs),
+        );
+        ext.add_op("eval".into(), "".into(), pf, extension_ref)
+            .unwrap();
 
-    let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
-    let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
-    let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
-    let pf = PolyFuncTypeRV::new(
-        [rowp.clone(), rowp.clone()],
-        FuncValueType::new(vec![evaled_fn, inputs], outputs),
-    );
-    e.add_op("eval".into(), "".into(), pf).unwrap();
-
-    let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
-    let pf = PolyFuncTypeRV::new(
-        [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
-        Signature::new(
-            vec![
-                Type::new_function(FuncValueType::new(rv(0), rv(2))),
-                Type::new_function(FuncValueType::new(rv(1), rv(3))),
-            ],
-            Type::new_function(FuncValueType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
-        ),
-    );
-    e.add_op("parallel".into(), "".into(), pf).unwrap();
-
-    e
+        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
+        let pf = PolyFuncTypeRV::new(
+            [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
+            Signature::new(
+                vec![
+                    Type::new_function(FuncValueType::new(rv(0), rv(2))),
+                    Type::new_function(FuncValueType::new(rv(1), rv(3))),
+                ],
+                Type::new_function(FuncValueType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
+            ),
+        );
+        ext.add_op("parallel".into(), "".into(), pf, extension_ref)
+            .unwrap();
+    })
 }
 
 #[test]
@@ -643,7 +646,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let eval2 = dfb.add_dataflow_op(eval2, [par_func, a, b])?;
     dfb.finish_hugr_with_outputs(
         eval2.outputs(),
-        &ExtensionRegistry::try_new([PRELUDE.clone(), e.into()]).unwrap(),
+        &ExtensionRegistry::try_new([PRELUDE.clone(), e]).unwrap(),
     )?;
     Ok(())
 }
@@ -683,41 +686,44 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(
         par_func.outputs(),
-        &ExtensionRegistry::try_new([PRELUDE.clone(), e.into()]).unwrap(),
+        &ExtensionRegistry::try_new([PRELUDE.clone(), e]).unwrap(),
     )?;
     Ok(())
 }
 
 #[test]
 fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
-    let mut e = Extension::new_test(EXT_ID);
-
-    let params: Vec<TypeParam> = vec![
-        TypeBound::Any.into(),
-        TypeParam::Extensions,
-        TypeBound::Any.into(),
-    ];
-    let evaled_fn = Type::new_function(
-        Signature::new(
-            Type::new_var_use(0, TypeBound::Any),
-            Type::new_var_use(2, TypeBound::Any),
-        )
-        .with_extension_delta(ExtensionSet::type_var(1)),
-    );
-    // Single-input/output version of the higher-order "eval" operation, with extension param.
-    // Note the extension-delta of the eval node includes that of the input function.
-    e.add_op(
-        "eval".into(),
-        "".into(),
-        PolyFuncTypeRV::new(
-            params.clone(),
+    let e = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+        let params: Vec<TypeParam> = vec![
+            TypeBound::Any.into(),
+            TypeParam::Extensions,
+            TypeBound::Any.into(),
+        ];
+        let evaled_fn = Type::new_function(
             Signature::new(
-                vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
+                Type::new_var_use(0, TypeBound::Any),
                 Type::new_var_use(2, TypeBound::Any),
             )
             .with_extension_delta(ExtensionSet::type_var(1)),
-        ),
-    )?;
+        );
+        // Single-input/output version of the higher-order "eval" operation, with extension param.
+        // Note the extension-delta of the eval node includes that of the input function.
+        ext.add_op(
+            "eval".into(),
+            "".into(),
+            PolyFuncTypeRV::new(
+                params.clone(),
+                Signature::new(
+                    vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
+                    Type::new_var_use(2, TypeBound::Any),
+                )
+                .with_extension_delta(ExtensionSet::type_var(1)),
+            ),
+            extension_ref,
+        )?;
+
+        Ok(())
+    })?;
 
     fn utou(e: impl Into<ExtensionSet>) -> Type {
         Type::new_function(Signature::new_endo(USIZE_T).with_extension_delta(e.into()))
@@ -763,7 +769,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         f.finish_with_outputs([tup])?
     };
 
-    let reg = ExtensionRegistry::try_new([e.into(), PRELUDE.clone()])?;
+    let reg = ExtensionRegistry::try_new([e, PRELUDE.clone()])?;
     let [func, tup] = d.input_wires_arr();
     let call = d.call(
         f.handle(),

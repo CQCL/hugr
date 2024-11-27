@@ -1,5 +1,7 @@
 //! Builders and utilities for benchmarks.
 
+use std::sync::Arc;
+
 use hugr::builder::{
     BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     HugrBuilder, ModuleBuilder,
@@ -53,35 +55,35 @@ pub fn simple_cfg_hugr() -> Hugr {
 }
 
 lazy_static! {
-    static ref QUANTUM_EXT: Extension = {
-        let mut extension = Extension::new(
+    static ref QUANTUM_EXT: Arc<Extension> = {
+        Extension::new_arc(
             "bench.quantum".try_into().unwrap(),
             hugr::extension::Version::new(0, 0, 0),
-        );
+            |ext, extension_ref| {
+                ext.add_op(
+                    OpName::new_inline("H"),
+                    "".into(),
+                    Signature::new_endo(QB_T),
+                    extension_ref,
+                )
+                .unwrap();
+                ext.add_op(
+                    OpName::new_inline("Rz"),
+                    "".into(),
+                    Signature::new(type_row![QB_T, FLOAT64_TYPE], type_row![QB_T]),
+                    extension_ref,
+                )
+                .unwrap();
 
-        extension
-            .add_op(
-                OpName::new_inline("H"),
-                "".into(),
-                Signature::new_endo(QB_T),
-            )
-            .unwrap();
-        extension
-            .add_op(
-                OpName::new_inline("Rz"),
-                "".into(),
-                Signature::new(type_row![QB_T, FLOAT64_TYPE], type_row![QB_T]),
-            )
-            .unwrap();
-
-        extension
-            .add_op(
-                OpName::new_inline("CX"),
-                "".into(),
-                Signature::new_endo(type_row![QB_T, QB_T]),
-            )
-            .unwrap();
-        extension
+                ext.add_op(
+                    OpName::new_inline("CX"),
+                    "".into(),
+                    Signature::new_endo(type_row![QB_T, QB_T]),
+                    extension_ref,
+                )
+                .unwrap();
+            },
+        )
     };
 }
 

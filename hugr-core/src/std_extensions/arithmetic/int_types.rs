@@ -188,18 +188,17 @@ impl CustomConst for ConstInt {
 
 /// Extension for basic integer types.
 pub fn extension() -> Arc<Extension> {
-    let mut extension = Extension::new(EXTENSION_ID, VERSION);
-
-    extension
-        .add_type(
-            INT_TYPE_ID,
-            vec![LOG_WIDTH_TYPE_PARAM],
-            "integral value of a given bit width".to_owned(),
-            TypeBound::Copyable.into(),
-        )
-        .unwrap();
-
-    Arc::new(extension)
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                INT_TYPE_ID,
+                vec![LOG_WIDTH_TYPE_PARAM],
+                "integral value of a given bit width".to_owned(),
+                TypeBound::Copyable.into(),
+                extension_ref,
+            )
+            .unwrap();
+    })
 }
 
 lazy_static! {

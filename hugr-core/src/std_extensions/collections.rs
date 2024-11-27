@@ -5,7 +5,7 @@ use std::hash::{Hash, Hasher};
 mod list_fold;
 
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -214,7 +214,7 @@ impl ListOp {
 
 impl MakeOpDef for ListOp {
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
@@ -226,9 +226,13 @@ impl MakeOpDef for ListOp {
     //
     // This method is re-defined here since we need to pass the list type def while computing the signature,
     // to avoid recursive loops initializing the extension.
-    fn add_to_extension(&self, extension: &mut Extension) -> Result<(), ExtensionBuildError> {
+    fn add_to_extension(
+        &self,
+        extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
+    ) -> Result<(), ExtensionBuildError> {
         let sig = self.compute_signature(extension.get_type(&LIST_TYPENAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig)?;
+        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -261,20 +265,19 @@ impl MakeOpDef for ListOp {
 lazy_static! {
     /// Extension for list operations.
     pub static ref EXTENSION: Arc<Extension> = {
-        let mut extension = Extension::new(EXTENSION_ID, VERSION);
+        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+            extension.add_type(
+                LIST_TYPENAME,
+                vec![ListOp::TP],
+                "Generic dynamically sized list of type T.".into(),
+                TypeDefBound::from_params(vec![0]),
+                extension_ref
+            )
+            .unwrap();
 
-        // The list type must be defined before the operations are added.
-        extension.add_type(
-            LIST_TYPENAME,
-            vec![ListOp::TP],
-            "Generic dynamically sized list of type T.".into(),
-            TypeDefBound::from_params(vec![0]),
-        )
-        .unwrap();
-
-        ListOp::load_all_ops(&mut extension).unwrap();
-
-        Arc::new(extension)
+            // The list type must be defined before the operations are added.
+            ListOp::load_all_ops(extension, extension_ref).unwrap();
+        })
     };
 
     /// Registry of extensions required to validate list operations.
@@ -402,7 +405,7 @@ mod test {
         assert_eq!(&ListOp::push.extension(), EXTENSION.name());
         assert!(ListOp::pop.registry().contains(EXTENSION.name()));
         for (_, op_def) in EXTENSION.operations() {
-            assert_eq!(op_def.extension(), &EXTENSION_ID);
+            assert_eq!(op_def.extension_id(), &EXTENSION_ID);
         }
     }
 

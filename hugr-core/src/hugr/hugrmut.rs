@@ -119,6 +119,8 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Remove a node from the graph and return the node weight.
+    /// Note that if the node has children, they are not removed; this leaves
+    /// the Hugr in an invalid state. See [Self::remove_subtree].
     ///
     /// # Panics
     ///
@@ -127,6 +129,19 @@ pub trait HugrMut: HugrMutInternals {
     fn remove_node(&mut self, node: Node) -> OpType {
         panic_invalid_non_root(self, node);
         self.hugr_mut().remove_node(node)
+    }
+
+    /// Remove a node from the graph, along with all its descendants in the hierarchy.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph, or is the root (this would leave an empty Hugr).
+    fn remove_subtree(&mut self, node: Node) {
+        panic_invalid_non_root(self, node);
+        while let Some(ch) = self.first_child(node) {
+            self.remove_subtree(ch)
+        }
+        self.hugr_mut().remove_node(node);
     }
 
     /// Connect two nodes at the given ports.
@@ -524,7 +539,7 @@ mod test {
             PRELUDE_REGISTRY,
         },
         macros::type_row,
-        ops::{self, dataflow::IOTrait},
+        ops::{self, dataflow::IOTrait, FuncDefn, Input, Output},
         types::{Signature, Type},
     };
 
@@ -582,5 +597,34 @@ mod test {
 
         hugr.remove_metadata(root, "meta");
         assert_eq!(hugr.get_metadata(root, "meta"), None);
+    }
+
+    #[test]
+    fn remove_subtree() {
+        let mut hugr = Hugr::default();
+        let root = hugr.root();
+        let [foo, bar] = ["foo", "bar"].map(|name| {
+            let fd = hugr.add_node_with_parent(
+                root,
+                FuncDefn {
+                    name: name.to_string(),
+                    signature: Signature::new_endo(NAT).into(),
+                },
+            );
+            let inp = hugr.add_node_with_parent(fd, Input::new(NAT));
+            let out = hugr.add_node_with_parent(fd, Output::new(NAT));
+            hugr.connect(inp, 0, out, 0);
+            fd
+        });
+        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        assert_eq!(hugr.node_count(), 7);
+
+        hugr.remove_subtree(foo);
+        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        assert_eq!(hugr.node_count(), 4);
+
+        hugr.remove_subtree(bar);
+        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        assert_eq!(hugr.node_count(), 1);
     }
 }

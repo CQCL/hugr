@@ -29,6 +29,7 @@ mod types;
 
 use std::fs::File;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::extension::prelude::PRELUDE_ID;
 use crate::ops::OpName;
@@ -150,19 +151,24 @@ impl ExtensionDeclaration {
         &self,
         imports: &ExtensionSet,
         ctx: DeclarationContext<'_>,
-    ) -> Result<Extension, ExtensionDeclarationError> {
-        let mut ext = Extension::new(self.name.clone(), crate::extension::Version::new(0, 0, 0))
-            .with_reqs(imports.clone());
+    ) -> Result<Arc<Extension>, ExtensionDeclarationError> {
+        Extension::try_new_arc(
+            self.name.clone(),
+            // TODO: Get the version as a parameter.
+            crate::extension::Version::new(0, 0, 0),
+            |ext, extension_ref| {
+                for t in &self.types {
+                    t.register(ext, ctx, extension_ref)?;
+                }
 
-        for t in &self.types {
-            t.register(&mut ext, ctx)?;
-        }
+                for o in &self.operations {
+                    o.register(ext, ctx, extension_ref)?;
+                }
+                ext.add_requirements(imports.clone());
 
-        for o in &self.operations {
-            o.register(&mut ext, ctx)?;
-        }
-
-        Ok(ext)
+                Ok(())
+            },
+        )
     }
 }
 

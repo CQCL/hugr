@@ -104,7 +104,7 @@ impl ExtensionOp {
     /// For a non-cloning version of this operation, use [`OpaqueOp::from`].
     pub fn make_opaque(&self) -> OpaqueOp {
         OpaqueOp {
-            extension: self.def.extension().clone(),
+            extension: self.def.extension_id().clone(),
             name: self.def.name().clone(),
             description: self.def.description().into(),
             args: self.args.clone(),
@@ -121,7 +121,7 @@ impl From<ExtensionOp> for OpaqueOp {
             signature,
         } = op;
         OpaqueOp {
-            extension: def.extension().clone(),
+            extension: def.extension_id().clone(),
             name: def.name().clone(),
             description: def.description().into(),
             args,
@@ -141,7 +141,7 @@ impl Eq for ExtensionOp {}
 impl NamedOp for ExtensionOp {
     /// The name of the operation.
     fn name(&self) -> OpName {
-        qualify_name(self.def.extension(), self.def.name())
+        qualify_name(self.def.extension_id(), self.def.name())
     }
 }
 
@@ -402,26 +402,30 @@ mod test {
 
     #[test]
     fn resolve_missing() {
-        let mut ext = Extension::new_test("ext".try_into().unwrap());
-        let ext_id = ext.name().clone();
         let val_name = "missing_val";
         let comp_name = "missing_comp";
-
         let endo_sig = Signature::new_endo(BOOL_T);
-        ext.add_op(
-            val_name.into(),
-            "".to_string(),
-            SignatureFunc::MissingValidateFunc(FuncValueType::from(endo_sig.clone()).into()),
-        )
-        .unwrap();
 
-        ext.add_op(
-            comp_name.into(),
-            "".to_string(),
-            SignatureFunc::MissingComputeFunc,
-        )
-        .unwrap();
-        let registry = ExtensionRegistry::try_new([ext.into()]).unwrap();
+        let ext = Extension::new_test_arc("ext".try_into().unwrap(), |ext, extension_ref| {
+            ext.add_op(
+                val_name.into(),
+                "".to_string(),
+                SignatureFunc::MissingValidateFunc(FuncValueType::from(endo_sig.clone()).into()),
+                extension_ref,
+            )
+            .unwrap();
+
+            ext.add_op(
+                comp_name.into(),
+                "".to_string(),
+                SignatureFunc::MissingComputeFunc,
+                extension_ref,
+            )
+            .unwrap();
+        });
+        let ext_id = ext.name().clone();
+
+        let registry = ExtensionRegistry::try_new([ext]).unwrap();
         let opaque_val = OpaqueOp::new(
             ext_id.clone(),
             val_name,
