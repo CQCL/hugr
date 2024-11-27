@@ -18,7 +18,8 @@ pub(super) fn mono_scan(
 ) {
     if subst_into.is_some() {
         // First flatten: move all FuncDefns (which do not refer to the TypeParams
-        // being substituted) to be siblings of the enclosing FuncDefn
+        // being substituted) to be siblings of the enclosing FuncDefn.
+        // TODO/PERF: we should do this only the first time we see each polymorphic FuncDefn.
         for ch in h.children(parent).collect::<Vec<_>>() {
             if h.get_optype(ch).is_func_defn() {
                 // Lift the FuncDefn out
@@ -36,8 +37,9 @@ pub(super) fn mono_scan(
         // Since one can only call up the hierarchy,
         // that means we've moved FuncDefns before we encounter any Calls to them
     }
-    for mut ch in h.children(parent).collect::<Vec<_>>() {
-        let ch_op = h.get_optype(ch);
+    let mut ch_map = HashMap::new();
+    for old_ch in h.children(parent).collect::<Vec<_>>() {
+        let ch_op = h.get_optype(old_ch);
         if let Some(fd) = ch_op.as_func_defn() {
             assert!(subst_into.is_none());
             if !fd.signature.params().is_empty() {
@@ -45,13 +47,15 @@ pub(super) fn mono_scan(
             }
         }
         // Perform substitution, and recurse into containers (mono_scan does nothing if no children)
-        if let Some((subst, new_parent)) = subst_into {
+        let (ch, nsubst) = if let Some((subst, new_parent)) = subst_into {
             let new_ch = h.add_node_with_parent(new_parent, ch_op.clone().substitute(subst));
-            mono_scan(h, ch, Some((subst, new_ch)), cache, reg);
-            ch = new_ch
+            ch_map.insert(old_ch, new_ch);
+            (new_ch, Some((subst, new_ch)))
         } else {
-            mono_scan(h, ch, None, cache, reg)
-        }
+            (old_ch, None)
+        };
+        mono_scan(h, old_ch, nsubst, cache, reg);
+
         let ch_op = h.get_optype(ch);
         let (type_args, instantiation) = match ch_op {
             OpType::Call(c) => (&c.type_args, &c.instantiation),
@@ -90,7 +94,24 @@ pub(super) fn mono_scan(
         h.connect(new_tgt, h.num_outputs(new_tgt) - 1, ch, fn_inp);
     }
     if subst_into.is_some() {
-        todo!("Copy edges!")
+        // TODO This won't work for 'ext' edges as cannot guarantee predecessors have been scanned.
+        // Need to wait until all recursive calls made by parent have completed
+        // ---> build ch_map across calls, then do this edge remapping in monomorphize()
+        // (also, remove all the polymorphic FuncDefns, as now all at toplevel, and defunct).
+        for &ch in ch_map.keys() {
+            for inport in h.node_inputs(ch).collect::<Vec<_>>() {
+                let srcs = h.linked_outputs(ch, inport).collect::<Vec<_>>();
+                h.disconnect(ch, inport);
+                for (src, outport) in srcs {
+                    h.connect(
+                        ch_map.get(&src).copied().unwrap_or(src),
+                        outport,
+                        ch,
+                        inport,
+                    );
+                }
+            }
+        }
     }
 }
 
