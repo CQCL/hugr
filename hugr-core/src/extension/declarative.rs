@@ -164,7 +164,7 @@ impl ExtensionDeclaration {
                 for o in &self.operations {
                     o.register(ext, ctx, extension_ref)?;
                 }
-                ext.set_reqs(imports.clone());
+                ext.add_requirements(imports.clone());
 
                 Ok(())
             },

@@ -462,7 +462,7 @@ impl Extension {
     }
 
     /// Extend the requirements of this extension with another set of extensions.
-    pub fn set_reqs(&mut self, extension_reqs: impl Into<ExtensionSet>) {
+    pub fn add_requirements(&mut self, extension_reqs: impl Into<ExtensionSet>) {
         let reqs = mem::take(&mut self.extension_reqs);
         self.extension_reqs = reqs.union(extension_reqs.into());
     }

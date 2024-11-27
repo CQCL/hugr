@@ -108,7 +108,7 @@ lazy_static! {
     /// Extension for basic float operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.set_reqs(ExtensionSet::singleton(&super::int_types::EXTENSION_ID));
+            extension.add_requirements(ExtensionSet::singleton(&super::int_types::EXTENSION_ID));
             FloatOps::load_all_ops(extension, extension_ref).unwrap();
         })
     };

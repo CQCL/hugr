@@ -159,7 +159,7 @@ lazy_static! {
     /// Extension for conversions between integers and floats.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.set_reqs(
+            extension.add_requirements(
                 ExtensionSet::from_iter(vec![
                     super::int_types::EXTENSION_ID,
                     super::float_types::EXTENSION_ID,
