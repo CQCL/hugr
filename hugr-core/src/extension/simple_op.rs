@@ -1,5 +1,7 @@
 //! A trait that enum for op definitions that gathers up some shared functionality.
 
+use std::sync::Weak;
+
 use strum::IntoEnumIterator;
 
 use crate::ops::{ExtensionOp, OpName, OpNameRef};
@@ -67,8 +69,20 @@ pub trait MakeOpDef: NamedOp {
 
     /// Add an operation implemented as an [MakeOpDef], which can provide the data
     /// required to define an [OpDef], to an extension.
-    fn add_to_extension(&self, extension: &mut Extension) -> Result<(), ExtensionBuildError> {
-        let def = extension.add_op(self.name(), self.description(), self.signature())?;
+    ///
+    /// Requires a [`Weak`] reference to the extension defining the operation.
+    /// This method is intended to be used inside the closure passed to [`Extension::new_arc`].
+    fn add_to_extension(
+        &self,
+        extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
+    ) -> Result<(), ExtensionBuildError> {
+        let def = extension.add_op(
+            self.name(),
+            self.description(),
+            self.signature(),
+            extension_ref,
+        )?;
 
         self.post_opdef(def);
 
@@ -77,12 +91,18 @@ pub trait MakeOpDef: NamedOp {
 
     /// Load all variants of an enum of op definitions in to an extension as op defs.
     /// See [strum::IntoEnumIterator].
-    fn load_all_ops(extension: &mut Extension) -> Result<(), ExtensionBuildError>
+    ///
+    /// Requires a [`Weak`] reference to the extension defining the operation.
+    /// This method is intended to be used inside the closure passed to [`Extension::new_arc`].
+    fn load_all_ops(
+        extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
+    ) -> Result<(), ExtensionBuildError>
     where
         Self: IntoEnumIterator,
     {
         for op in Self::iter() {
-            op.add_to_extension(extension)?;
+            op.add_to_extension(extension, extension_ref)?;
         }
         Ok(())
     }
@@ -316,9 +336,11 @@ mod test {
 
     lazy_static! {
         static ref EXT: Arc<Extension> = {
-            let mut e = Extension::new_test(EXT_ID.clone());
-            DummyEnum::Dumb.add_to_extension(&mut e).unwrap();
-            Arc::new(e)
+            Extension::new_test_arc(EXT_ID.clone(), |ext, extension_ref| {
+                DummyEnum::Dumb
+                    .add_to_extension(ext, extension_ref)
+                    .unwrap();
+            })
         };
         static ref DUMMY_REG: ExtensionRegistry =
             ExtensionRegistry::try_new([EXT.clone()]).unwrap();

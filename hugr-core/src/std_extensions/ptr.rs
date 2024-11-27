@@ -47,7 +47,7 @@ impl MakeOpDef for PtrOpDef {
     where
         Self: Sized,
     {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn signature(&self) -> SignatureFunc {
@@ -87,17 +87,18 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for pointer operations.
 fn extension() -> Arc<Extension> {
-    let mut extension = Extension::new(EXTENSION_ID, VERSION);
-    extension
-        .add_type(
-            PTR_TYPE_ID,
-            TYPE_PARAMS.into(),
-            "Standard extension pointer type.".into(),
-            TypeDefBound::copyable(),
-        )
-        .unwrap();
-    PtrOpDef::load_all_ops(&mut extension).unwrap();
-    Arc::new(extension)
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                PTR_TYPE_ID,
+                TYPE_PARAMS.into(),
+                "Standard extension pointer type.".into(),
+                TypeDefBound::copyable(),
+                extension_ref,
+            )
+            .unwrap();
+        PtrOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
 }
 
 lazy_static! {

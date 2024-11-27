@@ -91,7 +91,7 @@ impl MakeOpDef for LogicOp {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
@@ -110,16 +110,16 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for basic logical operations.
 fn extension() -> Arc<Extension> {
-    let mut extension = Extension::new(EXTENSION_ID, VERSION);
-    LogicOp::load_all_ops(&mut extension).unwrap();
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        LogicOp::load_all_ops(extension, extension_ref).unwrap();
 
-    extension
-        .add_value(FALSE_NAME, ops::Value::false_val())
-        .unwrap();
-    extension
-        .add_value(TRUE_NAME, ops::Value::true_val())
-        .unwrap();
-    Arc::new(extension)
+        extension
+            .add_value(FALSE_NAME, ops::Value::false_val())
+            .unwrap();
+        extension
+            .add_value(TRUE_NAME, ops::Value::true_val())
+            .unwrap();
+    })
 }
 
 lazy_static! {

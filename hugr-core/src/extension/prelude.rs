@@ -41,75 +41,80 @@ pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 lazy_static! {
     static ref PRELUDE_DEF: Arc<Extension> = {
-        let mut prelude = Extension::new(PRELUDE_ID, VERSION);
-        prelude
-            .add_type(
-                TypeName::new_inline("usize"),
-                vec![],
-                "usize".into(),
-                TypeDefBound::copyable(),
-            )
-            .unwrap();
-        prelude.add_type(
-                STRING_TYPE_NAME,
-                vec![],
-                "string".into(),
-                TypeDefBound::copyable(),
-            )
-            .unwrap();
-        prelude.add_op(
-            PRINT_OP_ID,
-            "Print the string to standard output".to_string(),
-            Signature::new(type_row![STRING_TYPE], type_row![]),
-            )
-            .unwrap();
-        prelude.add_type(
-                TypeName::new_inline(ARRAY_TYPE_NAME),
-                vec![ TypeParam::max_nat(), TypeBound::Any.into()],
-                "array".into(),
-                TypeDefBound::from_params(vec![1] ),
-            )
-            .unwrap();
+        Extension::new_arc(PRELUDE_ID, VERSION, |prelude, extension_ref| {
+            prelude
+                .add_type(
+                    TypeName::new_inline("usize"),
+                    vec![],
+                    "usize".into(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude.add_type(
+                    STRING_TYPE_NAME,
+                    vec![],
+                    "string".into(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude.add_op(
+                    PRINT_OP_ID,
+                    "Print the string to standard output".to_string(),
+                    Signature::new(type_row![STRING_TYPE], type_row![]),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude.add_type(
+                    TypeName::new_inline(ARRAY_TYPE_NAME),
+                    vec![ TypeParam::max_nat(), TypeBound::Any.into()],
+                    "array".into(),
+                    TypeDefBound::from_params(vec![1] ),
+                    extension_ref,
+                )
+                .unwrap();
 
-        prelude
-            .add_type(
-                TypeName::new_inline("qubit"),
-                vec![],
-                "qubit".into(),
-                TypeDefBound::any(),
-            )
-            .unwrap();
-        prelude
-        .add_type(
-            ERROR_TYPE_NAME,
-            vec![],
-            "Simple opaque error type.".into(),
-            TypeDefBound::copyable(),
-        )
-        .unwrap();
+            prelude
+                .add_type(
+                    TypeName::new_inline("qubit"),
+                    vec![],
+                    "qubit".into(),
+                    TypeDefBound::any(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude
+                .add_type(
+                    ERROR_TYPE_NAME,
+                    vec![],
+                    "Simple opaque error type.".into(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
 
+            prelude
+                .add_op(
+                    PANIC_OP_ID,
+                    "Panic with input error".to_string(),
+                    PolyFuncTypeRV::new(
+                        [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                        FuncValueType::new(
+                            vec![TypeRV::new_extension(ERROR_CUSTOM_TYPE), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                            vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                        ),
+                    ),
+                    extension_ref,
+                )
+                .unwrap();
 
-        prelude
-        .add_op(
-            PANIC_OP_ID,
-            "Panic with input error".to_string(),
-            PolyFuncTypeRV::new(
-                [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
-                FuncValueType::new(
-                    vec![TypeRV::new_extension(ERROR_CUSTOM_TYPE), TypeRV::new_row_var_use(0, TypeBound::Any)],
-                    vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
-                ),
-            ),
-        )
-        .unwrap();
-
-        TupleOpDef::load_all_ops(&mut prelude).unwrap();
-        NoopDef.add_to_extension(&mut prelude).unwrap();
-        LiftDef.add_to_extension(&mut prelude).unwrap();
-        array::ArrayOpDef::load_all_ops(&mut prelude).unwrap();
-        array::ArrayScanDef.add_to_extension(&mut prelude).unwrap();
-
-        Arc::new(prelude)
+            TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
+            NoopDef.add_to_extension(prelude, extension_ref).unwrap();
+            LiftDef.add_to_extension(prelude, extension_ref).unwrap();
+            array::ArrayOpDef::load_all_ops(prelude, extension_ref).unwrap();
+            array::ArrayScanDef.add_to_extension(prelude, extension_ref).unwrap();
+        })
     };
     /// An extension registry containing only the prelude
     pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
@@ -528,7 +533,7 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
@@ -695,7 +700,7 @@ impl MakeOpDef for NoopDef {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
@@ -805,7 +810,7 @@ impl MakeOpDef for LiftDef {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {

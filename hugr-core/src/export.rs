@@ -443,10 +443,10 @@ impl<'a> Context<'a> {
 
         let poly_func_type = match opdef.signature_func() {
             SignatureFunc::PolyFuncType(poly_func_type) => poly_func_type,
-            _ => return self.make_named_global_ref(opdef.extension(), opdef.name()),
+            _ => return self.make_named_global_ref(opdef.extension_id(), opdef.name()),
         };
 
-        let key = (opdef.extension().clone(), opdef.name().clone());
+        let key = (opdef.extension_id().clone(), opdef.name().clone());
         let entry = self.decl_operations.entry(key);
 
         let node = match entry {
@@ -467,7 +467,7 @@ impl<'a> Context<'a> {
         };
 
         let decl = self.with_local_scope(node, |this| {
-            let name = this.make_qualified_name(opdef.extension(), opdef.name());
+            let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
             let (params, constraints, r#type) = this.export_poly_func_type(poly_func_type);
             let decl = this.bump.alloc(model::OperationDecl {
                 name,

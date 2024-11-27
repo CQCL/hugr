@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::sync::Weak;
 
 use itertools::Itertools;
 use strum_macros::EnumIter;
@@ -180,7 +181,7 @@ impl MakeOpDef for ArrayOpDef {
     where
         Self: Sized,
     {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn signature(&self) -> SignatureFunc {
@@ -216,9 +217,10 @@ impl MakeOpDef for ArrayOpDef {
     fn add_to_extension(
         &self,
         extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig)?;
+        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -394,7 +396,7 @@ impl MakeOpDef for ArrayScanDef {
     where
         Self: Sized,
     {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn signature(&self) -> SignatureFunc {
@@ -421,9 +423,10 @@ impl MakeOpDef for ArrayScanDef {
     fn add_to_extension(
         &self,
         extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig)?;
+        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 

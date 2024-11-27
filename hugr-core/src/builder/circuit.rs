@@ -243,7 +243,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
-    use crate::extension::{ExtensionId, ExtensionSet};
+    use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY};
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::utils::test_quantum_extension::{
         self, cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
@@ -298,8 +298,18 @@ mod test {
     #[test]
     fn with_nonlinear_and_outputs() {
         let my_ext_name: ExtensionId = "MyExt".try_into().unwrap();
-        let mut my_ext = Extension::new_test(my_ext_name.clone());
-        let my_custom_op = my_ext.simple_ext_op("MyOp", Signature::new(vec![QB, NAT], vec![QB]));
+        let my_ext = Extension::new_test_arc(my_ext_name.clone(), |ext, extension_ref| {
+            ext.add_op(
+                "MyOp".into(),
+                "".to_string(),
+                Signature::new(vec![QB, NAT], vec![QB]),
+                extension_ref,
+            )
+            .unwrap();
+        });
+        let my_custom_op = my_ext
+            .instantiate_extension_op("MyOp", [], &PRELUDE_REGISTRY)
+            .unwrap();
 
         let build_res = build_main(
             Signature::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
