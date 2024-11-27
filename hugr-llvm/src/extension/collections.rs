@@ -8,12 +8,12 @@ use hugr_core::{
     types::{SumType, Type, TypeArg},
     HugrView,
 };
+use inkwell::values::FunctionValue;
 use inkwell::{
     types::{BasicType, BasicTypeEnum, FunctionType},
     values::{BasicValueEnum, IntValue, PointerValue},
     AddressSpace,
 };
-use itertools::Itertools;
 
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
@@ -21,12 +21,98 @@ use crate::{
     types::{HugrType, TypingSession},
 };
 
+/// Runtime functions that implement operations on lists.
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
+pub enum CollectionsRtFunc {
+    New,
+    Push,
+    Pop,
+    Get,
+    Set,
+    Insert,
+    Length,
+}
+
+impl CollectionsRtFunc {
+    /// The signature of a given [CollectionsRtFunc].
+    ///
+    /// Requires a [CollectionsCodegen] to determine the type of lists.
+    pub fn signature<'c>(
+        self,
+        ts: TypingSession<'c, '_>,
+        ccg: &(impl CollectionsCodegen + 'c),
+    ) -> FunctionType<'c> {
+        let iwc = ts.iw_context();
+        match self {
+            CollectionsRtFunc::New => ccg.list_type(ts).fn_type(
+                &[
+                    iwc.i64_type().into(), // Capacity
+                    iwc.i64_type().into(), // Single element size in bytes
+                    iwc.i64_type().into(), // Element alignment
+                    // Pointer to element destructor
+                    iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                ],
+                false,
+            ),
+            CollectionsRtFunc::Push => iwc.void_type().fn_type(
+                &[
+                    ccg.list_type(ts).into(),
+                    iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                ],
+                false,
+            ),
+            CollectionsRtFunc::Pop => iwc.bool_type().fn_type(
+                &[
+                    ccg.list_type(ts).into(),
+                    iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                ],
+                false,
+            ),
+            CollectionsRtFunc::Get | CollectionsRtFunc::Set | CollectionsRtFunc::Insert => {
+                iwc.bool_type().fn_type(
+                    &[
+                        ccg.list_type(ts).into(),
+                        iwc.i64_type().into(),
+                        iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                    ],
+                    false,
+                )
+            }
+            CollectionsRtFunc::Length => iwc.i64_type().fn_type(&[ccg.list_type(ts).into()], false),
+        }
+    }
+
+    /// Returns the extern function corresponding to this [CollectionsRtFunc].
+    ///
+    /// Requires a [CollectionsCodegen] to determine the function signature.
+    pub fn get_extern<'c, H: HugrView>(
+        self,
+        ctx: &EmitFuncContext<'c, '_, H>,
+        ccg: &(impl CollectionsCodegen + 'c),
+    ) -> Result<FunctionValue<'c>> {
+        ctx.get_extern_func(
+            ccg.rt_func_name(self),
+            self.signature(ctx.typing_session(), ccg),
+        )
+    }
+}
+
+impl From<ListOp> for CollectionsRtFunc {
+    fn from(op: ListOp) -> Self {
+        match op {
+            ListOp::get => CollectionsRtFunc::Get,
+            ListOp::set => CollectionsRtFunc::Set,
+            ListOp::push => CollectionsRtFunc::Push,
+            ListOp::pop => CollectionsRtFunc::Pop,
+            ListOp::insert => CollectionsRtFunc::Insert,
+            ListOp::length => CollectionsRtFunc::Length,
+            _ => todo!(),
+        }
+    }
+}
+
 /// A helper trait for customising the lowering [hugr_core::std_extensions::collections]
 /// types, [CustomConst]s, and ops.
-///
-/// All methods have defaults provided that call out to runtime functions, and
-/// [DefaultCollectionsCodegen] is a trivial implementation of this trait which
-/// delegates everything to those default implementations.
 pub trait CollectionsCodegen: Clone {
     /// Return the llvm type of [hugr_core::std_extensions::collections::LIST_TYPENAME].
     fn list_type<'c>(&self, session: TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
@@ -37,285 +123,18 @@ pub trait CollectionsCodegen: Clone {
             .into()
     }
 
-    /// Helper function to compute the signature of runtime functions.
-    fn rt_func_sig<'c>(
-        &self,
-        ts: TypingSession<'c, '_>,
-        fallible: bool,
-        indexed: bool,
-        inout: bool,
-    ) -> FunctionType<'c> {
-        let iwc = ts.iw_context();
-        let mut args = vec![self.list_type(ts).into()];
-        if indexed {
-            args.push(iwc.i64_type().into());
+    /// Return the name of a given [CollectionsRtFunc].
+    fn rt_func_name(&self, func: CollectionsRtFunc) -> String {
+        match func {
+            CollectionsRtFunc::New => "__rt__list__new",
+            CollectionsRtFunc::Push => "__rt__list__push",
+            CollectionsRtFunc::Pop => "__rt__list__pop",
+            CollectionsRtFunc::Get => "__rt__list__get",
+            CollectionsRtFunc::Set => "__rt__list__set",
+            CollectionsRtFunc::Insert => "__rt__list__insert",
+            CollectionsRtFunc::Length => "__rt__list__length",
         }
-        if inout {
-            args.push(iwc.i8_type().ptr_type(AddressSpace::default()).into());
-        }
-        if fallible {
-            iwc.bool_type().fn_type(&args, false)
-        } else {
-            iwc.void_type().fn_type(&args, false)
-        }
-    }
-
-    /// Emits a call to the runtime function that allocates a new list.
-    fn rt_list_new<'c, H: HugrView>(
-        &self,
-        ctx: &EmitFuncContext<'c, '_, H>,
-        capacity: IntValue<'c>,
-        elem_size: IntValue<'c>,
-        alignment: IntValue<'c>,
-        destructor: PointerValue<'c>,
-    ) -> Result<BasicValueEnum<'c>> {
-        let session = ctx.typing_session();
-        let iwc = session.iw_context();
-        let func_ty = self.list_type(session).fn_type(
-            &[
-                iwc.i64_type().into(), // Capacity
-                iwc.i64_type().into(), // Single element size in bytes
-                iwc.i64_type().into(), // Element alignment
-                // Pointer to element destructor
-                iwc.i8_type().ptr_type(AddressSpace::default()).into(),
-            ],
-            false,
-        );
-        let func = ctx.get_extern_func("__rt__list__new", func_ty)?;
-        let list = ctx
-            .builder()
-            .build_call(
-                func,
-                &[
-                    capacity.into(),
-                    elem_size.into(),
-                    alignment.into(),
-                    destructor.into(),
-                ],
-                "",
-            )?
-            .try_as_basic_value()
-            .unwrap_left();
-        Ok(list)
-    }
-
-    /// Emits a call to the runtime function that pushes to a list.
-    fn rt_list_push<'c, H: HugrView>(
-        &self,
-        ctx: &EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        elem_ptr: PointerValue<'c>,
-    ) -> Result<()> {
-        let sig = self.rt_func_sig(ctx.typing_session(), false, false, true);
-        let func = ctx.get_extern_func("__rt__list__push", sig)?;
-        ctx.builder()
-            .build_call(func, &[list.into(), elem_ptr.into()], "")?;
-        Ok(())
-    }
-
-    /// Emits a call to the runtime function that pops from a list.
-    fn rt_list_pop<'c, H: HugrView>(
-        &self,
-        ctx: &EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        out_ptr: PointerValue<'c>,
-    ) -> Result<IntValue<'c>> {
-        let sig = self.rt_func_sig(ctx.typing_session(), true, false, true);
-        let func = ctx.get_extern_func("__rt__list__pop", sig)?;
-        let res = ctx
-            .builder()
-            .build_call(func, &[list.into(), out_ptr.into()], "")?
-            .try_as_basic_value()
-            .unwrap_left()
-            .into_int_value();
-        Ok(res)
-    }
-
-    /// Emits a call to the runtime function that retrives an element from a list.
-    fn rt_list_get<'c, H: HugrView>(
-        &self,
-        ctx: &EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        idx: IntValue<'c>,
-        out_ptr: PointerValue<'c>,
-    ) -> Result<IntValue<'c>> {
-        let sig = self.rt_func_sig(ctx.typing_session(), true, true, true);
-        let func = ctx.get_extern_func("__rt__list__get", sig)?;
-        let res = ctx
-            .builder()
-            .build_call(func, &[list.into(), idx.into(), out_ptr.into()], "")?
-            .try_as_basic_value()
-            .unwrap_left()
-            .into_int_value();
-        Ok(res)
-    }
-
-    /// Emits a call to the runtime function that updates an element in a list.
-    fn rt_list_set<'c, H: HugrView>(
-        &self,
-        ctx: &EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        idx: IntValue<'c>,
-        elem_ptr: PointerValue<'c>,
-    ) -> Result<IntValue<'c>> {
-        let sig = self.rt_func_sig(ctx.typing_session(), true, true, true);
-        let func = ctx.get_extern_func("__rt__list__set", sig)?;
-        let res = ctx
-            .builder()
-            .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
-            .try_as_basic_value()
-            .unwrap_left()
-            .into_int_value();
-        Ok(res)
-    }
-
-    /// Emits a call to the runtime function that inserts an element into a list.
-    fn rt_list_insert<'c, H: HugrView>(
-        &self,
-        ctx: &EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        idx: IntValue<'c>,
-        elem_ptr: PointerValue<'c>,
-    ) -> Result<IntValue<'c>> {
-        let sig = self.rt_func_sig(ctx.typing_session(), true, true, true);
-        let func = ctx.get_extern_func("__rt__list__insert", sig)?;
-        let res = ctx
-            .builder()
-            .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
-            .try_as_basic_value()
-            .unwrap_left()
-            .into_int_value();
-        Ok(res)
-    }
-
-    /// Emits a call to the runtime function that computes the length of a list.
-    fn rt_list_length<'c, H: HugrView>(
-        &self,
-        ctx: &EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-    ) -> Result<IntValue<'c>> {
-        let session = ctx.typing_session();
-        let func_ty = session
-            .iw_context()
-            .i64_type()
-            .fn_type(&[self.list_type(session).into()], false);
-        let func = ctx.get_extern_func("__rt__list__length", func_ty)?;
-        let res = ctx
-            .builder()
-            .build_call(func, &[list.into()], "")?
-            .try_as_basic_value()
-            .unwrap_left()
-            .into_int_value();
-        Ok(res)
-    }
-
-    /// Emit instructions to materialise an LLVM value representing
-    /// a [ListValue].
-    fn emit_const_list<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        elems: Vec<BasicValueEnum<'c>>,
-        elem_ty: BasicTypeEnum<'c>,
-    ) -> Result<BasicValueEnum<'c>> {
-        let iwc = ctx.typing_session().iw_context();
-        let capacity = iwc.i64_type().const_int(elems.len() as u64, false);
-        let elem_size = elem_ty.size_of().unwrap();
-        let alignment = iwc.i64_type().const_int(8, false);
-        // TODO: Lookup destructor for elem_ty
-        let destructor = iwc.i8_type().ptr_type(AddressSpace::default()).const_null();
-        let list = self.rt_list_new(ctx, capacity, elem_size, alignment, destructor)?;
-        for elem in elems {
-            self.emit_push(ctx, list, elem)?;
-        }
-        Ok(list)
-    }
-
-    /// Emit a [ListOp::push] node.
-    fn emit_push<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        elem: BasicValueEnum<'c>,
-    ) -> Result<()> {
-        let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
-        self.rt_list_push(ctx, list, elem_ptr)
-    }
-
-    /// Emit a [ListOp::pop] node.
-    fn emit_pop<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        hugr_elem_ty: HugrType,
-    ) -> Result<BasicValueEnum<'c>> {
-        let elem_ty = ctx.llvm_type(&hugr_elem_ty)?;
-        let out_ptr = build_alloca_i8_ptr(ctx, Left(elem_ty))?;
-        let pop_ok = self.rt_list_pop(ctx, list, out_ptr)?;
-        let elem = build_load_i8_ptr(ctx, out_ptr, elem_ty)?;
-        build_option(ctx, pop_ok, elem, hugr_elem_ty)
-    }
-
-    /// Emit a [ListOp::get] node.
-    fn emit_get<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        index: IntValue<'c>,
-        hugr_elem_ty: HugrType,
-    ) -> Result<BasicValueEnum<'c>> {
-        let elem_ty = ctx.llvm_type(&hugr_elem_ty)?;
-        let out_ptr = build_alloca_i8_ptr(ctx, Left(elem_ty))?;
-        let get_ok = self.rt_list_get(ctx, list, index, out_ptr)?;
-        let elem = build_load_i8_ptr(ctx, out_ptr, elem_ty)?;
-        build_option(ctx, get_ok, elem, hugr_elem_ty)
-    }
-
-    /// Emit a [ListOp::set] node.
-    fn emit_set<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        index: IntValue<'c>,
-        elem: BasicValueEnum<'c>,
-        hugr_elem_ty: HugrType,
-    ) -> Result<BasicValueEnum<'c>> {
-        let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
-        let set_ok = self.rt_list_set(ctx, list, index, elem_ptr)?;
-        let old_elem = build_load_i8_ptr(ctx, elem_ptr, elem.get_type())?;
-        build_ok_or_else(
-            ctx,
-            set_ok,
-            elem,
-            hugr_elem_ty.clone(),
-            old_elem,
-            hugr_elem_ty,
-        )
-    }
-
-    /// Emit a [ListOp::insert] node.
-    fn emit_insert<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-        index: IntValue<'c>,
-        elem: BasicValueEnum<'c>,
-        hugr_elem_ty: HugrType,
-    ) -> Result<BasicValueEnum<'c>> {
-        let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
-        let insert_ok = self.rt_list_insert(ctx, list, index, elem_ptr)?;
-        let unit = ctx
-            .llvm_sum_type(SumType::new_unary(1))?
-            .build_tag(ctx.builder(), 0, vec![])?;
-        build_ok_or_else(ctx, insert_ok, unit, Type::UNIT, elem, hugr_elem_ty)
-    }
-
-    /// Emit a [ListOp::length] node.
-    fn emit_length<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        list: BasicValueEnum<'c>,
-    ) -> Result<IntValue<'c>> {
-        Ok(self.rt_list_length(ctx, list)?)
+        .into()
     }
 }
 
@@ -435,7 +254,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 }
 
 fn emit_list_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, '_, H>,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &(impl CollectionsCodegen + 'c),
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     op: ListOp,
@@ -446,42 +265,124 @@ fn emit_list_op<'c, H: HugrView>(
             return Err(anyhow!("Collections: invalid type args for list op"));
         }
     };
+    let elem_ty = ctx.llvm_type(&hugr_elem_ty)?;
+    let func = CollectionsRtFunc::get_extern(op.into(), ctx, ccg)?;
     match op {
         ListOp::push => {
             let [list, elem] = args.inputs.try_into().unwrap();
-            ccg.emit_push(context, list, elem)?;
-            args.outputs.finish(context.builder(), vec![list])?;
+            let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+            ctx.builder()
+                .build_call(func, &[list.into(), elem_ptr.into()], "")?;
+            args.outputs.finish(ctx.builder(), vec![list])?;
         }
         ListOp::pop => {
             let [list] = args.inputs.try_into().unwrap();
-            let elem_opt = ccg.emit_pop(context, list, hugr_elem_ty)?;
-            args.outputs
-                .finish(context.builder(), vec![list, elem_opt])?;
+            let out_ptr = build_alloca_i8_ptr(ctx, Left(elem_ty))?;
+            let ok = ctx
+                .builder()
+                .build_call(func, &[list.into(), out_ptr.into()], "")?
+                .try_as_basic_value()
+                .unwrap_left()
+                .into_int_value();
+            let elem = build_load_i8_ptr(ctx, out_ptr, elem_ty)?;
+            let elem_opt = build_option(ctx, ok, elem, hugr_elem_ty)?;
+            args.outputs.finish(ctx.builder(), vec![list, elem_opt])?;
         }
         ListOp::get => {
             let [list, idx] = args.inputs.try_into().unwrap();
-            let elem_opt = ccg.emit_get(context, list, idx.into_int_value(), hugr_elem_ty)?;
-            args.outputs.finish(context.builder(), vec![elem_opt])?;
+            let out_ptr = build_alloca_i8_ptr(ctx, Left(elem_ty))?;
+            let ok = ctx
+                .builder()
+                .build_call(func, &[list.into(), idx.into(), out_ptr.into()], "")?
+                .try_as_basic_value()
+                .unwrap_left()
+                .into_int_value();
+            let elem = build_load_i8_ptr(ctx, out_ptr, elem_ty)?;
+            let elem_opt = build_option(ctx, ok, elem, hugr_elem_ty)?;
+            args.outputs.finish(ctx.builder(), vec![elem_opt])?;
         }
         ListOp::set => {
             let [list, idx, elem] = args.inputs.try_into().unwrap();
-            let ok = ccg.emit_set(context, list, idx.into_int_value(), elem, hugr_elem_ty)?;
-            args.outputs.finish(context.builder(), vec![list, ok])?;
+            let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+            let ok = ctx
+                .builder()
+                .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
+                .try_as_basic_value()
+                .unwrap_left()
+                .into_int_value();
+            let old_elem = build_load_i8_ptr(ctx, elem_ptr, elem.get_type())?;
+            let ok_or =
+                build_ok_or_else(ctx, ok, elem, hugr_elem_ty.clone(), old_elem, hugr_elem_ty)?;
+            args.outputs.finish(ctx.builder(), vec![list, ok_or])?;
         }
         ListOp::insert => {
             let [list, idx, elem] = args.inputs.try_into().unwrap();
-            let ok = ccg.emit_insert(context, list, idx.into_int_value(), elem, hugr_elem_ty)?;
-            args.outputs.finish(context.builder(), vec![list, ok])?;
+            let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+            let ok = ctx
+                .builder()
+                .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
+                .try_as_basic_value()
+                .unwrap_left()
+                .into_int_value();
+            let unit =
+                ctx.llvm_sum_type(SumType::new_unary(1))?
+                    .build_tag(ctx.builder(), 0, vec![])?;
+            let ok_or = build_ok_or_else(ctx, ok, unit, Type::UNIT, elem, hugr_elem_ty)?;
+            args.outputs.finish(ctx.builder(), vec![list, ok_or])?;
         }
         ListOp::length => {
             let [list] = args.inputs.try_into().unwrap();
-            let length = ccg.emit_length(context, list)?;
+            let length = ctx
+                .builder()
+                .build_call(func, &[list.into()], "")?
+                .try_as_basic_value()
+                .unwrap_left()
+                .into_int_value();
             args.outputs
-                .finish(context.builder(), vec![list, length.into()])?;
+                .finish(ctx.builder(), vec![list, length.into()])?;
         }
         _ => return Err(anyhow!("Collections: unimplemented op: {}", op.name())),
     }
     Ok(())
+}
+
+fn emit_list_value<'c, H: HugrView>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    ccg: &(impl CollectionsCodegen + 'c),
+    val: &ListValue,
+) -> Result<BasicValueEnum<'c>> {
+    let elem_ty = ctx.llvm_type(&val.get_type())?;
+    let iwc = ctx.typing_session().iw_context();
+    let capacity = iwc
+        .i64_type()
+        .const_int(val.get_contents().len() as u64, false);
+    let elem_size = elem_ty.size_of().unwrap();
+    let alignment = iwc.i64_type().const_int(8, false);
+    // TODO: Lookup destructor for elem_ty
+    let destructor = iwc.i8_type().ptr_type(AddressSpace::default()).const_null();
+    let list = ctx
+        .builder()
+        .build_call(
+            CollectionsRtFunc::New.get_extern(ctx, ccg)?,
+            &[
+                capacity.into(),
+                elem_size.into(),
+                alignment.into(),
+                destructor.into(),
+            ],
+            "",
+        )?
+        .try_as_basic_value()
+        .unwrap_left();
+    // Push elements onto the list
+    let rt_push = CollectionsRtFunc::Push.get_extern(ctx, ccg)?;
+    for v in val.get_contents() {
+        let elem = emit_value(ctx, v)?;
+        let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+        ctx.builder()
+            .build_call(rt_push, &[list.into(), elem_ptr.into()], "")?;
+    }
+    Ok(list)
 }
 
 /// Add a [CollectionsCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
@@ -496,15 +397,7 @@ pub fn add_collections_extensions<'a, H: HugrView + 'a>(
     })
     .custom_const::<ListValue>({
         let ccg = ccg.clone();
-        move |ctx, k| {
-            let ty = ctx.llvm_type(&k.get_type())?;
-            let elems = k
-                .get_contents()
-                .iter()
-                .map(|v| emit_value(ctx, v))
-                .try_collect()?;
-            ccg.emit_const_list(ctx, elems, ty)
-        }
+        move |ctx, k| emit_list_value(ctx, &ccg, k)
     })
     .simple_extension_op::<ListOp>(move |ctx, args, op| emit_list_op(ctx, &ccg, args, op))
 }
