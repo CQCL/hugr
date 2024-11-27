@@ -124,10 +124,10 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Panics
     ///
-    /// If the node is not in the graph.
+    /// If the node is not in the graph, or if the node is the root node.
     #[inline]
     fn remove_node(&mut self, node: Node) -> OpType {
-        panic_invalid_node(self, node);
+        panic_invalid_non_root(self, node);
         self.hugr_mut().remove_node(node)
     }
 
