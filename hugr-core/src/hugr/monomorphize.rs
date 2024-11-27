@@ -16,13 +16,12 @@ pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
 }
 
 struct Instantiating<'a> {
-    poly_func: Node,
     subst: &'a Substitution<'a>,
     target_container: Node,
     node_map: &'a mut HashMap<Node, Node>,
 }
 
-type Instantiations = HashMap<(Node, Vec<TypeArg>), Node>;
+type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 
 fn mono_scan(
     h: &mut Hugr,
@@ -31,21 +30,6 @@ fn mono_scan(
     cache: &mut Instantiations,
     reg: &ExtensionRegistry,
 ) {
-    if let Some(Instantiating { poly_func, .. }) = subst_into {
-        // First flatten: move all FuncDefns (which do not refer to the TypeParams
-        // being substituted) to be siblings of the enclosing FuncDefn.
-        // TODO/PERF: we should do this only the first time we see each polymorphic FuncDefn.
-        let outer_name = h.get_optype(*poly_func).as_func_defn().unwrap().name.clone();
-        for ch in h.children(parent).collect::<Vec<_>>() {
-            if let OpType::FuncDefn(fd) = h.op_types.get_mut(ch.pg_index()) {
-                // Lift the FuncDefn out
-                fd.name = mangle_inner_func(&outer_name, &fd.name);
-                h.move_after_sibling(ch, *poly_func);
-            }
-        }
-        // Since one can only call up the hierarchy,
-        // that means we've moved FuncDefns before we encounter any Calls to them
-    }
     for old_ch in h.children(parent).collect::<Vec<_>>() {
         let ch_op = h.get_optype(old_ch);
         if let Some(fd) = ch_op.as_func_defn() {
@@ -64,7 +48,7 @@ fn mono_scan(
                 old_ch,
                 Some(&mut Instantiating {
                     target_container: new_ch,
-                    node_map: inst.node_map,   // &mut ref, so borrow
+                    node_map: inst.node_map, // &mut ref, so borrow
                     ..**inst
                 }),
                 cache,
@@ -101,7 +85,22 @@ fn instantiate(
     cache: &mut Instantiations,
     reg: &ExtensionRegistry,
 ) -> Node {
-    let ve = match cache.entry((poly_func, type_args.clone())) {
+    let for_func = cache.entry(poly_func).or_insert_with(|| {
+        // First time we've instantiated poly_func. Lift any nested FuncDefn's out to the same level.
+        let outer_name = h.get_optype(poly_func).as_func_defn().unwrap().name.clone();
+        let mut to_scan = Vec::from_iter(h.children(poly_func));
+        while let Some(n) = to_scan.pop() {
+            if let OpType::FuncDefn(fd) = h.op_types.get_mut(n.pg_index()) {
+                fd.name = mangle_inner_func(&outer_name, &fd.name);
+                h.move_after_sibling(n, poly_func);
+            } else {
+                to_scan.extend(h.children(n))
+            }
+        }
+        HashMap::new()
+    });
+
+    let ve = match for_func.entry(type_args.clone()) {
         Entry::Occupied(n) => return *n.get(),
         Entry::Vacant(ve) => ve,
     };
@@ -125,7 +124,6 @@ fn instantiate(
         h,
         poly_func,
         Some(&mut Instantiating {
-            poly_func,
             subst: &Substitution::new(&type_args, reg),
             target_container: mono_tgt,
             node_map: &mut node_map,
