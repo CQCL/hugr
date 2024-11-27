@@ -10,7 +10,7 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
@@ -31,7 +31,7 @@ use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
 
-use monomorphize::mono_scan;
+pub use monomorphize::monomorphize;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -169,14 +169,6 @@ impl Hugr {
         }
         infer(self, self.root(), remove)?;
         Ok(())
-    }
-
-    /// Destructively substitutes [Type Variables](crate::types::Type::Variable) (also [TypeArg::Variable])
-    /// given a new value for each.
-    pub fn monomorphize(mut self, reg: &ExtensionRegistry) -> Self {
-        let root = self.root(); // I.e. "all monomorphic funcs" for Module-Rooted Hugrs...right?
-        mono_scan(&mut self, root, None, &mut HashMap::new(), reg);
-        self
     }
 }
 
