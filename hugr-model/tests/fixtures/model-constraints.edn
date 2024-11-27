@@ -4,10 +4,10 @@
   (forall ?t type)
   (forall ?n nat)
   (where (nonlinear ?t))
-  [?t] [(@ array.Array ?t ?n)]
+  [?t] [(@ prelude.Array ?t ?n)]
   (ext))
 
 (declare-func array.copy
   (forall ?t type)
   (where (nonlinear ?t))
-  [(@ array.Array ?t)] [(@ array.Array ?t) (@ array.Array ?t)] (ext))
+  [(@ prelude.Array ?t)] [(@ prelude.Array ?t) (@ prelude.Array ?t)] (ext))

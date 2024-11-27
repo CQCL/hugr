@@ -535,17 +535,14 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
 mod test {
     use crate::{
         extension::{
-            prelude::{Noop, USIZE_T},
+            prelude::{usize_t, Noop},
             PRELUDE_REGISTRY,
         },
-        macros::type_row,
         ops::{self, dataflow::IOTrait, FuncDefn, Input, Output},
-        types::{Signature, Type},
+        types::Signature,
     };
 
     use super::*;
-
-    const NAT: Type = USIZE_T;
 
     #[test]
     fn simple_function() -> Result<(), Box<dyn std::error::Error>> {
@@ -559,16 +556,16 @@ mod test {
             module,
             ops::FuncDefn {
                 name: "main".into(),
-                signature: Signature::new(type_row![NAT], type_row![NAT, NAT])
+                signature: Signature::new(vec![usize_t()], vec![usize_t(), usize_t()])
                     .with_prelude()
                     .into(),
             },
         );
 
         {
-            let f_in = hugr.add_node_with_parent(f, ops::Input::new(type_row![NAT]));
-            let f_out = hugr.add_node_with_parent(f, ops::Output::new(type_row![NAT, NAT]));
-            let noop = hugr.add_node_with_parent(f, Noop(NAT));
+            let f_in = hugr.add_node_with_parent(f, ops::Input::new(vec![usize_t()]));
+            let f_out = hugr.add_node_with_parent(f, ops::Output::new(vec![usize_t(), usize_t()]));
+            let noop = hugr.add_node_with_parent(f, Noop(usize_t()));
 
             hugr.connect(f_in, 0, noop, 0);
             hugr.connect(noop, 0, f_out, 0);
@@ -608,11 +605,11 @@ mod test {
                 root,
                 FuncDefn {
                     name: name.to_string(),
-                    signature: Signature::new_endo(NAT).into(),
+                    signature: Signature::new_endo(usize_t()).into(),
                 },
             );
-            let inp = hugr.add_node_with_parent(fd, Input::new(NAT));
-            let out = hugr.add_node_with_parent(fd, Output::new(NAT));
+            let inp = hugr.add_node_with_parent(fd, Input::new(usize_t()));
+            let out = hugr.add_node_with_parent(fd, Output::new(usize_t()));
             hugr.connect(inp, 0, out, 0);
             fd
         });

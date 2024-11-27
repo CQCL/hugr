@@ -32,6 +32,7 @@ pub fn int_custom_type(width_arg: impl Into<TypeArg>) -> CustomType {
         [width_arg.into()],
         EXTENSION_ID,
         TypeBound::Copyable,
+        &Arc::<Extension>::downgrade(&EXTENSION),
     )
 }
 
@@ -187,7 +188,7 @@ impl CustomConst for ConstInt {
 }
 
 /// Extension for basic integer types.
-pub fn extension() -> Arc<Extension> {
+fn extension() -> Arc<Extension> {
     Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
         extension
             .add_type(

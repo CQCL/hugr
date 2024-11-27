@@ -28,17 +28,17 @@
 //! a simple quantum extension and then use the [[builder::DFGBuilder]] as follows:
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
-//! use hugr::extension::prelude::{BOOL_T, QB_T};
+//! use hugr::extension::prelude::{bool_t, qb_t};
 //! use hugr::hugr::Hugr;
 //! use hugr::type_row;
 //! use hugr::types::FuncValueType;
 //!
-//! // The type of qubits, `QB_T` is in the prelude but, by default, no gateset
+//! // The type of qubits, `qb_t()` is in the prelude but, by default, no gateset
 //! // is defined. This module provides Hadamard and CX gates.
 //! mod mini_quantum_extension {
 //!     use hugr::{
 //!         extension::{
-//!             prelude::{BOOL_T, QB_T},
+//!             prelude::{bool_t, qb_t},
 //!             ExtensionId, ExtensionRegistry, PRELUDE, Version,
 //!         },
 //!         ops::{ExtensionOp, OpName},
@@ -51,11 +51,11 @@
 //!     use lazy_static::lazy_static;
 //!
 //!     fn one_qb_func() -> PolyFuncTypeRV {
-//!         FuncValueType::new_endo(type_row![QB_T]).into()
+//!         FuncValueType::new_endo(vec![qb_t()]).into()
 //!     }
 //!
 //!     fn two_qb_func() -> PolyFuncTypeRV {
-//!         FuncValueType::new_endo(type_row![QB_T, QB_T]).into()
+//!         FuncValueType::new_endo(vec![qb_t(), qb_t()]).into()
 //!     }
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
@@ -71,7 +71,7 @@
 //!             ext.add_op(
 //!                 OpName::new_inline("Measure"),
 //!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-//!                 FuncValueType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+//!                 FuncValueType::new(vec![qb_t()], vec![qb_t(), bool_t()]),
 //!                 extension_ref,
 //!             )
 //!             .unwrap();
@@ -113,8 +113,8 @@
 //! // c:              ╚═
 //! fn make_dfg_hugr() -> Result<Hugr, BuildError> {
 //!     let mut dfg_builder = DFGBuilder::new(inout_sig(
-//!         type_row![QB_T, QB_T],
-//!         type_row![QB_T, QB_T, BOOL_T],
+//!         vec![qb_t(), qb_t()],
+//!         vec![qb_t(), qb_t(), bool_t()],
 //!     ))?;
 //!     let [wire0, wire1] = dfg_builder.input_wires_arr();
 //!     let h0 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;

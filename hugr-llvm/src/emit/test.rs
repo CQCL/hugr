@@ -250,7 +250,7 @@ mod test_fns {
 
     use hugr_core::builder::DataflowSubContainer;
     use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
-    use hugr_core::extension::prelude::{ConstUsize, BOOL_T, USIZE_T};
+    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize};
     use hugr_core::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use hugr_core::ops::constant::CustomConst;
 
@@ -378,8 +378,8 @@ mod test_fns {
 
         let mut mod_b = ModuleBuilder::new();
         build_recursive(&mut mod_b, "main_void", type_row![]);
-        build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
-        build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
+        build_recursive(&mut mod_b, "main_unary", vec![bool_t()].into());
+        build_recursive(&mut mod_b, "main_binary", vec![bool_t(), bool_t()].into());
         let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
         check_emission!(hugr, llvm_ctx);
     }
@@ -400,8 +400,8 @@ mod test_fns {
 
         let mut mod_b = ModuleBuilder::new();
         build_recursive(&mut mod_b, "main_void", type_row![]);
-        build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
-        build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
+        build_recursive(&mut mod_b, "main_unary", vec![bool_t()].into());
+        build_recursive(&mut mod_b, "main_binary", vec![bool_t(), bool_t()].into());
         let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
         check_emission!(hugr, llvm_ctx);
     }
@@ -467,16 +467,19 @@ mod test_fns {
     #[rstest]
     fn diverse_dfg_children(llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(BOOL_T)
+            .with_outs(bool_t())
             .finish(|mut builder: DFGW| {
                 let [r] = {
                     let mut builder = builder
-                        .dfg_builder(HugrFuncType::new(type_row![], BOOL_T), [])
+                        .dfg_builder(HugrFuncType::new(type_row![], bool_t()), [])
                         .unwrap();
                     let konst = builder.add_constant(Value::false_val());
                     let func = {
                         let mut builder = builder
-                            .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
+                            .define_function(
+                                "scoped_func",
+                                HugrFuncType::new(type_row![], bool_t()),
+                            )
                             .unwrap();
                         let w = builder.load_const(&konst);
                         builder.finish_with_outputs([w]).unwrap()
@@ -495,21 +498,24 @@ mod test_fns {
     #[rstest]
     fn diverse_cfg_children(llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(BOOL_T)
+            .with_outs(bool_t())
             .finish(|mut builder: DFGW| {
                 let [r] = {
-                    let mut builder = builder.cfg_builder([], type_row![BOOL_T]).unwrap();
+                    let mut builder = builder.cfg_builder([], vec![bool_t()].into()).unwrap();
                     let konst = builder.add_constant(Value::false_val());
                     let func = {
                         let mut builder = builder
-                            .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
+                            .define_function(
+                                "scoped_func",
+                                HugrFuncType::new(type_row![], bool_t()),
+                            )
                             .unwrap();
                         let w = builder.load_const(&konst);
                         builder.finish_with_outputs([w]).unwrap()
                     };
                     let entry = {
                         let mut builder = builder
-                            .entry_builder([type_row![]], type_row![BOOL_T])
+                            .entry_builder([type_row![]], vec![bool_t()].into())
                             .unwrap();
                         let control = builder.add_load_value(Value::unary_unit_sum());
                         let [r] = builder
@@ -554,7 +560,7 @@ mod test_fns {
     #[rstest]
     fn test_exec(mut exec_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(ConstUsize::new(42));

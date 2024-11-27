@@ -127,6 +127,7 @@ impl TypeDef {
             args,
             self.extension_id().clone(),
             bound,
+            &self.extension_ref,
         ))
     }
     /// The [`TypeBound`] of the definition.
@@ -223,9 +224,9 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::{QB_T, USIZE_T};
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::SignatureError;
-    use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
+    use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{Signature, Type, TypeBound};
 
@@ -251,15 +252,15 @@ mod test {
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(def.instantiate([USIZE_T.into()]).unwrap());
+        let typ2 = Type::new_extension(def.instantiate([usize_t().into()]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Copyable);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate([TypeArg::Type { ty: QB_T }]),
+            def.instantiate([TypeArg::Type { ty: qb_t() }]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    arg: TypeArg::Type { ty: QB_T },
+                    arg: TypeArg::Type { ty: qb_t() },
                     param: TypeBound::Copyable.into()
                 }
             ))
@@ -272,8 +273,8 @@ mod test {
         // Too many arguments:
         assert_eq!(
             def.instantiate([
-                TypeArg::Type { ty: FLOAT64_TYPE },
-                TypeArg::Type { ty: FLOAT64_TYPE },
+                TypeArg::Type { ty: float64_type() },
+                TypeArg::Type { ty: float64_type() },
             ])
             .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))

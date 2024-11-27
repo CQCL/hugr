@@ -150,11 +150,12 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
 #[cfg(test)]
 pub(crate) mod test {
     use std::num::NonZeroU64;
+    use std::sync::Arc;
 
     use cool_asserts::assert_matches;
     use lazy_static::lazy_static;
 
-    use crate::extension::prelude::{BOOL_T, PRELUDE_ID, USIZE_T};
+    use crate::extension::prelude::{bool_t, usize_t, PRELUDE_ID};
     use crate::extension::{
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, EMPTY_REG, PRELUDE,
         PRELUDE_REGISTRY,
@@ -193,20 +194,20 @@ pub(crate) mod test {
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let list_len = PolyFuncTypeBase::new_validated(
             [TypeBound::Any.into()],
-            Signature::new(vec![list_of_var], vec![USIZE_T]),
+            Signature::new(vec![list_of_var], vec![usize_t()]),
             &REGISTRY,
         )?;
 
-        let t = list_len.instantiate(&[TypeArg::Type { ty: USIZE_T }], &REGISTRY)?;
+        let t = list_len.instantiate(&[TypeArg::Type { ty: usize_t() }], &REGISTRY)?;
         assert_eq!(
             t,
             Signature::new(
                 vec![Type::new_extension(
                     list_def
-                        .instantiate([TypeArg::Type { ty: USIZE_T }])
+                        .instantiate([TypeArg::Type { ty: usize_t() }])
                         .unwrap()
                 )],
-                vec![USIZE_T]
+                vec![usize_t()]
             )
         );
 
@@ -230,12 +231,18 @@ pub(crate) mod test {
 
         // Sanity check (good args)
         good_ts.instantiate(
-            &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
+            &[
+                TypeArg::BoundedNat { n: 5 },
+                TypeArg::Type { ty: usize_t() },
+            ],
             &PRELUDE_REGISTRY,
         )?;
 
         let wrong_args = good_ts.instantiate(
-            &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
+            &[
+                TypeArg::Type { ty: usize_t() },
+                TypeArg::BoundedNat { n: 5 },
+            ],
             &PRELUDE_REGISTRY,
         );
         assert_eq!(
@@ -243,7 +250,7 @@ pub(crate) mod test {
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
                     param: typarams[0].clone(),
-                    arg: TypeArg::Type { ty: USIZE_T }
+                    arg: TypeArg::Type { ty: usize_t() }
                 }
             ))
         );
@@ -263,6 +270,7 @@ pub(crate) mod test {
             [szvar, tyvar],
             PRELUDE_ID,
             TypeBound::Any,
+            &Arc::downgrade(&PRELUDE),
         ));
         let bad_ts = PolyFuncTypeBase::new_validated(
             typarams.clone(),
@@ -332,7 +340,7 @@ pub(crate) mod test {
             .unwrap();
         });
 
-        let reg = ExtensionRegistry::try_new([ext]).unwrap();
+        let reg = ExtensionRegistry::try_new([ext.clone()]).unwrap();
 
         let make_scheme = |tp: TypeParam| {
             PolyFuncTypeBase::new_validated(
@@ -342,6 +350,7 @@ pub(crate) mod test {
                     [TypeArg::new_var_use(0, tp)],
                     EXT_ID,
                     TypeBound::Any,
+                    &Arc::downgrade(&ext),
                 ))),
                 &reg,
             )
@@ -403,7 +412,7 @@ pub(crate) mod test {
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
             FuncValueType::new(
-                vec![USIZE_T],
+                vec![usize_t()],
                 vec![TypeRV::new_row_var_use(0, TypeBound::Copyable)],
             ),
             &PRELUDE_REGISTRY,
@@ -432,7 +441,7 @@ pub(crate) mod test {
         let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::new_list(TP_ANY)],
             FuncValueType::new(
-                vec![USIZE_T.into(), rty.clone()],
+                vec![usize_t().into(), rty.clone()],
                 vec![TypeRV::new_tuple(rty)],
             ),
             &PRELUDE_REGISTRY,
@@ -440,13 +449,13 @@ pub(crate) mod test {
         .unwrap();
 
         fn seq2() -> Vec<TypeArg> {
-            vec![USIZE_T.into(), BOOL_T.into()]
+            vec![usize_t().into(), bool_t().into()]
         }
-        pf.instantiate(&[TypeArg::Type { ty: USIZE_T }], &PRELUDE_REGISTRY)
+        pf.instantiate(&[TypeArg::Type { ty: usize_t() }], &PRELUDE_REGISTRY)
             .unwrap_err();
         pf.instantiate(
             &[TypeArg::Sequence {
-                elems: vec![USIZE_T.into(), TypeArg::Sequence { elems: seq2() }],
+                elems: vec![usize_t().into(), TypeArg::Sequence { elems: seq2() }],
             }],
             &PRELUDE_REGISTRY,
         )
@@ -458,8 +467,8 @@ pub(crate) mod test {
         assert_eq!(
             t2,
             Signature::new(
-                vec![USIZE_T, USIZE_T, BOOL_T],
-                vec![Type::new_tuple(vec![USIZE_T, BOOL_T])]
+                vec![usize_t(), usize_t(), bool_t()],
+                vec![Type::new_tuple(vec![usize_t(), bool_t()])]
             )
         );
     }
@@ -476,23 +485,23 @@ pub(crate) mod test {
                     b: TypeBound::Copyable,
                 }),
             }],
-            Signature::new(vec![USIZE_T, inner_fty.clone()], vec![inner_fty]),
+            Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
             &PRELUDE_REGISTRY,
         )
         .unwrap();
 
-        let inner3 = Type::new_function(Signature::new_endo(vec![USIZE_T, BOOL_T, USIZE_T]));
+        let inner3 = Type::new_function(Signature::new_endo(vec![usize_t(), bool_t(), usize_t()]));
         let t3 = pf
             .instantiate(
                 &[TypeArg::Sequence {
-                    elems: vec![USIZE_T.into(), BOOL_T.into(), USIZE_T.into()],
+                    elems: vec![usize_t().into(), bool_t().into(), usize_t().into()],
                 }],
                 &PRELUDE_REGISTRY,
             )
             .unwrap();
         assert_eq!(
             t3,
-            Signature::new(vec![USIZE_T, inner3.clone()], vec![inner3])
+            Signature::new(vec![usize_t(), inner3.clone()], vec![inner3])
         );
     }
 }

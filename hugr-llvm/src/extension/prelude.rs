@@ -1,10 +1,10 @@
 use anyhow::{anyhow, bail, ensure, Ok, Result};
+use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
 use hugr_core::{
     extension::{
         prelude::{
-            self, ArrayOp, ArrayOpDef, ConstError, ConstExternalSymbol, ConstString, ConstUsize,
-            MakeTuple, TupleOpDef, UnpackTuple, ARRAY_TYPE_NAME, ERROR_CUSTOM_TYPE, ERROR_TYPE,
-            STRING_CUSTOM_TYPE,
+            self, error_type, ArrayOp, ArrayOpDef, ConstError, ConstExternalSymbol, ConstString,
+            ConstUsize, MakeTuple, TupleOpDef, UnpackTuple, ARRAY_TYPE_NAME,
         },
         simple_op::MakeExtensionOp as _,
     },
@@ -39,18 +39,18 @@ pub mod array;
 /// a trivial implementation of this trait which delegates everything to those
 /// default implementations.
 pub trait PreludeCodegen: Clone {
-    /// Return the llvm type of [hugr_core::extension::prelude::USIZE_T]. That type
+    /// Return the llvm type of [hugr_core::extension::prelude::usize_t]. That type
     /// must be an [IntType].
     fn usize_type<'c>(&self, session: &TypingSession<'c, '_>) -> IntType<'c> {
         session.iw_context().i64_type()
     }
 
-    /// Return the llvm type of [hugr_core::extension::prelude::QB_T].
+    /// Return the llvm type of [hugr_core::extension::prelude::qb_t].
     fn qubit_type<'c>(&self, session: &TypingSession<'c, '_>) -> impl BasicType<'c> {
         session.iw_context().i16_type()
     }
 
-    /// Return the llvm type of [hugr_core::extension::prelude::ERROR_TYPE].
+    /// Return the llvm type of [hugr_core::extension::prelude::error_type()].
     ///
     /// The returned type must always match the type of the returned value of
     /// [Self::emit_const_error], and the `err` argument of [Self::emit_panic].
@@ -114,7 +114,7 @@ pub trait PreludeCodegen: Clone {
         err: &ConstError,
     ) -> Result<BasicValueEnum<'c>> {
         let builder = ctx.builder();
-        let err_ty = ctx.llvm_type(&ERROR_TYPE)?.into_struct_type();
+        let err_ty = ctx.llvm_type(&error_type())?.into_struct_type();
         let signal = err_ty
             .get_field_type_at_index(0)
             .unwrap()
@@ -222,7 +222,7 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.usize_type(&ts).as_basic_type_enum())
     })
-    .custom_type((prelude::PRELUDE_ID, STRING_CUSTOM_TYPE.name().clone()), {
+    .custom_type((prelude::PRELUDE_ID, STRING_TYPE_NAME.clone()), {
         move |ts, _| {
             // TODO allow customising string type
             Ok(ts
@@ -232,7 +232,7 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
                 .into())
         }
     })
-    .custom_type((prelude::PRELUDE_ID, ERROR_CUSTOM_TYPE.name().clone()), {
+    .custom_type((prelude::PRELUDE_ID, ERROR_TYPE_NAME.clone()), {
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.error_type(&ts)?.as_basic_type_enum())
     })
@@ -347,7 +347,7 @@ mod test {
     use hugr_core::extension::{PRELUDE, PRELUDE_REGISTRY};
     use hugr_core::types::{Type, TypeArg};
     use hugr_core::{type_row, Hugr};
-    use prelude::{BOOL_T, PANIC_OP_ID, PRINT_OP_ID, QB_T, USIZE_T};
+    use prelude::{bool_t, qb_t, usize_t, PANIC_OP_ID, PRINT_OP_ID};
     use rstest::rstest;
 
     use crate::check_emission;
@@ -381,11 +381,11 @@ mod test {
 
         assert_eq!(
             iw_context.i32_type().as_basic_type_enum(),
-            session.llvm_type(&USIZE_T).unwrap()
+            session.llvm_type(&usize_t()).unwrap()
         );
         assert_eq!(
             iw_context.f64_type().as_basic_type_enum(),
-            session.llvm_type(&QB_T).unwrap()
+            session.llvm_type(&qb_t()).unwrap()
         );
     }
 
@@ -395,11 +395,11 @@ mod test {
         let tc = llvm_ctx.get_typing_session();
         assert_eq!(
             llvm_ctx.iw_context().i32_type().as_basic_type_enum(),
-            tc.llvm_type(&USIZE_T).unwrap()
+            tc.llvm_type(&usize_t()).unwrap()
         );
         assert_eq!(
             llvm_ctx.iw_context().f64_type().as_basic_type_enum(),
-            tc.llvm_type(&QB_T).unwrap()
+            tc.llvm_type(&qb_t()).unwrap()
         );
     }
 
@@ -412,7 +412,7 @@ mod test {
     #[rstest]
     fn prelude_const_usize(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(17));
@@ -423,10 +423,13 @@ mod test {
 
     #[rstest]
     fn prelude_const_external_symbol(prelude_llvm_ctx: TestContext) {
-        let konst1 = ConstExternalSymbol::new("sym1", USIZE_T, true);
+        let konst1 = ConstExternalSymbol::new("sym1", usize_t(), true);
         let konst2 = ConstExternalSymbol::new(
             "sym2",
-            HugrType::new_sum([type_row![USIZE_T, HugrType::new_unit_sum(3)], type_row![]]),
+            HugrType::new_sum([
+                vec![usize_t(), HugrType::new_unit_sum(3)].into(),
+                type_row![],
+            ]),
             false,
         );
 
@@ -444,8 +447,8 @@ mod test {
     #[rstest]
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(vec![BOOL_T, BOOL_T])
-            .with_outs(Type::new_tuple(vec![BOOL_T, BOOL_T]))
+            .with_ins(vec![bool_t(), bool_t()])
+            .with_outs(Type::new_tuple(vec![bool_t(), bool_t()]))
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -458,13 +461,13 @@ mod test {
     #[rstest]
     fn prelude_unpack_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(Type::new_tuple(vec![BOOL_T, BOOL_T]))
-            .with_outs(vec![BOOL_T, BOOL_T])
+            .with_ins(Type::new_tuple(vec![bool_t(), bool_t()]))
+            .with_outs(vec![bool_t(), bool_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let unpack = builder
                     .add_dataflow_op(
-                        UnpackTuple::new(vec![BOOL_T, BOOL_T].into()),
+                        UnpackTuple::new(vec![bool_t(), bool_t()].into()),
                         builder.input_wires(),
                     )
                     .unwrap();
@@ -476,9 +479,9 @@ mod test {
     #[rstest]
     fn prelude_panic(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "PANIC");
-        const TYPE_ARG_Q: TypeArg = TypeArg::Type { ty: QB_T };
+        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
         let type_arg_2q: TypeArg = TypeArg::Sequence {
-            elems: vec![TYPE_ARG_Q, TYPE_ARG_Q],
+            elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE
             .instantiate_extension_op(
@@ -489,8 +492,8 @@ mod test {
             .unwrap();
 
         let hugr = SimpleHugrConfig::new()
-            .with_ins(vec![QB_T, QB_T])
-            .with_outs(vec![QB_T, QB_T])
+            .with_ins(vec![qb_t(), qb_t()])
+            .with_outs(vec![qb_t(), qb_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let [q0, q1] = builder.input_wires_arr();

@@ -1,7 +1,7 @@
 use crate::const_fold::constant_fold_pass;
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{
-    const_ok, sum_with_error, ConstError, ConstString, UnpackTuple, BOOL_T, ERROR_TYPE, STRING_TYPE,
+    bool_t, const_ok, error_type, string_type, sum_with_error, ConstError, ConstString, UnpackTuple,
 };
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::ops::Value;
@@ -21,7 +21,7 @@ use hugr_core::builder::Container;
 use hugr_core::ops::OpType;
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr_core::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
+use hugr_core::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
 
 /// Check that a hugr just loads and returns a single expected constant.
 pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
@@ -93,7 +93,7 @@ fn test_big() {
 
     let unpack = build
         .add_dataflow_op(
-            UnpackTuple::new(type_row![FLOAT64_TYPE, FLOAT64_TYPE]),
+            UnpackTuple::new(vec![float64_type(), float64_type()].into()),
             [tup],
         )
         .unwrap();
@@ -120,7 +120,7 @@ fn test_big() {
 
     constant_fold_pass(&mut h, &reg);
 
-    let expected = const_ok(i2c(2).clone(), ERROR_TYPE);
+    let expected = const_ok(i2c(2).clone(), error_type());
     assert_fully_folded(&h, &expected);
 }
 
@@ -136,7 +136,7 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         collections::EXTENSION.to_owned(),
     ])
     .unwrap();
-    let base_list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
+    let base_list: Value = ListValue::new(bool_t(), [Value::false_val()]).into();
     let mut build = DFGBuilder::new(Signature::new(
         type_row![],
         vec![base_list.get_type().clone()],
@@ -147,18 +147,21 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     let [list, maybe_elem] = build
         .add_dataflow_op(
-            ListOp::pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
+            ListOp::pop
+                .with_type(bool_t())
+                .to_extension_op(&reg)
+                .unwrap(),
             [list],
         )?
         .outputs_arr();
 
-    // FIXME: Unwrap the Option<BOOL_T>
+    // FIXME: Unwrap the Option<bool_t>
     let elem = maybe_elem;
 
     let [list] = build
         .add_dataflow_op(
             ListOp::push
-                .with_type(BOOL_T)
+                .with_type(bool_t())
                 .to_extension_op(&reg)
                 .unwrap(),
             [list, elem],
@@ -179,7 +182,7 @@ fn test_fold_and() {
     // x0, x1 := bool(true), bool(true)
     // x2 := and(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(BOOL_T)).unwrap();
+    let mut build = DFGBuilder::new(noargfn(bool_t())).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::true_val());
     let x2 = build.add_dataflow_op(LogicOp::And, [x0, x1]).unwrap();
@@ -197,7 +200,7 @@ fn test_fold_or() {
     // x0, x1 := bool(true), bool(false)
     // x2 := or(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(BOOL_T)).unwrap();
+    let mut build = DFGBuilder::new(noargfn(bool_t())).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::false_val());
     let x2 = build.add_dataflow_op(LogicOp::Or, [x0, x1]).unwrap();
@@ -215,7 +218,7 @@ fn test_fold_not() {
     // x0 := bool(true)
     // x1 := not(x0)
     // output x1 == false;
-    let mut build = DFGBuilder::new(noargfn(BOOL_T)).unwrap();
+    let mut build = DFGBuilder::new(noargfn(bool_t())).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_dataflow_op(LogicOp::Not, [x0]).unwrap();
     let reg =
@@ -238,7 +241,7 @@ fn orphan_output() {
     // with no outputs.
     use hugr_core::ops::handle::NodeHandle;
 
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let true_wire = build.add_load_value(Value::true_val());
     // this Not will be manually replaced
     let orig_not = build.add_dataflow_op(LogicOp::Not, [true_wire]).unwrap();
@@ -275,7 +278,7 @@ fn test_folding_pass_issue_996() {
     // x6 := flt(x0, x5) // false
     // x7 := or(x4, x6) // true
     // output x7
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstF64::new(3.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(4.0)));
     let x2 = build.add_dataflow_op(FloatOps::fne, [x0, x1]).unwrap();
@@ -309,7 +312,7 @@ fn test_const_fold_to_nonfinite() {
     .unwrap();
 
     // HUGR computing 1.0 / 1.0
-    let mut build = DFGBuilder::new(noargfn(vec![FLOAT64_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![float64_type()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
@@ -321,7 +324,7 @@ fn test_const_fold_to_nonfinite() {
     assert_eq!(h0.node_count(), 5);
 
     // HUGR computing 1.0 / 0.0
-    let mut build = DFGBuilder::new(noargfn(vec![FLOAT64_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![float64_type()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(0.0)));
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
@@ -430,7 +433,7 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
         };
     }
     let expected = if succeeds {
-        const_ok(mk_const(to_log_width, val).unwrap().into(), ERROR_TYPE)
+        const_ok(mk_const(to_log_width, val).unwrap().into(), error_type())
     } else {
         INARROW_ERROR_VALUE.clone().as_either(elem_type)
     };
@@ -444,7 +447,7 @@ fn test_fold_itobool() {
     // x0 := int_u<0>(1);
     // x1 := itobool(x0);
     // output x1 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(0, 1).unwrap()));
     let x1 = build
         .add_dataflow_op(ConvertOpDef::itobool.without_log_width(), [x0])
@@ -489,7 +492,7 @@ fn test_fold_ieq() {
     // x0, x1 := int_s<3>(-1), int_u<3>(255)
     // x2 := ieq(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(3, -1).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 255).unwrap()));
     let x2 = build
@@ -512,7 +515,7 @@ fn test_fold_ine() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ine(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -535,7 +538,7 @@ fn test_fold_ilt_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ilt_u(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -558,7 +561,7 @@ fn test_fold_ilt_s() {
     // x0, x1 := int_s<5>(3), int_s<5>(-4)
     // x2 := ilt_s(x0, x1)
     // output x2 == false;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -581,7 +584,7 @@ fn test_fold_igt_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ilt_u(x0, x1)
     // output x2 == false;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -604,7 +607,7 @@ fn test_fold_igt_s() {
     // x0, x1 := int_s<5>(3), int_s<5>(-4)
     // x2 := ilt_s(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -627,7 +630,7 @@ fn test_fold_ile_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(3)
     // x2 := ile_u(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
@@ -650,7 +653,7 @@ fn test_fold_ile_s() {
     // x0, x1 := int_s<5>(-4), int_s<5>(-4)
     // x2 := ile_s(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -673,7 +676,7 @@ fn test_fold_ige_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ilt_u(x0, x1)
     // output x2 == false;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -696,7 +699,7 @@ fn test_fold_ige_s() {
     // x0, x1 := int_s<5>(3), int_s<5>(-4)
     // x2 := ilt_s(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -1429,7 +1432,7 @@ fn test_fold_itostring_u() {
     // x0 := int_u<5>(17);
     // x1 := itostring_u(x0);
     // output x2 := "17";
-    let mut build = DFGBuilder::new(noargfn(vec![STRING_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![string_type()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 17).unwrap()));
     let x1 = build
         .add_dataflow_op(ConvertOpDef::itostring_u.with_log_width(5), [x0])
@@ -1451,7 +1454,7 @@ fn test_fold_itostring_s() {
     // x0 := int_s<5>(-17);
     // x1 := itostring_s(x0);
     // output x2 := "-17";
-    let mut build = DFGBuilder::new(noargfn(vec![STRING_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![string_type()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -17).unwrap()));
     let x1 = build
         .add_dataflow_op(ConvertOpDef::itostring_s.with_log_width(5), [x0])
@@ -1480,7 +1483,7 @@ fn test_fold_int_ops() {
     // x6 := ilt_s(x0, x5) // false
     // x7 := or(x4, x6) // true
     // output x7
-    let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build

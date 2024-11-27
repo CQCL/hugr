@@ -796,13 +796,12 @@ mod tests {
             ModuleBuilder,
         },
         extension::{
-            prelude::{BOOL_T, QB_T},
+            prelude::{bool_t, qb_t},
             EMPTY_REG,
         },
         hugr::views::{HierarchyView, SiblingGraph},
         ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::test::and_op,
-        type_row,
     };
 
     use super::*;
@@ -837,7 +836,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(type_row![QB_T, QB_T, QB_T])
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
                 .with_extension_delta(ExtensionSet::from_iter([
                     test_quantum_extension::EXTENSION_ID,
                     float_types::EXTENSION_ID,
@@ -870,7 +869,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(type_row![BOOL_T])
+            Signature::new_endo(vec![bool_t()])
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -892,7 +891,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new(BOOL_T, type_row![BOOL_T, BOOL_T])
+            Signature::new(bool_t(), vec![bool_t(), bool_t()])
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -914,7 +913,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(BOOL_T)
+            Signature::new_endo(bool_t())
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -956,7 +955,7 @@ mod tests {
 
         let empty_dfg = {
             let builder =
-                DFGBuilder::new(Signature::new_endo(type_row![QB_T, QB_T, QB_T])).unwrap();
+                DFGBuilder::new(Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -979,7 +978,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
         assert_eq!(
             sub.signature(&func),
-            Signature::new_endo(type_row![QB_T, QB_T, QB_T]).with_extension_delta(
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).with_extension_delta(
                 ExtensionSet::from_iter([
                     test_quantum_extension::EXTENSION_ID,
                     float_types::EXTENSION_ID,
@@ -996,7 +995,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -1157,8 +1156,8 @@ mod tests {
     #[test]
     fn edge_both_output_and_copy() {
         // https://github.com/CQCL/hugr/issues/518
-        let one_bit = type_row![BOOL_T];
-        let two_bit = type_row![BOOL_T, BOOL_T];
+        let one_bit = vec![bool_t()];
+        let two_bit = vec![bool_t(), bool_t()];
 
         let mut builder = DFGBuilder::new(inout_sig(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
