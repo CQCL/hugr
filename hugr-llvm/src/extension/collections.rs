@@ -205,7 +205,18 @@ impl<CCG: CollectionsCodegen> CodegenExtension for CollectionsCodegenExtension<C
     where
         Self: 'a,
     {
-        add_collections_extensions(builder, self.0)
+        builder
+            .custom_type((collections::EXTENSION_ID, collections::LIST_TYPENAME), {
+                let ccg = self.0.clone();
+                move |ts, _hugr_type| Ok(ccg.list_type(ts).as_basic_type_enum())
+            })
+            .custom_const::<ListValue>({
+                let ccg = self.0.clone();
+                move |ctx, k| emit_list_value(ctx, &ccg, k)
+            })
+            .simple_extension_op::<ListOp>(move |ctx, args, op| {
+                emit_list_op(ctx, &self.0, args, op)
+            })
     }
 }
 
@@ -353,23 +364,6 @@ fn emit_list_value<'c, H: HugrView>(
             .build_call(rt_push, &[list.into(), elem_ptr.into()], "")?;
     }
     Ok(list)
-}
-
-/// Add a [CollectionsCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
-/// as the implementation.
-pub fn add_collections_extensions<'a, H: HugrView + 'a>(
-    cem: CodegenExtsBuilder<'a, H>,
-    ccg: impl CollectionsCodegen + 'a,
-) -> CodegenExtsBuilder<'a, H> {
-    cem.custom_type((collections::EXTENSION_ID, collections::LIST_TYPENAME), {
-        let ccg = ccg.clone();
-        move |ts, _hugr_type| Ok(ccg.list_type(ts).as_basic_type_enum())
-    })
-    .custom_const::<ListValue>({
-        let ccg = ccg.clone();
-        move |ctx, k| emit_list_value(ctx, &ccg, k)
-    })
-    .simple_extension_op::<ListOp>(move |ctx, args, op| emit_list_op(ctx, &ccg, args, op))
 }
 
 #[cfg(test)]
