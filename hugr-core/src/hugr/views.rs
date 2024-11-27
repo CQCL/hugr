@@ -261,6 +261,12 @@ pub trait HugrView: HugrInternals {
     /// Return iterator over the direct children of node.
     fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone;
 
+    /// Returns the first child of the specified node (if it is a parent).
+    /// Useful because `x.children().next()` leaves x borrowed.
+    fn first_child(&self, node: Node) -> Option<Node> {
+        self.children(node).next()
+    }
+
     /// Iterates over neighbour nodes in the given direction.
     /// May contain duplicates if the graph has multiple links between nodes.
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone;

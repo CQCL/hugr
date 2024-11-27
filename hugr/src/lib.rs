@@ -61,25 +61,21 @@
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
 //!     pub const VERSION: Version = Version::new(0, 1, 0);
 //!     fn extension() -> Arc<Extension> {
-//!         let mut extension = Extension::new(EXTENSION_ID, VERSION);
+//!         Extension::new_arc(EXTENSION_ID, VERSION, |ext, extension_ref| {
+//!             ext.add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func(), extension_ref)
+//!                 .unwrap();
 //!
-//!         extension
-//!             .add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func())
-//!             .unwrap();
+//!             ext.add_op(OpName::new_inline("CX"), "CX".into(), two_qb_func(), extension_ref)
+//!                 .unwrap();
 //!
-//!         extension
-//!             .add_op(OpName::new_inline("CX"), "CX".into(), two_qb_func())
-//!             .unwrap();
-//!
-//!         extension
-//!             .add_op(
+//!             ext.add_op(
 //!                 OpName::new_inline("Measure"),
 //!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
 //!                 FuncValueType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+//!                 extension_ref,
 //!             )
 //!             .unwrap();
-//!
-//!         Arc::new(extension)
+//!         })
 //!     }
 //!
 //!     lazy_static! {

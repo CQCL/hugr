@@ -82,18 +82,17 @@ impl CustomConst for ConstF64 {
 lazy_static! {
     /// Extension defining the float type.
     pub static ref EXTENSION: Arc<Extension> = {
-        let mut extension = Extension::new(EXTENSION_ID, VERSION);
-
-        extension
-            .add_type(
-                FLOAT_TYPE_ID,
-                vec![],
-                "64-bit IEEE 754-2019 floating-point value".to_owned(),
-                TypeBound::Copyable.into(),
-            )
-            .unwrap();
-
-        Arc::new(extension)
+        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+            extension
+                .add_type(
+                    FLOAT_TYPE_ID,
+                    vec![],
+                    "64-bit IEEE 754-2019 floating-point value".to_owned(),
+                    TypeBound::Copyable.into(),
+                    extension_ref,
+                )
+                .unwrap();
+        })
     };
 }
 #[cfg(test)]

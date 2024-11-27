@@ -100,7 +100,7 @@ impl<'a, H: HugrView> ExtensionOpMap<'a, H> {
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     ) -> Result<()> {
         let node = args.node();
-        let key = (node.def().extension().clone(), node.def().name().clone());
+        let key = (node.def().extension_id().clone(), node.def().name().clone());
         let Some(handler) = self.0.get(&key) else {
             bail!("No extension could emit extension op: {key:?}")
         };

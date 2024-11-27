@@ -321,16 +321,18 @@ pub(crate) mod test {
         const EXT_ID: ExtensionId = ExtensionId::new_unchecked("my_ext");
         const TYPE_NAME: TypeName = TypeName::new_inline("MyType");
 
-        let mut e = Extension::new_test(EXT_ID);
-        e.add_type(
-            TYPE_NAME,
-            vec![bound.clone()],
-            "".into(),
-            TypeDefBound::any(),
-        )
-        .unwrap();
+        let ext = Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
+            ext.add_type(
+                TYPE_NAME,
+                vec![bound.clone()],
+                "".into(),
+                TypeDefBound::any(),
+                extension_ref,
+            )
+            .unwrap();
+        });
 
-        let reg = ExtensionRegistry::try_new([e.into()]).unwrap();
+        let reg = ExtensionRegistry::try_new([ext]).unwrap();
 
         let make_scheme = |tp: TypeParam| {
             PolyFuncTypeBase::new_validated(

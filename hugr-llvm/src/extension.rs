@@ -1,3 +1,4 @@
+pub mod collections;
 pub mod conversions;
 pub mod float;
 pub mod int;
