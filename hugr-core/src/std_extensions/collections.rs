@@ -60,6 +60,11 @@ impl ListValue {
         list_custom_type(self.1.clone())
     }
 
+    /// Returns the type of values inside the `[ListValue]`.
+    pub fn get_element_type(&self) -> &Type {
+        &self.1
+    }
+
     /// Returns the values contained inside the `[ListValue]`.
     pub fn get_contents(&self) -> &[Value] {
         &self.0

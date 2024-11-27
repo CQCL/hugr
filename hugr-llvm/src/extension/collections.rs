@@ -1,8 +1,6 @@
 use anyhow::{anyhow, bail, Ok, Result};
-use hugr_core::core::Either;
-use hugr_core::core::Either::{Left, Right};
 use hugr_core::{
-    ops::{constant::CustomConst, ExtensionOp, NamedOp},
+    ops::{ExtensionOp, NamedOp},
     std_extensions::collections::{self, ListOp, ListValue},
     types::{SumType, Type, TypeArg},
     HugrView,
@@ -111,8 +109,8 @@ impl From<ListOp> for CollectionsRtFunc {
     }
 }
 
-/// A helper trait for customising the lowering [hugr_core::std_extensions::collections]
-/// types, [CustomConst]s, and ops.
+/// A helper trait for customising the lowering of [hugr_core::std_extensions::collections]
+/// types, [hugr_core::ops::constant::CustomConst]s, and ops.
 pub trait CollectionsCodegen: Clone {
     /// Return the llvm type of [hugr_core::std_extensions::collections::LIST_TYPENAME].
     fn list_type<'c>(&self, session: TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
@@ -136,43 +134,6 @@ pub trait CollectionsCodegen: Clone {
         }
         .into()
     }
-}
-
-/// Helper function to allocate space on the stack for a given type.
-///
-/// Returns an i8 pointer to the allocated memory.
-fn build_alloca_i8_ptr<'c, H: HugrView>(
-    ctx: &mut EmitFuncContext<'c, '_, H>,
-    ty_or_val: Either<BasicTypeEnum<'c>, BasicValueEnum<'c>>,
-) -> Result<PointerValue<'c>> {
-    let builder = ctx.builder();
-    let ty = match ty_or_val {
-        Left(ty) => ty,
-        Right(val) => val.get_type(),
-    };
-    let ptr = builder.build_alloca(ty, "")?;
-
-    if let Right(val) = ty_or_val {
-        builder.build_store(ptr, val)?;
-    }
-    let i8_ptr = builder.build_pointer_cast(
-        ptr,
-        ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
-        "",
-    )?;
-    Ok(i8_ptr)
-}
-
-/// Helper function to load a value from an i8 pointer.
-fn build_load_i8_ptr<'c, H: HugrView>(
-    ctx: &mut EmitFuncContext<'c, '_, H>,
-    i8_ptr: PointerValue<'c>,
-    ty: BasicTypeEnum<'c>,
-) -> Result<BasicValueEnum<'c>> {
-    let builder = ctx.builder();
-    let ptr = builder.build_pointer_cast(i8_ptr, ty.ptr_type(AddressSpace::default()), "")?;
-    let val = builder.build_load(ptr, "")?;
-    Ok(val)
 }
 
 /// A trivial implementation of [CollectionsCodegen] which passes all methods
@@ -251,14 +212,14 @@ fn emit_list_op<'c, H: HugrView>(
     match op {
         ListOp::push => {
             let [list, elem] = args.inputs.try_into().unwrap();
-            let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+            let elem_ptr = build_alloca_i8_ptr(ctx, elem_ty, Some(elem))?;
             ctx.builder()
                 .build_call(func, &[list.into(), elem_ptr.into()], "")?;
             args.outputs.finish(ctx.builder(), vec![list])?;
         }
         ListOp::pop => {
             let [list] = args.inputs.try_into().unwrap();
-            let out_ptr = build_alloca_i8_ptr(ctx, Left(elem_ty))?;
+            let out_ptr = build_alloca_i8_ptr(ctx, elem_ty, None)?;
             let ok = ctx
                 .builder()
                 .build_call(func, &[list.into(), out_ptr.into()], "")?
@@ -271,7 +232,7 @@ fn emit_list_op<'c, H: HugrView>(
         }
         ListOp::get => {
             let [list, idx] = args.inputs.try_into().unwrap();
-            let out_ptr = build_alloca_i8_ptr(ctx, Left(elem_ty))?;
+            let out_ptr = build_alloca_i8_ptr(ctx, elem_ty, None)?;
             let ok = ctx
                 .builder()
                 .build_call(func, &[list.into(), idx.into(), out_ptr.into()], "")?
@@ -284,7 +245,7 @@ fn emit_list_op<'c, H: HugrView>(
         }
         ListOp::set => {
             let [list, idx, elem] = args.inputs.try_into().unwrap();
-            let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+            let elem_ptr = build_alloca_i8_ptr(ctx, elem_ty, Some(elem))?;
             let ok = ctx
                 .builder()
                 .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
@@ -298,7 +259,7 @@ fn emit_list_op<'c, H: HugrView>(
         }
         ListOp::insert => {
             let [list, idx, elem] = args.inputs.try_into().unwrap();
-            let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+            let elem_ptr = build_alloca_i8_ptr(ctx, elem_ty, Some(elem))?;
             let ok = ctx
                 .builder()
                 .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
@@ -332,7 +293,7 @@ fn emit_list_value<'c, H: HugrView>(
     ccg: &(impl CollectionsCodegen + 'c),
     val: &ListValue,
 ) -> Result<BasicValueEnum<'c>> {
-    let elem_ty = ctx.llvm_type(&val.get_type())?;
+    let elem_ty = ctx.llvm_type(val.get_element_type())?;
     let iwc = ctx.typing_session().iw_context();
     let capacity = iwc
         .i64_type()
@@ -359,11 +320,46 @@ fn emit_list_value<'c, H: HugrView>(
     let rt_push = CollectionsRtFunc::Push.get_extern(ctx, ccg)?;
     for v in val.get_contents() {
         let elem = emit_value(ctx, v)?;
-        let elem_ptr = build_alloca_i8_ptr(ctx, Right(elem))?;
+        let elem_ptr = build_alloca_i8_ptr(ctx, elem_ty, Some(elem))?;
         ctx.builder()
             .build_call(rt_push, &[list.into(), elem_ptr.into()], "")?;
     }
     Ok(list)
+}
+
+/// Helper function to allocate space on the stack for a given type.
+///
+/// Optionally also stores a value at that location.
+///
+/// Returns an i8 pointer to the allocated memory.
+fn build_alloca_i8_ptr<'c, H: HugrView>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    ty: BasicTypeEnum<'c>,
+    value: Option<BasicValueEnum<'c>>,
+) -> Result<PointerValue<'c>> {
+    let builder = ctx.builder();
+    let ptr = builder.build_alloca(ty, "")?;
+    if let Some(val) = value {
+        builder.build_store(ptr, val)?;
+    }
+    let i8_ptr = builder.build_pointer_cast(
+        ptr,
+        ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
+        "",
+    )?;
+    Ok(i8_ptr)
+}
+
+/// Helper function to load a value from an i8 pointer.
+fn build_load_i8_ptr<'c, H: HugrView>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    i8_ptr: PointerValue<'c>,
+    ty: BasicTypeEnum<'c>,
+) -> Result<BasicValueEnum<'c>> {
+    let builder = ctx.builder();
+    let ptr = builder.build_pointer_cast(i8_ptr, ty.ptr_type(AddressSpace::default()), "")?;
+    let val = builder.build_load(ptr, "")?;
+    Ok(val)
 }
 
 #[cfg(test)]

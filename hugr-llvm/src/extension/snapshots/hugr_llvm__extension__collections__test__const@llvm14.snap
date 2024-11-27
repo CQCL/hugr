@@ -1,6 +1,5 @@
 ---
 source: hugr-llvm/src/extension/collections.rs
-assertion_line: 592
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
@@ -11,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = call i8* @__rt__list__new(i64 3, i64 ptrtoint (i8** getelementptr (i8*, i8** null, i32 1) to i64), i64 8, i8* null)
+  %0 = call i8* @__rt__list__new(i64 3, i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 8, i8* null)
   %1 = alloca i64, align 8
   store i64 1, i64* %1, align 4
   %2 = bitcast i64* %1 to i8*
