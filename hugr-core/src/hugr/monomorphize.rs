@@ -31,17 +31,14 @@ fn mono_scan(
     cache: &mut Instantiations,
     reg: &ExtensionRegistry,
 ) {
-    if subst_into.is_some() {
+    if let Some(Instantiating { poly_func, .. }) = subst_into {
         // First flatten: move all FuncDefns (which do not refer to the TypeParams
         // being substituted) to be siblings of the enclosing FuncDefn.
         // TODO/PERF: we should do this only the first time we see each polymorphic FuncDefn.
         for ch in h.children(parent).collect::<Vec<_>>() {
             if h.get_optype(ch).is_func_defn() {
                 // Lift the FuncDefn out
-                let enclosing_poly_func = std::iter::successors(Some(ch), |n| h.get_parent(*n))
-                    .find(|n| is_polymorphic_funcdefn(h, *n))
-                    .unwrap();
-                h.move_after_sibling(ch, enclosing_poly_func);
+                h.move_after_sibling(ch, *poly_func);
             }
         }
         // Since one can only call up the hierarchy,
@@ -66,8 +63,7 @@ fn mono_scan(
                 Some(&mut Instantiating {
                     target_container: new_ch,
                     node_map: inst.node_map,   // &mut ref, so borrow
-                    poly_func: inst.poly_func, // Node, so copy
-                    subst: inst.subst,         // &ref, so copy
+                    ..**inst
                 }),
                 cache,
                 reg,
@@ -157,12 +153,6 @@ fn instantiate(
     }
 
     mono_tgt
-}
-
-fn is_polymorphic_funcdefn(h: &impl HugrView, n: Node) -> bool {
-    h.get_optype(n)
-        .as_func_defn()
-        .is_some_and(|fd| !fd.signature.params().is_empty())
 }
 
 fn name_mangle(name: &str, type_args: &[TypeArg]) -> String {
