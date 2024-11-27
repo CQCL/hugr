@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Ok, Result};
+use anyhow::{bail, Ok, Result};
 use hugr_core::{
     ops::{ExtensionOp, NamedOp},
     std_extensions::collections::{self, ListOp, ListValue},
@@ -284,7 +284,7 @@ fn emit_list_op<'c, H: HugrView>(
             args.outputs
                 .finish(ctx.builder(), vec![list, length.into()])?;
         }
-        _ => return Err(anyhow!("Collections: unimplemented op: {}", op.name())),
+        _ => bail!("Collections: unimplemented op: {}", op.name()),
     }
     Ok(())
 }
