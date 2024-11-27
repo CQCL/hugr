@@ -1,0 +1,21 @@
+(hugr 0)
+
+(declare-operation core.call-indirect
+  (forall ?inputs (list type))
+  (forall ?outputs (list type))
+  (forall ?exts ext-set)
+  (fn [(fn ?inputs ?outputs ?exts) ?inputs ...] ?outputs ?exts))
+
+(declare-operation core.compose-parallel
+  (forall ?inputs-0 (list type))
+  (forall ?inputs-1 (list type))
+  (forall ?outputs-0 (list type))
+  (forall ?outputs-1 (list type))
+  (forall ?exts ext-set)
+  (fn
+    [(fn ?inputs-0 ?outputs-0 ?exts)
+     (fn ?inputs-1 ?outputs-1 ?exts)
+     ?inputs-0 ...
+     ?inputs-1 ...]
+    [?outputs-0 ... ?outputs-1 ...]
+    ?exts))
