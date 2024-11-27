@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{anyhow, bail, Ok, Result};
 use hugr_core::core::Either;
 use hugr_core::core::Either::{Left, Right};
 use hugr_core::{
@@ -243,7 +243,7 @@ fn emit_list_op<'c, H: HugrView>(
     let hugr_elem_ty = match args.node().args() {
         [TypeArg::Type { ty }] => ty.clone(),
         _ => {
-            return Err(anyhow!("Collections: invalid type args for list op"));
+            bail!("Collections: invalid type args for list op");
         }
     };
     let elem_ty = ctx.llvm_type(&hugr_elem_ty)?;
