@@ -1,13 +1,13 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::hugr::hugrmut::InsertionResult;
 pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node, OutgoingPort};
+use crate::{Hugr, IncomingPort, Node};
 use thiserror::Error;
 
 use super::inline_dfg::InlineDFGError;
@@ -161,33 +161,24 @@ impl Rewrite for SimpleReplacement {
         // remove the replacement root (which now has no children and no edges)
         h.remove_node(new_root);
 
-        // 3.4. Update replacement nodes according to insertion mapping and load in to
-        // connection set.
-        let mut connect: HashSet<(Node, OutgoingPort, Node, IncomingPort)> =
-            HashSet::with_capacity(nu_inp_connects.len() + nu_out_connects.len() + nu_out.len());
+        // 3.4. Update replacement nodes according to insertion mapping and connect
+        for (src_node, src_port, tgt_node, tgt_port) in nu_inp_connects {
+            h.connect(
+                src_node,
+                src_port,
+                *index_map.get(tgt_node).unwrap(),
+                *tgt_port,
+            )
+        }
 
-        connect.extend(nu_inp_connects.into_iter().map(
-            |(src_node, src_port, tgt_node, tgt_port)| {
-                (
-                    src_node,
-                    src_port,
-                    *index_map.get(tgt_node).unwrap(),
-                    *tgt_port,
-                )
-            },
-        ));
-
-        connect.extend(nu_out_connects.into_iter().map(
-            |(src_node, src_port, tgt_node, tgt_port)| {
-                (
-                    *index_map.get(&src_node).unwrap(),
-                    src_port,
-                    *tgt_node,
-                    *tgt_port,
-                )
-            },
-        ));
-
+        for (src_node, src_port, tgt_node, tgt_port) in nu_out_connects {
+            h.connect(
+                *index_map.get(&src_node).unwrap(),
+                src_port,
+                *tgt_node,
+                *tgt_port,
+            )
+        }
         // 3.5. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
         // to p1.
         //
@@ -204,19 +195,14 @@ impl Rewrite for SimpleReplacement {
                 //
                 // Otherwise, we might disconnect other wires in `rem_inp_node`
                 // that are needed for the following iterations.
-                connect.insert((
+                h.connect(
                     rem_inp_pred_node,
                     rem_inp_pred_port,
                     *rem_out_node,
                     *rem_out_port,
-                ));
+                );
             }
         }
-        connect
-            .into_iter()
-            .for_each(|(src_node, src_port, tgt_node, tgt_port)| {
-                h.connect(src_node, src_port, tgt_node, tgt_port);
-            });
 
         // 3.6. Remove all nodes in subgraph and edges between them.
         Ok(subgraph
