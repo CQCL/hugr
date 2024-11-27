@@ -7,7 +7,7 @@ use crate::{
     Node,
 };
 
-use super::{Hugr, HugrMut, HugrView, OpType};
+use super::{internal::HugrMutInternals, Hugr, HugrMut, HugrView, OpType};
 
 pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
     let root = h.root(); // I.e. "all monomorphic funcs" for Module-Rooted Hugrs...right?
@@ -25,7 +25,7 @@ struct Instantiating<'a> {
 type Instantiations = HashMap<(Node, Vec<TypeArg>), Node>;
 
 fn mono_scan(
-    h: &mut impl HugrMut,
+    h: &mut Hugr,
     parent: Node,
     mut subst_into: Option<&mut Instantiating>,
     cache: &mut Instantiations,
@@ -35,9 +35,11 @@ fn mono_scan(
         // First flatten: move all FuncDefns (which do not refer to the TypeParams
         // being substituted) to be siblings of the enclosing FuncDefn.
         // TODO/PERF: we should do this only the first time we see each polymorphic FuncDefn.
+        let outer_name = h.get_optype(*poly_func).as_func_defn().unwrap().name.clone();
         for ch in h.children(parent).collect::<Vec<_>>() {
-            if h.get_optype(ch).is_func_defn() {
+            if let OpType::FuncDefn(fd) = h.op_types.get_mut(ch.pg_index()) {
                 // Lift the FuncDefn out
+                fd.name = mangle_inner_func(&outer_name, &fd.name);
                 h.move_after_sibling(ch, *poly_func);
             }
         }
@@ -92,7 +94,7 @@ fn mono_scan(
 }
 
 fn instantiate(
-    h: &mut impl HugrMut,
+    h: &mut Hugr,
     poly_func: Node,
     type_args: Vec<TypeArg>,
     mono_sig: Signature,
@@ -156,5 +158,9 @@ fn instantiate(
 }
 
 fn name_mangle(name: &str, type_args: &[TypeArg]) -> String {
+    todo!()
+}
+
+fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
     todo!()
 }
