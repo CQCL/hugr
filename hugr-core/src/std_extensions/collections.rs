@@ -61,7 +61,7 @@ impl ListValue {
     }
 
     /// Returns the values contained inside the `[ListValue]`.
-    pub fn get_contents(&self) -> &Vec<Value> {
+    pub fn get_contents(&self) -> &[Value] {
         &self.0
     }
 }
