@@ -29,7 +29,7 @@ use crate::{
 /// delegates everything to those default implementations.
 pub trait CollectionsCodegen: Clone {
     /// Return the llvm type of [hugr_core::std_extensions::collections::LIST_TYPENAME].
-    fn list_type<'c>(&self, session: &TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
+    fn list_type<'c>(&self, session: TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
         session
             .iw_context()
             .i8_type()
@@ -46,7 +46,7 @@ pub trait CollectionsCodegen: Clone {
         inout: bool,
     ) -> FunctionType<'c> {
         let iwc = ts.iw_context();
-        let mut args = vec![self.list_type(&ts).into()];
+        let mut args = vec![self.list_type(ts).into()];
         if indexed {
             args.push(iwc.i64_type().into());
         }
@@ -71,7 +71,7 @@ pub trait CollectionsCodegen: Clone {
     ) -> Result<BasicValueEnum<'c>> {
         let session = ctx.typing_session();
         let iwc = session.iw_context();
-        let func_ty = self.list_type(&session).fn_type(
+        let func_ty = self.list_type(session).fn_type(
             &[
                 iwc.i64_type().into(), // Capacity
                 iwc.i64_type().into(), // Single element size in bytes
@@ -198,7 +198,7 @@ pub trait CollectionsCodegen: Clone {
         let func_ty = session
             .iw_context()
             .i64_type()
-            .fn_type(&[self.list_type(&session).into()], false);
+            .fn_type(&[self.list_type(session).into()], false);
         let func = ctx.get_extern_func("__rt__list__length", func_ty)?;
         let res = ctx
             .builder()
@@ -492,7 +492,7 @@ pub fn add_collections_extensions<'a, H: HugrView + 'a>(
 ) -> CodegenExtsBuilder<'a, H> {
     cem.custom_type((collections::EXTENSION_ID, collections::LIST_TYPENAME), {
         let ccg = ccg.clone();
-        move |ts, _hugr_type| Ok(ccg.list_type(&ts).as_basic_type_enum())
+        move |ts, _hugr_type| Ok(ccg.list_type(ts).as_basic_type_enum())
     })
     .custom_const::<ListValue>({
         let ccg = ccg.clone();
