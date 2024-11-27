@@ -21,6 +21,7 @@ use crate::{
 
 /// Runtime functions that implement operations on lists.
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
+#[non_exhaustive]
 pub enum CollectionsRtFunc {
     New,
     Push,
