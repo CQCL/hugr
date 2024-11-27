@@ -93,9 +93,6 @@ impl Rewrite for SimpleReplacement {
         // Now we proceed to connect the edges between the newly inserted
         // replacement and the rest of the graph.
         //
-        // We delay creating these connections to avoid them getting mixed with
-        // the pre-existing ones in the following logic.
-        //
         // Existing connections to the removed subgraph will be automatically
         // removed when the nodes are removed.
 
@@ -190,11 +187,7 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
-                // Delay connecting the nodes until after processing all nu_out
-                // entries.
-                //
-                // Otherwise, we might disconnect other wires in `rem_inp_node`
-                // that are needed for the following iterations.
+
                 h.connect(
                     rem_inp_pred_node,
                     rem_inp_pred_port,
