@@ -119,13 +119,15 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Remove a node from the graph and return the node weight.
+    /// Note that if the node has children, they are not removed; this leaves
+    /// the Hugr in an invalid state. See [Self::remove_subtree].
     ///
     /// # Panics
     ///
-    /// If the node is not in the graph, or if the node is the root node.
+    /// If the node is not in the graph.
     #[inline]
     fn remove_node(&mut self, node: Node) -> OpType {
-        panic_invalid_non_root(self, node);
+        panic_invalid_node(self, node);
         self.hugr_mut().remove_node(node)
     }
 
