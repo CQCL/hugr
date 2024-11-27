@@ -2,7 +2,6 @@ use anyhow::{anyhow, Ok, Result};
 use hugr_core::core::Either;
 use hugr_core::core::Either::{Left, Right};
 use hugr_core::{
-    extension::prelude::{either_type, option_type},
     ops::{constant::CustomConst, ExtensionOp, NamedOp},
     std_extensions::collections::{self, ListOp, ListValue},
     types::{SumType, Type, TypeArg},
@@ -11,14 +10,15 @@ use hugr_core::{
 use inkwell::values::FunctionValue;
 use inkwell::{
     types::{BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicValueEnum, IntValue, PointerValue},
+    values::{BasicValueEnum, PointerValue},
     AddressSpace,
 };
 
+use crate::emit::func::{build_ok_or_else, build_option};
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
     emit::{emit_value, func::EmitFuncContext, EmitOpArgs},
-    types::{HugrType, TypingSession},
+    types::TypingSession,
 };
 
 /// Runtime functions that implement operations on lists.
@@ -136,36 +136,6 @@ pub trait CollectionsCodegen: Clone {
         }
         .into()
     }
-}
-
-fn build_option<'c, H: HugrView>(
-    ctx: &mut EmitFuncContext<'c, '_, H>,
-    is_some: IntValue<'c>,
-    some_value: BasicValueEnum<'c>,
-    hugr_ty: HugrType,
-) -> Result<BasicValueEnum<'c>> {
-    let option_ty = ctx.llvm_sum_type(option_type(hugr_ty))?;
-    let builder = ctx.builder();
-    let some = option_ty.build_tag(builder, 1, vec![some_value])?;
-    let none = option_ty.build_tag(builder, 0, vec![])?;
-    let option = builder.build_select(is_some, some, none, "")?;
-    Ok(option)
-}
-
-fn build_ok_or_else<'c, H: HugrView>(
-    ctx: &mut EmitFuncContext<'c, '_, H>,
-    is_ok: IntValue<'c>,
-    ok_value: BasicValueEnum<'c>,
-    ok_hugr_ty: HugrType,
-    else_value: BasicValueEnum<'c>,
-    else_hugr_ty: HugrType,
-) -> Result<BasicValueEnum<'c>> {
-    let either_ty = ctx.llvm_sum_type(either_type(else_hugr_ty, ok_hugr_ty))?;
-    let builder = ctx.builder();
-    let left = either_ty.build_tag(builder, 0, vec![else_value])?;
-    let right = either_ty.build_tag(builder, 1, vec![ok_value])?;
-    let either = builder.build_select(is_ok, right, left, "")?;
-    Ok(either)
 }
 
 /// Helper function to allocate space on the stack for a given type.

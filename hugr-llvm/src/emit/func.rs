@@ -2,6 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use anyhow::{anyhow, Result};
 use hugr_core::{
+    extension::prelude::{either_type, option_type},
     ops::{constant::CustomConst, ExtensionOp, FuncDecl, FuncDefn},
     types::Type,
     HugrView, NodeIndex, PortIndex, Wire,
@@ -12,7 +13,7 @@ use inkwell::{
     context::Context,
     module::Module,
     types::{BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicValueEnum, FunctionValue, GlobalValue},
+    values::{BasicValueEnum, FunctionValue, GlobalValue, IntValue},
 };
 use itertools::zip_eq;
 
@@ -313,4 +314,37 @@ impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
         self.builder.build_unconditional_branch(self.launch_bb)?;
         Ok((self.emit_context, self.todo))
     }
+}
+
+/// Builds an optional value wrapping `some_value` conditioned on the provided `is_some` flag.
+pub fn build_option<'c, H: HugrView>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    is_some: IntValue<'c>,
+    some_value: BasicValueEnum<'c>,
+    hugr_ty: HugrType,
+) -> Result<BasicValueEnum<'c>> {
+    let option_ty = ctx.llvm_sum_type(option_type(hugr_ty))?;
+    let builder = ctx.builder();
+    let some = option_ty.build_tag(builder, 1, vec![some_value])?;
+    let none = option_ty.build_tag(builder, 0, vec![])?;
+    let option = builder.build_select(is_some, some, none, "")?;
+    Ok(option)
+}
+
+/// Builds a result value wrapping either `ok_value` or `else_value` depending on the provided
+/// `is_ok` flag.
+pub fn build_ok_or_else<'c, H: HugrView>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    is_ok: IntValue<'c>,
+    ok_value: BasicValueEnum<'c>,
+    ok_hugr_ty: HugrType,
+    else_value: BasicValueEnum<'c>,
+    else_hugr_ty: HugrType,
+) -> Result<BasicValueEnum<'c>> {
+    let either_ty = ctx.llvm_sum_type(either_type(else_hugr_ty, ok_hugr_ty))?;
+    let builder = ctx.builder();
+    let left = either_ty.build_tag(builder, 0, vec![else_value])?;
+    let right = either_ty.build_tag(builder, 1, vec![ok_value])?;
+    let either = builder.build_select(is_ok, right, left, "")?;
+    Ok(either)
 }
