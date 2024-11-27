@@ -7,7 +7,7 @@ use crate::{
     Node,
 };
 
-use super::{HugrMut, OpType};
+use super::{HugrMut, HugrView, OpType};
 
 pub(super) fn mono_scan(
     h: &mut impl HugrMut,
@@ -24,13 +24,8 @@ pub(super) fn mono_scan(
             if h.get_optype(ch).is_func_defn() {
                 // Lift the FuncDefn out
                 let enclosing_poly_func = std::iter::successors(Some(ch), |n| h.get_parent(*n))
-                    .find(|n| {
-                        h.get_optype(*n)
-                            .as_func_defn()
-                            .is_some_and(|fd| !fd.signature.params().is_empty())
-                    })
+                    .find(|n| is_polymorphic_funcdefn(h, *n))
                     .unwrap();
-                // Might need <nearest enclosing FuncDefn ancestor of>(new_parent) or some such
                 h.move_after_sibling(ch, enclosing_poly_func);
             }
         }
@@ -113,6 +108,12 @@ pub(super) fn mono_scan(
             }
         }
     }
+}
+
+fn is_polymorphic_funcdefn(h: &impl HugrView, n: Node) -> bool {
+    h.get_optype(n)
+        .as_func_defn()
+        .is_some_and(|fd| !fd.signature.params().is_empty())
 }
 
 fn name_mangle(name: &str, type_args: &[TypeArg]) -> String {
