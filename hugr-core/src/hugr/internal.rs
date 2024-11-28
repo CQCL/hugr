@@ -1,8 +1,6 @@
 //! Internal traits, not exposed in the public `hugr` API.
 
-use std::ops::Range;
-use std::rc::Rc;
-use std::sync::Arc;
+use std::ops::{Deref, Range};
 
 use delegate::delegate;
 use portgraph::{LinkView, MultiPortGraph, PortMut, PortView};
@@ -53,8 +51,8 @@ impl HugrInternals for Hugr {
     }
 }
 
-impl<T: HugrInternals> HugrInternals for &T {
-    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
+impl<H: HugrInternals, T: Deref<Target=H>> HugrInternals for T {
+    type Portgraph<'p> = H::Portgraph<'p> where Self: 'p;
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
@@ -64,38 +62,6 @@ impl<T: HugrInternals> HugrInternals for &T {
     }
 }
 
-impl<T: HugrInternals> HugrInternals for &mut T {
-    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
-    delegate! {
-        to (**self) {
-            fn portgraph(&self) -> Self::Portgraph<'_>;
-            fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
-        }
-    }
-}
-
-impl<T: HugrInternals> HugrInternals for Rc<T> {
-    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
-    delegate! {
-        to (**self) {
-            fn portgraph(&self) -> Self::Portgraph<'_>;
-            fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
-        }
-    }
-}
-
-impl<T: HugrInternals> HugrInternals for Arc<T> {
-    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
-    delegate! {
-        to (**self) {
-            fn portgraph(&self) -> Self::Portgraph<'_>;
-            fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
-        }
-    }
-}
 
 /// Trait for accessing the mutable internals of a Hugr(Mut).
 ///
