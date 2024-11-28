@@ -648,3 +648,27 @@ where
     P: Into<Port> + Copy,
 {
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{builder::test::simple_dfg_hugr, hugr::HugrMut, Hugr, HugrView};
+
+    #[test]
+    fn hugr_ref_is_hugr_view() {
+        let hugr = simple_dfg_hugr();
+
+        let hugr_ref: &Hugr = &hugr;
+
+        let _ = <&Hugr as HugrView>::root(&hugr_ref);
+    }
+
+    #[test]
+    fn hugr_mut_ref_is_hugr_mut() {
+        let mut hugr = simple_dfg_hugr();
+        let root = hugr.root();
+
+        let mut hugr_mut_ref: &mut Hugr = &mut hugr;
+
+        let _ = <&mut Hugr as HugrMut>::set_metadata(&mut hugr_mut_ref, root, "proof", true);
+    }
+}
