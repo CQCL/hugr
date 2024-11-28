@@ -1,6 +1,7 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 pub mod descendants;
+mod impls;
 pub mod petgraph;
 pub mod render;
 mod root_checked;
@@ -12,7 +13,6 @@ mod tests;
 
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
-use delegate::delegate;
 pub use descendants::DescendantsGraph;
 pub use root_checked::RootChecked;
 pub use sibling::SiblingGraph;
@@ -593,41 +593,6 @@ impl HugrView for Hugr {
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.graph.all_neighbours(node.pg_index()).map_into()
     }
-}
-
-macro_rules! hugr_view_methods {
-    ($arg:ident, $e:expr) => {
-        delegate! {
-            to ({let $arg=self; $e}) {
-                fn contains_node(&self, node: Node) -> bool;
-                fn node_count(&self) -> usize;
-                fn edge_count(&self) -> usize;
-                fn nodes(&self) -> impl Iterator<Item = Node> + Clone;
-                fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone;
-                fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone;
-                fn linked_ports(
-                    &self,
-                    node: Node,
-                    port: impl Into<Port>,
-                ) -> impl Iterator<Item = (Node, Port)> + Clone;
-                fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone;
-                fn num_ports(&self, node: Node, dir: Direction) -> usize;
-                fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone;
-                fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone;
-                fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone;
-            }
-        }
-    }
-}
-
-use hugr_view_methods;
-
-impl<T: HugrView> HugrView for &T {
-    hugr_view_methods! {this, *this}
-}
-
-impl<T: HugrView> HugrView for &mut T {
-    hugr_view_methods! {this, &**this}
 }
 
 /// Trait implementing methods on port iterators.

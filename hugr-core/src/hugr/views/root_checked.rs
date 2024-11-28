@@ -6,9 +6,9 @@ use portgraph::MultiPortGraph;
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
-use crate::{Direction, Hugr, Node, Port};
+use crate::{Hugr, Node};
 
-use super::{check_tag, hugr_view_methods, HugrView, RootTagged};
+use super::{check_tag, RootTagged};
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
@@ -57,9 +57,6 @@ impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
             fn root_node(&self) -> Node;
         }
     }
-}
-impl<H: AsRef<Hugr>, Root> HugrView for RootChecked<H, Root> {
-    hugr_view_methods! {this, this.as_ref()}
 }
 
 impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {

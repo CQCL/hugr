@@ -1,6 +1,8 @@
 //! Internal traits, not exposed in the public `hugr` API.
 
 use std::ops::Range;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use delegate::delegate;
 use portgraph::{LinkView, MultiPortGraph, PortMut, PortView};
@@ -72,6 +74,29 @@ impl<T: HugrInternals> HugrInternals for &mut T {
         }
     }
 }
+
+impl<T: HugrInternals> HugrInternals for Rc<T> {
+    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
+impl<T: HugrInternals> HugrInternals for Arc<T> {
+    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
 /// Trait for accessing the mutable internals of a Hugr(Mut).
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
