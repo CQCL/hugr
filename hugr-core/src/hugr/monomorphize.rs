@@ -125,7 +125,7 @@ fn instantiate(
         Entry::Vacant(ve) => ve,
     };
 
-    let name = name_mangle(
+    let name = mangle_name(
         &h.get_optype(poly_func).as_func_defn().unwrap().name,
         &type_args,
     );
@@ -175,7 +175,7 @@ fn instantiate(
     mono_tgt
 }
 
-fn name_mangle(name: &str, type_args: &[TypeArg]) -> String {
+fn mangle_name(name: &str, type_args: &[TypeArg]) -> String {
     todo!()
 }
 
