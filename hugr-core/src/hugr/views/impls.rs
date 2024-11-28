@@ -59,7 +59,7 @@ mod test {
 
     struct ViewWrapper<H>(H);
     impl<H: HugrView> ViewWrapper<H> {
-        fn nodes<'a>(&'a self) -> impl Iterator<Item = Node> + 'a {
+        fn nodes(&self) -> impl Iterator<Item = Node> + '_ {
             self.0.nodes()
         }
     }
