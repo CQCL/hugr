@@ -1,7 +1,20 @@
 //! Name resolution.
-
-// TODO: Document that a direct reference is only allowed if the target would be visible
-// in the current scope if it was referred to by name.
+//!
+//! Some nodes have the capability to introduce a named symbol. Symbols are
+//! organised and scoped through regions. Within a region no two symbols can
+//! introduce the same name. However, symbols can shadow other symbols from
+//! outer regions by having identical names. When directly referencing a symbol
+//! by the id of the node that introduced it, the symbol must be visible in the
+//! current scope as if it was referred to by name.
+//!
+//! Nodes that introduce symbols may also include a parameter list. The
+//! parameters of the node can be referenced by variables in terms. The type of
+//! a parameter can contain variables that reference parameters that appear
+//! earlier in the list. A node's variable scope is isolated from the variables
+//! in the parameter list of any ancestor nodes. When directly referencing a
+//! variable by the id of the node and the index in the node's parameter list,
+//! the variable must be visible in the current scope as if it was referred to
+//! by name.
 
 // TODO: Document that the regions passed to custom operations are currently isolated
 // from the parent scope of links.
@@ -26,6 +39,12 @@ mod bindings;
 use bindings::{Bindings, InsertBindingError};
 
 /// Resolve all names in the module.
+///
+/// After successful resolution all [`SymbolRef`]s, [`VarRef`]s and [`LinkRef`]s
+/// are replaced with their directly indexed variants. [`SymbolRef`]s that refer
+/// to names which can not be found are resolved by inserting an import node
+/// into the root region. Depending on the context, this may indicate an error or
+/// provide an opportunity for linking.
 pub fn resolve<'a>(module: &mut Module<'a>, bump: &'a Bump) -> Result<(), ModelError> {
     let term_visited = BitVec::repeat(false, module.terms.len());
 

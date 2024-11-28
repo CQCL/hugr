@@ -395,15 +395,17 @@ pub enum Operation<'a> {
         decl: &'a OperationDecl<'a>,
     },
 
-    /// Import a symbol.
+    /// Introduce a symbol without defining it or declaring its type to indicate
+    /// that the symbol should be imported from another module. Imports may only
+    /// occur in module regions.
     Import {
-        /// The name of the symbol to import.
+        /// The name of the symbol to introduce.
         name: &'a str,
     },
 }
 
 impl<'a> Operation<'a> {
-    /// The symbol associated with the operation, if any.
+    /// The symbol introduced by an operation, if any.
     pub fn symbol(&self) -> Option<&'a str> {
         match self {
             Operation::DefineFunc { decl } => Some(decl.name),
