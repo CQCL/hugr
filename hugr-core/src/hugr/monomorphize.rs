@@ -79,6 +79,7 @@ fn mono_scan(
             old_ch
         };
 
+        // Now instantiate the target of any Call/LoadFunction to a polymorphic function...
         let ch_op = h.get_optype(ch);
         let (type_args, mono_sig) = match ch_op {
             OpType::Call(c) => (&c.type_args, &c.instantiation),
