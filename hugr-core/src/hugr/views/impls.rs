@@ -51,3 +51,34 @@ impl<T: HugrView> HugrView for Arc<T> {
 impl<H: AsRef<Hugr>, Root> HugrView for RootChecked<H, Root> {
     hugr_view_methods! {this, this.as_ref()}
 }
+
+#[cfg(test)]
+mod test {
+    use crate::hugr::views::{DescendantsGraph, HierarchyView};
+    use crate::{Hugr, HugrView, Node};
+
+    struct ViewWrapper<H>(H);
+    impl<H: HugrView> ViewWrapper<H> {
+        fn nodes<'a>(&'a self) -> impl Iterator<Item = Node> + 'a {
+            self.0.nodes()
+        }
+    }
+
+    #[test]
+    fn test_views() {
+        let h = Hugr::default();
+        let v = ViewWrapper(&h);
+        let c = h.nodes().count();
+        assert_eq!(v.nodes().count(), c);
+        let v2 = ViewWrapper(DescendantsGraph::<Node>::try_new(&h, h.root()).unwrap());
+        // v2 owns the DescendantsGraph, but that only borrows `h`, so we still have both
+        assert_eq!(v2.nodes().count(), v.nodes().count());
+        // And we can borrow the DescendantsGraph, even just a reference to that counts as a HugrView
+        assert_eq!(ViewWrapper(&v2.0).nodes().count(), v.nodes().count());
+
+        let vh = ViewWrapper(h);
+        assert_eq!(vh.nodes().count(), c);
+        let h: Hugr = vh.0;
+        assert_eq!(h.nodes().count(), c);
+    }
+}
