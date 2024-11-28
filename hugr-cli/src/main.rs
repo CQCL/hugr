@@ -4,7 +4,7 @@ use clap::Parser as _;
 
 use hugr_cli::{validate, CliArgs};
 
-use clap_verbosity_flag::Level;
+use clap_verbosity_flag::log::Level;
 
 fn main() {
     match CliArgs::parse() {
