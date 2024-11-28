@@ -15,6 +15,25 @@ pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
     h
 }
 
+pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
+    let mut pfs_to_delete = Vec::new();
+    let mut to_scan = Vec::from_iter(h.children(h.root()));
+    while let Some(n) = to_scan.pop() {
+        if h.get_optype(n)
+            .as_func_defn()
+            .is_some_and(|fd| !fd.signature.params().is_empty())
+        {
+            pfs_to_delete.push(n)
+        } else {
+            to_scan.extend(h.children(n));
+        }
+    }
+    for n in pfs_to_delete {
+        h.remove_subtree(n);
+    }
+    h
+}
+
 struct Instantiating<'a> {
     subst: &'a Substitution<'a>,
     target_container: Node,
