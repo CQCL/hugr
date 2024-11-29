@@ -51,7 +51,9 @@ impl ListValue {
     }
 
     /// Create a new [CustomConst] for an empty list of values of type `typ`.
+    /// Note this will be valid only if `typ` is concrete (does not contain type variables).
     pub fn new_empty(typ: Type) -> Self {
+        debug_assert!(!typ.contains_vars());
         Self(vec![], typ)
     }
 
@@ -123,6 +125,8 @@ impl CustomConst for ListValue {
 #[allow(non_camel_case_types)]
 #[non_exhaustive]
 pub enum ListOp {
+    /// Create a new empty list
+    new,
     /// Pop from the end of list. Return an optional value.
     pop,
     /// Push to end of list. Return the new list.
@@ -160,6 +164,7 @@ impl ListOp {
         let e = Type::new_var_use(0, TypeBound::Any);
         let l = self.list_type(list_type_def, 0);
         match self {
+            new => self.list_polytype(Vec::<Type>::new(), l).into(),
             pop => self
                 .list_polytype(vec![l.clone()], vec![l, Type::from(option_type(e))])
                 .into(),
@@ -237,6 +242,7 @@ impl MakeOpDef for ListOp {
         use ListOp::*;
 
         match self {
+            new => "Create a new empty list",
             pop => "Pop from the back of list. Returns an optional value.",
             push => "Push to the back of list",
             get => "Lookup an element in a list by index. Panics if the index is out of bounds.",
