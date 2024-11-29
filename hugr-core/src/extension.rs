@@ -681,6 +681,10 @@ impl ExtensionSet {
             },
         }))
     }
+
+    pub(crate) fn contains_vars(&self) -> bool {
+        self.0.iter().any(|id| as_typevar(id).is_some())
+    }
 }
 
 impl From<ExtensionId> for ExtensionSet {

@@ -321,6 +321,16 @@ impl TypeArg {
             } => t.apply_var(*idx, cached_decl),
         }
     }
+
+    pub(crate) fn contains_vars(&self) -> bool {
+        match self {
+            TypeArg::Type { ty } => ty.contains_vars(),
+            TypeArg::BoundedNat { .. } | TypeArg::String { .. } => false,
+            TypeArg::Sequence { elems } => elems.iter().any(TypeArg::contains_vars),
+            TypeArg::Extensions { es } => es.contains_vars(),
+            TypeArg::Variable { .. } => true,
+        }
+    }
 }
 
 impl TypeArgVariable {

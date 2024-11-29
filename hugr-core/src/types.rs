@@ -455,6 +455,28 @@ impl<RV: MaybeRV> TypeBase<RV> {
             }
         }
     }
+
+    pub(crate) fn contains_vars(&self) -> bool {
+        match self.as_type_enum() {
+            TypeEnum::Extension(custom_type) => {
+                custom_type.args().iter().any(TypeArg::contains_vars)
+            }
+            TypeEnum::Alias(_) => false, // Any unresolved/undefined AliasDecl must be at top level in Module so no vars in scope
+            TypeEnum::Function(ft) => {
+                ft.input.iter().any(TypeRV::contains_vars)
+                    || ft.output.iter().any(TypeRV::contains_vars)
+                    || ft.extension_reqs.contains_vars()
+            }
+            TypeEnum::Variable(_, _) | TypeEnum::RowVar(_) => true,
+            TypeEnum::Sum(sum_type) => (0..sum_type.num_variants()).any(|i| {
+                sum_type
+                    .get_variant(i)
+                    .unwrap()
+                    .iter()
+                    .any(TypeRV::contains_vars)
+            }),
+        }
+    }
 }
 
 impl Type {
