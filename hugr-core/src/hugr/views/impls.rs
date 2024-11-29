@@ -1,5 +1,5 @@
-use std::rc::Rc;
 use std::sync::Arc;
+use std::{borrow::Cow, rc::Rc};
 
 use delegate::delegate;
 
@@ -45,6 +45,14 @@ impl<T: HugrView> HugrView for Rc<T> {
 }
 
 impl<T: HugrView> HugrView for Arc<T> {
+    hugr_view_methods! {this, this.as_ref()}
+}
+
+impl<T: HugrView> HugrView for Box<T> {
+    hugr_view_methods! {this, this.as_ref()}
+}
+
+impl<T: HugrView + ToOwned> HugrView for Cow<'_, T> {
     hugr_view_methods! {this, this.as_ref()}
 }
 

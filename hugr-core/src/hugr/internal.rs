@@ -1,5 +1,6 @@
 //! Internal traits, not exposed in the public `hugr` API.
 
+use std::borrow::Cow;
 use std::ops::Range;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -112,6 +113,33 @@ impl<T: HugrInternals> HugrInternals for Arc<T> {
     }
 }
 
+impl<T: HugrInternals> HugrInternals for Box<T> {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
+impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to self.as_ref() {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
 /// Trait for accessing the mutable internals of a Hugr(Mut).
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
