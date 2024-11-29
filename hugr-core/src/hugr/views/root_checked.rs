@@ -49,7 +49,10 @@ impl<Root> RootChecked<&mut Hugr, Root> {
 }
 
 impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
-    type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
+    type Portgraph<'p>
+        = &'p MultiPortGraph
+    where
+        Self: 'p;
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
