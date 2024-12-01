@@ -169,7 +169,8 @@ fn instantiate(
 }
 
 fn mangle_name(name: &str, type_args: &[TypeArg]) -> String {
-    todo!()
+    let s = format!("__{name}_{type_args:?}");
+    s.replace(&['[', ']', '{', '}', ' '], "_")
 }
 
 fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
