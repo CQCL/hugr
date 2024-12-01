@@ -181,16 +181,18 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::builder::BuildHandle;
-    use crate::builder::{test::simple_dfg_hugr, Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
-    use crate::extension::{prelude::{PRELUDE, USIZE_T}, ExtensionRegistry, EMPTY_REG};
+    use crate::builder::test::simple_dfg_hugr;
+    use crate::builder::{
+        BuildHandle, Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    };
+    use crate::extension::prelude::{UnpackTuple, USIZE_T};
+    use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::handle::FuncID;
-    use crate::std_extensions::collections::{self, list_type, ListOp, ListValue};
+    use crate::ops::{OpType, Tag};
     use crate::types::{PolyFuncType, Signature, Type, TypeBound};
     use crate::{Hugr, HugrView};
 
-    use super::{monomorphize, mangle_name};
-
+    use super::{mangle_name, monomorphize};
 
     #[rstest]
     fn test_null(simple_dfg_hugr: Hugr) {
@@ -198,74 +200,134 @@ mod test {
         assert_eq!(simple_dfg_hugr, mono);
     }
 
-    fn add_singleton(ctr: &mut impl Container, reg: &ExtensionRegistry) -> BuildHandle<FuncID<true>> {
-        let elem_ty = Type::new_var_use(0, TypeBound::Any);
-        let mut fb = ctr.define_function("singleton", PolyFuncType::new([TypeBound::Any.into()], Signature::new(
-        elem_ty.clone(), list_type(elem_ty.clone())
-        ))).unwrap();
+    fn pair_type(ty: Type) -> Type {
+        Type::new_tuple(vec![ty.clone(), ty])
+    }
+
+    fn triple_type(ty: Type) -> Type {
+        Type::new_tuple(vec![ty.clone(), ty.clone(), ty])
+    }
+
+    fn add_double(ctr: &mut impl Container) -> BuildHandle<FuncID<true>> {
+        let elem_ty = Type::new_var_use(0, TypeBound::Copyable);
+        let mut fb = ctr
+            .define_function(
+                "double",
+                PolyFuncType::new(
+                    [TypeBound::Copyable.into()],
+                    Signature::new(elem_ty.clone(), pair_type(elem_ty.clone())),
+                ),
+            )
+            .unwrap();
         let [elem] = fb.input_wires_arr();
-        let empty = fb.add_load_value(ListValue::new_empty(elem_ty.clone()));
-        let push = fb.add_dataflow_op(ListOp::push.with_type(elem_ty).to_extension_op(&reg).unwrap(), [empty, elem]).unwrap();
-        fb.finish_with_outputs(push.outputs()).unwrap()
+        let tag = Tag::new(0, vec![vec![elem_ty.clone(), elem_ty].into()]);
+        let tag = fb.add_dataflow_op(tag, [elem, elem]).unwrap();
+        fb.finish_with_outputs(tag.outputs()).unwrap()
     }
 
     #[test]
     fn test_module() {
-        let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned(), PRELUDE.to_owned()]).unwrap();
         let mut mb = ModuleBuilder::new();
-        let sing = add_singleton(&mut mb, &reg);
-        let dub = {
+        let doub = add_double(&mut mb);
+        let trip = {
             let elem_ty = Type::new_var_use(0, TypeBound::Copyable);
-            let mut fb = mb.define_function("doubled", PolyFuncType::new([TypeBound::Copyable.into()], Signature::new(
-                elem_ty.clone(), list_type(elem_ty.clone())
-            ))).unwrap();
+            let mut fb = mb
+                .define_function(
+                    "triple",
+                    PolyFuncType::new(
+                        [TypeBound::Copyable.into()],
+                        Signature::new(elem_ty.clone(), Type::new_tuple(vec![elem_ty.clone(); 3])),
+                    ),
+                )
+                .unwrap();
             let [elem] = fb.input_wires_arr();
-            let [sing] = fb.call(sing.handle(), &[elem_ty.clone().into()], [elem], &reg).unwrap().outputs_arr();
-            let push = fb.add_dataflow_op(ListOp::push.with_type(elem_ty).to_extension_op(&reg).unwrap(), [sing, elem]).unwrap();
-            fb.finish_with_outputs(push.outputs()).unwrap()
+            let [pair] = fb
+                .call(
+                    doub.handle(),
+                    &[elem_ty.clone().into()],
+                    [elem],
+                    &PRELUDE_REGISTRY,
+                )
+                .unwrap()
+                .outputs_arr();
+            let [elem1, elem2] = fb
+                .add_dataflow_op(UnpackTuple(vec![elem_ty.clone(); 2].into()), [pair])
+                .unwrap()
+                .outputs_arr();
+            let tag = Tag::new(0, vec![vec![elem_ty.clone(); 3].into()]);
+            let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem]).unwrap();
+            fb.finish_with_outputs(trip.outputs()).unwrap()
         };
         {
-            let mut fb = mb.define_function("main", Signature::new(
-                USIZE_T,
-                vec![
-                    list_type(USIZE_T),
-                    list_type(list_type(USIZE_T))
-                ])).unwrap();
+            let mut fb = mb
+                .define_function(
+                    "main",
+                    Signature::new(
+                        USIZE_T,
+                        vec![triple_type(USIZE_T), triple_type(pair_type(USIZE_T))],
+                    ),
+                )
+                .unwrap();
             let [elem] = fb.input_wires_arr();
-            let [two] = fb.call(dub.handle(), &[USIZE_T.into()], [elem], &reg).unwrap().outputs_arr();
-            let sing = fb.call(sing.handle(), &[USIZE_T.into()], [elem], &reg).unwrap();
-            let [two_by_one] = fb.call(dub.handle(), &[list_type(USIZE_T).into()], sing.outputs(), &reg).unwrap().outputs_arr();
-            fb.finish_with_outputs([two, two_by_one]).unwrap();
+            let [res1] = fb
+                .call(trip.handle(), &[USIZE_T.into()], [elem], &PRELUDE_REGISTRY)
+                .unwrap()
+                .outputs_arr();
+            let pair = fb
+                .call(doub.handle(), &[USIZE_T.into()], [elem], &PRELUDE_REGISTRY)
+                .unwrap();
+            let [res2] = fb
+                .call(
+                    trip.handle(),
+                    &[pair_type(USIZE_T).into()],
+                    pair.outputs(),
+                    &PRELUDE_REGISTRY,
+                )
+                .unwrap()
+                .outputs_arr();
+            fb.finish_with_outputs([res1, res2]).unwrap();
         }
-        let hugr = mb.finish_hugr(&reg).unwrap();
-        assert_eq!(hugr.nodes().filter(|n| hugr.get_optype(*n).is_func_defn()).count(), 3);
-        let mono_hugr = monomorphize(hugr, &reg);
-        mono_hugr.validate(&reg).unwrap();
-        let funcs = mono_hugr.nodes().filter_map(|n| mono_hugr.get_optype(n).as_func_defn()).collect_vec();
-        let expected_mangled_names = [mangle_name("singleton", &[USIZE_T.into()]),
-        mangle_name("doubled", &[USIZE_T.into()]), mangle_name("singleton", &[list_type(USIZE_T).into()]),
-    mangle_name("doubled", &[list_type(USIZE_T).into()])];
+        let hugr = mb.finish_hugr(&PRELUDE_REGISTRY).unwrap();
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_func_defn())
+                .count(),
+            3
+        );
+        let mono_hugr = monomorphize(hugr, &PRELUDE_REGISTRY);
+        mono_hugr.validate(&PRELUDE_REGISTRY).unwrap();
 
-        assert_eq!(funcs.iter().map(|fd|&fd.name).sorted().collect_vec(),
-            ["main", "singleton", "doubled"].into_iter().chain(expected_mangled_names.iter().map(String::as_str)).sorted().collect_vec());
+        let funcs = mono_hugr
+            .nodes()
+            .filter_map(|n| mono_hugr.get_optype(n).as_func_defn())
+            .collect_vec();
+        let expected_mangled_names = [
+            mangle_name("double", &[USIZE_T.into()]),
+            mangle_name("triple", &[USIZE_T.into()]),
+            mangle_name("double", &[triple_type(USIZE_T).into()]),
+            mangle_name("triple_type", &[triple_type(USIZE_T).into()]),
+        ];
+
+        assert_eq!(
+            funcs.iter().map(|fd| &fd.name).sorted().collect_vec(),
+            ["main", "double", "triple"]
+                .into_iter()
+                .chain(expected_mangled_names.iter().map(String::as_str))
+                .sorted()
+                .collect_vec()
+        );
         for n in expected_mangled_names {
-            let mono_fn = funcs.iter().find(|fd|fd.name == n).unwrap();
+            let mono_fn = funcs.iter().find(|fd| fd.name == n).unwrap();
             assert!(mono_fn.signature.params().is_empty());
         }
     }
 
     #[test]
-    fn test_flattening() {
-
-    }
+    fn test_flattening() {}
 
     #[test]
-    fn test_recursive() {
-        
-    }
+    fn test_recursive() {}
 
     #[test]
-    fn test_root_polyfunc() {
-
-    }
+    fn test_root_polyfunc() {}
 }
