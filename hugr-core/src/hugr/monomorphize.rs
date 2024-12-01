@@ -62,17 +62,12 @@ fn mono_scan(
             let new_ch =
                 h.add_node_with_parent(inst.target_container, ch_op.clone().substitute(inst.subst));
             inst.node_map.insert(old_ch, new_ch);
-            mono_scan(
-                h,
-                old_ch,
-                Some(&mut Instantiating {
-                    target_container: new_ch,
-                    node_map: inst.node_map, // &mut ref, so borrow
-                    ..**inst
-                }),
-                cache,
-                reg,
-            );
+            let mut inst = Instantiating {
+                target_container: new_ch,
+                node_map: inst.node_map,
+                ..**inst
+            };
+            mono_scan(h, old_ch, Some(&mut inst), cache, reg);
             new_ch
         } else {
             mono_scan(h, old_ch, None, cache, reg);
@@ -92,8 +87,9 @@ fn mono_scan(
         let fn_inp = ch_op.static_input_port().unwrap();
         let tgt = h.static_source(ch).unwrap();
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache, reg);
+        let fn_out = h.get_optype(new_tgt).static_output_port().unwrap();
         h.disconnect(ch, fn_inp);
-        h.connect(new_tgt, h.num_outputs(new_tgt) - 1, ch, fn_inp);
+        h.connect(new_tgt, fn_out, ch, fn_inp);
     }
 }
 
@@ -140,17 +136,12 @@ fn instantiate(
     ve.insert(mono_tgt);
     // Now make the instantiation
     let mut node_map = HashMap::new();
-    mono_scan(
-        h,
-        poly_func,
-        Some(&mut Instantiating {
-            subst: &Substitution::new(&type_args, reg),
-            target_container: mono_tgt,
-            node_map: &mut node_map,
-        }),
-        cache,
-        reg,
-    );
+    let mut inst = Instantiating {
+        subst: &Substitution::new(&type_args, reg),
+        target_container: mono_tgt,
+        node_map: &mut node_map,
+    };
+    mono_scan(h, poly_func, Some(&mut inst), cache, reg);
     // Copy edges...we have built a node_map for every node in the function.
     // Note we could avoid building the "large" map (smaller than the Hugr we've just created)
     // by doing this during recursion, but we'd need to be careful with nonlocal edges -
