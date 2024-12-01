@@ -2,7 +2,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
     extension::ExtensionRegistry,
-    ops::{FuncDefn, OpTrait},
+    ops::{Call, FuncDefn, OpTrait},
     types::{Signature, Substitution, TypeArg},
     Node,
 };
@@ -77,19 +77,21 @@ fn mono_scan(
         // Now instantiate the target of any Call/LoadFunction to a polymorphic function...
         let ch_op = h.get_optype(ch);
         let (type_args, mono_sig) = match ch_op {
-            OpType::Call(c) => (&c.type_args, &c.instantiation),
-            OpType::LoadFunction(lf) => (&lf.type_args, &lf.signature),
+            OpType::Call(c) => (&c.type_args, c.instantiation.clone()),
+            OpType::LoadFunction(lf) => (&lf.type_args, lf.signature.clone()),
             _ => continue,
         };
         if type_args.is_empty() {
             continue;
         };
         let fn_inp = ch_op.static_input_port().unwrap();
-        let tgt = h.static_source(ch).unwrap();
+        let tgt = h.static_source(old_ch).unwrap(); // Use old_ch as edges not copied yet
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache, reg);
         let fn_out = h.get_optype(new_tgt).static_output_port().unwrap();
         h.disconnect(ch, fn_inp);
         h.connect(new_tgt, fn_out, ch, fn_inp);
+        *h.op_types.get_mut(ch.pg_index()) =
+            Call::try_new(mono_sig.into(), vec![], &reg).unwrap().into();
     }
 }
 
