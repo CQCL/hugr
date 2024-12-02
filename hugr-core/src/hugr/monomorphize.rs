@@ -202,6 +202,7 @@ mod test {
     };
     use crate::extension::prelude::{UnpackTuple, USIZE_T};
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::hugr::monomorphize::remove_polyfuncs;
     use crate::ops::handle::FuncID;
     use crate::ops::Tag;
     use crate::types::{PolyFuncType, Signature, Type, TypeBound};
@@ -331,10 +332,31 @@ mod test {
                 .sorted()
                 .collect_vec()
         );
-        for n in expected_mangled_names {
-            let mono_fn = funcs.iter().find(|fd| fd.name == n).unwrap();
+        for n in expected_mangled_names.iter() {
+            let mono_fn = funcs.iter().find(|fd| &fd.name == n).unwrap();
             assert!(mono_fn.signature.params().is_empty());
         }
+
+        assert_eq!(
+            monomorphize(mono_hugr.clone(), &PRELUDE_REGISTRY),
+            mono_hugr
+        ); // Idempotent
+
+        let nopoly = remove_polyfuncs(mono_hugr);
+        let funcs = nopoly
+            .nodes()
+            .filter_map(|n| nopoly.get_optype(n).as_func_defn())
+            .collect_vec();
+
+        assert_eq!(
+            funcs.iter().map(|fd| &fd.name).sorted().collect_vec(),
+            expected_mangled_names
+                .iter()
+                .chain(std::iter::once(&"main".into()))
+                .sorted()
+                .collect_vec()
+        );
+        assert!(funcs.into_iter().all(|fd| fd.signature.params().is_empty()));
     }
 
     #[test]
