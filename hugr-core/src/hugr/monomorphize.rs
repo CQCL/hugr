@@ -10,13 +10,20 @@ use crate::{
 use super::{internal::HugrMutInternals, Hugr, HugrMut, HugrView, OpType};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
-/// instantiations of the polymorphic ones. The original polymorphic [FuncDefn]s
-/// are left untouched (including Calls inside them) - see [remove_polyfuncs]
+/// instantiations of the polymorphic ones.
+///
+/// If the Hugr is [Module](OpType::Module)-rooted,
+/// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
+///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
+/// * else, the originals are removed (they are invisible from outside the Hugr).
 pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
-    let root = h.root(); // I.e. "all monomorphic funcs" for Module-Rooted Hugrs...right?
+    let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
         mono_scan(&mut h, root, None, &mut HashMap::new(), reg);
+        if !h.get_optype(root).is_module() {
+            return remove_polyfuncs(h);
+        }
     }
     h
 }
@@ -190,8 +197,8 @@ fn mangle_name(name: &str, type_args: &[TypeArg]) -> String {
     s.replace(['[', ']', '{', '}', ' '], "_")
 }
 
-fn mangle_inner_func(_outer_name: &str, _inner_name: &str) -> String {
-    todo!()
+fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
+    format!("$_{outer_name}_$_{inner_name}")
 }
 
 #[cfg(test)]
