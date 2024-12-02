@@ -375,11 +375,7 @@ impl FromStr for ArrayScanDef {
 impl ArrayScanDef {
     /// To avoid recursion when defining the extension, take the type definition
     /// and a reference to the extension as an argument.
-    fn signature_from_def(
-        &self,
-        array_def: &TypeDef,
-        _extension_ref: &Weak<Extension>,
-    ) -> SignatureFunc {
+    fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
         // array<N, T1>, (T1, *A -> T2, *A), -> array<N, T2>, *A
         let params = vec![
             TypeParam::max_nat(),
@@ -418,8 +414,8 @@ impl MakeOpDef for ArrayScanDef {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
-    fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
-        self.signature_from_def(array_type_def(), extension_ref)
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
+        self.signature_from_def(array_type_def())
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -448,8 +444,7 @@ impl MakeOpDef for ArrayScanDef {
         extension: &mut Extension,
         extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
-        let sig =
-            self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap(), extension_ref);
+        let sig = self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap());
         let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
