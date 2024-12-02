@@ -560,14 +560,13 @@ pub type ValueNameRef = str;
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
-    use std::sync::Weak;
+    use std::sync::{Arc, Weak};
 
     use super::Value;
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
-    use crate::extension::prelude::bool_t;
+    use crate::extension::prelude::{bool_t, usize_custom_t};
     use crate::std_extensions::arithmetic::int_types::ConstInt;
-    use crate::types::TypeEnum;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -629,10 +628,7 @@ mod test {
             type_row![],
             TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;
-        let usize_t = usize_t();
-        let TypeEnum::Extension(usize_custom_t) = usize_t.as_type_enum() else {
-            panic!("Expected extension type")
-        };
+        let usize_custom_t = usize_custom_t(&Arc::downgrade(&PRELUDE));
         let c = b.add_constant(Value::sum(
             0,
             [
