@@ -293,22 +293,44 @@ pub enum Operation<'a> {
     /// that have not yet been fully constructed.
     #[default]
     Invalid,
+
     /// Data flow graphs.
+    ///
+    /// Nodes with this operation contain a single dataflow region. The region
+    /// is not isolated, so links can cross the region boundary.
     Dfg,
+
     /// Control flow graphs.
+    ///
+    /// Nodes with this operation contain a single control flow region. The region
+    /// is not isolated, so links can cross the region boundary.
     Cfg,
+
     /// Basic blocks.
     Block,
+
     /// Function definitions.
+    ///
+    /// Like [`Operation::DeclareFunc`], a function definition introduces a
+    /// symbol. A function definition additionally expects a data flow region
+    /// that serves as the body of the function. This data flow region is isolated
+    /// so that links can not cross the region boundary.
     DefineFunc {
         /// The declaration of the function to be defined.
         decl: &'a FuncDecl<'a>,
     },
+
     /// Function declarations.
+    ///
+    /// A function declaration introduces a symbol of type `(quote (fn ?ins ?outs ?ext))`.
+    /// `?ins` and `?outs` are lists of runtime types that represent the types of the inputs
+    /// and outputs of the function. `?ext` is the set of extensions that is required to
+    /// run the declared function.
     DeclareFunc {
         /// The function to be declared.
         decl: &'a FuncDecl<'a>,
     },
+
     /// Function calls.
     CallFunc {
         /// The function to be called.
@@ -325,19 +347,27 @@ pub enum Operation<'a> {
     /// leaving out the implicit parameters. Once the declaration of the custom operation
     /// becomes known by resolving the reference, the node can be transformed into a [`Operation::CustomFull`]
     /// by inferring terms for the implicit parameters or at least filling them in with a wildcard term.
+    ///
+    /// The custom operation may have data flow regions. These regions are
+    /// isolated so that links can not cross the region boundary.
     Custom {
         /// The name of the custom operation.
         operation: SymbolRef<'a>,
     },
+
     /// Custom operation with full parameters.
     ///
     /// The node's parameters correspond to both the explicit and implicit parameters of the custom operation.
     /// Since this can be tedious to write, the [`Operation::Custom`] variant can be used to indicate that
     /// the implicit parameters should be inferred.
+    ///
+    /// The custom operation may have data flow regions. These regions are
+    /// isolated so that links can not cross the region boundary.
     CustomFull {
         /// The name of the custom operation.
         operation: SymbolRef<'a>,
     },
+
     /// Alias definitions.
     DefineAlias {
         /// The declaration of the alias to be defined.
@@ -353,9 +383,13 @@ pub enum Operation<'a> {
     },
 
     /// Tail controlled loop.
-    /// Nodes with this operation contain a dataflow graph that is executed in a loop.
+    ///
+    /// Nodes with this operation contain a dataflow region that is executed in a loop.
     /// The loop body is executed at least once, producing a result that indicates whether
-    /// to continue the loop or return the result.
+    /// to continue the loop or return the result. The dataflow region is not isolated,
+    /// so links can cross the region boundary. Due to the possibility that the loop body
+    /// is run multiple times, the types of the links that cross the region boundary must
+    /// be non-linear.
     ///
     /// # Port Types
     ///
@@ -366,6 +400,11 @@ pub enum Operation<'a> {
     TailLoop,
 
     /// Conditional operation.
+    ///
+    /// Nodes with this operation contain a dataflow region for every branch of the conditional.
+    /// The dataflow regions are not isolated, so links can cross the region boundary. When
+    /// a link crosses the boundary of some but not all of the branch regions, the type of
+    /// the link must be non-linear.
     ///
     /// # Port types
     ///

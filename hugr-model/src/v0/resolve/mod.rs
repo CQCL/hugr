@@ -15,9 +15,14 @@
 //! variable by the id of the node and the index in the node's parameter list,
 //! the variable must be visible in the current scope as if it was referred to
 //! by name.
+//!
+//! Ports of nodes and regions are connected when they have the same link.
 
 // TODO: Document that the regions passed to custom operations are currently isolated
 // from the parent scope of links.
+
+// TODO: There is more to link resolution than we currently handle: the sources and
+// targets of a region are scoped to that region, even if the region is not isolated.
 
 // TODO: We currently rely on terms with names not to be deduplicated, since in different
 // scopes the same name may be resolved to different nodes. We should either document this,
@@ -28,7 +33,7 @@ use crate::v0::Link;
 
 use super::{
     ExtSetPart, LinkId, LinkRef, ListPart, MetaItem, ModelError, Module, Node, NodeId, Operation,
-    Param, RegionId, SymbolIntroError, SymbolRef, SymbolRefError, Term, TermId, VarRef,
+    Param, RegionId, SymbolIntroError, SymbolRef, SymbolRefError, Term, TermId, VarIndex, VarRef,
     VarRefError,
 };
 use bitvec::vec::BitVec;
@@ -46,43 +51,52 @@ use bindings::{Bindings, InsertBindingError};
 /// into the root region. Depending on the context, this may indicate an error or
 /// provide an opportunity for linking.
 pub fn resolve<'a>(module: &mut Module<'a>, bump: &'a Bump) -> Result<(), ModelError> {
-    let term_visited = BitVec::repeat(false, module.terms.len());
-
-    let mut resolver = Resolver {
-        module,
-        bump,
-        scope_globals: Bindings::new(),
-        scope_locals: Bindings::new(),
-        global_import: FxHashMap::default(),
-        links: FxHashMap::default(),
-        term_visited,
-    };
-
+    let mut resolver = Resolver::new(module, bump);
     resolver.resolve_region(resolver.module.root)?;
     resolver.add_imports_to_root();
-
     Ok(())
 }
 
 struct Resolver<'m, 'a> {
+    /// The module to resolve.
     module: &'m mut Module<'a>,
+
+    /// The bump allocator to use for allocations.
     bump: &'a Bump,
 
-    /// Global scope.
-    scope_globals: Bindings<&'a str, RegionId, NodeId>,
+    /// Symbols that are visible in the current scope.
+    symbol_scope: Bindings<&'a str, RegionId, NodeId>,
 
-    global_import: FxHashMap<&'a str, NodeId>,
+    /// Map from symbol names to newly created import nodes.
+    ///
+    /// When a symbol can not be resolved, we create an import node to be added to the root region
+    /// at the end of the resolution process. This field is used to keep track of the import nodes
+    /// that we have already created.
+    symbol_import: FxHashMap<&'a str, NodeId>,
 
-    /// Local scope.
-    scope_locals: Bindings<&'a str, NodeId, u16>,
+    /// Variables that are visible in the current scope.
+    var_scope: Bindings<&'a str, NodeId, VarIndex>,
 
-    links: FxHashMap<&'a str, LinkId>,
+    /// Links that are visible in the current scope.
+    link_scope: FxHashMap<&'a str, LinkId>,
 
     /// Bit vector to keep track of visited terms so that we do not visit them multiple times.
     term_visited: BitVec,
 }
 
 impl<'m, 'a> Resolver<'m, 'a> {
+    fn new(module: &'m mut Module<'a>, bump: &'a Bump) -> Self {
+        Self {
+            term_visited: BitVec::repeat(false, module.terms.len()),
+            module,
+            bump,
+            symbol_scope: Bindings::new(),
+            var_scope: Bindings::new(),
+            symbol_import: FxHashMap::default(),
+            link_scope: FxHashMap::default(),
+        }
+    }
+
     fn resolve_region(&mut self, region: RegionId) -> Result<(), ModelError> {
         let mut region_data = self
             .module
@@ -98,7 +112,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
         }
 
         // First collect all declarations in the region.
-        self.scope_globals.enter(region);
+        self.symbol_scope.enter(region);
 
         for child in region_data.children {
             let child_data = self
@@ -107,10 +121,9 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 .ok_or_else(|| ModelError::NodeNotFound(*child))?;
 
             if let Some(name) = child_data.operation.symbol() {
-                self.scope_globals
+                self.symbol_scope
                     .insert(name, *child)
                     .map_err(|err| match err {
-                        InsertBindingError::NoScope => unreachable!(),
                         InsertBindingError::Duplicate(other) => {
                             SymbolIntroError::DuplicateSymbol(other, *child, name.to_string())
                         }
@@ -124,17 +137,21 @@ impl<'m, 'a> Resolver<'m, 'a> {
         }
 
         // Finally reset the global scope
-        self.scope_globals.exit();
+        self.symbol_scope.exit();
 
         self.module.regions[region.index()] = region_data;
 
         Ok(())
     }
 
+    /// Resolve an isolated region.
+    ///
+    /// In an isolated region the link scope is not inherited from the parent scope.
+    /// Otherwise the resolution process is the same as in `resolve_region`.
     fn resolve_isolated_region(&mut self, region: RegionId) -> Result<(), ModelError> {
-        let links = std::mem::take(&mut self.links);
+        let links = std::mem::take(&mut self.link_scope);
         self.resolve_region(region)?;
-        self.links = links;
+        self.link_scope = links;
         Ok(())
     }
 
@@ -163,49 +180,49 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             Operation::DefineFunc { decl } => {
-                self.scope_locals.enter_isolated(node);
+                self.var_scope.enter_isolated(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
                 self.resolve_term(decl.signature)?;
                 for region in node_data.regions {
-                    self.resolve_region(*region)?;
+                    self.resolve_isolated_region(*region)?;
                 }
-                self.scope_locals.exit();
+                self.var_scope.exit();
             }
 
             Operation::DeclareFunc { decl } => {
-                self.scope_locals.enter_isolated(node);
+                self.var_scope.enter_isolated(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
                 self.resolve_term(decl.signature)?;
-                self.scope_locals.exit();
+                self.var_scope.exit();
             }
 
             Operation::DefineAlias { decl, value } => {
-                self.scope_locals.enter_isolated(node);
+                self.var_scope.enter_isolated(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_term(value)?;
-                self.scope_locals.exit();
+                self.var_scope.exit();
             }
 
             Operation::DeclareAlias { decl } => {
-                self.scope_locals.enter_isolated(node);
+                self.var_scope.enter_isolated(node);
                 self.resolve_params(decl.params)?;
-                self.scope_locals.exit();
+                self.var_scope.exit();
             }
 
             Operation::DeclareConstructor { decl } => {
-                self.scope_locals.enter_isolated(node);
+                self.var_scope.enter_isolated(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
-                self.scope_locals.exit();
+                self.var_scope.exit();
             }
 
             Operation::DeclareOperation { decl } => {
-                self.scope_locals.enter_isolated(node);
+                self.var_scope.enter_isolated(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
-                self.scope_locals.exit();
+                self.var_scope.exit();
             }
 
             Operation::CallFunc { func } => {
@@ -253,12 +270,11 @@ impl<'m, 'a> Resolver<'m, 'a> {
     fn resolve_params(&mut self, params: &'a [Param<'a>]) -> Result<(), ModelError> {
         for (index, param) in params.iter().enumerate() {
             self.resolve_term(param.r#type)?;
-            let node = *self.scope_locals.scope().unwrap();
+            let node = *self.var_scope.scope().unwrap();
 
-            self.scope_locals
+            self.var_scope
                 .insert(param.name, index as u16)
                 .map_err(|err| match err {
-                    InsertBindingError::NoScope => unreachable!(),
                     InsertBindingError::Duplicate(other) => SymbolIntroError::DuplicateVar(
                         node,
                         other,
@@ -285,7 +301,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
         for link_ref in link_refs {
             resolved.push(match link_ref {
                 LinkRef::Id(_) => *link_ref,
-                LinkRef::Named(name) => match self.links.entry(*name) {
+                LinkRef::Named(name) => match self.link_scope.entry(*name) {
                     Entry::Occupied(entry) => LinkRef::Id(*entry.get()),
                     Entry::Vacant(entry) => {
                         let link_id = self.module.insert_link(Link { name });
@@ -412,7 +428,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
         match local_ref {
             VarRef::Index(node, index) => {
                 // Check whether this local would have been visible at this point.
-                if self.scope_locals.scope() != Some(&node) {
+                if self.var_scope.scope() != Some(&node) {
                     return Err(VarRefError::NotVisible(node, index));
                 }
 
@@ -420,12 +436,12 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
             VarRef::Named(name) => {
                 let index = self
-                    .scope_locals
+                    .var_scope
                     .get(name)
                     .ok_or_else(|| VarRefError::NameNotFound(name.to_string()))?;
 
                 // UNWRAP: If the local is in scope, then the scope must be set.
-                let node = self.scope_locals.scope().unwrap();
+                let node = self.var_scope.scope().unwrap();
                 Ok(VarRef::Index(*node, index))
             }
         }
@@ -436,7 +452,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             SymbolRef::Direct(node) => {
                 // Check whether the global is visible at this point.
                 let name = self.module.symbol_name(symbol_ref)?;
-                let visible = self.scope_globals.get(name);
+                let visible = self.symbol_scope.get(name);
 
                 if visible != Some(node) {
                     return Err(SymbolRefError::NotVisible(node).into());
@@ -445,20 +461,28 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 Ok(symbol_ref)
             }
             SymbolRef::Named(name) => {
-                if let Some(node) = self.scope_globals.get(name) {
+                if let Some(node) = self.symbol_scope.get(name) {
                     return Ok(SymbolRef::Direct(node));
                 }
 
-                Ok(SymbolRef::Direct(
-                    *self.global_import.entry(name).or_insert_with(|| {
-                        self.module.insert_node(Node {
-                            operation: Operation::Import { name },
-                            ..Node::default()
-                        })
-                    }),
-                ))
+                Ok(SymbolRef::Direct(self.make_symbol_import(name)))
             }
         }
+    }
+
+    /// Creates an import node for the given symbol name and returns its id.
+    ///
+    /// When there already exists an import node for the symbol name, the id of
+    /// the existing node is returned. The import node is added to the root
+    /// region of the module at the end of the resolution process via
+    /// [`Self::add_imports_to_root`].
+    fn make_symbol_import(&mut self, name: &'a str) -> NodeId {
+        *self.symbol_import.entry(name).or_insert_with(|| {
+            self.module.insert_node(Node {
+                operation: Operation::Import { name },
+                ..Node::default()
+            })
+        })
     }
 
     fn resolve_meta(&mut self, meta_item: &'a MetaItem<'a>) -> Result<(), Error> {
@@ -468,16 +492,16 @@ impl<'m, 'a> Resolver<'m, 'a> {
     fn add_imports_to_root(&mut self) {
         // Short circuit if there are no imports to add. This avoids allocating
         // a new slice for the children of the root region.
-        if self.global_import.is_empty() {
+        if self.symbol_import.is_empty() {
             return;
         }
 
         let root_region = &mut self.module.regions[self.module.root.index()];
         let mut children = BumpVec::with_capacity_in(
-            root_region.children.len() + self.global_import.len(),
+            root_region.children.len() + self.symbol_import.len(),
             self.bump,
         );
-        children.extend(self.global_import.drain().map(|(_, node)| node));
+        children.extend(self.symbol_import.drain().map(|(_, node)| node));
         children.extend(root_region.children.iter().copied());
         root_region.children = children.into_bump_slice();
     }

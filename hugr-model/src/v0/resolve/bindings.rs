@@ -29,12 +29,16 @@ where
     }
 
     /// Insert a new binding into the current scope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no current scope.
     pub fn insert(&mut self, key: K, value: V) -> Result<(), InsertBindingError<V>> {
         let scope = self
             .scopes
             .len()
             .checked_sub(1)
-            .ok_or(InsertBindingError::NoScope)?;
+            .expect("no scope to insert into");
 
         match self.bindings.insert(key, (value, scope)) {
             Some(shadowed) if shadowed.1 == scope => {
@@ -117,9 +121,6 @@ type UndoDepth = usize;
 /// Error that can occur when inserting a binding.
 #[derive(Debug, Error)]
 pub enum InsertBindingError<V> {
-    /// There is no current scope.
-    #[error("no current scope")]
-    NoScope,
     /// The binding has already been defined in this scope.
     #[error("binding has already been defined in this scope")]
     Duplicate(V),
@@ -129,15 +130,6 @@ pub enum InsertBindingError<V> {
 mod test {
     use super::Bindings;
     use super::InsertBindingError;
-
-    #[test]
-    fn no_scope() {
-        let mut bindings = Bindings::<&'static str, (), usize>::new();
-        assert!(matches!(
-            bindings.insert("foo", 1),
-            Err(InsertBindingError::NoScope)
-        ));
-    }
 
     #[test]
     fn shadow() {
