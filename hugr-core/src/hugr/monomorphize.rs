@@ -87,9 +87,14 @@ fn mono_scan(
         let fn_inp = ch_op.static_input_port().unwrap();
         let tgt = h.static_source(old_ch).unwrap(); // Use old_ch as edges not copied yet
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache, reg);
-        let fn_out = h.get_optype(new_tgt).static_output_port().unwrap();
-        h.disconnect(ch, fn_inp);
-        h.connect(new_tgt, fn_out, ch, fn_inp);
+        if let Some(ref mut inst) = subst_into {
+            // Edges will be added by instantiate
+            inst.node_map.insert(tgt, new_tgt);
+        } else {
+            let fn_out = h.get_optype(new_tgt).static_output_port().unwrap();
+            h.disconnect(ch, fn_inp);
+            h.connect(new_tgt, fn_out, ch, fn_inp);
+        }
         *h.op_types.get_mut(ch.pg_index()) =
             Call::try_new(mono_sig.into(), vec![], &reg).unwrap().into();
     }
@@ -149,16 +154,15 @@ fn instantiate(
     // by doing this during recursion, but we'd need to be careful with nonlocal edges -
     // 'ext' edges by copying every node before recursing on any of them,
     // 'dom' edges would *also* require recursing in dominator-tree preorder.
-    for &ch in node_map.keys() {
-        for inport in h.node_inputs(ch).collect::<Vec<_>>() {
-            let srcs = h.linked_outputs(ch, inport).collect::<Vec<_>>();
-            // Sources could be a mixture of within this polymorphic FuncDefn, and Static edges from outside
-            h.disconnect(ch, inport);
+    for (&old_ch, &new_ch) in node_map.iter() {
+        for inport in h.node_inputs(old_ch).collect::<Vec<_>>() {
+            let srcs = h.linked_outputs(old_ch, inport).collect::<Vec<_>>();
             for (src, outport) in srcs {
+                // Sources could be a mixture of within this polymorphic FuncDefn, and Static edges from outside
                 h.connect(
                     node_map.get(&src).copied().unwrap_or(src),
                     outport,
-                    ch,
+                    new_ch,
                     inport,
                 );
             }
