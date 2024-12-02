@@ -226,17 +226,13 @@ mod test {
 
     fn add_double(ctr: &mut impl Container) -> BuildHandle<FuncID<true>> {
         let elem_ty = Type::new_var_use(0, TypeBound::Copyable);
-        let mut fb = ctr
-            .define_function(
-                "double",
-                PolyFuncType::new(
-                    [TypeBound::Copyable.into()],
-                    Signature::new(elem_ty.clone(), pair_type(elem_ty.clone())),
-                ),
-            )
-            .unwrap();
+        let pfty = PolyFuncType::new(
+            [TypeBound::Copyable.into()],
+            Signature::new(elem_ty.clone(), pair_type(elem_ty.clone())),
+        );
+        let mut fb = ctr.define_function("double", pfty).unwrap();
         let [elem] = fb.input_wires_arr();
-        let tag = Tag::new(0, vec![vec![elem_ty.clone(), elem_ty].into()]);
+        let tag = Tag::new(0, vec![vec![elem_ty; 2].into()]);
         let tag = fb.add_dataflow_op(tag, [elem, elem]).unwrap();
         fb.finish_with_outputs(tag.outputs()).unwrap()
     }
@@ -246,31 +242,22 @@ mod test {
         let mut mb = ModuleBuilder::new();
         let doub = add_double(&mut mb);
         let trip = {
-            let elem_ty = Type::new_var_use(0, TypeBound::Copyable);
-            let mut fb = mb
-                .define_function(
-                    "triple",
-                    PolyFuncType::new(
-                        [TypeBound::Copyable.into()],
-                        Signature::new(elem_ty.clone(), Type::new_tuple(vec![elem_ty.clone(); 3])),
-                    ),
-                )
-                .unwrap();
+            let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
+            let pfty = PolyFuncType::new(
+                [TypeBound::Copyable.into()],
+                Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3])),
+            );
+            let mut fb = mb.define_function("triple", pfty).unwrap();
             let [elem] = fb.input_wires_arr();
-            let [pair] = fb
-                .call(
-                    doub.handle(),
-                    &[elem_ty.clone().into()],
-                    [elem],
-                    &PRELUDE_REGISTRY,
-                )
-                .unwrap()
-                .outputs_arr();
+            let pair = fb
+                .call(doub.handle(), &[tv0().into()], [elem], &PRELUDE_REGISTRY)
+                .unwrap();
+
             let [elem1, elem2] = fb
-                .add_dataflow_op(UnpackTuple(vec![elem_ty.clone(); 2].into()), [pair])
+                .add_dataflow_op(UnpackTuple(vec![tv0(); 2].into()), pair.outputs())
                 .unwrap()
                 .outputs_arr();
-            let tag = Tag::new(0, vec![vec![elem_ty.clone(); 3].into()]);
+            let tag = Tag::new(0, vec![vec![tv0(); 3].into()]);
             let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem]).unwrap();
             fb.finish_with_outputs(trip.outputs()).unwrap()
         };
