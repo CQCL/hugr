@@ -14,7 +14,10 @@ use super::{internal::HugrMutInternals, Hugr, HugrMut, HugrView, OpType};
 /// are left untouched (including Calls inside them) - see [remove_polyfuncs]
 pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
     let root = h.root(); // I.e. "all monomorphic funcs" for Module-Rooted Hugrs...right?
-    mono_scan(&mut h, root, None, &mut HashMap::new(), reg);
+    // If the root is a polymorphic function, then there are no external calls, so nothing to do
+    if !is_polymorphic_funcdefn(h.get_optype(root)) {
+        mono_scan(&mut h, root, None, &mut HashMap::new(), reg);
+    }
     h
 }
 
@@ -25,10 +28,7 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
     while let Some(n) = to_scan.pop() {
-        if h.get_optype(n)
-            .as_func_defn()
-            .is_some_and(|fd| !fd.signature.params().is_empty())
-        {
+        if is_polymorphic_funcdefn(h.get_optype(n)) {
             pfs_to_delete.push(n)
         } else {
             to_scan.extend(h.children(n));
@@ -38,6 +38,11 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
         h.remove_subtree(n);
     }
     h
+}
+
+fn is_polymorphic_funcdefn(t: &OpType) -> bool {
+    t.as_func_defn()
+        .is_some_and(|fd| !fd.signature.params().is_empty())
 }
 
 struct Instantiating<'a> {
@@ -61,12 +66,10 @@ fn mono_scan(
 ) {
     for old_ch in h.children(parent).collect::<Vec<_>>() {
         let ch_op = h.get_optype(old_ch);
-        if let Some(fd) = ch_op.as_func_defn() {
-            assert!(subst_into.is_none());
-            if !fd.signature.params().is_empty() {
-                continue;
-            }
-        }
+        debug_assert!(!ch_op.is_func_defn() || subst_into.is_none()); // If substituting, should have flattened already
+        if is_polymorphic_funcdefn(ch_op) {
+            continue;
+        };
         // Perform substitution, and recurse into containers (mono_scan does nothing if no children)
         let ch = if let Some(ref mut inst) = subst_into {
             let new_ch =
@@ -351,7 +354,4 @@ mod test {
 
     #[test]
     fn test_recursive() {}
-
-    #[test]
-    fn test_root_polyfunc() {}
 }
