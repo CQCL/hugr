@@ -376,11 +376,14 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(
         dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY),
-        Err(ValidationError::OpaqueOpError(OpaqueOpError::UnresolvedOp(
-            wire.node(),
-            "Not".into(),
-            ext_name
-        ))
+        Err(ValidationError::ExtensionResolutionError(
+            ExtensionResolutionError::MissingOpExtension {
+                node: not_node,
+                op: "logic.Not".into(),
+                missing_extension: ext_name.to_string(),
+                available_extensions: vec!["prelude".into()]
+            }
+        )
         .into())
     );
 

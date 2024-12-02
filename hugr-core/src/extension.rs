@@ -21,24 +21,26 @@ use crate::types::RowVariable;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
+mod const_fold;
 mod op_def;
+pub mod prelude;
+pub mod resolution;
+pub mod simple_op;
+mod type_def;
+
+pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,
 };
-mod type_def;
-pub use type_def::{TypeDef, TypeDefBound};
-mod const_fold;
-pub mod prelude;
-pub mod simple_op;
-pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
+pub use type_def::{TypeDef, TypeDefBound};
 
 #[cfg(feature = "declarative")]
 pub mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExtensionRegistry(BTreeMap<ExtensionId, Arc<Extension>>);
 
 impl ExtensionRegistry {
@@ -96,14 +98,15 @@ impl ExtensionRegistry {
         }
     }
 
-    /// Registers a new extension to the registry, keeping most up to date if extension exists.
+    /// Registers a new extension to the registry, keeping the one most up to
+    /// date if the extension already exists.
     ///
     /// If extension IDs match, the extension with the higher version is kept.
-    /// If versions match, the original extension is kept.
-    /// Returns a reference to the registered extension if successful.
+    /// If versions match, the original extension is kept. Returns a reference
+    /// to the registered extension if successful.
     ///
-    /// Takes an Arc to the extension. To avoid cloning Arcs unless necessary, see
-    /// [`ExtensionRegistry::register_updated_ref`].
+    /// Takes an Arc to the extension. To avoid cloning Arcs unless necessary,
+    /// see [`ExtensionRegistry::register_updated_ref`].
     pub fn register_updated(&mut self, extension: impl Into<Arc<Extension>>) {
         let extension = extension.into();
         match self.0.entry(extension.name().clone()) {
@@ -118,8 +121,8 @@ impl ExtensionRegistry {
         }
     }
 
-    /// Registers a new extension to the registry, keeping most up to date if
-    /// extension exists.
+    /// Registers a new extension to the registry, keeping the one most up to
+    /// date if the extension already exists.
     ///
     /// If extension IDs match, the extension with the higher version is kept.
     /// If versions match, the original extension is kept. Returns a reference
@@ -151,13 +154,18 @@ impl ExtensionRegistry {
     }
 
     /// Returns an iterator over the extensions in the registry.
-    pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Arc<Extension>)> {
+    pub fn iter(&self) -> <&BTreeMap<ExtensionId, Arc<Extension>> as IntoIterator>::IntoIter {
         self.0.iter()
     }
 
     /// Returns an iterator over the extensions ids in the registry.
     pub fn ids(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.keys()
+    }
+
+    /// Returns an iterator over the extensions ids in the registry.
+    pub fn extensions(&self) -> impl Iterator<Item = &Arc<Extension>> {
+        self.0.values()
     }
 
     /// Delete an extension from the registry and return it if it was present.
@@ -173,6 +181,32 @@ impl IntoIterator for ExtensionRegistry {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExtensionRegistry {
+    type Item = (&'a ExtensionId, &'a Arc<Extension>);
+
+    type IntoIter = <&'a BTreeMap<ExtensionId, Arc<Extension>> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> Extend<(&'a ExtensionId, &'a Arc<Extension>)> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = (&'a ExtensionId, &'a Arc<Extension>)>>(&mut self, iter: T) {
+        for (_name, ext) in iter {
+            self.register_updated_ref(ext);
+        }
+    }
+}
+
+impl Extend<(ExtensionId, Arc<Extension>)> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = (ExtensionId, Arc<Extension>)>>(&mut self, iter: T) {
+        for (_name, ext) in iter {
+            self.register_updated(ext);
+        }
     }
 }
 
@@ -197,8 +231,13 @@ pub enum SignatureError {
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
     /// The Extension Registry did not contain an Extension referenced by the Signature
-    #[error("Extension '{0}' not found")]
-    ExtensionNotFound(ExtensionId),
+    #[error("Extension '{missing}' not found. Available extensions: {}",
+        available.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ")
+    )]
+    ExtensionNotFound {
+        missing: ExtensionId,
+        available: Vec<ExtensionId>,
+    },
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
@@ -537,7 +576,7 @@ impl Extension {
         ExtensionOp::new(op_def.clone(), args, ext_reg)
     }
 
-    // Validates against a registry, which we can assume includes this extension itself.
+    /// Validates against a registry, which we can assume includes this extension itself.
     // (TODO deal with the registry itself containing invalid extensions!)
     fn validate(&self, all_exts: &ExtensionRegistry) -> Result<(), SignatureError> {
         // We should validate TypeParams of TypeDefs too - https://github.com/CQCL/hugr/issues/624

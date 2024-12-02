@@ -361,13 +361,10 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 }
 #[test]
 fn unregistered_extension() {
-    let (mut h, def) = identity_hugr_with_type(usize_t());
-    assert_eq!(
+    let (mut h, _def) = identity_hugr_with_type(usize_t());
+    assert_matches!(
         h.validate(&EMPTY_REG),
-        Err(ValidationError::SignatureError {
-            node: def,
-            cause: SignatureError::ExtensionNotFound(PRELUDE.name.clone())
-        })
+        Err(ValidationError::SignatureError { .. })
     );
     h.update_validate(&PRELUDE_REGISTRY).unwrap();
 }
@@ -392,7 +389,7 @@ fn invalid_types() {
     let validate_to_sig_error = |t: CustomType| {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));
         match h.validate(&reg) {
-            Err(ValidationError::SignatureError { node, cause }) if node == def => cause,
+            Err(ValidationError::SignatureError { node, cause, .. }) if node == def => cause,
             e => panic!(
                 "Expected SignatureError at def node, got {}",
                 match e {

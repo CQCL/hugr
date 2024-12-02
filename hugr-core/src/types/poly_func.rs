@@ -145,6 +145,11 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
             self.params.iter().map(ToString::to_string).join(" ")
         )
     }
+
+    /// Returns a mutable reference to the body of the function type.
+    pub(crate) fn body_mut(&mut self) -> &mut FuncTypeBase<RV> {
+        &mut self.body
+    }
 }
 
 #[cfg(test)]

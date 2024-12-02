@@ -98,7 +98,10 @@ impl CustomType {
         let ex = extension_registry.get(&self.extension);
         // Even if OpDef's (+binaries) are not available, the part of the Extension definition
         // describing the TypeDefs can easily be passed around (serialized), so should be available.
-        let ex = ex.ok_or(SignatureError::ExtensionNotFound(self.extension.clone()))?;
+        let ex = ex.ok_or(SignatureError::ExtensionNotFound {
+            missing: self.extension.clone(),
+            available: extension_registry.ids().cloned().collect(),
+        })?;
         ex.get_type(&self.id)
             .ok_or(SignatureError::ExtensionTypeNotFound {
                 exn: self.extension.clone(),
