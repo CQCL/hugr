@@ -1,7 +1,7 @@
 //! Basic integer types
 
 use std::num::NonZeroU64;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use crate::ops::constant::ValueName;
 use crate::types::TypeName;
@@ -26,13 +26,16 @@ pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
 /// Integer type of a given bit width (specified by the TypeArg).  Depending on
 /// the operation, the semantic interpretation may be unsigned integer, signed
 /// integer or bit string.
-pub fn int_custom_type(width_arg: impl Into<TypeArg>) -> CustomType {
+pub fn int_custom_type(
+    width_arg: impl Into<TypeArg>,
+    extension_ref: &Weak<Extension>,
+) -> CustomType {
     CustomType::new(
         INT_TYPE_ID,
         [width_arg.into()],
         EXTENSION_ID,
         TypeBound::Copyable,
-        &Arc::<Extension>::downgrade(&EXTENSION),
+        extension_ref,
     )
 }
 
@@ -40,7 +43,7 @@ pub fn int_custom_type(width_arg: impl Into<TypeArg>) -> CustomType {
 ///
 /// Constructed from [int_custom_type].
 pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
-    Type::new_extension(int_custom_type(width_arg.into()))
+    int_custom_type(width_arg.into(), &Arc::<Extension>::downgrade(&EXTENSION)).into()
 }
 
 lazy_static! {

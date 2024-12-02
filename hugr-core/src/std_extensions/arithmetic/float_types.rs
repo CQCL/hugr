@@ -1,6 +1,6 @@
 //! Basic floating-point types
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
@@ -21,19 +21,19 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 pub const FLOAT_TYPE_ID: TypeName = TypeName::new_inline("float64");
 
 /// 64-bit IEEE 754-2019 floating-point type (as [CustomType])
-pub fn float64_custom_type() -> CustomType {
+pub fn float64_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
     CustomType::new(
         FLOAT_TYPE_ID,
         vec![],
         EXTENSION_ID,
         TypeBound::Copyable,
-        &Arc::downgrade(&EXTENSION),
+        extension_ref,
     )
 }
 
 /// 64-bit IEEE 754-2019 floating-point type (as [Type])
 pub fn float64_type() -> Type {
-    Type::new_extension(float64_custom_type())
+    float64_custom_type(&Arc::downgrade(&EXTENSION)).into()
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
