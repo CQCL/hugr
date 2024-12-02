@@ -305,8 +305,8 @@ mod test {
         let expected_mangled_names = [
             mangle_name("double", &[USIZE_T.into()]),
             mangle_name("triple", &[USIZE_T.into()]),
-            mangle_name("double", &[triple_type(USIZE_T).into()]),
-            mangle_name("triple_type", &[triple_type(USIZE_T).into()]),
+            mangle_name("double", &[pair_type(USIZE_T).into()]),
+            mangle_name("triple", &[pair_type(USIZE_T).into()]),
         ];
 
         assert_eq!(
