@@ -45,5 +45,3 @@ bumpalo = { workspace = true, features = ["collections"] }
 name = "bench_main"
 harness = false
 
-[profile.bench]
-debug = true
