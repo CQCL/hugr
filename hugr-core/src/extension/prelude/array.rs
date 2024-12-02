@@ -128,6 +128,10 @@ impl ArrayOpDef {
             let array_ty = instantiate(array_def, size_var.clone(), elem_ty_var.clone());
             let standard_params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
 
+            // Construct the usize type using the passed extension reference.
+            //
+            // If we tried to use `usize_t()` directly it would try to access
+            // the `PRELUDE` lazy static recursively, causing a deadlock.
             let usize_t: Type = usize_custom_t(extension_ref).into();
 
             match self {

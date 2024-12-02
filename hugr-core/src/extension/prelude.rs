@@ -44,6 +44,12 @@ lazy_static! {
     pub static ref PRELUDE: Arc<Extension> = {
         Extension::new_arc(PRELUDE_ID, VERSION, |prelude, extension_ref| {
 
+            // Construct the list and error types using the passed extension
+            // reference.
+            //
+            // If we tried to use `string_type()` or `error_type()` directly it
+            // would try to access the `PRELUDE` lazy static recursively,
+            // causing a deadlock.
             let string_type: Type = string_custom_type(extension_ref).into();
             let error_type: CustomType = error_custom_type(extension_ref);
 
