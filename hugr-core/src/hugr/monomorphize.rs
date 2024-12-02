@@ -313,7 +313,7 @@ mod test {
 
         for n in expected_mangled_names.iter() {
             let mono_fn = funcs.remove(n).unwrap();
-            assert!((*mono_fn).signature.params().is_empty());
+            assert!(mono_fn.signature.params().is_empty());
         }
 
         assert_eq!(
@@ -329,7 +329,7 @@ mod test {
             .filter_map(|n| nopoly.get_optype(n).as_func_defn().map(|fd| (&fd.name, fd)))
             .collect::<HashMap<_, _>>();
 
-        assert!(funcs.values().all(|fd| (*fd).signature.params().is_empty()));
+        assert!(funcs.values().all(|fd| fd.signature.params().is_empty()));
         for n in expected_mangled_names {
             assert!(funcs.remove(&n).is_some());
         }
