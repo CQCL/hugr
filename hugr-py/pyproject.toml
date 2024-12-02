@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "pydantic>=2.8,<2.10",
+    "pydantic>=2.8,<2.11",
     "pydantic-extra-types>=2.9.0",
     "semver>=3.0.2",
     "graphviz>=0.20.3",

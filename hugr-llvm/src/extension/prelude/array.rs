@@ -42,7 +42,7 @@ fn with_array_alloca<'c, T, E: From<BuilderError>>(
     };
     let ptr = builder.build_array_alloca(array_ty.get_element_type(), array_len, "")?;
     let array_ptr = builder
-        .build_bitcast(ptr, array_ty.ptr_type(Default::default()), "")?
+        .build_bit_cast(ptr, array_ty.ptr_type(Default::default()), "")?
         .into_pointer_value();
     builder.build_store(array_ptr, array)?;
     go(ptr)
@@ -176,7 +176,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                         let elem_v = builder.build_load(elem_addr, "")?;
                         builder.build_store(elem_addr, value_v)?;
                         let ptr = builder
-                            .build_bitcast(
+                            .build_bit_cast(
                                 ptr,
                                 array_v.get_type().ptr_type(Default::default()),
                                 "",
@@ -261,7 +261,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                         builder.build_store(elem1_addr, elem2_v)?;
                         builder.build_store(elem2_addr, elem1_v)?;
                         let ptr = builder
-                            .build_bitcast(
+                            .build_bit_cast(
                                 ptr,
                                 array_v.get_type().ptr_type(Default::default()),
                                 "",
@@ -376,7 +376,7 @@ fn emit_pop_op<'c>(
             .get_element_type()
             .array_type(size as u32 - 1);
         let ptr = builder
-            .build_bitcast(ptr, new_array_ty.ptr_type(Default::default()), "")?
+            .build_bit_cast(ptr, new_array_ty.ptr_type(Default::default()), "")?
             .into_pointer_value();
         let array_v = builder.build_load(ptr, "")?;
         Ok((elem_v, array_v))

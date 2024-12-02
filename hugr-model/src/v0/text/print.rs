@@ -587,7 +587,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         let term_data = self
             .module
             .get_term(term_id)
-            .ok_or_else(|| PrintError::TermNotFound(term_id))?;
+            .ok_or(PrintError::TermNotFound(term_id))?;
 
         if let Term::List { parts } = term_data {
             for part in *parts {
@@ -611,7 +611,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         let term_data = self
             .module
             .get_term(term_id)
-            .ok_or_else(|| PrintError::TermNotFound(term_id))?;
+            .ok_or(PrintError::TermNotFound(term_id))?;
 
         if let Term::ExtSet { parts } = term_data {
             for part in *parts {
