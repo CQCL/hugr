@@ -107,14 +107,10 @@ fn mono_scan(
         let fn_inp = ch_op.static_input_port().unwrap();
         let tgt = h.static_source(old_ch).unwrap(); // Use old_ch as edges not copied yet
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache, reg);
-        if let Some(ref mut inst) = subst_into {
-            // Edges will be added by instantiate
-            inst.node_map.insert(tgt, new_tgt);
-        } else {
-            let fn_out = h.get_optype(new_tgt).static_output_port().unwrap();
-            h.disconnect(ch, fn_inp);
-            h.connect(new_tgt, fn_out, ch, fn_inp);
-        }
+        let fn_out = h.get_optype(new_tgt).static_output_port().unwrap();
+        h.disconnect(ch, fn_inp); // No-op if copying+substituting
+        h.connect(new_tgt, fn_out, ch, fn_inp);
+
         *h.op_types.get_mut(ch.pg_index()) =
             Call::try_new(mono_sig.into(), vec![], reg).unwrap().into();
     }
@@ -176,6 +172,11 @@ fn instantiate(
     // 'dom' edges would *also* require recursing in dominator-tree preorder.
     for (&old_ch, &new_ch) in node_map.iter() {
         for inport in h.node_inputs(old_ch).collect::<Vec<_>>() {
+            // Edges from monomorphized functions to their calls already added during mono_scan()
+            // as these depend not just on the original FuncDefn but also the TypeArgs
+            if h.linked_outputs(new_ch, inport).next().is_some() {
+                continue;
+            };
             let srcs = h.linked_outputs(old_ch, inport).collect::<Vec<_>>();
             for (src, outport) in srcs {
                 // Sources could be a mixture of within this polymorphic FuncDefn, and Static edges from outside
