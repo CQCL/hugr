@@ -79,3 +79,6 @@ pub fn llvm_version() -> &'static str {
 pub mod test;
 
 pub use custom::{CodegenExtension, CodegenExtsBuilder};
+
+pub use inkwell::llvm_sys;
+pub use inkwell;
