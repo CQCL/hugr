@@ -47,8 +47,6 @@ where
 ///
 /// Particularly useful with C-style enums that implement [strum::IntoEnumIterator],
 /// as then all definitions can be added to an extension at once.
-///
-/// When implementing this trait, you must also
 pub trait MakeOpDef: NamedOp {
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
@@ -66,7 +64,7 @@ pub trait MakeOpDef: NamedOp {
     /// Requires a [`Weak`] reference to the extension defining the operation.
     /// This method is intended to be used inside the closure passed to [`Extension::new_arc`],
     /// and it is normally internally called by [`MakeOpDef::add_to_extension`].
-    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc;
+    fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc;
 
     /// Return the signature (polymorphic function type) of the operation.
     fn signature(&self) -> SignatureFunc {
