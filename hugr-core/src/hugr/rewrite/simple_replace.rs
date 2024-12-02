@@ -243,7 +243,7 @@ pub(in crate::hugr::rewrite) mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::extension::{ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
     use crate::ops::dataflow::DataflowOpTrait;
@@ -253,7 +253,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::logic::LogicOp;
     use crate::types::{Signature, Type};
-    use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
+    use crate::utils::test_quantum_extension::{self, cx_gate, h_gate, EXTENSION_ID};
     use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
@@ -297,7 +297,7 @@ pub(in crate::hugr::rewrite) mod test {
 
             func_builder.finish_with_outputs(inner_graph.outputs().chain(q_out.outputs()))?
         };
-        Ok(module_builder.finish_prelude_hugr()?)
+        Ok(module_builder.finish_hugr(&test_quantum_extension::REG)?)
     }
 
     #[fixture]
@@ -317,7 +317,7 @@ pub(in crate::hugr::rewrite) mod test {
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire45 =
             dfg_builder.add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
-        dfg_builder.finish_prelude_hugr_with_outputs(wire45.outputs())
+        dfg_builder.finish_hugr_with_outputs(wire45.outputs(), &test_quantum_extension::REG)
     }
 
     #[fixture]
@@ -337,7 +337,7 @@ pub(in crate::hugr::rewrite) mod test {
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
-        dfg_builder.finish_prelude_hugr_with_outputs(wireoutvec)
+        dfg_builder.finish_hugr_with_outputs(wireoutvec, &test_quantum_extension::REG)
     }
 
     #[fixture]
@@ -372,7 +372,7 @@ pub(in crate::hugr::rewrite) mod test {
 
         (
             dfg_builder
-                .finish_prelude_hugr_with_outputs([b0, b1])
+                .finish_hugr_with_outputs([b0, b1], &test_quantum_extension::REG)
                 .unwrap(),
             vec![not_inp.node(), not_0.node(), not_1.node()],
         )
@@ -404,7 +404,7 @@ pub(in crate::hugr::rewrite) mod test {
 
         (
             dfg_builder
-                .finish_prelude_hugr_with_outputs([b0, b1])
+                .finish_hugr_with_outputs([b0, b1], &test_quantum_extension::REG)
                 .unwrap(),
             vec![not_inp.node(), not_0.node()],
         )
@@ -489,7 +489,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(h.update_validate(&test_quantum_extension::REG), Ok(()));
     }
 
     #[rstest]
@@ -561,7 +561,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(h.update_validate(&test_quantum_extension::REG), Ok(()));
     }
 
     #[test]
@@ -573,7 +573,9 @@ pub(in crate::hugr::rewrite) mod test {
         circ.append(cx_gate(), [1, 0]).unwrap();
         let wires = circ.finish();
         let [input, output] = builder.io();
-        let mut h = builder.finish_prelude_hugr_with_outputs(wires).unwrap();
+        let mut h = builder
+            .finish_hugr_with_outputs(wires, &test_quantum_extension::REG)
+            .unwrap();
         let replacement = h.clone();
         let orig = h.clone();
 
@@ -632,13 +634,17 @@ pub(in crate::hugr::rewrite) mod test {
             .unwrap()
             .outputs();
         let [input, _] = builder.io();
-        let mut h = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
+        let mut h = builder
+            .finish_hugr_with_outputs(outw, &test_quantum_extension::REG)
+            .unwrap();
 
         let mut builder = DFGBuilder::new(inout_sig(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
         let outw = builder.add_dataflow_op(and_op(), inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();
-        let repl = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
+        let repl = builder
+            .finish_hugr_with_outputs(outw, &test_quantum_extension::REG)
+            .unwrap();
 
         let orig = h.clone();
 
@@ -747,7 +753,8 @@ pub(in crate::hugr::rewrite) mod test {
             let not = b.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
             let [w_not] = not.outputs_arr();
             (
-                b.finish_prelude_hugr_with_outputs([w, w_not]).unwrap(),
+                b.finish_hugr_with_outputs([w, w_not], &test_quantum_extension::REG)
+                    .unwrap(),
                 not.node(),
             )
         };

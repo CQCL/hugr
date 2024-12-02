@@ -5,9 +5,10 @@ use hugr_core::extension::prelude::{
 };
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::ops::Value;
-use hugr_core::std_extensions::arithmetic;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+use hugr_core::std_extensions::arithmetic::{self, float_ops, float_types};
+use hugr_core::std_extensions::collections;
 use hugr_core::std_extensions::logic::{self, LogicOp};
 use hugr_core::type_row;
 use hugr_core::types::{Signature, Type, TypeRow, TypeRowRV};
@@ -22,6 +23,21 @@ use hugr_core::ops::OpType;
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr_core::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+
+lazy_static! {
+    /// A registry containing various extensions for testing.
+    pub(crate) static ref TEST_REG: ExtensionRegistry = ExtensionRegistry::try_new([
+        PRELUDE.clone(),
+        arithmetic::int_ops::EXTENSION.clone(),
+        arithmetic::int_types::EXTENSION.clone(),
+        float_types::EXTENSION.clone(),
+        float_ops::EXTENSION.clone(),
+        logic::EXTENSION.clone(),
+        arithmetic::conversions::EXTENSION.to_owned(),
+        collections::EXTENSION.to_owned(),
+    ])
+    .unwrap();
+}
 
 /// Check that a hugr just loads and returns a single expected constant.
 pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
@@ -105,20 +121,12 @@ fn test_big() {
         .add_dataflow_op(ConvertOpDef::trunc_u.with_log_width(5), sub.outputs())
         .unwrap();
 
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-        arithmetic::float_types::EXTENSION.to_owned(),
-        arithmetic::float_ops::EXTENSION.to_owned(),
-        arithmetic::conversions::EXTENSION.to_owned(),
-    ])
-    .unwrap();
     let mut h = build
-        .finish_hugr_with_outputs(to_int.outputs(), &reg)
+        .finish_hugr_with_outputs(to_int.outputs(), &TEST_REG)
         .unwrap();
     assert_eq!(h.node_count(), 8);
 
-    constant_fold_pass(&mut h, &reg);
+    constant_fold_pass(&mut h, &TEST_REG);
 
     let expected = const_ok(i2c(2).clone(), error_type());
     assert_fully_folded(&h, &expected);
@@ -128,14 +136,8 @@ fn test_big() {
 #[ignore = "Waiting for `unwrap` operation"]
 // TODO: https://github.com/CQCL/hugr/issues/1486
 fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
-    use hugr_core::std_extensions::collections::{self, ListOp, ListValue};
+    use hugr_core::std_extensions::collections::{ListOp, ListValue};
 
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        logic::EXTENSION.to_owned(),
-        collections::EXTENSION.to_owned(),
-    ])
-    .unwrap();
     let base_list: Value = ListValue::new(bool_t(), [Value::false_val()]).into();
     let mut build = DFGBuilder::new(Signature::new(
         type_row![],
@@ -149,7 +151,7 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(
             ListOp::pop
                 .with_type(bool_t())
-                .to_extension_op(&reg)
+                .to_extension_op(&TEST_REG)
                 .unwrap(),
             [list],
         )?
@@ -162,15 +164,15 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(
             ListOp::push
                 .with_type(bool_t())
-                .to_extension_op(&reg)
+                .to_extension_op(&TEST_REG)
                 .unwrap(),
             [list, elem],
         )?
         .outputs_arr();
 
-    let mut h = build.finish_hugr_with_outputs([list], &reg)?;
+    let mut h = build.finish_hugr_with_outputs([list], &TEST_REG)?;
 
-    constant_fold_pass(&mut h, &reg);
+    constant_fold_pass(&mut h, &TEST_REG);
 
     assert_fully_folded(&h, &base_list);
     Ok(())
@@ -186,10 +188,10 @@ fn test_fold_and() {
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::true_val());
     let x2 = build.add_dataflow_op(LogicOp::And, [x0, x1]).unwrap();
-    let reg =
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -204,10 +206,10 @@ fn test_fold_or() {
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::false_val());
     let x2 = build.add_dataflow_op(LogicOp::Or, [x0, x1]).unwrap();
-    let reg =
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -221,10 +223,10 @@ fn test_fold_not() {
     let mut build = DFGBuilder::new(noargfn(bool_t())).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_dataflow_op(LogicOp::Not, [x0]).unwrap();
-    let reg =
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::false_val();
     assert_fully_folded(&h, &expected);
 }
@@ -250,9 +252,9 @@ fn orphan_output() {
         .unwrap();
     let or_node = r.node();
     let parent = build.container_node();
-    let reg =
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
-    let mut h = build.finish_hugr_with_outputs(r.outputs(), &reg).unwrap();
+    let mut h = build
+        .finish_hugr_with_outputs(r.outputs(), &TEST_REG)
+        .unwrap();
 
     // we delete the original Not and create a new One. This means it will be
     // traversed by `constant_fold_pass` after the Or.
@@ -261,7 +263,7 @@ fn orphan_output() {
     h.disconnect(or_node, IncomingPort::from(1));
     h.connect(new_not, 0, or_node, 1);
     h.remove_node(orig_not.node());
-    constant_fold_pass(&mut h, &reg);
+    constant_fold_pass(&mut h, &TEST_REG);
     assert_fully_folded(&h, &Value::true_val())
 }
 
@@ -291,33 +293,25 @@ fn test_folding_pass_issue_996() {
     let x7 = build
         .add_dataflow_op(LogicOp::Or, x4.outputs().chain(x6.outputs()))
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        logic::EXTENSION.to_owned(),
-        arithmetic::float_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x7.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x7.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
 
 #[test]
 fn test_const_fold_to_nonfinite() {
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::float_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-
     // HUGR computing 1.0 / 1.0
     let mut build = DFGBuilder::new(noargfn(vec![float64_type()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
-    let mut h0 = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h0, &reg);
+    let mut h0 = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h0, &TEST_REG);
     assert_fully_folded_with(&h0, |v| {
         v.get_custom_value::<ConstF64>().unwrap().value() == 1.0
     });
@@ -328,8 +322,10 @@ fn test_const_fold_to_nonfinite() {
     let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(0.0)));
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
-    let mut h1 = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h1, &reg);
+    let mut h1 = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h1, &TEST_REG);
     assert_eq!(h1.node_count(), 8);
 }
 
@@ -345,13 +341,10 @@ fn test_fold_iwiden_u() {
     let x1 = build
         .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(4, 5), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 13).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -368,13 +361,10 @@ fn test_fold_iwiden_s() {
     let x1 = build
         .add_dataflow_op(IntOpDef::iwiden_s.with_two_log_widths(4, 5), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, -3).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -419,13 +409,10 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
             [x0],
         )
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     lazy_static! {
         static ref INARROW_ERROR_VALUE: ConstError = ConstError {
             signal: 0,
@@ -452,13 +439,10 @@ fn test_fold_itobool() {
     let x1 = build
         .add_dataflow_op(ConvertOpDef::itobool.without_log_width(), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -475,13 +459,10 @@ fn test_fold_ifrombool() {
     let x1 = build
         .add_dataflow_op(ConvertOpDef::ifrombool.without_log_width(), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(0, 0).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -498,13 +479,10 @@ fn test_fold_ieq() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ieq.with_log_width(3), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -521,13 +499,10 @@ fn test_fold_ine() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ine.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -544,13 +519,10 @@ fn test_fold_ilt_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ilt_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -567,13 +539,10 @@ fn test_fold_ilt_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ilt_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::false_val();
     assert_fully_folded(&h, &expected);
 }
@@ -590,13 +559,10 @@ fn test_fold_igt_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::igt_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::false_val();
     assert_fully_folded(&h, &expected);
 }
@@ -613,13 +579,10 @@ fn test_fold_igt_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::igt_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -636,13 +599,10 @@ fn test_fold_ile_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ile_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -659,13 +619,10 @@ fn test_fold_ile_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ile_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -682,13 +639,10 @@ fn test_fold_ige_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ige_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::false_val();
     assert_fully_folded(&h, &expected);
 }
@@ -705,13 +659,10 @@ fn test_fold_ige_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ige_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }
@@ -728,13 +679,10 @@ fn test_fold_imax_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imax_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 11).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -751,13 +699,10 @@ fn test_fold_imax_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imax_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, 1).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -774,13 +719,10 @@ fn test_fold_imin_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imin_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 7).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -797,13 +739,10 @@ fn test_fold_imin_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imin_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, -2).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -820,13 +759,10 @@ fn test_fold_iadd() {
     let x2 = build
         .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, -1).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -843,13 +779,10 @@ fn test_fold_isub() {
     let x2 = build
         .add_dataflow_op(IntOpDef::isub.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, -3).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -865,13 +798,10 @@ fn test_fold_ineg() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ineg.with_log_width(5), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, 2).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -888,13 +818,10 @@ fn test_fold_imul() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imul.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, -14).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -914,13 +841,10 @@ fn test_fold_idivmod_checked_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::idivmod_checked_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = ConstError {
         signal: 0,
         message: "Division by zero".to_string(),
@@ -946,13 +870,10 @@ fn test_fold_idivmod_u() {
     let x4 = build
         .add_dataflow_op(IntOpDef::iadd.with_log_width(3), [x2, x3])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x4.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x4.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(3, 8).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -972,13 +893,10 @@ fn test_fold_idivmod_checked_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::idivmod_checked_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = ConstError {
         signal: 0,
         message: "Division by zero".to_string(),
@@ -1006,13 +924,10 @@ fn test_fold_idivmod_s(#[case] a: i64, #[case] b: u64, #[case] c: i64) {
     let x4 = build
         .add_dataflow_op(IntOpDef::iadd.with_log_width(6), [x2, x3])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x4.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x4.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(6, c).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1030,13 +945,10 @@ fn test_fold_idiv_checked_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::idiv_checked_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = ConstError {
         signal: 0,
         message: "Division by zero".to_string(),
@@ -1057,13 +969,10 @@ fn test_fold_idiv_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::idiv_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 6).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1081,13 +990,10 @@ fn test_fold_imod_checked_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imod_checked_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = ConstError {
         signal: 0,
         message: "Division by zero".to_string(),
@@ -1108,13 +1014,10 @@ fn test_fold_imod_u() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imod_u.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 2).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1132,13 +1035,10 @@ fn test_fold_idiv_checked_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::idiv_checked_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = ConstError {
         signal: 0,
         message: "Division by zero".to_string(),
@@ -1159,13 +1059,10 @@ fn test_fold_idiv_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::idiv_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_s(5, -7).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1183,13 +1080,10 @@ fn test_fold_imod_checked_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imod_checked_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = ConstError {
         signal: 0,
         message: "Division by zero".to_string(),
@@ -1210,13 +1104,10 @@ fn test_fold_imod_s() {
     let x2 = build
         .add_dataflow_op(IntOpDef::imod_s.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 1).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1232,13 +1123,10 @@ fn test_fold_iabs() {
     let x2 = build
         .add_dataflow_op(IntOpDef::iabs.with_log_width(5), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 2).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1255,13 +1143,10 @@ fn test_fold_iand() {
     let x2 = build
         .add_dataflow_op(IntOpDef::iand.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 4).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1278,13 +1163,10 @@ fn test_fold_ior() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ior.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 30).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1301,13 +1183,10 @@ fn test_fold_ixor() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ixor.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 26).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1323,13 +1202,10 @@ fn test_fold_inot() {
     let x2 = build
         .add_dataflow_op(IntOpDef::inot.with_log_width(5), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, (1u64 << 32) - 15).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1346,13 +1222,10 @@ fn test_fold_ishl() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ishl.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 112).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1369,13 +1242,10 @@ fn test_fold_ishr() {
     let x2 = build
         .add_dataflow_op(IntOpDef::ishr.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 1).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1392,13 +1262,10 @@ fn test_fold_irotl() {
     let x2 = build
         .add_dataflow_op(IntOpDef::irotl.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 3 * (1u64 << 30) + 1).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1415,13 +1282,10 @@ fn test_fold_irotr() {
     let x2 = build
         .add_dataflow_op(IntOpDef::irotr.with_log_width(5), [x0, x1])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x2.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstInt::new_u(5, 3 * (1u64 << 30) + 1).unwrap());
     assert_fully_folded(&h, &expected);
 }
@@ -1437,13 +1301,10 @@ fn test_fold_itostring_u() {
     let x1 = build
         .add_dataflow_op(ConvertOpDef::itostring_u.with_log_width(5), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstString::new("17".into()));
     assert_fully_folded(&h, &expected);
 }
@@ -1459,13 +1320,10 @@ fn test_fold_itostring_s() {
     let x1 = build
         .add_dataflow_op(ConvertOpDef::itostring_s.with_log_width(5), [x0])
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x1.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::extension(ConstString::new("-17".into()));
     assert_fully_folded(&h, &expected);
 }
@@ -1502,14 +1360,10 @@ fn test_fold_int_ops() {
     let x7 = build
         .add_dataflow_op(LogicOp::Or, x4.outputs().chain(x6.outputs()))
         .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        logic::EXTENSION.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x7.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
+    let mut h = build
+        .finish_hugr_with_outputs(x7.outputs(), &TEST_REG)
+        .unwrap();
+    constant_fold_pass(&mut h, &TEST_REG);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
 }

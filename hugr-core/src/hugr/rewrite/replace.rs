@@ -462,7 +462,7 @@ mod test {
     use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
     use crate::std_extensions::collections::{self, list_type, ListOp};
     use crate::types::{Signature, Type, TypeRow};
-    use crate::utils::depth;
+    use crate::utils::{depth, test_quantum_extension};
     use crate::{type_row, Direction, Extension, Hugr, HugrView, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
@@ -657,6 +657,8 @@ mod test {
         let baz = ext
             .instantiate_extension_op("baz", [], &PRELUDE_REGISTRY)
             .unwrap();
+        let mut registry = test_quantum_extension::REG.clone();
+        registry.register(ext).unwrap();
 
         let mut h = DFGBuilder::new(
             Signature::new(vec![usize_t(), bool_t()], vec![usize_t()])
@@ -688,7 +690,7 @@ mod test {
         let case2 = case2.finish_with_outputs(baz_dfg.outputs()).unwrap().node();
         let cond = cond.finish_sub_container().unwrap();
         let h = h
-            .finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)
+            .finish_hugr_with_outputs(cond.outputs(), &registry)
             .unwrap();
 
         let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());

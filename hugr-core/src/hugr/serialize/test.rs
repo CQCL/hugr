@@ -11,7 +11,8 @@ use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
-use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
+use crate::hugr::ExtensionResolutionError;
+use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
@@ -22,6 +23,7 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
+use crate::utils::test_quantum_extension;
 use crate::{type_row, OutgoingPort};
 
 use itertools::Itertools;
@@ -331,7 +333,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .out_wire(0);
     }
-    let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
+    let hugr = dfg.finish_hugr_with_outputs(params, &test_quantum_extension::REG)?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -350,7 +352,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .out_wire(0);
 
-    let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
+    let hugr = dfg.finish_hugr_with_outputs([wire], &test_quantum_extension::REG)?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -368,6 +370,7 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(extension_op.clone(), [wire])
         .unwrap()
         .out_wire(0);
+    let not_node = wire.node();
 
     // Add an unresolved opaque operation
     let opaque_op: OpaqueOp = extension_op.into();

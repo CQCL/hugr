@@ -243,6 +243,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
+    use crate::builder::{Container, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY};
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
@@ -308,33 +309,44 @@ mod test {
             .instantiate_extension_op("MyOp", [], &PRELUDE_REGISTRY)
             .unwrap();
 
-        let build_res = build_main(
-            Signature::new(
-                vec![qb_t(), qb_t(), usize_t()],
-                vec![qb_t(), qb_t(), bool_t()],
+        let mut module_builder = ModuleBuilder::new();
+        let mut f_build = module_builder
+            .define_function(
+                "main",
+                Signature::new(
+                    vec![qb_t(), qb_t(), usize_t()],
+                    vec![qb_t(), qb_t(), bool_t()],
+                )
+                .with_extension_delta(ExtensionSet::from_iter([
+                    test_quantum_extension::EXTENSION_ID,
+                    my_ext_name,
+                ])),
             )
-            .with_extension_delta(ExtensionSet::from_iter([
-                test_quantum_extension::EXTENSION_ID,
-                my_ext_name,
-            ]))
-            .into(),
-            |mut f_build| {
-                let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
+            .unwrap();
 
-                let mut linear = f_build.as_circuit([q0, q1]);
+        let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
-                let measure_out = linear
-                    .append(cx_gate(), [0, 1])?
-                    .append_and_consume(
-                        my_custom_op,
-                        [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
-                    )?
-                    .append_with_outputs(measure(), [0])?;
+        let mut linear = f_build.as_circuit([q0, q1]);
 
-                let out_qbs = linear.finish();
-                f_build.finish_with_outputs(out_qbs.into_iter().chain(measure_out))
-            },
-        );
+        let measure_out = linear
+            .append(cx_gate(), [0, 1])
+            .unwrap()
+            .append_and_consume(
+                my_custom_op,
+                [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+            )
+            .unwrap()
+            .append_with_outputs(measure(), [0])
+            .unwrap();
+
+        let out_qbs = linear.finish();
+        f_build
+            .finish_with_outputs(out_qbs.into_iter().chain(measure_out))
+            .unwrap();
+
+        let mut registry = test_quantum_extension::REG.clone();
+        registry.register(my_ext).unwrap();
+        let build_res = module_builder.finish_hugr(&registry);
 
         assert_matches!(build_res, Ok(_));
     }

@@ -795,10 +795,7 @@ mod tests {
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
-        extension::{
-            prelude::{bool_t, qb_t},
-            EMPTY_REG,
-        },
+        extension::prelude::{bool_t, qb_t},
         hugr::views::{HierarchyView, SiblingGraph},
         ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::test::and_op,
@@ -881,7 +878,7 @@ mod tests {
             dfg.finish_with_outputs(outs3.outputs())?
         };
         let hugr = mod_builder
-            .finish_prelude_hugr()
+            .finish_hugr(&test_quantum_extension::REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -903,7 +900,7 @@ mod tests {
             dfg.finish_with_outputs([b1, b2])?
         };
         let hugr = mod_builder
-            .finish_prelude_hugr()
+            .finish_hugr(&test_quantum_extension::REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -924,7 +921,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr(&EMPTY_REG)
+            .finish_hugr(&test_quantum_extension::REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -1170,7 +1167,9 @@ mod tests {
             .unwrap()
             .outputs();
         let outw = [outw1].into_iter().chain(outw2);
-        let h = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
+        let h = builder
+            .finish_hugr_with_outputs(outw, &test_quantum_extension::REG)
+            .unwrap();
         let view = SiblingGraph::<DfgID>::try_new(&h, h.root()).unwrap();
         let subg = SiblingSubgraph::try_new_dataflow_subgraph(&view).unwrap();
         assert_eq!(subg.nodes().len(), 2);

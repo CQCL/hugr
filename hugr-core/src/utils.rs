@@ -106,6 +106,8 @@ pub(crate) mod test_quantum_extension {
     use std::sync::Arc;
 
     use crate::ops::{OpName, OpNameRef};
+    use crate::std_extensions::arithmetic::float_ops;
+    use crate::std_extensions::logic;
     use crate::types::FuncValueType;
     use crate::{
         extension::{
@@ -190,7 +192,15 @@ pub(crate) mod test_quantum_extension {
     lazy_static! {
         /// Quantum extension definition.
         pub static ref EXTENSION: Arc<Extension> = extension();
-        static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.clone(), PRELUDE.clone(), float_types::EXTENSION.clone()]).unwrap();
+
+        /// A registry with all necessary extensions to run tests internally, including the test quantum extension.
+        pub static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([
+            EXTENSION.clone(),
+            PRELUDE.clone(),
+            float_types::EXTENSION.clone(),
+            float_ops::EXTENSION.clone(),
+            logic::EXTENSION.clone()
+        ]).unwrap();
 
     }
 

@@ -26,6 +26,7 @@ use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
+use crate::utils::test_quantum_extension;
 use crate::{
     const_extension_ids, test_file, type_row, Direction, IncomingPort, Node, OutgoingPort,
 };
@@ -127,13 +128,13 @@ fn dfg_root() {
     let mut b = Hugr::new(dfg_op);
     let root = b.root();
     add_df_children(&mut b, root, 1);
-    assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
+    assert_eq!(b.update_validate(&test_quantum_extension::REG), Ok(()));
 }
 
 #[test]
 fn simple_hugr() {
     let mut b = make_simple_hugr(2).0;
-    assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
+    assert_eq!(b.update_validate(&test_quantum_extension::REG), Ok(()));
 }
 
 #[test]
@@ -158,7 +159,7 @@ fn children_restrictions() {
         },
     );
     assert_matches!(
-        b.update_validate(&EMPTY_REG),
+        b.update_validate(&test_quantum_extension::REG),
         Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
     );
 
@@ -166,7 +167,7 @@ fn children_restrictions() {
     add_df_children(&mut b, new_def, 2);
     b.set_parent(new_def, copy);
     assert_matches!(
-        b.update_validate(&EMPTY_REG),
+        b.update_validate(&test_quantum_extension::REG),
         Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
     );
     b.set_parent(new_def, root);
@@ -175,7 +176,7 @@ fn children_restrictions() {
     // add an input node to the module subgraph
     let new_input = b.add_node_with_parent(root, ops::Input::new(type_row![]));
     assert_matches!(
-        b.validate(&EMPTY_REG),
+        b.validate(&test_quantum_extension::REG),
         Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
     );
 }
@@ -194,7 +195,7 @@ fn df_children_restrictions() {
     // Replace the output operation of the df subgraph with a copy
     b.replace_op(output, Noop(usize_t())).unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG),
+        b.validate(&test_quantum_extension::REG),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
     );
 
@@ -202,7 +203,7 @@ fn df_children_restrictions() {
     b.replace_op(output, ops::Output::new(vec![bool_t()]))
         .unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG),
+        b.validate(&test_quantum_extension::REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
             => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
     );
@@ -213,7 +214,7 @@ fn df_children_restrictions() {
     b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]))
         .unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG),
+        b.validate(&test_quantum_extension::REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
             => {assert_eq!(parent, def); assert_eq!(child, copy.pg_index())}
     );
@@ -248,20 +249,20 @@ fn test_ext_edge() {
     h.connect(sub_dfg, 0, output, 0);
 
     assert_matches!(
-        h.update_validate(&EMPTY_REG),
+        h.update_validate(&test_quantum_extension::REG),
         Err(ValidationError::UnconnectedPort { .. })
     );
 
     h.connect(input, 1, sub_op, 1);
     assert_matches!(
-        h.update_validate(&EMPTY_REG),
+        h.update_validate(&test_quantum_extension::REG),
         Err(ValidationError::InterGraphEdgeError(
             InterGraphEdgeError::MissingOrderEdge { .. }
         ))
     );
     //Order edge. This will need metadata indicating its purpose.
     h.add_other_edge(input, sub_dfg);
-    h.update_validate(&EMPTY_REG).unwrap();
+    h.update_validate(&test_quantum_extension::REG).unwrap();
 }
 
 #[test]
@@ -277,7 +278,7 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
     let func = func.finish_with_outputs(and_op.outputs())?;
     let loadfn = dfg.load_func(func.handle(), &[], &EMPTY_REG)?;
     let dfg = dfg.finish_with_outputs([loadfn])?;
-    let res = h.finish_hugr_with_outputs(dfg.outputs(), &EMPTY_REG);
+    let res = h.finish_hugr_with_outputs(dfg.outputs(), &test_quantum_extension::REG);
     assert_eq!(
         res,
         Err(BuildError::InvalidHUGR(
@@ -302,7 +303,7 @@ fn test_local_const() {
     h.connect(input, 0, and, 0);
     h.connect(and, 0, output, 0);
     assert_eq!(
-        h.update_validate(&EMPTY_REG),
+        h.update_validate(&test_quantum_extension::REG),
         Err(ValidationError::UnconnectedPort {
             node: and,
             port: IncomingPort::from(1).into(),
@@ -323,7 +324,7 @@ fn test_local_const() {
     h.connect(lcst, 0, and, 1);
     assert_eq!(h.static_source(lcst), Some(cst));
     // There is no edge from Input to LoadConstant, but that's OK:
-    h.update_validate(&EMPTY_REG).unwrap();
+    h.update_validate(&test_quantum_extension::REG).unwrap();
 }
 
 #[test]
@@ -339,7 +340,10 @@ fn dfg_with_cycles() {
     h.connect(input, 1, not2, 0);
     h.connect(not2, 0, output, 0);
     // The graph contains a cycle:
-    assert_matches!(h.validate(&EMPTY_REG), Err(ValidationError::NotADag { .. }));
+    assert_matches!(
+        h.validate(&test_quantum_extension::REG),
+        Err(ValidationError::NotADag { .. })
+    );
 }
 
 fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
@@ -366,7 +370,7 @@ fn unregistered_extension() {
         h.validate(&EMPTY_REG),
         Err(ValidationError::SignatureError { .. })
     );
-    h.update_validate(&PRELUDE_REGISTRY).unwrap();
+    h.update_validate(&test_quantum_extension::REG).unwrap();
 }
 
 const_extension_ids! {
@@ -828,7 +832,7 @@ fn cfg_children_restrictions() {
         .unwrap();
     // Write Extension annotations into the Hugr while it's still well-formed
     // enough for us to compute them
-    b.validate(&EMPTY_REG).unwrap();
+    b.validate(&test_quantum_extension::REG).unwrap();
     b.replace_op(
         copy,
         ops::CFG {
@@ -837,7 +841,7 @@ fn cfg_children_restrictions() {
     )
     .unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG),
+        b.validate(&test_quantum_extension::REG),
         Err(ValidationError::ContainerWithoutChildren { .. })
     );
     let cfg = copy;
@@ -873,7 +877,7 @@ fn cfg_children_restrictions() {
         },
     );
     b.add_other_edge(block, exit);
-    assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
+    assert_eq!(b.update_validate(&test_quantum_extension::REG), Ok(()));
 
     // Test malformed errors
 
@@ -885,7 +889,7 @@ fn cfg_children_restrictions() {
         },
     );
     assert_matches!(
-        b.validate(&EMPTY_REG),
+        b.validate(&test_quantum_extension::REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
             => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
     );
@@ -920,7 +924,7 @@ fn cfg_children_restrictions() {
     )
     .unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG),
+        b.validate(&test_quantum_extension::REG),
         Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
             => assert_eq!(parent, cfg)
     );

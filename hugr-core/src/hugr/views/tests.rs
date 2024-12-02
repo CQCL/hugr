@@ -1,6 +1,8 @@
 use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
+use crate::std_extensions::logic::LOGIC_REG;
+use crate::utils::test_quantum_extension;
 use crate::{
     builder::{
         endo_sig, inout_sig, BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr,
@@ -32,7 +34,8 @@ pub(crate) fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dat
     dfg.add_other_wire(n1.node(), n2.node());
 
     (
-        dfg.finish_prelude_hugr_with_outputs(n2.outputs()).unwrap(),
+        dfg.finish_hugr_with_outputs(n2.outputs(), &test_quantum_extension::REG)
+            .unwrap(),
         n1,
         n2,
     )
@@ -143,7 +146,10 @@ fn value_types() {
     let n2 = dfg.add_dataflow_op(LogicOp::Not, [b]).unwrap();
     dfg.add_other_wire(n1.node(), n2.node());
     let h = dfg
-        .finish_prelude_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
+        .finish_hugr_with_outputs(
+            [n2.out_wire(0), n1.out_wire(0)],
+            &test_quantum_extension::REG,
+        )
         .unwrap();
 
     let [_, o] = h.get_io(h.root()).unwrap();
@@ -178,7 +184,7 @@ fn static_targets() {
 #[test]
 fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
-    use crate::extension::{prelude::bool_t, PRELUDE_REGISTRY};
+    use crate::extension::prelude::bool_t;
     use crate::hugr::views::PortIterator;
 
     use itertools::Itertools;
@@ -195,16 +201,11 @@ fn test_dataflow_ports_only() {
 
     let not = dfg.add_dataflow_op(LogicOp::Not, [in_bool]).unwrap();
     let call = dfg
-        .call(
-            local_and.handle(),
-            &[],
-            [not.out_wire(0); 2],
-            &PRELUDE_REGISTRY,
-        )
+        .call(local_and.handle(), &[], [not.out_wire(0); 2], &LOGIC_REG)
         .unwrap();
     dfg.add_other_wire(not.node(), call.node());
     let h = dfg
-        .finish_hugr_with_outputs(not.outputs(), &PRELUDE_REGISTRY)
+        .finish_hugr_with_outputs(not.outputs(), &LOGIC_REG)
         .unwrap();
     let filtered_ports = h
         .all_linked_outputs(call.node())
