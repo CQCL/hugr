@@ -1,6 +1,6 @@
 use fxhash::FxHashMap;
+use std::collections::hash_map::Entry as HashMapEntry;
 use std::hash::Hash;
-use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct Bindings<K, S, V> {
@@ -28,28 +28,42 @@ where
         }
     }
 
-    /// Insert a new binding into the current scope.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no current scope.
-    pub fn insert(&mut self, key: K, value: V) -> Result<(), InsertBindingError<V>> {
+    pub fn entry(&mut self, key: K) -> Entry<K, V> {
         let scope = self
             .scopes
             .len()
             .checked_sub(1)
             .expect("no scope to insert into");
 
-        match self.bindings.insert(key, (value, scope)) {
-            Some(shadowed) if shadowed.1 == scope => {
-                self.bindings.insert(key, shadowed);
-                Err(InsertBindingError::Duplicate(shadowed.0))
+        let undo_log = &mut self.undo_log;
+
+        match self.bindings.entry(key) {
+            HashMapEntry::Occupied(entry) if entry.get().1 == scope => {
+                Entry::Occupied(OccupiedEntry { entry })
             }
-            shadowed => {
-                self.undo_log.push((key, shadowed));
-                Ok(())
-            }
+            HashMapEntry::Occupied(entry) => Entry::Visible(VisibleEntry {
+                entry,
+                scope,
+                undo_log,
+            }),
+            HashMapEntry::Vacant(entry) => Entry::Vacant(VacantEntry {
+                scope,
+                entry,
+                undo_log,
+            }),
         }
+    }
+
+    /// Try to insert a new binding into the current scope.
+    ///
+    /// If the key is already bound in the current scope, the old value is returned
+    /// and the bindings remain unchanged.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no current scope.
+    pub fn try_insert(&mut self, key: K, value: V) -> Result<(), V> {
+        self.entry(key).try_insert(value)
     }
 
     /// Retrieve a binding with the given key.
@@ -118,29 +132,126 @@ where
 type ScopeId = usize;
 type UndoDepth = usize;
 
-/// Error that can occur when inserting a binding.
-#[derive(Debug, Error)]
-pub enum InsertBindingError<V> {
-    /// The binding has already been defined in this scope.
-    #[error("binding has already been defined in this scope")]
-    Duplicate(V),
+/// An entry in a [`Bindings`] map.
+pub enum Entry<'a, K, V> {
+    Occupied(OccupiedEntry<'a, K, V>),
+    Vacant(VacantEntry<'a, K, V>),
+    Visible(VisibleEntry<'a, K, V>),
+}
+
+impl<'a, K, V> Entry<'a, K, V>
+where
+    K: Eq + Hash + Copy,
+    V: Copy,
+{
+    pub fn key(&self) -> K {
+        match self {
+            Entry::Occupied(entry) => entry.key(),
+            Entry::Vacant(entry) => entry.key(),
+            Entry::Visible(entry) => entry.key(),
+        }
+    }
+
+    pub fn try_insert(self, value: V) -> Result<(), V> {
+        match self {
+            Entry::Occupied(entry) => Err(entry.get()),
+            Entry::Vacant(entry) => {
+                entry.insert(value);
+                Ok(())
+            }
+            Entry::Visible(entry) => {
+                entry.insert(value);
+                Ok(())
+            }
+        }
+    }
+}
+
+/// An entry in a [`Bindings`] map that is occupied by a binding in a parent scope,
+/// but vacant in the current scope.
+pub struct VisibleEntry<'a, K, V> {
+    entry: std::collections::hash_map::OccupiedEntry<'a, K, (V, ScopeId)>,
+    undo_log: &'a mut Vec<(K, Option<(V, ScopeId)>)>,
+    scope: ScopeId,
+}
+
+impl<'a, K, V> VisibleEntry<'a, K, V>
+where
+    K: Eq + Hash + Copy,
+    V: Copy,
+{
+    pub fn key(&self) -> K {
+        *self.entry.key()
+    }
+
+    pub fn get(&self) -> V {
+        self.entry.get().0
+    }
+
+    pub fn insert(mut self, value: V) {
+        let key = self.key();
+        let shadowed = self.entry.insert((value, self.scope));
+        self.undo_log.push((key, Some(shadowed)));
+    }
+}
+
+/// An entry in a [`Bindings`] map that is occupied in the current scope.
+pub struct OccupiedEntry<'a, K, V> {
+    entry: std::collections::hash_map::OccupiedEntry<'a, K, (V, ScopeId)>,
+}
+
+impl<'a, K, V> OccupiedEntry<'a, K, V>
+where
+    K: Eq + Hash + Copy,
+    V: Copy,
+{
+    pub fn key(&self) -> K {
+        *self.entry.key()
+    }
+
+    pub fn get(&self) -> V {
+        self.entry.get().0
+    }
+}
+
+/// An entry in a [`Bindings`] map that is vacant in the current scope and not visible
+/// from any parent scope.
+pub struct VacantEntry<'a, K, V> {
+    entry: std::collections::hash_map::VacantEntry<'a, K, (V, ScopeId)>,
+    undo_log: &'a mut Vec<(K, Option<(V, ScopeId)>)>,
+    scope: ScopeId,
+}
+
+impl<'a, K, V> VacantEntry<'a, K, V>
+where
+    K: Eq + Hash + Copy,
+    V: Copy,
+{
+    pub fn key(&self) -> K {
+        *self.entry.key()
+    }
+
+    pub fn insert(self, value: V) {
+        let key = self.key();
+        self.entry.insert((value, self.scope));
+        self.undo_log.push((key, None));
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::Bindings;
-    use super::InsertBindingError;
 
     #[test]
     fn shadow() {
         let mut bindings = Bindings::<&'static str, (), usize>::new();
         bindings.enter(());
-        bindings.insert("foo", 1).unwrap();
+        assert_eq!(bindings.try_insert("foo", 1), Ok(()));
         assert_eq!(bindings.get("foo"), Some(1));
         bindings.enter(());
         // The binding for `foo` is still visible in the new scope:
         assert_eq!(bindings.get("foo"), Some(1));
-        bindings.insert("foo", 2).unwrap();
+        assert_eq!(bindings.try_insert("foo", 2), Ok(()));
         // The new binding shadows the old one:
         assert_eq!(bindings.get("foo"), Some(2));
         bindings.exit();
@@ -155,12 +266,12 @@ mod test {
     fn shadow_isolated() {
         let mut bindings = Bindings::<&'static str, (), usize>::new();
         bindings.enter(());
-        bindings.insert("foo", 1).unwrap();
+        assert_eq!(bindings.try_insert("foo", 1), Ok(()));
         assert_eq!(bindings.get("foo"), Some(1));
         bindings.enter_isolated(());
         // The binding for `foo` is not visible in the new scope:
         assert_eq!(bindings.get("foo"), None);
-        bindings.insert("foo", 2).unwrap();
+        assert_eq!(bindings.try_insert("foo", 2), Ok(()));
         assert_eq!(bindings.get("foo"), Some(2));
         bindings.exit();
         // The old binding is restored:
@@ -173,12 +284,9 @@ mod test {
     fn duplicate() {
         let mut bindings = Bindings::<&'static str, (), usize>::new();
         bindings.enter(());
-        bindings.insert("foo", 1).unwrap();
+        assert_eq!(bindings.try_insert("foo", 1), Ok(()));
         assert_eq!(bindings.get("foo"), Some(1));
-        assert!(matches!(
-            bindings.insert("foo", 2),
-            Err(InsertBindingError::Duplicate(1))
-        ));
+        assert_eq!(bindings.try_insert("foo", 2), Err(1));
         // The old binding is still there and unchanged:
         assert_eq!(bindings.get("foo"), Some(1));
     }

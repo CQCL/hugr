@@ -21,9 +21,6 @@
 // TODO: Document that the regions passed to custom operations are currently isolated
 // from the parent scope of links.
 
-// TODO: There is more to link resolution than we currently handle: the sources and
-// targets of a region are scoped to that region, even if the region is not isolated.
-
 // TODO: We currently rely on terms with names not to be deduplicated, since in different
 // scopes the same name may be resolved to different nodes. We should either document this,
 // and make the deduplication process respect this; or we should figure out a solution
@@ -41,7 +38,7 @@ use bumpalo::{collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
 
 mod bindings;
-use bindings::{Bindings, InsertBindingError};
+use bindings::Bindings;
 
 /// Resolve all names in the module.
 ///
@@ -78,7 +75,7 @@ struct Resolver<'m, 'a> {
     var_scope: Bindings<&'a str, NodeId, VarIndex>,
 
     /// Links that are visible in the current scope.
-    link_scope: FxHashMap<&'a str, LinkId>,
+    link_scope: Bindings<&'a str, RegionId, LinkId>,
 
     /// Bit vector to keep track of visited terms so that we do not visit them multiple times.
     term_visited: BitVec,
@@ -93,11 +90,27 @@ impl<'m, 'a> Resolver<'m, 'a> {
             symbol_scope: Bindings::new(),
             var_scope: Bindings::new(),
             symbol_import: FxHashMap::default(),
-            link_scope: FxHashMap::default(),
+            link_scope: Bindings::new(),
         }
     }
 
+    /// Resolve a non-isolated region.
     fn resolve_region(&mut self, region: RegionId) -> Result<(), ModelError> {
+        self.link_scope.enter(region);
+        self.resolve_region_inner(region)?;
+        self.link_scope.exit();
+        Ok(())
+    }
+
+    /// Resolve an isolated region.
+    fn resolve_isolated_region(&mut self, region: RegionId) -> Result<(), ModelError> {
+        self.link_scope.enter_isolated(region);
+        self.resolve_region_inner(region)?;
+        self.link_scope.exit();
+        Ok(())
+    }
+
+    fn resolve_region_inner(&mut self, region: RegionId) -> Result<(), ModelError> {
         let mut region_data = self
             .module
             .get_region(region)
@@ -122,11 +135,9 @@ impl<'m, 'a> Resolver<'m, 'a> {
 
             if let Some(name) = child_data.operation.symbol() {
                 self.symbol_scope
-                    .insert(name, *child)
-                    .map_err(|err| match err {
-                        InsertBindingError::Duplicate(other) => {
-                            SymbolIntroError::DuplicateSymbol(other, *child, name.to_string())
-                        }
+                    .try_insert(name, *child)
+                    .map_err(|other| {
+                        SymbolIntroError::DuplicateSymbol(other, *child, name.to_string())
                     })?;
             }
         }
@@ -141,17 +152,6 @@ impl<'m, 'a> Resolver<'m, 'a> {
 
         self.module.regions[region.index()] = region_data;
 
-        Ok(())
-    }
-
-    /// Resolve an isolated region.
-    ///
-    /// In an isolated region the link scope is not inherited from the parent scope.
-    /// Otherwise the resolution process is the same as in `resolve_region`.
-    fn resolve_isolated_region(&mut self, region: RegionId) -> Result<(), ModelError> {
-        let links = std::mem::take(&mut self.link_scope);
-        self.resolve_region(region)?;
-        self.link_scope = links;
         Ok(())
     }
 
@@ -273,14 +273,14 @@ impl<'m, 'a> Resolver<'m, 'a> {
             let node = *self.var_scope.scope().unwrap();
 
             self.var_scope
-                .insert(param.name, index as u16)
-                .map_err(|err| match err {
-                    InsertBindingError::Duplicate(other) => SymbolIntroError::DuplicateVar(
+                .try_insert(param.name, index as u16)
+                .map_err(|other| {
+                    SymbolIntroError::DuplicateVar(
                         node,
                         other,
                         index as u16,
                         param.name.to_string(),
-                    ),
+                    )
                 })?;
         }
 
@@ -288,8 +288,6 @@ impl<'m, 'a> Resolver<'m, 'a> {
     }
 
     fn resolve_links(&mut self, link_refs: &'a [LinkRef<'a>]) -> &'a [LinkRef<'a>] {
-        use std::collections::hash_map::Entry;
-
         // Short circuit if all links are already resolved.
         if link_refs.iter().all(|l| matches!(l, LinkRef::Id(_))) {
             return link_refs;
@@ -299,17 +297,20 @@ impl<'m, 'a> Resolver<'m, 'a> {
         let mut resolved = BumpVec::with_capacity_in(link_refs.len(), self.bump);
 
         for link_ref in link_refs {
-            resolved.push(match link_ref {
-                LinkRef::Id(_) => *link_ref,
-                LinkRef::Named(name) => match self.link_scope.entry(*name) {
-                    Entry::Occupied(entry) => LinkRef::Id(*entry.get()),
-                    Entry::Vacant(entry) => {
+            let link_id = match *link_ref {
+                LinkRef::Id(link_id) => link_id,
+                LinkRef::Named(name) => match self.link_scope.entry(name) {
+                    bindings::Entry::Occupied(entry) => entry.get(),
+                    bindings::Entry::Visible(entry) => entry.get(),
+                    bindings::Entry::Vacant(entry) => {
                         let link_id = self.module.insert_link(Link { name });
                         entry.insert(link_id);
-                        LinkRef::Id(link_id)
+                        link_id
                     }
                 },
-            });
+            };
+
+            resolved.push(LinkRef::Id(link_id));
         }
 
         resolved.into_bump_slice()
