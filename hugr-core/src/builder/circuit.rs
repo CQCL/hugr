@@ -243,6 +243,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY};
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::utils::test_quantum_extension::{
@@ -250,19 +251,15 @@ mod test {
     };
     use crate::Extension;
     use crate::{
-        builder::{
-            test::{build_main, NAT, QB},
-            DataflowSubContainer,
-        },
-        extension::prelude::BOOL_T,
-        type_row,
+        builder::{test::build_main, DataflowSubContainer},
+        extension::prelude::bool_t,
         types::Signature,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            Signature::new(type_row![QB, QB], type_row![QB, QB])
+            Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .with_extension_delta(float_types::EXTENSION_ID)
                 .into(),
@@ -302,7 +299,7 @@ mod test {
             ext.add_op(
                 "MyOp".into(),
                 "".to_string(),
-                Signature::new(vec![QB, NAT], vec![QB]),
+                Signature::new(vec![qb_t(), usize_t()], vec![qb_t()]),
                 extension_ref,
             )
             .unwrap();
@@ -312,12 +309,15 @@ mod test {
             .unwrap();
 
         let build_res = build_main(
-            Signature::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
-                .with_extension_delta(ExtensionSet::from_iter([
-                    test_quantum_extension::EXTENSION_ID,
-                    my_ext_name,
-                ]))
-                .into(),
+            Signature::new(
+                vec![qb_t(), qb_t(), usize_t()],
+                vec![qb_t(), qb_t(), bool_t()],
+            )
+            .with_extension_delta(ExtensionSet::from_iter([
+                test_quantum_extension::EXTENSION_ID,
+                my_ext_name,
+            ]))
+            .into(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
@@ -342,7 +342,7 @@ mod test {
     #[test]
     fn ancillae() {
         let build_res = build_main(
-            Signature::new_endo(QB)
+            Signature::new_endo(qb_t())
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .into(),
             |mut f_build| {
@@ -380,7 +380,7 @@ mod test {
     #[test]
     fn circuit_builder_errors() {
         let _build_res = build_main(
-            Signature::new_endo(type_row![QB, QB]).into(),
+            Signature::new_endo(vec![qb_t(), qb_t()]).into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
                 let [q0, q1] = circ.tracked_units_arr();

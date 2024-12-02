@@ -40,7 +40,7 @@ fn emit_icmp<'c, H: HugrView>(
             rhs.into_int_value(),
             "",
         )?;
-        // convert to whatever BOOL_T is
+        // convert to whatever bool_t is
         Ok(vec![ctx
             .builder()
             .build_select(r, true_val, false_val, "")?])
@@ -167,7 +167,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 mod test {
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
-        extension::prelude::BOOL_T,
+        extension::prelude::bool_t,
         std_extensions::arithmetic::{int_ops, int_types::INT_TYPES},
         types::TypeRow,
         Hugr,
@@ -187,7 +187,7 @@ mod test {
     }
 
     fn test_binary_icmp_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
-        test_binary_int_op_with_results(name, log_width, vec![BOOL_T])
+        test_binary_int_op_with_results(name, log_width, vec![bool_t()])
     }
     fn test_binary_int_op_with_results(
         name: impl AsRef<str>,

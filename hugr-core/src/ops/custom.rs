@@ -354,7 +354,7 @@ mod test {
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{
-            prelude::{BOOL_T, QB_T, USIZE_T},
+            prelude::{bool_t, qb_t, usize_t},
             SignatureFunc,
         },
         std_extensions::arithmetic::int_types::INT_TYPES,
@@ -366,17 +366,17 @@ mod test {
 
     #[test]
     fn new_opaque_op() {
-        let sig = Signature::new_endo(vec![QB_T]);
+        let sig = Signature::new_endo(vec![qb_t()]);
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
             "desc".into(),
-            vec![TypeArg::Type { ty: USIZE_T }],
+            vec![TypeArg::Type { ty: usize_t() }],
             sig.clone(),
         );
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
-        assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
+        assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
         assert_eq!(
             op.signature(),
             sig.with_extension_delta(op.extension().clone())
@@ -392,7 +392,7 @@ mod test {
             "itobool",
             "description".into(),
             vec![],
-            Signature::new(i0.clone(), BOOL_T),
+            Signature::new(i0.clone(), bool_t()),
         );
         let resolved =
             super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
@@ -404,7 +404,7 @@ mod test {
     fn resolve_missing() {
         let val_name = "missing_val";
         let comp_name = "missing_comp";
-        let endo_sig = Signature::new_endo(BOOL_T);
+        let endo_sig = Signature::new_endo(bool_t());
 
         let ext = Extension::new_test_arc("ext".try_into().unwrap(), |ext, extension_ref| {
             ext.add_op(

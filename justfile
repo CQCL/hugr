@@ -32,7 +32,7 @@ fix language="[rust|python]": (_run_lang language \
 
 # Format the code.
 format language="[rust|python]": (_run_lang language \
-        "cargo fmt" \
+        "cargo fmt --all" \
         "uv run ruff format"
     )
 

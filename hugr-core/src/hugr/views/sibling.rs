@@ -336,16 +336,14 @@ mod test {
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::PRELUDE_REGISTRY;
     use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID};
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::ops::{OpTrait, OpType};
-    use crate::types::{Signature, Type};
+    use crate::types::Signature;
     use crate::utils::test_quantum_extension::EXTENSION_ID;
-    use crate::{type_row, IncomingPort};
-
-    const NAT: Type = crate::extension::prelude::USIZE_T;
-    const QB: Type = crate::extension::prelude::QB_T;
+    use crate::IncomingPort;
 
     use super::super::descendants::test::make_module_hgr;
     use super::*;
@@ -372,7 +370,7 @@ mod test {
         assert_eq!(
             region.poly_func_type(),
             Some(
-                Signature::new_endo(type_row![NAT, QB])
+                Signature::new_endo(vec![usize_t(), qb_t()])
                     .with_extension_delta(EXTENSION_ID)
                     .into()
             )
@@ -380,7 +378,7 @@ mod test {
 
         assert_eq!(
             inner_region.inner_function_type(),
-            Some(Signature::new(type_row![NAT], type_row![NAT]))
+            Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
         assert_eq!(inner_region.edge_count(), 1);
@@ -453,7 +451,7 @@ mod test {
     #[test]
     fn nested_flat() -> Result<(), Box<dyn std::error::Error>> {
         let mut module_builder = ModuleBuilder::new();
-        let fty = Signature::new(type_row![NAT], type_row![NAT]);
+        let fty = Signature::new(vec![usize_t()], vec![usize_t()]);
         let mut fbuild = module_builder.define_function("main", fty.clone())?;
         let dfg = fbuild.dfg_builder(fty, fbuild.input_wires())?;
         let ins = dfg.input_wires();
@@ -472,8 +470,8 @@ mod test {
 
         // Both ways work:
         let just_io = vec![
-            Input::new(type_row![NAT]).into(),
-            Output::new(type_row![NAT]).into(),
+            Input::new(vec![usize_t()]).into(),
+            Output::new(vec![usize_t()]).into(),
         ];
         for d in [dfg_view, nested_dfg_view] {
             assert_eq!(

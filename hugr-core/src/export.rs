@@ -926,9 +926,8 @@ mod test {
 
     use crate::{
         builder::{Dataflow, DataflowSubContainer},
-        extension::prelude::QB_T,
+        extension::prelude::qb_t,
         std_extensions::arithmetic::float_types,
-        type_row,
         types::Signature,
         utils::test_quantum_extension::{self, cx_gate, h_gate},
         Hugr,
@@ -937,7 +936,7 @@ mod test {
     #[fixture]
     fn test_simple_circuit() -> Hugr {
         crate::builder::test::build_main(
-            Signature::new_endo(type_row![QB_T, QB_T])
+            Signature::new_endo(vec![qb_t(), qb_t()])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .with_extension_delta(float_types::EXTENSION_ID)
                 .into(),

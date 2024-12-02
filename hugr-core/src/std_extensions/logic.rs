@@ -1,6 +1,6 @@
 //! Basic logical operations.
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
@@ -10,11 +10,11 @@ use crate::ops::Value;
 use crate::types::Signature;
 use crate::{
     extension::{
-        prelude::BOOL_T,
+        prelude::bool_t,
         simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, OpDef, SignatureFunc,
     },
-    ops, type_row,
+    ops,
     types::type_param::TypeArg,
     utils::sorted_consts,
     Extension, IncomingPort,
@@ -70,14 +70,18 @@ pub enum LogicOp {
 }
 
 impl MakeOpDef for LogicOp {
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
             LogicOp::And | LogicOp::Or | LogicOp::Eq => {
-                Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T])
+                Signature::new(vec![bool_t(); 2], vec![bool_t()])
             }
-            LogicOp::Not => Signature::new_endo(type_row![BOOL_T]),
+            LogicOp::Not => Signature::new_endo(vec![bool_t()]),
         }
         .into()
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 
     fn description(&self) -> String {
@@ -166,7 +170,7 @@ pub(crate) mod test {
     use super::{extension, LogicOp, FALSE_NAME, TRUE_NAME};
     use crate::{
         extension::{
-            prelude::BOOL_T,
+            prelude::bool_t,
             simple_op::{MakeOpDef, MakeRegisteredOp},
         },
         ops::{NamedOp, Value},
@@ -206,16 +210,16 @@ pub(crate) mod test {
 
         for v in [false_val, true_val] {
             let simpl = v.typed_value().get_type();
-            assert_eq!(simpl, BOOL_T);
+            assert_eq!(simpl, bool_t());
         }
     }
 
-    /// Generate a logic extension "and" operation over [`crate::prelude::BOOL_T`]
+    /// Generate a logic extension "and" operation over [`crate::prelude::bool_t()`]
     pub(crate) fn and_op() -> LogicOp {
         LogicOp::And
     }
 
-    /// Generate a logic extension "or" operation over [`crate::prelude::BOOL_T`]
+    /// Generate a logic extension "or" operation over [`crate::prelude::bool_t()`]
     pub(crate) fn or_op() -> LogicOp {
         LogicOp::Or
     }

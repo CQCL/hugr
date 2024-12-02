@@ -1,9 +1,9 @@
 //! Basic integer operations.
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
-use crate::extension::prelude::{sum_with_error, BOOL_T};
+use crate::extension::prelude::{bool_t, sum_with_error};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -12,7 +12,6 @@ use crate::extension::{
 };
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
-use crate::type_row;
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
@@ -111,7 +110,11 @@ impl MakeOpDef for IntOpDef {
         EXTENSION_ID.to_owned()
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         use IntOpDef::*;
         let tv0 = int_tv(0);
         match self {
@@ -126,7 +129,7 @@ impl MakeOpDef for IntOpDef {
             )
             .into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
-                int_polytype(1, vec![tv0; 2], type_row![BOOL_T]).into()
+                int_polytype(1, vec![tv0; 2], vec![bool_t()]).into()
             }
             imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor | ipow => {
                 ibinop_sig().into()

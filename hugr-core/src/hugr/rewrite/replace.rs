@@ -451,7 +451,7 @@ mod test {
         endo_sig, BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
-    use crate::extension::prelude::{BOOL_T, USIZE_T};
+    use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
@@ -473,17 +473,17 @@ mod test {
         let reg =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()])
                 .unwrap();
-        let listy = list_type(USIZE_T);
+        let listy = list_type(usize_t());
         let pop: ExtensionOp = ListOp::pop
-            .with_type(USIZE_T)
+            .with_type(usize_t())
             .to_extension_op(&reg)
             .unwrap();
         let push: ExtensionOp = ListOp::push
-            .with_type(USIZE_T)
+            .with_type(usize_t())
             .to_extension_op(&reg)
             .unwrap();
         let just_list = TypeRow::from(vec![listy.clone()]);
-        let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
+        let intermed = TypeRow::from(vec![listy.clone(), usize_t()]);
 
         let mut cfg = CFGBuilder::new(endo_sig(just_list.clone()))?;
 
@@ -638,7 +638,7 @@ mod test {
 
     #[test]
     fn test_invalid() {
-        let utou = Signature::new_endo(vec![USIZE_T]);
+        let utou = Signature::new_endo(vec![usize_t()]);
         let ext = Extension::new_test_arc("new_ext".try_into().unwrap(), |ext, extension_ref| {
             ext.add_op("foo".into(), "".to_string(), utou.clone(), extension_ref)
                 .unwrap();
@@ -659,7 +659,7 @@ mod test {
             .unwrap();
 
         let mut h = DFGBuilder::new(
-            Signature::new(type_row![USIZE_T, BOOL_T], type_row![USIZE_T])
+            Signature::new(vec![usize_t(), bool_t()], vec![usize_t()])
                 .with_extension_delta(ext_name.clone()),
         )
         .unwrap();
@@ -667,8 +667,8 @@ mod test {
         let mut cond = h
             .conditional_builder_exts(
                 (vec![type_row![]; 2], b),
-                [(USIZE_T, i)],
-                type_row![USIZE_T],
+                [(usize_t(), i)],
+                vec![usize_t()].into(),
                 ext_name.clone(),
             )
             .unwrap();
