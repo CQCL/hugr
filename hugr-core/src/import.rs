@@ -47,7 +47,7 @@ pub enum ImportError {
     /// A signature mismatch was detected during import.
     #[error("signature error: {0}")]
     Signature(#[from] SignatureError),
-    /// An required extension is missing.
+    /// A required extension is missing.
     #[error("Importing the hugr requires extension {missing_ext}, which was not found in the registry. The available extensions are: [{}]",
             available.iter().map(|ext| ext.to_string()).collect::<Vec<_>>().join(", "))]
     Extension {
