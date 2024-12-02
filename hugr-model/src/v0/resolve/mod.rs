@@ -16,7 +16,10 @@
 //! the variable must be visible in the current scope as if it was referred to
 //! by name.
 //!
-//! Ports of nodes and regions are connected when they have the same link.
+//! Ports of nodes and regions are connected when they have the same link. Links
+//! are scoped through regions and a region's source and target ports are
+//! considered to be within the region. Depending on the operation, regions may
+//! be isolated in which case no link can cross the boundary of the region.
 
 // TODO: Document that the regions passed to custom operations are currently isolated
 // from the parent scope of links.
@@ -124,14 +127,18 @@ impl<'m, 'a> Resolver<'m, 'a> {
             self.resolve_term(signature)?;
         }
 
-        // First collect all declarations in the region.
         self.symbol_scope.enter(region);
 
+        // In a first pass over the region's children, we resolve the symbols
+        // that are defined by the nodes as well as the links in their inputs
+        // and outputs. This is to ensure that resolution is independent of the
+        // order of the nodes.
         for child in region_data.children {
-            let child_data = self
+            let mut child_data = self
                 .module
                 .get_node(*child)
-                .ok_or_else(|| ModelError::NodeNotFound(*child))?;
+                .ok_or_else(|| ModelError::NodeNotFound(*child))?
+                .clone();
 
             if let Some(name) = child_data.operation.symbol() {
                 self.symbol_scope
@@ -140,16 +147,18 @@ impl<'m, 'a> Resolver<'m, 'a> {
                         SymbolIntroError::DuplicateSymbol(other, *child, name.to_string())
                     })?;
             }
+
+            child_data.inputs = self.resolve_links(child_data.inputs);
+            child_data.outputs = self.resolve_links(child_data.outputs);
+            self.module.nodes[child.index()] = child_data;
         }
 
-        // Then resolve all children.
+        // In a second pass, we resolve the remaining properties of the nodes.
         for child in region_data.children {
             self.resolve_node(*child)?;
         }
 
-        // Finally reset the global scope
         self.symbol_scope.exit();
-
         self.module.regions[region.index()] = region_data;
 
         Ok(())
@@ -162,8 +171,6 @@ impl<'m, 'a> Resolver<'m, 'a> {
             .ok_or_else(|| ModelError::NodeNotFound(node))?
             .clone();
 
-        node_data.inputs = self.resolve_links(node_data.inputs);
-        node_data.outputs = self.resolve_links(node_data.outputs);
         self.resolve_terms(node_data.params)?;
 
         match node_data.operation {
@@ -298,7 +305,10 @@ impl<'m, 'a> Resolver<'m, 'a> {
 
         for link_ref in link_refs {
             let link_id = match *link_ref {
-                LinkRef::Id(link_id) => link_id,
+                LinkRef::Id(link_id) => {
+                    // TODO: Check if the link is visible.
+                    link_id
+                }
                 LinkRef::Named(name) => match self.link_scope.entry(name) {
                     bindings::Entry::Occupied(entry) => entry.get(),
                     bindings::Entry::Visible(entry) => entry.get(),
