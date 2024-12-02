@@ -80,6 +80,9 @@ struct Resolver<'m, 'a> {
     /// Links that are visible in the current scope.
     link_scope: Bindings<&'a str, RegionId, LinkId>,
 
+    /// The regions in which links are defined. Indexed by [`LinkId`]s.
+    link_regions: Vec<Option<RegionId>>,
+
     /// Bit vector to keep track of visited terms so that we do not visit them multiple times.
     term_visited: BitVec,
 }
@@ -88,6 +91,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
     fn new(module: &'m mut Module<'a>, bump: &'a Bump) -> Self {
         Self {
             term_visited: BitVec::repeat(false, module.terms.len()),
+            link_regions: vec![None; module.links.len()],
             module,
             bump,
             symbol_scope: Bindings::new(),
@@ -99,9 +103,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
 
     /// Resolve a non-isolated region.
     fn resolve_region(&mut self, region: RegionId) -> Result<(), ModelError> {
-        self.link_scope.enter(region);
         self.resolve_region_inner(region)?;
-        self.link_scope.exit();
         Ok(())
     }
 
@@ -309,15 +311,17 @@ impl<'m, 'a> Resolver<'m, 'a> {
                     // TODO: Check if the link is visible.
                     link_id
                 }
-                LinkRef::Named(name) => match self.link_scope.entry(name) {
-                    bindings::Entry::Occupied(entry) => entry.get(),
-                    bindings::Entry::Visible(entry) => entry.get(),
-                    bindings::Entry::Vacant(entry) => {
-                        let link_id = self.module.insert_link(Link { name });
-                        entry.insert(link_id);
-                        link_id
-                    }
-                },
+                LinkRef::Named(name) => todo!(),
+                // match self.link_scope.try_insert(name, ) {
+                //     bindings::Entry::Occupied(entry) => entry.get(),
+                //     bindings::Entry::Visible(entry) => entry.get(),
+                //     bindings::Entry::Vacant(entry) => {
+                //         let link_id = self.module.insert_link(Link { name });
+                //         entry.insert(link_id);
+                //         self.link_regions.push(self.link_scope.scope().copied());
+                //         link_id
+                //     }
+                // },
             };
 
             resolved.push(LinkRef::Id(link_id));
@@ -448,7 +452,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             VarRef::Named(name) => {
                 let index = self
                     .var_scope
-                    .get(name)
+                    .get_value_by_key(name)
                     .ok_or_else(|| VarRefError::NameNotFound(name.to_string()))?;
 
                 // UNWRAP: If the local is in scope, then the scope must be set.
@@ -462,17 +466,14 @@ impl<'m, 'a> Resolver<'m, 'a> {
         match symbol_ref {
             SymbolRef::Direct(node) => {
                 // Check whether the global is visible at this point.
-                let name = self.module.symbol_name(symbol_ref)?;
-                let visible = self.symbol_scope.get(name);
-
-                if visible != Some(node) {
+                if self.symbol_scope.get_key_by_value(node).is_none() {
                     return Err(SymbolRefError::NotVisible(node).into());
                 }
 
                 Ok(symbol_ref)
             }
             SymbolRef::Named(name) => {
-                if let Some(node) = self.symbol_scope.get(name) {
+                if let Some(node) = self.symbol_scope.get_value_by_key(name) {
                     return Ok(SymbolRef::Direct(node));
                 }
 
