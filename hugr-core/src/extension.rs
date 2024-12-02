@@ -155,6 +155,11 @@ impl ExtensionRegistry {
         self.0.iter()
     }
 
+    /// Returns an iterator over the extensions ids in the registry.
+    pub fn ids(&self) -> impl Iterator<Item = &ExtensionId> {
+        self.0.keys()
+    }
+
     /// Delete an extension from the registry and return it if it was present.
     pub fn remove_extension(&mut self, name: &ExtensionId) -> Option<Arc<Extension>> {
         self.0.remove(name)

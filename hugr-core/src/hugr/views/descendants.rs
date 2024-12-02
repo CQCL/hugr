@@ -175,19 +175,16 @@ where
 pub(super) mod test {
     use rstest::rstest;
 
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::PRELUDE_REGISTRY;
     use crate::IncomingPort;
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        type_row,
-        types::{Signature, Type},
+        types::Signature,
         utils::test_quantum_extension::{h_gate, EXTENSION_ID},
     };
 
     use super::*;
-
-    const NAT: Type = crate::extension::prelude::USIZE_T;
-    const QB: Type = crate::extension::prelude::QB_T;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///
@@ -199,7 +196,7 @@ pub(super) mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                Signature::new_endo(type_row![NAT, QB]).with_extension_delta(EXTENSION_ID),
+                Signature::new_endo(vec![usize_t(), qb_t()]).with_extension_delta(EXTENSION_ID),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
@@ -208,7 +205,7 @@ pub(super) mod test {
 
             let inner_id = {
                 let inner_builder = func_builder
-                    .dfg_builder(Signature::new(type_row![NAT], type_row![NAT]), [int])?;
+                    .dfg_builder(Signature::new(vec![usize_t()], vec![usize_t()]), [int])?;
                 let w = inner_builder.input_wires();
                 inner_builder.finish_with_outputs(w)
             }?;
@@ -237,7 +234,7 @@ pub(super) mod test {
         assert_eq!(
             region.poly_func_type(),
             Some(
-                Signature::new_endo(type_row![NAT, QB])
+                Signature::new_endo(vec![usize_t(), qb_t()])
                     .with_extension_delta(EXTENSION_ID)
                     .into()
             )
@@ -246,7 +243,7 @@ pub(super) mod test {
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
             inner_region.inner_function_type(),
-            Some(Signature::new(type_row![NAT], type_row![NAT]))
+            Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
         assert_eq!(inner_region.edge_count(), 2);

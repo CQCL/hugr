@@ -53,11 +53,23 @@ pub trait MakeOpDef: NamedOp {
     where
         Self: Sized;
 
-    /// Return the signature (polymorphic function type) of the operation.
-    fn signature(&self) -> SignatureFunc;
-
     /// The ID of the extension this operation is defined in.
     fn extension(&self) -> ExtensionId;
+
+    /// Returns a weak reference to the extension this operation is defined in.
+    fn extension_ref(&self) -> Weak<Extension>;
+
+    /// Compute the signature of the operation while the extension definition is being built.
+    ///
+    /// Requires a [`Weak`] reference to the extension defining the operation.
+    /// This method is intended to be used inside the closure passed to [`Extension::new_arc`],
+    /// and it is normally internally called by [`MakeOpDef::add_to_extension`].
+    fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc;
+
+    /// Return the signature (polymorphic function type) of the operation.
+    fn signature(&self) -> SignatureFunc {
+        self.init_signature(&self.extension_ref())
+    }
 
     /// Description of the operation. By default, the same as `self.name()`.
     fn description(&self) -> String {
@@ -80,7 +92,7 @@ pub trait MakeOpDef: NamedOp {
         let def = extension.add_op(
             self.name(),
             self.description(),
-            self.signature(),
+            self.init_signature(extension_ref),
             extension_ref,
         )?;
 
@@ -306,8 +318,12 @@ mod test {
     }
 
     impl MakeOpDef for DummyEnum {
-        fn signature(&self) -> SignatureFunc {
+        fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
             Signature::new_endo(type_row![]).into()
+        }
+
+        fn extension_ref(&self) -> Weak<Extension> {
+            Arc::downgrade(&EXT)
         }
 
         fn from_def(_op_def: &OpDef) -> Result<Self, OpLoadError> {

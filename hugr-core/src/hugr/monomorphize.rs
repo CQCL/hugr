@@ -212,7 +212,7 @@ mod test {
         BuildHandle, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::{ConstUsize, UnpackTuple, USIZE_T};
+    use crate::extension::prelude::{usize_t, ConstUsize, UnpackTuple};
     use crate::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::monomorphize::mangle_inner_func;
     use crate::ops::handle::FuncID;
@@ -279,23 +279,33 @@ mod test {
                 .define_function(
                     "main",
                     Signature::new(
-                        USIZE_T,
-                        vec![triple_type(USIZE_T), triple_type(pair_type(USIZE_T))],
+                        usize_t(),
+                        vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))],
                     ),
                 )
                 .unwrap();
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
-                .call(trip.handle(), &[USIZE_T.into()], [elem], &PRELUDE_REGISTRY)
+                .call(
+                    trip.handle(),
+                    &[usize_t().into()],
+                    [elem],
+                    &PRELUDE_REGISTRY,
+                )
                 .unwrap()
                 .outputs_arr();
             let pair = fb
-                .call(doub.handle(), &[USIZE_T.into()], [elem], &PRELUDE_REGISTRY)
+                .call(
+                    doub.handle(),
+                    &[usize_t().into()],
+                    [elem],
+                    &PRELUDE_REGISTRY,
+                )
                 .unwrap();
             let [res2] = fb
                 .call(
                     trip.handle(),
-                    &[pair_type(USIZE_T).into()],
+                    &[pair_type(usize_t()).into()],
                     pair.outputs(),
                     &PRELUDE_REGISTRY,
                 )
@@ -318,10 +328,10 @@ mod test {
             .filter_map(|n| mono_hugr.get_optype(n).as_func_defn())
             .collect_vec();
         let expected_mangled_names = [
-            mangle_name("double", &[USIZE_T.into()]),
-            mangle_name("triple", &[USIZE_T.into()]),
-            mangle_name("double", &[pair_type(USIZE_T).into()]),
-            mangle_name("triple", &[pair_type(USIZE_T).into()]),
+            mangle_name("double", &[usize_t().into()]),
+            mangle_name("triple", &[usize_t().into()]),
+            mangle_name("double", &[pair_type(usize_t()).into()]),
+            mangle_name("triple", &[pair_type(usize_t()).into()]),
         ];
 
         assert_eq!(
@@ -368,22 +378,22 @@ mod test {
         let tv0 = || Type::new_var_use(0, TypeBound::Any);
         let ity = || INT_TYPES[3].clone();
 
-        let mut outer = FunctionBuilder::new("mainish", Signature::new(ity(), USIZE_T)).unwrap();
+        let mut outer = FunctionBuilder::new("mainish", Signature::new(ity(), usize_t())).unwrap();
         let sig = PolyFuncType::new(
             [TypeBound::Any.into()],
-            Signature::new(tv0(), vec![tv0(), USIZE_T, USIZE_T]),
+            Signature::new(tv0(), vec![tv0(), usize_t(), usize_t()]),
         );
         let mut pf1 = outer.define_function("pf1", sig).unwrap();
 
         let sig = PolyFuncType::new(
             [TypeBound::Any.into()],
-            Signature::new(tv0(), vec![tv0(), USIZE_T]),
+            Signature::new(tv0(), vec![tv0(), usize_t()]),
         );
         let mut pf2 = pf1.define_function("pf2", sig).unwrap();
 
         let mono_func = {
             let mut mono_b = pf2
-                .define_function("get_usz", Signature::new(type_row![], USIZE_T))
+                .define_function("get_usz", Signature::new(type_row![], usize_t()))
                 .unwrap();
             let cst0 = mono_b.add_load_value(ConstUsize::new(1));
             mono_b.finish_with_outputs([cst0]).unwrap()
@@ -404,7 +414,7 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [u1, u2] = pf1
-            .call(pf2.handle(), &[USIZE_T.into()], [u], &reg)
+            .call(pf2.handle(), &[usize_t().into()], [u], &reg)
             .unwrap()
             .outputs_arr();
         let pf1 = pf1.finish_with_outputs([a, u1, u2]).unwrap();
@@ -414,7 +424,7 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [_, u, _] = outer
-            .call(pf1.handle(), &[USIZE_T.into()], [u], &reg)
+            .call(pf1.handle(), &[usize_t().into()], [u], &reg)
             .unwrap()
             .outputs_arr();
         let hugr = outer.finish_hugr_with_outputs([u], &reg).unwrap();
@@ -430,9 +440,9 @@ mod test {
             funcs.iter().map(|(_, fd)| &fd.name).sorted().collect_vec(),
             vec![
                 &mangle_name("pf1", &[ity().into()]),
-                &mangle_name("pf1", &[USIZE_T.into()]),
+                &mangle_name("pf1", &[usize_t().into()]),
                 &mangle_name(&pf2_name, &[ity().into()]), // from pf1<int>
-                &mangle_name(&pf2_name, &[USIZE_T.into()]), // from pf1<int> and (2*)pf1<USIZE_T>
+                &mangle_name(&pf2_name, &[usize_t().into()]), // from pf1<int> and (2*)pf1<usize_t>
                 &mangle_inner_func(&pf2_name, "get_usz"),
                 "mainish"
             ]

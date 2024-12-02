@@ -11,7 +11,7 @@ use crate::builder::{
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::Noop;
-use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
+use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE, PRELUDE_ID};
 use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
@@ -30,15 +30,13 @@ use crate::{
     const_extension_ids, test_file, type_row, Direction, IncomingPort, Node, OutgoingPort,
 };
 
-const NAT: Type = crate::extension::prelude::USIZE_T;
-
 /// Creates a hugr with a single function definition that copies a bit `copies` times.
 ///
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: Signature::new(type_row![BOOL_T], vec![BOOL_T; copies])
+        signature: Signature::new(vec![bool_t()], vec![bool_t(); copies])
             .with_prelude()
             .into(),
     }
@@ -53,13 +51,13 @@ fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     (b, def)
 }
 
-/// Adds an input{BOOL_T}, copy{BOOL_T -> BOOL_T^copies}, and output{BOOL_T^copies} operation to a dataflow container.
+/// Adds an input{bool_t()}, copy{bool_t() -> bool_t()^copies}, and output{bool_t()^copies} operation to a dataflow container.
 ///
 /// Returns the node indices of each of the operations.
 fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
-    let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
-    let output = b.add_node_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]));
-    let copy = b.add_node_with_parent(parent, Noop(BOOL_T));
+    let input = b.add_node_with_parent(parent, ops::Input::new(vec![bool_t()]));
+    let output = b.add_node_with_parent(parent, ops::Output::new(vec![bool_t(); copies]));
+    let copy = b.add_node_with_parent(parent, Noop(bool_t()));
 
     b.connect(input, 0, copy, 0);
     for i in 0..copies {
@@ -113,7 +111,7 @@ fn invalid_root() {
 
 #[test]
 fn leaf_root() {
-    let leaf_op: OpType = Noop(USIZE_T).into();
+    let leaf_op: OpType = Noop(usize_t()).into();
 
     let b = Hugr::new(leaf_op);
     assert_eq!(b.validate(&PRELUDE_REGISTRY), Ok(()));
@@ -122,7 +120,7 @@ fn leaf_root() {
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: Signature::new_endo(type_row![BOOL_T]).with_prelude(),
+        signature: Signature::new_endo(vec![bool_t()]).with_prelude(),
     }
     .into();
 
@@ -151,7 +149,7 @@ fn children_restrictions() {
         .unwrap();
 
     // Add a definition without children
-    let def_sig = Signature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
+    let def_sig = Signature::new(vec![bool_t()], vec![bool_t(), bool_t()]);
     let new_def = b.add_node_with_parent(
         root,
         ops::FuncDefn {
@@ -194,25 +192,25 @@ fn df_children_restrictions() {
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, Noop(NAT)).unwrap();
+    b.replace_op(output, Noop(usize_t())).unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
     );
 
     // Revert it back to an output, but with the wrong number of ports
-    b.replace_op(output, ops::Output::new(type_row![BOOL_T]))
+    b.replace_op(output, ops::Output::new(vec![bool_t()]))
         .unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
             => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
     );
-    b.replace_op(output, ops::Output::new(type_row![BOOL_T, BOOL_T]))
+    b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]))
         .unwrap();
 
     // After fixing the output back, replace the copy with an output op
-    b.replace_op(copy, ops::Output::new(type_row![BOOL_T, BOOL_T]))
+    b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]))
         .unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
@@ -224,22 +222,22 @@ fn df_children_restrictions() {
 #[test]
 fn test_ext_edge() {
     let mut h = closed_dfg_root_hugr(
-        Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])
+        Signature::new(vec![bool_t(), bool_t()], vec![bool_t()])
             .with_extension_delta(TO_BE_INFERRED),
     );
     let [input, output] = h.get_io(h.root()).unwrap();
 
-    // Nested DFG BOOL_T -> BOOL_T
+    // Nested DFG bool_t() -> bool_t()
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: Signature::new_endo(type_row![BOOL_T]).with_extension_delta(TO_BE_INFERRED),
+            signature: Signature::new_endo(vec![bool_t()]).with_extension_delta(TO_BE_INFERRED),
         },
     );
     // this Xor has its 2nd input unconnected
     let sub_op = {
-        let sub_input = h.add_node_with_parent(sub_dfg, ops::Input::new(type_row![BOOL_T]));
-        let sub_output = h.add_node_with_parent(sub_dfg, ops::Output::new(type_row![BOOL_T]));
+        let sub_input = h.add_node_with_parent(sub_dfg, ops::Input::new(vec![bool_t()]));
+        let sub_output = h.add_node_with_parent(sub_dfg, ops::Output::new(vec![bool_t()]));
         let sub_op = h.add_node_with_parent(sub_dfg, and_op());
         h.connect(sub_input, 0, sub_op, 0);
         h.connect(sub_op, 0, sub_output, 0);
@@ -268,8 +266,8 @@ fn test_ext_edge() {
 
 #[test]
 fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
-    let b2b = Signature::new_endo(BOOL_T);
-    let mut h = DFGBuilder::new(Signature::new(BOOL_T, Type::new_function(b2b.clone())))?;
+    let b2b = Signature::new_endo(bool_t());
+    let mut h = DFGBuilder::new(Signature::new(bool_t(), Type::new_function(b2b.clone())))?;
     let [input] = h.input_wires_arr();
 
     let mut dfg = h.dfg_builder(Signature::new(vec![], Type::new_function(b2b.clone())), [])?;
@@ -298,7 +296,7 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_local_const() {
     let mut h =
-        closed_dfg_root_hugr(Signature::new_endo(BOOL_T).with_extension_delta(TO_BE_INFERRED));
+        closed_dfg_root_hugr(Signature::new_endo(bool_t()).with_extension_delta(TO_BE_INFERRED));
     let [input, output] = h.get_io(h.root()).unwrap();
     let and = h.add_node_with_parent(h.root(), and_op());
     h.connect(input, 0, and, 0);
@@ -308,7 +306,7 @@ fn test_local_const() {
         Err(ValidationError::UnconnectedPort {
             node: and,
             port: IncomingPort::from(1).into(),
-            port_kind: EdgeKind::Value(BOOL_T)
+            port_kind: EdgeKind::Value(bool_t())
         })
     );
     let const_op: ops::Const = logic::EXTENSION
@@ -319,7 +317,7 @@ fn test_local_const() {
         .into();
     // Second input of Xor from a constant
     let cst = h.add_node_with_parent(h.root(), const_op);
-    let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T });
+    let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: bool_t() });
 
     h.connect(cst, 0, lcst, 0);
     h.connect(lcst, 0, and, 1);
@@ -330,7 +328,7 @@ fn test_local_const() {
 
 #[test]
 fn dfg_with_cycles() {
-    let mut h = closed_dfg_root_hugr(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]));
+    let mut h = closed_dfg_root_hugr(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()]));
     let [input, output] = h.get_io(h.root()).unwrap();
     let or = h.add_node_with_parent(h.root(), or_op());
     let not1 = h.add_node_with_parent(h.root(), LogicOp::Not);
@@ -363,7 +361,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 }
 #[test]
 fn unregistered_extension() {
-    let (mut h, def) = identity_hugr_with_type(USIZE_T);
+    let (mut h, def) = identity_hugr_with_type(usize_t());
     assert_eq!(
         h.validate(&EMPTY_REG),
         Err(ValidationError::SignatureError {
@@ -389,7 +387,7 @@ fn invalid_types() {
         )
         .unwrap();
     });
-    let reg = ExtensionRegistry::try_new([ext, PRELUDE.clone()]).unwrap();
+    let reg = ExtensionRegistry::try_new([ext.clone(), PRELUDE.clone()]).unwrap();
 
     let validate_to_sig_error = |t: CustomType| {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));
@@ -407,9 +405,10 @@ fn invalid_types() {
 
     let valid = Type::new_extension(CustomType::new(
         "MyContainer",
-        vec![TypeArg::Type { ty: USIZE_T }],
+        vec![TypeArg::Type { ty: usize_t() }],
         EXT_ID,
         TypeBound::Any,
+        &Arc::downgrade(&ext),
     ));
     assert_eq!(
         identity_hugr_with_type(valid.clone())
@@ -424,6 +423,7 @@ fn invalid_types() {
         vec![TypeArg::Type { ty: valid.clone() }],
         EXT_ID,
         TypeBound::Any,
+        &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
@@ -435,9 +435,10 @@ fn invalid_types() {
 
     let bad_bound = CustomType::new(
         "MyContainer",
-        vec![TypeArg::Type { ty: USIZE_T }],
+        vec![TypeArg::Type { ty: usize_t() }],
         EXT_ID,
         TypeBound::Copyable,
+        &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(bad_bound.clone()),
@@ -455,6 +456,7 @@ fn invalid_types() {
         }],
         EXT_ID,
         TypeBound::Any,
+        &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(nested),
@@ -466,9 +468,13 @@ fn invalid_types() {
 
     let too_many_type_args = CustomType::new(
         "MyContainer",
-        vec![TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 3 }],
+        vec![
+            TypeArg::Type { ty: usize_t() },
+            TypeArg::BoundedNat { n: 3 },
+        ],
         EXT_ID,
         TypeBound::Any,
+        &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(too_many_type_args),
@@ -622,15 +628,15 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     fn uint_seq(i: usize) -> TypeArg {
-        vec![TypeArg::Type { ty: USIZE_T }; i].into()
+        vec![TypeArg::Type { ty: usize_t() }; i].into()
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
         vec![
-            Type::new_function(Signature::new(USIZE_T, vec![USIZE_T, USIZE_T])),
-            USIZE_T,
+            Type::new_function(Signature::new(usize_t(), vec![usize_t(), usize_t()])),
+            usize_t(),
         ], // inputs: function + its argument
-        vec![USIZE_T; 4], // outputs (*2^2, three calls)
+        vec![usize_t(); 4], // outputs (*2^2, three calls)
     ))?;
     let [func, int] = dfb.input_wires_arr();
     let eval = e.instantiate_extension_op("eval", [uint_seq(1), uint_seq(2)], &PRELUDE_REGISTRY)?;
@@ -662,7 +668,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
-    let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), USIZE_T.into()]));
+    let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), usize_t().into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
@@ -673,14 +679,14 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
     let id_usz = {
-        let bldr = fb.define_function("id_usz", Signature::new_endo(USIZE_T))?;
+        let bldr = fb.define_function("id_usz", Signature::new_endo(usize_t()))?;
         let vals = bldr.input_wires();
         let inner_def = bldr.finish_with_outputs(vals)?;
         fb.load_func(inner_def.handle(), &[], &PRELUDE_REGISTRY)?
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), USIZE_T.into(), tv.clone(), USIZE_T.into()].map(seq1ty),
+        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(seq1ty),
         &PRELUDE_REGISTRY,
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
@@ -726,10 +732,10 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     fn utou(e: impl Into<ExtensionSet>) -> Type {
-        Type::new_function(Signature::new_endo(USIZE_T).with_extension_delta(e.into()))
+        Type::new_function(Signature::new_endo(usize_t()).with_extension_delta(e.into()))
     }
 
-    let int_pair = Type::new_tuple(type_row![USIZE_T; 2]);
+    let int_pair = Type::new_tuple(vec![usize_t(); 2]);
     // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
     let mut d = DFGBuilder::new(inout_sig(
         vec![utou(PRELUDE_ID), int_pair.clone()],
@@ -750,15 +756,19 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         )?;
         let [func, tup] = f.input_wires_arr();
         let mut c = f.conditional_builder(
-            (vec![type_row![USIZE_T; 2]], tup),
+            (vec![vec![usize_t(); 2].into()], tup),
             vec![],
-            type_row![USIZE_T;2],
+            vec![usize_t(); 2].into(),
         )?;
         let mut cc = c.case_builder(0)?;
         let [i1, i2] = cc.input_wires_arr();
         let op = e.instantiate_extension_op(
             "eval",
-            vec![USIZE_T.into(), TypeArg::Extensions { es }, USIZE_T.into()],
+            vec![
+                usize_t().into(),
+                TypeArg::Extensions { es },
+                usize_t().into(),
+            ],
             &PRELUDE_REGISTRY,
         )?;
         let [f1] = cc.add_dataflow_op(op.clone(), [func, i1])?.outputs_arr();
@@ -800,10 +810,10 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let sig = Signature::new(
         vec![],
-        vec![Type::new_function(Signature::new_endo(vec![USIZE_T]))],
+        vec![Type::new_function(Signature::new_endo(vec![usize_t()]))],
     );
     let mut f = m.define_function("main", sig)?;
-    let l = f.load_func(&id, &[USIZE_T.into()], &PRELUDE_REGISTRY)?;
+    let l = f.load_func(&id, &[usize_t().into()], &PRELUDE_REGISTRY)?;
     f.finish_with_outputs([l])?;
     let _ = m.finish_prelude_hugr()?;
     Ok(())
@@ -825,7 +835,7 @@ fn cfg_children_restrictions() {
     b.replace_op(
         copy,
         ops::CFG {
-            signature: Signature::new(type_row![BOOL_T], type_row![BOOL_T]),
+            signature: Signature::new(vec![bool_t()], vec![bool_t()]),
         },
     )
     .unwrap();
@@ -839,18 +849,18 @@ fn cfg_children_restrictions() {
     let block = b.add_node_with_parent(
         cfg,
         ops::DataflowBlock {
-            inputs: type_row![BOOL_T],
+            inputs: vec![bool_t()].into(),
             sum_rows: vec![type_row![]],
-            other_outputs: type_row![BOOL_T],
+            other_outputs: vec![bool_t()].into(),
             extension_delta: ExtensionSet::new(),
         },
     );
     let const_op: ops::Const = ops::Value::unit_sum(0, 1).unwrap().into();
     let tag_type = Type::new_unit_sum(1);
     {
-        let input = b.add_node_with_parent(block, ops::Input::new(type_row![BOOL_T]));
+        let input = b.add_node_with_parent(block, ops::Input::new(vec![bool_t()]));
         let output =
-            b.add_node_with_parent(block, ops::Output::new(vec![tag_type.clone(), BOOL_T]));
+            b.add_node_with_parent(block, ops::Output::new(vec![tag_type.clone(), bool_t()]));
         let tag_def = b.add_node_with_parent(b.root(), const_op);
         let tag = b.add_node_with_parent(block, ops::LoadConstant { datatype: tag_type });
 
@@ -862,7 +872,7 @@ fn cfg_children_restrictions() {
     let exit = b.add_node_with_parent(
         cfg,
         ops::ExitBlock {
-            cfg_outputs: type_row![BOOL_T],
+            cfg_outputs: vec![bool_t()].into(),
         },
     );
     b.add_other_edge(block, exit);
@@ -874,7 +884,7 @@ fn cfg_children_restrictions() {
     let exit2 = b.add_node_after(
         exit,
         ops::ExitBlock {
-            cfg_outputs: type_row![BOOL_T],
+            cfg_outputs: vec![bool_t()].into(),
         },
     );
     assert_matches!(
@@ -888,16 +898,16 @@ fn cfg_children_restrictions() {
     b.replace_op(
         cfg,
         ops::CFG {
-            signature: Signature::new(type_row![QB_T], type_row![BOOL_T]),
+            signature: Signature::new(vec![qb_t()], vec![bool_t()]),
         },
     )
     .unwrap();
     b.replace_op(
         block,
         ops::DataflowBlock {
-            inputs: type_row![QB_T],
+            inputs: vec![qb_t()].into(),
             sum_rows: vec![type_row![]],
-            other_outputs: type_row![QB_T],
+            other_outputs: vec![qb_t()].into(),
             extension_delta: ExtensionSet::new(),
         },
     )
@@ -905,11 +915,11 @@ fn cfg_children_restrictions() {
     let mut block_children = b.hierarchy.children(block.pg_index());
     let block_input = block_children.next().unwrap().into();
     let block_output = block_children.next_back().unwrap().into();
-    b.replace_op(block_input, ops::Input::new(type_row![QB_T]))
+    b.replace_op(block_input, ops::Input::new(vec![qb_t()]))
         .unwrap();
     b.replace_op(
         block_output,
-        ops::Output::new(type_row![Type::new_unit_sum(1), QB_T]),
+        ops::Output::new(vec![Type::new_unit_sum(1), qb_t()]),
     )
     .unwrap();
     assert_matches!(
@@ -926,14 +936,15 @@ fn cfg_children_restrictions() {
 fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
     use crate::builder::CFGBuilder;
 
-    let mut hugr = CFGBuilder::new(Signature::new_endo(USIZE_T))?;
+    let mut hugr = CFGBuilder::new(Signature::new_endo(usize_t()))?;
     let unary_pred = hugr.add_constant(Value::unary_unit_sum());
-    let mut entry = hugr.simple_entry_builder_exts(type_row![USIZE_T], 1, ExtensionSet::new())?;
+    let mut entry =
+        hugr.simple_entry_builder_exts(vec![usize_t()].into(), 1, ExtensionSet::new())?;
     let p = entry.load_const(&unary_pred);
     let ins = entry.input_wires();
     let entry = entry.finish_with_outputs(p, ins)?;
 
-    let mut middle = hugr.simple_block_builder(Signature::new_endo(USIZE_T), 1)?;
+    let mut middle = hugr.simple_block_builder(Signature::new_endo(usize_t()), 1)?;
     let p = middle.load_const(&unary_pred);
     let ins = middle.input_wires();
     let middle = middle.finish_with_outputs(p, ins)?;
@@ -1001,24 +1012,25 @@ mod extension_tests {
     ) {
         // Child graph adds extension "XB", but the parent (in all cases)
         // declares a different delta, causing a mismatch.
-        let parent =
-            parent_f(Signature::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()));
+        let parent = parent_f(
+            Signature::new_endo(usize_t()).with_extension_delta(parent_extensions.clone()),
+        );
         let mut hugr = Hugr::new(parent);
 
         let input = hugr.add_node_with_parent(
             hugr.root(),
             ops::Input {
-                types: type_row![USIZE_T],
+                types: vec![usize_t()].into(),
             },
         );
         let output = hugr.add_node_with_parent(
             hugr.root(),
             ops::Output {
-                types: type_row![USIZE_T],
+                types: vec![usize_t()].into(),
             },
         );
 
-        let lift = hugr.add_node_with_parent(hugr.root(), Lift::new(type_row![USIZE_T], XB));
+        let lift = hugr.add_node_with_parent(hugr.root(), Lift::new(vec![usize_t()].into(), XB));
 
         hugr.connect(input, 0, lift, 0);
         hugr.connect(lift, 0, output, 0);
@@ -1044,9 +1056,9 @@ mod extension_tests {
         #[case] success: bool,
     ) -> Result<(), BuildError> {
         let mut cfg = CFGBuilder::new(
-            Signature::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
+            Signature::new_endo(usize_t()).with_extension_delta(parent_extensions.clone()),
         )?;
-        let mut bb = cfg.simple_entry_builder_exts(USIZE_T.into(), 1, XB)?;
+        let mut bb = cfg.simple_entry_builder_exts(usize_t().into(), 1, XB)?;
         let pred = bb.add_load_value(Value::unary_unit_sum());
         let inputs = bb.input_wires();
         let blk = bb.finish_with_outputs(pred, inputs)?;
@@ -1082,8 +1094,8 @@ mod extension_tests {
         // declares a different delta, in same cases causing a mismatch.
         let parent = ops::Conditional {
             sum_rows: vec![type_row![], type_row![]],
-            other_inputs: type_row![USIZE_T],
-            outputs: type_row![USIZE_T],
+            other_inputs: vec![usize_t()].into(),
+            outputs: vec![usize_t()].into(),
             extension_delta: parent_extensions.clone(),
         };
         let mut hugr = Hugr::new(parent);
@@ -1098,27 +1110,27 @@ mod extension_tests {
             let case = hugr.add_node_with_parent(
                 hugr.root(),
                 ops::Case {
-                    signature: Signature::new_endo(USIZE_T).with_extension_delta(case_exts),
+                    signature: Signature::new_endo(usize_t()).with_extension_delta(case_exts),
                 },
             );
 
             let input = hugr.add_node_with_parent(
                 case,
                 ops::Input {
-                    types: type_row![USIZE_T],
+                    types: vec![usize_t()].into(),
                 },
             );
             let output = hugr.add_node_with_parent(
                 case,
                 ops::Output {
-                    types: type_row![USIZE_T],
+                    types: vec![usize_t()].into(),
                 },
             );
             let res = match case_ext {
                 None => input,
                 Some(new_ext) => {
                     let lift =
-                        hugr.add_node_with_parent(case, Lift::new(type_row![USIZE_T], new_ext));
+                        hugr.add_node_with_parent(case, Lift::new(vec![usize_t()].into(), new_ext));
                     hugr.connect(input, 0, lift, 0);
                     lift
                 }
@@ -1151,8 +1163,8 @@ mod extension_tests {
         parent_exts_success: (ExtensionSet, bool),
     ) -> Result<(), BuildError> {
         let (parent_extensions, success) = parent_exts_success;
-        let mut dfg = dfg_fn(USIZE_T, parent_extensions.clone());
-        let lift = dfg.add_dataflow_op(Lift::new(USIZE_T.into(), XB), dfg.input_wires())?;
+        let mut dfg = dfg_fn(usize_t(), parent_extensions.clone());
+        let lift = dfg.add_dataflow_op(Lift::new(usize_t().into(), XB), dfg.input_wires())?;
         let pred = make_pred(&mut dfg, lift.outputs())?;
         let root = dfg.hugr().root();
         let res = dfg.finish_prelude_hugr_with_outputs([pred]);

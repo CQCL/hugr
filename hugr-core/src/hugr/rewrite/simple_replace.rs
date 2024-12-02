@@ -1,13 +1,13 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::hugr::hugrmut::InsertionResult;
 pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node, OutgoingPort};
+use crate::{Hugr, IncomingPort, Node};
 use thiserror::Error;
 
 use super::inline_dfg::InlineDFGError;
@@ -67,23 +67,84 @@ impl Rewrite for SimpleReplacement {
     }
 
     fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
-        let parent = self.subgraph.get_parent(h);
+        let Self {
+            subgraph,
+            replacement,
+            nu_inp,
+            nu_out,
+        } = self;
+        let parent = subgraph.get_parent(h);
         // 1. Check the parent node exists and is a DataflowParent.
         if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
-        for node in self.subgraph.nodes() {
+        for node in subgraph.nodes() {
             if h.get_parent(*node) != Some(parent) || h.children(*node).next().is_some() {
                 return Err(SimpleReplacementError::InvalidRemovedNode());
             }
         }
+
+        let replacement_output_node = replacement
+            .get_io(replacement.root())
+            .expect("parent already checked.")[1];
+
         // 3. Do the replacement.
-        // 3.1. Insert the replacement as a whole.
+        // Now we proceed to connect the edges between the newly inserted
+        // replacement and the rest of the graph.
+        //
+        // Existing connections to the removed subgraph will be automatically
+        // removed when the nodes are removed.
+
+        // 3.1. For each p = self.nu_inp[q] such that q is not an Output port, add an edge from the
+        // predecessor of p to (the new copy of) q.
+        let nu_inp_connects: Vec<_> = nu_inp
+            .iter()
+            .filter(|&((rep_inp_node, _), _)| {
+                replacement.get_optype(*rep_inp_node).tag() != OpTag::Output
+            })
+            .map(
+                |((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port))| {
+                    // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
+                    let (rem_inp_pred_node, rem_inp_pred_port) = h
+                        .single_linked_output(*rem_inp_node, *rem_inp_port)
+                        .unwrap();
+                    (
+                        rem_inp_pred_node,
+                        rem_inp_pred_port,
+                        // the new input node will be updated after insertion
+                        rep_inp_node,
+                        rep_inp_port,
+                    )
+                },
+            )
+            .collect();
+
+        // 3.2. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
+        // edge from (the new copy of) the predecessor of q to p.
+        let nu_out_connects: Vec<_> = nu_out
+            .iter()
+            .filter_map(|((rem_out_node, rem_out_port), rep_out_port)| {
+                let (rep_out_pred_node, rep_out_pred_port) = replacement
+                    .single_linked_output(replacement_output_node, *rep_out_port)
+                    .unwrap();
+                (replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input).then_some({
+                    (
+                        // the new output node will be updated after insertion
+                        rep_out_pred_node,
+                        rep_out_pred_port,
+                        rem_out_node,
+                        rem_out_port,
+                    )
+                })
+            })
+            .collect();
+
+        // 3.3. Insert the replacement as a whole.
         let InsertionResult {
             new_root,
             node_map: index_map,
-        } = h.insert_hugr(parent, self.replacement.clone());
+        } = h.insert_hugr(parent, replacement);
 
         // remove the Input and Output nodes from the replacement graph
         let replace_children = h.children(new_root).collect::<Vec<Node>>();
@@ -97,87 +158,47 @@ impl Rewrite for SimpleReplacement {
         // remove the replacement root (which now has no children and no edges)
         h.remove_node(new_root);
 
-        // Now we proceed to connect the edges between the newly inserted
-        // replacement and the rest of the graph.
-        //
-        // We delay creating these connections to avoid them getting mixed with
-        // the pre-existing ones in the following logic.
-        //
-        // Existing connections to the removed subgraph will be automatically
-        // removed when the nodes are removed.
-        let mut connect: HashSet<(Node, OutgoingPort, Node, IncomingPort)> = HashSet::new();
+        // 3.4. Update replacement nodes according to insertion mapping and connect
+        for (src_node, src_port, tgt_node, tgt_port) in nu_inp_connects {
+            h.connect(
+                src_node,
+                src_port,
+                *index_map.get(tgt_node).unwrap(),
+                *tgt_port,
+            )
+        }
 
-        // 3.2. For each p = self.nu_inp[q] such that q is not an Output port, add an edge from the
-        // predecessor of p to (the new copy of) q.
-        for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
-            if self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
-                // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
-                let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .single_linked_output(*rem_inp_node, *rem_inp_port)
-                    .unwrap();
-                let new_inp_node = index_map.get(rep_inp_node).unwrap();
-                connect.insert((
-                    rem_inp_pred_node,
-                    rem_inp_pred_port,
-                    *new_inp_node,
-                    *rep_inp_port,
-                ));
-            }
+        for (src_node, src_port, tgt_node, tgt_port) in nu_out_connects {
+            h.connect(
+                *index_map.get(&src_node).unwrap(),
+                src_port,
+                *tgt_node,
+                *tgt_port,
+            )
         }
-        let replacement_output_node = self
-            .replacement
-            .get_io(self.replacement.root())
-            .expect("parent already checked.")[1];
-        // 3.3. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
-        // edge from (the new copy of) the predecessor of q to p.
-        for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
-            let (rep_out_pred_node, rep_out_pred_port) = self
-                .replacement
-                .single_linked_output(replacement_output_node, *rep_out_port)
-                .unwrap();
-            if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
-                let new_out_node = index_map.get(&rep_out_pred_node).unwrap();
-                connect.insert((
-                    *new_out_node,
-                    rep_out_pred_port,
-                    *rem_out_node,
-                    *rem_out_port,
-                ));
-            }
-        }
-        // 3.4. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
+        // 3.5. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
         // to p1.
         //
         // i.e. the replacement graph has direct edges between the input and output nodes.
-        for ((rem_out_node, rem_out_port), &rep_out_port) in &self.nu_out {
-            let rem_inp_nodeport = self.nu_inp.get(&(replacement_output_node, rep_out_port));
+        for ((rem_out_node, rem_out_port), &rep_out_port) in &nu_out {
+            let rem_inp_nodeport = nu_inp.get(&(replacement_output_node, rep_out_port));
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
                 // add edge from predecessor of (rem_inp_node, rem_inp_port) to (rem_out_node, rem_out_port):
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
-                // Delay connecting the nodes until after processing all nu_out
-                // entries.
-                //
-                // Otherwise, we might disconnect other wires in `rem_inp_node`
-                // that are needed for the following iterations.
-                connect.insert((
+
+                h.connect(
                     rem_inp_pred_node,
                     rem_inp_pred_port,
                     *rem_out_node,
                     *rem_out_port,
-                ));
+                );
             }
         }
-        connect
-            .into_iter()
-            .for_each(|(src_node, src_port, tgt_node, tgt_port)| {
-                h.connect(src_node, src_port, tgt_node, tgt_port);
-            });
 
-        // 3.5. Remove all nodes in self.removal and edges between them.
-        Ok(self
-            .subgraph
+        // 3.6. Remove all nodes in subgraph and edges between them.
+        Ok(subgraph
             .nodes()
             .iter()
             .map(|&node| (node, h.remove_node(node)))
@@ -221,7 +242,7 @@ pub(in crate::hugr::rewrite) mod test {
         endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::{BOOL_T, QB_T};
+    use crate::extension::prelude::{bool_t, qb_t};
     use crate::extension::{ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
@@ -231,14 +252,11 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::ops::OpTrait;
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::logic::LogicOp;
-    use crate::type_row;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
     use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
-
-    const QB: Type = crate::extension::prelude::QB_T;
 
     /// Creates a hugr like the following:
     /// --   H   --
@@ -255,14 +273,16 @@ pub(in crate::hugr::rewrite) mod test {
             let just_q: ExtensionSet = EXTENSION_ID.into();
             let mut func_builder = module_builder.define_function(
                 "main",
-                Signature::new_endo(type_row![QB, QB, QB]).with_extension_delta(just_q.clone()),
+                Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
+                    .with_extension_delta(just_q.clone()),
             )?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
 
             let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb2])?;
 
-            let mut inner_builder = func_builder.dfg_builder_endo([(QB, qb0), (QB, qb1)])?;
+            let mut inner_builder =
+                func_builder.dfg_builder_endo([(qb_t(), qb0), (qb_t(), qb1)])?;
             let inner_graph = {
                 let [wire0, wire1] = inner_builder.input_wires_arr();
                 let wire2 = inner_builder.add_dataflow_op(h_gate(), vec![wire0])?;
@@ -291,7 +311,7 @@ pub(in crate::hugr::rewrite) mod test {
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(endo_sig(type_row![QB, QB]).with_prelude())?;
+        let mut dfg_builder = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]).with_prelude())?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
@@ -311,7 +331,7 @@ pub(in crate::hugr::rewrite) mod test {
     /// ┤ H ├
     /// └───┘
     fn make_dfg_hugr2() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(endo_sig(type_row![QB, QB]))?;
+        let mut dfg_builder = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
 
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
@@ -325,7 +345,7 @@ pub(in crate::hugr::rewrite) mod test {
         make_dfg_hugr2().unwrap()
     }
 
-    /// A hugr with a DFG root mapping BOOL_T to (BOOL_T, BOOL_T)
+    /// A hugr with a DFG root mapping bool_t() to (bool_t(), bool_t())
     ///                     ┌─────────┐
     ///                ┌────┤ (1) NOT ├──
     ///  ┌─────────┐   │    └─────────┘
@@ -339,7 +359,7 @@ pub(in crate::hugr::rewrite) mod test {
     #[fixture]
     pub(in crate::hugr::rewrite) fn dfg_hugr_copy_bools() -> (Hugr, Vec<Node>) {
         let mut dfg_builder =
-            DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
+            DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t(), bool_t()])).unwrap();
         let [b] = dfg_builder.input_wires_arr();
 
         let not_inp = dfg_builder.add_dataflow_op(LogicOp::Not, vec![b]).unwrap();
@@ -358,7 +378,7 @@ pub(in crate::hugr::rewrite) mod test {
         )
     }
 
-    /// A hugr with a DFG root mapping BOOL_T to (BOOL_T, BOOL_T)
+    /// A hugr with a DFG root mapping bool_t() to (bool_t(), bool_t())
     ///                     ┌─────────┐
     ///                ┌────┤ (1) NOT ├──
     ///  ┌─────────┐   │    └─────────┘
@@ -372,7 +392,7 @@ pub(in crate::hugr::rewrite) mod test {
     #[fixture]
     pub(in crate::hugr::rewrite) fn dfg_hugr_half_not_bools() -> (Hugr, Vec<Node>) {
         let mut dfg_builder =
-            DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
+            DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t(), bool_t()])).unwrap();
         let [b] = dfg_builder.input_wires_arr();
 
         let not_inp = dfg_builder.add_dataflow_op(LogicOp::Not, vec![b]).unwrap();
@@ -546,7 +566,7 @@ pub(in crate::hugr::rewrite) mod test {
 
     #[test]
     fn test_replace_cx_cross() {
-        let q_row: Vec<Type> = vec![QB, QB];
+        let q_row: Vec<Type> = vec![qb_t(), qb_t()];
         let mut builder = DFGBuilder::new(endo_sig(q_row)).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires());
         circ.append(cx_gate(), [0, 1]).unwrap();
@@ -602,8 +622,8 @@ pub(in crate::hugr::rewrite) mod test {
 
     #[test]
     fn test_replace_after_copy() {
-        let one_bit = type_row![BOOL_T];
-        let two_bit = type_row![BOOL_T, BOOL_T];
+        let one_bit = vec![bool_t()];
+        let two_bit = vec![bool_t(), bool_t()];
 
         let mut builder = DFGBuilder::new(endo_sig(one_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
@@ -664,8 +684,8 @@ pub(in crate::hugr::rewrite) mod test {
         let [_input, output] = hugr.get_io(hugr.root()).unwrap();
 
         let replacement = {
-            let b = DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))
-                .unwrap();
+            let b =
+                DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t(), bool_t()])).unwrap();
             let [w] = b.input_wires_arr();
             b.finish_prelude_hugr_with_outputs([w, w]).unwrap()
         };
@@ -722,7 +742,7 @@ pub(in crate::hugr::rewrite) mod test {
 
         let (replacement, repl_not) = {
             let mut b =
-                DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
+                DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t(), bool_t()])).unwrap();
             let [w] = b.input_wires_arr();
             let not = b.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
             let [w_not] = not.outputs_arr();
@@ -781,9 +801,9 @@ pub(in crate::hugr::rewrite) mod test {
             .unwrap();
 
         // build a nested identity dfg
-        let mut nest_build = DFGBuilder::new(Signature::new_endo(QB_T)).unwrap();
+        let mut nest_build = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
         let [input] = nest_build.input_wires_arr();
-        let inner_build = nest_build.dfg_builder_endo([(QB_T, input)]).unwrap();
+        let inner_build = nest_build.dfg_builder_endo([(qb_t(), input)]).unwrap();
         let inner_dfg = n_identity(inner_build).unwrap();
         let inner_dfg_node = inner_dfg.node();
         let replacement = nest_build

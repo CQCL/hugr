@@ -1,6 +1,6 @@
 // Required for black_box uses
 #![allow(clippy::unit_arg)]
-use hugr::extension::prelude::{QB_T, USIZE_T};
+use hugr::extension::prelude::{qb_t, usize_t};
 use hugr::ops::AliasDecl;
 use hugr::types::{Signature, Type, TypeBound};
 
@@ -8,8 +8,8 @@ use criterion::{black_box, criterion_group, AxisScale, Criterion, PlotConfigurat
 
 /// Construct a complex type.
 fn make_complex_type() -> Type {
-    let qb = QB_T;
-    let int = USIZE_T;
+    let qb = qb_t();
+    let int = usize_t();
     let q_register = Type::new_tuple(vec![qb; 8]);
     let b_register = Type::new_tuple(vec![int; 8]);
     let q_alias = Type::new_alias(AliasDecl::new("QReg", TypeBound::Any));

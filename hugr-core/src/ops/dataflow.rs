@@ -261,9 +261,9 @@ impl Call {
     /// # use hugr::ops::dataflow::Call;
     /// # use hugr::ops::OpType;
     /// # use hugr::types::Signature;
-    /// # use hugr::extension::prelude::QB_T;
+    /// # use hugr::extension::prelude::qb_t;
     /// # use hugr::extension::PRELUDE_REGISTRY;
-    /// let signature = Signature::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
+    /// let signature = Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()]);
     /// let call = Call::try_new(signature.into(), &[], &PRELUDE_REGISTRY).unwrap();
     /// let op = OpType::Call(call.clone());
     /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));

@@ -1,7 +1,7 @@
 //! The `validate` subcommand.
 
 use clap::Parser;
-use clap_verbosity_flag::Level;
+use clap_verbosity_flag::log::Level;
 use hugr::{extension::ExtensionRegistry, Extension, Hugr};
 
 use crate::{CliError, HugrArgs};

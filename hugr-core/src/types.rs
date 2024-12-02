@@ -617,20 +617,24 @@ pub(crate) fn check_typevar_decl(
 #[cfg(test)]
 pub(crate) mod test {
 
+    use std::sync::Weak;
+
     use super::*;
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::usize_t;
     use crate::type_row;
 
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
-            USIZE_T,
+            usize_t(),
             Type::new_function(Signature::new_endo(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
                 "my_extension".try_into().unwrap(),
                 TypeBound::Copyable,
+                // Dummy extension reference.
+                &Weak::default(),
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);

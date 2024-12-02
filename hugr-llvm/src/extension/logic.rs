@@ -93,7 +93,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 mod test {
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
-        extension::{prelude::BOOL_T, ExtensionRegistry},
+        extension::{prelude::bool_t, ExtensionRegistry},
         std_extensions::logic::{self, LogicOp},
         Hugr,
     };
@@ -108,8 +108,8 @@ mod test {
 
     fn test_logic_op(op: LogicOp, arity: usize) -> Hugr {
         SimpleHugrConfig::new()
-            .with_ins(vec![BOOL_T; arity])
-            .with_outs(vec![BOOL_T])
+            .with_ins(vec![bool_t(); arity])
+            .with_outs(vec![bool_t()])
             .with_extensions(ExtensionRegistry::try_new(vec![logic::EXTENSION.to_owned()]).unwrap())
             .finish(|mut builder| {
                 let outputs = builder

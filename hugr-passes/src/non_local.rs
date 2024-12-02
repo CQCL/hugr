@@ -43,7 +43,7 @@ mod test {
     use hugr_core::{
         builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer},
         extension::{
-            prelude::{Noop, BOOL_T},
+            prelude::{bool_t, Noop},
             EMPTY_REG,
         },
         ops::handle::NodeHandle,
@@ -56,10 +56,11 @@ mod test {
     #[test]
     fn ensures_no_nonlocal_edges() {
         let hugr = {
-            let mut builder = DFGBuilder::new(Signature::new_endo(BOOL_T).with_prelude()).unwrap();
+            let mut builder =
+                DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
             let [in_w] = builder.input_wires_arr();
             let [out_w] = builder
-                .add_dataflow_op(Noop::new(BOOL_T), [in_w])
+                .add_dataflow_op(Noop::new(bool_t()), [in_w])
                 .unwrap()
                 .outputs_arr();
             builder
@@ -72,14 +73,15 @@ mod test {
     #[test]
     fn find_nonlocal_edges() {
         let (hugr, edge) = {
-            let mut builder = DFGBuilder::new(Signature::new_endo(BOOL_T).with_prelude()).unwrap();
+            let mut builder =
+                DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
             let [in_w] = builder.input_wires_arr();
             let ([out_w], edge) = {
                 let mut dfg_builder = builder
-                    .dfg_builder(Signature::new(type_row![], BOOL_T).with_prelude(), [])
+                    .dfg_builder(Signature::new(type_row![], bool_t()).with_prelude(), [])
                     .unwrap();
                 let noop = dfg_builder
-                    .add_dataflow_op(Noop::new(BOOL_T), [in_w])
+                    .add_dataflow_op(Noop::new(bool_t()), [in_w])
                     .unwrap();
                 let noop_edge = (noop.node(), IncomingPort::from(0));
                 (

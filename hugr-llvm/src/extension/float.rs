@@ -34,7 +34,7 @@ fn emit_fcmp<'c, H: HugrView>(
             rhs.into_float_value(),
             "",
         )?;
-        // convert to whatever BOOL_T is
+        // convert to whatever bool_t is
         Ok(vec![ctx
             .builder()
             .build_select(r, true_val, false_val, "")?])
@@ -114,7 +114,7 @@ pub fn add_float_extensions<'a, H: HugrView + 'a>(
     cem.custom_type(
         (
             float_types::EXTENSION_ID,
-            float_types::FLOAT64_CUSTOM_TYPE.name().clone(),
+            float_types::FLOAT_TYPE_ID.clone(),
         ),
         |ts, _custom_type| Ok(ts.iw_context().f64_type().as_basic_type_enum()),
     )
@@ -139,7 +139,7 @@ mod test {
         builder::{Dataflow, DataflowSubContainer},
         std_extensions::arithmetic::{
             float_ops::FLOAT_OPS_REGISTRY,
-            float_types::{ConstF64, FLOAT64_TYPE},
+            float_types::{float64_type, ConstF64},
         },
     };
     use rstest::rstest;
@@ -176,7 +176,7 @@ mod test {
     fn const_float(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_float_extensions);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(FLOAT64_TYPE)
+            .with_outs(float64_type())
             .with_extensions(FLOAT_OPS_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let c = builder.add_load_value(ConstF64::new(3.12));

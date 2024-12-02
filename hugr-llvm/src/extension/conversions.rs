@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, ensure, Result};
 
 use hugr_core::{
     extension::{
-        prelude::{sum_with_error, ConstError, BOOL_T},
+        prelude::{bool_t, sum_with_error, ConstError},
         simple_op::MakeExtensionOp,
     },
     ops::{constant::Value, custom::ExtensionOp, DataflowOpTrait as _},
@@ -179,9 +179,9 @@ fn emit_conversion_op<'c, H: HugrView>(
                 .into_int_type();
             let sum_ty = context
                 .typing_session()
-                .llvm_sum_type(match BOOL_T.as_type_enum() {
+                .llvm_sum_type(match bool_t().as_type_enum() {
                     TypeEnum::Sum(st) => st.clone(),
-                    _ => panic!("Hugr prelude BOOL_T not a Sum"),
+                    _ => panic!("Hugr prelude bool_t() not a Sum"),
                 })?;
 
             emit_custom_unary_op(context, args, |ctx, arg, _| {
@@ -254,10 +254,10 @@ mod test {
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
-        extension::prelude::{ConstUsize, PRELUDE_REGISTRY, USIZE_T},
+        extension::prelude::{usize_t, ConstUsize, PRELUDE_REGISTRY},
         std_extensions::arithmetic::{
             conversions::{ConvertOpDef, CONVERT_OPS_REGISTRY, EXTENSION},
-            float_types::FLOAT64_TYPE,
+            float_types::float64_type,
             int_types::INT_TYPES,
         },
         types::Type,
@@ -302,7 +302,7 @@ mod test {
                 .add_conversion_extensions()
         });
         let in_ty = INT_TYPES[log_width as usize].clone();
-        let out_ty = FLOAT64_TYPE;
+        let out_ty = float64_type();
         let hugr = test_conversion_op(op_name, in_ty, out_ty, log_width);
         check_emission!(op_name, hugr, llvm_ctx);
     }
@@ -322,7 +322,7 @@ mod test {
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
         });
-        let in_ty = FLOAT64_TYPE;
+        let in_ty = float64_type();
         let out_ty = sum_with_error(INT_TYPES[log_width as usize].clone());
         let hugr = test_conversion_op(op_name, in_ty, out_ty.into(), log_width);
         check_emission!(op_name, hugr, llvm_ctx);
@@ -336,7 +336,7 @@ mod test {
         #[case] op_name: &str,
         #[case] input_int: bool,
     ) {
-        let mut tys = [INT_TYPES[0].clone(), BOOL_T];
+        let mut tys = [INT_TYPES[0].clone(), bool_t()];
         if !input_int {
             tys.reverse()
         };
@@ -368,7 +368,7 @@ mod test {
     #[rstest]
     fn my_test_exec(mut exec_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(ConstUsize::new(42));
@@ -384,7 +384,7 @@ mod test {
     #[case(18_446_744_073_709_551_615)]
     fn usize_roundtrip(mut exec_ctx: TestContext, #[case] val: u64) -> () {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(CONVERT_OPS_REGISTRY.clone())
             .finish(|mut builder: DFGW| {
                 let k = builder.add_load_value(ConstUsize::new(val));
@@ -410,7 +410,7 @@ mod test {
     fn roundtrip_hugr(val: u64, signed: bool) -> Hugr {
         let int64 = INT_TYPES[6].clone();
         SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(CONVERT_OPS_REGISTRY.clone())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(val));
@@ -572,7 +572,7 @@ mod test {
         use hugr_core::type_row;
 
         let hugr = SimpleHugrConfig::new()
-            .with_outs(vec![USIZE_T])
+            .with_outs(vec![usize_t()])
             .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(0, i).unwrap());
@@ -581,7 +581,11 @@ mod test {
                     .unwrap();
                 let [b] = builder.add_dataflow_op(ext_op, [i]).unwrap().outputs_arr();
                 let mut cond = builder
-                    .conditional_builder(([type_row![], type_row![]], b), [], type_row![USIZE_T])
+                    .conditional_builder(
+                        ([type_row![], type_row![]], b),
+                        [],
+                        vec![usize_t()].into(),
+                    )
                     .unwrap();
                 let mut case_false = cond.case_builder(0).unwrap();
                 let false_result = case_false.add_load_value(ConstUsize::new(1));
