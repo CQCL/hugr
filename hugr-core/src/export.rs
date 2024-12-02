@@ -36,7 +36,9 @@ struct Context<'a> {
     module: model::Module<'a>,
     /// Mapping from ports to link indices.
     /// This only includes the minimum port among groups of linked ports.
-    links: FxHashMap<(Node, Port), model::LinkId>,
+    links: FxHashMap<(Node, Port), model::LinkIndex>,
+    /// The number of links exported so far.
+    link_count: u32,
     /// The arena in which the model is allocated.
     bump: &'a Bump,
     /// Stores the terms that we have already seen to avoid duplicates.
@@ -70,6 +72,7 @@ impl<'a> Context<'a> {
             module,
             bump,
             links: FxHashMap::default(),
+            link_count: 0,
             term_map: FxHashMap::default(),
             local_scope: None,
             decl_operations: FxHashMap::default(),
@@ -95,25 +98,27 @@ impl<'a> Context<'a> {
             children: self.bump.alloc_slice_copy(&children),
             meta: &[], // TODO: Export metadata
             signature: None,
+            links_isolated: true,
         });
 
         self.module.root = root;
     }
 
-    /// Returns the edge id for a given port, creating a new edge if necessary.
+    /// Returns the link index for a given port, creating a new edge if necessary.
     ///
     /// Any two ports that are linked will be represented by the same link.
-    fn get_link_id(&mut self, node: Node, port: impl Into<Port>) -> model::LinkId {
+    fn get_link_index(&mut self, node: Node, port: impl Into<Port>) -> model::LinkIndex {
         // To ensure that linked ports are represented by the same edge, we take the minimum port
         // among all the linked ports, including the one we started with.
         let port = port.into();
         let linked_ports = self.hugr.linked_ports(node, port);
         let all_ports = std::iter::once((node, port)).chain(linked_ports);
         let repr = all_ports.min().unwrap();
-        *self
-            .links
-            .entry(repr)
-            .or_insert_with(|| self.module.insert_link(model::Link { name: "" }))
+        *self.links.entry(repr).or_insert_with(|| {
+            let index = self.link_count;
+            self.link_count += 1;
+            model::LinkIndex(index)
+        })
     }
 
     pub fn make_ports(
@@ -126,7 +131,7 @@ impl<'a> Context<'a> {
         let mut links = BumpVec::with_capacity_in(ports.size_hint().0, self.bump);
 
         for port in ports.take(num_ports) {
-            links.push(model::LinkRef::Id(self.get_link_id(node, port)));
+            links.push(model::LinkRef::Index(self.get_link_index(node, port)));
         }
 
         links.into_bump_slice()
@@ -220,7 +225,7 @@ impl<'a> Context<'a> {
                 let extensions = self.export_ext_set(&dfg.signature.extension_reqs);
                 regions = self
                     .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
                 model::Operation::Dfg
             }
 
@@ -241,7 +246,7 @@ impl<'a> Context<'a> {
                 let extensions = self.export_ext_set(&block.extension_delta);
                 regions = self
                     .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
                 model::Operation::Block
             }
 
@@ -257,7 +262,7 @@ impl<'a> Context<'a> {
                 let extensions = this.export_ext_set(&func.signature.body().extension_reqs);
                 regions = this
                     .bump
-                    .alloc_slice_copy(&[this.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[this.export_dfg(node, extensions, true)]);
                 model::Operation::DefineFunc { decl }
             }),
 
@@ -335,7 +340,7 @@ impl<'a> Context<'a> {
                 let extensions = self.export_ext_set(&tail_loop.extension_delta);
                 regions = self
                     .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
                 model::Operation::TailLoop
             }
 
@@ -360,7 +365,7 @@ impl<'a> Context<'a> {
                 // as that of the node. This might change in the future.
                 let extensions = self.export_ext_set(&op.extension_delta());
 
-                if let Some(region) = self.export_dfg_if_present(node, extensions) {
+                if let Some(region) = self.export_dfg_if_present(node, extensions, true) {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
@@ -380,7 +385,7 @@ impl<'a> Context<'a> {
                 // as that of the node. This might change in the future.
                 let extensions = self.export_ext_set(&op.extension_delta());
 
-                if let Some(region) = self.export_dfg_if_present(node, extensions) {
+                if let Some(region) = self.export_dfg_if_present(node, extensions, true) {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
@@ -544,18 +549,24 @@ impl<'a> Context<'a> {
         &mut self,
         node: Node,
         extensions: model::TermId,
+        links_isolated: bool,
     ) -> Option<model::RegionId> {
         if self.hugr.children(node).next().is_none() {
             None
         } else {
-            Some(self.export_dfg(node, extensions))
+            Some(self.export_dfg(node, extensions, links_isolated))
         }
     }
 
     /// Creates a data flow region from the given node's children.
     ///
     /// `Input` and `Output` nodes are used to determine the source and target ports of the region.
-    pub fn export_dfg(&mut self, node: Node, extensions: model::TermId) -> model::RegionId {
+    pub fn export_dfg(
+        &mut self,
+        node: Node,
+        extensions: model::TermId,
+        links_isolated: bool,
+    ) -> model::RegionId {
         let mut children = self.hugr.children(node);
 
         // The first child is an `Input` node, which we use to determine the region's sources.
@@ -597,6 +608,7 @@ impl<'a> Context<'a> {
             children: region_children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
             signature,
+            links_isolated,
         })
     }
 
@@ -614,7 +626,7 @@ impl<'a> Context<'a> {
             panic!("expected a `DataflowBlock` node as the first child node");
         };
 
-        let source = model::LinkRef::Id(self.get_link_id(entry_block, IncomingPort::from(0)));
+        let source = model::LinkRef::Index(self.get_link_index(entry_block, IncomingPort::from(0)));
         region_children.push(self.export_node(entry_block));
 
         // The last child is the exit block.
@@ -645,6 +657,7 @@ impl<'a> Context<'a> {
             children: region_children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
             signature,
+            links_isolated: false,
         })
     }
 
@@ -659,7 +672,7 @@ impl<'a> Context<'a> {
             };
 
             let extensions = self.export_ext_set(&case_op.signature.extension_reqs);
-            regions.push(self.export_dfg(child, extensions));
+            regions.push(self.export_dfg(child, extensions, false));
         }
 
         regions.into_bump_slice()

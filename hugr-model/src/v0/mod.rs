@@ -141,7 +141,7 @@ define_index! {
 define_index! {
     /// Index of a link in a hugr graph.
     #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-    pub struct LinkId(pub u32);
+    pub struct LinkIndex(pub u32);
 }
 
 define_index! {
@@ -167,8 +167,6 @@ pub struct Module<'a> {
     pub regions: Vec<Region<'a>>,
     /// Table of [`Term`]s.
     pub terms: Vec<Term<'a>>,
-    /// Table of [`Link`]s.
-    pub links: Vec<Link<'a>>,
 }
 
 impl<'a> Module<'a> {
@@ -226,25 +224,6 @@ impl<'a> Module<'a> {
     pub fn insert_region(&mut self, region: Region<'a>) -> RegionId {
         let id = RegionId::new(self.regions.len());
         self.regions.push(region);
-        id
-    }
-
-    /// Return the link data for a given link id.
-    #[inline]
-    pub fn get_link(&self, link_id: LinkId) -> Option<&Link<'a>> {
-        self.links.get(link_id.index())
-    }
-
-    /// Return a mutable reference to the link data for a given link id.
-    #[inline]
-    pub fn get_link_mut(&mut self, link_id: LinkId) -> Option<&mut Link<'a>> {
-        self.links.get_mut(link_id.index())
-    }
-
-    /// Insert a new link into the module and return its id.
-    pub fn insert_link(&mut self, link: Link<'a>) -> LinkId {
-        let id = LinkId::new(self.links.len());
-        self.links.push(link);
         id
     }
 
@@ -476,6 +455,8 @@ pub struct Region<'a> {
     ///
     /// Can be `None` to indicate that the region signature should be inferred.
     pub signature: Option<TermId>,
+    /// Whether the links in the region are isolated.
+    pub links_isolated: bool,
 }
 
 /// The kind of a region.
@@ -594,8 +575,8 @@ pub type VarIndex = u16;
 /// A reference to a link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LinkRef<'a> {
-    /// Reference to the link by its id.
-    Id(LinkId),
+    /// Reference to the link by its index.
+    Index(LinkIndex),
     /// Reference to the link by its name.
     Named(&'a str),
 }
@@ -603,7 +584,7 @@ pub enum LinkRef<'a> {
 impl std::fmt::Display for LinkRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LinkRef::Id(id) => write!(f, "%:{})", id.index()),
+            LinkRef::Index(index) => write!(f, "%:{})", index.index()),
             LinkRef::Named(name) => write!(f, "%{}", name),
         }
     }
@@ -808,13 +789,6 @@ pub enum ParamSort {
     Explicit,
 }
 
-/// A link in a module.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Link<'a> {
-    /// The name of the link.
-    pub name: &'a str,
-}
-
 /// Errors that can occur when traversing and interpreting the model.
 #[derive(Debug, Clone, Error)]
 pub enum ModelError {
@@ -829,7 +803,7 @@ pub enum ModelError {
     RegionNotFound(RegionId),
     /// There is a reference to a link that does not exist.
     #[error("link not found: {0}")]
-    LinkNotFound(LinkId),
+    LinkNotFound(LinkIndex),
     /// Errors that can occur when resolving variables.
     #[error(transparent)]
     VarRef(#[from] VarRefError),

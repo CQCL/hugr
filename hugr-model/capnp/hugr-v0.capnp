@@ -12,15 +12,14 @@ using RegionId = UInt32;
 # The id of a `Node`.
 using NodeId = UInt32;
 
-# The id of a `Link`.
-using LinkId = UInt32;
+# The index of a `Link`.
+using LinkIndex = UInt32;
 
 struct Module {
     root @0 :RegionId;
     nodes @1 :List(Node);
     regions @2 :List(Region);
     terms @3 :List(Term);
-    links @4 :List(Link);
 }
 
 struct Node {
@@ -104,6 +103,7 @@ struct Region {
     children @3 :List(NodeId);
     meta @4 :List(MetaItem);
     signature @5 :OptionalTermId;
+    linksIsolated @6 :Bool;
 }
 
 enum RegionKind {
@@ -119,7 +119,7 @@ struct MetaItem {
 
 struct LinkRef {
     union {
-        id @0 :LinkId;
+        index @0 :LinkIndex;
         named @1 :Text;
     }
 }
@@ -214,8 +214,4 @@ struct Param {
 enum ParamSort {
     implicit @0;
     explicit @1;
-}
-
-struct Link {
-    name @0 :Text;
 }

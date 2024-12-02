@@ -90,6 +90,7 @@ pub fn import_hugr(
         nodes: FxHashMap::default(),
         local_variables: IndexMap::default(),
         custom_name_cache: FxHashMap::default(),
+        link_scope: module.root,
     };
 
     ctx.import_root()?;
@@ -108,7 +109,7 @@ struct Context<'a> {
 
     /// The ports that are part of each link. This is used to connect the ports at the end of the
     /// import process.
-    link_ports: FxHashMap<model::LinkRef<'a>, Vec<(Node, Port)>>,
+    link_ports: FxHashMap<(model::RegionId, model::LinkRef<'a>), Vec<(Node, Port)>>,
 
     /// Pairs of nodes that should be connected by a static edge.
     /// These are collected during the import process and connected at the end.
@@ -124,6 +125,9 @@ struct Context<'a> {
 
     /// The local variables that are currently in scope.
     local_variables: FxIndexMap<&'a str, LocalVar>,
+
+    /// The closest region that establishes a link scope.
+    link_scope: model::RegionId,
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 }
@@ -208,7 +212,10 @@ impl<'a> Context<'a> {
         debug_assert!(links.len() <= optype.port_count(direction));
 
         for (link, port) in links.iter().zip(self.hugr.node_ports(node, direction)) {
-            self.link_ports.entry(*link).or_default().push((node, port));
+            self.link_ports
+                .entry((self.link_scope, *link))
+                .or_default()
+                .push((node, port));
         }
     }
 
@@ -235,8 +242,9 @@ impl<'a> Context<'a> {
 
             if inputs.is_empty() || outputs.is_empty() {
                 return Err(error_unsupported!(
-                    "link {} is missing either an input or an output port",
-                    link_id
+                    "link {} in region {} is missing either an input or an output port",
+                    link_id.0,
+                    link_id.1
                 ));
             }
 
@@ -567,6 +575,12 @@ impl<'a> Context<'a> {
     ) -> Result<(), ImportError> {
         let region_data = self.get_region(region)?;
 
+        let prev_link_scope = if region_data.links_isolated {
+            std::mem::replace(&mut self.link_scope, region)
+        } else {
+            self.link_scope
+        };
+
         if region_data.kind != model::RegionKind::DataFlow {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
@@ -598,6 +612,8 @@ impl<'a> Context<'a> {
         for child in region_data.children {
             self.import_node(*child, node)?;
         }
+
+        self.link_scope = prev_link_scope;
 
         Ok(())
     }
@@ -731,6 +747,12 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
+        let prev_link_scope = if region_data.links_isolated {
+            std::mem::replace(&mut self.link_scope, region)
+        } else {
+            self.link_scope
+        };
+
         let (region_source, region_targets, _) = self.get_func_type(
             region_data
                 .signature
@@ -836,6 +858,8 @@ impl<'a> Context<'a> {
                 .add_node_with_parent(node, OpType::ExitBlock(ExitBlock { cfg_outputs }));
             self.record_links(exit, Direction::Incoming, region_data.targets);
         }
+
+        self.link_scope = prev_link_scope;
 
         Ok(())
     }

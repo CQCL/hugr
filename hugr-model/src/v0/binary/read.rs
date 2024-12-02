@@ -61,18 +61,11 @@ fn read_module<'a>(
         .map(|r| read_term(bump, r))
         .collect::<ReadResult<_>>()?;
 
-    let links = reader
-        .get_links()?
-        .iter()
-        .map(|r| read_link(bump, r))
-        .collect::<ReadResult<_>>()?;
-
     Ok(model::Module {
         root,
         nodes,
         regions,
         terms,
-        links,
     })
 }
 
@@ -128,7 +121,7 @@ fn read_link_ref<'a>(
 ) -> ReadResult<model::LinkRef<'a>> {
     use hugr_capnp::link_ref::Which;
     Ok(match reader.which()? {
-        Which::Id(id) => model::LinkRef::Id(model::LinkId(id)),
+        Which::Index(index) => model::LinkRef::Index(model::LinkIndex(index)),
         Which::Named(name) => model::LinkRef::Named(bump.alloc_str(name?.to_str()?)),
     })
 }
@@ -260,6 +253,7 @@ fn read_region<'a>(
     let children = read_scalar_list!(bump, reader, get_children, model::NodeId);
     let meta = read_list!(bump, reader, get_meta, read_meta_item);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
+    let links_isolated = reader.get_links_isolated();
 
     Ok(model::Region {
         kind,
@@ -268,6 +262,7 @@ fn read_region<'a>(
         children,
         meta,
         signature,
+        links_isolated,
     })
 }
 
@@ -390,9 +385,4 @@ fn read_param<'a>(
     };
 
     Ok(model::Param { name, r#type, sort })
-}
-
-fn read_link<'a>(bump: &'a Bump, reader: hugr_capnp::link::Reader) -> ReadResult<model::Link<'a>> {
-    let name = bump.alloc_str(reader.get_name()?.to_str()?);
-    Ok(model::Link { name })
 }

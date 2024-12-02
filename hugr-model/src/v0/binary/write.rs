@@ -27,7 +27,6 @@ fn write_module(mut builder: hugr_capnp::module::Builder, module: &model::Module
     write_list!(builder, init_nodes, write_node, module.nodes);
     write_list!(builder, init_regions, write_region, module.regions);
     write_list!(builder, init_terms, write_term, module.terms);
-    write_list!(builder, init_links, write_link, module.links);
 }
 
 fn write_node(mut builder: hugr_capnp::node::Builder, node: &model::Node) {
@@ -127,7 +126,7 @@ fn write_symbol_ref(mut builder: hugr_capnp::symbol_ref::Builder, symbol_ref: &m
 
 fn write_link_ref(mut builder: hugr_capnp::link_ref::Builder, link_ref: &model::LinkRef) {
     match link_ref {
-        model::LinkRef::Id(id) => builder.set_id(id.0),
+        model::LinkRef::Index(id) => builder.set_index(id.0),
         model::LinkRef::Named(name) => builder.set_named(name),
     }
 }
@@ -160,6 +159,7 @@ fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region
     let _ = builder.set_children(model::NodeId::unwrap_slice(region.children));
     write_list!(builder, init_meta, write_meta_item, region.meta);
     builder.set_signature(region.signature.map_or(0, |t| t.0 + 1));
+    builder.set_links_isolated(region.links_isolated);
 }
 
 fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
@@ -234,8 +234,4 @@ fn write_ext_set_item(
         model::ExtSetPart::Extension(ext) => builder.set_extension(ext),
         model::ExtSetPart::Splice(term_id) => builder.set_splice(term_id.0),
     }
-}
-
-fn write_link(mut builder: hugr_capnp::link::Builder, link: &model::Link) {
-    builder.set_name(link.name);
 }

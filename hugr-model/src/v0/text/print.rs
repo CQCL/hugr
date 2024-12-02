@@ -449,15 +449,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     }
 
     fn print_link_ref(&mut self, link_ref: LinkRef<'a>) -> PrintResult<()> {
-        // TODO: We need some better textual representation for links with an id.
         match link_ref {
-            LinkRef::Id(link_id) => {
-                let _link = self
-                    .module
-                    .get_link(link_id)
-                    .ok_or_else(|| ModelError::LinkNotFound(link_id))?;
-
-                self.print_text(format!("%{}", link_id.0));
+            LinkRef::Index(link_index) => {
+                self.print_text(format!("%:{}", link_index.0));
                 Ok(())
             }
             LinkRef::Named(name) => {

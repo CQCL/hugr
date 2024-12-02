@@ -74,6 +74,7 @@ impl<'a> ParseContext<'a> {
             children,
             meta,
             signature: None,
+            links_isolated: true,
         });
 
         self.module.root = root_region;
@@ -236,7 +237,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Dfg,
                     inputs,
@@ -253,7 +254,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Cfg,
                     inputs,
@@ -270,7 +271,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Block,
                     inputs,
@@ -285,7 +286,7 @@ impl<'a> ParseContext<'a> {
             Rule::node_define_func => {
                 let decl = self.parse_func_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, true)?;
                 Node {
                     operation: Operation::DefineFunc { decl },
                     inputs: &[],
@@ -401,7 +402,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, true)?;
                 Node {
                     operation,
                     inputs,
@@ -418,7 +419,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::TailLoop,
                     inputs,
@@ -435,7 +436,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Conditional,
                     inputs,
@@ -514,15 +515,23 @@ impl<'a> ParseContext<'a> {
         Ok(node_id)
     }
 
-    fn parse_regions(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [RegionId]> {
+    fn parse_regions(
+        &mut self,
+        pairs: &mut Pairs<'a, Rule>,
+        links_isolated: bool,
+    ) -> ParseResult<&'a [RegionId]> {
         let mut regions = Vec::new();
         for pair in filter_rule(pairs, Rule::region) {
-            regions.push(self.parse_region(pair)?);
+            regions.push(self.parse_region(pair, links_isolated)?);
         }
         Ok(self.bump.alloc_slice_copy(&regions))
     }
 
-    fn parse_region(&mut self, pair: Pair<'a, Rule>) -> ParseResult<RegionId> {
+    fn parse_region(
+        &mut self,
+        pair: Pair<'a, Rule>,
+        links_isolated: bool,
+    ) -> ParseResult<RegionId> {
         debug_assert_eq!(pair.as_rule(), Rule::region);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
@@ -547,6 +556,7 @@ impl<'a> ParseContext<'a> {
             children,
             meta,
             signature,
+            links_isolated,
         }))
     }
 
