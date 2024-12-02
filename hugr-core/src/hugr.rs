@@ -31,7 +31,7 @@ use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
 
-pub use monomorphize::monomorphize;
+pub use monomorphize::{monomorphize, remove_polyfuncs};
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]

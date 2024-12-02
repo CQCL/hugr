@@ -9,12 +9,18 @@ use crate::{
 
 use super::{internal::HugrMutInternals, Hugr, HugrMut, HugrView, OpType};
 
+/// Replaces calls to polymorphic functions with calls to new monomorphic
+/// instantiations of the polymorphic ones. The original polymorphic [FuncDefn]s
+/// are left untouched (including Calls inside them) - see [remove_polyfuncs]
 pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
     let root = h.root(); // I.e. "all monomorphic funcs" for Module-Rooted Hugrs...right?
     mono_scan(&mut h, root, None, &mut HashMap::new(), reg);
     h
 }
 
+/// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
+/// calls from *monomorphic* code, this will make the Hugr invalid (call [monomorphize]
+/// first).
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
@@ -42,6 +48,10 @@ struct Instantiating<'a> {
 
 type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 
+/// Scans a subtree for polymorphic calls and monomorphizes them by instantiating the
+/// called functions (if instantations not already in `cache`).
+/// Optionally copies the subtree into a new location whilst applying a substitution.
+/// The subtree should be monomorphic after the substitution (if provided) has been applied.
 fn mono_scan(
     h: &mut Hugr,
     parent: Node,
@@ -96,7 +106,7 @@ fn mono_scan(
             h.connect(new_tgt, fn_out, ch, fn_inp);
         }
         *h.op_types.get_mut(ch.pg_index()) =
-            Call::try_new(mono_sig.into(), vec![], &reg).unwrap().into();
+            Call::try_new(mono_sig.into(), vec![], reg).unwrap().into();
     }
 }
 
@@ -174,10 +184,10 @@ fn instantiate(
 
 fn mangle_name(name: &str, type_args: &[TypeArg]) -> String {
     let s = format!("__{name}_{type_args:?}");
-    s.replace(&['[', ']', '{', '}', ' '], "_")
+    s.replace(['[', ']', '{', '}', ' '], "_")
 }
 
-fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
+fn mangle_inner_func(_outer_name: &str, _inner_name: &str) -> String {
     todo!()
 }
 
@@ -193,7 +203,7 @@ mod test {
     use crate::extension::prelude::{UnpackTuple, USIZE_T};
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::handle::FuncID;
-    use crate::ops::{OpType, Tag};
+    use crate::ops::Tag;
     use crate::types::{PolyFuncType, Signature, Type, TypeBound};
     use crate::{Hugr, HugrView};
 
