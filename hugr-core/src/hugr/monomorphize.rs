@@ -218,10 +218,10 @@ mod test {
     use crate::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::monomorphize::mangle_inner_func;
     use crate::ops::handle::FuncID;
-    use crate::ops::Tag;
+    use crate::ops::{FuncDefn, Tag};
     use crate::std_extensions::arithmetic::int_types::{self, INT_TYPES};
     use crate::types::{PolyFuncType, Signature, Type, TypeBound};
-    use crate::{type_row, Hugr, HugrView};
+    use crate::{type_row, Hugr, HugrView, Node};
 
     use super::{mangle_name, monomorphize, remove_polyfuncs};
 
@@ -330,12 +330,11 @@ mod test {
         assert_eq!(monomorphize(mono.clone(), &PRELUDE_REGISTRY), mono); // Idempotent
 
         let nopoly = remove_polyfuncs(mono);
-        let mut funcs = nopoly
-            .nodes()
-            .filter_map(|n| nopoly.get_optype(n).as_func_defn().map(|fd| (&fd.name, fd)))
-            .collect::<HashMap<_, _>>();
+        let mut funcs = list_funcs(&nopoly);
 
-        assert!(funcs.values().all(|fd| fd.signature.params().is_empty()));
+        assert!(funcs
+            .values()
+            .all(|(_, fd)| fd.signature.params().is_empty()));
         for n in expected_mangled_names {
             assert!(funcs.remove(&n).is_some());
         }
@@ -389,13 +388,10 @@ mod test {
 
         let mono_hugr = monomorphize(hugr, &reg);
         mono_hugr.validate(&reg)?;
-        let funcs = mono_hugr
-            .nodes()
-            .filter_map(|n| mono_hugr.get_optype(n).as_func_defn().map(|fd| (n, fd)))
-            .collect_vec();
+        let funcs = list_funcs(&mono_hugr);
         let pf2_name = mangle_inner_func("pf1", "pf2");
         assert_eq!(
-            funcs.iter().map(|(_, fd)| &fd.name).sorted().collect_vec(),
+            funcs.keys().copied().sorted().collect_vec(),
             vec![
                 &mangle_name("pf1", &[ity().into()]),
                 &mangle_name("pf1", &[usize_t().into()]),
@@ -408,11 +404,17 @@ mod test {
             .sorted()
             .collect_vec()
         );
-        for (n, fd) in funcs {
+        for (n, fd) in funcs.into_values() {
             assert!(fd.signature.params().is_empty());
             assert!(mono_hugr.get_parent(n) == (fd.name != "mainish").then_some(mono_hugr.root()));
         }
         Ok(())
+    }
+
+    fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
+        h.nodes()
+            .filter_map(|n| h.get_optype(n).as_func_defn().map(|fd| (&fd.name, (n, fd))))
+            .collect::<HashMap<_, _>>()
     }
 
     #[test]
