@@ -211,13 +211,13 @@ mod test {
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{
-        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        ModuleBuilder,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+        HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{usize_t, ConstUsize, UnpackTuple};
     use crate::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::monomorphize::mangle_inner_func;
-    use crate::ops::handle::FuncID;
+    use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{FuncDefn, Tag};
     use crate::std_extensions::arithmetic::int_types::{self, INT_TYPES};
     use crate::types::{PolyFuncType, Signature, Type, TypeBound};
@@ -418,8 +418,45 @@ mod test {
     }
 
     #[test]
-    fn test_not_flattened() {
-        //monof2 contains polyf3 (and instantiates) - not moved
-        //polyf4 contains polyf5 but not instantiated -> not moved
+    fn test_no_flatten_out_of_mono_func() -> Result<(), Box<dyn std::error::Error>> {
+        let ity = || INT_TYPES[4].clone();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), int_types::EXTENSION.to_owned()])?;
+        let sig = Signature::new_endo(vec![usize_t(), ity()]);
+        let mut dfg = DFGBuilder::new(sig.clone())?;
+        let mut mono = dfg.define_function("id2", sig)?;
+        let pf = mono.define_function(
+            "id",
+            PolyFuncType::new(
+                [TypeBound::Any.into()],
+                Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
+            ),
+        )?;
+        let outs = pf.input_wires();
+        let pf = pf.finish_with_outputs(outs)?;
+        let [a, b] = mono.input_wires_arr();
+        let [a] = mono
+            .call(pf.handle(), &[usize_t().into()], [a], &reg)?
+            .outputs_arr();
+        let [b] = mono
+            .call(pf.handle(), &[ity().into()], [b], &reg)?
+            .outputs_arr();
+        let mono = mono.finish_with_outputs([a, b])?;
+        let c = dfg.call(mono.handle(), &[], dfg.input_wires(), &reg)?;
+        let hugr = dfg.finish_hugr_with_outputs(c.outputs(), &reg)?;
+        let mono_hugr = monomorphize(hugr, &reg);
+
+        let mut funcs = list_funcs(&mono_hugr);
+        assert!(funcs
+            .values()
+            .all(|(_, fd)| fd.signature.params().is_empty()));
+        let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
+        assert_eq!(m, mono.handle().node());
+        assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.root()));
+        for t in [usize_t(), ity()] {
+            let (n, _) = funcs.remove(&mangle_name("id", &[t.into()])).unwrap();
+            assert_eq!(mono_hugr.get_parent(n), Some(m)); // Not lifted to top
+        }
+        Ok(())
     }
 }
