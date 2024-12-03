@@ -1,174 +1,213 @@
-//! Resolve weak links inside `CustomType`s in an optype's signature.
+//! Collect the extensions referenced inside `CustomType`s in an optype or
+//! signature.
+//!
+//! Fails if any of the weak extension pointers have been invalidated.
+//!
+//! See [`super::update_op_types_extensions`] for a mutating version that
+//! updates the weak links to point to the correct extensions.
 
-use std::sync::Arc;
+use std::collections::HashSet;
 
-use super::{ExtensionRegistry, ExtensionResolutionError};
-use crate::ops::OpType;
+use super::ExtensionCollectionError;
+use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::ops::{DataflowOpTrait, OpType};
 use crate::types::type_row::TypeRowBase;
-use crate::types::{MaybeRV, Signature, SumType, TypeBase, TypeEnum};
+use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
 use crate::Node;
 
-/// Replace the dangling extension pointer in the [`CustomType`]s inside a
-/// signature with a valid pointer to the extension in the `extensions`
-/// registry.
+/// Collects every extension used te define the types in an operation.
 ///
-/// When a pointer is replaced, the extension is added to the
-/// `used_extensions` registry and the new type definition is returned.
+/// Custom types store a [`Weak`] reference to their extension, which can be
+/// invalidated if the original `Arc<Extension>` is dropped. This normally
+/// happens when deserializing a HUGR. On such cases, we return an error with
+/// the missing extension names.
 ///
-/// This is a helper function used right after deserializing a Hugr.
-pub fn update_op_types_extensions(
-    node: Node,
-    op: &mut OpType,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
-) -> Result<(), ExtensionResolutionError> {
+/// Use [`collect_op_types_extensions`] instead to update the weak references and
+/// ensure they point to valid extensions.
+///
+/// # Attributes
+///
+/// - `node`: The node where the operation is located, if available.
+///   This is used to provide context in the error message.
+/// - `op`: The operation to collect the extensions from.
+pub fn collect_op_types_extensions(
+    node: Option<Node>,
+    op: &OpType,
+) -> Result<ExtensionRegistry, ExtensionCollectionError> {
+    let mut used = ExtensionRegistry::default();
+    let mut missing = HashSet::<ExtensionId>::new();
+
     match op {
         OpType::ExtensionOp(ext) => {
-            update_signature_exts(node, ext.signature_mut(), extensions, used_extensions)?
+            collect_signature_exts(&ext.signature(), &mut used, &mut missing)
         }
-        OpType::FuncDefn(f) => {
-            update_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?
-        }
-        OpType::FuncDecl(f) => {
-            update_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?
-        }
+        OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
+        OpType::FuncDecl(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
         OpType::Const(_c) => {
-            // TODO: Is it OK to assume that `Value::get_type` returns a well-resolved value?
+            // TODO: Is it OK to assume that `Value::get_type` returns a well-resolved value
         }
-        OpType::Input(inp) => {
-            update_type_row_exts(node, &mut inp.types, extensions, used_extensions)?
-        }
-        OpType::Output(out) => {
-            update_type_row_exts(node, &mut out.types, extensions, used_extensions)?
-        }
+        OpType::Input(inp) => collect_type_row_exts(&inp.types, &mut used, &mut missing),
+        OpType::Output(out) => collect_type_row_exts(&out.types, &mut used, &mut missing),
         OpType::Call(c) => {
-            update_signature_exts(node, c.func_sig.body_mut(), extensions, used_extensions)?;
-            update_signature_exts(node, &mut c.instantiation, extensions, used_extensions)?;
+            collect_signature_exts(c.func_sig.body(), &mut used, &mut missing);
+            collect_signature_exts(&c.instantiation, &mut used, &mut missing);
         }
-        OpType::CallIndirect(c) => {
-            update_signature_exts(node, &mut c.signature, extensions, used_extensions)?
-        }
-        OpType::LoadConstant(lc) => {
-            update_type_exts(node, &mut lc.datatype, extensions, used_extensions)?
-        }
+        OpType::CallIndirect(c) => collect_signature_exts(&c.signature, &mut used, &mut missing),
+        OpType::LoadConstant(lc) => collect_type_exts(&lc.datatype, &mut used, &mut missing),
         OpType::LoadFunction(lf) => {
-            update_signature_exts(node, lf.func_sig.body_mut(), extensions, used_extensions)?;
-            update_signature_exts(node, &mut lf.signature, extensions, used_extensions)?;
+            collect_signature_exts(lf.func_sig.body(), &mut used, &mut missing);
+            collect_signature_exts(&lf.signature, &mut used, &mut missing);
         }
-        OpType::DFG(dfg) => {
-            update_signature_exts(node, &mut dfg.signature, extensions, used_extensions)?
-        }
-        OpType::OpaqueOp(op) => {
-            update_signature_exts(node, op.signature_mut(), extensions, used_extensions)?
-        }
+        OpType::DFG(dfg) => collect_signature_exts(&dfg.signature, &mut used, &mut missing),
+        OpType::OpaqueOp(op) => collect_signature_exts(&op.signature(), &mut used, &mut missing),
         OpType::Tag(t) => {
-            for variant in t.variants.iter_mut() {
-                update_type_row_exts(node, variant, extensions, used_extensions)?
+            for variant in t.variants.iter() {
+                collect_type_row_exts(variant, &mut used, &mut missing)
             }
         }
         OpType::DataflowBlock(db) => {
-            update_type_row_exts(node, &mut db.inputs, extensions, used_extensions)?;
-            update_type_row_exts(node, &mut db.other_outputs, extensions, used_extensions)?;
-            for row in db.sum_rows.iter_mut() {
-                update_type_row_exts(node, row, extensions, used_extensions)?;
+            collect_type_row_exts(&db.inputs, &mut used, &mut missing);
+            collect_type_row_exts(&db.other_outputs, &mut used, &mut missing);
+            for row in db.sum_rows.iter() {
+                collect_type_row_exts(row, &mut used, &mut missing);
             }
         }
         OpType::ExitBlock(e) => {
-            update_type_row_exts(node, &mut e.cfg_outputs, extensions, used_extensions)?;
+            collect_type_row_exts(&e.cfg_outputs, &mut used, &mut missing);
         }
         OpType::TailLoop(tl) => {
-            update_type_row_exts(node, &mut tl.just_inputs, extensions, used_extensions)?;
-            update_type_row_exts(node, &mut tl.just_outputs, extensions, used_extensions)?;
-            update_type_row_exts(node, &mut tl.rest, extensions, used_extensions)?;
+            collect_type_row_exts(&tl.just_inputs, &mut used, &mut missing);
+            collect_type_row_exts(&tl.just_outputs, &mut used, &mut missing);
+            collect_type_row_exts(&tl.rest, &mut used, &mut missing);
         }
         OpType::CFG(cfg) => {
-            update_signature_exts(node, &mut cfg.signature, extensions, used_extensions)?;
+            collect_signature_exts(&cfg.signature, &mut used, &mut missing);
         }
         OpType::Conditional(cond) => {
-            for row in cond.sum_rows.iter_mut() {
-                update_type_row_exts(node, row, extensions, used_extensions)?;
+            for row in cond.sum_rows.iter() {
+                collect_type_row_exts(row, &mut used, &mut missing);
             }
-            update_type_row_exts(node, &mut cond.other_inputs, extensions, used_extensions)?;
-            update_type_row_exts(node, &mut cond.outputs, extensions, used_extensions)?;
+            collect_type_row_exts(&cond.other_inputs, &mut used, &mut missing);
+            collect_type_row_exts(&cond.outputs, &mut used, &mut missing);
         }
         OpType::Case(case) => {
-            update_signature_exts(node, &mut case.signature, extensions, used_extensions)?;
+            collect_signature_exts(&case.signature, &mut used, &mut missing);
         }
         // Ignore optypes that do not store a signature.
         _ => {}
+    };
+
+    if missing.is_empty() {
+        Ok(used)
+    } else {
+        Err(ExtensionCollectionError::dropped_op_extension(
+            node, op, missing,
+        ))
     }
-    Ok(())
 }
 
-/// Update all weak Extension pointers in the [`CustomType`]s inside a signature.
+/// Collect the Extension pointers in the [`CustomType`]s inside a signature.
 ///
-/// Adds the extensions used in the signature to the `used_extensions` registry.
-fn update_signature_exts(
-    node: Node,
-    signature: &mut Signature,
-    extensions: &ExtensionRegistry,
+/// # Attributes
+///
+/// - `signature`: The signature to collect the extensions from.
+/// - `used_extensions`: A The registry where to store the used extensions.
+/// - `missing_extensions`: A set of `ExtensionId`s of which the
+///   `Weak<Extension>` pointer has been invalidated.
+pub(crate) fn collect_signature_exts<RV: MaybeRV>(
+    signature: &FuncTypeBase<RV>,
     used_extensions: &mut ExtensionRegistry,
-) -> Result<(), ExtensionResolutionError> {
+    missing_extensions: &mut HashSet<ExtensionId>,
+) {
     // Note that we do not include the signature's `extension_reqs` here, as those refer
     // to _runtime_ requirements that may not be currently present.
     // See https://github.com/CQCL/hugr/issues/1734
     // TODO: Update comment once that issue gets implemented.
-    update_type_row_exts(node, &mut signature.input, extensions, used_extensions)?;
-    update_type_row_exts(node, &mut signature.output, extensions, used_extensions)?;
-    Ok(())
+    collect_type_row_exts(&signature.input, used_extensions, missing_extensions);
+    collect_type_row_exts(&signature.output, used_extensions, missing_extensions);
 }
 
-/// Update all weak Extension pointers in the [`CustomType`]s inside a type row.
+/// Collect the Extension pointers in the [`CustomType`]s inside a type row.
 ///
-/// Adds the extensions used in the row to the `used_extensions` registry.
-fn update_type_row_exts<RV: MaybeRV>(
-    node: Node,
-    row: &mut TypeRowBase<RV>,
-    extensions: &ExtensionRegistry,
+/// # Attributes
+///
+/// - `row`: The type row to collect the extensions from.
+/// - `used_extensions`: A The registry where to store the used extensions.
+/// - `missing_extensions`: A set of `ExtensionId`s of which the
+///   `Weak<Extension>` pointer has been invalidated.
+fn collect_type_row_exts<RV: MaybeRV>(
+    row: &TypeRowBase<RV>,
     used_extensions: &mut ExtensionRegistry,
-) -> Result<(), ExtensionResolutionError> {
-    for ty in row.iter_mut() {
-        update_type_exts(node, ty, extensions, used_extensions)?;
+    missing_extensions: &mut HashSet<ExtensionId>,
+) {
+    for ty in row.iter() {
+        collect_type_exts(ty, used_extensions, missing_extensions);
     }
-    Ok(())
 }
 
-/// Update all weak Extension pointers in the [`CustomType`]s inside a type.
+/// Collect the Extension pointers in the [`CustomType`]s inside a type.
 ///
-/// Adds the extensions used in the type to the `used_extensions` registry.
-fn update_type_exts<RV: MaybeRV>(
-    node: Node,
-    typ: &mut TypeBase<RV>,
-    extensions: &ExtensionRegistry,
+/// # Attributes
+///
+/// - `typ`: The type to collect the extensions from.
+/// - `used_extensions`: A The registry where to store the used extensions.
+/// - `missing_extensions`: A set of `ExtensionId`s of which the
+///   `Weak<Extension>` pointer has been invalidated.
+fn collect_type_exts<RV: MaybeRV>(
+    typ: &TypeBase<RV>,
     used_extensions: &mut ExtensionRegistry,
-) -> Result<(), ExtensionResolutionError> {
-    match typ.as_type_enum_mut() {
+    missing_extensions: &mut HashSet<ExtensionId>,
+) {
+    match typ.as_type_enum() {
         TypeEnum::Extension(custom) => {
-            let ext_id = custom.extension();
-            let ext = extensions.get(ext_id).ok_or_else(|| {
-                ExtensionResolutionError::missing_type_extension(
-                    node,
-                    custom.name(),
-                    ext_id,
-                    extensions,
-                )
-            })?;
-
-            // Add the extension to the used extensions registry,
-            // and update the CustomType with the valid pointer.
-            used_extensions.register_updated_ref(ext);
-            custom.update_extension(Arc::downgrade(ext));
+            for arg in custom.args() {
+                collect_typearg_exts(arg, used_extensions, missing_extensions);
+            }
+            match custom.extension_ref().upgrade() {
+                Some(ext) => {
+                    // The extension pointer is still valid.
+                    used_extensions.register_updated(ext);
+                }
+                None => {
+                    // The extension has been dropped.
+                    // Register it in the missing set.
+                    missing_extensions.insert(custom.extension().clone());
+                }
+            }
         }
         TypeEnum::Function(f) => {
-            update_type_row_exts(node, &mut f.input, extensions, used_extensions)?;
-            update_type_row_exts(node, &mut f.output, extensions, used_extensions)?;
+            collect_type_row_exts(&f.input, used_extensions, missing_extensions);
+            collect_type_row_exts(&f.output, used_extensions, missing_extensions);
         }
         TypeEnum::Sum(SumType::General { rows }) => {
-            for row in rows.iter_mut() {
-                update_type_row_exts(node, row, extensions, used_extensions)?;
+            for row in rows.iter() {
+                collect_type_row_exts(row, used_extensions, missing_extensions);
             }
         }
         _ => {}
     }
-    Ok(())
+}
+
+/// Collect the Extension pointers in the [`CustomType`]s inside a type argument.
+///
+/// # Attributes
+///
+/// - `arg`: The type argument to collect the extensions from.
+/// - `used_extensions`: A The registry where to store the used extensions.
+/// - `missing_extensions`: A set of `ExtensionId`s of which the
+///   `Weak<Extension>` pointer has been invalidated.
+fn collect_typearg_exts(
+    arg: &TypeArg,
+    used_extensions: &mut ExtensionRegistry,
+    missing_extensions: &mut HashSet<ExtensionId>,
+) {
+    match arg {
+        TypeArg::Type { ty } => collect_type_exts(ty, used_extensions, missing_extensions),
+        TypeArg::Sequence { elems } => {
+            for elem in elems.iter() {
+                collect_typearg_exts(elem, used_extensions, missing_extensions);
+            }
+        }
+        _ => {}
+    }
 }
