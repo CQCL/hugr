@@ -8,10 +8,12 @@ use crate::builder::{
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
 use crate::extension::simple_op::MakeRegisteredOp;
+use crate::extension::ExtensionId;
 use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
-use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
+use crate::hugr::ExtensionResolutionError;
+use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
@@ -22,6 +24,7 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
+use crate::utils::test_quantum_extension;
 use crate::{type_row, OutgoingPort};
 
 use itertools::Itertools;
@@ -331,7 +334,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .out_wire(0);
     }
-    let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
+    let hugr = dfg.finish_hugr_with_outputs(params, &test_quantum_extension::REG)?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -350,7 +353,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .out_wire(0);
 
-    let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
+    let hugr = dfg.finish_hugr_with_outputs([wire], &test_quantum_extension::REG)?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -368,6 +371,7 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(extension_op.clone(), [wire])
         .unwrap()
         .out_wire(0);
+    let not_node = wire.node();
 
     // Add an unresolved opaque operation
     let opaque_op: OpaqueOp = extension_op.into();
@@ -376,11 +380,14 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(
         dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY),
-        Err(ValidationError::OpaqueOpError(OpaqueOpError::UnresolvedOp(
-            wire.node(),
-            "Not".into(),
-            ext_name
-        ))
+        Err(ValidationError::ExtensionResolutionError(
+            ExtensionResolutionError::MissingOpExtension {
+                node: not_node,
+                op: "logic.Not".into(),
+                missing_extension: ext_name,
+                available_extensions: vec![ExtensionId::new("prelude").unwrap()]
+            }
+        )
         .into())
     );
 
@@ -554,7 +561,7 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
 // test all standard extension serialisations are valid against scheme
 fn std_extensions_valid() {
     let std_reg = crate::std_extensions::std_reg();
-    for (_, ext) in std_reg.into_iter() {
+    for ext in std_reg {
         let val = serde_json::to_value(ext).unwrap();
         NamedSchema::check_schemas(&val, get_schemas(true));
         // check deserialises correctly, can't check equality because of custom binaries.

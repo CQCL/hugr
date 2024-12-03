@@ -218,4 +218,4 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
 }
 
 #[cfg(test)]
-mod test;
+pub(crate) mod test;

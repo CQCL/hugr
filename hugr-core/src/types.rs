@@ -395,6 +395,12 @@ impl<RV: MaybeRV> TypeBase<RV> {
         &self.0
     }
 
+    /// Report a mutable reference to the component TypeEnum.
+    #[inline(always)]
+    pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
+        &mut self.0
+    }
+
     /// Report if the type is copyable - i.e.the least upper bound of the type
     /// is contained by the copyable bound.
     pub const fn copyable(&self) -> bool {

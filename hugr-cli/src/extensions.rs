@@ -28,9 +28,9 @@ impl ExtArgs {
     pub fn run_dump(&self, registry: &ExtensionRegistry) {
         let base_dir = &self.outdir;
 
-        for (name, ext) in registry.iter() {
+        for ext in registry.iter() {
             let mut path = base_dir.clone();
-            for part in name.split('.') {
+            for part in ext.name().split('.') {
                 path.push(part);
             }
             path.set_extension("json");

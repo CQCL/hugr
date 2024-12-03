@@ -101,10 +101,8 @@ mod tests {
 
     use super::super::simple_replace::test::dfg_hugr;
     use super::*;
-    use crate::{
-        extension::{prelude::qb_t, PRELUDE_REGISTRY},
-        Hugr,
-    };
+    use crate::utils::test_quantum_extension;
+    use crate::{extension::prelude::qb_t, Hugr};
 
     #[rstest]
     fn correct_insertion(dfg_hugr: Hugr) {
@@ -129,6 +127,6 @@ mod tests {
 
         assert_eq!(noop, Noop(qb_t()));
 
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&test_quantum_extension::REG).unwrap();
     }
 }

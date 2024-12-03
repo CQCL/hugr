@@ -372,7 +372,7 @@ impl ListOpInst {
                 .clone()
                 .into_iter()
                 // ignore self if already in registry
-                .filter_map(|(_, ext)| (ext.name() != EXTENSION.name()).then_some(ext))
+                .filter(|ext| ext.name() != EXTENSION.name())
                 .chain(std::iter::once(EXTENSION.to_owned())),
         )
         .unwrap();
