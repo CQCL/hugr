@@ -1,15 +1,13 @@
 use crate::const_fold::constant_fold_pass;
+use crate::test::TEST_REG;
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{
     bool_t, const_ok, error_type, string_type, sum_with_error, ConstError, ConstString, UnpackTuple,
 };
-use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::ops::Value;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use hugr_core::std_extensions::arithmetic::{self, float_ops, float_types};
-use hugr_core::std_extensions::collections;
-use hugr_core::std_extensions::logic::{self, LogicOp};
+use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::type_row;
 use hugr_core::types::{Signature, Type, TypeRow, TypeRowRV};
 
@@ -23,21 +21,6 @@ use hugr_core::ops::OpType;
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr_core::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
-
-lazy_static! {
-    /// A registry containing various extensions for testing.
-    pub(crate) static ref TEST_REG: ExtensionRegistry = ExtensionRegistry::try_new([
-        PRELUDE.clone(),
-        arithmetic::int_ops::EXTENSION.clone(),
-        arithmetic::int_types::EXTENSION.clone(),
-        float_types::EXTENSION.clone(),
-        float_ops::EXTENSION.clone(),
-        logic::EXTENSION.clone(),
-        arithmetic::conversions::EXTENSION.to_owned(),
-        collections::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-}
 
 /// Check that a hugr just loads and returns a single expected constant.
 pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {

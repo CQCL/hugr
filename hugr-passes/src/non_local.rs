@@ -48,7 +48,7 @@ mod test {
         types::Signature,
     };
 
-    use crate::const_fold::test::TEST_REG;
+    use crate::test::TEST_REG;
 
     use super::*;
 
