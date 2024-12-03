@@ -13,7 +13,7 @@
 //! Note: These procedures are only temporary until `hugr-model` is stabilized.
 //! Once that happens, hugrs will no longer be directly deserialized using serde
 //! but instead will be created by the methods in `crate::import`. As these
-//! (should) automatically resolve extensions as the operations are created,
+//! (will) automatically resolve extensions as the operations are created,
 //! we will no longer require this post-facto resolution step.
 
 mod types;
@@ -24,9 +24,10 @@ use std::sync::Arc;
 
 use derive_more::{Display, Error, From};
 
-use super::{Extension, ExtensionRegistry};
+use super::{Extension, ExtensionId, ExtensionRegistry};
 use crate::ops::custom::OpaqueOpError;
-use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpType};
+use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpName, OpType};
+use crate::types::TypeName;
 use crate::Node;
 
 /// The result of resolving an operation.
@@ -107,12 +108,6 @@ fn operation_extension<'e>(
     op: &OpType,
     extensions: &'e ExtensionRegistry,
 ) -> Result<Option<&'e Arc<Extension>>, ExtensionResolutionError> {
-    let err = |ext: &str| ExtensionResolutionError::MissingOpExtension {
-        node,
-        op: NamedOp::name(op).to_string(),
-        missing_extension: ext.to_owned(),
-        available_extensions: extensions.ids().map(|id| id.to_string()).collect(),
-    };
     let extension = match op {
         OpType::OpaqueOp(opaque) => opaque.extension(),
         OpType::ExtensionOp(e) => e.def().extension_id(),
@@ -120,7 +115,9 @@ fn operation_extension<'e>(
     };
     match extensions.get(extension) {
         Some(e) => Ok(Some(e)),
-        None => Err(err(extension)),
+        None => Err(ExtensionResolutionError::missing_op_extension(
+            node, op, extension, extensions,
+        )),
     }
 }
 
@@ -141,11 +138,11 @@ pub enum ExtensionResolutionError {
         /// The node that requires the extension.
         node: Node,
         /// The operation that requires the extension.
-        op: String,
+        op: OpName,
         /// The missing extension
-        missing_extension: String,
+        missing_extension: ExtensionId,
         /// A list of available extensions.
-        available_extensions: Vec<String>,
+        available_extensions: Vec<ExtensionId>,
     },
     #[display(
         "Type {ty} in {node} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
@@ -156,10 +153,42 @@ pub enum ExtensionResolutionError {
         /// The node that requires the extension.
         node: Node,
         /// The type that requires the extension.
-        ty: String,
+        ty: TypeName,
         /// The missing extension
-        missing_extension: String,
+        missing_extension: ExtensionId,
         /// A list of available extensions.
-        available_extensions: Vec<String>,
+        available_extensions: Vec<ExtensionId>,
     },
+}
+
+impl ExtensionResolutionError {
+    /// Create a new error for missing operation extensions.
+    pub fn missing_op_extension(
+        node: Node,
+        op: &OpType,
+        missing_extension: &ExtensionId,
+        extensions: &ExtensionRegistry,
+    ) -> Self {
+        Self::MissingOpExtension {
+            node,
+            op: NamedOp::name(op),
+            missing_extension: missing_extension.clone(),
+            available_extensions: extensions.ids().cloned().collect(),
+        }
+    }
+
+    /// Create a new error for missing type extensions.
+    pub fn missing_type_extension(
+        node: Node,
+        ty: &TypeName,
+        missing_extension: &ExtensionId,
+        extensions: &ExtensionRegistry,
+    ) -> Self {
+        Self::MissingTypeExtension {
+            node,
+            ty: ty.clone(),
+            missing_extension: missing_extension.clone(),
+            available_extensions: extensions.ids().cloned().collect(),
+        }
+    }
 }

@@ -8,6 +8,7 @@ use crate::builder::{
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
 use crate::extension::simple_op::MakeRegisteredOp;
+use crate::extension::ExtensionId;
 use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
@@ -383,8 +384,8 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
             ExtensionResolutionError::MissingOpExtension {
                 node: not_node,
                 op: "logic.Not".into(),
-                missing_extension: ext_name.to_string(),
-                available_extensions: vec!["prelude".into()]
+                missing_extension: ext_name,
+                available_extensions: vec![ExtensionId::new("prelude").unwrap()]
             }
         )
         .into())

@@ -142,12 +142,12 @@ fn update_type_exts<RV: MaybeRV>(
         TypeEnum::Extension(custom) => {
             let ext_id = custom.extension();
             let ext = extensions.get(ext_id).ok_or_else(|| {
-                ExtensionResolutionError::MissingTypeExtension {
+                ExtensionResolutionError::missing_type_extension(
                     node,
-                    ty: custom.to_string(),
-                    missing_extension: ext_id.to_string(),
-                    available_extensions: extensions.ids().map(|id| id.to_string()).collect(),
-                }
+                    custom.name(),
+                    ext_id,
+                    extensions,
+                )
             })?;
 
             // Add the extension to the used extensions registry,

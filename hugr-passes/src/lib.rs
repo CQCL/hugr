@@ -25,12 +25,12 @@ pub(crate) mod test {
     lazy_static! {
         /// A registry containing various extensions for testing.
         pub(crate) static ref TEST_REG: ExtensionRegistry = ExtensionRegistry::try_new([
-            PRELUDE.clone(),
-            arithmetic::int_ops::EXTENSION.clone(),
-            arithmetic::int_types::EXTENSION.clone(),
-            arithmetic::float_types::EXTENSION.clone(),
-            arithmetic::float_ops::EXTENSION.clone(),
-            logic::EXTENSION.clone(),
+            PRELUDE.to_owned(),
+            arithmetic::int_ops::EXTENSION.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+            arithmetic::float_types::EXTENSION.to_owned(),
+            arithmetic::float_ops::EXTENSION.to_owned(),
+            logic::EXTENSION.to_owned(),
             arithmetic::conversions::EXTENSION.to_owned(),
             collections::EXTENSION.to_owned(),
         ])
