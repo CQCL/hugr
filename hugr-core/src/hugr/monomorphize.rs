@@ -214,14 +214,14 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::{usize_t, ConstUsize, UnpackTuple};
+    use crate::extension::prelude::{usize_t, ConstUsize, UnpackTuple, PRELUDE_ID};
     use crate::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::monomorphize::mangle_inner_func;
     use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{FuncDefn, Tag};
     use crate::std_extensions::arithmetic::int_types::{self, INT_TYPES};
-    use crate::types::{PolyFuncType, Signature, Type, TypeBound};
-    use crate::{type_row, Hugr, HugrView, Node};
+    use crate::types::{PolyFuncType, Signature, Type, TypeBound, TypeRow};
+    use crate::{Hugr, HugrView, Node};
 
     use super::{mangle_name, monomorphize, remove_polyfuncs};
 
@@ -237,6 +237,10 @@ mod test {
 
     fn triple_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty.clone(), ty])
+    }
+
+    fn prelusig(ins: impl Into<TypeRow>, outs: impl Into<TypeRow>) -> Signature {
+        Signature::new(ins, outs).with_extension_delta(PRELUDE_ID)
     }
 
     #[test]
@@ -258,17 +262,17 @@ mod test {
                 &FuncID::<true>::from(fb.container_node()),
                 &[tv0().into()],
                 [elem],
-                &PRELUDE_REGISTRY,
+                &EMPTY_REG,
             )?;
             fb.finish_with_outputs(tag.outputs())?
         };
 
         let tr = {
-            let pfty = PolyFuncType::new(
-                [TypeBound::Copyable.into()],
-                Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3])),
-            );
-            let mut fb = mb.define_function("triple", pfty)?;
+            let sig = prelusig(tv0(), Type::new_tuple(vec![tv0(); 3]));
+            let mut fb = mb.define_function(
+                "triple",
+                PolyFuncType::new([TypeBound::Copyable.into()], sig),
+            )?;
             let [elem] = fb.input_wires_arr();
             let pair = fb.call(db.handle(), &[tv0().into()], [elem], &PRELUDE_REGISTRY)?;
 
@@ -280,11 +284,8 @@ mod test {
             fb.finish_with_outputs(trip.outputs())?
         };
         {
-            let sig = Signature::new(
-                usize_t(),
-                vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))],
-            );
-            let mut fb = mb.define_function("main", sig)?;
+            let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
+            let mut fb = mb.define_function("main", prelusig(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem], &PRELUDE_REGISTRY)?
@@ -349,18 +350,19 @@ mod test {
         let reg =
             ExtensionRegistry::try_new([int_types::EXTENSION.to_owned(), PRELUDE.to_owned()])?;
         let tv0 = || Type::new_var_use(0, TypeBound::Any);
-        let pf_any = |sig: Signature| PolyFuncType::new([TypeBound::Any.into()], sig);
         let ity = || INT_TYPES[3].clone();
 
-        let mut outer = FunctionBuilder::new("mainish", Signature::new(ity(), usize_t()))?;
-        let sig = pf_any(Signature::new(tv0(), vec![tv0(), usize_t(), usize_t()]));
-        let mut pf1 = outer.define_function("pf1", sig)?;
+        let pf_any = |ins, outs| PolyFuncType::new([TypeBound::Any.into()], prelusig(ins, outs));
 
-        let sig = pf_any(Signature::new(tv0(), vec![tv0(), usize_t()]));
-        let mut pf2 = pf1.define_function("pf2", sig)?;
+        let mut outer = FunctionBuilder::new("mainish", prelusig(ity(), usize_t()))?;
+
+        let pfty = pf_any(vec![tv0()], vec![tv0(), usize_t(), usize_t()]);
+        let mut pf1 = outer.define_function("pf1", pfty)?;
+
+        let mut pf2 = pf1.define_function("pf2", pf_any(vec![tv0()], vec![tv0(), usize_t()]))?;
 
         let mono_func = {
-            let mut fb = pf2.define_function("get_usz", Signature::new(type_row![], usize_t()))?;
+            let mut fb = pf2.define_function("get_usz", prelusig(vec![], usize_t()))?;
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0])?
         };
