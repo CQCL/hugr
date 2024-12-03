@@ -211,8 +211,8 @@ mod test {
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{
-        BuildHandle, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-        HugrBuilder, ModuleBuilder,
+        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        ModuleBuilder,
     };
     use crate::extension::prelude::{usize_t, ConstUsize, UnpackTuple};
     use crate::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY};
@@ -239,25 +239,31 @@ mod test {
         Type::new_tuple(vec![ty.clone(), ty.clone(), ty])
     }
 
-    fn add_double(ctr: &mut impl Container) -> BuildHandle<FuncID<true>> {
-        let elem_ty = Type::new_var_use(0, TypeBound::Copyable);
-        let pfty = PolyFuncType::new(
-            [TypeBound::Copyable.into()],
-            Signature::new(elem_ty.clone(), pair_type(elem_ty.clone())),
-        );
-        let mut fb = ctr.define_function("double", pfty).unwrap();
-        let [elem] = fb.input_wires_arr();
-        let tag = Tag::new(0, vec![vec![elem_ty; 2].into()]);
-        let tag = fb.add_dataflow_op(tag, [elem, elem]).unwrap();
-        fb.finish_with_outputs(tag.outputs()).unwrap()
-    }
-
     #[test]
     fn test_module() -> Result<(), Box<dyn std::error::Error>> {
+        let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
         let mut mb = ModuleBuilder::new();
-        let db = add_double(&mut mb);
+        let db = {
+            let pfty = PolyFuncType::new(
+                [TypeBound::Copyable.into()],
+                Signature::new(tv0(), pair_type(tv0())),
+            );
+            let mut fb = mb.define_function("double", pfty)?;
+            let [elem] = fb.input_wires_arr();
+            // A "genuine" impl might:
+            //   let tag = Tag::new(0, vec![vec![elem_ty; 2].into()]);
+            //   let tag = fb.add_dataflow_op(tag, [elem, elem]).unwrap();
+            // ...but since this will never execute, we can test recursion here
+            let tag = fb.call(
+                &FuncID::<true>::from(fb.container_node()),
+                &[tv0().into()],
+                [elem],
+                &PRELUDE_REGISTRY,
+            )?;
+            fb.finish_with_outputs(tag.outputs())?
+        };
+
         let tr = {
-            let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
             let pfty = PolyFuncType::new(
                 [TypeBound::Copyable.into()],
                 Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3])),
@@ -413,10 +419,5 @@ mod test {
     fn test_not_flattened() {
         //monof2 contains polyf3 (and instantiates) - not moved
         //polyf4 contains polyf5 but not instantiated -> not moved
-    }
-
-    #[test]
-    fn test_recursive() {
-        // make map,
     }
 }
