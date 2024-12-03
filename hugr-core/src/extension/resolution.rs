@@ -163,3 +163,6 @@ impl ExtensionCollectionError {
         }
     }
 }
+
+#[cfg(test)]
+mod test;
