@@ -354,12 +354,9 @@ extensions:
         let new_exts = new_extensions(&reg, dependencies).collect_vec();
 
         assert_eq!(new_exts.len(), num_declarations);
+        assert_eq!(new_exts.iter().flat_map(|e| e.types()).count(), num_types);
         assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.types()).count(),
-            num_types
-        );
-        assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.operations()).count(),
+            new_exts.iter().flat_map(|e| e.operations()).count(),
             num_operations
         );
         Ok(())
@@ -381,12 +378,9 @@ extensions:
         let new_exts = new_extensions(&reg, dependencies).collect_vec();
 
         assert_eq!(new_exts.len(), num_declarations);
+        assert_eq!(new_exts.iter().flat_map(|e| e.types()).count(), num_types);
         assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.types()).count(),
-            num_types
-        );
-        assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.operations()).count(),
+            new_exts.iter().flat_map(|e| e.operations()).count(),
             num_operations
         );
         Ok(())
@@ -413,8 +407,8 @@ extensions:
     fn new_extensions<'a>(
         reg: &'a ExtensionRegistry,
         dependencies: &'a ExtensionRegistry,
-    ) -> impl Iterator<Item = (&'a ExtensionId, &'a Arc<Extension>)> {
+    ) -> impl Iterator<Item = &'a Arc<Extension>> {
         reg.iter()
-            .filter(move |(id, _)| !dependencies.contains(id) && *id != &PRELUDE_ID)
+            .filter(move |ext| !dependencies.contains(ext.name()) && ext.name() != &PRELUDE_ID)
     }
 }

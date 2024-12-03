@@ -560,7 +560,7 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
 // test all standard extension serialisations are valid against scheme
 fn std_extensions_valid() {
     let std_reg = crate::std_extensions::std_reg();
-    for (_, ext) in std_reg.into_iter() {
+    for ext in std_reg {
         let val = serde_json::to_value(ext).unwrap();
         NamedSchema::check_schemas(&val, get_schemas(true));
         // check deserialises correctly, can't check equality because of custom binaries.

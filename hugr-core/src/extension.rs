@@ -154,18 +154,13 @@ impl ExtensionRegistry {
     }
 
     /// Returns an iterator over the extensions in the registry.
-    pub fn iter(&self) -> <&BTreeMap<ExtensionId, Arc<Extension>> as IntoIterator>::IntoIter {
-        self.0.iter()
+    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.0.values()
     }
 
     /// Returns an iterator over the extensions ids in the registry.
     pub fn ids(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.keys()
-    }
-
-    /// Returns an iterator over the extensions ids in the registry.
-    pub fn extensions(&self) -> impl Iterator<Item = &Arc<Extension>> {
-        self.0.values()
     }
 
     /// Delete an extension from the registry and return it if it was present.
@@ -175,36 +170,36 @@ impl ExtensionRegistry {
 }
 
 impl IntoIterator for ExtensionRegistry {
-    type Item = (ExtensionId, Arc<Extension>);
+    type Item = Arc<Extension>;
 
-    type IntoIter = <BTreeMap<ExtensionId, Arc<Extension>> as IntoIterator>::IntoIter;
+    type IntoIter = std::collections::btree_map::IntoValues<ExtensionId, Arc<Extension>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.0.into_values()
     }
 }
 
 impl<'a> IntoIterator for &'a ExtensionRegistry {
-    type Item = (&'a ExtensionId, &'a Arc<Extension>);
+    type Item = &'a Arc<Extension>;
 
-    type IntoIter = <&'a BTreeMap<ExtensionId, Arc<Extension>> as IntoIterator>::IntoIter;
+    type IntoIter = std::collections::btree_map::Values<'a, ExtensionId, Arc<Extension>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        self.0.values()
     }
 }
 
-impl<'a> Extend<(&'a ExtensionId, &'a Arc<Extension>)> for ExtensionRegistry {
-    fn extend<T: IntoIterator<Item = (&'a ExtensionId, &'a Arc<Extension>)>>(&mut self, iter: T) {
-        for (_name, ext) in iter {
+impl<'a> Extend<&'a Arc<Extension>> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = &'a Arc<Extension>>>(&mut self, iter: T) {
+        for ext in iter {
             self.register_updated_ref(ext);
         }
     }
 }
 
-impl Extend<(ExtensionId, Arc<Extension>)> for ExtensionRegistry {
-    fn extend<T: IntoIterator<Item = (ExtensionId, Arc<Extension>)>>(&mut self, iter: T) {
-        for (_name, ext) in iter {
+impl Extend<Arc<Extension>> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = Arc<Extension>>>(&mut self, iter: T) {
+        for ext in iter {
             self.register_updated(ext);
         }
     }
