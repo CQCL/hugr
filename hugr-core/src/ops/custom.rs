@@ -297,7 +297,9 @@ pub enum OpaqueOpError {
 #[cfg(test)]
 mod test {
 
-    use crate::extension::resolution::{resolve_op_extensions, OpResolutionResult};
+    use ops::OpType;
+
+    use crate::extension::resolution::update_op_extensions;
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{
@@ -312,13 +314,8 @@ mod test {
     use super::*;
 
     /// Unwrap the replacement type's `OpDef` from the return type of `resolve_op_definition`.
-    fn resolve_res_definition<'a>(res: &'a OpResolutionResult) -> &'a OpDef {
-        res.replacement_op
-            .as_ref()
-            .unwrap()
-            .as_extension_op()
-            .unwrap()
-            .def()
+    fn resolve_res_definition(res: &OpType) -> &OpDef {
+        res.as_extension_op().unwrap().def()
     }
 
     #[test]
@@ -351,9 +348,10 @@ mod test {
             vec![],
             Signature::new(i0.clone(), bool_t()),
         );
-        let resolved = resolve_op_extensions(
+        let mut resolved = opaque.into();
+        update_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
-            &opaque.into(),
+            &mut resolved,
             registry,
         )
         .unwrap();
@@ -394,17 +392,19 @@ mod test {
             endo_sig.clone(),
         );
         let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
-        let resolved_val = resolve_op_extensions(
+        let mut resolved_val = opaque_val.into();
+        update_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
-            &opaque_val.into(),
+            &mut resolved_val,
             &registry,
         )
         .unwrap();
         assert_eq!(resolve_res_definition(&resolved_val).name(), val_name);
 
-        let resolved_comp = resolve_op_extensions(
+        let mut resolved_comp = opaque_comp.into();
+        update_op_extensions(
             Node::from(portgraph::NodeIndex::new(2)),
-            &opaque_comp.into(),
+            &mut resolved_comp,
             &registry,
         )
         .unwrap();

@@ -25,7 +25,7 @@ use thiserror::Error;
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
 use crate::extension::resolution::{
-    resolve_op_extensions, update_op_types_extensions, ExtensionResolutionError,
+    update_op_extensions, update_op_types_extensions, ExtensionResolutionError,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{OpTag, OpTrait};
@@ -222,14 +222,9 @@ impl Hugr {
 
             let op = &mut self.op_types[pg_node];
 
-            let op_resolution = resolve_op_extensions(node, op, extensions)?;
-            if let Some(extension) = op_resolution.used_extension {
+            if let Some(extension) = update_op_extensions(node, op, extensions)? {
                 used_extensions.register_updated_ref(extension);
             }
-            if let Some(replacement) = op_resolution.replacement_op {
-                *op = replacement;
-            }
-
             update_op_types_extensions(node, op, extensions, &mut used_extensions)?;
         }
 
