@@ -42,14 +42,13 @@ pub fn ensure_no_nonlocal_edges(hugr: &impl HugrView) -> Result<(), NonLocalEdge
 mod test {
     use hugr_core::{
         builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer},
-        extension::{
-            prelude::{bool_t, Noop},
-            EMPTY_REG,
-        },
+        extension::prelude::{bool_t, Noop},
         ops::handle::NodeHandle,
         type_row,
         types::Signature,
     };
+
+    use crate::test::TEST_REG;
 
     use super::*;
 
@@ -64,7 +63,7 @@ mod test {
                 .unwrap()
                 .outputs_arr();
             builder
-                .finish_hugr_with_outputs([out_w], &EMPTY_REG)
+                .finish_hugr_with_outputs([out_w], &TEST_REG)
                 .unwrap()
         };
         ensure_no_nonlocal_edges(&hugr).unwrap();
@@ -94,7 +93,7 @@ mod test {
             };
             (
                 builder
-                    .finish_hugr_with_outputs([out_w], &EMPTY_REG)
+                    .finish_hugr_with_outputs([out_w], &TEST_REG)
                     .unwrap(),
                 edge,
             )

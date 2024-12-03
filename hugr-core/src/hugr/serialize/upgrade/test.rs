@@ -4,6 +4,7 @@ use crate::{
     hugr::serialize::test::check_hugr_deserialize,
     std_extensions::logic::LogicOp,
     types::Signature,
+    utils::test_quantum_extension,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -50,7 +51,7 @@ pub fn hugr_with_named_op() -> Hugr {
     let [a, b] = builder.input_wires_arr();
     let x = builder.add_dataflow_op(LogicOp::And, [a, b]).unwrap();
     builder
-        .finish_prelude_hugr_with_outputs(x.outputs())
+        .finish_hugr_with_outputs(x.outputs(), &test_quantum_extension::REG)
         .unwrap()
 }
 

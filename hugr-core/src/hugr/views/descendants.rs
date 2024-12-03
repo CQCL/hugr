@@ -176,7 +176,7 @@ pub(super) mod test {
     use rstest::rstest;
 
     use crate::extension::prelude::{qb_t, usize_t};
-    use crate::extension::PRELUDE_REGISTRY;
+    use crate::utils::test_quantum_extension;
     use crate::IncomingPort;
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
@@ -214,7 +214,7 @@ pub(super) mod test {
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?;
             (f_id, inner_id)
         };
-        let hugr = module_builder.finish_prelude_hugr()?;
+        let hugr = module_builder.finish_hugr(&test_quantum_extension::REG)?;
         Ok((hugr, f_id.handle().node(), inner_id.handle().node()))
     }
 
@@ -291,7 +291,7 @@ pub(super) mod test {
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
         let extracted = region.extract_hugr();
-        extracted.validate(&PRELUDE_REGISTRY)?;
+        extracted.validate(&test_quantum_extension::REG)?;
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
 

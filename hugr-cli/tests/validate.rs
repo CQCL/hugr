@@ -190,7 +190,7 @@ fn test_no_std_fail(float_hugr_string: String, mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains(" Extension 'arithmetic.float.types' not found"));
+        .stderr(contains(" requires extension arithmetic.float.types"));
 }
 
 #[rstest]

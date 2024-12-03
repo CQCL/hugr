@@ -325,7 +325,7 @@ pub(crate) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
     use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
-    use crate::utils::test_quantum_extension::h_gate;
+    use crate::utils::test_quantum_extension::{self, h_gate};
     use crate::{builder::test::n_identity, type_row, Wire};
 
     use super::super::test::simple_dfg_hugr;
@@ -342,8 +342,10 @@ pub(crate) mod test {
             let inner_builder = outer_builder.dfg_builder_endo([(usize_t(), int)])?;
             let inner_id = n_identity(inner_builder)?;
 
-            outer_builder
-                .finish_prelude_hugr_with_outputs(inner_id.outputs().chain(q_out.outputs()))
+            outer_builder.finish_hugr_with_outputs(
+                inner_id.outputs().chain(q_out.outputs()),
+                &test_quantum_extension::REG,
+            )
         };
 
         assert_eq!(build_result.err(), None);
@@ -361,7 +363,7 @@ pub(crate) mod test {
 
             f(&mut builder)?;
 
-            builder.finish_hugr(&EMPTY_REG)
+            builder.finish_hugr(&test_quantum_extension::REG)
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -583,7 +585,7 @@ pub(crate) mod test {
 
         let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
-        parent.finish_hugr_with_outputs([w], &EMPTY_REG)?;
+        parent.finish_hugr_with_outputs([w], &test_quantum_extension::REG)?;
 
         Ok(())
     }

@@ -960,6 +960,7 @@ mod test {
     use crate::builder::inout_sig;
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+    use crate::utils::test_quantum_extension;
     use crate::{
         builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
@@ -1150,7 +1151,8 @@ mod test {
             .add_dataflow_op(panic_op, [err, q0, q1])
             .unwrap()
             .outputs_arr();
-        b.finish_prelude_hugr_with_outputs([q0, q1]).unwrap();
+        b.finish_hugr_with_outputs([q0, q1], &test_quantum_extension::REG)
+            .unwrap();
     }
 
     #[test]

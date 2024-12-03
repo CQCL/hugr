@@ -241,8 +241,8 @@ pub(crate) mod test {
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
-    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::types::{PolyFuncType, Signature};
+    use crate::utils::test_quantum_extension;
     use crate::Hugr;
 
     use super::handle::BuildHandle;
@@ -269,7 +269,7 @@ pub(crate) mod test {
 
         f(f_builder)?;
 
-        Ok(module_builder.finish_hugr(&FLOAT_OPS_REGISTRY)?)
+        Ok(module_builder.finish_hugr(&test_quantum_extension::REG)?)
     }
 
     #[fixture]
