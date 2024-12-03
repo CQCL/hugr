@@ -314,11 +314,7 @@ impl Rewrite for Replacement {
         for (new_parent, &old_parent) in self.adoptions.iter() {
             let new_parent = node_map.get(new_parent).unwrap();
             debug_assert!(h.children(old_parent).next().is_some());
-            loop {
-                let ch = match h.children(old_parent).next() {
-                    None => break,
-                    Some(c) => c,
-                };
+            while let Some(ch) = h.first_child(old_parent) {
                 h.set_parent(ch, *new_parent);
             }
         }
