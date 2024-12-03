@@ -51,7 +51,7 @@ pub trait DataflowOpTrait: Sized {
     }
 
     /// Apply a type-level substitution to this OpType, i.e. replace
-    /// [type variables](Type::Variable) with new types.
+    /// [type variables](TypeArg::new_var_use) with new types.
     fn substitute(self, _subst: &Substitution) -> Self;
 }
 
