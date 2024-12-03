@@ -109,6 +109,10 @@ fn update_signature_exts(
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
+    // Note that we do not include the signature's `extension_reqs` here, as those refer
+    // to _runtime_ requirements that may not be currently present.
+    // See https://github.com/CQCL/hugr/issues/1734
+    // TODO: Update comment once that issue gets implemented.
     update_type_row_exts(node, &mut signature.input, extensions, used_extensions)?;
     update_type_row_exts(node, &mut signature.output, extensions, used_extensions)?;
     Ok(())
