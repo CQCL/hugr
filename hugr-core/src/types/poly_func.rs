@@ -147,7 +147,7 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     }
 
     /// Returns a mutable reference to the body of the function type.
-    pub(crate) fn body_mut(&mut self) -> &mut FuncTypeBase<RV> {
+    pub fn body_mut(&mut self) -> &mut FuncTypeBase<RV> {
         &mut self.body
     }
 }

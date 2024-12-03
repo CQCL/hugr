@@ -47,12 +47,13 @@ pub(crate) fn update_op_extensions<'e>(
         .into());
     };
 
-    let ext_op = ExtensionOp::new_with_cached(def.clone(), opaque.args(), opaque, extensions)
-        .map_err(|e| OpaqueOpError::SignatureError {
-            node,
-            name: opaque.name().clone(),
-            cause: e,
-        })?;
+    let ext_op =
+        ExtensionOp::new_with_cached(def.clone(), opaque.args().to_vec(), opaque, extensions)
+            .map_err(|e| OpaqueOpError::SignatureError {
+                node,
+                name: opaque.name().clone(),
+                cause: e,
+            })?;
 
     if opaque.signature() != ext_op.signature() {
         return Err(OpaqueOpError::SignatureMismatch {

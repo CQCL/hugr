@@ -5,7 +5,7 @@ use std::sync::Arc;
 use super::{ExtensionRegistry, ExtensionResolutionError};
 use crate::ops::OpType;
 use crate::types::type_row::TypeRowBase;
-use crate::types::{CustomType, MaybeRV, Signature, SumType, TypeBase, TypeEnum};
+use crate::types::{MaybeRV, Signature, SumType, TypeBase, TypeEnum};
 use crate::Node;
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside a
@@ -157,13 +157,7 @@ fn update_type_exts<RV: MaybeRV>(
             // Add the extension to the used extensions registry,
             // and update the CustomType with the valid pointer.
             used_extensions.register_updated_ref(ext);
-            *custom = CustomType::new(
-                custom.name().clone(),
-                custom.args(),
-                custom.extension().clone(),
-                custom.bound(),
-                &Arc::downgrade(ext),
-            );
+            custom.update_extension(Arc::downgrade(ext));
         }
         TypeEnum::Function(f) => {
             update_type_row_exts(node, &mut f.input, extensions, used_extensions)?;

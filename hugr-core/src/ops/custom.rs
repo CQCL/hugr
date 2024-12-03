@@ -57,11 +57,11 @@ impl ExtensionOp {
     /// If OpDef is missing binary computation, trust the cached signature.
     pub(crate) fn new_with_cached(
         def: Arc<OpDef>,
-        args: impl Into<Vec<TypeArg>>,
+        args: impl IntoIterator<Item = TypeArg>,
         opaque: &OpaqueOp,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let args: Vec<TypeArg> = args.into();
+        let args: Vec<TypeArg> = args.into_iter().collect();
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
         let signature = match def.compute_signature(&args, exts) {
@@ -113,7 +113,7 @@ impl ExtensionOp {
     }
 
     /// Returns a mutable reference to the cached signature of the operation.
-    pub(crate) fn signature_mut(&mut self) -> &mut Signature {
+    pub fn signature_mut(&mut self) -> &mut Signature {
         &mut self.signature
     }
 }
@@ -209,7 +209,7 @@ impl OpaqueOp {
     }
 
     /// Returns a mutable reference to the signature of the operation.
-    pub(crate) fn signature_mut(&mut self) -> &mut Signature {
+    pub fn signature_mut(&mut self) -> &mut Signature {
         &mut self.signature
     }
 }

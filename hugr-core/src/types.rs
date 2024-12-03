@@ -397,7 +397,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     /// Report a mutable reference to the component TypeEnum.
     #[inline(always)]
-    pub(crate) fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
+    pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
         &mut self.0
     }
 

@@ -146,6 +146,11 @@ impl CustomType {
     pub fn extension_ref(&self) -> Weak<Extension> {
         self.extension_ref.clone()
     }
+
+    /// Update the internal extension reference with a new weak pointer.
+    pub fn update_extension(&mut self, extension_ref: Weak<Extension>) {
+        self.extension_ref = extension_ref;
+    }
 }
 
 impl Display for CustomType {
