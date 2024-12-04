@@ -127,7 +127,7 @@ mod test {
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
-            loop_b.finish_prelude_hugr()
+            loop_b.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));
@@ -191,7 +191,7 @@ mod test {
                 };
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish_prelude_hugr()
+            module_builder.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));

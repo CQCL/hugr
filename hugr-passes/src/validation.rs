@@ -3,11 +3,8 @@
 
 use thiserror::Error;
 
-use hugr_core::{
-    extension::ExtensionRegistry,
-    hugr::{hugrmut::HugrMut, ValidationError},
-    HugrView,
-};
+use hugr_core::hugr::{hugrmut::HugrMut, ValidationError};
+use hugr_core::HugrView;
 
 #[derive(Debug, Clone, Copy, Ord, Eq, PartialOrd, PartialEq)]
 /// A type for running [HugrMut] algorithms with verification.
@@ -61,18 +58,19 @@ impl ValidationLevel {
     pub fn run_validated_pass<H: HugrMut, E, T>(
         &self,
         hugr: &mut H,
-        reg: &ExtensionRegistry,
         pass: impl FnOnce(&mut H, &Self) -> Result<T, E>,
     ) -> Result<T, E>
     where
         ValidatePassError: Into<E>,
     {
-        self.validation_impl(hugr, reg, |err, pretty_hugr| {
-            ValidatePassError::InputError { err, pretty_hugr }
+        self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::InputError {
+            err,
+            pretty_hugr,
         })?;
         let result = pass(hugr, self)?;
-        self.validation_impl(hugr, reg, |err, pretty_hugr| {
-            ValidatePassError::OutputError { err, pretty_hugr }
+        self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::OutputError {
+            err,
+            pretty_hugr,
         })?;
         Ok(result)
     }
@@ -80,7 +78,6 @@ impl ValidationLevel {
     fn validation_impl<E>(
         &self,
         hugr: &impl HugrView,
-        reg: &ExtensionRegistry,
         mk_err: impl FnOnce(ValidationError, String) -> ValidatePassError,
     ) -> Result<(), E>
     where
@@ -88,8 +85,8 @@ impl ValidationLevel {
     {
         match self {
             ValidationLevel::None => Ok(()),
-            ValidationLevel::WithoutExtensions => hugr.validate_no_extensions(reg),
-            ValidationLevel::WithExtensions => hugr.validate(reg),
+            ValidationLevel::WithoutExtensions => hugr.validate_no_extensions(),
+            ValidationLevel::WithExtensions => hugr.validate(),
         }
         .map_err(|err| mk_err(err, hugr.mermaid_string()).into())
     }

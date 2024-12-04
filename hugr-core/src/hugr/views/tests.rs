@@ -1,8 +1,6 @@
 use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
-use crate::std_extensions::logic::LOGIC_REG;
-use crate::utils::test_quantum_extension;
 use crate::{
     builder::{
         endo_sig, inout_sig, BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr,
@@ -33,12 +31,7 @@ pub(crate) fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dat
     let n2 = dfg.add_dataflow_op(cx_gate(), [q2, q1]).unwrap();
     dfg.add_other_wire(n1.node(), n2.node());
 
-    (
-        dfg.finish_hugr_with_outputs(n2.outputs(), &test_quantum_extension::REG)
-            .unwrap(),
-        n1,
-        n2,
-    )
+    (dfg.finish_hugr_with_outputs(n2.outputs()).unwrap(), n1, n2)
 }
 
 #[rstest]
@@ -146,10 +139,7 @@ fn value_types() {
     let n2 = dfg.add_dataflow_op(LogicOp::Not, [b]).unwrap();
     dfg.add_other_wire(n1.node(), n2.node());
     let h = dfg
-        .finish_hugr_with_outputs(
-            [n2.out_wire(0), n1.out_wire(0)],
-            &test_quantum_extension::REG,
-        )
+        .finish_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
         .unwrap();
 
     let [_, o] = h.get_io(h.root()).unwrap();
@@ -171,7 +161,7 @@ fn static_targets() {
 
     let load = dfg.load_const(&c);
 
-    let h = dfg.finish_prelude_hugr_with_outputs([load]).unwrap();
+    let h = dfg.finish_hugr_with_outputs([load]).unwrap();
 
     assert_eq!(h.static_source(load.node()), Some(c.node()));
 
@@ -201,12 +191,10 @@ fn test_dataflow_ports_only() {
 
     let not = dfg.add_dataflow_op(LogicOp::Not, [in_bool]).unwrap();
     let call = dfg
-        .call(local_and.handle(), &[], [not.out_wire(0); 2], &LOGIC_REG)
+        .call(local_and.handle(), &[], [not.out_wire(0); 2])
         .unwrap();
     dfg.add_other_wire(not.node(), call.node());
-    let h = dfg
-        .finish_hugr_with_outputs(not.outputs(), &LOGIC_REG)
-        .unwrap();
+    let h = dfg.finish_hugr_with_outputs(not.outputs()).unwrap();
     let filtered_ports = h
         .all_linked_outputs(call.node())
         .dataflow_ports_only(&h)

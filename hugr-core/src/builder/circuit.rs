@@ -346,7 +346,7 @@ mod test {
 
         let mut registry = test_quantum_extension::REG.clone();
         registry.register(my_ext).unwrap();
-        let build_res = module_builder.finish_hugr(&registry);
+        let build_res = module_builder.finish_hugr();
 
         assert_matches!(build_res, Ok(_));
     }
