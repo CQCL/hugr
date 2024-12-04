@@ -4,7 +4,6 @@ pub mod hugrmut;
 
 pub(crate) mod ident;
 pub mod internal;
-mod monomorphize;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
@@ -32,8 +31,6 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
-
-pub use monomorphize::{monomorphize, remove_polyfuncs};
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]

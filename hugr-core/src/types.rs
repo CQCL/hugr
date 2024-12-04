@@ -547,7 +547,13 @@ impl From<Type> for TypeRV {
 pub struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl<'a> Substitution<'a> {
-    pub(crate) fn new(items: &'a [TypeArg], exts: &'a ExtensionRegistry) -> Self {
+    /// Create a new Substitution given the replacement values (indexed
+    /// as the variables they replace). `exts` must contain the [TypeDef]
+    /// for every custom [Type] (to which the Substitution is applied)
+    /// containing a type-variable.
+    ///
+    /// [TypeDef]: crate::extension::TypeDef
+    pub fn new(items: &'a [TypeArg], exts: &'a ExtensionRegistry) -> Self {
         Self(items, exts)
     }
 
