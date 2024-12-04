@@ -33,14 +33,12 @@ use std::hash::BuildHasherDefault;
 
 use super::{
     ExtSetPart, LinkRef, ListPart, MetaItem, ModelError, Module, Node, NodeId, Operation, Param,
-    RegionId, SymbolIntroError, SymbolRef, SymbolRefError, Term, TermId, VarIndex, VarRef,
-    VarRefError,
+    RegionId, SymbolIntroError, SymbolRef, SymbolRefError, Term, TermId, VarRef, VarRefError,
 };
 use bumpalo::{collections::Vec as BumpVec, Bump};
 use fxhash::{FxHashMap, FxHasher};
 
 mod bindings;
-use bindings::Bindings;
 use indexmap::IndexMap;
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
@@ -73,8 +71,9 @@ struct Resolver<'m, 'a> {
     /// that we have already created.
     symbol_import: FxHashMap<&'a str, NodeId>,
 
-    /// Variables that are visible in the current scope.
-    var_scope: Bindings<&'a str, NodeId, VarIndex>,
+    /// Stack of entered variable scopes.
+    var_scopes: Vec<VarScope>,
+    var_names: FxHashMap<(NodeId, &'a str), u16>,
 
     symbols: FxIndexMap<&'a str, NodeId>,
     node_data: FxIndexMap<NodeId, NodeData>,
@@ -95,9 +94,10 @@ impl<'m, 'a> Resolver<'m, 'a> {
             region_data: FxIndexMap::default(),
             term_data: FxHashMap::default(),
             symbols: FxIndexMap::default(),
+            var_names: FxHashMap::default(),
+            var_scopes: Vec::new(),
             module,
             bump,
-            var_scope: Bindings::new(),
             symbol_import: FxHashMap::default(),
         }
     }
@@ -186,49 +186,49 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             Operation::DefineFunc { decl } => {
-                self.var_scope.enter_isolated(node);
+                self.enter_var_scope(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
                 self.resolve_term(decl.signature)?;
                 for region in node_data.regions {
                     self.resolve_isolated_region(*region)?;
                 }
-                self.var_scope.exit();
+                self.exit_var_scope();
             }
 
             Operation::DeclareFunc { decl } => {
-                self.var_scope.enter_isolated(node);
+                self.enter_var_scope(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
                 self.resolve_term(decl.signature)?;
-                self.var_scope.exit();
+                self.exit_var_scope();
             }
 
             Operation::DefineAlias { decl, value } => {
-                self.var_scope.enter_isolated(node);
+                self.enter_var_scope(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_term(value)?;
-                self.var_scope.exit();
+                self.exit_var_scope();
             }
 
             Operation::DeclareAlias { decl } => {
-                self.var_scope.enter_isolated(node);
+                self.enter_var_scope(node);
                 self.resolve_params(decl.params)?;
-                self.var_scope.exit();
+                self.exit_var_scope();
             }
 
             Operation::DeclareConstructor { decl } => {
-                self.var_scope.enter_isolated(node);
+                self.enter_var_scope(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
-                self.var_scope.exit();
+                self.exit_var_scope();
             }
 
             Operation::DeclareOperation { decl } => {
-                self.var_scope.enter_isolated(node);
+                self.enter_var_scope(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
-                self.var_scope.exit();
+                self.exit_var_scope();
             }
 
             Operation::CallFunc { func } => {
@@ -273,21 +273,36 @@ impl<'m, 'a> Resolver<'m, 'a> {
         Ok(())
     }
 
+    fn enter_var_scope(&mut self, node: NodeId) {
+        self.var_scopes.push(VarScope {
+            node,
+            parameters: 0,
+        })
+    }
+
+    fn exit_var_scope(&mut self) {
+        self.var_scopes.pop();
+    }
+
     fn resolve_params(&mut self, params: &'a [Param<'a>]) -> Result<(), ModelError> {
         for (index, param) in params.iter().enumerate() {
             self.resolve_term(param.r#type)?;
-            let node = *self.var_scope.scope().unwrap();
+            let var_scope = self.var_scopes.last_mut().unwrap();
+            let node = var_scope.node;
+            var_scope.parameters += 1;
+            let other = self
+                .var_names
+                .insert((var_scope.node, param.name), index as u16);
 
-            self.var_scope
-                .try_insert(param.name, index as u16)
-                .map_err(|other| {
-                    SymbolIntroError::DuplicateVar(
-                        node,
-                        other,
-                        index as u16,
-                        param.name.to_string(),
-                    )
-                })?;
+            if let Some(other) = other {
+                return Err(SymbolIntroError::DuplicateVar(
+                    node,
+                    other,
+                    index as u16,
+                    param.name.to_string(),
+                )
+                .into());
+            }
         }
 
         Ok(())
@@ -432,22 +447,27 @@ impl<'m, 'a> Resolver<'m, 'a> {
     fn resolve_var_ref(&self, local_ref: VarRef<'a>) -> Result<VarRef<'a>, VarRefError> {
         match local_ref {
             VarRef::Index(node, index) => {
-                // Check whether this local would have been visible at this point.
-                if self.var_scope.scope() != Some(&node) {
-                    return Err(VarRefError::NotVisible(node, index));
-                }
+                // Check if this variable is in scope.
+                self.var_scopes
+                    .last()
+                    .filter(|scope| scope.node == node)
+                    .filter(|scope| index < scope.parameters)
+                    .ok_or(VarRefError::NotVisible(node, index))?;
 
                 Ok(local_ref)
             }
             VarRef::Named(name) => {
-                let index = self
-                    .var_scope
-                    .get_value_by_key(name)
+                let var_scope = self
+                    .var_scopes
+                    .last()
                     .ok_or_else(|| VarRefError::NameNotFound(name.to_string()))?;
 
-                // UNWRAP: If the local is in scope, then the scope must be set.
-                let node = self.var_scope.scope().unwrap();
-                Ok(VarRef::Index(*node, index))
+                let index = *self
+                    .var_names
+                    .get(&(var_scope.node, name))
+                    .ok_or_else(|| VarRefError::NameNotFound(name.to_string()))?;
+
+                Ok(VarRef::Index(var_scope.node, index))
             }
         }
     }
@@ -560,6 +580,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 scope_depth: region_entry.index(),
                 shadows: shadowed,
                 position,
+                parameters: 0,
             },
         );
 
@@ -580,9 +601,16 @@ struct NodeData {
     scope_depth: ScopeDepth,
     shadows: Option<NodeId>,
     position: usize,
+    parameters: u16,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct RegionData {
     binding_count: u32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct VarScope {
+    node: NodeId,
+    parameters: u16,
 }

@@ -652,7 +652,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             VarRef::Index(node, i) => self
                 .locals
                 .get(i as usize)
-                .ok_or(VarRefError::Invalid(node, i))?,
+                .ok_or(VarRefError::NotVisible(node, i))?,
             VarRef::Named(name) => name,
         };
 

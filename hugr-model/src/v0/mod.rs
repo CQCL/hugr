@@ -871,9 +871,6 @@ pub enum VarRefError {
     /// A `VarRef::Index` refers to a variable that is not visible in the current scope.
     #[error("the variable defined by node {0} at index {1} is not visible in the current scope")]
     NotVisible(NodeId, VarIndex),
-    /// A `VarRef::Index` refers to a node that does not have a variable at the given index.
-    #[error("the node {0} does not have any variable at index {1}")]
-    Invalid(NodeId, VarIndex),
     /// A `VarRef::Named` refers to a variable name that does not exist in the current scope.
     #[error("the variable name `{0}` does not exist in the current scope")]
     NameNotFound(String),

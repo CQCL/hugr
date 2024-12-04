@@ -173,7 +173,7 @@ impl<'a> Context<'a> {
                 let (_, v) = self
                     .local_variables
                     .get_index(index as usize)
-                    .ok_or(model::VarRefError::Invalid(node, index))?;
+                    .ok_or(model::VarRefError::NotVisible(node, index))?;
                 Ok((index as usize, *v))
             }
             model::VarRef::Named(name) => {
