@@ -14,6 +14,7 @@ use super::{ListOp, ListValue};
 
 pub(super) fn set_fold(op: &ListOp, def: &mut OpDef) {
     match op {
+        ListOp::new => def.set_constant_folder(NewFold),
         ListOp::pop => def.set_constant_folder(PopFold),
         ListOp::push => def.set_constant_folder(PushFold),
         ListOp::get => def.set_constant_folder(GetFold),
@@ -23,6 +24,24 @@ pub(super) fn set_fold(op: &ListOp, def: &mut OpDef) {
     }
 }
 
+pub struct NewFold;
+
+impl ConstFold for NewFold {
+    fn fold(
+        &self,
+        type_args: &[TypeArg],
+        _consts: &[(crate::IncomingPort, crate::ops::Value)],
+    ) -> ConstFoldResult {
+        let [TypeArg::Type { ty }] = type_args else {
+            panic!("Should have just element type")
+        };
+        if ty.contains_vars() {
+            None
+        } else {
+            Some(vec![(0.into(), ListValue::new_empty(ty.clone()).into())])
+        }
+    }
+}
 pub struct PopFold;
 
 impl ConstFold for PopFold {
