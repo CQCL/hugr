@@ -219,14 +219,14 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
 
 struct ConstFoldContext<'a, H>(&'a H);
 
-impl<'a, H: HugrView> std::ops::Deref for ConstFoldContext<'a, H> {
+impl<H: HugrView> std::ops::Deref for ConstFoldContext<'_, H> {
     type Target = H;
     fn deref(&self) -> &H {
         self.0
     }
 }
 
-impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
+impl<H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'_, H> {
     fn value_from_opaque(&self, loc: ConstLocation, val: &OpaqueValue) -> Option<ValueHandle> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
@@ -254,7 +254,7 @@ impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
     }
 }
 
-impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
+impl<H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'_, H> {
     fn interpret_leaf_op(
         &mut self,
         node: Node,

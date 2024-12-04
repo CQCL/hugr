@@ -39,8 +39,8 @@ fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
     let n = Node::from(portgraph::NodeIndex::new(7));
     let st = SumType::new([vec![k.get_type()], vec![]]);
     let subject_val = Value::sum(0, [k.clone().into()], st).unwrap();
-    let mut temp = Hugr::default();
-    let ctx: ConstFoldContext<Hugr> = ConstFoldContext(&mut temp);
+    let temp = Hugr::default();
+    let ctx: ConstFoldContext<Hugr> = ConstFoldContext(&temp);
     let v1 = partial_from_const(&ctx, n, &subject_val);
 
     let v1_subfield = {
@@ -111,8 +111,8 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
         v.get_custom_value::<ConstF64>().unwrap().value()
     }
     let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
-    let mut temp = Hugr::default();
-    let mut ctx = ConstFoldContext(&mut temp);
+    let temp = Hugr::default();
+    let mut ctx = ConstFoldContext(&temp);
     let v_a = partial_from_const(&ctx, n_a, &f2c(a));
     let v_b = partial_from_const(&ctx, n_b, &f2c(b));
     assert_eq!(unwrap_float(v_a.clone()), a);
@@ -1468,10 +1468,9 @@ fn tail_loop_hugr(int_cst: ConstInt) -> Hugr {
         .add_dataflow_op(IntOpDef::iadd.with_log_width(lw), [lcst, loop_out_w])
         .unwrap();
 
-    let hugr = builder
+    builder
         .finish_hugr_with_outputs(add.outputs(), &TEST_REG)
-        .unwrap();
-    hugr
+        .unwrap()
 }
 
 #[test]
@@ -1617,10 +1616,10 @@ fn cfg_hugr() -> Hugr {
     cfg.branch(&a, fals, &x).unwrap();
     let cfg = cfg.finish_sub_container().unwrap();
     let nested = nested.finish_with_outputs(cfg.outputs()).unwrap();
-    let hugr = builder
+
+    builder
         .finish_hugr_with_outputs(nested.outputs(), &TEST_REG)
-        .unwrap();
-    hugr
+        .unwrap()
 }
 
 #[rstest]
@@ -1637,7 +1636,7 @@ fn test_cfg(
     let backup = cfg_hugr();
     let mut hugr = backup.clone();
     let pass = ConstFoldPass::default()
-        .with_inputs(inputs.into_iter().map(|(p, b)| (*p, Value::from_bool(*b))));
+        .with_inputs(inputs.iter().map(|(p, b)| (*p, Value::from_bool(*b))));
     pass.run(&mut hugr, &TEST_REG).unwrap();
     // CFG inside DFG retained
     let nested = hugr
