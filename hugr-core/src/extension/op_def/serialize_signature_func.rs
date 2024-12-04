@@ -57,7 +57,7 @@ mod test {
     use super::*;
     use crate::{
         extension::{
-            prelude::USIZE_T, CustomSignatureFunc, CustomValidator, ExtensionRegistry, OpDef,
+            prelude::usize_t, CustomSignatureFunc, CustomValidator, ExtensionRegistry, OpDef,
             SignatureError, ValidateTypeArgs,
         },
         types::{FuncValueType, Signature, TypeArg},
@@ -121,7 +121,7 @@ mod test {
     #[test]
     fn test_serial_sig_func() {
         // test round-trip
-        let sig: FuncValueType = Signature::new_endo(USIZE_T.clone()).into();
+        let sig: FuncValueType = Signature::new_endo(usize_t().clone()).into();
         let simple: SignatureFunc = sig.clone().into();
         let ser: SerSignatureFunc = simple.into();
         let expected_ser = SerSignatureFunc {

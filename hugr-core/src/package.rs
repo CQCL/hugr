@@ -3,6 +3,7 @@
 use derive_more::{Display, Error, From};
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use std::{fs, io, mem};
 
 use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
@@ -19,7 +20,7 @@ pub struct Package {
     /// Module HUGRs included in the package.
     pub modules: Vec<Hugr>,
     /// Extensions to validate against.
-    pub extensions: Vec<Extension>,
+    pub extensions: Vec<Arc<Extension>>,
 }
 
 impl Package {
@@ -32,7 +33,7 @@ impl Package {
     /// Returns an error if any of the HUGRs does not have a `Module` root.
     pub fn new(
         modules: impl IntoIterator<Item = Hugr>,
-        extensions: impl IntoIterator<Item = Extension>,
+        extensions: impl IntoIterator<Item = Arc<Extension>>,
     ) -> Result<Self, PackageError> {
         let modules: Vec<Hugr> = modules.into_iter().collect();
         for (idx, module) in modules.iter().enumerate() {
@@ -62,7 +63,7 @@ impl Package {
     /// Returns an error if any of the HUGRs cannot be wrapped in a module.
     pub fn from_hugrs(
         modules: impl IntoIterator<Item = Hugr>,
-        extensions: impl IntoIterator<Item = Extension>,
+        extensions: impl IntoIterator<Item = Arc<Extension>>,
     ) -> Result<Self, PackageError> {
         let modules: Vec<Hugr> = modules
             .into_iter()
@@ -98,7 +99,7 @@ impl Package {
         reg: &mut ExtensionRegistry,
     ) -> Result<(), PackageValidationError> {
         for ext in &self.extensions {
-            reg.register_updated_ref(ext)?;
+            reg.register_updated_ref(ext);
         }
         for hugr in self.modules.iter_mut() {
             hugr.update_validate(reg)?;
@@ -378,7 +379,7 @@ mod test {
 
         Package {
             modules: vec![hugr0, hugr1],
-            extensions: vec![ext1, ext2],
+            extensions: vec![ext1.into(), ext2.into()],
         }
     }
 

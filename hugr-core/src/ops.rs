@@ -10,7 +10,7 @@ pub mod sum;
 pub mod tag;
 pub mod validate;
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionId, ExtensionSet};
 use crate::types::{EdgeKind, Signature};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -299,6 +299,15 @@ impl OpType {
     pub fn cast<T: MakeExtensionOp>(&self) -> Option<T> {
         self.as_extension_op()
             .and_then(|o| T::from_extension_op(o).ok())
+    }
+
+    /// Returns the extension where the operation is defined, if any.
+    pub fn extension_id(&self) -> Option<&ExtensionId> {
+        match self {
+            OpType::OpaqueOp(opaque) => Some(opaque.extension()),
+            OpType::ExtensionOp(e) => Some(e.def().extension_id()),
+            _ => None,
+        }
     }
 }
 

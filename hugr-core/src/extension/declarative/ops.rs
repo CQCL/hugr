@@ -8,6 +8,7 @@
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
 use std::collections::HashMap;
+use std::sync::Weak;
 
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
@@ -55,10 +56,14 @@ pub(super) struct OperationDeclaration {
 
 impl OperationDeclaration {
     /// Register this operation in the given extension.
+    ///
+    /// Requires a [`Weak`] reference to the extension defining the operation.
+    /// This method is intended to be used inside the closure passed to [`Extension::new_arc`].
     pub fn register<'ext>(
         &self,
         ext: &'ext mut Extension,
         ctx: DeclarationContext<'_>,
+        extension_ref: &Weak<Extension>,
     ) -> Result<&'ext mut OpDef, ExtensionDeclarationError> {
         // We currently only support explicit signatures.
         //
@@ -88,7 +93,12 @@ impl OperationDeclaration {
 
         let signature_func: SignatureFunc = signature.make_signature(ext, ctx, &params)?;
 
-        let op_def = ext.add_op(self.name.clone(), self.description.clone(), signature_func)?;
+        let op_def = ext.add_op(
+            self.name.clone(),
+            self.description.clone(),
+            signature_func,
+            extension_ref,
+        )?;
 
         for (k, v) in &self.misc {
             op_def.add_misc(k, v.clone());

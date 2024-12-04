@@ -136,7 +136,7 @@ mod test {
         endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         SubContainer,
     };
-    use crate::extension::prelude::QB_T;
+    use crate::extension::prelude::qb_t;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
@@ -244,22 +244,22 @@ mod test {
 
     #[test]
     fn permutation() -> Result<(), Box<dyn std::error::Error>> {
-        let mut h = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T]))?;
+        let mut h = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [p, q] = h.input_wires_arr();
         let [p_h] = h
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
         let swap = {
-            let swap = h.dfg_builder(Signature::new_endo(type_row![QB_T, QB_T]), [p_h, q])?;
+            let swap = h.dfg_builder(Signature::new_endo(vec![qb_t(), qb_t()]), [p_h, q])?;
             let [a, b] = swap.input_wires_arr();
             swap.finish_with_outputs([b, a])?
         };
         let [q, p] = swap.outputs_arr();
         let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
         let reg = ExtensionRegistry::try_new([
-            test_quantum_extension::EXTENSION.to_owned(),
-            PRELUDE.to_owned(),
-            float_types::EXTENSION.to_owned(),
+            test_quantum_extension::EXTENSION.clone(),
+            PRELUDE.clone(),
+            float_types::EXTENSION.clone(),
         ])
         .unwrap();
 
@@ -339,11 +339,11 @@ mod test {
             PRELUDE.to_owned(),
         ])
         .unwrap();
-        let mut outer = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T]))?;
+        let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
-        let mut inner = outer.dfg_builder(endo_sig(QB_T), h_b.outputs())?;
+        let mut inner = outer.dfg_builder(endo_sig(qb_t()), h_b.outputs())?;
         let [i] = inner.input_wires_arr();
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());

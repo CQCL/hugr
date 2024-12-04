@@ -140,7 +140,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
         self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
-impl<'g, Root: NodeHandle> RootTagged for SiblingGraph<'g, Root> {
+impl<Root: NodeHandle> RootTagged for SiblingGraph<'_, Root> {
     type RootHandle = Root;
 }
 
@@ -171,13 +171,16 @@ where
     }
 }
 
-impl<'g, Root: NodeHandle> ExtractHugr for SiblingGraph<'g, Root> {}
+impl<Root: NodeHandle> ExtractHugr for SiblingGraph<'_, Root> {}
 
 impl<'g, Root> HugrInternals for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
 {
-    type Portgraph<'p> = &'p FlatRegionGraph<'g> where Self: 'p;
+    type Portgraph<'p>
+        = &'p FlatRegionGraph<'g>
+    where
+        Self: 'p;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -236,10 +239,14 @@ impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
     }
 }
 
-impl<'g, Root: NodeHandle> ExtractHugr for SiblingMut<'g, Root> {}
+impl<Root: NodeHandle> ExtractHugr for SiblingMut<'_, Root> {}
 
 impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
-    type Portgraph<'p> = FlatRegionGraph<'p> where 'g: 'p, Root: 'p;
+    type Portgraph<'p>
+        = FlatRegionGraph<'p>
+    where
+        'g: 'p,
+        Root: 'p;
 
     fn portgraph(&self) -> Self::Portgraph<'_> {
         FlatRegionGraph::new_flat_region(
@@ -311,17 +318,17 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 }
 
-impl<'g, Root: NodeHandle> RootTagged for SiblingMut<'g, Root> {
+impl<Root: NodeHandle> RootTagged for SiblingMut<'_, Root> {
     type RootHandle = Root;
 }
 
-impl<'g, Root: NodeHandle> HugrMutInternals for SiblingMut<'g, Root> {
+impl<Root: NodeHandle> HugrMutInternals for SiblingMut<'_, Root> {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.hugr
     }
 }
 
-impl<'g, Root: NodeHandle> HugrMut for SiblingMut<'g, Root> {}
+impl<Root: NodeHandle> HugrMut for SiblingMut<'_, Root> {}
 
 #[cfg(test)]
 mod test {
@@ -329,16 +336,13 @@ mod test {
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
-    use crate::extension::PRELUDE_REGISTRY;
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID};
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::ops::{OpTrait, OpType};
-    use crate::types::{Signature, Type};
-    use crate::utils::test_quantum_extension::EXTENSION_ID;
-    use crate::{type_row, IncomingPort};
-
-    const NAT: Type = crate::extension::prelude::USIZE_T;
-    const QB: Type = crate::extension::prelude::QB_T;
+    use crate::types::Signature;
+    use crate::utils::test_quantum_extension::{self, EXTENSION_ID};
+    use crate::IncomingPort;
 
     use super::super::descendants::test::make_module_hgr;
     use super::*;
@@ -365,7 +369,7 @@ mod test {
         assert_eq!(
             region.poly_func_type(),
             Some(
-                Signature::new_endo(type_row![NAT, QB])
+                Signature::new_endo(vec![usize_t(), qb_t()])
                     .with_extension_delta(EXTENSION_ID)
                     .into()
             )
@@ -373,7 +377,7 @@ mod test {
 
         assert_eq!(
             inner_region.inner_function_type(),
-            Some(Signature::new(type_row![NAT], type_row![NAT]))
+            Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
         assert_eq!(inner_region.edge_count(), 1);
@@ -446,13 +450,13 @@ mod test {
     #[test]
     fn nested_flat() -> Result<(), Box<dyn std::error::Error>> {
         let mut module_builder = ModuleBuilder::new();
-        let fty = Signature::new(type_row![NAT], type_row![NAT]);
+        let fty = Signature::new(vec![usize_t()], vec![usize_t()]);
         let mut fbuild = module_builder.define_function("main", fty.clone())?;
         let dfg = fbuild.dfg_builder(fty, fbuild.input_wires())?;
         let ins = dfg.input_wires();
         let sub_dfg = dfg.finish_with_outputs(ins)?;
         let fun = fbuild.finish_with_outputs(sub_dfg.outputs())?;
-        let h = module_builder.finish_hugr(&PRELUDE_REGISTRY)?;
+        let h = module_builder.finish_hugr(&test_quantum_extension::REG)?;
         let sub_dfg = sub_dfg.node();
 
         // We can create a view from a child or grandchild of a hugr:
@@ -465,8 +469,8 @@ mod test {
 
         // Both ways work:
         let just_io = vec![
-            Input::new(type_row![NAT]).into(),
-            Output::new(type_row![NAT]).into(),
+            Input::new(vec![usize_t()]).into(),
+            Output::new(vec![usize_t()]).into(),
         ];
         for d in [dfg_view, nested_dfg_view] {
             assert_eq!(
@@ -481,7 +485,9 @@ mod test {
     /// Mutate a SiblingMut wrapper
     #[rstest]
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
-        simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
+        simple_dfg_hugr
+            .update_validate(&test_quantum_extension::REG)
+            .unwrap();
         let root = simple_dfg_hugr.root();
         let signature = simple_dfg_hugr.inner_function_type().unwrap().clone();
 
@@ -506,7 +512,9 @@ mod test {
 
         // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
         simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
-        assert!(simple_dfg_hugr.validate(&PRELUDE_REGISTRY).is_err());
+        assert!(simple_dfg_hugr
+            .validate(&test_quantum_extension::REG)
+            .is_err());
     }
 
     #[rstest]
@@ -535,7 +543,7 @@ mod test {
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
         let extracted = region.extract_hugr();
-        extracted.validate(&PRELUDE_REGISTRY)?;
+        extracted.validate(&test_quantum_extension::REG)?;
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
 

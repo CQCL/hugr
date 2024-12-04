@@ -119,6 +119,8 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Remove a node from the graph and return the node weight.
+    /// Note that if the node has children, they are not removed; this leaves
+    /// the Hugr in an invalid state. See [Self::remove_subtree].
     ///
     /// # Panics
     ///
@@ -127,6 +129,19 @@ pub trait HugrMut: HugrMutInternals {
     fn remove_node(&mut self, node: Node) -> OpType {
         panic_invalid_non_root(self, node);
         self.hugr_mut().remove_node(node)
+    }
+
+    /// Remove a node from the graph, along with all its descendants in the hierarchy.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph, or is the root (this would leave an empty Hugr).
+    fn remove_subtree(&mut self, node: Node) {
+        panic_invalid_non_root(self, node);
+        while let Some(ch) = self.first_child(node) {
+            self.remove_subtree(ch)
+        }
+        self.hugr_mut().remove_node(node);
     }
 
     /// Connect two nodes at the given ports.
@@ -520,17 +535,14 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
 mod test {
     use crate::{
         extension::{
-            prelude::{Noop, USIZE_T},
+            prelude::{usize_t, Noop},
             PRELUDE_REGISTRY,
         },
-        macros::type_row,
-        ops::{self, dataflow::IOTrait},
-        types::{Signature, Type},
+        ops::{self, dataflow::IOTrait, FuncDefn, Input, Output},
+        types::Signature,
     };
 
     use super::*;
-
-    const NAT: Type = USIZE_T;
 
     #[test]
     fn simple_function() -> Result<(), Box<dyn std::error::Error>> {
@@ -544,16 +556,16 @@ mod test {
             module,
             ops::FuncDefn {
                 name: "main".into(),
-                signature: Signature::new(type_row![NAT], type_row![NAT, NAT])
+                signature: Signature::new(vec![usize_t()], vec![usize_t(), usize_t()])
                     .with_prelude()
                     .into(),
             },
         );
 
         {
-            let f_in = hugr.add_node_with_parent(f, ops::Input::new(type_row![NAT]));
-            let f_out = hugr.add_node_with_parent(f, ops::Output::new(type_row![NAT, NAT]));
-            let noop = hugr.add_node_with_parent(f, Noop(NAT));
+            let f_in = hugr.add_node_with_parent(f, ops::Input::new(vec![usize_t()]));
+            let f_out = hugr.add_node_with_parent(f, ops::Output::new(vec![usize_t(), usize_t()]));
+            let noop = hugr.add_node_with_parent(f, Noop(usize_t()));
 
             hugr.connect(f_in, 0, noop, 0);
             hugr.connect(noop, 0, f_out, 0);
@@ -582,5 +594,34 @@ mod test {
 
         hugr.remove_metadata(root, "meta");
         assert_eq!(hugr.get_metadata(root, "meta"), None);
+    }
+
+    #[test]
+    fn remove_subtree() {
+        let mut hugr = Hugr::default();
+        let root = hugr.root();
+        let [foo, bar] = ["foo", "bar"].map(|name| {
+            let fd = hugr.add_node_with_parent(
+                root,
+                FuncDefn {
+                    name: name.to_string(),
+                    signature: Signature::new_endo(usize_t()).into(),
+                },
+            );
+            let inp = hugr.add_node_with_parent(fd, Input::new(usize_t()));
+            let out = hugr.add_node_with_parent(fd, Output::new(usize_t()));
+            hugr.connect(inp, 0, out, 0);
+            fd
+        });
+        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        assert_eq!(hugr.node_count(), 7);
+
+        hugr.remove_subtree(foo);
+        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        assert_eq!(hugr.node_count(), 4);
+
+        hugr.remove_subtree(bar);
+        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        assert_eq!(hugr.node_count(), 1);
     }
 }

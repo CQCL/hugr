@@ -1,0 +1,31 @@
+---
+source: src/extension/logic.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i32, {}, {} } @_hl.main.1({ i32, {}, {} } %0, { i32, {}, {} } %1) {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"2_0" = alloca { i32, {}, {} }, align 8
+  %"2_1" = alloca { i32, {}, {} }, align 8
+  %"4_0" = alloca { i32, {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { i32, {}, {} } %0, { i32, {}, {} }* %"2_0", align 4
+  store { i32, {}, {} } %1, { i32, {}, {} }* %"2_1", align 4
+  %"2_01" = load { i32, {}, {} }, { i32, {}, {} }* %"2_0", align 4
+  %"2_12" = load { i32, {}, {} }, { i32, {}, {} }* %"2_1", align 4
+  %2 = extractvalue { i32, {}, {} } %"2_01", 0
+  %3 = extractvalue { i32, {}, {} } %"2_12", 0
+  %4 = and i32 %2, %3
+  %5 = trunc i32 %4 to i1
+  %6 = select i1 %5, { i32, {}, {} } { i32 1, {} poison, {} undef }, { i32, {}, {} } { i32 0, {} undef, {} poison }
+  store { i32, {}, {} } %6, { i32, {}, {} }* %"4_0", align 4
+  %"4_03" = load { i32, {}, {} }, { i32, {}, {} }* %"4_0", align 4
+  store { i32, {}, {} } %"4_03", { i32, {}, {} }* %"0", align 4
+  %"04" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"04"
+}

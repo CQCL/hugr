@@ -1,10 +1,10 @@
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
-    extension::prelude::BOOL_T,
+    extension::prelude::bool_t,
     hugr::serialize::test::check_hugr_deserialize,
     std_extensions::logic::LogicOp,
-    type_row,
     types::Signature,
+    utils::test_quantum_extension,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -47,11 +47,11 @@ pub fn empty_hugr() -> Hugr {
 #[once]
 pub fn hugr_with_named_op() -> Hugr {
     let mut builder =
-        DFGBuilder::new(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])).unwrap();
+        DFGBuilder::new(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()])).unwrap();
     let [a, b] = builder.input_wires_arr();
     let x = builder.add_dataflow_op(LogicOp::And, [a, b]).unwrap();
     builder
-        .finish_prelude_hugr_with_outputs(x.outputs())
+        .finish_hugr_with_outputs(x.outputs(), &test_quantum_extension::REG)
         .unwrap()
 }
 

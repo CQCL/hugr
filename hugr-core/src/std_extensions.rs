@@ -12,7 +12,7 @@ pub mod ptr;
 /// Extension registry with all standard extensions and prelude.
 pub fn std_reg() -> ExtensionRegistry {
     ExtensionRegistry::try_new([
-        crate::extension::prelude::PRELUDE.to_owned(),
+        crate::extension::prelude::PRELUDE.clone(),
         arithmetic::int_ops::EXTENSION.to_owned(),
         arithmetic::int_types::EXTENSION.to_owned(),
         arithmetic::conversions::EXTENSION.to_owned(),

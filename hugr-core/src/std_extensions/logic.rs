@@ -1,5 +1,7 @@
 //! Basic logical operations.
 
+use std::sync::{Arc, Weak};
+
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
@@ -8,11 +10,11 @@ use crate::ops::Value;
 use crate::types::Signature;
 use crate::{
     extension::{
-        prelude::BOOL_T,
+        prelude::bool_t,
         simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, OpDef, SignatureFunc,
     },
-    ops, type_row,
+    ops,
     types::type_param::TypeArg,
     utils::sorted_consts,
     Extension, IncomingPort,
@@ -68,14 +70,18 @@ pub enum LogicOp {
 }
 
 impl MakeOpDef for LogicOp {
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
             LogicOp::And | LogicOp::Or | LogicOp::Eq => {
-                Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T])
+                Signature::new(vec![bool_t(); 2], vec![bool_t()])
             }
-            LogicOp::Not => Signature::new_endo(type_row![BOOL_T]),
+            LogicOp::Not => Signature::new_endo(vec![bool_t()]),
         }
         .into()
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 
     fn description(&self) -> String {
@@ -89,7 +95,7 @@ impl MakeOpDef for LogicOp {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
@@ -107,25 +113,25 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for basic logical operations.
-fn extension() -> Extension {
-    let mut extension = Extension::new(EXTENSION_ID, VERSION);
-    LogicOp::load_all_ops(&mut extension).unwrap();
+fn extension() -> Arc<Extension> {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        LogicOp::load_all_ops(extension, extension_ref).unwrap();
 
-    extension
-        .add_value(FALSE_NAME, ops::Value::false_val())
-        .unwrap();
-    extension
-        .add_value(TRUE_NAME, ops::Value::true_val())
-        .unwrap();
-    extension
+        extension
+            .add_value(FALSE_NAME, ops::Value::false_val())
+            .unwrap();
+        extension
+            .add_value(TRUE_NAME, ops::Value::true_val())
+            .unwrap();
+    })
 }
 
 lazy_static! {
     /// Reference to the logic Extension.
-    pub static ref EXTENSION: Extension = extension();
+    pub static ref EXTENSION: Arc<Extension> = extension();
     /// Registry required to validate logic extension.
     pub static ref LOGIC_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
+        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
 }
 
 impl MakeRegisteredOp for LogicOp {
@@ -159,10 +165,12 @@ fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use std::sync::Arc;
+
     use super::{extension, LogicOp, FALSE_NAME, TRUE_NAME};
     use crate::{
         extension::{
-            prelude::BOOL_T,
+            prelude::bool_t,
             simple_op::{MakeOpDef, MakeRegisteredOp},
         },
         ops::{NamedOp, Value},
@@ -174,7 +182,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_logic_extension() {
-        let r: Extension = extension();
+        let r: Arc<Extension> = extension();
         assert_eq!(r.name() as &str, "logic");
         assert_eq!(r.operations().count(), 4);
 
@@ -196,22 +204,22 @@ pub(crate) mod test {
 
     #[test]
     fn test_values() {
-        let r: Extension = extension();
+        let r: Arc<Extension> = extension();
         let false_val = r.get_value(&FALSE_NAME).unwrap();
         let true_val = r.get_value(&TRUE_NAME).unwrap();
 
         for v in [false_val, true_val] {
             let simpl = v.typed_value().get_type();
-            assert_eq!(simpl, BOOL_T);
+            assert_eq!(simpl, bool_t());
         }
     }
 
-    /// Generate a logic extension "and" operation over [`crate::prelude::BOOL_T`]
+    /// Generate a logic extension "and" operation over [`crate::prelude::bool_t()`]
     pub(crate) fn and_op() -> LogicOp {
         LogicOp::And
     }
 
-    /// Generate a logic extension "or" operation over [`crate::prelude::BOOL_T`]
+    /// Generate a logic extension "or" operation over [`crate::prelude::bool_t()`]
     pub(crate) fn or_op() -> LogicOp {
         LogicOp::Or
     }

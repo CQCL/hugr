@@ -1,7 +1,9 @@
 //! Basic integer operations.
 
+use std::sync::{Arc, Weak};
+
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
-use crate::extension::prelude::{sum_with_error, BOOL_T};
+use crate::extension::prelude::{bool_t, sum_with_error};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -10,7 +12,6 @@ use crate::extension::{
 };
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
-use crate::type_row;
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
@@ -102,14 +103,18 @@ pub enum IntOpDef {
 
 impl MakeOpDef for IntOpDef {
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         use IntOpDef::*;
         let tv0 = int_tv(0);
         match self {
@@ -124,7 +129,7 @@ impl MakeOpDef for IntOpDef {
             )
             .into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
-                int_polytype(1, vec![tv0; 2], type_row![BOOL_T]).into()
+                int_polytype(1, vec![tv0; 2], vec![bool_t()]).into()
             }
             imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor | ipow => {
                 ibinop_sig().into()
@@ -247,23 +252,18 @@ fn iunop_sig() -> PolyFuncTypeRV {
 
 lazy_static! {
     /// Extension for basic integer operations.
-    pub static ref EXTENSION: Extension = {
-        let mut extension = Extension::new(
-            EXTENSION_ID,
-            VERSION).with_reqs(
-            ExtensionSet::singleton(&super::int_types::EXTENSION_ID)
-        );
-
-        IntOpDef::load_all_ops(&mut extension).unwrap();
-
-        extension
+    pub static ref EXTENSION: Arc<Extension> = {
+        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+            extension.add_requirements(ExtensionSet::singleton(&super::int_types::EXTENSION_ID));
+            IntOpDef::load_all_ops(extension, extension_ref).unwrap();
+        })
     };
 
     /// Registry of extensions required to validate integer operations.
     pub static ref INT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        super::int_types::EXTENSION.to_owned(),
-        EXTENSION.to_owned(),
+        PRELUDE.clone(),
+        super::int_types::EXTENSION.clone(),
+        EXTENSION.clone(),
     ])
     .unwrap();
 }

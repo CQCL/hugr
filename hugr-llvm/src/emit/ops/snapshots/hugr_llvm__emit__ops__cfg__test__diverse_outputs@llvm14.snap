@@ -1,0 +1,49 @@
+---
+source: src/emit/ops/cfg.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define i8 @_hl.main.1(i8 %0, i8 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %2
+
+2:                                                ; preds = %14, %entry_block
+  %"7_0.0" = phi i8 [ %0, %entry_block ], [ %16, %14 ]
+  %"7_1.0" = phi i8 [ %1, %entry_block ], [ %9, %14 ]
+  %3 = insertvalue { i8, i8 } undef, i8 %"7_0.0", 0
+  %4 = insertvalue { i8, i8 } %3, i8 %"7_1.0", 1
+  %5 = insertvalue { { i8, i8 } } poison, { i8, i8 } %4, 0
+  switch i32 0, label %6 [
+  ]
+
+6:                                                ; preds = %2
+  %7 = extractvalue { { i8, i8 } } %5, 0
+  %8 = extractvalue { i8, i8 } %7, 0
+  %9 = extractvalue { i8, i8 } %7, 1
+  br label %10
+
+10:                                               ; preds = %6
+  %11 = insertvalue { i8 } undef, i8 %8, 0
+  %12 = insertvalue { i32, { i8 }, {} } { i32 0, { i8 } poison, {} poison }, { i8 } %11, 1
+  %13 = extractvalue { i32, { i8 }, {} } %12, 0
+  switch i32 %13, label %14 [
+    i32 1, label %17
+  ]
+
+14:                                               ; preds = %10
+  %15 = extractvalue { i32, { i8 }, {} } %12, 1
+  %16 = extractvalue { i8 } %15, 0
+  br label %2
+
+17:                                               ; preds = %10
+  %18 = extractvalue { i32, { i8 }, {} } %12, 2
+  br label %19
+
+19:                                               ; preds = %17
+  ret i8 %9
+}

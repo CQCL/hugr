@@ -28,17 +28,17 @@
 //! a simple quantum extension and then use the [[builder::DFGBuilder]] as follows:
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
-//! use hugr::extension::prelude::{BOOL_T, QB_T};
+//! use hugr::extension::prelude::{bool_t, qb_t};
 //! use hugr::hugr::Hugr;
 //! use hugr::type_row;
 //! use hugr::types::FuncValueType;
 //!
-//! // The type of qubits, `QB_T` is in the prelude but, by default, no gateset
+//! // The type of qubits, `qb_t()` is in the prelude but, by default, no gateset
 //! // is defined. This module provides Hadamard and CX gates.
 //! mod mini_quantum_extension {
 //!     use hugr::{
 //!         extension::{
-//!             prelude::{BOOL_T, QB_T},
+//!             prelude::{bool_t, qb_t},
 //!             ExtensionId, ExtensionRegistry, PRELUDE, Version,
 //!         },
 //!         ops::{ExtensionOp, OpName},
@@ -47,46 +47,42 @@
 //!         Extension,
 //!     };
 //!
+//!     use std::sync::Arc;
 //!     use lazy_static::lazy_static;
 //!
 //!     fn one_qb_func() -> PolyFuncTypeRV {
-//!         FuncValueType::new_endo(type_row![QB_T]).into()
+//!         FuncValueType::new_endo(vec![qb_t()]).into()
 //!     }
 //!
 //!     fn two_qb_func() -> PolyFuncTypeRV {
-//!         FuncValueType::new_endo(type_row![QB_T, QB_T]).into()
+//!         FuncValueType::new_endo(vec![qb_t(), qb_t()]).into()
 //!     }
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
 //!     pub const VERSION: Version = Version::new(0, 1, 0);
-//!     fn extension() -> Extension {
-//!         let mut extension = Extension::new(EXTENSION_ID, VERSION);
+//!     fn extension() -> Arc<Extension> {
+//!         Extension::new_arc(EXTENSION_ID, VERSION, |ext, extension_ref| {
+//!             ext.add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func(), extension_ref)
+//!                 .unwrap();
 //!
-//!         extension
-//!             .add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func())
-//!             .unwrap();
+//!             ext.add_op(OpName::new_inline("CX"), "CX".into(), two_qb_func(), extension_ref)
+//!                 .unwrap();
 //!
-//!         extension
-//!             .add_op(OpName::new_inline("CX"), "CX".into(), two_qb_func())
-//!             .unwrap();
-//!
-//!         extension
-//!             .add_op(
+//!             ext.add_op(
 //!                 OpName::new_inline("Measure"),
 //!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-//!                 FuncValueType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+//!                 FuncValueType::new(vec![qb_t()], vec![qb_t(), bool_t()]),
+//!                 extension_ref,
 //!             )
 //!             .unwrap();
-//!
-//!         extension
+//!         })
 //!     }
 //!
 //!     lazy_static! {
 //!         /// Quantum extension definition.
-//!         pub static ref EXTENSION: Extension = extension();
-//!         static ref REG: ExtensionRegistry =
-//!             ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned()]).unwrap();
-//!
+//!         pub static ref EXTENSION: Arc<Extension> = extension();
+//!         pub static ref REG: ExtensionRegistry =
+//!             ExtensionRegistry::try_new([EXTENSION.clone(), PRELUDE.clone()]).unwrap();
 //!     }
 //!     fn get_gate(gate_name: impl Into<OpName>) -> ExtensionOp {
 //!         EXTENSION
@@ -107,7 +103,7 @@
 //!     }
 //! }
 //!
-//! use mini_quantum_extension::{cx_gate, h_gate, measure};
+//! use mini_quantum_extension::{cx_gate, h_gate, measure, REG};
 //!
 //! //      ┌───┐
 //! // q_0: ┤ H ├──■─────
@@ -117,15 +113,15 @@
 //! // c:              ╚═
 //! fn make_dfg_hugr() -> Result<Hugr, BuildError> {
 //!     let mut dfg_builder = DFGBuilder::new(inout_sig(
-//!         type_row![QB_T, QB_T],
-//!         type_row![QB_T, QB_T, BOOL_T],
+//!         vec![qb_t(), qb_t()],
+//!         vec![qb_t(), qb_t(), bool_t()],
 //!     ))?;
 //!     let [wire0, wire1] = dfg_builder.input_wires_arr();
 //!     let h0 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
 //!     let h1 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
 //!     let cx = dfg_builder.add_dataflow_op(cx_gate(), h0.outputs().chain(h1.outputs()))?;
 //!     let measure = dfg_builder.add_dataflow_op(measure(), cx.outputs().last())?;
-//!     dfg_builder.finish_prelude_hugr_with_outputs(cx.outputs().take(1).chain(measure.outputs()))
+//!     dfg_builder.finish_hugr_with_outputs(cx.outputs().take(1).chain(measure.outputs()), &REG)
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().unwrap();
@@ -138,6 +134,10 @@
 pub use hugr_core::{builder, core, extension, ops, package, std_extensions, types, utils};
 #[doc(inline)]
 pub use hugr_passes as algorithms;
+
+#[cfg(feature = "llvm")]
+#[doc(inline)]
+pub use hugr_llvm as llvm;
 
 // Modules with hand-picked re-exports.
 pub mod hugr;

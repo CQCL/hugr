@@ -1,0 +1,14 @@
+---
+source: src/emit/test.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { {} } @_hl.main.1({ {} } %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  ret { {} } %0
+}
