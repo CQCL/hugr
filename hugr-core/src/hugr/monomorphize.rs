@@ -47,9 +47,12 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     h
 }
 
+fn is_polymorphic(fd: &FuncDefn) -> bool {
+    !fd.signature.params().is_empty()
+}
+
 fn is_polymorphic_funcdefn(t: &OpType) -> bool {
-    t.as_func_defn()
-        .is_some_and(|fd| !fd.signature.params().is_empty())
+    t.as_func_defn().is_some_and(is_polymorphic)
 }
 
 struct Instantiating<'a> {
@@ -223,7 +226,7 @@ mod test {
     use crate::types::{PolyFuncType, Signature, Type, TypeBound, TypeRow};
     use crate::{Hugr, HugrView, Node};
 
-    use super::{mangle_name, monomorphize, remove_polyfuncs};
+    use super::{is_polymorphic, mangle_name, monomorphize, remove_polyfuncs};
 
     #[rstest]
     fn test_null(simple_dfg_hugr: Hugr) {
@@ -319,8 +322,7 @@ mod test {
         ];
 
         for n in expected_mangled_names.iter() {
-            let mono_fn = funcs.remove(n).unwrap();
-            assert!(mono_fn.signature.params().is_empty());
+            assert!(!is_polymorphic(funcs.remove(n).unwrap()));
         }
 
         assert_eq!(
@@ -333,9 +335,7 @@ mod test {
         let nopoly = remove_polyfuncs(mono);
         let mut funcs = list_funcs(&nopoly);
 
-        assert!(funcs
-            .values()
-            .all(|(_, fd)| fd.signature.params().is_empty()));
+        assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
         for n in expected_mangled_names {
             assert!(funcs.remove(&n).is_some());
         }
@@ -407,7 +407,7 @@ mod test {
             .collect_vec()
         );
         for (n, fd) in funcs.into_values() {
-            assert!(fd.signature.params().is_empty());
+            assert!(!is_polymorphic(fd));
             assert!(mono_hugr.get_parent(n) == (fd.name != "mainish").then_some(mono_hugr.root()));
         }
         Ok(())
@@ -449,9 +449,7 @@ mod test {
         let mono_hugr = monomorphize(hugr, &reg);
 
         let mut funcs = list_funcs(&mono_hugr);
-        assert!(funcs
-            .values()
-            .all(|(_, fd)| fd.signature.params().is_empty()));
+        assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
         #[allow(clippy::unnecessary_to_owned)] // It is necessary
         let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
         assert_eq!(m, mono.handle().node());
