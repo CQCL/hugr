@@ -793,7 +793,7 @@ pub(in crate::hugr::rewrite) mod test {
         };
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
-        assert_eq!(hugr.update_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(hugr.update_validate(&test_quantum_extension::REG), Ok(()));
         assert_eq!(hugr.node_count(), 4);
     }
 
