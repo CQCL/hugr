@@ -48,8 +48,6 @@ mod test {
         types::Signature,
     };
 
-    use crate::test::TEST_REG;
-
     use super::*;
 
     #[test]
@@ -62,9 +60,7 @@ mod test {
                 .add_dataflow_op(Noop::new(bool_t()), [in_w])
                 .unwrap()
                 .outputs_arr();
-            builder
-                .finish_hugr_with_outputs([out_w], &TEST_REG)
-                .unwrap()
+            builder.finish_hugr_with_outputs([out_w]).unwrap()
         };
         ensure_no_nonlocal_edges(&hugr).unwrap();
     }
@@ -91,12 +87,7 @@ mod test {
                     noop_edge,
                 )
             };
-            (
-                builder
-                    .finish_hugr_with_outputs([out_w], &TEST_REG)
-                    .unwrap(),
-                edge,
-            )
+            (builder.finish_hugr_with_outputs([out_w]).unwrap(), edge)
         };
         assert_eq!(
             ensure_no_nonlocal_edges(&hugr).unwrap_err(),

@@ -243,7 +243,7 @@ pub(in crate::hugr::rewrite) mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
+    use crate::extension::ExtensionSet;
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
     use crate::ops::dataflow::DataflowOpTrait;
@@ -253,7 +253,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::logic::LogicOp;
     use crate::types::{Signature, Type};
-    use crate::utils::test_quantum_extension::{self, cx_gate, h_gate, EXTENSION_ID};
+    use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
     use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
@@ -297,7 +297,7 @@ pub(in crate::hugr::rewrite) mod test {
 
             func_builder.finish_with_outputs(inner_graph.outputs().chain(q_out.outputs()))?
         };
-        Ok(module_builder.finish_hugr(&test_quantum_extension::REG)?)
+        Ok(module_builder.finish_hugr()?)
     }
 
     #[fixture]
@@ -317,7 +317,7 @@ pub(in crate::hugr::rewrite) mod test {
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire45 =
             dfg_builder.add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
-        dfg_builder.finish_hugr_with_outputs(wire45.outputs(), &test_quantum_extension::REG)
+        dfg_builder.finish_hugr_with_outputs(wire45.outputs())
     }
 
     #[fixture]
@@ -337,7 +337,7 @@ pub(in crate::hugr::rewrite) mod test {
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
-        dfg_builder.finish_hugr_with_outputs(wireoutvec, &test_quantum_extension::REG)
+        dfg_builder.finish_hugr_with_outputs(wireoutvec)
     }
 
     #[fixture]
@@ -371,9 +371,7 @@ pub(in crate::hugr::rewrite) mod test {
         let [b1] = not_1.outputs_arr();
 
         (
-            dfg_builder
-                .finish_hugr_with_outputs([b0, b1], &test_quantum_extension::REG)
-                .unwrap(),
+            dfg_builder.finish_hugr_with_outputs([b0, b1]).unwrap(),
             vec![not_inp.node(), not_0.node(), not_1.node()],
         )
     }
@@ -403,9 +401,7 @@ pub(in crate::hugr::rewrite) mod test {
         let b1 = b;
 
         (
-            dfg_builder
-                .finish_hugr_with_outputs([b0, b1], &test_quantum_extension::REG)
-                .unwrap(),
+            dfg_builder.finish_hugr_with_outputs([b0, b1]).unwrap(),
             vec![not_inp.node(), not_0.node()],
         )
     }
@@ -489,7 +485,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        assert_eq!(h.update_validate(&test_quantum_extension::REG), Ok(()));
+        assert_eq!(h.validate(), Ok(()));
     }
 
     #[rstest]
@@ -561,7 +557,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        assert_eq!(h.update_validate(&test_quantum_extension::REG), Ok(()));
+        assert_eq!(h.validate(), Ok(()));
     }
 
     #[test]
@@ -573,9 +569,7 @@ pub(in crate::hugr::rewrite) mod test {
         circ.append(cx_gate(), [1, 0]).unwrap();
         let wires = circ.finish();
         let [input, output] = builder.io();
-        let mut h = builder
-            .finish_hugr_with_outputs(wires, &test_quantum_extension::REG)
-            .unwrap();
+        let mut h = builder.finish_hugr_with_outputs(wires).unwrap();
         let replacement = h.clone();
         let orig = h.clone();
 
@@ -634,17 +628,13 @@ pub(in crate::hugr::rewrite) mod test {
             .unwrap()
             .outputs();
         let [input, _] = builder.io();
-        let mut h = builder
-            .finish_hugr_with_outputs(outw, &test_quantum_extension::REG)
-            .unwrap();
+        let mut h = builder.finish_hugr_with_outputs(outw).unwrap();
 
         let mut builder = DFGBuilder::new(inout_sig(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
         let outw = builder.add_dataflow_op(and_op(), inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();
-        let repl = builder
-            .finish_hugr_with_outputs(outw, &test_quantum_extension::REG)
-            .unwrap();
+        let repl = builder.finish_hugr_with_outputs(outw).unwrap();
 
         let orig = h.clone();
 
@@ -693,7 +683,7 @@ pub(in crate::hugr::rewrite) mod test {
             let b =
                 DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t(), bool_t()])).unwrap();
             let [w] = b.input_wires_arr();
-            b.finish_prelude_hugr_with_outputs([w, w]).unwrap()
+            b.finish_hugr_with_outputs([w, w]).unwrap()
         };
         let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
 
@@ -731,7 +721,7 @@ pub(in crate::hugr::rewrite) mod test {
         };
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
-        assert_eq!(hugr.update_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(hugr.validate(), Ok(()));
         assert_eq!(hugr.node_count(), 3);
     }
 
@@ -752,11 +742,7 @@ pub(in crate::hugr::rewrite) mod test {
             let [w] = b.input_wires_arr();
             let not = b.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
             let [w_not] = not.outputs_arr();
-            (
-                b.finish_hugr_with_outputs([w, w_not], &test_quantum_extension::REG)
-                    .unwrap(),
-                not.node(),
-            )
+            (b.finish_hugr_with_outputs([w, w_not]).unwrap(), not.node())
         };
         let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
 
@@ -793,7 +779,7 @@ pub(in crate::hugr::rewrite) mod test {
         };
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
-        assert_eq!(hugr.update_validate(&test_quantum_extension::REG), Ok(()));
+        assert_eq!(hugr.validate(), Ok(()));
         assert_eq!(hugr.node_count(), 4);
     }
 
@@ -814,7 +800,7 @@ pub(in crate::hugr::rewrite) mod test {
         let inner_dfg = n_identity(inner_build).unwrap();
         let inner_dfg_node = inner_dfg.node();
         let replacement = nest_build
-            .finish_prelude_hugr_with_outputs([inner_dfg.out_wire(0)])
+            .finish_hugr_with_outputs([inner_dfg.out_wire(0)])
             .unwrap();
         let subgraph = SiblingSubgraph::try_from_nodes(vec![h_node], &h).unwrap();
         let nu_inp = vec![(
@@ -836,8 +822,7 @@ pub(in crate::hugr::rewrite) mod test {
         assert_eq!(h.node_count(), 4);
 
         rewrite.apply(&mut h).unwrap_or_else(|e| panic!("{e}"));
-        h.update_validate(&PRELUDE_REGISTRY)
-            .unwrap_or_else(|e| panic!("{e}"));
+        h.validate().unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(h.node_count(), 6);
     }

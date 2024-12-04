@@ -570,7 +570,6 @@ pub(crate) mod test {
     use hugr_core::builder::{
         endo_sig, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
     };
-    use hugr_core::extension::PRELUDE_REGISTRY;
     use hugr_core::extension::{prelude::usize_t, ExtensionSet};
 
     use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
@@ -628,7 +627,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let mut h = cfg_builder.finish_prelude_hugr()?;
+        let mut h = cfg_builder.finish_hugr()?;
         let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
@@ -654,7 +653,7 @@ pub(crate) mod test {
             ])
         );
         transform_cfg_to_nested(&mut IdentityCfgMap::new(rc));
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate().unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
         for n in [split, left, right, merge, head, tail] {
@@ -758,7 +757,7 @@ pub(crate) mod test {
         let root = h.root();
         let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate().unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
         for n in [split, left, right, merge] {
@@ -902,7 +901,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_prelude_hugr()?;
+        let h = cfg_builder.finish_hugr()?;
         Ok((h, merge, tail))
     }
 
@@ -912,7 +911,7 @@ pub(crate) mod test {
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(Signature::new_endo(usize_t()))?;
         let (head, tail) = build_conditional_in_loop(&mut cfg_builder, separate_headers)?;
-        let h = cfg_builder.finish_prelude_hugr()?;
+        let h = cfg_builder.finish_hugr()?;
         Ok((h, head, tail))
     }
 

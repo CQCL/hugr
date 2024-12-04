@@ -205,11 +205,10 @@ mod test {
 
     use super::*;
     use hugr_core::builder::{endo_sig, BuildHandle, Dataflow, DataflowHugr};
-    use hugr_core::extension::EMPTY_REG;
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::Value;
-    use hugr_core::std_extensions::arithmetic::int_ops::{self, IntOpDef};
+    use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, Type};
     use hugr_core::{builder::DFGBuilder, hugr::Hugr};
@@ -261,10 +260,7 @@ mod test {
             .unwrap();
         (
             builder
-                .finish_hugr_with_outputs(
-                    [v2.out_wire(0), v3.out_wire(0)],
-                    &int_ops::INT_OPS_REGISTRY,
-                )
+                .finish_hugr_with_outputs([v2.out_wire(0), v3.out_wire(0)])
                 .unwrap(),
             nodes,
         )
@@ -279,8 +275,7 @@ mod test {
             .iter(&hugr.as_petgraph())
             .filter(|n| rank_map.contains_key(n))
             .collect_vec();
-        hugr.validate_no_extensions(&int_ops::INT_OPS_REGISTRY)
-            .unwrap();
+        hugr.validate_no_extensions().unwrap();
 
         topo_sorted
     }
@@ -326,9 +321,7 @@ mod test {
             let mut builder =
                 DFGBuilder::new(Signature::new(Type::EMPTY_TYPEROW, Type::UNIT)).unwrap();
             let unit = builder.add_load_value(Value::unary_unit_sum());
-            builder
-                .finish_hugr_with_outputs([unit], &EMPTY_REG)
-                .unwrap()
+            builder.finish_hugr_with_outputs([unit]).unwrap()
         };
         let root = hugr.root();
         force_order(&mut hugr, root, |_, _| 0).unwrap();

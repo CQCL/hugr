@@ -6,14 +6,6 @@ use hugr::{extension::ExtensionRegistry, Extension, Hugr};
 
 use crate::{CliError, HugrArgs};
 
-// TODO: Deprecated re-export. Remove on a breaking release.
-#[doc(inline)]
-#[deprecated(
-    since = "0.13.2",
-    note = "Use `hugr::package::PackageValidationError` instead."
-)]
-pub use hugr::package::PackageValidationError as ValError;
-
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", long_about = None)]
@@ -31,7 +23,7 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 
 impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
-    pub fn run(&mut self) -> Result<(Vec<Hugr>, ExtensionRegistry), CliError> {
+    pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
         let result = self.hugr_args.validate()?;
         if self.verbosity(Level::Info) {
             eprintln!("{}", VALID_PRINT);
@@ -50,24 +42,29 @@ impl HugrArgs {
     ///
     /// Returns the validated modules and the extension registry the modules
     /// were validated against.
-    pub fn validate(&mut self) -> Result<(Vec<Hugr>, ExtensionRegistry), CliError> {
-        let mut package = self.get_package_or_hugr()?;
+    pub fn validate(&mut self) -> Result<Vec<Hugr>, CliError> {
+        let reg = self.extensions()?;
+        let package = self.get_package_or_hugr(&reg)?;
 
-        let mut reg: ExtensionRegistry = if self.no_std {
+        package.validate()?;
+        Ok(package.into_hugrs())
+    }
+
+    /// Return a register with the selected extensions.
+    pub fn extensions(&self) -> Result<ExtensionRegistry, CliError> {
+        let mut reg = if self.no_std {
             hugr::extension::PRELUDE_REGISTRY.to_owned()
         } else {
             hugr::std_extensions::STD_REG.to_owned()
         };
 
-        // register external extensions
         for ext in &self.extensions {
             let f = std::fs::File::open(ext)?;
             let ext: Extension = serde_json::from_reader(f)?;
             reg.register_updated(ext);
         }
 
-        package.update_validate(&mut reg)?;
-        Ok((package.into_hugrs(), reg))
+        Ok(reg)
     }
 
     /// Test whether a `level` message should be output.
