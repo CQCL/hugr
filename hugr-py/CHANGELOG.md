@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.9.0...hugr-py-v0.9.1) (2024-12-04)
+
+
+### Features
+
+* Add array `repeat` and `scan` ops ([#1633](https://github.com/CQCL/hugr/issues/1633)) ([649589c](https://github.com/CQCL/hugr/commit/649589c9e3f1fbd9cfff53a2adb8e1f9649fbe87)), closes [#1627](https://github.com/CQCL/hugr/issues/1627)
+
+
+### Bug Fixes
+
+* **py:** allow conditional cases to be defined out of order ([#1599](https://github.com/CQCL/hugr/issues/1599)) ([583d21d](https://github.com/CQCL/hugr/commit/583d21d371320851f8608daa295ef8b723d31326))
+* Update number of ports for PartialOps, and sanitize orderd edges ([#1635](https://github.com/CQCL/hugr/issues/1635)) ([81a1385](https://github.com/CQCL/hugr/commit/81a1385fd56a9a12b84153756b4c0bb046808c50)), closes [#1625](https://github.com/CQCL/hugr/issues/1625)
+
 ## [0.9.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.1...hugr-py-v0.9.0) (2024-10-14)
 
 
