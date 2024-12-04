@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::{borrow::Cow, rc::Rc};
+use std::{borrow::Cow, rc::Rc, sync::Arc};
 
 use delegate::delegate;
 
@@ -62,6 +61,8 @@ impl<H: AsRef<Hugr>, Root> HugrView for RootChecked<H, Root> {
 
 #[cfg(test)]
 mod test {
+    use std::{rc::Rc, sync::Arc};
+
     use crate::hugr::views::{DescendantsGraph, HierarchyView};
     use crate::{Hugr, HugrView, Node};
 
@@ -73,7 +74,7 @@ mod test {
     }
 
     #[test]
-    fn test_views() {
+    fn test_refs_to_view() {
         let h = Hugr::default();
         let v = ViewWrapper(&h);
         let c = h.nodes().count();
@@ -88,5 +89,13 @@ mod test {
         assert_eq!(vh.nodes().count(), c);
         let h: Hugr = vh.0;
         assert_eq!(h.nodes().count(), c);
+
+        let vb = ViewWrapper(Box::new(&h));
+        assert_eq!(vb.nodes().count(), c);
+        let va = ViewWrapper(Arc::new(h));
+        assert_eq!(va.nodes().count(), c);
+        let h = Arc::try_unwrap(va.0).unwrap();
+        let vr = Rc::new(&h);
+        assert_eq!(ViewWrapper(&vr).nodes().count(), h.nodes().count());
     }
 }
