@@ -3,13 +3,16 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
+use itertools::Itertools;
 pub use semver::Version;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::btree_map;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 use std::mem;
 use std::sync::{Arc, Weak};
 
+use derive_more::Display;
 use thiserror::Error;
 
 use crate::hugr::IdentList;
@@ -40,10 +43,22 @@ pub use type_def::{TypeDef, TypeDefBound};
 pub mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Display, Default, PartialEq)]
+#[display("ExtensionRegistry[{}]", _0.keys().join(", "))]
 pub struct ExtensionRegistry(BTreeMap<ExtensionId, Arc<Extension>>);
 
 impl ExtensionRegistry {
+    /// Create a new empty extension registry.
+    ///
+    /// For a version that checks the validity of the extensions, see [`ExtensionRegistry::try_new`].
+    pub fn new(extensions: impl IntoIterator<Item = Arc<Extension>>) -> Self {
+        let mut res = Self::default();
+        for ext in extensions.into_iter() {
+            res.register_updated(ext);
+        }
+        res
+    }
+
     /// Gets the Extension with the given name
     pub fn get(&self, name: &str) -> Option<&Arc<Extension>> {
         self.0.get(name)
@@ -55,14 +70,12 @@ impl ExtensionRegistry {
     }
 
     /// Makes a new [ExtensionRegistry], validating all the extensions in it.
+    ///
+    /// For an unvalidated version, see [`ExtensionRegistry::new`].
     pub fn try_new(
         value: impl IntoIterator<Item = Arc<Extension>>,
     ) -> Result<Self, ExtensionRegistryError> {
-        let mut res = ExtensionRegistry(BTreeMap::new());
-
-        for ext in value.into_iter() {
-            res.register(ext)?;
-        }
+        let res = ExtensionRegistry::new(value);
 
         // Note this potentially asks extensions to validate themselves against other extensions that
         // may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
@@ -205,6 +218,28 @@ impl Extend<Arc<Extension>> for ExtensionRegistry {
     }
 }
 
+// Encode/decode ExtensionRegistry as a list of extensions.
+// We can get the map key from the extension itself.
+impl<'de> Deserialize<'de> for ExtensionRegistry {
+    fn deserialize<D>(deserializer: D) -> Result<ExtensionRegistry, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let extensions: Vec<Arc<Extension>> = Vec::deserialize(deserializer)?;
+        Ok(ExtensionRegistry::new(extensions))
+    }
+}
+
+impl Serialize for ExtensionRegistry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let extensions: Vec<Arc<Extension>> = self.0.values().cloned().collect();
+        extensions.serialize(serializer)
+    }
+}
+
 /// An Extension Registry containing no extensions.
 pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
 
@@ -226,7 +261,7 @@ pub enum SignatureError {
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
     /// The Extension Registry did not contain an Extension referenced by the Signature
-    #[error("Extension '{missing}' not found. Available extensions: {}",
+    #[error("Extension '{missing}' is not part of the declared HUGR extensions [{}]",
         available.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ")
     )]
     ExtensionNotFound {
@@ -614,7 +649,10 @@ pub enum ExtensionBuildError {
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, Display, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+#[display("[{}]", _0.iter().join(", "))]
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 /// A special ExtensionId which indicates that the delta of a non-Function
@@ -735,12 +773,6 @@ fn as_typevar(e: &ExtensionId) -> Option<usize> {
     match e.chars().next() {
         Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
         _ => None,
-    }
-}
-
-impl Display for ExtensionSet {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_list().entries(self.0.iter()).finish()
     }
 }
 
