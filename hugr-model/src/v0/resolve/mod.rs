@@ -29,17 +29,22 @@
 // and make the deduplication process respect this; or we should figure out a solution
 // on how to deal with this otherwise.
 
+use std::hash::BuildHasherDefault;
+
 use super::{
     ExtSetPart, LinkRef, ListPart, MetaItem, ModelError, Module, Node, NodeId, Operation, Param,
     RegionId, SymbolIntroError, SymbolRef, SymbolRefError, Term, TermId, VarIndex, VarRef,
     VarRefError,
 };
-use bitvec::vec::BitVec;
 use bumpalo::{collections::Vec as BumpVec, Bump};
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHasher};
 
 mod bindings;
 use bindings::Bindings;
+use indexmap::IndexMap;
+use std::collections::hash_map::Entry as HashMapEntry;
+
+type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
 /// Resolve all names in the module.
 ///
@@ -62,9 +67,6 @@ struct Resolver<'m, 'a> {
     /// The bump allocator to use for allocations.
     bump: &'a Bump,
 
-    /// Symbols that are visible in the current scope.
-    symbol_scope: Bindings<&'a str, RegionId, NodeId>,
-
     /// Map from symbol names to newly created import nodes.
     ///
     /// When a symbol can not be resolved, we create an import node to be added to the root region
@@ -75,22 +77,29 @@ struct Resolver<'m, 'a> {
     /// Variables that are visible in the current scope.
     var_scope: Bindings<&'a str, NodeId, VarIndex>,
 
-    // Links that are visible in the current scope.
-    // link_scope: Bindings<&'a str, RegionId, LinkId>,
-    /// Bit vector to keep track of visited terms so that we do not visit them multiple times.
-    term_visited: BitVec,
+    symbols: FxHashMap<&'a str, NodeId>,
+    node_data: FxIndexMap<NodeId, NodeData>,
+    region_data: FxIndexMap<RegionId, RegionData>,
+    term_data: FxHashMap<TermId, TermData>,
+}
+
+macro_rules! set_max {
+    ($name:ident, $e:expr) => {
+        $name = ::std::cmp::max($name, $e);
+    };
 }
 
 impl<'m, 'a> Resolver<'m, 'a> {
     fn new(module: &'m mut Module<'a>, bump: &'a Bump) -> Self {
         Self {
-            term_visited: BitVec::repeat(false, module.terms.len()),
+            node_data: FxIndexMap::default(),
+            region_data: FxIndexMap::default(),
+            term_data: FxHashMap::default(),
+            symbols: FxHashMap::default(),
             module,
             bump,
-            symbol_scope: Bindings::new(),
             var_scope: Bindings::new(),
             symbol_import: FxHashMap::default(),
-            // link_scope: Bindings::new(),
         }
     }
 
@@ -122,7 +131,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             self.resolve_term(signature)?;
         }
 
-        self.symbol_scope.enter(region);
+        self.enter_region(region);
 
         // In a first pass over the region's children, we resolve the symbols
         // that are defined by the nodes as well as the links in their inputs
@@ -136,11 +145,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 .clone();
 
             if let Some(name) = child_data.operation.symbol() {
-                self.symbol_scope
-                    .try_insert(name, *child)
-                    .map_err(|other| {
-                        SymbolIntroError::DuplicateSymbol(other, *child, name.to_string())
-                    })?;
+                self.introduce_symbol(name, *child)?;
             }
 
             child_data.inputs = self.resolve_links(child_data.inputs);
@@ -153,7 +158,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             self.resolve_node(*child)?;
         }
 
-        self.symbol_scope.exit();
+        self.exit_region();
         self.module.regions[region.index()] = region_data;
 
         Ok(())
@@ -236,7 +241,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             Operation::Custom { operation } => {
-                let operation = self.resolve_symbol_ref(operation)?;
+                let (operation, _) = self.resolve_symbol_ref(operation)?;
                 node_data.operation = Operation::Custom { operation };
 
                 for region in node_data.regions {
@@ -245,7 +250,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             Operation::CustomFull { operation } => {
-                let operation = self.resolve_symbol_ref(operation)?;
+                let (operation, _) = self.resolve_symbol_ref(operation)?;
                 node_data.operation = Operation::CustomFull { operation };
 
                 for region in node_data.regions {
@@ -306,13 +311,18 @@ impl<'m, 'a> Resolver<'m, 'a> {
     }
 
     fn resolve_terms(&mut self, terms: &'a [TermId]) -> Result<(), ModelError> {
-        terms.iter().try_for_each(|term| self.resolve_term(*term))
+        terms.iter().try_for_each(|term| {
+            self.resolve_term(*term)?;
+            Ok(())
+        })
     }
 
-    fn resolve_term(&mut self, term: TermId) -> Result<(), ModelError> {
-        // Mark the term as visited and short circuit if it has already been visited before.
-        if self.term_visited.replace(term.index(), true) {
-            return Ok(());
+    fn resolve_term(&mut self, term: TermId) -> Result<ScopeDepth, ModelError> {
+        if let Some(term_data) = self.term_data.get(&term) {
+            match self.region_data.get_full(&term_data.region) {
+                Some((scope_depth, _, _)) => return Ok(scope_depth),
+                None => panic!("this should be an error"),
+            }
         }
 
         let term_data = self
@@ -320,6 +330,8 @@ impl<'m, 'a> Resolver<'m, 'a> {
             .get_term(term)
             .ok_or_else(|| ModelError::TermNotFound(term))
             .copied()?;
+
+        let mut scope_depth = 0;
 
         match term_data {
             super::Term::Wildcard
@@ -338,58 +350,60 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 self.module.terms[term.index()] = Term::Var(local);
             }
 
-            super::Term::Apply {
-                symbol: global,
-                args,
-            } => {
-                let global = self.resolve_symbol_ref(global)?;
-                self.module.terms[term.index()] = Term::Apply {
-                    symbol: global,
-                    args,
-                };
+            super::Term::Apply { symbol, args } => {
+                let (symbol, symbol_depth) = self.resolve_symbol_ref(symbol)?;
+                self.module.terms[term.index()] = Term::Apply { symbol, args };
+                set_max!(scope_depth, symbol_depth);
 
                 for arg in args {
-                    self.resolve_term(*arg)?;
+                    set_max!(scope_depth, self.resolve_term(*arg)?);
                 }
             }
 
             super::Term::ApplyFull { symbol, args } => {
-                let symbol = self.resolve_symbol_ref(symbol)?;
+                let (symbol, symbol_depth) = self.resolve_symbol_ref(symbol)?;
                 self.module.terms[term.index()] = Term::ApplyFull { symbol, args };
+                set_max!(scope_depth, symbol_depth);
 
                 for arg in args {
-                    self.resolve_term(*arg)?;
+                    set_max!(scope_depth, self.resolve_term(*arg)?);
                 }
             }
 
             super::Term::Quote { r#type } => {
-                self.resolve_term(r#type)?;
+                set_max!(scope_depth, self.resolve_term(r#type)?);
             }
 
             super::Term::List { parts } => {
                 for part in parts {
-                    match part {
-                        ListPart::Item(term) => self.resolve_term(*term)?,
-                        ListPart::Splice(term) => self.resolve_term(*term)?,
-                    }
+                    set_max!(
+                        scope_depth,
+                        match part {
+                            ListPart::Item(term) => self.resolve_term(*term)?,
+                            ListPart::Splice(term) => self.resolve_term(*term)?,
+                        }
+                    );
                 }
             }
 
             super::Term::ListType { item_type } => {
-                self.resolve_term(item_type)?;
+                set_max!(scope_depth, self.resolve_term(item_type)?);
             }
 
             super::Term::ExtSet { parts } => {
                 for part in parts {
-                    match part {
-                        ExtSetPart::Extension(_) => {}
-                        ExtSetPart::Splice(term) => self.resolve_term(*term)?,
-                    }
+                    set_max!(
+                        scope_depth,
+                        match part {
+                            ExtSetPart::Extension(_) => 0,
+                            ExtSetPart::Splice(term) => self.resolve_term(*term)?,
+                        }
+                    );
                 }
             }
 
             super::Term::Adt { variants } => {
-                self.resolve_term(variants)?;
+                set_max!(scope_depth, self.resolve_term(variants)?);
             }
 
             super::Term::FuncType {
@@ -397,21 +411,23 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 outputs,
                 extensions,
             } => {
-                self.resolve_term(inputs)?;
-                self.resolve_term(outputs)?;
-                self.resolve_term(extensions)?;
+                set_max!(scope_depth, self.resolve_term(inputs)?);
+                set_max!(scope_depth, self.resolve_term(outputs)?);
+                set_max!(scope_depth, self.resolve_term(extensions)?);
             }
 
             super::Term::Control { values } => {
-                self.resolve_term(values)?;
+                set_max!(scope_depth, self.resolve_term(values)?);
             }
 
             super::Term::NonLinearConstraint { term } => {
-                self.resolve_term(term)?;
+                set_max!(scope_depth, self.resolve_term(term)?);
             }
-        }
+        };
 
-        Ok(())
+        let (region, _) = self.region_data.get_index(scope_depth as _).unwrap();
+        self.term_data.insert(term, TermData { region: *region });
+        Ok(scope_depth)
     }
 
     fn resolve_var_ref(&self, local_ref: VarRef<'a>) -> Result<VarRef<'a>, VarRefError> {
@@ -437,22 +453,30 @@ impl<'m, 'a> Resolver<'m, 'a> {
         }
     }
 
-    fn resolve_symbol_ref(&mut self, symbol_ref: SymbolRef<'a>) -> Result<SymbolRef<'a>, Error> {
+    fn resolve_symbol_ref(
+        &mut self,
+        symbol_ref: SymbolRef<'a>,
+    ) -> Result<(SymbolRef<'a>, ScopeDepth), Error> {
         match symbol_ref {
             SymbolRef::Direct(node) => {
-                // Check whether the global is visible at this point.
-                if self.symbol_scope.get_key_by_value(node).is_none() {
+                let node_data = self
+                    .node_data
+                    .get(&node)
+                    .ok_or(SymbolRefError::NotVisible(node))?;
+
+                if node_data.shadowed {
                     return Err(SymbolRefError::NotVisible(node).into());
                 }
 
-                Ok(symbol_ref)
+                Ok((symbol_ref, node_data.scope_depth))
             }
             SymbolRef::Named(name) => {
-                if let Some(node) = self.symbol_scope.get_value_by_key(name) {
-                    return Ok(SymbolRef::Direct(node));
+                if let Some(node) = self.symbols.get(name) {
+                    let node_data = self.node_data.get(node).unwrap();
+                    return Ok((SymbolRef::Direct(*node), node_data.scope_depth));
                 }
 
-                Ok(SymbolRef::Direct(self.make_symbol_import(name)))
+                Ok((SymbolRef::Direct(self.make_symbol_import(name)), 0))
             }
         }
     }
@@ -473,7 +497,8 @@ impl<'m, 'a> Resolver<'m, 'a> {
     }
 
     fn resolve_meta(&mut self, meta_item: &'a MetaItem<'a>) -> Result<(), Error> {
-        self.resolve_term(meta_item.value)
+        self.resolve_term(meta_item.value)?;
+        Ok(())
     }
 
     fn add_imports_to_root(&mut self) {
@@ -492,6 +517,86 @@ impl<'m, 'a> Resolver<'m, 'a> {
         children.extend(root_region.children.iter().copied());
         root_region.children = children.into_bump_slice();
     }
+
+    fn enter_region(&mut self, region: RegionId) {
+        let region_data = RegionData { binding_count: 0 };
+        self.region_data.insert(region, region_data);
+    }
+
+    fn exit_region(&mut self) {
+        let (_, region_data) = self.region_data.pop().unwrap();
+
+        for _ in 0..region_data.binding_count {
+            let (node, node_data) = self.node_data.pop().unwrap();
+            let name = self.module.symbol_name(SymbolRef::Direct(node)).unwrap();
+
+            if let Some(shadows) = node_data.shadows {
+                let shadows_data = self.node_data.get_mut(&shadows).unwrap();
+                shadows_data.shadowed = false;
+                self.symbols.insert(name, shadows);
+            } else {
+                self.symbols.remove(name);
+            }
+        }
+    }
+
+    fn introduce_symbol(&mut self, name: &'a str, node: NodeId) -> Result<(), SymbolIntroError> {
+        let mut region_entry = self.region_data.last_entry().unwrap();
+
+        let shadows = match self.symbols.entry(name) {
+            HashMapEntry::Occupied(mut entry) => {
+                let shadows = *entry.get();
+                let shadows_data = self.node_data.get_mut(&shadows).unwrap();
+
+                if shadows_data.scope_depth == region_entry.index() {
+                    return Err(SymbolIntroError::DuplicateSymbol(
+                        node,
+                        shadows,
+                        name.to_string(),
+                    ));
+                }
+
+                shadows_data.shadowed = true;
+                entry.insert(node);
+                Some(shadows)
+            }
+            HashMapEntry::Vacant(entry) => {
+                entry.insert(node);
+                None
+            }
+        };
+
+        region_entry.get_mut().binding_count += 1;
+
+        self.node_data.insert(
+            node,
+            NodeData {
+                scope_depth: region_entry.index(),
+                shadows,
+                shadowed: false,
+            },
+        );
+
+        Ok(())
+    }
 }
 
 type Error = ModelError;
+type ScopeDepth = usize;
+
+#[derive(Debug, Clone, Copy)]
+struct TermData {
+    region: RegionId,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NodeData {
+    scope_depth: ScopeDepth,
+    shadows: Option<NodeId>,
+    shadowed: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RegionData {
+    binding_count: u32,
+}

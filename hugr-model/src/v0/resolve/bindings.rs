@@ -13,12 +13,30 @@ type BindingIndex = usize;
 type ScopeIndex = usize;
 
 #[derive(Debug, Clone, Copy)]
-struct Binding<K, V> {
-    name: K,
+pub struct Binding<K, V> {
+    key: K,
     value: V,
     scope: ScopeIndex,
     shadows: BindingIndex,
     shadowed: bool,
+}
+
+impl<K, V> Binding<K, V>
+where
+    K: Copy,
+    V: Copy,
+{
+    pub fn key(&self) -> K {
+        self.key
+    }
+
+    pub fn value(&self) -> V {
+        self.value
+    }
+
+    pub fn scope(&self) -> ScopeIndex {
+        self.scope
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,26 +61,34 @@ where
         }
     }
 
-    pub fn get_value_by_key(&self, key: K) -> Option<V> {
+    pub fn get_by_key(&self, key: K) -> Option<&Binding<K, V>> {
         let binding_index = *self.key_to_binding.get(&key)?;
-        let binding = self.bindings[binding_index];
+        let binding = &self.bindings[binding_index];
 
         if binding.shadowed || binding.scope < self.isolation_depth() {
             None
         } else {
-            Some(binding.value)
+            Some(binding)
         }
     }
 
-    pub fn get_key_by_value(&self, value: V) -> Option<K> {
+    pub fn get_by_value(&self, value: V) -> Option<&Binding<K, V>> {
         let binding_index = *self.value_to_binding.get(&value)?;
-        let binding = self.bindings[binding_index];
+        let binding = &self.bindings[binding_index];
 
         if binding.shadowed || binding.scope < self.isolation_depth() {
             None
         } else {
-            Some(binding.name)
+            Some(binding)
         }
+    }
+
+    pub fn get_value_by_key(&self, key: K) -> Option<V> {
+        Some(self.get_by_key(key)?.value)
+    }
+
+    pub fn get_key_by_value(&self, value: V) -> Option<K> {
+        Some(self.get_by_value(value)?.key)
     }
 
     pub fn try_insert(&mut self, key: K, value: V) -> Result<(), V> {
@@ -95,7 +121,7 @@ where
         self.value_to_binding.insert(value, self.bindings.len());
 
         self.bindings.push(Binding {
-            name: key,
+            key,
             value,
             scope,
             shadows,
@@ -134,12 +160,12 @@ where
 
             if let Some(shadows) = self.bindings.get_mut(binding.shadows) {
                 debug_assert!(shadows.shadowed);
-                debug_assert!(shadows.name == binding.name);
+                debug_assert!(shadows.key == binding.key);
                 shadows.shadowed = false;
-                self.key_to_binding.insert(shadows.name, binding.shadows);
+                self.key_to_binding.insert(shadows.key, binding.shadows);
                 self.value_to_binding.insert(shadows.value, binding.shadows);
             } else {
-                self.key_to_binding.remove(&binding.name);
+                self.key_to_binding.remove(&binding.key);
             }
         }
 

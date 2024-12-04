@@ -280,7 +280,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "graphviz", specifier = ">=0.20.3" },
-    { name = "pydantic", specifier = ">=2.8,<2.10" },
+    { name = "pydantic", specifier = ">=2.8,<2.11" },
     { name = "pydantic-extra-types", specifier = ">=2.9.0" },
     { name = "semver", specifier = ">=3.0.2" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=8.0.2,<9.0.0" },
