@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::collections::hash_map::RandomState;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -1430,7 +1431,7 @@ fn test_via_part_unknown_tuple() {
     constant_fold_pass(&mut hugr, &TEST_REG);
 
     // We expect: root dfg, input, output, const 9, load constant, iadd
-    let mut expected_op_tags: HashSet<_, std::hash::RandomState> = [
+    let mut expected_op_tags: HashSet<_, RandomState> = [
         OpTag::Dfg,
         OpTag::Input,
         OpTag::Output,
