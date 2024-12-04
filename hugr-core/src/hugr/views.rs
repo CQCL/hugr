@@ -1,6 +1,7 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 pub mod descendants;
+mod impls;
 pub mod petgraph;
 pub mod render;
 mod root_checked;
@@ -10,8 +11,6 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
-use std::iter::Map;
-
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
@@ -19,10 +18,9 @@ pub use root_checked::RootChecked;
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
-use itertools::{Itertools, MapInto};
+use itertools::Itertools;
 use portgraph::render::{DotFormat, MermaidFormat};
-use portgraph::{multiportgraph, LinkView, PortView};
+use portgraph::{LinkView, PortView};
 
 use super::internal::HugrInternals;
 use super::{
@@ -40,36 +38,6 @@ use itertools::Either;
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
 pub trait HugrView: HugrInternals {
-    /// An Iterator over the nodes in a Hugr(View)
-    type Nodes<'a>: Iterator<Item = Node>
-    where
-        Self: 'a;
-
-    /// An Iterator over (some or all) ports of a node
-    type NodePorts<'a>: Iterator<Item = Port>
-    where
-        Self: 'a;
-
-    /// An Iterator over the children of a node
-    type Children<'a>: Iterator<Item = Node>
-    where
-        Self: 'a;
-
-    /// An Iterator over (some or all) the nodes neighbouring a node
-    type Neighbours<'a>: Iterator<Item = Node>
-    where
-        Self: 'a;
-
-    /// Iterator over the children of a node
-    type PortLinks<'a>: Iterator<Item = (Node, Port)>
-    where
-        Self: 'a;
-
-    /// Iterator over the links between two nodes.
-    type NodeConnections<'a>: Iterator<Item = [Port; 2]>
-    where
-        Self: 'a;
-
     /// Return the root node of this view.
     #[inline]
     fn root(&self) -> Node {
@@ -147,16 +115,16 @@ pub trait HugrView: HugrInternals {
     fn edge_count(&self) -> usize;
 
     /// Iterates over the nodes in the port graph.
-    fn nodes(&self) -> Self::Nodes<'_>;
+    fn nodes(&self) -> impl Iterator<Item = Node> + Clone;
 
     /// Iterator over ports of node in a given direction.
-    fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_>;
+    fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone;
 
     /// Iterator over output ports of node.
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`
     /// but preserves knowledge that the ports are [OutgoingPort]s.
     #[inline]
-    fn node_outputs(&self, node: Node) -> OutgoingPorts<Self::NodePorts<'_>> {
+    fn node_outputs(&self, node: Node) -> impl Iterator<Item = OutgoingPort> + Clone {
         self.node_ports(node, Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
     }
@@ -165,16 +133,20 @@ pub trait HugrView: HugrInternals {
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`
     /// but preserves knowledge that the ports are [IncomingPort]s.
     #[inline]
-    fn node_inputs(&self, node: Node) -> IncomingPorts<Self::NodePorts<'_>> {
+    fn node_inputs(&self, node: Node) -> impl Iterator<Item = IncomingPort> + Clone {
         self.node_ports(node, Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
     }
 
     /// Iterator over both the input and output ports of node.
-    fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_>;
+    fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone;
 
     /// Iterator over the nodes and ports connected to a port.
-    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
+    fn linked_ports(
+        &self,
+        node: Node,
+        port: impl Into<Port>,
+    ) -> impl Iterator<Item = (Node, Port)> + Clone;
 
     /// Iterator over all the nodes and ports connected to a node in a given direction.
     fn all_linked_ports(
@@ -245,7 +217,7 @@ pub trait HugrView: HugrInternals {
         &self,
         node: Node,
         port: impl Into<IncomingPort>,
-    ) -> OutgoingNodePorts<Self::PortLinks<'_>> {
+    ) -> impl Iterator<Item = (Node, OutgoingPort)> {
         self.linked_ports(node, port.into())
             .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
@@ -257,13 +229,13 @@ pub trait HugrView: HugrInternals {
         &self,
         node: Node,
         port: impl Into<OutgoingPort>,
-    ) -> IncomingNodePorts<Self::PortLinks<'_>> {
+    ) -> impl Iterator<Item = (Node, IncomingPort)> {
         self.linked_ports(node, port.into())
             .map(|(n, p)| (n, p.as_incoming().unwrap()))
     }
 
     /// Iterator the links between two nodes.
-    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
+    fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone;
 
     /// Returns whether a port is connected.
     fn is_linked(&self, node: Node, port: impl Into<Port>) -> bool {
@@ -288,28 +260,34 @@ pub trait HugrView: HugrInternals {
     }
 
     /// Return iterator over the direct children of node.
-    fn children(&self, node: Node) -> Self::Children<'_>;
+    fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone;
+
+    /// Returns the first child of the specified node (if it is a parent).
+    /// Useful because `x.children().next()` leaves x borrowed.
+    fn first_child(&self, node: Node) -> Option<Node> {
+        self.children(node).next()
+    }
 
     /// Iterates over neighbour nodes in the given direction.
     /// May contain duplicates if the graph has multiple links between nodes.
-    fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_>;
+    fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone;
 
     /// Iterates over the input neighbours of the `node`.
     /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Incoming)`.
     #[inline]
-    fn input_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
+    fn input_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.neighbours(node, Direction::Incoming)
     }
 
     /// Iterates over the output neighbours of the `node`.
     /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Outgoing)`.
     #[inline]
-    fn output_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
+    fn output_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.neighbours(node, Direction::Outgoing)
     }
 
     /// Iterates over the input and output neighbours of the `node` in sequence.
-    fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
+    fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone;
 
     /// Get the input and output child nodes of a dataflow parent.
     /// If the node isn't a dataflow parent, then return None
@@ -469,18 +447,6 @@ pub trait HugrView: HugrInternals {
     }
 }
 
-/// Wraps an iterator over [Port]s that are known to be [OutgoingPort]s
-pub type OutgoingPorts<I> = Map<I, fn(Port) -> OutgoingPort>;
-
-/// Wraps an iterator over [Port]s that are known to be [IncomingPort]s
-pub type IncomingPorts<I> = Map<I, fn(Port) -> IncomingPort>;
-
-/// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [OutgoingPort]s
-pub type OutgoingNodePorts<I> = Map<I, fn((Node, Port)) -> (Node, OutgoingPort)>;
-
-/// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [IncomingPort]s
-pub type IncomingNodePorts<I> = Map<I, fn((Node, Port)) -> (Node, IncomingPort)>;
-
 /// Trait for views that provides a guaranteed bound on the type of the root node.
 pub trait RootTagged: HugrView {
     /// The kind of handle that can be used to refer to the root node.
@@ -554,120 +520,84 @@ impl ExtractHugr for &mut Hugr {
     }
 }
 
-impl<T: AsRef<Hugr>> HugrView for T {
-    /// An Iterator over the nodes in a Hugr(View)
-    type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
-
-    /// An Iterator over (some or all) ports of a node
-    type NodePorts<'a> = MapInto<portgraph::portgraph::NodePortOffsets, Port> where Self: 'a;
-
-    /// An Iterator over the children of a node
-    type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node> where Self: 'a;
-
-    /// An Iterator over (some or all) the nodes neighbouring a node
-    type Neighbours<'a> = MapInto<multiportgraph::Neighbours<'a>, Node> where Self: 'a;
-
-    /// Iterator over the children of a node
-    type PortLinks<'a> = MapWithCtx<multiportgraph::PortLinks<'a>, &'a Hugr, (Node, Port)>
-    where
-        Self: 'a;
-
-    type NodeConnections<'a> = MapWithCtx<multiportgraph::NodeConnections<'a>,&'a Hugr, [Port; 2]> where Self: 'a;
-
+impl HugrView for Hugr {
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.as_ref().graph.contains_node(node.pg_index())
+        self.graph.contains_node(node.pg_index())
     }
 
     #[inline]
     fn node_count(&self) -> usize {
-        self.as_ref().graph.node_count()
+        self.graph.node_count()
     }
 
     #[inline]
     fn edge_count(&self) -> usize {
-        self.as_ref().graph.link_count()
+        self.graph.link_count()
     }
 
     #[inline]
-    fn nodes(&self) -> Self::Nodes<'_> {
-        self.as_ref().graph.nodes_iter().map_into()
+    fn nodes(&self) -> impl Iterator<Item = Node> + Clone {
+        self.graph.nodes_iter().map_into()
     }
 
     #[inline]
-    fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.as_ref()
-            .graph
-            .port_offsets(node.pg_index(), dir)
-            .map_into()
+    fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
+        self.graph.port_offsets(node.pg_index(), dir).map_into()
     }
 
     #[inline]
-    fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.as_ref()
-            .graph
-            .all_port_offsets(node.pg_index())
-            .map_into()
+    fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
+        self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
     #[inline]
-    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
+    fn linked_ports(
+        &self,
+        node: Node,
+        port: impl Into<Port>,
+    ) -> impl Iterator<Item = (Node, Port)> + Clone {
         let port = port.into();
-        let hugr = self.as_ref();
-        let port = hugr
+
+        let port = self
             .graph
             .port_index(node.pg_index(), port.pg_offset())
             .unwrap();
-        hugr.graph
-            .port_links(port)
-            .with_context(hugr)
-            .map_with_context(|(_, link), hugr| {
-                let port = link.port();
-                let node = hugr.graph.port_node(port).unwrap();
-                let offset = hugr.graph.port_offset(port).unwrap();
-                (node.into(), offset.into())
-            })
+        self.graph.port_links(port).map(|(_, link)| {
+            let port = link.port();
+            let node = self.graph.port_node(port).unwrap();
+            let offset = self.graph.port_offset(port).unwrap();
+            (node.into(), offset.into())
+        })
     }
 
     #[inline]
-    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
-        let hugr = self.as_ref();
-
-        hugr.graph
+    fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
+        self.graph
             .get_connections(node.pg_index(), other.pg_index())
-            .with_context(hugr)
-            .map_with_context(|(p1, p2), hugr| {
-                [p1, p2].map(|link| {
-                    let offset = hugr.graph.port_offset(link.port()).unwrap();
-                    offset.into()
-                })
+            .map(|(p1, p2)| {
+                [p1, p2].map(|link| self.graph.port_offset(link.port()).unwrap().into())
             })
     }
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.as_ref().graph.num_ports(node.pg_index(), dir)
+        self.graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
-    fn children(&self, node: Node) -> Self::Children<'_> {
-        self.as_ref().hierarchy.children(node.pg_index()).map_into()
+    fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
+        self.hierarchy.children(node.pg_index()).map_into()
     }
 
     #[inline]
-    fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.as_ref()
-            .graph
-            .neighbours(node.pg_index(), dir)
-            .map_into()
+    fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
+        self.graph.neighbours(node.pg_index(), dir).map_into()
     }
 
     #[inline]
-    fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.as_ref()
-            .graph
-            .all_neighbours(node.pg_index())
-            .map_into()
+    fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
+        self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
 

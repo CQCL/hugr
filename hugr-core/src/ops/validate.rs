@@ -351,21 +351,21 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::{Noop, USIZE_T};
+    use crate::extension::prelude::{usize_t, Noop};
+    use crate::ops;
     use crate::ops::dataflow::IOTrait;
-    use crate::{ops, type_row};
     use cool_asserts::assert_matches;
 
     use super::*;
 
     #[test]
     fn test_validate_io_nodes() {
-        let in_types: TypeRow = type_row![USIZE_T];
-        let out_types: TypeRow = type_row![USIZE_T, USIZE_T];
+        let in_types: TypeRow = vec![usize_t()].into();
+        let out_types: TypeRow = vec![usize_t(), usize_t()].into();
 
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
-        let leaf_node = Noop(USIZE_T).into();
+        let leaf_node = Noop(usize_t()).into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![

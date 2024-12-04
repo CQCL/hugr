@@ -1,5 +1,7 @@
 //! Prelude extension - available in all contexts, defining common types,
 //! operations and constants.
+use std::sync::{Arc, Weak};
+
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
@@ -25,6 +27,10 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use super::ExtensionRegistry;
 
+mod unwrap_builder;
+
+pub use unwrap_builder::UnwrapBuilder;
+
 /// Array type and operations.
 pub mod array;
 pub use array::{array_type, new_array_op, ArrayOp, ArrayOpDef, ARRAY_TYPE_NAME, NEW_ARRAY_OP_ID};
@@ -34,99 +40,129 @@ pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 lazy_static! {
-    static ref PRELUDE_DEF: Extension = {
-        let mut prelude = Extension::new(PRELUDE_ID, VERSION);
-        prelude
-            .add_type(
-                TypeName::new_inline("usize"),
-                vec![],
-                "usize".into(),
-                TypeDefBound::copyable(),
-            )
-            .unwrap();
-        prelude.add_type(
-                STRING_TYPE_NAME,
-                vec![],
-                "string".into(),
-                TypeDefBound::copyable(),
-            )
-            .unwrap();
-        prelude.add_op(
-            PRINT_OP_ID,
-            "Print the string to standard output".to_string(),
-            Signature::new(type_row![STRING_TYPE], type_row![]),
-            )
-            .unwrap();
-        prelude.add_type(
-                TypeName::new_inline(ARRAY_TYPE_NAME),
-                vec![ TypeParam::max_nat(), TypeBound::Any.into()],
-                "array".into(),
-                TypeDefBound::from_params(vec![1] ),
-            )
-            .unwrap();
+    /// Prelude extension, containing common types and operations.
+    pub static ref PRELUDE: Arc<Extension> = {
+        Extension::new_arc(PRELUDE_ID, VERSION, |prelude, extension_ref| {
 
-        prelude
-            .add_type(
-                TypeName::new_inline("qubit"),
-                vec![],
-                "qubit".into(),
-                TypeDefBound::any(),
-            )
-            .unwrap();
-        prelude
-        .add_type(
-            ERROR_TYPE_NAME,
-            vec![],
-            "Simple opaque error type.".into(),
-            TypeDefBound::copyable(),
-        )
-        .unwrap();
+            // Construct the list and error types using the passed extension
+            // reference.
+            //
+            // If we tried to use `string_type()` or `error_type()` directly it
+            // would try to access the `PRELUDE` lazy static recursively,
+            // causing a deadlock.
+            let string_type: Type = string_custom_type(extension_ref).into();
+            let error_type: CustomType = error_custom_type(extension_ref);
 
+            prelude
+                .add_type(
+                    TypeName::new_inline("usize"),
+                    vec![],
+                    "usize".into(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude.add_type(
+                    STRING_TYPE_NAME,
+                    vec![],
+                    "string".into(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude.add_op(
+                    PRINT_OP_ID,
+                    "Print the string to standard output".to_string(),
+                    Signature::new(vec![string_type], type_row![]),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude.add_type(
+                    TypeName::new_inline(ARRAY_TYPE_NAME),
+                    vec![ TypeParam::max_nat(), TypeBound::Any.into()],
+                    "array".into(),
+                    TypeDefBound::from_params(vec![1] ),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude
+                .add_type(
+                    TypeName::new_inline("qubit"),
+                    vec![],
+                    "qubit".into(),
+                    TypeDefBound::any(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude
+                .add_type(
+                    ERROR_TYPE_NAME,
+                    vec![],
+                    "Simple opaque error type.".into(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude
+                .add_op(
+                    PANIC_OP_ID,
+                    "Panic with input error".to_string(),
+                    PolyFuncTypeRV::new(
+                        [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                        FuncValueType::new(
+                            vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                            vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                        ),
+                    ),
+                    extension_ref,
+                )
+                .unwrap();
 
-        prelude
-        .add_op(
-            PANIC_OP_ID,
-            "Panic with input error".to_string(),
-            PolyFuncTypeRV::new(
-                [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
-                FuncValueType::new(
-                    vec![TypeRV::new_extension(ERROR_CUSTOM_TYPE), TypeRV::new_row_var_use(0, TypeBound::Any)],
-                    vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
-                ),
-            ),
-        )
-        .unwrap();
-
-        TupleOpDef::load_all_ops(&mut prelude).unwrap();
-        NoopDef.add_to_extension(&mut prelude).unwrap();
-        LiftDef.add_to_extension(&mut prelude).unwrap();
-        array::ArrayOpDef::load_all_ops(&mut prelude).unwrap();
-        prelude
+            TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
+            NoopDef.add_to_extension(prelude, extension_ref).unwrap();
+            LiftDef.add_to_extension(prelude, extension_ref).unwrap();
+            array::ArrayOpDef::load_all_ops(prelude, extension_ref).unwrap();
+            array::ArrayScanDef.add_to_extension(prelude, extension_ref).unwrap();
+        })
     };
+
     /// An extension registry containing only the prelude
     pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
-        ExtensionRegistry::try_new([PRELUDE_DEF.to_owned()]).unwrap();
-
-    /// Prelude extension
-    pub static ref PRELUDE: &'static Extension = PRELUDE_REGISTRY.get(&PRELUDE_ID).unwrap();
-
+        ExtensionRegistry::try_new([PRELUDE.clone()]).unwrap();
 }
 
-pub(crate) const USIZE_CUSTOM_T: CustomType = CustomType::new_simple(
-    TypeName::new_inline("usize"),
-    PRELUDE_ID,
-    TypeBound::Copyable,
-);
+pub(crate) fn usize_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
+    CustomType::new(
+        TypeName::new_inline("usize"),
+        vec![],
+        PRELUDE_ID,
+        TypeBound::Copyable,
+        extension_ref,
+    )
+}
 
-pub(crate) const QB_CUSTOM_T: CustomType =
-    CustomType::new_simple(TypeName::new_inline("qubit"), PRELUDE_ID, TypeBound::Any);
+pub(crate) fn qb_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
+    CustomType::new(
+        TypeName::new_inline("qubit"),
+        vec![],
+        PRELUDE_ID,
+        TypeBound::Any,
+        extension_ref,
+    )
+}
 
 /// Qubit type.
-pub const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
+pub fn qb_t() -> Type {
+    qb_custom_t(&Arc::downgrade(&PRELUDE)).into()
+}
 /// Unsigned size type.
-pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
+pub fn usize_t() -> Type {
+    usize_custom_t(&Arc::downgrade(&PRELUDE)).into()
+}
 /// Boolean type - Sum of two units.
-pub const BOOL_T: Type = Type::new_unit_sum(2);
+pub fn bool_t() -> Type {
+    Type::new_unit_sum(2)
+}
 
 /// Name of the prelude panic operation.
 ///
@@ -143,11 +179,23 @@ pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 pub const STRING_TYPE_NAME: TypeName = TypeName::new_inline("string");
 
 /// Custom type for strings.
-pub const STRING_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(STRING_TYPE_NAME, PRELUDE_ID, TypeBound::Copyable);
+///
+/// Receives a reference to the prelude extensions as a parameter.
+/// This avoids deadlocks when we are in the process of creating the prelude.
+fn string_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
+    CustomType::new(
+        STRING_TYPE_NAME,
+        vec![],
+        PRELUDE_ID,
+        TypeBound::Copyable,
+        extension_ref,
+    )
+}
 
 /// String type.
-pub const STRING_TYPE: Type = Type::new_extension(STRING_CUSTOM_TYPE);
+pub fn string_type() -> Type {
+    string_custom_type(&Arc::downgrade(&PRELUDE)).into()
+}
 
 #[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant string values.
@@ -180,7 +228,7 @@ impl CustomConst for ConstString {
     }
 
     fn get_type(&self) -> Type {
-        STRING_TYPE
+        string_type()
     }
 }
 
@@ -188,17 +236,30 @@ impl CustomConst for ConstString {
 pub const PRINT_OP_ID: OpName = OpName::new_inline("print");
 
 /// The custom type for Errors.
-pub const ERROR_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(ERROR_TYPE_NAME, PRELUDE_ID, TypeBound::Copyable);
+///
+/// Receives a reference to the prelude extensions as a parameter.
+/// This avoids deadlocks when we are in the process of creating the prelude.
+fn error_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
+    CustomType::new(
+        ERROR_TYPE_NAME,
+        vec![],
+        PRELUDE_ID,
+        TypeBound::Copyable,
+        extension_ref,
+    )
+}
+
 /// Unspecified opaque error type.
-pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
+pub fn error_type() -> Type {
+    error_custom_type(&Arc::downgrade(&PRELUDE)).into()
+}
 
 /// The string name of the error type.
 pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the second variant as the given type and the first an Error.
 pub fn sum_with_error(ty: impl Into<TypeRowRV>) -> SumType {
-    either_type(ERROR_TYPE, ty)
+    either_type(error_type(), ty)
 }
 
 /// An optional type, i.e. a Sum type with the second variant as the given type and the first as an empty tuple.
@@ -360,7 +421,7 @@ impl CustomConst for ConstUsize {
     }
 
     fn get_type(&self) -> Type {
-        USIZE_T
+        usize_t()
     }
 }
 
@@ -405,7 +466,7 @@ impl CustomConst for ConstError {
         ExtensionSet::singleton(&PRELUDE_ID)
     }
     fn get_type(&self) -> Type {
-        ERROR_TYPE
+        error_type()
     }
 }
 
@@ -495,7 +556,7 @@ impl ConstFold for TupleOpDef {
     }
 }
 impl MakeOpDef for TupleOpDef {
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let rv = TypeRV::new_row_var_use(0, TypeBound::Any);
         let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
 
@@ -520,11 +581,15 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
         PRELUDE_ID.to_owned()
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
@@ -677,7 +742,7 @@ impl std::str::FromStr for NoopDef {
     }
 }
 impl MakeOpDef for NoopDef {
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let tv = Type::new_var_use(0, TypeBound::Any);
         PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(tv)).into()
     }
@@ -687,11 +752,15 @@ impl MakeOpDef for NoopDef {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
         PRELUDE_ID.to_owned()
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
@@ -783,7 +852,7 @@ impl std::str::FromStr for LiftDef {
 }
 
 impl MakeOpDef for LiftDef {
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
             FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))
@@ -797,11 +866,15 @@ impl MakeOpDef for LiftDef {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name(), op_def.extension())
+        try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
         PRELUDE_ID.to_owned()
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
@@ -886,7 +959,8 @@ impl MakeRegisteredOp for Lift {
 mod test {
     use crate::builder::inout_sig;
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
-    use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
+    use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+    use crate::utils::test_quantum_extension;
     use crate::{
         builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
@@ -964,14 +1038,14 @@ mod test {
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array() {
         let mut b = DFGBuilder::new(inout_sig(
-            vec![QB_T, QB_T],
-            array_type(TypeArg::BoundedNat { n: 2 }, QB_T),
+            vec![qb_t(), qb_t()],
+            array_type(TypeArg::BoundedNat { n: 2 }, qb_t()),
         ))
         .unwrap();
 
         let [q1, q2] = b.input_wires_arr();
 
-        let op = new_array_op(QB_T, 2);
+        let op = new_array_op(qb_t(), 2);
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
@@ -980,9 +1054,9 @@ mod test {
 
     #[test]
     fn test_option() {
-        let typ: Type = option_type(BOOL_T).into();
+        let typ: Type = option_type(bool_t()).into();
         let const_val1 = const_some(Value::true_val());
-        let const_val2 = const_none(BOOL_T);
+        let const_val2 = const_none(bool_t());
 
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![typ.clone(), typ])).unwrap();
 
@@ -994,9 +1068,9 @@ mod test {
 
     #[test]
     fn test_result() {
-        let typ: Type = either_type(BOOL_T, FLOAT64_TYPE).into();
-        let const_bool = const_left(Value::true_val(), FLOAT64_TYPE);
-        let const_float = const_right(BOOL_T, ConstF64::new(0.5).into());
+        let typ: Type = either_type(bool_t(), float64_type()).into();
+        let const_bool = const_left(Value::true_val(), float64_type());
+        let const_float = const_right(bool_t(), ConstF64::new(0.5).into());
 
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![typ.clone(), typ])).unwrap();
 
@@ -1017,7 +1091,7 @@ mod test {
             .unwrap();
 
         let ext_type = Type::new_extension(ext_def);
-        assert_eq!(ext_type, ERROR_TYPE);
+        assert_eq!(ext_type, error_type());
 
         let error_val = ConstError::new(2, "my message");
 
@@ -1054,9 +1128,9 @@ mod test {
     /// test the panic operation with input and output wires
     fn test_panic_with_io() {
         let error_val = ConstError::new(42, "PANIC");
-        const TYPE_ARG_Q: TypeArg = TypeArg::Type { ty: QB_T };
+        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
         let type_arg_2q: TypeArg = TypeArg::Sequence {
-            elems: vec![TYPE_ARG_Q, TYPE_ARG_Q],
+            elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE
             .instantiate_extension_op(
@@ -1066,7 +1140,7 @@ mod test {
             )
             .unwrap();
 
-        let mut b = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T])).unwrap();
+        let mut b = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()])).unwrap();
         let [q0, q1] = b.input_wires_arr();
         let [q0, q1] = b
             .add_dataflow_op(cx_gate(), [q0, q1])
@@ -1077,7 +1151,8 @@ mod test {
             .add_dataflow_op(panic_op, [err, q0, q1])
             .unwrap()
             .outputs_arr();
-        b.finish_prelude_hugr_with_outputs([q0, q1]).unwrap();
+        b.finish_hugr_with_outputs([q0, q1], &test_quantum_extension::REG)
+            .unwrap();
     }
 
     #[test]
@@ -1088,8 +1163,8 @@ mod test {
             .unwrap()
             .instantiate([])
             .unwrap();
-        let string_type: Type = Type::new_extension(string_custom_type);
-        assert_eq!(string_type, STRING_TYPE);
+        let string_ty: Type = Type::new_extension(string_custom_type);
+        assert_eq!(string_ty, string_type());
         let string_const: ConstString = ConstString::new("Lorem ipsum".into());
         assert_eq!(string_const.name(), "ConstString(\"Lorem ipsum\")");
         assert!(string_const.validate().is_ok());
@@ -1126,7 +1201,7 @@ mod test {
         );
         assert!(subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("bar", Type::UNIT, false)));
-        assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", STRING_TYPE, false)));
+        assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", string_type(), false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, true)));
 
         assert!(ConstExternalSymbol::new("", Type::UNIT, true)

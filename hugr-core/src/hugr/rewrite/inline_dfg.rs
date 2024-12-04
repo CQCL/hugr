@@ -136,7 +136,7 @@ mod test {
         endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         SubContainer,
     };
-    use crate::extension::prelude::QB_T;
+    use crate::extension::prelude::qb_t;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
@@ -208,7 +208,7 @@ mod test {
 
         // Sanity checks
         assert_eq!(
-            outer.children(inner.node()).len(),
+            outer.children(inner.node()).count(),
             if nonlocal { 3 } else { 6 }
         ); // Input, Output, add; + const, load_const, lift
         assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
@@ -217,7 +217,7 @@ mod test {
             outer.get_parent(outer.get_parent(add).unwrap()),
             outer.get_parent(sub)
         );
-        assert_eq!(outer.nodes().len(), 11); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
+        assert_eq!(outer.nodes().count(), 11); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
         {
             // Check we can't inline the outer DFG
             let mut h = outer.clone();
@@ -230,7 +230,7 @@ mod test {
 
         outer.apply_rewrite(InlineDFG(*inner.handle()))?;
         outer.validate(&reg)?;
-        assert_eq!(outer.nodes().len(), 8);
+        assert_eq!(outer.nodes().count(), 8);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
         let [_lift, add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(outer.get_parent(add), Some(outer.root()));
@@ -244,29 +244,29 @@ mod test {
 
     #[test]
     fn permutation() -> Result<(), Box<dyn std::error::Error>> {
-        let mut h = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T]))?;
+        let mut h = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [p, q] = h.input_wires_arr();
         let [p_h] = h
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
         let swap = {
-            let swap = h.dfg_builder(Signature::new_endo(type_row![QB_T, QB_T]), [p_h, q])?;
+            let swap = h.dfg_builder(Signature::new_endo(vec![qb_t(), qb_t()]), [p_h, q])?;
             let [a, b] = swap.input_wires_arr();
             swap.finish_with_outputs([b, a])?
         };
         let [q, p] = swap.outputs_arr();
         let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
         let reg = ExtensionRegistry::try_new([
-            test_quantum_extension::EXTENSION.to_owned(),
-            PRELUDE.to_owned(),
-            float_types::EXTENSION.to_owned(),
+            test_quantum_extension::EXTENSION.clone(),
+            PRELUDE.clone(),
+            float_types::EXTENSION.clone(),
         ])
         .unwrap();
 
         let mut h = h.finish_hugr_with_outputs(cx.outputs(), &reg)?;
         assert_eq!(find_dfgs(&h), vec![h.root(), swap.node()]);
-        assert_eq!(h.nodes().len(), 8); // Dfg+I+O, H, CX, Dfg+I+O
-                                        // No permutation outside the swap DFG:
+        assert_eq!(h.nodes().count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
+                                          // No permutation outside the swap DFG:
         assert_eq!(
             h.node_connections(p_h.node(), swap.node())
                 .collect::<Vec<_>>(),
@@ -292,7 +292,7 @@ mod test {
 
         h.apply_rewrite(InlineDFG(*swap.handle()))?;
         assert_eq!(find_dfgs(&h), vec![h.root()]);
-        assert_eq!(h.nodes().len(), 5); // Dfg+I+O
+        assert_eq!(h.nodes().count(), 5); // Dfg+I+O
         let mut ops = extension_ops(&h);
         ops.sort_by_key(|n| h.num_outputs(*n)); // Put H before CX
         let [h_gate, cx] = ops.try_into().unwrap();
@@ -339,11 +339,11 @@ mod test {
             PRELUDE.to_owned(),
         ])
         .unwrap();
-        let mut outer = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T]))?;
+        let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
-        let mut inner = outer.dfg_builder(endo_sig(QB_T), h_b.outputs())?;
+        let mut inner = outer.dfg_builder(endo_sig(qb_t()), h_b.outputs())?;
         let [i] = inner.input_wires_arr();
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());

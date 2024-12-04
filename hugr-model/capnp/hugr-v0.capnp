@@ -56,13 +56,15 @@ struct Operation {
     struct FuncDefn {
         name @0 :Text;
         params @1 :List(Param);
-        signature @2 :TermId;
+        constraints @2 :List(TermId);
+        signature @3 :TermId;
     }
 
     struct FuncDecl {
         name @0 :Text;
         params @1 :List(Param);
-        signature @2 :TermId;
+        constraints @2 :List(TermId);
+        signature @3 :TermId;
     }
 
     struct AliasDefn {
@@ -81,13 +83,15 @@ struct Operation {
     struct ConstructorDecl {
         name @0 :Text;
         params @1 :List(Param);
-        type @2 :TermId;
+        constraints @2 :List(TermId);
+        type @3 :TermId;
     }
 
     struct OperationDecl {
         name @0 :Text;
         params @1 :List(Param);
-        type @2 :TermId;
+        constraints @2 :List(TermId);
+        type @3 :TermId;
     }
 }
 
@@ -157,6 +161,7 @@ struct Term {
         funcType @17 :FuncType;
         control @18 :TermId;
         controlType @19 :Void;
+        nonLinearConstraint @20 :TermId;
     }
 
     struct Apply {
@@ -170,13 +175,25 @@ struct Term {
     }
 
     struct ListTerm {
-        items @0 :List(TermId);
-        tail @1 :OptionalTermId;
+        items @0 :List(ListPart);
+    }
+
+    struct ListPart {
+        union {
+            item @0 :TermId;
+            splice @1 :TermId;
+        }
     }
 
     struct ExtSet {
-        extensions @0 :List(Text);
-        rest @1 :OptionalTermId;
+        items @0 :List(ExtSetPart);
+    }
+
+    struct ExtSetPart {
+        union {
+            extension @0 :Text;
+            splice @1 :TermId;
+        }
     }
 
     struct FuncType {
@@ -187,19 +204,12 @@ struct Term {
 }
 
 struct Param {
-    union {
-        implicit @0 :Implicit;
-        explicit @1 :Explicit;
-        constraint @2 :TermId;
-    }
+    name @0 :Text;
+    type @1 :TermId;
+    sort @2 :ParamSort;
+}
 
-    struct Implicit {
-        name @0 :Text;
-        type @1 :TermId;
-    }
-
-    struct Explicit {
-        name @0 :Text;
-        type @1 :TermId;
-    }
+enum ParamSort {
+    implicit @0;
+    explicit @1;
 }

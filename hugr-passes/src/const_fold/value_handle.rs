@@ -170,10 +170,10 @@ impl From<ValueHandle> for Value {
 mod test {
     use hugr_core::{
         builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{ConstString, USIZE_T},
+        extension::prelude::{usize_t, ConstString},
         std_extensions::{
             arithmetic::{
-                float_types::{ConstF64, FLOAT64_TYPE},
+                float_types::{float64_type, ConstF64},
                 int_types::{ConstInt, INT_TYPES},
             },
             collections::ListValue,
@@ -214,7 +214,7 @@ mod test {
     }
 
     fn make_hugr(num_wires: usize) -> Hugr {
-        let d = DFGBuilder::new(endo_sig(vec![USIZE_T; num_wires])).unwrap();
+        let d = DFGBuilder::new(endo_sig(vec![usize_t(); num_wires])).unwrap();
         let inputs = d.input_wires();
         d.finish_prelude_hugr_with_outputs(inputs).unwrap()
     }
@@ -233,7 +233,7 @@ mod test {
             ValueHandle::new_opaque(ConstLocation::Field(1, &n.into()), lst.into())
         );
 
-        let lst = ListValue::new(FLOAT64_TYPE, [v3.into()]);
+        let lst = ListValue::new(float64_type(), [v3.into()]);
         assert_ne!(
             ValueHandle::new_opaque(n, lst.clone().into()),
             ValueHandle::new_opaque(ConstLocation::Field(3, &n.into()), lst.into())

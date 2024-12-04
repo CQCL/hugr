@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bumpalo::Bump;
 use hugr_model::v0 as model;
 use pretty_assertions::assert_eq;
@@ -50,4 +52,14 @@ pub fn test_params() {
 #[test]
 pub fn test_decl_exts() {
     binary_roundtrip(include_str!("fixtures/model-decl-exts.edn"));
+}
+
+#[test]
+pub fn test_constraints() {
+    binary_roundtrip(include_str!("fixtures/model-constraints.edn"));
+}
+
+#[test]
+pub fn test_lists() {
+    binary_roundtrip(include_str!("fixtures/model-lists.edn"));
 }

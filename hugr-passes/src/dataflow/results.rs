@@ -2,22 +2,22 @@ use std::collections::HashMap;
 
 use hugr_core::{HugrView, IncomingPort, Node, PortIndex, Wire};
 
-use super::{partial_value::ExtractValueError, AbstractValue, DFContext, PartialValue, Sum};
+use super::{partial_value::ExtractValueError, AbstractValue, PartialValue, Sum};
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
-pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>> {
-    pub(super) ctx: C,
+pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
+    pub(super) hugr: H,
     pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
     pub(super) case_reachable: Vec<(Node, Node)>,
     pub(super) bb_reachable: Vec<(Node, Node)>,
     pub(super) out_wire_values: HashMap<Wire, PartialValue<V>>,
 }
 
-impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
-    /// Allows to use the [HugrView] contained within
-    pub fn hugr(&self) -> &C::View {
-        &self.ctx
+impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
+    /// Allows reading the Hugr(View) for which the results were computed
+    pub fn hugr(&self) -> &H {
+        &self.hugr
     }
 
     /// Gets the lattice value computed for the given wire
@@ -31,8 +31,8 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     ///
     /// [TailLoop]: hugr_core::ops::TailLoop
     pub fn tail_loop_terminates(&self, node: Node) -> Option<TailLoopTermination> {
-        self.hugr().get_optype(node).as_tail_loop()?;
-        let [_, out] = self.hugr().get_io(node).unwrap();
+        self.hugr.get_optype(node).as_tail_loop()?;
+        let [_, out] = self.hugr.get_io(node).unwrap();
         Some(TailLoopTermination::from_control_value(
             self.in_wire_value
                 .iter()
@@ -49,9 +49,9 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     /// [Case]: hugr_core::ops::Case
     /// [Conditional]: hugr_core::ops::Conditional
     pub fn case_reachable(&self, case: Node) -> Option<bool> {
-        self.hugr().get_optype(case).as_case()?;
-        let cond = self.hugr().get_parent(case)?;
-        self.hugr().get_optype(cond).as_conditional()?;
+        self.hugr.get_optype(case).as_case()?;
+        let cond = self.hugr.get_parent(case)?;
+        self.hugr.get_optype(cond).as_conditional()?;
         Some(
             self.case_reachable
                 .iter()
@@ -66,9 +66,9 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     /// [DataflowBlock]: hugr_core::ops::DataflowBlock
     /// [ExitBlock]: hugr_core::ops::ExitBlock
     pub fn bb_reachable(&self, bb: Node) -> Option<bool> {
-        let cfg = self.hugr().get_parent(bb)?; // Not really required...??
-        self.hugr().get_optype(cfg).as_cfg()?;
-        let t = self.hugr().get_optype(bb);
+        let cfg = self.hugr.get_parent(bb)?; // Not really required...??
+        self.hugr.get_optype(cfg).as_cfg()?;
+        let t = self.hugr.get_optype(bb);
         (t.is_dataflow_block() || t.is_exit_block()).then(|| {
             self.bb_reachable
                 .iter()
@@ -81,13 +81,10 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     /// [PartialValue::Value] or a [PartialValue::PartialSum] with a single possible tag.)
     ///
     /// # Errors
-    /// `None` if the analysis did not produce a result for that wire
-    /// `Some(e)` if conversion to a concrete value failed with error `e`, see [PartialValue::try_into_value]
-    ///
-    /// # Panics
-    ///
-    /// If a [Type](hugr_core::types::Type) for the specified wire could not be extracted from the Hugr
-    pub fn try_read_wire_value<V2, VE, SE>(
+    /// `None` if the analysis did not produce a result for that wire, or if
+    ///    the Hugr did not have a [Type](hugr_core::types::Type) for the specified wire
+    /// `Some(e)` if [conversion to a concrete value](PartialValue::try_into_concrete) failed with error `e`
+    pub fn try_read_wire_concrete<V2, VE, SE>(
         &self,
         w: Wire,
     ) -> Result<V2, Option<ExtractValueError<V, VE, SE>>>
@@ -96,11 +93,11 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
-            .hugr()
+            .hugr
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
-            .unwrap();
-        v.try_into_value(&typ).map_err(Some)
+            .ok_or(None)?;
+        v.try_into_concrete(&typ).map_err(Some)
     }
 }
 

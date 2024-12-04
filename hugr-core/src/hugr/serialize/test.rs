@@ -1,17 +1,21 @@
+//! Tests for the HUGR serialization format.
+
 use super::*;
 use crate::builder::{
     endo_sig, inout_sig, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::Noop;
-use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
+use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
 use crate::extension::simple_op::MakeRegisteredOp;
+use crate::extension::ExtensionId;
 use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
-use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
+use crate::hugr::ExtensionResolutionError;
+use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
-use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
+use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
@@ -20,6 +24,7 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
+use crate::utils::test_quantum_extension;
 use crate::{type_row, OutgoingPort};
 
 use itertools::Itertools;
@@ -28,9 +33,6 @@ use lazy_static::lazy_static;
 use portgraph::LinkView;
 use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
 use rstest::rstest;
-
-const NAT: Type = crate::extension::prelude::USIZE_T;
-const QB: Type = crate::extension::prelude::QB_T;
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
@@ -182,6 +184,7 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     new_hugr
 }
 
+/// Deserialize a HUGR json, ensuring that it is valid against the schema.
 pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schema: bool) -> Hugr {
     let new_hugr = ser_deserialize_check_schema(value, get_schemas(check_schema));
 
@@ -189,6 +192,7 @@ pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schem
     new_hugr
 }
 
+/// Check that two HUGRs are equivalent, up to node renumbering.
 pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
     // Original HUGR, with canonicalized node indices
     //
@@ -244,11 +248,11 @@ fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
     let outputs = g.num_outputs(node);
     match (inputs == 0, outputs == 0) {
         (false, false) => DFG {
-            signature: Signature::new(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
+            signature: Signature::new(vec![usize_t(); inputs - 1], vec![usize_t(); outputs - 1]),
         }
         .into(),
-        (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
-        (false, true) => Output::new(vec![NAT; inputs - 1]).into(),
+        (true, false) => Input::new(vec![usize_t(); outputs - 1]).into(),
+        (false, true) => Output::new(vec![usize_t(); inputs - 1]).into(),
         (true, true) => Module::new().into(),
     }
 }
@@ -296,7 +300,7 @@ fn weighted_hugr_ser() {
         let mut module_builder = ModuleBuilder::new();
         module_builder.set_metadata("name", "test");
 
-        let t_row = vec![Type::new_sum([type_row![NAT], type_row![QB]])];
+        let t_row = vec![Type::new_sum([vec![usize_t()], vec![qb_t()]])];
         let mut f_build = module_builder
             .define_function("main", Signature::new(t_row.clone(), t_row).with_prelude())
             .unwrap();
@@ -321,13 +325,16 @@ fn weighted_hugr_ser() {
 
 #[test]
 fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    let tp: Vec<Type> = vec![BOOL_T; 2];
+    let tp: Vec<Type> = vec![bool_t(); 2];
     let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp).with_prelude())?;
     let mut params: [_; 2] = dfg.input_wires_arr();
     for p in params.iter_mut() {
-        *p = dfg.add_dataflow_op(Noop(BOOL_T), [*p]).unwrap().out_wire(0);
+        *p = dfg
+            .add_dataflow_op(Noop(bool_t()), [*p])
+            .unwrap()
+            .out_wire(0);
     }
-    let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
+    let hugr = dfg.finish_hugr_with_outputs(params, &test_quantum_extension::REG)?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -335,7 +342,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
-    let tp: Vec<Type> = vec![BOOL_T; 1];
+    let tp: Vec<Type> = vec![bool_t(); 1];
     let mut dfg = DFGBuilder::new(endo_sig(tp))?;
     let [wire] = dfg.input_wires_arr();
 
@@ -346,7 +353,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .out_wire(0);
 
-    let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
+    let hugr = dfg.finish_hugr_with_outputs([wire], &test_quantum_extension::REG)?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -354,7 +361,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
-    let tp: Vec<Type> = vec![BOOL_T; 1];
+    let tp: Vec<Type> = vec![bool_t(); 1];
     let mut dfg = DFGBuilder::new(endo_sig(tp))?;
     let [wire] = dfg.input_wires_arr();
 
@@ -364,6 +371,7 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(extension_op.clone(), [wire])
         .unwrap()
         .out_wire(0);
+    let not_node = wire.node();
 
     // Add an unresolved opaque operation
     let opaque_op: OpaqueOp = extension_op.into();
@@ -372,11 +380,14 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(
         dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY),
-        Err(ValidationError::OpaqueOpError(OpaqueOpError::UnresolvedOp(
-            wire.node(),
-            "Not".into(),
-            ext_name
-        ))
+        Err(ValidationError::ExtensionResolutionError(
+            ExtensionResolutionError::MissingOpExtension {
+                node: not_node,
+                op: "logic.Not".into(),
+                missing_extension: ext_name,
+                available_extensions: vec![ExtensionId::new("prelude").unwrap()]
+            }
+        )
         .into())
     );
 
@@ -385,7 +396,7 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn function_type() -> Result<(), Box<dyn std::error::Error>> {
-    let fn_ty = Type::new_function(Signature::new_endo(type_row![BOOL_T]).with_prelude());
+    let fn_ty = Type::new_function(Signature::new_endo(vec![bool_t()]).with_prelude());
     let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]).with_prelude())?;
     let op = bldr.add_dataflow_op(Noop(fn_ty), bldr.input_wires())?;
     let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
@@ -396,12 +407,12 @@ fn function_type() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
-    let mut hugr = closed_dfg_root_hugr(Signature::new(vec![QB], vec![QB]));
+    let mut hugr = closed_dfg_root_hugr(Signature::new(vec![qb_t()], vec![qb_t()]));
     let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
     hugr.connect(old_in, 0, out, 0);
 
     // Now add a new input
-    let new_in = hugr.add_node(Input::new([QB].to_vec()).into());
+    let new_in = hugr.add_node(Input::new([qb_t()].to_vec()).into());
     hugr.disconnect(old_in, OutgoingPort::from(0));
     hugr.connect(new_in, 0, out, 0);
     hugr.move_before_sibling(new_in, old_in);
@@ -434,11 +445,11 @@ fn serialize_types_roundtrip() {
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
-    let t = Type::new_tuple(vec![USIZE_T, g]);
+    let t = Type::new_tuple(vec![usize_t(), g]);
     check_testing_roundtrip(t);
 
     // A Classic sum
-    let t = TypeRV::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
+    let t = TypeRV::new_sum([vec![usize_t()], vec![float64_type()]]);
     check_testing_roundtrip(t);
 
     let t = Type::new_unit_sum(4);
@@ -446,21 +457,21 @@ fn serialize_types_roundtrip() {
 }
 
 #[rstest]
-#[case(BOOL_T)]
-#[case(USIZE_T)]
+#[case(bool_t())]
+#[case(usize_t())]
 #[case(INT_TYPES[2].clone())]
 #[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Any)))]
 #[case(Type::new_var_use(2, TypeBound::Copyable))]
-#[case(Type::new_tuple(type_row![BOOL_T,QB_T]))]
-#[case(Type::new_sum([type_row![BOOL_T,QB_T], type_row![Type::new_unit_sum(4)]]))]
-#[case(Type::new_function(Signature::new_endo(type_row![QB_T,BOOL_T,USIZE_T])))]
+#[case(Type::new_tuple(vec![bool_t(),qb_t()]))]
+#[case(Type::new_sum([vec![bool_t(),qb_t()], vec![Type::new_unit_sum(4)]]))]
+#[case(Type::new_function(Signature::new_endo(vec![qb_t(),bool_t(),usize_t()])))]
 fn roundtrip_type(#[case] typ: Type) {
     check_testing_roundtrip(typ);
 }
 
 #[rstest]
 #[case(SumType::new_unary(2))]
-#[case(SumType::new([type_row![USIZE_T, QB_T], type_row![]]))]
+#[case(SumType::new([vec![usize_t(), qb_t()].into(), type_row![]]))]
 fn roundtrip_sumtype(#[case] sum_type: SumType) {
     check_testing_roundtrip(sum_type);
 }
@@ -502,8 +513,8 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[rstest]
 #[case(Signature::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
-#[case(PolyFuncType::new([TypeParam::String], Signature::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeParam::String], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncType::new([TypeParam::new_list(TypeBound::Any)], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
@@ -515,8 +526,8 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
-#[case(PolyFuncTypeRV::new([TypeParam::String], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeParam::String], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeParam::new_list(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
@@ -535,10 +546,10 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
 #[case(ops::Const::new(Value::false_val()))]
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
-#[case(ops::Input::new(type_row![Type::new_var_use(3,TypeBound::Copyable)]))]
+#[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
 #[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(&PRELUDE_ID)} ], &EMPTY_REG).unwrap())]
-#[case(ops::CallIndirect { signature : Signature::new_endo(type_row![BOOL_T]) })]
+#[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
         parent: portgraph::NodeIndex::new(0).into(),
@@ -550,7 +561,7 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
 // test all standard extension serialisations are valid against scheme
 fn std_extensions_valid() {
     let std_reg = crate::std_extensions::std_reg();
-    for (_, ext) in std_reg.into_iter() {
+    for ext in std_reg {
         let val = serde_json::to_value(ext).unwrap();
         NamedSchema::check_schemas(&val, get_schemas(true));
         // check deserialises correctly, can't check equality because of custom binaries.

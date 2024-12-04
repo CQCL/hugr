@@ -7,7 +7,7 @@ use crate::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
         CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
-        TypeBase, TypeEnum,
+        TypeBase, TypeBound, TypeEnum,
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
@@ -44,8 +44,21 @@ struct Context<'a> {
     bump: &'a Bump,
     /// Stores the terms that we have already seen to avoid duplicates.
     term_map: FxHashMap<model::Term<'a>, model::TermId>,
+
     /// The current scope for local variables.
+    ///
+    /// This is set to the id of the smallest enclosing node that defines a polymorphic type.
+    /// We use this when exporting local variables in terms.
     local_scope: Option<model::NodeId>,
+
+    /// Constraints to be added to the local scope.
+    ///
+    /// When exporting a node that defines a polymorphic type, we use this field
+    /// to collect the constraints that need to be added to that polymorphic
+    /// type. Currently this is used to record `nonlinear` constraints on uses
+    /// of `TypeParam::Type` with a `TypeBound::Copyable` bound.
+    local_constraints: Vec<model::TermId>,
+
     /// Mapping from extension operations to their declarations.
     decl_operations: FxHashMap<(ExtensionId, OpName), model::NodeId>,
 }
@@ -63,13 +76,14 @@ impl<'a> Context<'a> {
             term_map: FxHashMap::default(),
             local_scope: None,
             decl_operations: FxHashMap::default(),
+            local_constraints: Vec::new(),
         }
     }
 
     /// Exports the root module of the HUGR graph.
     pub fn export_root(&mut self) {
         let hugr_children = self.hugr.children(self.hugr.root());
-        let mut children = Vec::with_capacity(hugr_children.len());
+        let mut children = Vec::with_capacity(hugr_children.size_hint().0);
 
         for child in self.hugr.children(self.hugr.root()) {
             children.push(self.export_node(child));
@@ -110,7 +124,7 @@ impl<'a> Context<'a> {
         num_ports: usize,
     ) -> &'a [model::LinkRef<'a>] {
         let ports = self.hugr.node_ports(node, direction);
-        let mut links = BumpVec::with_capacity_in(ports.len(), self.bump);
+        let mut links = BumpVec::with_capacity_in(ports.size_hint().0, self.bump);
 
         for port in ports.take(num_ports) {
             links.push(model::LinkRef::Id(self.get_link_id(node, port)));
@@ -173,9 +187,11 @@ impl<'a> Context<'a> {
     }
 
     fn with_local_scope<T>(&mut self, node: model::NodeId, f: impl FnOnce(&mut Self) -> T) -> T {
-        let old_scope = self.local_scope.replace(node);
+        let prev_local_scope = self.local_scope.replace(node);
+        let prev_local_constraints = std::mem::take(&mut self.local_constraints);
         let result = f(self);
-        self.local_scope = old_scope;
+        self.local_scope = prev_local_scope;
+        self.local_constraints = prev_local_constraints;
         result
     }
 
@@ -232,10 +248,11 @@ impl<'a> Context<'a> {
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let (params, signature) = this.export_poly_func_type(&func.signature);
+                let (params, constraints, signature) = this.export_poly_func_type(&func.signature);
                 let decl = this.bump.alloc(model::FuncDecl {
                     name,
                     params,
+                    constraints,
                     signature,
                 });
                 let extensions = this.export_ext_set(&func.signature.body().extension_reqs);
@@ -247,10 +264,11 @@ impl<'a> Context<'a> {
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let (params, func) = this.export_poly_func_type(&func.signature);
+                let (params, constraints, func) = this.export_poly_func_type(&func.signature);
                 let decl = this.bump.alloc(model::FuncDecl {
                     name,
                     params,
+                    constraints,
                     signature: func,
                 });
                 model::Operation::DeclareFunc { decl }
@@ -425,10 +443,10 @@ impl<'a> Context<'a> {
 
         let poly_func_type = match opdef.signature_func() {
             SignatureFunc::PolyFuncType(poly_func_type) => poly_func_type,
-            _ => return self.make_named_global_ref(opdef.extension(), opdef.name()),
+            _ => return self.make_named_global_ref(opdef.extension_id(), opdef.name()),
         };
 
-        let key = (opdef.extension().clone(), opdef.name().clone());
+        let key = (opdef.extension_id().clone(), opdef.name().clone());
         let entry = self.decl_operations.entry(key);
 
         let node = match entry {
@@ -449,11 +467,12 @@ impl<'a> Context<'a> {
         };
 
         let decl = self.with_local_scope(node, |this| {
-            let name = this.make_qualified_name(opdef.extension(), opdef.name());
-            let (params, r#type) = this.export_poly_func_type(poly_func_type);
+            let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
+            let (params, constraints, r#type) = this.export_poly_func_type(poly_func_type);
             let decl = this.bump.alloc(model::OperationDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             decl
@@ -490,48 +509,24 @@ impl<'a> Context<'a> {
     /// like for the other nodes since the ports are control flow ports.
     pub fn export_block_signature(&mut self, block: &DataflowBlock) -> model::TermId {
         let inputs = {
-            let mut inputs = BumpVec::with_capacity_in(block.inputs.len(), self.bump);
-            for input in block.inputs.iter() {
-                inputs.push(self.export_type(input));
-            }
-            let inputs = self.make_term(model::Term::List {
-                items: inputs.into_bump_slice(),
-                tail: None,
-            });
+            let inputs = self.export_type_row(&block.inputs);
             let inputs = self.make_term(model::Term::Control { values: inputs });
             self.make_term(model::Term::List {
-                items: self.bump.alloc_slice_copy(&[inputs]),
-                tail: None,
+                parts: self.bump.alloc_slice_copy(&[model::ListPart::Item(inputs)]),
             })
         };
 
-        let tail = {
-            let mut tail = BumpVec::with_capacity_in(block.other_outputs.len(), self.bump);
-            for other_output in block.other_outputs.iter() {
-                tail.push(self.export_type(other_output));
-            }
-            self.make_term(model::Term::List {
-                items: tail.into_bump_slice(),
-                tail: None,
-            })
-        };
+        let tail = self.export_type_row(&block.other_outputs);
 
         let outputs = {
             let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
             for sum_row in block.sum_rows.iter() {
-                let mut variant = BumpVec::with_capacity_in(sum_row.len(), self.bump);
-                for typ in sum_row.iter() {
-                    variant.push(self.export_type(typ));
-                }
-                let variant = self.make_term(model::Term::List {
-                    items: variant.into_bump_slice(),
-                    tail: Some(tail),
-                });
-                outputs.push(self.make_term(model::Term::Control { values: variant }));
+                let variant = self.export_type_row_with_tail(sum_row, Some(tail));
+                let control = self.make_term(model::Term::Control { values: variant });
+                outputs.push(model::ListPart::Item(control));
             }
             self.make_term(model::Term::List {
-                items: outputs.into_bump_slice(),
-                tail: None,
+                parts: outputs.into_bump_slice(),
             })
         };
 
@@ -579,7 +574,7 @@ impl<'a> Context<'a> {
         let targets = self.make_ports(output_node, Direction::Incoming, output_op.types.len());
 
         // Export the remaining children of the node.
-        let mut region_children = BumpVec::with_capacity_in(children.len(), self.bump);
+        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0, self.bump);
 
         for child in children {
             region_children.push(self.export_node(child));
@@ -609,7 +604,7 @@ impl<'a> Context<'a> {
     /// Creates a control flow region from the given node's children.
     pub fn export_cfg(&mut self, node: Node) -> model::RegionId {
         let mut children = self.hugr.children(node);
-        let mut region_children = BumpVec::with_capacity_in(children.len() + 1, self.bump);
+        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 + 1, self.bump);
 
         // The first child is the entry block.
         // We create a source port on the control flow region and connect it to the
@@ -623,16 +618,16 @@ impl<'a> Context<'a> {
         let source = model::LinkRef::Id(self.get_link_id(entry_block, IncomingPort::from(0)));
         region_children.push(self.export_node(entry_block));
 
-        // Export the remaining children of the node, except for the last one.
-        for _ in 0..children.len() - 1 {
-            region_children.push(self.export_node(children.next().unwrap()));
-        }
-
         // The last child is the exit block.
         // Contrary to the entry block, the exit block does not have a dataflow subgraph.
         // We therefore do not export the block itself, but simply use its output ports
         // as the target ports of the control flow region.
-        let exit_block = children.next().unwrap();
+        let exit_block = children.next_back().unwrap();
+
+        // Export the remaining children of the node, except for the last one.
+        for child in children {
+            region_children.push(self.export_node(child));
+        }
 
         let OpType::ExitBlock(_) = self.hugr.get_optype(exit_block) else {
             panic!("expected an `ExitBlock` node as the last child node");
@@ -657,7 +652,7 @@ impl<'a> Context<'a> {
     /// Export the `Case` node children of a `Conditional` node as data flow regions.
     pub fn export_conditional_regions(&mut self, node: Node) -> &'a [model::RegionId] {
         let children = self.hugr.children(node);
-        let mut regions = BumpVec::with_capacity_in(children.len(), self.bump);
+        let mut regions = BumpVec::with_capacity_in(children.size_hint().0, self.bump);
 
         for child in children {
             let OpType::Case(case_op) = self.hugr.get_optype(child) else {
@@ -671,22 +666,36 @@ impl<'a> Context<'a> {
         regions.into_bump_slice()
     }
 
+    /// Exports a polymorphic function type.
+    ///
+    /// The returned triple consists of:
+    ///  - The static parameters of the polymorphic function type.
+    ///  - The constraints of the polymorphic function type.
+    ///  - The function type itself.
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         t: &PolyFuncTypeBase<RV>,
-    ) -> (&'a [model::Param<'a>], model::TermId) {
+    ) -> (&'a [model::Param<'a>], &'a [model::TermId], model::TermId) {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
+        let scope = self
+            .local_scope
+            .expect("exporting poly func type outside of local scope");
 
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
-            let r#type = self.export_type_param(param);
-            let param = model::Param::Implicit { name, r#type };
+            let r#type = self.export_type_param(param, Some(model::LocalRef::Index(scope, i as _)));
+            let param = model::Param {
+                name,
+                r#type,
+                sort: model::ParamSort::Implicit,
+            };
             params.push(param)
         }
 
+        let constraints = self.bump.alloc_slice_copy(&self.local_constraints);
         let body = self.export_func_type(t.body());
 
-        (params.into_bump_slice(), body)
+        (params.into_bump_slice(), constraints, body)
     }
 
     pub fn export_type<RV: MaybeRV>(&mut self, t: &TypeBase<RV>) -> model::TermId {
@@ -703,7 +712,6 @@ impl<'a> Context<'a> {
             }
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
-                // This ignores the type bound for now
                 let node = self.local_scope.expect("local variable out of scope");
                 self.make_term(model::Term::Var(model::LocalRef::Index(node, *index as _)))
             }
@@ -740,10 +748,12 @@ impl<'a> Context<'a> {
             TypeArg::String { arg } => self.make_term(model::Term::Str(self.bump.alloc_str(arg))),
             TypeArg::Sequence { elems } => {
                 // For now we assume that the sequence is meant to be a list.
-                let items = self
-                    .bump
-                    .alloc_slice_fill_iter(elems.iter().map(|elem| self.export_type_arg(elem)));
-                self.make_term(model::Term::List { items, tail: None })
+                let parts = self.bump.alloc_slice_fill_iter(
+                    elems
+                        .iter()
+                        .map(|elem| model::ListPart::Item(self.export_type_arg(elem))),
+                );
+                self.make_term(model::Term::List { parts })
             }
             TypeArg::Extensions { es } => self.export_ext_set(es),
             TypeArg::Variable { v } => self.export_type_arg_var(v),
@@ -766,50 +776,90 @@ impl<'a> Context<'a> {
     pub fn export_sum_type(&mut self, t: &SumType) -> model::TermId {
         match t {
             SumType::Unit { size } => {
-                let items = self.bump.alloc_slice_fill_iter((0..*size).map(|_| {
-                    self.make_term(model::Term::List {
-                        items: &[],
-                        tail: None,
-                    })
+                let parts = self.bump.alloc_slice_fill_iter((0..*size).map(|_| {
+                    model::ListPart::Item(self.make_term(model::Term::List { parts: &[] }))
                 }));
-                let list = model::Term::List { items, tail: None };
-                let variants = self.make_term(list);
+                let variants = self.make_term(model::Term::List { parts });
                 self.make_term(model::Term::Adt { variants })
             }
             SumType::General { rows } => {
-                let items = self
-                    .bump
-                    .alloc_slice_fill_iter(rows.iter().map(|row| self.export_type_row(row)));
-                let list = model::Term::List { items, tail: None };
+                let parts = self.bump.alloc_slice_fill_iter(
+                    rows.iter()
+                        .map(|row| model::ListPart::Item(self.export_type_row(row))),
+                );
+                let list = model::Term::List { parts };
                 let variants = { self.make_term(list) };
                 self.make_term(model::Term::Adt { variants })
             }
         }
     }
 
-    pub fn export_type_row<RV: MaybeRV>(&mut self, t: &TypeRowBase<RV>) -> model::TermId {
-        let mut items = BumpVec::with_capacity_in(t.len(), self.bump);
-        items.extend(t.iter().map(|row| self.export_type(row)));
-        let items = items.into_bump_slice();
-        self.make_term(model::Term::List { items, tail: None })
+    #[inline]
+    pub fn export_type_row<RV: MaybeRV>(&mut self, row: &TypeRowBase<RV>) -> model::TermId {
+        self.export_type_row_with_tail(row, None)
     }
 
-    pub fn export_type_param(&mut self, t: &TypeParam) -> model::TermId {
+    pub fn export_type_row_with_tail<RV: MaybeRV>(
+        &mut self,
+        row: &TypeRowBase<RV>,
+        tail: Option<model::TermId>,
+    ) -> model::TermId {
+        let mut parts = BumpVec::with_capacity_in(row.len() + tail.is_some() as usize, self.bump);
+
+        for t in row.iter() {
+            match t.as_type_enum() {
+                TypeEnum::RowVar(var) => {
+                    parts.push(model::ListPart::Splice(self.export_row_var(var.as_rv())));
+                }
+                _ => {
+                    parts.push(model::ListPart::Item(self.export_type(t)));
+                }
+            }
+        }
+
+        if let Some(tail) = tail {
+            parts.push(model::ListPart::Splice(tail));
+        }
+
+        let parts = parts.into_bump_slice();
+        self.make_term(model::Term::List { parts })
+    }
+
+    /// Exports a `TypeParam` to a term.
+    ///
+    /// The `var` argument is set when the type parameter being exported is the
+    /// type of a parameter to a polymorphic definition. In that case we can
+    /// generate a `nonlinear` constraint for the type of runtime types marked as
+    /// `TypeBound::Copyable`.
+    pub fn export_type_param(
+        &mut self,
+        t: &TypeParam,
+        var: Option<model::LocalRef<'static>>,
+    ) -> model::TermId {
         match t {
-            // This ignores the type bound for now.
-            TypeParam::Type { .. } => self.make_term(model::Term::Type),
-            // This ignores the type bound for now.
+            TypeParam::Type { b } => {
+                if let (Some(var), TypeBound::Copyable) = (var, b) {
+                    let term = self.make_term(model::Term::Var(var));
+                    let non_linear = self.make_term(model::Term::NonLinearConstraint { term });
+                    self.local_constraints.push(non_linear);
+                }
+
+                self.make_term(model::Term::Type)
+            }
+            // This ignores the bound on the natural for now.
             TypeParam::BoundedNat { .. } => self.make_term(model::Term::NatType),
             TypeParam::String => self.make_term(model::Term::StrType),
             TypeParam::List { param } => {
-                let item_type = self.export_type_param(param);
+                let item_type = self.export_type_param(param, None);
                 self.make_term(model::Term::ListType { item_type })
             }
             TypeParam::Tuple { params } => {
-                let items = self.bump.alloc_slice_fill_iter(
-                    params.iter().map(|param| self.export_type_param(param)),
+                let parts = self.bump.alloc_slice_fill_iter(
+                    params
+                        .iter()
+                        .map(|param| model::ListPart::Item(self.export_type_param(param, None))),
                 );
-                let types = self.make_term(model::Term::List { items, tail: None });
+                let types = self.make_term(model::Term::List { parts });
                 self.make_term(model::Term::ApplyFull {
                     global: model::GlobalRef::Named(TERM_PARAM_TUPLE),
                     args: self.bump.alloc_slice_copy(&[types]),
@@ -822,54 +872,26 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn export_ext_set(&mut self, t: &ExtensionSet) -> model::TermId {
-        // Extension sets with variables are encoded using a hack: a variable in the
-        // extension set is represented by converting its index into a string.
-        // Until we have a better representation for extension sets, we therefore
-        // need to try and parse each extension as a number to determine if it is
-        // a variable or an extension.
+    pub fn export_ext_set(&mut self, ext_set: &ExtensionSet) -> model::TermId {
+        let capacity = ext_set.iter().size_hint().0;
+        let mut parts = BumpVec::with_capacity_in(capacity, self.bump);
 
-        // NOTE: This overprovisions the capacity since some of the entries of the row
-        // may be variables. Since we panic when there is more than one variable, this
-        // may at most waste one slot. That is way better than having to allocate
-        // a temporary vector.
-        //
-        // Also `ExtensionSet` has no way of reporting its size, so we have to count
-        // the elements by iterating over them...
-        let capacity = t.iter().count();
-        let mut extensions = BumpVec::with_capacity_in(capacity, self.bump);
-        let mut rest = None;
-
-        for ext in t.iter() {
-            if let Ok(index) = ext.parse::<usize>() {
-                // Extension sets in the model support at most one variable. This is a
-                // deliberate limitation so that extension sets behave like polymorphic rows.
-                // The type theory of such rows and how to apply them to model (co)effects
-                // is well understood.
-                //
-                // Extension sets in `hugr-core` at this point have no such restriction.
-                // However, it appears that so far we never actually use extension sets with
-                // multiple variables, except for extension sets that are generated through
-                // property testing.
-                if rest.is_some() {
-                    // TODO: We won't need this anymore once we have a core representation
-                    // that ensures that extension sets have at most one variable.
-                    panic!("Extension set with multiple variables")
+        for ext in ext_set.iter() {
+            // `ExtensionSet`s represent variables by extension names that parse to integers.
+            match ext.parse::<u16>() {
+                Ok(var) => {
+                    let node = self.local_scope.expect("local variable out of scope");
+                    let local_ref = model::LocalRef::Index(node, var);
+                    let term = self.make_term(model::Term::Var(local_ref));
+                    parts.push(model::ExtSetPart::Splice(term));
                 }
-
-                let node = self.local_scope.expect("local variable out of scope");
-                rest = Some(
-                    self.module
-                        .insert_term(model::Term::Var(model::LocalRef::Index(node, index as _))),
-                );
-            } else {
-                extensions.push(self.bump.alloc_str(ext) as &str);
+                Err(_) => parts.push(model::ExtSetPart::Extension(self.bump.alloc_str(ext))),
             }
         }
 
-        let extensions = extensions.into_bump_slice();
-
-        self.make_term(model::Term::ExtSet { extensions, rest })
+        self.make_term(model::Term::ExtSet {
+            parts: parts.into_bump_slice(),
+        })
     }
 
     pub fn export_node_metadata(
@@ -904,9 +926,8 @@ mod test {
 
     use crate::{
         builder::{Dataflow, DataflowSubContainer},
-        extension::prelude::QB_T,
+        extension::prelude::qb_t,
         std_extensions::arithmetic::float_types,
-        type_row,
         types::Signature,
         utils::test_quantum_extension::{self, cx_gate, h_gate},
         Hugr,
@@ -915,7 +936,7 @@ mod test {
     #[fixture]
     fn test_simple_circuit() -> Hugr {
         crate::builder::test::build_main(
-            Signature::new_endo(type_row![QB_T, QB_T])
+            Signature::new_endo(vec![qb_t(), qb_t()])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .with_extension_delta(float_types::EXTENSION_ID)
                 .into(),

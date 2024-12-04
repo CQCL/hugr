@@ -1,5 +1,7 @@
 //! Pointer type and operations.
 
+use std::sync::{Arc, Weak};
+
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::builder::{BuildError, Dataflow};
@@ -45,11 +47,12 @@ impl MakeOpDef for PtrOpDef {
     where
         Self: Sized,
     {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
-    fn signature(&self) -> SignatureFunc {
-        let ptr_t = ptr_type(Type::new_var_use(0, TypeBound::Copyable));
+    fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
+        let ptr_t: Type =
+            ptr_custom_type(Type::new_var_use(0, TypeBound::Copyable), extension_ref).into();
         let inner_t = Type::new_var_use(0, TypeBound::Copyable);
         let body = match self {
             PtrOpDef::New => Signature::new(inner_t, ptr_t),
@@ -62,6 +65,10 @@ impl MakeOpDef for PtrOpDef {
 
     fn extension(&self) -> ExtensionId {
         EXTENSION_ID
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 
     fn description(&self) -> String {
@@ -84,41 +91,46 @@ const TYPE_PARAMS: [TypeParam; 1] = [TypeParam::Type {
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for pointer operations.
-fn extension() -> Extension {
-    let mut extension = Extension::new(EXTENSION_ID, VERSION);
-    extension
-        .add_type(
-            PTR_TYPE_ID,
-            TYPE_PARAMS.into(),
-            "Standard extension pointer type.".into(),
-            TypeDefBound::copyable(),
-        )
-        .unwrap();
-    PtrOpDef::load_all_ops(&mut extension).unwrap();
-    extension
+fn extension() -> Arc<Extension> {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                PTR_TYPE_ID,
+                TYPE_PARAMS.into(),
+                "Standard extension pointer type.".into(),
+                TypeDefBound::copyable(),
+                extension_ref,
+            )
+            .unwrap();
+        PtrOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
 }
 
 lazy_static! {
     /// Reference to the pointer Extension.
-    pub static ref EXTENSION: Extension = extension();
+    pub static ref EXTENSION: Arc<Extension> = extension();
     /// Registry required to validate pointer extension.
     pub static ref PTR_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
+        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).  Depending on
 /// the operation, the semantic interpretation may be unsigned integer, signed
 /// integer or bit string.
-pub fn ptr_custom_type(ty: impl Into<Type>) -> CustomType {
+fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> CustomType {
     let ty = ty.into();
-    CustomType::new(PTR_TYPE_ID, [ty.into()], EXTENSION_ID, TypeBound::Copyable)
+    CustomType::new(
+        PTR_TYPE_ID,
+        [ty.into()],
+        EXTENSION_ID,
+        TypeBound::Copyable,
+        extension_ref,
+    )
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).
-///
-/// Constructed from [ptr_custom_type].
 pub fn ptr_type(ty: impl Into<Type>) -> Type {
-    Type::new_extension(ptr_custom_type(ty))
+    ptr_custom_type(ty, &Arc::<Extension>::downgrade(&EXTENSION)).into()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -212,7 +224,7 @@ impl HasDef for PtrOp {
 #[cfg(test)]
 pub(crate) mod test {
     use crate::builder::DFGBuilder;
-    use crate::extension::prelude::BOOL_T;
+    use crate::extension::prelude::bool_t;
     use crate::ops::ExtensionOp;
     use crate::{
         builder::{Dataflow, DataflowHugr},
@@ -225,7 +237,7 @@ pub(crate) mod test {
 
     use super::*;
     use crate::std_extensions::arithmetic::float_types::{
-        EXTENSION as FLOAT_EXTENSION, FLOAT64_TYPE,
+        float64_type, EXTENSION as FLOAT_EXTENSION,
     };
     fn get_opdef(op: impl NamedOp) -> Option<&'static Arc<OpDef>> {
         EXTENSION.get_op(&op.name())
@@ -243,8 +255,8 @@ pub(crate) mod test {
     #[test]
     fn test_ops() {
         let ops = [
-            PtrOp::new(PtrOpDef::New, BOOL_T.clone()),
-            PtrOp::new(PtrOpDef::Read, FLOAT64_TYPE.clone()),
+            PtrOp::new(PtrOpDef::New, bool_t().clone()),
+            PtrOp::new(PtrOpDef::Read, float64_type()),
             PtrOp::new(PtrOpDef::Write, INT_TYPES[5].clone()),
         ];
         for op in ops {
@@ -258,7 +270,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_build() {
-        let in_row = vec![BOOL_T, FLOAT64_TYPE];
+        let in_row = vec![bool_t(), float64_type()];
 
         let reg =
             ExtensionRegistry::try_new([EXTENSION.to_owned(), FLOAT_EXTENSION.to_owned()]).unwrap();

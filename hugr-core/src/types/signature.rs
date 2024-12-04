@@ -298,7 +298,7 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<R
 
 #[cfg(test)]
 mod test {
-    use crate::{extension::prelude::USIZE_T, type_row};
+    use crate::{extension::prelude::usize_t, type_row};
 
     use super::*;
     #[test]
@@ -315,12 +315,15 @@ mod test {
         );
 
         let out = Port::new(Direction::Outgoing, 0);
-        *(f_type.port_type_mut(out).unwrap()) = USIZE_T;
+        *(f_type.port_type_mut(out).unwrap()) = usize_t();
 
-        assert_eq!(f_type.port_type(out), Some(&USIZE_T));
+        assert_eq!(f_type.port_type(out), Some(&usize_t()));
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
-        assert_eq!(f_type.output_types(), &[USIZE_T]);
-        assert_eq!(f_type.io(), (&type_row![Type::UNIT], &type_row![USIZE_T]));
+        assert_eq!(f_type.output_types(), &[usize_t()]);
+        assert_eq!(
+            f_type.io(),
+            (&type_row![Type::UNIT], &vec![usize_t()].into())
+        );
     }
 }

@@ -1,0 +1,20 @@
+---
+source: src/emit/test.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i32, {}, {}, {} } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca { i32, {}, {}, {} }, align 8
+  %"4_0" = alloca { i32, {}, {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { i32, {}, {}, {} } { i32 1, {} poison, {} undef, {} poison }, { i32, {}, {}, {} }* %"4_0", align 4
+  %"4_01" = load { i32, {}, {}, {} }, { i32, {}, {}, {} }* %"4_0", align 4
+  store { i32, {}, {}, {} } %"4_01", { i32, {}, {}, {} }* %"0", align 4
+  %"02" = load { i32, {}, {}, {} }, { i32, {}, {}, {} }* %"0", align 4
+  ret { i32, {}, {}, {} } %"02"
+}

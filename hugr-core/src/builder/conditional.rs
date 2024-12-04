@@ -214,11 +214,9 @@ mod test {
 
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
+    use crate::extension::prelude::usize_t;
     use crate::{
-        builder::{
-            test::{n_identity, NAT},
-            Dataflow,
-        },
+        builder::{test::n_identity, Dataflow},
         ops::Value,
         type_row,
     };
@@ -229,8 +227,8 @@ mod test {
     fn basic_conditional() -> Result<(), BuildError> {
         let mut conditional_b = ConditionalBuilder::new_exts(
             [type_row![], type_row![]],
-            type_row![NAT],
-            type_row![NAT],
+            vec![usize_t()],
+            vec![usize_t()],
             ExtensionSet::new(),
         )?;
 
@@ -244,14 +242,14 @@ mod test {
         let build_result: Result<Hugr, BuildError> = {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder
-                .define_function("main", Signature::new(type_row![NAT], type_row![NAT]))?;
+                .define_function("main", Signature::new(vec![usize_t()], vec![usize_t()]))?;
             let tru_const = fbuild.add_constant(Value::true_val());
             let _fdef = {
                 let const_wire = fbuild.load_const(&tru_const);
                 let [int] = fbuild.input_wires_arr();
                 let conditional_id = {
-                    let other_inputs = vec![(NAT, int)];
-                    let outputs = vec![NAT].into();
+                    let other_inputs = vec![(usize_t(), int)];
+                    let outputs = vec![usize_t()].into();
                     let mut conditional_b = fbuild.conditional_builder(
                         ([type_row![], type_row![]], const_wire),
                         other_inputs,

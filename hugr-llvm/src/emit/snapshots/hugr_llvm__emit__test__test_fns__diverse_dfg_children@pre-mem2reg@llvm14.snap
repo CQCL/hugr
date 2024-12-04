@@ -1,0 +1,38 @@
+---
+source: src/emit/test.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i32, {}, {} } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"4_0" = alloca { i32, {}, {} }, align 8
+  %"12_0" = alloca { i32, {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = call { i32, {}, {} } @_hl.scoped_func.8()
+  store { i32, {}, {} } %0, { i32, {}, {} }* %"12_0", align 4
+  %"12_01" = load { i32, {}, {} }, { i32, {}, {} }* %"12_0", align 4
+  store { i32, {}, {} } %"12_01", { i32, {}, {} }* %"4_0", align 4
+  %"4_02" = load { i32, {}, {} }, { i32, {}, {} }* %"4_0", align 4
+  store { i32, {}, {} } %"4_02", { i32, {}, {} }* %"0", align 4
+  %"03" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"03"
+}
+
+define { i32, {}, {} } @_hl.scoped_func.8() {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"11_0" = alloca { i32, {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { i32, {}, {} } { i32 0, {} undef, {} poison }, { i32, {}, {} }* %"11_0", align 4
+  %"11_01" = load { i32, {}, {} }, { i32, {}, {} }* %"11_0", align 4
+  store { i32, {}, {} } %"11_01", { i32, {}, {} }* %"0", align 4
+  %"02" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"02"
+}

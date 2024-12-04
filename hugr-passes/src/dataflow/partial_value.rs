@@ -147,21 +147,18 @@ impl<V: AbstractValue> PartialSum<V> {
         self.0.contains_key(&tag)
     }
 
-    /// Turns this instance into a [Sum] of some "concrete" value type `V2`,
+    /// Turns this instance into a [Sum] of some "concrete" value type `C`,
     /// *if* this PartialSum has exactly one possible tag.
     ///
     /// # Errors
     ///
     /// If this PartialSum had multiple possible tags; or if `typ` was not a [TypeEnum::Sum]
     /// supporting the single possible tag with the correct number of elements and no row variables;
-    /// or if converting a child element failed via [PartialValue::try_into_value].
-    pub fn try_into_sum<V2, VE, SE>(
-        self,
-        typ: &Type,
-    ) -> Result<Sum<V2>, ExtractValueError<V, VE, SE>>
+    /// or if converting a child element failed via [PartialValue::try_into_concrete].
+    pub fn try_into_sum<C, VE, SE>(self, typ: &Type) -> Result<Sum<C>, ExtractValueError<V, VE, SE>>
     where
-        V: TryInto<V2, Error = VE>,
-        Sum<V2>: TryInto<V2, Error = SE>,
+        V: TryInto<C, Error = VE>,
+        Sum<C>: TryInto<C, Error = SE>,
     {
         if self.0.len() != 1 {
             return Err(ExtractValueError::MultipleVariants(self));
@@ -174,7 +171,7 @@ impl<V: AbstractValue> PartialSum<V> {
                         return Ok(Sum {
                             tag,
                             values: zip_eq(v, r.iter())
-                                .map(|(v, t)| v.try_into_value(t))
+                                .map(|(v, t)| v.try_into_concrete(t))
                                 .collect::<Result<Vec<_>, _>>()?,
                             st: st.clone(),
                         });
@@ -198,7 +195,7 @@ impl<V: AbstractValue> PartialSum<V> {
 }
 
 /// An error converting a [PartialValue] or [PartialSum] into a concrete value type
-/// via [PartialValue::try_into_value] or [PartialSum::try_into_value]
+/// via [PartialValue::try_into_concrete] or [PartialSum::try_into_sum]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
 pub enum ExtractValueError<V, VE, SE> {
@@ -342,7 +339,7 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
-    /// Turns this instance into some "concrete" value type `V2`, *if* it is a single value,
+    /// Turns this instance into some "concrete" value type `C`, *if* it is a single value,
     /// or a [Sum](PartialValue::PartialSum) (of a single tag) convertible by
     /// [PartialSum::try_into_sum].
     ///
@@ -351,10 +348,10 @@ impl<V: AbstractValue> PartialValue<V> {
     /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
     /// that could not be converted into a [Sum] by [PartialSum::try_into_sum] (e.g. if `typ` is
     /// incorrect), or if that [Sum] could not be converted into a `V2`.
-    pub fn try_into_value<V2, VE, SE>(self, typ: &Type) -> Result<V2, ExtractValueError<V, VE, SE>>
+    pub fn try_into_concrete<C, VE, SE>(self, typ: &Type) -> Result<C, ExtractValueError<V, VE, SE>>
     where
-        V: TryInto<V2, Error = VE>,
-        Sum<V2>: TryInto<V2, Error = SE>,
+        V: TryInto<C, Error = VE>,
+        Sum<C>: TryInto<C, Error = SE>,
     {
         match self {
             Self::Value(v) => v

@@ -1,4 +1,5 @@
 use std::collections::btree_map::Entry;
+use std::sync::Weak;
 
 use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError};
@@ -56,6 +57,9 @@ impl TypeDefBound {
 pub struct TypeDef {
     /// The unique Extension owning this TypeDef (of which this TypeDef is a member)
     extension: ExtensionId,
+    /// A weak reference to the extension defining this operation.
+    #[serde(skip)]
+    extension_ref: Weak<Extension>,
     /// The unique name of the type
     name: TypeName,
     /// Declaration of type parameters. The TypeDef must be instantiated
@@ -82,9 +86,9 @@ impl TypeDef {
     /// This function will return an error if the type of the instance does not
     /// match the definition.
     pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
-        if self.extension() != custom.parent_extension() {
+        if self.extension_id() != custom.parent_extension() {
             return Err(SignatureError::ExtensionMismatch(
-                self.extension().clone(),
+                self.extension_id().clone(),
                 custom.parent_extension().clone(),
             ));
         }
@@ -121,8 +125,9 @@ impl TypeDef {
         Ok(CustomType::new(
             self.name().clone(),
             args,
-            self.extension().clone(),
+            self.extension_id().clone(),
             bound,
+            &self.extension_ref,
         ))
     }
     /// The [`TypeBound`] of the definition.
@@ -156,22 +161,55 @@ impl TypeDef {
         &self.name
     }
 
-    fn extension(&self) -> &ExtensionId {
+    /// Returns a reference to the extension id of this [`TypeDef`].
+    pub fn extension_id(&self) -> &ExtensionId {
         &self.extension
+    }
+
+    /// Returns a weak reference to the extension defining this type.
+    pub fn extension(&self) -> Weak<Extension> {
+        self.extension_ref.clone()
     }
 }
 
 impl Extension {
     /// Add an exported type to the extension.
+    ///
+    /// This method requires a [`Weak`] reference to the [`std::sync::Arc`] containing the
+    /// extension being defined. The intended way to call this method is inside
+    /// the closure passed to [`Extension::new_arc`] when defining the extension.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use hugr_core::types::Signature;
+    /// # use hugr_core::extension::{Extension, ExtensionId, Version};
+    /// # use hugr_core::extension::{TypeDefBound};
+    /// Extension::new_arc(
+    ///     ExtensionId::new_unchecked("my.extension"),
+    ///     Version::new(0, 1, 0),
+    ///     |ext, extension_ref| {
+    ///         ext.add_type(
+    ///             "MyType".into(),
+    ///             vec![], // No type parameters
+    ///             "Some type".into(),
+    ///             TypeDefBound::any(),
+    ///             extension_ref,
+    ///         );
+    ///     },
+    /// );
+    /// ```
     pub fn add_type(
         &mut self,
         name: TypeName,
         params: Vec<TypeParam>,
         description: String,
         bound: TypeDefBound,
+        extension_ref: &Weak<Extension>,
     ) -> Result<&TypeDef, ExtensionBuildError> {
         let ty = TypeDef {
             extension: self.name.clone(),
+            extension_ref: extension_ref.clone(),
             name,
             params,
             description,
@@ -186,9 +224,9 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::{QB_T, USIZE_T};
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::SignatureError;
-    use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
+    use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{Signature, Type, TypeBound};
 
@@ -202,6 +240,8 @@ mod test {
                 b: TypeBound::Copyable,
             }],
             extension: "MyRsrc".try_into().unwrap(),
+            // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
+            extension_ref: Default::default(),
             description: "Some parametrised type".into(),
             bound: TypeDefBound::FromParams { indices: vec![0] },
         };
@@ -212,15 +252,15 @@ mod test {
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(def.instantiate([USIZE_T.into()]).unwrap());
+        let typ2 = Type::new_extension(def.instantiate([usize_t().into()]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Copyable);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate([TypeArg::Type { ty: QB_T }]),
+            def.instantiate([TypeArg::Type { ty: qb_t() }]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    arg: TypeArg::Type { ty: QB_T },
+                    arg: TypeArg::Type { ty: qb_t() },
                     param: TypeBound::Copyable.into()
                 }
             ))
@@ -233,8 +273,8 @@ mod test {
         // Too many arguments:
         assert_eq!(
             def.instantiate([
-                TypeArg::Type { ty: FLOAT64_TYPE },
-                TypeArg::Type { ty: FLOAT64_TYPE },
+                TypeArg::Type { ty: float64_type() },
+                TypeArg::Type { ty: float64_type() },
             ])
             .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))

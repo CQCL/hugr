@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use hugr_model::v0 as model;
 
 fn roundtrip(source: &str) -> String {

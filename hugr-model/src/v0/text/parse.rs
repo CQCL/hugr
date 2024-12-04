@@ -1,4 +1,4 @@
-use bumpalo::{collections::String as BumpString, Bump};
+use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
 use pest::{
     iterators::{Pair, Pairs},
     Parser, RuleType,
@@ -6,8 +6,9 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    AliasDecl, ConstructorDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node,
-    NodeId, Operation, OperationDecl, Param, Region, RegionId, RegionKind, Term, TermId,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef, ListPart, LocalRef,
+    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
+    RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -136,21 +137,21 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_list => {
-                let mut items = Vec::new();
-                let mut tail = None;
+                let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
 
-                for token in filter_rule(&mut inner, Rule::term) {
-                    items.push(self.parse_term(token)?);
-                }
-
-                if inner.next().is_some() {
-                    let token = inner.next().unwrap();
-                    tail = Some(self.parse_term(token)?);
+                for token in inner {
+                    match token.as_rule() {
+                        Rule::term => parts.push(ListPart::Item(self.parse_term(token)?)),
+                        Rule::spliced_term => {
+                            let term_token = token.into_inner().next().unwrap();
+                            parts.push(ListPart::Splice(self.parse_term(term_token)?))
+                        }
+                        _ => unreachable!(),
+                    }
                 }
 
                 Term::List {
-                    items: self.bump.alloc_slice_copy(&items),
-                    tail,
+                    parts: parts.into_bump_slice(),
                 }
             }
 
@@ -170,21 +171,23 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_ext_set => {
-                let mut extensions = Vec::new();
-                let mut rest = None;
+                let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
 
-                for token in filter_rule(&mut inner, Rule::ext_name) {
-                    extensions.push(token.as_str());
-                }
-
-                if inner.next().is_some() {
-                    let token = inner.next().unwrap();
-                    rest = Some(self.parse_term(token)?);
+                for token in inner {
+                    match token.as_rule() {
+                        Rule::ext_name => {
+                            parts.push(ExtSetPart::Extension(self.bump.alloc_str(token.as_str())))
+                        }
+                        Rule::spliced_term => {
+                            let term_token = token.into_inner().next().unwrap();
+                            parts.push(ExtSetPart::Splice(self.parse_term(term_token)?))
+                        }
+                        _ => unreachable!(),
+                    }
                 }
 
                 Term::ExtSet {
-                    extensions: self.bump.alloc_slice_copy(&extensions),
-                    rest,
+                    parts: parts.into_bump_slice(),
                 }
             }
 
@@ -207,6 +210,11 @@ impl<'a> ParseContext<'a> {
             Rule::term_ctrl => {
                 let values = self.parse_term(inner.next().unwrap())?;
                 Term::Control { values }
+            }
+
+            Rule::term_non_linear => {
+                let term = self.parse_term(inner.next().unwrap())?;
+                Term::NonLinearConstraint { term }
             }
 
             r => unreachable!("term: {:?}", r),
@@ -544,6 +552,7 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
 
         let inputs = self.parse_term(inner.next().unwrap())?;
         let outputs = self.parse_term(inner.next().unwrap())?;
@@ -559,6 +568,7 @@ impl<'a> ParseContext<'a> {
         Ok(self.bump.alloc(FuncDecl {
             name,
             params,
+            constraints,
             signature: func,
         }))
     }
@@ -584,11 +594,13 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(ConstructorDecl {
             name,
             params,
+            constraints,
             r#type,
         }))
     }
@@ -599,11 +611,13 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(OperationDecl {
             name,
             params,
+            constraints,
             r#type,
         }))
     }
@@ -619,18 +633,21 @@ impl<'a> ParseContext<'a> {
                     let mut inner = param.into_inner();
                     let name = &inner.next().unwrap().as_str()[1..];
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param::Implicit { name, r#type }
+                    Param {
+                        name,
+                        r#type,
+                        sort: ParamSort::Implicit,
+                    }
                 }
                 Rule::param_explicit => {
                     let mut inner = param.into_inner();
                     let name = &inner.next().unwrap().as_str()[1..];
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param::Explicit { name, r#type }
-                }
-                Rule::param_constraint => {
-                    let mut inner = param.into_inner();
-                    let constraint = self.parse_term(inner.next().unwrap())?;
-                    Param::Constraint { constraint }
+                    Param {
+                        name,
+                        r#type,
+                        sort: ParamSort::Explicit,
+                    }
                 }
                 _ => unreachable!(),
             };
@@ -639,6 +656,17 @@ impl<'a> ParseContext<'a> {
         }
 
         Ok(self.bump.alloc_slice_copy(&params))
+    }
+
+    fn parse_constraints(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [TermId]> {
+        let mut constraints = Vec::new();
+
+        for pair in filter_rule(pairs, Rule::where_clause) {
+            let constraint = self.parse_term(pair.into_inner().next().unwrap())?;
+            constraints.push(constraint);
+        }
+
+        Ok(self.bump.alloc_slice_copy(&constraints))
     }
 
     fn parse_signature(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<TermId>> {

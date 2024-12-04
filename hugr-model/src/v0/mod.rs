@@ -397,6 +397,8 @@ pub struct FuncDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the function.
     pub params: &'a [Param<'a>],
+    /// The constraints on the static parameters.
+    pub constraints: &'a [TermId],
     /// The signature of the function.
     pub signature: TermId,
 }
@@ -419,6 +421,8 @@ pub struct ConstructorDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the constructor.
     pub params: &'a [Param<'a>],
+    /// The constraints on the static parameters.
+    pub constraints: &'a [TermId],
     /// The type of the constructed term.
     pub r#type: TermId,
 }
@@ -430,6 +434,8 @@ pub struct OperationDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the operation.
     pub params: &'a [Param<'a>],
+    /// The constraints on the static parameters.
+    pub constraints: &'a [TermId],
     /// The type of the operation. This must be a function type.
     pub r#type: TermId,
 }
@@ -563,19 +569,10 @@ pub enum Term<'a> {
         r#type: TermId,
     },
 
-    /// A list, with an optional tail.
-    ///
-    /// - `[ITEM-0 ... ITEM-n] : (list T)` where `T : static`, `ITEM-i : T`.
-    /// - `[ITEM-0 ... ITEM-n . TAIL] : (list item-type)` where `T : static`, `ITEM-i : T`, `TAIL : (list T)`.
+    /// A list. May include individual items or other lists to be spliced in.
     List {
-        /// The items in the list.
-        ///
-        /// `item-i : item-type`
-        items: &'a [TermId],
-        /// The tail of the list.
-        ///
-        /// `tail : (list item-type)`
-        tail: Option<TermId>,
+        /// The parts of the list.
+        parts: &'a [ListPart],
     },
 
     /// The type of lists, given a type for the items.
@@ -609,14 +606,11 @@ pub enum Term<'a> {
     NatType,
 
     /// Extension set.
-    ///
-    /// - `(ext EXT-0 ... EXT-n) : ext-set`
-    /// - `(ext EXT-0 ... EXT-n . REST) : ext-set` where `REST : ext-set`.
     ExtSet {
-        /// The items in the extension set.
-        extensions: &'a [&'a str],
-        /// The rest of the extension set.
-        rest: Option<TermId>,
+        /// The parts of the extension set.
+        ///
+        /// Since extension sets are unordered, the parts may occur in any order.
+        parts: &'a [ExtSetPart<'a>],
     },
 
     /// The type of extension sets.
@@ -662,6 +656,30 @@ pub enum Term<'a> {
     ///
     /// `ctrl : static`
     ControlType,
+
+    /// Constraint that requires a runtime type to be copyable and discardable.
+    NonLinearConstraint {
+        /// The runtime type that must be copyable and discardable.
+        term: TermId,
+    },
+}
+
+/// A part of a list term.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ListPart {
+    /// A single item.
+    Item(TermId),
+    /// A list to be spliced into the parent list.
+    Splice(TermId),
+}
+
+/// A part of an extension set term.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ExtSetPart<'a> {
+    /// An extension.
+    Extension(&'a str),
+    /// An extension set to be spliced into the parent extension set.
+    Splice(TermId),
 }
 
 /// A parameter to a function or alias.
@@ -669,33 +687,23 @@ pub enum Term<'a> {
 /// Parameter names must be unique within a parameter list.
 /// Implicit and explicit parameters share a namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Param<'a> {
-    /// An implicit parameter that should be inferred, unless a full application form is used
+pub struct Param<'a> {
+    /// The name of the parameter.
+    pub name: &'a str,
+    /// The type of the parameter.
+    pub r#type: TermId,
+    /// The sort of the parameter (implicit or explicit).
+    pub sort: ParamSort,
+}
+
+/// The sort of a parameter (implicit or explicit).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ParamSort {
+    /// The parameter is implicit and should be inferred, unless a full application form is used
     /// (see [`Term::ApplyFull`] and [`Operation::CustomFull`]).
-    Implicit {
-        /// The name of the parameter.
-        name: &'a str,
-        /// The type of the parameter.
-        ///
-        /// This must be a term of type `static`.
-        r#type: TermId,
-    },
-    /// An explicit parameter that should always be provided.
-    Explicit {
-        /// The name of the parameter.
-        name: &'a str,
-        /// The type of the parameter.
-        ///
-        /// This must be a term of type `static`.
-        r#type: TermId,
-    },
-    /// A constraint that should be satisfied by other parameters in a parameter list.
-    Constraint {
-        /// The constraint to be satisfied.
-        ///
-        /// This must be a term of type `constraint`.
-        constraint: TermId,
-    },
+    Implicit,
+    /// The parameter is explicit and should always be provided.
+    Explicit,
 }
 
 /// Errors that can occur when traversing and interpreting the model.

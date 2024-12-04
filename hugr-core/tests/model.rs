@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use hugr::std_extensions::std_reg;
 use hugr_core::{export::export_hugr, import::import_hugr};
 use hugr_model::v0 as model;
@@ -56,5 +58,12 @@ pub fn test_roundtrip_loop() {
 pub fn test_roundtrip_params() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-params.edn"
+    )));
+}
+
+#[test]
+pub fn test_roundtrip_constraints() {
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-constraints.edn"
     )));
 }

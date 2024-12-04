@@ -157,13 +157,14 @@ fn mk_rep(
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::sync::Arc;
 
     use hugr_core::extension::prelude::Lift;
     use itertools::Itertools;
     use rstest::rstest;
 
     use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
-    use hugr_core::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
+    use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize, PRELUDE_ID};
     use hugr_core::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
@@ -178,28 +179,30 @@ mod test {
         const EXT_ID: ExtensionId = "TestExt";
     }
 
-    fn extension() -> Extension {
-        let mut e = Extension::new(EXT_ID, hugr_core::extension::Version::new(0, 1, 0));
-        e.add_op(
-            "Test".into(),
-            String::new(),
-            Signature::new(
-                type_row![QB_T, USIZE_T],
-                TypeRow::from(vec![Type::new_sum(vec![
-                    type_row![QB_T],
-                    type_row![USIZE_T],
-                ])]),
-            ),
+    fn extension() -> Arc<Extension> {
+        Extension::new_arc(
+            EXT_ID,
+            hugr_core::extension::Version::new(0, 1, 0),
+            |ext, extension_ref| {
+                ext.add_op(
+                    "Test".into(),
+                    String::new(),
+                    Signature::new(
+                        vec![qb_t(), usize_t()],
+                        TypeRow::from(vec![Type::new_sum(vec![vec![qb_t()], vec![usize_t()]])]),
+                    ),
+                    extension_ref,
+                )
+                .unwrap();
+            },
         )
-        .unwrap();
-        e
     }
 
     fn lifted_unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
         let lc = b.add_load_value(Value::unary_unit_sum());
         let lift = b
             .add_dataflow_op(
-                Lift::new(type_row![Type::new_unit_sum(1)], PRELUDE_ID),
+                Lift::new(vec![Type::new_unit_sum(1)].into(), PRELUDE_ID),
                 [lc],
             )
             .unwrap();
@@ -224,14 +227,14 @@ mod test {
         */
 
         use hugr_core::extension::prelude::Noop;
-        let loop_variants = type_row![QB_T];
-        let exit_types = type_row![USIZE_T];
+        let loop_variants: TypeRow = vec![qb_t()].into();
+        let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
-        let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
+        let reg = ExtensionRegistry::try_new([PRELUDE.clone(), e])?;
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
-        let n = no_b1.add_dataflow_op(Noop::new(QB_T), no_b1.input_wires())?;
+        let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
         let br = lifted_unary_unit_sum(&mut no_b1);
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
@@ -249,7 +252,7 @@ mod test {
             no_b1
         } else {
             let mut no_b2 = h.simple_block_builder(endo_sig(loop_variants), 1)?;
-            let n = no_b2.add_dataflow_op(Noop::new(QB_T), no_b2.input_wires())?;
+            let n = no_b2.add_dataflow_op(Noop::new(qb_t()), no_b2.input_wires())?;
             let br = lifted_unary_unit_sum(&mut no_b2);
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
             h.branch(&nid, 0, &no_b1)?;
@@ -276,7 +279,7 @@ mod test {
             .nodes()
             .filter(|n| h.get_optype(*n).cast::<Noop>().is_some());
         let (entry_nop, expected_backedge_target) = if self_loop {
-            assert_eq!(h.children(r).len(), 2);
+            assert_eq!(h.children(r).count(), 2);
             (nops.exactly_one().ok().unwrap(), entry)
         } else {
             let [_, _, no_b2] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
@@ -299,7 +302,7 @@ mod test {
         // And the Noop in the entry block is consumed by the custom Test op
         let tst = find_unique(
             h.nodes(),
-            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension() != &PRELUDE_ID),
+            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(entry));
         assert_eq!(
@@ -325,24 +328,24 @@ mod test {
             .into_owned()
             .try_into()
             .unwrap();
-        let mut h = CFGBuilder::new(inout_sig(QB_T, res_t.clone()))?;
-        let mut bb1 = h.simple_entry_builder(type_row![USIZE_T, QB_T], 1)?;
+        let mut h = CFGBuilder::new(inout_sig(qb_t(), res_t.clone()))?;
+        let mut bb1 = h.simple_entry_builder(vec![usize_t(), qb_t()].into(), 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
         let pred = lifted_unary_unit_sum(&mut bb1);
         let bb1 = bb1.finish_with_outputs(pred, [load_cst, inw])?;
 
         let mut bb2 = h.block_builder(
-            type_row![USIZE_T, QB_T],
+            vec![usize_t(), qb_t()].into(),
             vec![type_row![]],
-            type_row![QB_T, USIZE_T],
+            vec![qb_t(), usize_t()].into(),
         )?;
         let [u, q] = bb2.input_wires_arr();
         let pred = lifted_unary_unit_sum(&mut bb2);
         let bb2 = bb2.finish_with_outputs(pred, [q, u])?;
 
         let mut bb3 = h.block_builder(
-            type_row![QB_T, USIZE_T],
+            vec![qb_t(), usize_t()].into(),
             vec![type_row![]],
             res_t.clone().into(),
         )?;
@@ -355,7 +358,7 @@ mod test {
         h.branch(&bb2, 0, &bb3)?;
         h.branch(&bb3, 0, &h.exit_block())?;
 
-        let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
+        let reg = ExtensionRegistry::try_new([e, PRELUDE.clone()])?;
         let mut h = h.finish_hugr(&reg)?;
         let root = h.root();
         merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
@@ -365,7 +368,7 @@ mod test {
         let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
         let tst = find_unique(
             h.nodes(),
-            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension() != &PRELUDE_ID),
+            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(bb));
 
@@ -375,7 +378,10 @@ mod test {
         let [other_input] = tst_inputs.try_into().unwrap();
         assert_eq!(
             h.get_optype(other_input),
-            &(LoadConstant { datatype: USIZE_T }.into())
+            &(LoadConstant {
+                datatype: usize_t()
+            }
+            .into())
         );
         Ok(())
     }

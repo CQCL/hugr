@@ -315,8 +315,8 @@ pub(crate) mod test {
     use crate::builder::{
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
+    use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::extension::prelude::{Lift, Noop};
-    use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, OpTag};
@@ -325,28 +325,27 @@ pub(crate) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
     use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
-    use crate::utils::test_quantum_extension::h_gate;
-    use crate::{
-        builder::test::{n_identity, BIT, NAT, QB},
-        type_row, Wire,
-    };
+    use crate::utils::test_quantum_extension::{self, h_gate};
+    use crate::{builder::test::n_identity, type_row, Wire};
 
     use super::super::test::simple_dfg_hugr;
     use super::*;
     #[test]
     fn nested_identity() -> Result<(), BuildError> {
         let build_result = {
-            let mut outer_builder = DFGBuilder::new(endo_sig(type_row![NAT, QB]))?;
+            let mut outer_builder = DFGBuilder::new(endo_sig(vec![usize_t(), qb_t()]))?;
 
             let [int, qb] = outer_builder.input_wires_arr();
 
             let q_out = outer_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
-            let inner_builder = outer_builder.dfg_builder_endo([(NAT, int)])?;
+            let inner_builder = outer_builder.dfg_builder_endo([(usize_t(), int)])?;
             let inner_id = n_identity(inner_builder)?;
 
-            outer_builder
-                .finish_prelude_hugr_with_outputs(inner_id.outputs().chain(q_out.outputs()))
+            outer_builder.finish_hugr_with_outputs(
+                inner_id.outputs().chain(q_out.outputs()),
+                &test_quantum_extension::REG,
+            )
         };
 
         assert_eq!(build_result.err(), None);
@@ -360,11 +359,11 @@ pub(crate) mod test {
         F: FnOnce(&mut DFGBuilder<Hugr>) -> Result<(), BuildError>,
     {
         let build_result = {
-            let mut builder = DFGBuilder::new(inout_sig(BOOL_T, type_row![BOOL_T, BOOL_T]))?;
+            let mut builder = DFGBuilder::new(inout_sig(bool_t(), vec![bool_t(), bool_t()]))?;
 
             f(&mut builder)?;
 
-            builder.finish_hugr(&EMPTY_REG)
+            builder.finish_hugr(&test_quantum_extension::REG)
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -408,7 +407,7 @@ pub(crate) mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let f_build = module_builder
-                .define_function("main", Signature::new(type_row![QB], type_row![QB, QB]))?;
+                .define_function("main", Signature::new(vec![qb_t()], vec![qb_t(), qb_t()]))?;
 
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
@@ -422,7 +421,7 @@ pub(crate) mod test {
                 error: BuilderWiringError::NoCopyLinear { typ, .. },
                 ..
             })
-            if typ == QB
+            if typ == qb_t()
         );
     }
 
@@ -431,19 +430,19 @@ pub(crate) mod test {
         let builder = || -> Result<Hugr, BuildError> {
             let mut f_build = FunctionBuilder::new(
                 "main",
-                Signature::new(type_row![BIT], type_row![BIT]).with_prelude(),
+                Signature::new(vec![bool_t()], vec![bool_t()]).with_prelude(),
             )?;
 
             let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(Noop(BIT), [i1])?;
+            let noop = f_build.add_dataflow_op(Noop(bool_t()), [i1])?;
             let i1 = noop.out_wire(0);
 
             let mut nested = f_build.dfg_builder(
-                Signature::new(type_row![], type_row![BIT]).with_prelude(),
+                Signature::new(type_row![], vec![bool_t()]).with_prelude(),
                 [],
             )?;
 
-            let id = nested.add_dataflow_op(Noop(BIT), [i1])?;
+            let id = nested.add_dataflow_op(Noop(bool_t()), [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
@@ -458,21 +457,21 @@ pub(crate) mod test {
         let builder = || -> Result<(Hugr, Node), BuildError> {
             let mut f_build = FunctionBuilder::new(
                 "main",
-                Signature::new(type_row![BIT], type_row![BIT]).with_prelude(),
+                Signature::new(vec![bool_t()], vec![bool_t()]).with_prelude(),
             )?;
             let f_node = f_build.container_node();
 
             let [i0] = f_build.input_wires_arr();
-            let noop0 = f_build.add_dataflow_op(Noop(BIT), [i0])?;
+            let noop0 = f_build.add_dataflow_op(Noop(bool_t()), [i0])?;
 
             // Some some order edges
             f_build.set_order(&f_build.io()[0], &noop0.node());
             f_build.set_order(&noop0.node(), &f_build.io()[1]);
 
             // Add a new input and output, and connect them with a noop in between
-            f_build.add_output(QB);
-            let i1 = f_build.add_input(QB);
-            let noop1 = f_build.add_dataflow_op(Noop(QB), [i1])?;
+            f_build.add_output(qb_t());
+            let i1 = f_build.add_input(qb_t());
+            let noop1 = f_build.add_dataflow_op(Noop(qb_t()), [i1])?;
 
             let hugr =
                 f_build.finish_prelude_hugr_with_outputs([noop0.out_wire(0), noop1.out_wire(0)])?;
@@ -482,21 +481,26 @@ pub(crate) mod test {
         let (hugr, f_node) = builder().unwrap_or_else(|e| panic!("{e}"));
 
         let func_sig = hugr.get_optype(f_node).inner_function_type().unwrap();
-        assert_eq!(func_sig.io(), (&type_row![BIT, QB], &type_row![BIT, QB]));
+        assert_eq!(
+            func_sig.io(),
+            (
+                &vec![bool_t(), qb_t()].into(),
+                &vec![bool_t(), qb_t()].into()
+            )
+        );
     }
 
     #[test]
     fn error_on_linear_inter_graph_edge() -> Result<(), BuildError> {
-        let mut f_build =
-            FunctionBuilder::new("main", Signature::new(type_row![QB], type_row![QB]))?;
+        let mut f_build = FunctionBuilder::new("main", Signature::new(vec![qb_t()], vec![qb_t()]))?;
 
         let [i1] = f_build.input_wires_arr();
-        let noop = f_build.add_dataflow_op(Noop(QB), [i1])?;
+        let noop = f_build.add_dataflow_op(Noop(qb_t()), [i1])?;
         let i1 = noop.out_wire(0);
 
-        let mut nested = f_build.dfg_builder(Signature::new(type_row![], type_row![QB]), [])?;
+        let mut nested = f_build.dfg_builder(Signature::new(type_row![], vec![qb_t()]), [])?;
 
-        let id_res = nested.add_dataflow_op(Noop(QB), [i1]);
+        let id_res = nested.add_dataflow_op(Noop(qb_t()), [i1]);
 
         // The error would anyway be caught in validation when we finish the Hugr,
         // but the builder catches it earlier
@@ -520,7 +524,7 @@ pub(crate) mod test {
     #[test]
     fn insert_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
-        let mut dfg_builder = DFGBuilder::new(Signature::new(type_row![BIT], type_row![BIT]))?;
+        let mut dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.set_metadata("x", 42);
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1], &EMPTY_REG)?;
@@ -530,7 +534,7 @@ pub(crate) mod test {
 
         let (dfg_node, f_node) = {
             let mut f_build = module_builder
-                .define_function("main", Signature::new(type_row![BIT], type_row![BIT]))?;
+                .define_function("main", Signature::new(vec![bool_t()], vec![bool_t()]))?;
 
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
@@ -555,18 +559,18 @@ pub(crate) mod test {
         let xb: ExtensionId = "B".try_into().unwrap();
         let xc: ExtensionId = "C".try_into().unwrap();
 
-        let mut parent = DFGBuilder::new(endo_sig(BIT))?;
+        let mut parent = DFGBuilder::new(endo_sig(bool_t()))?;
 
         let [w] = parent.input_wires_arr();
 
         // A box which adds extensions A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(endo_sig(BIT), [w])?;
+        let mut add_ab = parent.dfg_builder(endo_sig(bool_t()), [w])?;
         let [w] = add_ab.input_wires_arr();
 
-        let lift_a = add_ab.add_dataflow_op(Lift::new(type_row![BIT], xa.clone()), [w])?;
+        let lift_a = add_ab.add_dataflow_op(Lift::new(vec![bool_t()].into(), xa.clone()), [w])?;
         let [w] = lift_a.outputs_arr();
 
-        let lift_b = add_ab.add_dataflow_op(Lift::new(type_row![BIT], xb), [w])?;
+        let lift_b = add_ab.add_dataflow_op(Lift::new(vec![bool_t()].into(), xb), [w])?;
         let [w] = lift_b.outputs_arr();
 
         let add_ab = add_ab.finish_with_outputs([w])?;
@@ -574,14 +578,14 @@ pub(crate) mod test {
 
         // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
-        let mut add_c = parent.dfg_builder(endo_sig(BIT), [w])?;
+        let mut add_c = parent.dfg_builder(endo_sig(bool_t()), [w])?;
         let [w] = add_c.input_wires_arr();
-        let lift_c = add_c.add_dataflow_op(Lift::new(type_row![BIT], xc), [w])?;
+        let lift_c = add_c.add_dataflow_op(Lift::new(vec![bool_t()].into(), xc), [w])?;
         let wires: Vec<Wire> = lift_c.outputs().collect();
 
         let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
-        parent.finish_hugr_with_outputs([w], &EMPTY_REG)?;
+        parent.finish_hugr_with_outputs([w], &test_quantum_extension::REG)?;
 
         Ok(())
     }
@@ -647,7 +651,7 @@ pub(crate) mod test {
             PolyFuncType::new(
                 [TypeParam::new_list(TypeBound::Copyable)],
                 Signature::new(
-                    Type::new_function(FuncValueType::new(USIZE_T, tv.clone())),
+                    Type::new_function(FuncValueType::new(usize_t(), tv.clone())),
                     vec![],
                 ),
             ),
@@ -656,7 +660,7 @@ pub(crate) mod test {
         // But cannot eval it...
         let ev = e.instantiate_extension_op(
             "eval",
-            [vec![USIZE_T.into()].into(), vec![tv.into()].into()],
+            [vec![usize_t().into()].into(), vec![tv.into()].into()],
             &PRELUDE_REGISTRY,
         );
         assert_eq!(
@@ -673,11 +677,11 @@ pub(crate) mod test {
         let (mut hugr, load_constant, call) = {
             let mut builder = ModuleBuilder::new();
             let func = builder
-                .declare("func", Signature::new_endo(BOOL_T).into())
+                .declare("func", Signature::new_endo(bool_t()).into())
                 .unwrap();
             let (load_constant, call) = {
                 let mut builder = builder
-                    .define_function("main", Signature::new(Type::EMPTY_TYPEROW, BOOL_T))
+                    .define_function("main", Signature::new(Type::EMPTY_TYPEROW, bool_t()))
                     .unwrap();
                 let load_constant = builder.add_load_value(Value::true_val());
                 let [r] = builder

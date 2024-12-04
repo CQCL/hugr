@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::btree_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry,
@@ -302,6 +302,9 @@ impl Debug for LowerFunc {
 pub struct OpDef {
     /// The unique Extension owning this OpDef (of which this OpDef is a member)
     extension: ExtensionId,
+    /// A weak reference to the extension defining this operation.
+    #[serde(skip)]
+    extension_ref: Weak<Extension>,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
     name: OpName,
@@ -394,9 +397,14 @@ impl OpDef {
         &self.name
     }
 
-    /// Returns a reference to the extension of this [`OpDef`].
-    pub fn extension(&self) -> &ExtensionId {
+    /// Returns a reference to the extension id of this [`OpDef`].
+    pub fn extension_id(&self) -> &ExtensionId {
         &self.extension
+    }
+
+    /// Returns a weak reference to the extension defining this operation.
+    pub fn extension(&self) -> Weak<Extension> {
+        self.extension_ref.clone()
     }
 
     /// Returns a reference to the description of this [`OpDef`].
@@ -436,6 +444,7 @@ impl OpDef {
     }
 
     /// Iterate over all miscellaneous data in the [OpDef].
+    #[allow(unused)] // Unused when no features are enabled
     pub(crate) fn iter_misc(&self) -> impl ExactSizeIterator<Item = (&str, &serde_json::Value)> {
         self.misc.iter().map(|(k, v)| (k.as_str(), v))
     }
@@ -466,15 +475,41 @@ impl Extension {
     /// Add an operation definition to the extension. Must be a type scheme
     /// (defined by a [`PolyFuncTypeRV`]), a type scheme along with binary
     /// validation for type arguments ([`CustomValidator`]), or a custom binary
-    /// function for computing the signature given type arguments (`impl [CustomSignatureFunc]`).
+    /// function for computing the signature given type arguments (implementing
+    /// `[CustomSignatureFunc]`).
+    ///
+    /// This method requires a [`Weak`] reference to the [`Arc`] containing the
+    /// extension being defined. The intended way to call this method is inside
+    /// the closure passed to [`Extension::new_arc`] when defining the extension.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use hugr_core::types::Signature;
+    /// # use hugr_core::extension::{Extension, ExtensionId, Version};
+    /// Extension::new_arc(
+    ///     ExtensionId::new_unchecked("my.extension"),
+    ///     Version::new(0, 1, 0),
+    ///     |ext, extension_ref| {
+    ///         ext.add_op(
+    ///             "MyOp".into(),
+    ///             "Some operation".into(),
+    ///             Signature::new_endo(vec![]),
+    ///             extension_ref,
+    ///         );
+    ///     },
+    /// );
+    /// ```
     pub fn add_op(
         &mut self,
         name: OpName,
         description: String,
         signature_func: impl Into<SignatureFunc>,
+        extension_ref: &Weak<Extension>,
     ) -> Result<&mut OpDef, ExtensionBuildError> {
         let op = OpDef {
             extension: self.name.clone(),
+            extension_ref: extension_ref.clone(),
             name,
             description,
             signature_func: signature_func.into(),
@@ -500,7 +535,7 @@ pub(super) mod test {
     use super::SignatureFromArgs;
     use crate::builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::usize_t;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::OpName;
@@ -513,10 +548,12 @@ pub(super) mod test {
         const EXT_ID: ExtensionId = "MyExt";
     }
 
+    /// A dummy wrapper over an operation definition.
     #[derive(serde::Serialize, serde::Deserialize, Debug)]
     pub struct SimpleOpDef(OpDef);
 
     impl SimpleOpDef {
+        /// Create a new dummy opdef.
         pub fn new(op_def: OpDef) -> Self {
             assert!(op_def.constant_folder.is_none());
             assert!(matches!(
@@ -541,6 +578,7 @@ pub(super) mod test {
         fn eq(&self, other: &Self) -> bool {
             let OpDef {
                 extension,
+                extension_ref: _,
                 name,
                 description,
                 misc,
@@ -550,6 +588,7 @@ pub(super) mod test {
             } = &self.0;
             let OpDef {
                 extension: other_extension,
+                extension_ref: _,
                 name: other_name,
                 description: other_description,
                 misc: other_misc,
@@ -598,32 +637,35 @@ pub(super) mod test {
     #[test]
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let mut e = Extension::new_test(EXT_ID);
-        const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
-        let list_of_var =
-            Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: OpName = OpName::new_inline("Reverse");
-        let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
 
-        let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
-        def.add_lower_func(LowerFunc::FixedHugr {
-            extensions: ExtensionSet::new(),
-            hugr: crate::builder::test::simple_dfg_hugr(), // this is nonsense, but we are not testing the actual lowering here
-        });
-        def.add_misc("key", Default::default());
-        assert_eq!(def.description(), "desc");
-        assert_eq!(def.lower_funcs.len(), 1);
-        assert_eq!(def.misc.len(), 1);
+        let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
+            let list_of_var =
+                Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
+            let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
 
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap();
+            let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
+            def.add_lower_func(LowerFunc::FixedHugr {
+                extensions: ExtensionSet::new(),
+                hugr: crate::builder::test::simple_dfg_hugr(), // this is nonsense, but we are not testing the actual lowering here
+            });
+            def.add_misc("key", Default::default());
+            assert_eq!(def.description(), "desc");
+            assert_eq!(def.lower_funcs.len(), 1);
+            assert_eq!(def.misc.len(), 1);
+
+            Ok(())
+        })?;
+
+        let reg = ExtensionRegistry::try_new([PRELUDE.clone(), EXTENSION.clone(), ext]).unwrap();
         let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =
-            Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
+            Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: usize_t() }])?);
         let mut dfg = DFGBuilder::new(endo_sig(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
+            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: usize_t() }], &reg)
                 .unwrap(),
             dfg.input_wires(),
         )?;
@@ -663,60 +705,64 @@ pub(super) mod test {
                 MAX_NAT
             }
         }
-        let mut e = Extension::new_test(EXT_ID);
-        let def: &mut crate::extension::OpDef =
-            e.add_op("MyOp".into(), "".to_string(), SigFun())?;
+        let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            let def: &mut crate::extension::OpDef =
+                ext.add_op("MyOp".into(), "".to_string(), SigFun(), extension_ref)?;
 
-        // Base case, no type variables:
-        let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
-        assert_eq!(
-            def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(
-                Signature::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
-                    .with_extension_delta(EXT_ID)
-            )
-        );
-        assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
+            // Base case, no type variables:
+            let args = [TypeArg::BoundedNat { n: 3 }, usize_t().into()];
+            assert_eq!(
+                def.compute_signature(&args, &PRELUDE_REGISTRY),
+                Ok(Signature::new(
+                    vec![usize_t(); 3],
+                    vec![Type::new_tuple(vec![usize_t(); 3])]
+                )
+                .with_extension_delta(EXT_ID))
+            );
+            assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
 
-        // Second arg may be a variable (substitutable)
-        let tyvar = Type::new_var_use(0, TypeBound::Copyable);
-        let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
-        let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
-        assert_eq!(
-            def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(
-                Signature::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
-                    .with_extension_delta(EXT_ID)
-            )
-        );
-        def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Copyable.into()])
-            .unwrap();
+            // Second arg may be a variable (substitutable)
+            let tyvar = Type::new_var_use(0, TypeBound::Copyable);
+            let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
+            let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
+            assert_eq!(
+                def.compute_signature(&args, &PRELUDE_REGISTRY),
+                Ok(
+                    Signature::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
+                        .with_extension_delta(EXT_ID)
+                )
+            );
+            def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Copyable.into()])
+                .unwrap();
 
-        // quick sanity check that we are validating the args - note changed bound:
-        assert_eq!(
-            def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Any.into()]),
-            Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                actual: TypeBound::Any.into(),
-                cached: TypeBound::Copyable.into()
-            })
-        );
+            // quick sanity check that we are validating the args - note changed bound:
+            assert_eq!(
+                def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Any.into()]),
+                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    actual: TypeBound::Any.into(),
+                    cached: TypeBound::Copyable.into()
+                })
+            );
 
-        // First arg must be concrete, not a variable
-        let kind = TypeParam::bounded_nat(NonZeroU64::new(5).unwrap());
-        let args = [TypeArg::new_var_use(0, kind.clone()), USIZE_T.into()];
-        // We can't prevent this from getting into our compute_signature implementation:
-        assert_eq!(
-            def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Err(SignatureError::InvalidTypeArgs)
-        );
-        // But validation rules it out, even when the variable is declared:
-        assert_eq!(
-            def.validate_args(&args, &PRELUDE_REGISTRY, &[kind]),
-            Err(SignatureError::FreeTypeVar {
-                idx: 0,
-                num_decls: 0
-            })
-        );
+            // First arg must be concrete, not a variable
+            let kind = TypeParam::bounded_nat(NonZeroU64::new(5).unwrap());
+            let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
+            // We can't prevent this from getting into our compute_signature implementation:
+            assert_eq!(
+                def.compute_signature(&args, &PRELUDE_REGISTRY),
+                Err(SignatureError::InvalidTypeArgs)
+            );
+            // But validation rules it out, even when the variable is declared:
+            assert_eq!(
+                def.validate_args(&args, &PRELUDE_REGISTRY, &[kind]),
+                Err(SignatureError::FreeTypeVar {
+                    idx: 0,
+                    num_decls: 0
+                })
+            );
+
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -725,68 +771,77 @@ pub(super) mod test {
     fn type_scheme_instantiate_var() -> Result<(), Box<dyn std::error::Error>> {
         // Check that we can instantiate a PolyFuncTypeRV-scheme with an (external)
         // type variable
-        let mut e = Extension::new_test(EXT_ID);
-        let def = e.add_op(
-            "SimpleOp".into(),
-            "".into(),
-            PolyFuncTypeRV::new(
-                vec![TypeBound::Any.into()],
-                Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
-            ),
-        )?;
-        let tv = Type::new_var_use(1, TypeBound::Copyable);
-        let args = [TypeArg::Type { ty: tv.clone() }];
-        let decls = [TypeParam::Extensions, TypeBound::Copyable.into()];
-        def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
-        assert_eq!(
-            def.compute_signature(&args, &EMPTY_REG),
-            Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID))
-        );
-        // But not with an external row variable
-        let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
-        assert_eq!(
-            def.compute_signature(&[arg.clone()], &EMPTY_REG),
-            Err(SignatureError::TypeArgMismatch(
-                TypeArgError::TypeMismatch {
-                    param: TypeBound::Any.into(),
-                    arg
-                }
-            ))
-        );
+        let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            let def = ext.add_op(
+                "SimpleOp".into(),
+                "".into(),
+                PolyFuncTypeRV::new(
+                    vec![TypeBound::Any.into()],
+                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                ),
+                extension_ref,
+            )?;
+            let tv = Type::new_var_use(1, TypeBound::Copyable);
+            let args = [TypeArg::Type { ty: tv.clone() }];
+            let decls = [TypeParam::Extensions, TypeBound::Copyable.into()];
+            def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
+            assert_eq!(
+                def.compute_signature(&args, &EMPTY_REG),
+                Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID))
+            );
+            // But not with an external row variable
+            let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
+            assert_eq!(
+                def.compute_signature(&[arg.clone()], &EMPTY_REG),
+                Err(SignatureError::TypeArgMismatch(
+                    TypeArgError::TypeMismatch {
+                        param: TypeBound::Any.into(),
+                        arg
+                    }
+                ))
+            );
+            Ok(())
+        })?;
         Ok(())
     }
 
     #[test]
     fn instantiate_extension_delta() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY};
+        use crate::extension::prelude::{bool_t, PRELUDE_REGISTRY};
 
-        let mut e = Extension::new_test(EXT_ID);
+        let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            let params: Vec<TypeParam> = vec![TypeParam::Extensions];
+            let db_set = ExtensionSet::type_var(0);
+            let fun_ty = Signature::new_endo(bool_t()).with_extension_delta(db_set);
 
-        let params: Vec<TypeParam> = vec![TypeParam::Extensions];
-        let db_set = ExtensionSet::type_var(0);
-        let fun_ty = Signature::new_endo(BOOL_T).with_extension_delta(db_set);
+            let def = ext.add_op(
+                "SimpleOp".into(),
+                "".into(),
+                PolyFuncTypeRV::new(params.clone(), fun_ty),
+                extension_ref,
+            )?;
 
-        let def = e.add_op(
-            "SimpleOp".into(),
-            "".into(),
-            PolyFuncTypeRV::new(params.clone(), fun_ty),
-        )?;
+            // Concrete extension set
+            let es = ExtensionSet::singleton(&EXT_ID);
+            let exp_fun_ty = Signature::new_endo(bool_t()).with_extension_delta(es.clone());
+            let args = [TypeArg::Extensions { es }];
 
-        // Concrete extension set
-        let es = ExtensionSet::singleton(&EXT_ID);
-        let exp_fun_ty = Signature::new_endo(BOOL_T).with_extension_delta(es.clone());
-        let args = [TypeArg::Extensions { es }];
+            def.validate_args(&args, &PRELUDE_REGISTRY, &params)
+                .unwrap();
+            assert_eq!(
+                def.compute_signature(&args, &PRELUDE_REGISTRY),
+                Ok(exp_fun_ty)
+            );
 
-        def.validate_args(&args, &PRELUDE_REGISTRY, &params)
-            .unwrap();
-        assert_eq!(
-            def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(exp_fun_ty)
-        );
+            Ok(())
+        })?;
+
         Ok(())
     }
 
     mod proptest {
+        use std::sync::Weak;
+
         use super::SimpleOpDef;
         use ::proptest::prelude::*;
 
@@ -843,6 +898,8 @@ pub(super) mod test {
                         |(extension, name, description, misc, signature_func, lower_funcs)| {
                             Self::new(OpDef {
                                 extension,
+                                // Use a dead weak reference. Trying to access the extension will always return None.
+                                extension_ref: Weak::default(),
                                 name,
                                 description,
                                 misc,

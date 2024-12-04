@@ -28,7 +28,7 @@
 //! ```rust
 //! # use hugr::Hugr;
 //! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
-//! use hugr::extension::prelude::BOOL_T;
+//! use hugr::extension::prelude::bool_t;
 //! use hugr::std_extensions::logic::{EXTENSION_ID, LOGIC_REG, LogicOp};
 //! use hugr::types::Signature;
 //!
@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             Signature::new_endo(BOOL_T).with_extension_delta(EXTENSION_ID),
+//!             Signature::new_endo(bool_t()).with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,7 +59,7 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             Signature::new_endo(vec![BOOL_T, BOOL_T])
+//!             Signature::new_endo(vec![bool_t(), bool_t()])
 //!                 .with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
@@ -238,11 +238,12 @@ pub enum BuilderWiringError {
 pub(crate) mod test {
     use rstest::fixture;
 
+    use crate::extension::prelude::{bool_t, usize_t};
     use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
-    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
-    use crate::types::{PolyFuncType, Signature, Type};
-    use crate::{type_row, Hugr};
+    use crate::types::{PolyFuncType, Signature};
+    use crate::utils::test_quantum_extension;
+    use crate::Hugr;
 
     use super::handle::BuildHandle;
     use super::{
@@ -251,12 +252,8 @@ pub(crate) mod test {
     };
     use super::{DataflowSubContainer, HugrBuilder};
 
-    pub(super) const NAT: Type = crate::extension::prelude::USIZE_T;
-    pub(super) const BIT: Type = crate::extension::prelude::BOOL_T;
-    pub(super) const QB: Type = crate::extension::prelude::QB_T;
-
     /// Wire up inputs of a Dataflow container to the outputs.
-    pub(super) fn n_identity<T: DataflowSubContainer>(
+    pub(crate) fn n_identity<T: DataflowSubContainer>(
         dataflow_builder: T,
     ) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();
@@ -272,12 +269,12 @@ pub(crate) mod test {
 
         f(f_builder)?;
 
-        Ok(module_builder.finish_hugr(&FLOAT_OPS_REGISTRY)?)
+        Ok(module_builder.finish_hugr(&test_quantum_extension::REG)?)
     }
 
     #[fixture]
     pub(crate) fn simple_dfg_hugr() -> Hugr {
-        let dfg_builder = DFGBuilder::new(Signature::new(type_row![BIT], type_row![BIT])).unwrap();
+        let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
     }
@@ -285,7 +282,7 @@ pub(crate) mod test {
     #[fixture]
     pub(crate) fn simple_funcdef_hugr() -> Hugr {
         let fn_builder =
-            FunctionBuilder::new("test", Signature::new(type_row![BIT], type_row![BIT])).unwrap();
+            FunctionBuilder::new("test", Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
         let [i1] = fn_builder.input_wires_arr();
         fn_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
     }
@@ -293,7 +290,7 @@ pub(crate) mod test {
     #[fixture]
     pub(crate) fn simple_module_hugr() -> Hugr {
         let mut builder = ModuleBuilder::new();
-        let sig = Signature::new(type_row![BIT], type_row![BIT]);
+        let sig = Signature::new(vec![bool_t()], vec![bool_t()]);
         builder.declare("test", sig.into()).unwrap();
         builder.finish_prelude_hugr().unwrap()
     }
@@ -301,7 +298,7 @@ pub(crate) mod test {
     #[fixture]
     pub(crate) fn simple_cfg_hugr() -> Hugr {
         let mut cfg_builder =
-            CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT])).unwrap();
+            CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
         super::cfg::test::build_basic_cfg(&mut cfg_builder).unwrap();
         cfg_builder.finish_prelude_hugr().unwrap()
     }

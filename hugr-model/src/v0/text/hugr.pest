@@ -10,8 +10,6 @@ string_raw     = @{ (!("\\" | "\"") ~ ANY)+ }
 string_escape  = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
 string_unicode = @{ "\\u" ~ "{" ~ ASCII_HEX_DIGIT+ ~ "}" }
 
-list_tail = { "." }
-
 module = { "(" ~ "hugr" ~ "0" ~ ")" ~ meta* ~ node* ~ EOI }
 
 meta = { "(" ~ "meta" ~ symbol ~ term ~ ")" }
@@ -56,16 +54,16 @@ node_tag               = { "(" ~ "tag" ~ tag ~ port_lists? ~ signature? ~ meta* 
 node_custom            = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
 signature        = { "(" ~ "signature" ~ term ~ ")" }
-func_header      = { symbol ~ param* ~ term ~ term ~ term }
+func_header      = { symbol ~ param* ~ where_clause* ~ term ~ term ~ term }
 alias_header     = { symbol ~ param* ~ term }
-ctr_header       = { symbol ~ param* ~ term }
-operation_header = { symbol ~ param* ~ term }
+ctr_header       = { symbol ~ param* ~ where_clause* ~ term }
+operation_header = { symbol ~ param* ~ where_clause* ~ term }
 
-param = { param_implicit | param_explicit | param_constraint }
+param = { param_implicit | param_explicit }
 
-param_implicit   = { "(" ~ "forall" ~ term_var ~ term ~ ")" }
-param_explicit   = { "(" ~ "param" ~ term_var ~ term ~ ")" }
-param_constraint = { "(" ~ "where" ~ term ~ ")" }
+param_implicit = { "(" ~ "forall" ~ term_var ~ term ~ ")" }
+param_explicit = { "(" ~ "param" ~ term_var ~ term ~ ")" }
+where_clause   = { "(" ~ "where" ~ term ~ ")" }
 
 region     = { region_dfg | region_cfg }
 region_dfg = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ node* ~ ")" }
@@ -92,6 +90,7 @@ term = {
   | term_ctrl_type
   | term_apply_full
   | term_apply
+  | term_non_linear
 }
 
 term_wildcard     = { "_" }
@@ -102,15 +101,18 @@ term_var          = { "?" ~ identifier }
 term_apply_full   = { ("(" ~ "@" ~ symbol ~ term* ~ ")") }
 term_apply        = { symbol | ("(" ~ symbol ~ term* ~ ")") }
 term_quote        = { "(" ~ "quote" ~ term ~ ")" }
-term_list         = { "[" ~ term* ~ (list_tail ~ term)? ~ "]" }
+term_list         = { "[" ~ (spliced_term | term)* ~ "]" }
 term_list_type    = { "(" ~ "list" ~ term ~ ")" }
 term_str          = { string }
 term_str_type     = { "str" }
 term_nat          = { (ASCII_DIGIT)+ }
 term_nat_type     = { "nat" }
-term_ext_set      = { "(" ~ "ext" ~ ext_name* ~ (list_tail ~ term)? ~ ")" }
+term_ext_set      = { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
 term_ext_set_type = { "ext-set" }
 term_adt          = { "(" ~ "adt" ~ term ~ ")" }
 term_func_type    = { "(" ~ "fn" ~ term ~ term ~ term ~ ")" }
 term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
 term_ctrl_type    = { "ctrl" }
+term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }
+
+spliced_term = { term ~ "..." }

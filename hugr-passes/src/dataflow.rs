@@ -14,17 +14,13 @@ pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::types::TypeArg;
-use hugr_core::{Hugr, HugrView, Node};
+use hugr_core::{Hugr, Node};
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).
-pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
-    /// Type of view contained within this context. (Ideally we'd constrain
-    /// by `std::ops::Deref<Target: impl HugrView>` but that's not stable yet.)
-    type View: HugrView;
-
+pub trait DFContext<V>: ConstLoader<V> {
     /// Given lattice values for each input, update lattice values for the (dataflow) outputs.
-    /// For extension ops only, excluding [MakeTuple] and [UnpackTuple].
+    /// For extension ops only, excluding [MakeTuple] and [UnpackTuple] which are handled automatically.
     /// `_outs` is an array with one element per dataflow output, each initialized to [PartialValue::Top]
     /// which is the correct value to leave if nothing can be deduced about that output.
     /// (The default does nothing, i.e. leaves `Top` for all outputs.)
@@ -32,7 +28,7 @@ pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
     /// [MakeTuple]: hugr_core::extension::prelude::MakeTuple
     /// [UnpackTuple]: hugr_core::extension::prelude::UnpackTuple
     fn interpret_leaf_op(
-        &self,
+        &mut self,
         _node: Node,
         _e: &ExtensionOp,
         _ins: &[PartialValue<V>],
@@ -52,7 +48,7 @@ pub enum ConstLocation<'a> {
     Node(Node),
 }
 
-impl<'a> From<Node> for ConstLocation<'a> {
+impl From<Node> for ConstLocation<'_> {
     fn from(value: Node) -> Self {
         ConstLocation::Node(value)
     }

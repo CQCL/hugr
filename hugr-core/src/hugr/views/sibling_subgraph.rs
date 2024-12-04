@@ -211,7 +211,7 @@ impl SiblingSubgraph {
     /// The subgraph signature will be given by the types of the incoming and
     /// outgoing edges ordered by the node order in `nodes` and within each node
     /// by the port order.
-
+    ///
     /// The in- and out-arity of the signature will match the
     /// number of incoming and outgoing edges respectively. In particular, the
     /// assumption is made that no two incoming edges have the same source
@@ -238,6 +238,14 @@ impl SiblingSubgraph {
         checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
+
+        // If there's one or less nodes, we don't need to check convexity.
+        match nodes.as_slice() {
+            [] => return Err(InvalidSubgraph::EmptySubgraph),
+            [node] => return Ok(Self::from_node(*node, hugr)),
+            _ => {}
+        };
+
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
         let incoming_edges = nodes
             .iter()
@@ -263,6 +271,31 @@ impl SiblingSubgraph {
             })
             .collect_vec();
         Self::try_new_with_checker(inputs, outputs, hugr, checker)
+    }
+
+    /// Create a subgraph containing a single node.
+    ///
+    /// The subgraph signature will be given by signature of the node.
+    pub fn from_node(node: Node, hugr: &impl HugrView) -> Self {
+        // TODO once https://github.com/CQCL/portgraph/issues/155
+        // is fixed we can just call try_from_nodes here.
+        // Until then, doing this saves a lot of work.
+        let nodes = vec![node];
+        let inputs = hugr
+            .node_inputs(node)
+            .filter(|&p| hugr.is_linked(node, p))
+            .map(|p| vec![(node, p)])
+            .collect_vec();
+        let outputs = hugr
+            .node_outputs(node)
+            .filter_map(|p| hugr.is_linked(node, p).then_some((node, p)))
+            .collect_vec();
+
+        Self {
+            nodes,
+            inputs,
+            outputs,
+        }
     }
 
     /// An iterator over the nodes in the subgraph.
@@ -424,15 +457,21 @@ impl SiblingSubgraph {
 
         // Connect the inserted nodes in-between the input and output nodes.
         let [inp, out] = extracted.get_io(extracted.root()).unwrap();
-        for (inp_port, repl_ports) in extracted.node_outputs(inp).zip(self.inputs.iter()) {
+        let inputs = extracted.node_outputs(inp).zip(self.inputs.iter());
+        let outputs = extracted.node_inputs(out).zip(self.outputs.iter());
+        let mut connections = Vec::with_capacity(inputs.size_hint().0 + outputs.size_hint().0);
+
+        for (inp_port, repl_ports) in inputs {
             for (repl_node, repl_port) in repl_ports {
-                extracted.connect(inp, inp_port, node_map[repl_node], *repl_port);
+                connections.push((inp, inp_port, node_map[repl_node], *repl_port));
             }
         }
-        for (out_port, (repl_node, repl_port)) in
-            extracted.node_inputs(out).zip(self.outputs.iter())
-        {
-            extracted.connect(node_map[repl_node], *repl_port, out, out_port);
+        for (out_port, (repl_node, repl_port)) in outputs {
+            connections.push((node_map[repl_node], *repl_port, out, out_port));
+        }
+
+        for (src, src_port, dst, dst_port) in connections {
+            extracted.connect(src, src_port, dst, dst_port);
         }
 
         extracted
@@ -475,7 +514,7 @@ impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
     }
 }
 
-impl<'g, Base: HugrView> ConvexChecker for TopoConvexChecker<'g, Base> {
+impl<Base: HugrView> ConvexChecker for TopoConvexChecker<'_, Base> {
     fn is_convex(
         &self,
         nodes: impl IntoIterator<Item = portgraph::NodeIndex>,
@@ -756,14 +795,10 @@ mod tests {
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
-        extension::{
-            prelude::{BOOL_T, QB_T},
-            EMPTY_REG,
-        },
+        extension::prelude::{bool_t, qb_t},
         hugr::views::{HierarchyView, SiblingGraph},
         ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::test::and_op,
-        type_row,
     };
 
     use super::*;
@@ -798,7 +833,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(type_row![QB_T, QB_T, QB_T])
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
                 .with_extension_delta(ExtensionSet::from_iter([
                     test_quantum_extension::EXTENSION_ID,
                     float_types::EXTENSION_ID,
@@ -831,7 +866,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(type_row![BOOL_T])
+            Signature::new_endo(vec![bool_t()])
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -843,7 +878,7 @@ mod tests {
             dfg.finish_with_outputs(outs3.outputs())?
         };
         let hugr = mod_builder
-            .finish_prelude_hugr()
+            .finish_hugr(&test_quantum_extension::REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -853,7 +888,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new(BOOL_T, type_row![BOOL_T, BOOL_T])
+            Signature::new(bool_t(), vec![bool_t(), bool_t()])
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -865,7 +900,7 @@ mod tests {
             dfg.finish_with_outputs([b1, b2])?
         };
         let hugr = mod_builder
-            .finish_prelude_hugr()
+            .finish_hugr(&test_quantum_extension::REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -875,7 +910,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(BOOL_T)
+            Signature::new_endo(bool_t())
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -886,7 +921,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr(&EMPTY_REG)
+            .finish_hugr(&test_quantum_extension::REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -917,7 +952,7 @@ mod tests {
 
         let empty_dfg = {
             let builder =
-                DFGBuilder::new(Signature::new_endo(type_row![QB_T, QB_T, QB_T])).unwrap();
+                DFGBuilder::new(Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -940,7 +975,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
         assert_eq!(
             sub.signature(&func),
-            Signature::new_endo(type_row![QB_T, QB_T, QB_T]).with_extension_delta(
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).with_extension_delta(
                 ExtensionSet::from_iter([
                     test_quantum_extension::EXTENSION_ID,
                     float_types::EXTENSION_ID,
@@ -957,7 +992,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -1030,9 +1065,9 @@ mod tests {
         let (hugr, func_root) = build_3not_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         let [inp, _out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().unwrap();
-        let not2 = hugr.output_neighbours(not1).exactly_one().unwrap();
-        let not3 = hugr.output_neighbours(not2).exactly_one().unwrap();
+        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
+        let not2 = hugr.output_neighbours(not1).exactly_one().ok().unwrap();
+        let not3 = hugr.output_neighbours(not2).exactly_one().ok().unwrap();
         let not1_inp = hugr.node_inputs(not1).next().unwrap();
         let not1_out = hugr.node_outputs(not1).next().unwrap();
         let not3_inp = hugr.node_inputs(not3).next().unwrap();
@@ -1053,11 +1088,12 @@ mod tests {
     fn convex_multiports() {
         let (hugr, func_root) = build_multiport_hugr().unwrap();
         let [inp, out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().unwrap();
+        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
         let not2 = hugr
             .output_neighbours(not1)
             .filter(|&n| n != out)
             .exactly_one()
+            .ok()
             .unwrap();
 
         let subgraph = SiblingSubgraph::try_from_nodes([not1, not2], &hugr).unwrap();
@@ -1117,8 +1153,8 @@ mod tests {
     #[test]
     fn edge_both_output_and_copy() {
         // https://github.com/CQCL/hugr/issues/518
-        let one_bit = type_row![BOOL_T];
-        let two_bit = type_row![BOOL_T, BOOL_T];
+        let one_bit = vec![bool_t()];
+        let two_bit = vec![bool_t(), bool_t()];
 
         let mut builder = DFGBuilder::new(inout_sig(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
@@ -1131,7 +1167,9 @@ mod tests {
             .unwrap()
             .outputs();
         let outw = [outw1].into_iter().chain(outw2);
-        let h = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
+        let h = builder
+            .finish_hugr_with_outputs(outw, &test_quantum_extension::REG)
+            .unwrap();
         let view = SiblingGraph::<DfgID>::try_new(&h, h.root()).unwrap();
         let subg = SiblingSubgraph::try_new_dataflow_subgraph(&view).unwrap();
         assert_eq!(subg.nodes().len(), 2);

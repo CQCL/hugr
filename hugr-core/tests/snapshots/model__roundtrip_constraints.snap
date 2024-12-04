@@ -1,0 +1,16 @@
+---
+source: hugr-core/tests/model.rs
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-constraints.edn\"))"
+---
+(hugr 0)
+
+(declare-func array.replicate
+  (forall ?0 type)
+  (forall ?1 nat)
+  (where (nonlinear ?0))
+  [?0] [(@ prelude.Array ?0 ?1)] (ext))
+
+(declare-func array.copy
+  (forall ?0 type)
+  (where (nonlinear ?0))
+  [(@ prelude.Array ?0)] [(@ prelude.Array ?0) (@ prelude.Array ?0)] (ext))

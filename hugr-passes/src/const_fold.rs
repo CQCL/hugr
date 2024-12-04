@@ -78,7 +78,7 @@ impl ConstFoldPass {
             )
         });
 
-        let results = Machine::default().run(ConstFoldContext(hugr), inputs);
+        let results = Machine::new(&hugr).run(ConstFoldContext(hugr), inputs);
         let mut keep_nodes = HashSet::new();
         self.find_needed_nodes(&results, &mut keep_nodes);
         let [root_inp, _] = hugr.get_io(hugr.root()).unwrap();
@@ -105,7 +105,7 @@ impl ConstFoldPass {
                     n,
                     ip,
                     results
-                        .try_read_wire_value::<Value, _, _>(Wire::new(src, outp))
+                        .try_read_wire_concrete::<Value, _, _>(Wire::new(src, outp))
                         .ok()?,
                 ))
             })
@@ -139,7 +139,7 @@ impl ConstFoldPass {
 
     fn find_needed_nodes<H: HugrView>(
         &self,
-        results: &AnalysisResults<ValueHandle, ConstFoldContext<H>>,
+        results: &AnalysisResults<ValueHandle, H>,
         needed: &mut HashSet<Node>,
     ) {
         let mut q = VecDeque::new();
@@ -175,7 +175,7 @@ impl ConstFoldPass {
                     EdgeKind::Value(_) => {
                         h.get_optype(src).is_load_constant()
                             || results
-                                .try_read_wire_value::<Value, _, _>(Wire::new(src, op))
+                                .try_read_wire_concrete::<Value, _, _>(Wire::new(src, op))
                                 .is_err()
                     }
                     EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
@@ -192,10 +192,7 @@ impl ConstFoldPass {
 
 // "Diverge" aka "never-terminate"
 // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
-fn might_diverge<V: AbstractValue>(
-    results: &AnalysisResults<V, impl DFContext<V>>,
-    n: Node,
-) -> bool {
+fn might_diverge<V: AbstractValue>(results: &AnalysisResults<V, impl HugrView>, n: Node) -> bool {
     let op = results.hugr().get_optype(n);
     if op.is_cfg() {
         // TODO if the CFG has no cycles (that are possible given predicates)
@@ -258,10 +255,8 @@ impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
 }
 
 impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
-    type View = H;
-
     fn interpret_leaf_op(
-        &self,
+        &mut self,
         node: Node,
         op: &ExtensionOp,
         ins: &[PartialValue<ValueHandle>],
@@ -274,7 +269,9 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
             .enumerate()
             .zip(ins.iter())
             .filter_map(|((i, ty), pv)| {
-                Some((IncomingPort::from(i), pv.clone().try_into_value(ty).ok()?))
+                pv.clone()
+                    .try_into_concrete(ty)
+                    .map_or(None, |v| Some((IncomingPort::from(i), v)))
             })
             .collect::<Vec<_>>();
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {

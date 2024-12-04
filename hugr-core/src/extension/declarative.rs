@@ -29,6 +29,7 @@ mod types;
 
 use std::fs::File;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::extension::prelude::PRELUDE_ID;
 use crate::ops::OpName;
@@ -136,8 +137,8 @@ impl ExtensionSetDeclaration {
                 registry,
             };
             let ext = decl.make_extension(&self.imports, ctx)?;
-            let ext = registry.register(ext)?;
-            scope.insert(ext.name())
+            scope.insert(ext.name());
+            registry.register(ext)?;
         }
 
         Ok(())
@@ -150,19 +151,24 @@ impl ExtensionDeclaration {
         &self,
         imports: &ExtensionSet,
         ctx: DeclarationContext<'_>,
-    ) -> Result<Extension, ExtensionDeclarationError> {
-        let mut ext = Extension::new(self.name.clone(), crate::extension::Version::new(0, 0, 0))
-            .with_reqs(imports.clone());
+    ) -> Result<Arc<Extension>, ExtensionDeclarationError> {
+        Extension::try_new_arc(
+            self.name.clone(),
+            // TODO: Get the version as a parameter.
+            crate::extension::Version::new(0, 0, 0),
+            |ext, extension_ref| {
+                for t in &self.types {
+                    t.register(ext, ctx, extension_ref)?;
+                }
 
-        for t in &self.types {
-            t.register(&mut ext, ctx)?;
-        }
+                for o in &self.operations {
+                    o.register(ext, ctx, extension_ref)?;
+                }
+                ext.add_requirements(imports.clone());
 
-        for o in &self.operations {
-            o.register(&mut ext, ctx)?;
-        }
-
-        Ok(ext)
+                Ok(())
+            },
+        )
     }
 }
 
@@ -272,6 +278,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
     use crate::extension::PRELUDE_REGISTRY;
     use crate::std_extensions;
@@ -347,12 +354,9 @@ extensions:
         let new_exts = new_extensions(&reg, dependencies).collect_vec();
 
         assert_eq!(new_exts.len(), num_declarations);
+        assert_eq!(new_exts.iter().flat_map(|e| e.types()).count(), num_types);
         assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.types()).count(),
-            num_types
-        );
-        assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.operations()).count(),
+            new_exts.iter().flat_map(|e| e.operations()).count(),
             num_operations
         );
         Ok(())
@@ -374,12 +378,9 @@ extensions:
         let new_exts = new_extensions(&reg, dependencies).collect_vec();
 
         assert_eq!(new_exts.len(), num_declarations);
+        assert_eq!(new_exts.iter().flat_map(|e| e.types()).count(), num_types);
         assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.types()).count(),
-            num_types
-        );
-        assert_eq!(
-            new_exts.iter().flat_map(|(_, e)| e.operations()).count(),
+            new_exts.iter().flat_map(|e| e.operations()).count(),
             num_operations
         );
         Ok(())
@@ -406,8 +407,8 @@ extensions:
     fn new_extensions<'a>(
         reg: &'a ExtensionRegistry,
         dependencies: &'a ExtensionRegistry,
-    ) -> impl Iterator<Item = (&'a ExtensionId, &'a Extension)> {
+    ) -> impl Iterator<Item = &'a Arc<Extension>> {
         reg.iter()
-            .filter(move |(id, _)| !dependencies.contains(id) && *id != &PRELUDE_ID)
+            .filter(move |ext| !dependencies.contains(ext.name()) && ext.name() != &PRELUDE_ID)
     }
 }

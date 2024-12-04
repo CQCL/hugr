@@ -1,21 +1,22 @@
 //! Builders and utilities for benchmarks.
 
+use std::sync::Arc;
+
 use hugr::builder::{
     BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     HugrBuilder, ModuleBuilder,
 };
-use hugr::extension::prelude::{BOOL_T, QB_T, USIZE_T};
+use hugr::extension::prelude::{bool_t, qb_t, usize_t};
 use hugr::extension::PRELUDE_REGISTRY;
 use hugr::ops::OpName;
 use hugr::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
-use hugr::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
+use hugr::std_extensions::arithmetic::float_types::float64_type;
 use hugr::types::Signature;
 use hugr::{type_row, Extension, Hugr, Node};
 use lazy_static::lazy_static;
 
 pub fn simple_dfg_hugr() -> Hugr {
-    let dfg_builder =
-        DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
+    let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
     let [i1] = dfg_builder.input_wires_arr();
     dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
 }
@@ -23,7 +24,7 @@ pub fn simple_dfg_hugr() -> Hugr {
 pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
     cfg_builder: &mut CFGBuilder<T>,
 ) -> Result<(), BuildError> {
-    let sum2_variants = vec![type_row![USIZE_T], type_row![USIZE_T]];
+    let sum2_variants = vec![vec![usize_t()].into(), vec![usize_t()].into()];
     let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
     let entry = {
         let [inw] = entry_b.input_wires_arr();
@@ -31,8 +32,8 @@ pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
         let sum = entry_b.make_sum(1, sum2_variants, [inw])?;
         entry_b.finish_with_outputs(sum, [])?
     };
-    let mut middle_b = cfg_builder
-        .simple_block_builder(Signature::new(type_row![USIZE_T], type_row![USIZE_T]), 1)?;
+    let mut middle_b =
+        cfg_builder.simple_block_builder(Signature::new(vec![usize_t()], vec![usize_t()]), 1)?;
     let middle = {
         let c = middle_b.add_load_const(hugr::ops::Value::unary_unit_sum());
         let [inw] = middle_b.input_wires_arr();
@@ -47,41 +48,41 @@ pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
 
 pub fn simple_cfg_hugr() -> Hugr {
     let mut cfg_builder =
-        CFGBuilder::new(Signature::new(type_row![USIZE_T], type_row![USIZE_T])).unwrap();
+        CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
     simple_cfg_builder(&mut cfg_builder).unwrap();
     cfg_builder.finish_prelude_hugr().unwrap()
 }
 
 lazy_static! {
-    static ref QUANTUM_EXT: Extension = {
-        let mut extension = Extension::new(
+    static ref QUANTUM_EXT: Arc<Extension> = {
+        Extension::new_arc(
             "bench.quantum".try_into().unwrap(),
             hugr::extension::Version::new(0, 0, 0),
-        );
+            |ext, extension_ref| {
+                ext.add_op(
+                    OpName::new_inline("H"),
+                    "".into(),
+                    Signature::new_endo(qb_t()),
+                    extension_ref,
+                )
+                .unwrap();
+                ext.add_op(
+                    OpName::new_inline("Rz"),
+                    "".into(),
+                    Signature::new(vec![qb_t(), float64_type()], vec![qb_t()]),
+                    extension_ref,
+                )
+                .unwrap();
 
-        extension
-            .add_op(
-                OpName::new_inline("H"),
-                "".into(),
-                Signature::new_endo(QB_T),
-            )
-            .unwrap();
-        extension
-            .add_op(
-                OpName::new_inline("Rz"),
-                "".into(),
-                Signature::new(type_row![QB_T, FLOAT64_TYPE], type_row![QB_T]),
-            )
-            .unwrap();
-
-        extension
-            .add_op(
-                OpName::new_inline("CX"),
-                "".into(),
-                Signature::new_endo(type_row![QB_T, QB_T]),
-            )
-            .unwrap();
-        extension
+                ext.add_op(
+                    OpName::new_inline("CX"),
+                    "".into(),
+                    Signature::new_endo(vec![qb_t(), qb_t()]),
+                    extension_ref,
+                )
+                .unwrap();
+            },
+        )
     };
 }
 
@@ -104,7 +105,7 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     //     .instantiate_extension_op("Rz", [], &FLOAT_OPS_REGISTRY)
     //     .unwrap();
     let signature =
-        Signature::new_endo(type_row![QB_T, QB_T]).with_extension_delta(QUANTUM_EXT.name().clone());
+        Signature::new_endo(vec![qb_t(), qb_t()]).with_extension_delta(QUANTUM_EXT.name().clone());
     let mut module_builder = ModuleBuilder::new();
     let mut f_build = module_builder.define_function("main", signature).unwrap();
 

@@ -24,8 +24,10 @@ use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
+use crate::extension::resolution::{
+    update_op_extensions, update_op_types_extensions, ExtensionResolutionError,
+};
 use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
-use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
@@ -87,7 +89,7 @@ impl Hugr {
         &mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
-        resolve_extension_ops(self, extension_registry)?;
+        self.resolve_extension_defs(extension_registry)?;
         self.validate_no_extensions(extension_registry)?;
         #[cfg(feature = "extension_inference")]
         {
@@ -166,6 +168,67 @@ impl Hugr {
         }
         infer(self, self.root(), remove)?;
         Ok(())
+    }
+
+    /// Given a Hugr that has been deserialized, collect all extensions used to
+    /// define the HUGR while resolving all [`OpType::OpaqueOp`] operations into
+    /// [`OpType::ExtensionOp`]s and updating the extension pointer in all
+    /// internal [`crate::types::CustomType`]s to point to the extensions in the
+    /// register.
+    ///
+    /// When listing "used extensions" we only care about _definitional_
+    /// extension requirements, i.e., the operations and types that are required
+    /// to define the HUGR nodes and wire types. This is computed from the union
+    /// of all extension required across the HUGR.
+    ///
+    /// This is distinct from _runtime_ extension requirements computed in
+    /// [`Hugr::infer_extensions`], which are computed more granularly in each
+    /// function signature by the `required_extensions` field and define the set
+    /// of capabilities required by the runtime to execute each function.
+    ///
+    /// Returns a new extension registry with the extensions used in the Hugr.
+    ///
+    /// # Parameters
+    ///
+    /// - `extensions`: The extension set considered when resolving opaque
+    ///     operations and types. The original Hugr's internal extension
+    ///     registry is ignored and replaced with the newly computed one.
+    ///
+    /// # Errors
+    ///
+    /// - If an opaque operation cannot be resolved to an extension operation.
+    /// - If an extension operation references an extension that is missing from
+    ///   the registry.
+    /// - If a custom type references an extension that is missing from the
+    ///   registry.
+    pub fn resolve_extension_defs(
+        &mut self,
+        extensions: &ExtensionRegistry,
+    ) -> Result<ExtensionRegistry, ExtensionResolutionError> {
+        let mut used_extensions = ExtensionRegistry::default();
+
+        // Here we need to iterate the optypes in the hugr mutably, to avoid
+        // having to clone and accumulate all replacements before finally
+        // applying them.
+        //
+        // This is not something we want to expose it the API, so we manually
+        // iterate instead of writing it as a method.
+        for n in 0..self.node_count() {
+            let pg_node = portgraph::NodeIndex::new(n);
+            let node: Node = pg_node.into();
+            if !self.contains_node(node) {
+                continue;
+            }
+
+            let op = &mut self.op_types[pg_node];
+
+            if let Some(extension) = update_op_extensions(node, op, extensions)? {
+                used_extensions.register_updated_ref(extension);
+            }
+            update_op_types_extensions(node, op, extensions, &mut used_extensions)?;
+        }
+
+        Ok(used_extensions)
     }
 }
 
