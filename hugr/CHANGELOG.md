@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-v0.13.3...hugr-v0.14.0) - 2024-12-04
+
+### Bug Fixes
+
+- hierarchical simple replacement using insert_hugr ([#1718](https://github.com/CQCL/hugr/pull/1718))
+
+### New Features
+
+- Dataflow analysis framework ([#1476](https://github.com/CQCL/hugr/pull/1476))
+- Export/import of JSON metadata ([#1622](https://github.com/CQCL/hugr/pull/1622))
+- Add `SiblingSubgraph::from_node` ([#1655](https://github.com/CQCL/hugr/pull/1655))
+- [**breaking**] Replace GATs with `impl Iterator` returns (RPITIT) on `HugrView` ([#1660](https://github.com/CQCL/hugr/pull/1660))
+- Emulate `TypeBound`s on parameters via constraints. ([#1624](https://github.com/CQCL/hugr/pull/1624))
+- Add array `repeat` and `scan` ops ([#1633](https://github.com/CQCL/hugr/pull/1633))
+- move unwrap builder to hugr core ([#1674](https://github.com/CQCL/hugr/pull/1674))
+- Lists and extension sets with splicing ([#1657](https://github.com/CQCL/hugr/pull/1657))
+- add HugrView::first_child and HugrMut::remove_subtree ([#1721](https://github.com/CQCL/hugr/pull/1721))
+- Lower collections extension ([#1720](https://github.com/CQCL/hugr/pull/1720))
+- [**breaking**] impl HugrView for any &(mut) to a HugrView ([#1678](https://github.com/CQCL/hugr/pull/1678))
+- export llvm test utilities under llvm-test feature ([#1677](https://github.com/CQCL/hugr/pull/1677))
+- [**breaking**] Share `Extension`s under `Arc`s ([#1647](https://github.com/CQCL/hugr/pull/1647))
+- [**breaking**] OpDefs and TypeDefs keep a reference to their extension ([#1719](https://github.com/CQCL/hugr/pull/1719))
+- [**breaking**] Have `CustomType`s reference their `Extension` definition ([#1723](https://github.com/CQCL/hugr/pull/1723))
+- [**breaking**] Resolve OpaqueOps and CustomType extensions  ([#1735](https://github.com/CQCL/hugr/pull/1735))
+
+### Performance
+
+- Faster singleton SiblingSubgraph construction ([#1654](https://github.com/CQCL/hugr/pull/1654))
+
+### Refactor
+
+- avoid hugr clone in simple replace ([#1724](https://github.com/CQCL/hugr/pull/1724))
+- [trivial] replace.rs: use HugrView::first_child  ([#1737](https://github.com/CQCL/hugr/pull/1737))
+
 ## [0.13.3](https://github.com/CQCL/hugr/compare/hugr-v0.13.2...hugr-v0.13.3) - 2024-11-06
 
 ### Bug Fixes
