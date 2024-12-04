@@ -4,14 +4,14 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeArg, TypeRow};
+use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
 use crate::IncomingPort;
 
 #[cfg(test)]
 use ::proptest_derive::Arbitrary;
 
 /// Trait implemented by all dataflow operations.
-pub trait DataflowOpTrait {
+pub trait DataflowOpTrait: Sized + Clone {
     /// Tag identifying the operation.
     const TAG: OpTag;
 
@@ -49,6 +49,10 @@ pub trait DataflowOpTrait {
     fn static_input(&self) -> Option<EdgeKind> {
         None
     }
+
+    /// Apply a type-level substitution to this OpType, i.e. replace
+    /// [type variables](TypeArg::new_var_use) with new types.
+    fn subst_mut(&mut self, _subst: &Substitution) {}
 }
 
 /// Helpers to construct input and output nodes
@@ -108,6 +112,10 @@ impl DataflowOpTrait for Input {
     fn signature(&self) -> Signature {
         Signature::new(TypeRow::new(), self.types.clone())
     }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.types = self.types.substitute(subst);
+    }
 }
 impl DataflowOpTrait for Output {
     const TAG: OpTag = OpTag::Output;
@@ -124,6 +132,10 @@ impl DataflowOpTrait for Output {
 
     fn other_output(&self) -> Option<EdgeKind> {
         None
+    }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.types = self.types.substitute(subst);
     }
 }
 
@@ -150,6 +162,10 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn static_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::static_input(self)
+    }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        DataflowOpTrait::subst_mut(self, subst)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -186,6 +202,19 @@ impl DataflowOpTrait for Call {
 
     fn static_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Function(self.called_function_type().clone()))
+    }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for ta in self.type_args.iter_mut() {
+            *ta = ta.substitute(subst);
+        }
+        self.instantiation = self.instantiation.substitute(subst);
+        debug_assert_eq!(
+            self.func_sig
+                .instantiate(&self.type_args, subst.extension_registry())
+                .as_ref(),
+            Ok(&self.instantiation)
+        );
     }
 }
 impl Call {
@@ -279,6 +308,10 @@ impl DataflowOpTrait for CallIndirect {
             .insert(0, Type::new_function(self.signature.clone()));
         s
     }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.signature = self.signature.substitute(subst);
+    }
 }
 
 /// Load a static constant in to the local dataflow graph.
@@ -289,6 +322,7 @@ pub struct LoadConstant {
     pub datatype: Type,
 }
 impl_op_name!(LoadConstant);
+// Constants cannot contain type variables, so no substitution required
 impl DataflowOpTrait for LoadConstant {
     const TAG: OpTag = OpTag::LoadConst;
 
@@ -304,6 +338,7 @@ impl DataflowOpTrait for LoadConstant {
         Some(EdgeKind::Const(self.constant_type().clone()))
     }
 }
+
 impl LoadConstant {
     #[inline]
     /// The type of the constant loaded by this op.
@@ -357,6 +392,19 @@ impl DataflowOpTrait for LoadFunction {
 
     fn static_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Function(self.func_sig.clone()))
+    }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for ta in self.type_args.iter_mut() {
+            *ta = ta.substitute(subst);
+        }
+        self.signature = self.signature.substitute(subst);
+        debug_assert_eq!(
+            self.func_sig
+                .instantiate(&self.type_args, subst.extension_registry())
+                .as_ref(),
+            Ok(&self.signature)
+        );
     }
 }
 impl LoadFunction {
@@ -446,5 +494,9 @@ impl DataflowOpTrait for DFG {
 
     fn signature(&self) -> Signature {
         self.inner_signature()
+    }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.signature = self.signature.substitute(subst)
     }
 }

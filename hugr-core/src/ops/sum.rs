@@ -2,7 +2,7 @@
 
 use super::dataflow::DataflowOpTrait;
 use super::{impl_op_name, OpTag};
-use crate::types::{EdgeKind, Signature, Type, TypeRow};
+use crate::types::{EdgeKind, Signature, Substitution, Type, TypeRow};
 
 /// An operation that creates a tagged sum value from one of its variants.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -51,5 +51,11 @@ impl DataflowOpTrait for Tag {
 
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
+    }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for r in self.variants.iter_mut() {
+            *r = r.substitute(subst);
+        }
     }
 }

@@ -11,8 +11,11 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::types::{type_param::TypeArg, Signature};
+use crate::{
+    extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError},
+    types::Substitution,
+};
 use crate::{ops, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -160,6 +163,19 @@ impl DataflowOpTrait for ExtensionOp {
     fn signature(&self) -> Signature {
         self.signature.clone()
     }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for ta in self.args.iter_mut() {
+            *ta = ta.substitute(subst);
+        }
+        self.signature = self.signature.substitute(subst);
+        debug_assert_eq!(
+            self.def
+                .compute_signature(&self.args, subst.extension_registry())
+                .as_ref(),
+            Ok(&self.signature)
+        );
+    }
 }
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
@@ -248,6 +264,13 @@ impl DataflowOpTrait for OpaqueOp {
         self.signature
             .clone()
             .with_extension_delta(self.extension().clone())
+    }
+
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for ta in self.args.iter_mut() {
+            *ta = ta.substitute(subst);
+        }
+        self.signature = self.signature.substitute(subst);
     }
 }
 
