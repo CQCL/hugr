@@ -3,22 +3,25 @@
 use core::panic;
 use std::sync::Arc;
 
+use cool_asserts::assert_matches;
 use itertools::Itertools;
 use rstest::rstest;
 
-use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+use crate::builder::{
+    Container, Dataflow, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
+};
 use crate::extension::prelude::{bool_t, ConstUsize};
 use crate::extension::resolution::{
     collect_op_extensions, collect_op_types_extensions, update_op_extensions,
-    update_op_types_extensions,
+    update_op_types_extensions, ExtensionCollectionError,
 };
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE};
-use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
+use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
 use crate::std_extensions::arithmetic::float_types::{self, float64_type};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::types::{Signature, Type};
-use crate::{type_row, Extension, HugrView};
+use crate::{type_row, Extension, Hugr, HugrView};
 
 #[rstest]
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
@@ -84,6 +87,7 @@ fn resolve_hugr_extensions() {
     let (ext_b, op_b) = make_extension("dummy.b", "op_b");
     let (ext_c, op_c) = make_extension("dummy.c", "op_c");
     let (ext_d, op_d) = make_extension("dummy.d", "op_d");
+    let (ext_e, op_e) = make_extension("dummy.e", "op_e");
 
     let build_extensions = ExtensionRegistry::new([
         PRELUDE.to_owned(),
@@ -91,6 +95,7 @@ fn resolve_hugr_extensions() {
         ext_b.clone(),
         ext_c.clone(),
         ext_d.clone(),
+        ext_e.clone(),
         float_types::EXTENSION.to_owned(),
         int_types::EXTENSION.to_owned(),
     ]);
@@ -113,10 +118,16 @@ fn resolve_hugr_extensions() {
         .define_function(
             "dummy_fn",
             Signature::new(vec![float64_type(), bool_t()], vec![]).with_extension_delta(
-                [ext_a.name(), ext_b.name(), ext_c.name(), ext_d.name()]
-                    .into_iter()
-                    .cloned()
-                    .collect::<ExtensionSet>(),
+                [
+                    ext_a.name(),
+                    ext_b.name(),
+                    ext_c.name(),
+                    ext_d.name(),
+                    ext_e.name(),
+                ]
+                .into_iter()
+                .cloned()
+                .collect::<ExtensionSet>(),
             ),
         )
         .unwrap();
@@ -161,7 +172,7 @@ fn resolve_hugr_extensions() {
     )
     .unwrap();
 
-    // Dfg control flow.
+    // Dfg control flow: Tail loop
     let mut tail_loop = func
         .tail_loop_builder([(bool_t(), func_i1)], [], vec![].into())
         .unwrap();
@@ -176,6 +187,15 @@ fn resolve_hugr_extensions() {
         .unwrap()
         .out_wire(0);
     tail_loop.finish_with_outputs(tl_tag, vec![]).unwrap();
+
+    // Dfg control flow: Conditionals
+    let cond_tag = func.add_load_const(Value::unary_unit_sum());
+    let mut cond = func
+        .conditional_builder(([type_row![]], cond_tag), [], type_row![])
+        .unwrap();
+    let mut case = cond.case_builder(0).unwrap();
+    case.add_dataflow_op(op_e, [func_i1]).unwrap();
+    case.finish_with_outputs([]).unwrap();
 
     // Cfg control flow.
     let mut cfg = func
@@ -210,9 +230,63 @@ fn resolve_hugr_extensions() {
     );
 
     // Check that the mutable methods collect the same extensions.
+    assert_matches!(
+        hugr.resolve_extension_defs(&ExtensionRegistry::default()),
+        Err(_)
+    );
     let resolved = hugr.resolve_extension_defs(&build_extensions).unwrap();
     assert_eq!(
         &resolved, &build_extensions,
         "{resolved} != {build_extensions}"
+    );
+}
+
+/// Fail when collecting extensions but the weak pointers are not resolved.
+#[rstest]
+fn dropped_weak_extensions() {
+    let (ext_a, op_a) = make_extension("dummy.a", "op_a");
+    let build_extensions = ExtensionRegistry::new([
+        PRELUDE.to_owned(),
+        ext_a.clone(),
+        float_types::EXTENSION.to_owned(),
+    ]);
+
+    let mut func = FunctionBuilder::new(
+        "dummy_fn",
+        Signature::new(vec![float64_type(), bool_t()], vec![]).with_extension_delta(
+            [ext_a.name()]
+                .into_iter()
+                .cloned()
+                .collect::<ExtensionSet>(),
+        ),
+    )
+    .unwrap();
+    let [_func_i0, func_i1] = func.input_wires_arr();
+    func.add_dataflow_op(op_a, vec![func_i1]).unwrap();
+
+    let hugr = func.finish_hugr(&build_extensions).unwrap();
+
+    // Do a serialization roundtrip to drop the references.
+    let ser = serde_json::to_string(&hugr).unwrap();
+    let hugr: Hugr = serde_json::from_str(&ser).unwrap();
+
+    let op_collection = hugr
+        .nodes()
+        .try_for_each(|node| hugr.get_optype(node).used_extensions().map(|_| ()));
+    assert_matches!(
+        op_collection,
+        Err(ExtensionCollectionError::DroppedOpExtensions { .. })
+    );
+
+    let op_collection = hugr.nodes().try_for_each(|node| {
+        let op = hugr.get_optype(node);
+        if let Some(sig) = op.dataflow_signature() {
+            sig.used_extensions()?;
+        }
+        Ok(())
+    });
+    assert_matches!(
+        op_collection,
+        Err(ExtensionCollectionError::DroppedSignatureExtensions { .. })
     );
 }
