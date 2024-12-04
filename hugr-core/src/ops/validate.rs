@@ -215,21 +215,18 @@ impl ChildrenValidationError {
 #[non_exhaustive]
 pub enum EdgeValidationError {
     /// The dataflow signature of two connected basic blocks does not match.
-    #[error("The dataflow signature of two connected basic blocks does not match. The source type was {source_ty} but the target had type {target_types}",
-        source_ty = source_types.clone().unwrap_or_default(),
+    #[error("The dataflow signature of two connected basic blocks does not match. Output signature: {source_op}, input signature: {target_op}",
+        source_op = edge.source_op,
+        target_op = edge.target_op
     )]
-    CFGEdgeSignatureMismatch {
-        edge: ChildrenEdgeData,
-        source_types: Option<TypeRow>,
-        target_types: TypeRow,
-    },
+    CFGEdgeSignatureMismatch { edge: ChildrenEdgeData },
 }
 
 impl EdgeValidationError {
     /// Returns information on the edge that caused the error.
     pub fn edge(&self) -> &ChildrenEdgeData {
         match self {
-            EdgeValidationError::CFGEdgeSignatureMismatch { edge, .. } => edge,
+            EdgeValidationError::CFGEdgeSignatureMismatch { edge } => edge,
         }
     }
 }
@@ -345,14 +342,8 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
         _ => panic!("CFG sibling graphs can only contain basic block operations."),
     };
 
-    let source_types = source.successor_input(edge.source_port.index());
-    if source_types.as_ref() != Some(target_input) {
-        let target_types = target_input.clone();
-        return Err(EdgeValidationError::CFGEdgeSignatureMismatch {
-            edge,
-            source_types,
-            target_types,
-        });
+    if source.successor_input(edge.source_port.index()).as_ref() != Some(target_input) {
+        return Err(EdgeValidationError::CFGEdgeSignatureMismatch { edge });
     }
 
     Ok(())
