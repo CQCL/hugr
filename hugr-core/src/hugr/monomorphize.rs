@@ -452,6 +452,7 @@ mod test {
         assert!(funcs
             .values()
             .all(|(_, fd)| fd.signature.params().is_empty()));
+        #[allow(clippy::unnecessary_to_owned)] // It is necessary
         let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
         assert_eq!(m, mono.handle().node());
         assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.root()));
