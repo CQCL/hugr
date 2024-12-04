@@ -391,7 +391,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
     fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
-        let block_op = base.get_optype(block_n).as_dataflow_block().unwrap();
+        let block_op = base
+            .as_ref()
+            .get_optype(block_n)
+            .as_dataflow_block()
+            .unwrap();
         let signature = block_op.inner_signature();
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))

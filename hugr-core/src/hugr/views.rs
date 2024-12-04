@@ -1,6 +1,7 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 pub mod descendants;
+mod impls;
 pub mod petgraph;
 pub mod render;
 mod root_checked;
@@ -519,41 +520,35 @@ impl ExtractHugr for &mut Hugr {
     }
 }
 
-impl<T: AsRef<Hugr>> HugrView for T {
+impl HugrView for Hugr {
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.as_ref().graph.contains_node(node.pg_index())
+        self.graph.contains_node(node.pg_index())
     }
 
     #[inline]
     fn node_count(&self) -> usize {
-        self.as_ref().graph.node_count()
+        self.graph.node_count()
     }
 
     #[inline]
     fn edge_count(&self) -> usize {
-        self.as_ref().graph.link_count()
+        self.graph.link_count()
     }
 
     #[inline]
     fn nodes(&self) -> impl Iterator<Item = Node> + Clone {
-        self.as_ref().graph.nodes_iter().map_into()
+        self.graph.nodes_iter().map_into()
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
-        self.as_ref()
-            .graph
-            .port_offsets(node.pg_index(), dir)
-            .map_into()
+        self.graph.port_offsets(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
-        self.as_ref()
-            .graph
-            .all_port_offsets(node.pg_index())
-            .map_into()
+        self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
     #[inline]
@@ -563,54 +558,46 @@ impl<T: AsRef<Hugr>> HugrView for T {
         port: impl Into<Port>,
     ) -> impl Iterator<Item = (Node, Port)> + Clone {
         let port = port.into();
-        let hugr = self.as_ref();
-        let port = hugr
+
+        let port = self
             .graph
             .port_index(node.pg_index(), port.pg_offset())
             .unwrap();
-        hugr.graph.port_links(port).map(|(_, link)| {
+        self.graph.port_links(port).map(|(_, link)| {
             let port = link.port();
-            let node = hugr.graph.port_node(port).unwrap();
-            let offset = hugr.graph.port_offset(port).unwrap();
+            let node = self.graph.port_node(port).unwrap();
+            let offset = self.graph.port_offset(port).unwrap();
             (node.into(), offset.into())
         })
     }
 
     #[inline]
     fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
-        let hugr = self.as_ref();
-
-        hugr.graph
+        self.graph
             .get_connections(node.pg_index(), other.pg_index())
             .map(|(p1, p2)| {
-                [p1, p2].map(|link| hugr.graph.port_offset(link.port()).unwrap().into())
+                [p1, p2].map(|link| self.graph.port_offset(link.port()).unwrap().into())
             })
     }
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.as_ref().graph.num_ports(node.pg_index(), dir)
+        self.graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
     fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
-        self.as_ref().hierarchy.children(node.pg_index()).map_into()
+        self.hierarchy.children(node.pg_index()).map_into()
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
-        self.as_ref()
-            .graph
-            .neighbours(node.pg_index(), dir)
-            .map_into()
+        self.graph.neighbours(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
-        self.as_ref()
-            .graph
-            .all_neighbours(node.pg_index())
-            .map_into()
+        self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
 
