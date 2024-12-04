@@ -42,7 +42,6 @@ use fxhash::{FxHashMap, FxHasher};
 mod bindings;
 use bindings::Bindings;
 use indexmap::IndexMap;
-use std::collections::hash_map::Entry as HashMapEntry;
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -77,7 +76,7 @@ struct Resolver<'m, 'a> {
     /// Variables that are visible in the current scope.
     var_scope: Bindings<&'a str, NodeId, VarIndex>,
 
-    symbols: FxHashMap<&'a str, NodeId>,
+    symbols: FxIndexMap<&'a str, NodeId>,
     node_data: FxIndexMap<NodeId, NodeData>,
     region_data: FxIndexMap<RegionId, RegionData>,
     term_data: FxHashMap<TermId, TermData>,
@@ -95,7 +94,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             node_data: FxIndexMap::default(),
             region_data: FxIndexMap::default(),
             term_data: FxHashMap::default(),
-            symbols: FxHashMap::default(),
+            symbols: FxIndexMap::default(),
             module,
             bump,
             var_scope: Bindings::new(),
@@ -464,7 +463,8 @@ impl<'m, 'a> Resolver<'m, 'a> {
                     .get(&node)
                     .ok_or(SymbolRefError::NotVisible(node))?;
 
-                if node_data.shadowed {
+                // Check if the symbol has been shadowed at this point.
+                if self.symbols[node_data.position] != node {
                     return Err(SymbolRefError::NotVisible(node).into());
                 }
 
@@ -528,43 +528,29 @@ impl<'m, 'a> Resolver<'m, 'a> {
 
         for _ in 0..region_data.binding_count {
             let (node, node_data) = self.node_data.pop().unwrap();
-            let name = self.module.symbol_name(SymbolRef::Direct(node)).unwrap();
 
             if let Some(shadows) = node_data.shadows {
-                let shadows_data = self.node_data.get_mut(&shadows).unwrap();
-                shadows_data.shadowed = false;
-                self.symbols.insert(name, shadows);
+                self.symbols[node_data.position] = shadows;
             } else {
-                self.symbols.remove(name);
+                debug_assert_eq!(self.symbols.last().unwrap().1, &node);
+                self.symbols.pop();
             }
         }
     }
 
     fn introduce_symbol(&mut self, name: &'a str, node: NodeId) -> Result<(), SymbolIntroError> {
         let mut region_entry = self.region_data.last_entry().unwrap();
+        let (position, shadowed) = self.symbols.insert_full(name, node);
 
-        let shadows = match self.symbols.entry(name) {
-            HashMapEntry::Occupied(mut entry) => {
-                let shadows = *entry.get();
-                let shadows_data = self.node_data.get_mut(&shadows).unwrap();
-
-                if shadows_data.scope_depth == region_entry.index() {
-                    return Err(SymbolIntroError::DuplicateSymbol(
-                        node,
-                        shadows,
-                        name.to_string(),
-                    ));
-                }
-
-                shadows_data.shadowed = true;
-                entry.insert(node);
-                Some(shadows)
+        if let Some(shadowed) = shadowed {
+            if self.node_data[&shadowed].scope_depth == region_entry.index() {
+                return Err(SymbolIntroError::DuplicateSymbol(
+                    node,
+                    shadowed,
+                    name.to_string(),
+                ));
             }
-            HashMapEntry::Vacant(entry) => {
-                entry.insert(node);
-                None
-            }
-        };
+        }
 
         region_entry.get_mut().binding_count += 1;
 
@@ -572,8 +558,8 @@ impl<'m, 'a> Resolver<'m, 'a> {
             node,
             NodeData {
                 scope_depth: region_entry.index(),
-                shadows,
-                shadowed: false,
+                shadows: shadowed,
+                position,
             },
         );
 
@@ -593,7 +579,7 @@ struct TermData {
 struct NodeData {
     scope_depth: ScopeDepth,
     shadows: Option<NodeId>,
-    shadowed: bool,
+    position: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
