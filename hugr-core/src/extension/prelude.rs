@@ -958,9 +958,7 @@ impl MakeRegisteredOp for Lift {
 #[cfg(test)]
 mod test {
     use crate::builder::inout_sig;
-    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
-    use crate::utils::test_quantum_extension;
     use crate::{
         builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
@@ -1049,7 +1047,7 @@ mod test {
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
-        b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+        b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }
 
     #[test]
@@ -1063,7 +1061,7 @@ mod test {
         let some = b.add_load_value(const_val1);
         let none = b.add_load_value(const_val2);
 
-        b.finish_prelude_hugr_with_outputs([some, none]).unwrap();
+        b.finish_hugr_with_outputs([some, none]).unwrap();
     }
 
     #[test]
@@ -1077,8 +1075,7 @@ mod test {
         let bool = b.add_load_value(const_bool);
         let float = b.add_load_value(const_float);
 
-        b.finish_hugr_with_outputs([bool, float], &FLOAT_OPS_REGISTRY)
-            .unwrap();
+        b.finish_hugr_with_outputs([bool, float]).unwrap();
     }
 
     #[test]
@@ -1121,7 +1118,7 @@ mod test {
 
         b.add_dataflow_op(op, [err]).unwrap();
 
-        b.finish_prelude_hugr_with_outputs([]).unwrap();
+        b.finish_hugr_with_outputs([]).unwrap();
     }
 
     #[test]
@@ -1151,8 +1148,7 @@ mod test {
             .add_dataflow_op(panic_op, [err, q0, q1])
             .unwrap()
             .outputs_arr();
-        b.finish_hugr_with_outputs([q0, q1], &test_quantum_extension::REG)
-            .unwrap();
+        b.finish_hugr_with_outputs([q0, q1]).unwrap();
     }
 
     #[test]
@@ -1186,7 +1182,7 @@ mod test {
             .instantiate_extension_op(&PRINT_OP_ID, [], &PRELUDE_REGISTRY)
             .unwrap();
         b.add_dataflow_op(print_op, [greeting_out]).unwrap();
-        b.finish_prelude_hugr_with_outputs([]).unwrap();
+        b.finish_hugr_with_outputs([]).unwrap();
     }
 
     #[test]

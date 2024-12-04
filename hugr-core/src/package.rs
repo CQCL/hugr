@@ -1,41 +1,43 @@
 //! Bundles of hugr modules along with the extension required to load them.
 
 use derive_more::{Display, Error, From};
-use std::collections::HashMap;
+use itertools::Itertools;
 use std::path::Path;
-use std::sync::Arc;
 use std::{fs, io, mem};
 
 use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
-use crate::extension::{ExtensionRegistry, ExtensionRegistryError};
+use crate::extension::resolution::ExtensionResolutionError;
+use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::hugr::internal::HugrMutInternals;
-use crate::hugr::{HugrView, ValidationError};
+use crate::hugr::{ExtensionError, HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
-use crate::{Extension, Hugr};
+use crate::Hugr;
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-/// Package of module HUGRs and extensions.
-/// The HUGRs are validated against the extensions.
+#[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Package of module HUGRs.
 pub struct Package {
     /// Module HUGRs included in the package.
     pub modules: Vec<Hugr>,
-    /// Extensions to validate against.
-    pub extensions: Vec<Arc<Extension>>,
+    /// Extensions used in the modules.
+    ///
+    /// This is a superset of the extensions used in the modules.
+    pub extensions: ExtensionRegistry,
 }
 
 impl Package {
-    /// Create a new package from a list of hugrs and extensions.
+    /// Create a new package from a list of hugrs.
     ///
     /// All the HUGRs must have a `Module` operation at the root.
+    ///
+    /// Collects the extensions used in the modules and stores them in top-level
+    /// `extensions` attribute.
     ///
     /// # Errors
     ///
     /// Returns an error if any of the HUGRs does not have a `Module` root.
-    pub fn new(
-        modules: impl IntoIterator<Item = Hugr>,
-        extensions: impl IntoIterator<Item = Arc<Extension>>,
-    ) -> Result<Self, PackageError> {
+    pub fn new(modules: impl IntoIterator<Item = Hugr>) -> Result<Self, PackageError> {
         let modules: Vec<Hugr> = modules.into_iter().collect();
+        let mut extensions = ExtensionRegistry::default();
         for (idx, module) in modules.iter().enumerate() {
             let root_op = module.get_optype(module.root());
             if !root_op.is_module() {
@@ -44,14 +46,15 @@ impl Package {
                     root_op: root_op.clone(),
                 });
             }
+            extensions.extend(module.extensions());
         }
         Ok(Self {
             modules,
-            extensions: extensions.into_iter().collect(),
+            extensions,
         })
     }
 
-    /// Create a new package from a list of hugrs and extensions.
+    /// Create a new package from a list of hugrs.
     ///
     /// HUGRs that do not have a `Module` root will be wrapped in a new `Module` root,
     /// depending on the root optype.
@@ -61,21 +64,24 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if any of the HUGRs cannot be wrapped in a module.
-    pub fn from_hugrs(
-        modules: impl IntoIterator<Item = Hugr>,
-        extensions: impl IntoIterator<Item = Arc<Extension>>,
-    ) -> Result<Self, PackageError> {
+    pub fn from_hugrs(modules: impl IntoIterator<Item = Hugr>) -> Result<Self, PackageError> {
         let modules: Vec<Hugr> = modules
             .into_iter()
             .map(to_module_hugr)
             .collect::<Result<_, PackageError>>()?;
+
+        let mut extensions = ExtensionRegistry::default();
+        for module in &modules {
+            extensions.extend(module.extensions());
+        }
+
         Ok(Self {
             modules,
-            extensions: extensions.into_iter().collect(),
+            extensions,
         })
     }
 
-    /// Create a new package containing a single HUGR, and no extension definitions.
+    /// Create a new package containing a single HUGR.
     ///
     /// If the Hugr is not a module, a new [OpType::Module] root will be added.
     /// This behaviours depends on the root optype.
@@ -88,52 +94,64 @@ impl Package {
     pub fn from_hugr(hugr: Hugr) -> Result<Self, PackageError> {
         let mut package = Self::default();
         let module = to_module_hugr(hugr)?;
+        package.extensions = module.extensions().clone();
         package.modules.push(module);
         Ok(package)
     }
-    /// Validate the package against an extension registry.
+
+    /// Validate the modules of the package.
     ///
-    /// `reg` is updated with any new extensions.
-    pub fn update_validate(
-        &mut self,
-        reg: &mut ExtensionRegistry,
-    ) -> Result<(), PackageValidationError> {
-        for ext in &self.extensions {
-            reg.register_updated_ref(ext);
-        }
-        for hugr in self.modules.iter_mut() {
-            hugr.update_validate(reg)?;
+    /// Ensures that the top-level extension list is a superset of the extensions used in the modules.
+    pub fn validate(&self) -> Result<(), PackageValidationError> {
+        for hugr in self.modules.iter() {
+            hugr.validate()?;
+
+            let missing_exts = hugr
+                .extensions()
+                .ids()
+                .filter(|id| !self.extensions.contains(id))
+                .cloned()
+                .collect_vec();
+            if !missing_exts.is_empty() {
+                return Err(PackageValidationError::MissingExtension {
+                    missing: missing_exts,
+                    available: self.extensions.ids().cloned().collect(),
+                });
+            }
         }
         Ok(())
-    }
-
-    /// Validate the package against an extension registry.
-    ///
-    /// `reg` is updated with any new extensions.
-    ///
-    /// Returns the validated modules.
-    ///
-    /// deprecated: use [Package::update_validate] instead.
-    #[deprecated(since = "0.13.2", note = "Replaced by `Package::update_validate`")]
-    pub fn validate(
-        mut self,
-        reg: &mut ExtensionRegistry,
-    ) -> Result<Vec<Hugr>, PackageValidationError> {
-        self.update_validate(reg)?;
-        Ok(self.modules)
     }
 
     /// Read a Package in json format from an io reader.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
-    pub fn from_json_reader(reader: impl io::Read) -> Result<Self, PackageEncodingError> {
+    pub fn from_json_reader(
+        reader: impl io::Read,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Self, PackageEncodingError> {
         let val: serde_json::Value = serde_json::from_reader(reader)?;
-        let pkg_load_err = match serde_json::from_value::<Package>(val.clone()) {
-            Ok(p) => return Ok(p),
-            Err(e) => e,
-        };
+        let loaded_pkg = serde_json::from_value::<Package>(val.clone());
 
-        if let Ok(hugr) = serde_json::from_value::<Hugr>(val) {
+        if let Ok(mut pkg) = loaded_pkg {
+            // Resolve the operations in the modules using the defined registries.
+            let mut combined_registry = extension_registry.clone();
+            combined_registry.extend(&pkg.extensions);
+
+            for module in &mut pkg.modules {
+                module.resolve_extension_defs(&combined_registry)?;
+                pkg.extensions.extend(module.extensions());
+            }
+
+            return Ok(pkg);
+        };
+        let pkg_load_err = loaded_pkg.unwrap_err();
+
+        // As a fallback, try to load a hugr json.
+        if let Ok(mut hugr) = serde_json::from_value::<Hugr>(val) {
+            hugr.resolve_extension_defs(extension_registry)?;
+            if cfg!(feature = "extension_inference") {
+                hugr.infer_extensions(false)?;
+            }
             return Ok(Package::from_hugr(hugr)?);
         }
 
@@ -144,17 +162,23 @@ impl Package {
     /// Read a Package from a json string.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
-    pub fn from_json(json: impl AsRef<str>) -> Result<Self, PackageEncodingError> {
-        Self::from_json_reader(json.as_ref().as_bytes())
+    pub fn from_json(
+        json: impl AsRef<str>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Self, PackageEncodingError> {
+        Self::from_json_reader(json.as_ref().as_bytes(), extension_registry)
     }
 
     /// Read a Package from a json file.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
-    pub fn from_json_file(path: impl AsRef<Path>) -> Result<Self, PackageEncodingError> {
+    pub fn from_json_file(
+        path: impl AsRef<Path>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Self, PackageEncodingError> {
         let file = fs::File::open(path)?;
         let reader = io::BufReader::new(file);
-        Self::from_json_reader(reader)
+        Self::from_json_reader(reader, extension_registry)
     }
 
     /// Write the Package in json format into an io writer.
@@ -176,24 +200,6 @@ impl Package {
         let file = fs::File::open(path)?;
         let writer = io::BufWriter::new(file);
         self.to_json_writer(writer)
-    }
-}
-
-impl PartialEq for Package {
-    fn eq(&self, other: &Self) -> bool {
-        if self.modules != other.modules || self.extensions.len() != other.extensions.len() {
-            return false;
-        }
-        // Extensions may be in different orders, so we compare them as sets.
-        let exts = self
-            .extensions
-            .iter()
-            .map(|e| (&e.name, e))
-            .collect::<HashMap<_, _>>();
-        other
-            .extensions
-            .iter()
-            .all(|e| exts.get(&e.name).map_or(false, |&e2| e == e2))
     }
 }
 
@@ -296,60 +302,30 @@ pub enum PackageEncodingError {
     IOError(io::Error),
     /// Improper package definition.
     Package(PackageError),
+    /// Could not resolve the extension needed to encode the hugr.
+    ExtensionResolution(ExtensionResolutionError),
+    /// Could not resolve the runtime extensions for the hugr.
+    RuntimeExtensionResolution(ExtensionError),
 }
 
 /// Error raised while validating a package.
-#[derive(Debug, From)]
+#[derive(Debug, Display, From, Error)]
 #[non_exhaustive]
 pub enum PackageValidationError {
     /// Error raised while processing the package extensions.
-    Extension(ExtensionRegistryError),
+    #[display("The package modules use the extension{} {} not present in the defined set. The declared extensions are {}",
+            if missing.len() > 1 {"s"} else {""},
+            missing.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
+            available.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
+        )]
+    MissingExtension {
+        /// The missing extensions.
+        missing: Vec<ExtensionId>,
+        /// The available extensions.
+        available: Vec<ExtensionId>,
+    },
     /// Error raised while validating the package hugrs.
     Validation(ValidationError),
-    /// Error validating HUGR.
-    // TODO: Remove manual Display and Error impls when removing deprecated variants.
-    #[from(ignore)]
-    #[deprecated(
-        since = "0.13.2",
-        note = "Replaced by `PackageValidationError::Validation`"
-    )]
-    Validate(ValidationError),
-    /// Error registering extension.
-    // TODO: Remove manual Display and Error impls when removing deprecated variants.
-    #[from(ignore)]
-    #[deprecated(
-        since = "0.13.2",
-        note = "Replaced by `PackageValidationError::Extension`"
-    )]
-    ExtReg(ExtensionRegistryError),
-}
-
-// Note: We cannot use the `derive_more::Error` derive due to a bug with deprecated elements.
-// See https://github.com/JelteF/derive_more/issues/419
-#[allow(deprecated)]
-impl std::error::Error for PackageValidationError {
-    fn source(&self) -> Option<&(dyn derive_more::Error + 'static)> {
-        match self {
-            PackageValidationError::Extension(source) => Some(source),
-            PackageValidationError::Validation(source) => Some(source),
-            PackageValidationError::Validate(source) => Some(source),
-            PackageValidationError::ExtReg(source) => Some(source),
-        }
-    }
-}
-
-// Note: We cannot use the `derive_more::Display` derive due to a bug with deprecated elements.
-// See https://github.com/JelteF/derive_more/issues/419
-impl Display for PackageValidationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[allow(deprecated)]
-        match self {
-            PackageValidationError::Extension(e) => write!(f, "Error processing extensions: {}", e),
-            PackageValidationError::Validation(e) => write!(f, "Error validating HUGR: {}", e),
-            PackageValidationError::Validate(e) => write!(f, "Error validating HUGR: {}", e),
-            PackageValidationError::ExtReg(e) => write!(f, "Error registering extension: {}", e),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -359,28 +335,17 @@ mod test {
     use crate::builder::test::{
         simple_cfg_hugr, simple_dfg_hugr, simple_funcdef_hugr, simple_module_hugr,
     };
-    use crate::extension::{ExtensionId, EMPTY_REG};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::Input;
 
     use super::*;
     use rstest::{fixture, rstest};
-    use semver::Version;
 
     #[fixture]
     fn simple_package() -> Package {
         let hugr0 = simple_module_hugr();
         let hugr1 = simple_module_hugr();
-
-        let ext_1_id = ExtensionId::new("ext1").unwrap();
-        let ext_2_id = ExtensionId::new("ext2").unwrap();
-        let ext1 = Extension::new(ext_1_id.clone(), Version::new(2, 4, 8));
-        let ext2 = Extension::new(ext_2_id, Version::new(1, 0, 0));
-
-        Package {
-            modules: vec![hugr0, hugr1],
-            extensions: vec![ext1.into(), ext2.into()],
-        }
+        Package::new([hugr0, hugr1]).unwrap()
     }
 
     #[fixture]
@@ -392,8 +357,10 @@ mod test {
     #[case::empty(Package::default())]
     #[case::simple(simple_package())]
     fn package_roundtrip(#[case] package: Package) {
+        use crate::extension::PRELUDE_REGISTRY;
+
         let json = package.to_json().unwrap();
-        let new_package = Package::from_json(&json).unwrap();
+        let new_package = Package::from_json(&json, &PRELUDE_REGISTRY).unwrap();
         assert_eq!(package, new_package);
     }
 
@@ -425,16 +392,15 @@ mod test {
         let dfg = simple_dfg_hugr();
 
         assert_matches!(
-            Package::new([module.clone(), dfg.clone()], []),
+            Package::new([module.clone(), dfg.clone()]),
             Err(PackageError::NonModuleHugr {
                 module_index: 1,
                 root_op: OpType::DFG(_),
             })
         );
 
-        let mut pkg = Package::from_hugrs([module, dfg], []).unwrap();
-        let mut reg = EMPTY_REG.clone();
-        pkg.update_validate(&mut reg).unwrap();
+        let pkg = Package::from_hugrs([module, dfg]).unwrap();
+        pkg.validate().unwrap();
 
         assert_eq!(pkg.modules.len(), 2);
     }

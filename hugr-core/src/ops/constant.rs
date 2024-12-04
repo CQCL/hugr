@@ -566,14 +566,15 @@ mod test {
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
     use crate::extension::prelude::{bool_t, usize_custom_t};
+    use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
             prelude::{usize_t, ConstUsize},
-            ExtensionId, ExtensionRegistry, PRELUDE,
+            ExtensionId,
         },
-        std_extensions::arithmetic::float_types::{self, float64_type, ConstF64},
+        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
         type_row,
         types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
@@ -613,10 +614,6 @@ mod test {
             .into()
     }
 
-    fn test_registry() -> ExtensionRegistry {
-        ExtensionRegistry::new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()])
-    }
-
     /// Constructs a DFG hugr defining a sum constant, and returning the loaded value.
     #[test]
     fn test_sum() -> Result<(), BuildError> {
@@ -638,7 +635,7 @@ mod test {
             pred_ty.clone(),
         )?);
         let w = b.load_const(&c);
-        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
+        b.finish_hugr_with_outputs([w]).unwrap();
 
         let mut b = DFGBuilder::new(Signature::new(
             type_row![],
@@ -646,7 +643,7 @@ mod test {
         ))?;
         let c = b.add_constant(Value::sum(1, [], pred_ty.clone())?);
         let w = b.load_const(&c);
-        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
+        b.finish_hugr_with_outputs([w]).unwrap();
 
         Ok(())
     }

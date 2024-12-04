@@ -434,16 +434,30 @@ pub trait HugrView: HugrInternals {
             .map(|(p, t)| (p.as_outgoing().unwrap(), t))
     }
 
+    /// Returns the set of extensions used by the HUGR.
+    ///
+    /// This set may contain extensions that are no longer required by the HUGR.
+    fn extensions(&self) -> &ExtensionRegistry {
+        &self.base_hugr().extensions
+    }
+
     /// Check the validity of the underlying HUGR.
-    fn validate(&self, reg: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.base_hugr().validate(reg)
+    ///
+    /// This includes checking consistency of extension requirements between
+    /// connected nodes and between parents and children.
+    /// See [`HugrView::validate_no_extensions`] for a version that doesn't check
+    /// extension requirements.
+    fn validate(&self) -> Result<(), ValidationError> {
+        self.base_hugr().validate()
     }
 
     /// Check the validity of the underlying HUGR, but don't check consistency
     /// of extension requirements between connected nodes or between parents and
     /// children.
-    fn validate_no_extensions(&self, reg: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.base_hugr().validate_no_extensions(reg)
+    ///
+    /// For a more thorough check, use [`HugrView::validate`].
+    fn validate_no_extensions(&self) -> Result<(), ValidationError> {
+        self.base_hugr().validate_no_extensions()
     }
 }
 

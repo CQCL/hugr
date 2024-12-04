@@ -5,14 +5,9 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{
-    extension::TO_BE_INFERRED,
-    ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType},
-};
-use crate::{
-    extension::{ExtensionRegistry, ExtensionSet},
-    types::Signature,
-};
+use crate::extension::TO_BE_INFERRED;
+use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
+use crate::{extension::ExtensionSet, types::Signature};
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
@@ -108,7 +103,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     cfg_builder.branch(&entry, 1, &successor_b)?; // branch 1 goes to successor_b
 ///     cfg_builder.branch(&successor_a, 0, &exit)?;
 ///     cfg_builder.branch(&successor_b, 0, &exit)?;
-///     let hugr = cfg_builder.finish_prelude_hugr()?;
+///     let hugr = cfg_builder.finish_hugr()?;
 ///     Ok(hugr)
 /// };
 /// #[cfg(not(feature = "extension_inference"))]
@@ -162,11 +157,11 @@ impl CFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for CFGBuilder<Hugr> {
-    fn finish_hugr(
-        mut self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.update_validate(extension_registry)?;
+    fn finish_hugr(mut self) -> Result<Hugr, crate::hugr::ValidationError> {
+        if cfg!(feature = "extension_inference") {
+            self.base.infer_extensions(false)?;
+        }
+        self.base.validate()?;
         Ok(self.base)
     }
 }
@@ -455,11 +450,9 @@ impl BlockBuilder<Hugr> {
         mut self,
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
-        extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, BuildError> {
         self.set_outputs(branch_wire, outputs)?;
-        self.finish_hugr(extension_registry)
-            .map_err(BuildError::InvalidHUGR)
+        self.finish_hugr().map_err(BuildError::InvalidHUGR)
     }
 }
 
@@ -493,10 +486,10 @@ pub(crate) mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish_prelude_hugr()
+            module_builder.finish_hugr()
         };
 
-        assert_eq!(build_result.err(), None);
+        assert!(build_result.is_ok(), "{}", build_result.unwrap_err());
 
         Ok(())
     }
@@ -504,7 +497,7 @@ pub(crate) mod test {
     fn basic_cfg_hugr() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()]))?;
         build_basic_cfg(&mut cfg_builder)?;
-        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
+        assert_matches!(cfg_builder.finish_hugr(), Ok(_));
 
         Ok(())
     }
@@ -564,7 +557,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&entry, 0, &middle)?;
         cfg_builder.branch(&middle, 0, &exit)?;
-        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
+        assert_matches!(cfg_builder.finish_hugr(), Ok(_));
 
         Ok(())
     }
@@ -594,7 +587,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &middle)?;
         cfg_builder.branch(&middle, 0, &exit)?;
         assert_matches!(
-            cfg_builder.finish_prelude_hugr(),
+            cfg_builder.finish_hugr(),
             Err(ValidationError::InterGraphEdgeError(
                 InterGraphEdgeError::NonDominatedAncestor { .. }
             ))

@@ -302,6 +302,9 @@ pub enum OpaqueOpError {
     /// Unresolved operation encountered during validation.
     #[error("Unexpected unresolved opaque operation '{1}' in {0}, from Extension {2}.")]
     UnresolvedOp(Node, OpName, ExtensionId),
+    /// Error updating the extension registry in the Hugr while resolving opaque ops.
+    #[error("Error updating extension registry: {0}")]
+    ExtensionRegistryError(#[from] crate::extension::ExtensionRegistryError),
 }
 
 #[cfg(test)]

@@ -159,13 +159,13 @@ mod test {
     use std::collections::HashSet;
     use std::sync::Arc;
 
-    use hugr_core::extension::prelude::Lift;
+    use hugr_core::extension::prelude::{Lift, PRELUDE_ID};
     use itertools::Itertools;
     use rstest::rstest;
 
     use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
-    use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize, PRELUDE_ID};
-    use hugr_core::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
+    use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize};
+    use hugr_core::extension::PRELUDE_REGISTRY;
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
@@ -231,8 +231,6 @@ mod test {
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
-        let reg = ExtensionRegistry::new([PRELUDE.clone(), e]);
-        reg.validate()?;
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
         let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
@@ -263,10 +261,10 @@ mod test {
         h.branch(&test_block, 0, &loop_backedge_target)?;
         h.branch(&test_block, 1, &h.exit_block())?;
 
-        let mut h = h.finish_hugr(&reg)?;
+        let mut h = h.finish_hugr()?;
         let r = h.root();
         merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
-        h.update_validate(&reg).unwrap();
+        h.validate().unwrap();
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
         let [entry, exit] = h
@@ -359,12 +357,10 @@ mod test {
         h.branch(&bb2, 0, &bb3)?;
         h.branch(&bb3, 0, &h.exit_block())?;
 
-        let reg = ExtensionRegistry::new([e, PRELUDE.clone()]);
-        reg.validate()?;
-        let mut h = h.finish_hugr(&reg)?;
+        let mut h = h.finish_hugr()?;
         let root = h.root();
         merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
-        h.update_validate(&reg)?;
+        h.validate()?;
 
         // Should only be one BB left
         let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
