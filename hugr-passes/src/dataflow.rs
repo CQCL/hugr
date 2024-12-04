@@ -52,7 +52,7 @@ pub enum ConstLocation<'a> {
     Node(Node),
 }
 
-impl<'a> From<Node> for ConstLocation<'a> {
+impl From<Node> for ConstLocation<'_> {
     fn from(value: Node) -> Self {
         ConstLocation::Node(value)
     }
