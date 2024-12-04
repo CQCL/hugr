@@ -20,7 +20,7 @@ use hugr_core::{Hugr, Node};
 /// must implement this trait (including providing an appropriate domain type `V`).
 pub trait DFContext<V>: ConstLoader<V> {
     /// Given lattice values for each input, update lattice values for the (dataflow) outputs.
-    /// For extension ops only, excluding [MakeTuple] and [UnpackTuple].
+    /// For extension ops only, excluding [MakeTuple] and [UnpackTuple] which are handled automatically.
     /// `_outs` is an array with one element per dataflow output, each initialized to [PartialValue::Top]
     /// which is the correct value to leave if nothing can be deduced about that output.
     /// (The default does nothing, i.e. leaves `Top` for all outputs.)
@@ -28,7 +28,7 @@ pub trait DFContext<V>: ConstLoader<V> {
     /// [MakeTuple]: hugr_core::extension::prelude::MakeTuple
     /// [UnpackTuple]: hugr_core::extension::prelude::UnpackTuple
     fn interpret_leaf_op(
-        &self,
+        &mut self,
         _node: Node,
         _e: &ExtensionOp,
         _ins: &[PartialValue<V>],

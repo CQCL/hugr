@@ -387,8 +387,7 @@ fn test_cfg(
     xor_and_cfg: Hugr,
 ) {
     let root = xor_and_cfg.root();
-    let results =
-        Machine::new(&xor_and_cfg).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
+    let results = Machine::new(&xor_and_cfg).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
 
     assert_eq!(results.read_out_wire(Wire::new(root, 0)).unwrap(), out0);
     assert_eq!(results.read_out_wire(Wire::new(root, 1)).unwrap(), out1);

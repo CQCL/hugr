@@ -127,7 +127,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
 }
 
 pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
-    ctx: impl DFContext<V>,
+    mut ctx: impl DFContext<V>,
     hugr: H,
     in_wire_value_proto: Vec<(Node, IncomingPort, PV<V>)>,
 ) -> AnalysisResults<V, H> {
@@ -187,7 +187,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
            if !op_t.is_container(),
            if let Some(sig) = op_t.dataflow_signature(),
            node_in_value_row(n, vs),
-           if let Some(outs) = propagate_leaf_op(&ctx, &hugr, *n, &vs[..], sig.output_count()),
+           if let Some(outs) = propagate_leaf_op(&mut ctx, &hugr, *n, &vs[..], sig.output_count()),
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
         // DFG --------------------
@@ -329,7 +329,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 }
 
 fn propagate_leaf_op<V: AbstractValue>(
-    ctx: &impl DFContext<V>,
+    ctx: &mut impl DFContext<V>,
     hugr: &impl HugrView,
     n: Node,
     ins: &[PV<V>],
