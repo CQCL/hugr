@@ -39,8 +39,8 @@ use fxhash::FxHashMap;
 mod bindings;
 mod symbols;
 mod vars;
-use symbols::Symbols;
-use vars::Vars;
+pub use symbols::SymbolTable;
+pub use vars::VarTable;
 
 /// Resolve all names in the module.
 ///
@@ -70,8 +70,8 @@ struct Resolver<'m, 'a> {
     /// that we have already created.
     symbol_import: FxHashMap<&'a str, NodeId>,
 
-    vars: Vars<'a>,
-    symbols: Symbols<'a>,
+    vars: VarTable<'a>,
+    symbols: SymbolTable<'a>,
 
     term_to_region: FxHashMap<TermId, RegionId>,
 }
@@ -86,29 +86,15 @@ impl<'m, 'a> Resolver<'m, 'a> {
     fn new(module: &'m mut Module<'a>, bump: &'a Bump) -> Self {
         Self {
             term_to_region: FxHashMap::default(),
-            symbols: Symbols::new(),
-            vars: Vars::new(),
+            symbols: SymbolTable::new(),
+            vars: VarTable::new(),
             module,
             bump,
             symbol_import: FxHashMap::default(),
         }
     }
 
-    /// Resolve a non-isolated region.
     fn resolve_region(&mut self, region: RegionId) -> Result<(), ModelError> {
-        self.resolve_region_inner(region)?;
-        Ok(())
-    }
-
-    /// Resolve an isolated region.
-    fn resolve_isolated_region(&mut self, region: RegionId) -> Result<(), ModelError> {
-        // self.link_scope.enter_isolated(region);
-        self.resolve_region_inner(region)?;
-        // self.link_scope.exit();
-        Ok(())
-    }
-
-    fn resolve_region_inner(&mut self, region: RegionId) -> Result<(), ModelError> {
         let region_data = self
             .module
             .get_region(region)
@@ -174,7 +160,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 self.resolve_terms(decl.constraints)?;
                 self.resolve_term(decl.signature)?;
                 for region in node_data.regions {
-                    self.resolve_isolated_region(*region)?;
+                    self.resolve_region(*region)?;
                 }
                 self.vars.exit();
             }
@@ -227,7 +213,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 node_data.operation = Operation::Custom { operation };
 
                 for region in node_data.regions {
-                    self.resolve_isolated_region(*region)?;
+                    self.resolve_region(*region)?;
                 }
             }
 
@@ -236,7 +222,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 node_data.operation = Operation::CustomFull { operation };
 
                 for region in node_data.regions {
-                    self.resolve_isolated_region(*region)?;
+                    self.resolve_region(*region)?;
                 }
             }
 

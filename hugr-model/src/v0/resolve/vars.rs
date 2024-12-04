@@ -1,23 +1,52 @@
-use crate::v0::{NodeId, SymbolIntroError, VarIndex, VarRef, VarRefError};
-use fxhash::FxHashMap;
+use std::hash::BuildHasherDefault;
 
-pub struct Vars<'a> {
+use crate::v0::{NodeId, SymbolIntroError, VarIndex, VarRef, VarRefError};
+use fxhash::FxHasher;
+use indexmap::IndexMap;
+
+type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
+
+/// Variable binding table that keeps track of variable resolution and scoping.
+pub struct VarTable<'a> {
     scopes: Vec<VarScope>,
-    table: FxHashMap<(NodeId, &'a str), VarIndex>,
+    table: FxIndexMap<(NodeId, &'a str), VarIndex>,
 }
 
-impl<'a> Vars<'a> {
+impl<'a> VarTable<'a> {
+    /// Create a new variable table.
     pub fn new() -> Self {
         Self {
             scopes: Vec::new(),
-            table: FxHashMap::default(),
+            table: FxIndexMap::default(),
         }
     }
 
-    pub fn enter(&mut self, node: NodeId) {}
+    /// Enter a new scope for the given node.
+    pub fn enter(&mut self, node: NodeId) {
+        self.scopes.push(VarScope { node, params: 0 })
+    }
 
-    pub fn exit(&mut self) {}
+    /// Exit a previously entered scope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no remaining open scopes.
+    pub fn exit(&mut self) {
+        let scope = self.scopes.pop().unwrap();
 
+        // Remove the variable bindings that are no longer needed.
+        // This is not necessary for correctness, but it helps to keep the table small.
+        for _ in 0..scope.params {
+            let last = self.table.pop();
+            debug_assert_eq!(last.unwrap().0 .0, scope.node);
+        }
+    }
+
+    /// Insert a new variable into the current scope.
+    ///
+    /// # Errors
+    ///
+    /// It is an error to insert a variable with the same name twice in the same scope.
     pub fn insert(&mut self, name: &'a str) -> Result<(), SymbolIntroError> {
         let var_scope = self.scopes.last_mut().unwrap();
         let node = var_scope.node;
@@ -37,6 +66,12 @@ impl<'a> Vars<'a> {
         Ok(())
     }
 
+    /// Resolve a variable reference to a variable index.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned if a named variable is not found in the current scope,
+    /// or if an indexed variable from a different scope is referenced.
     pub fn resolve(&self, var_ref: VarRef<'a>) -> Result<VarRef<'a>, VarRefError> {
         match var_ref {
             VarRef::Index(node, index) => {
@@ -68,6 +103,10 @@ impl<'a> Vars<'a> {
 
 #[derive(Debug, Clone, Copy)]
 struct VarScope {
+    /// The node that defines this scope.
     node: NodeId,
+    /// The number of parameters that have been defined so far.
+    /// This is initially zero and is incremented for each parameter that is added.
+    /// In this way we ensure that the node's parameters come into scope gradually.
     params: u16,
 }

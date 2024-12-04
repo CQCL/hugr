@@ -878,6 +878,3 @@ pub enum VarRefError {
     #[error("the variable name `{0}` was not resolved")]
     Unresolved(String),
 }
-
-#[derive(Debug, Clone, Error)]
-pub enum LinkRefError {}
