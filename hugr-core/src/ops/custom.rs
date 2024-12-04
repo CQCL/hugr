@@ -11,8 +11,11 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::types::{type_param::TypeArg, Signature};
+use crate::{
+    extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError},
+    types::Substitution,
+};
 use crate::{ops, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -161,24 +164,17 @@ impl DataflowOpTrait for ExtensionOp {
         self.signature.clone()
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        let args = self
-            .args
-            .into_iter()
-            .map(|ta| ta.substitute(subst))
-            .collect::<Vec<_>>();
-        let signature = self.signature.substitute(subst);
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for ta in self.args.iter_mut() {
+            *ta = ta.substitute(subst);
+        }
+        self.signature = self.signature.substitute(subst);
         debug_assert_eq!(
             self.def
-                .compute_signature(&args, subst.extension_registry())
+                .compute_signature(&self.args, subst.extension_registry())
                 .as_ref(),
-            Ok(&signature)
+            Ok(&self.signature)
         );
-        Self {
-            def: self.def,
-            args,
-            signature,
-        }
     }
 }
 
@@ -270,16 +266,11 @@ impl DataflowOpTrait for OpaqueOp {
             .with_extension_delta(self.extension().clone())
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            args: self
-                .args
-                .into_iter()
-                .map(|ta| ta.substitute(subst))
-                .collect(),
-            signature: self.signature.substitute(subst),
-            ..self
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for ta in self.args.iter_mut() {
+            *ta = ta.substitute(subst);
         }
+        self.signature = self.signature.substitute(subst);
     }
 }
 

@@ -83,7 +83,7 @@ fn mono_scan(
         // Perform substitution, and recurse into containers (mono_scan does nothing if no children)
         let ch = if let Some(ref mut inst) = subst_into {
             let new_ch =
-                h.add_node_with_parent(inst.target_container, ch_op.clone().substitute(inst.subst));
+                h.add_node_with_parent(inst.target_container, ch_op.substitute(inst.subst));
             inst.node_map.insert(old_ch, new_ch);
             let mut inst = Instantiating {
                 target_container: new_ch,

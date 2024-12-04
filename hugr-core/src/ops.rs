@@ -350,7 +350,7 @@ pub trait StaticTag {
 
 #[enum_dispatch]
 /// Trait implemented by all OpType variants.
-pub trait OpTrait: Sized {
+pub trait OpTrait: Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
 
@@ -415,11 +415,19 @@ pub trait OpTrait: Sized {
         .is_some() as usize
     }
 
+    /// Like [Self::subst_mut] but returns a substituted clone of `self`.
+    /// The default impl is correct so long as `subst_mut` is, so trait
+    /// `impl`s should/must override that if the op may contain type variables.
+    fn substitute(&self, subst: &Substitution) -> Self {
+        let mut s = self.clone();
+        s.subst_mut(subst);
+        s
+    }
+
     /// Apply a type-level substitution to this OpType, i.e. replace
     /// [type variables](crate::types::TypeArg::new_var_use) with new types.
-    fn substitute(self, _subst: &Substitution) -> Self {
-        self
-    }
+    /// The default is appropriate when there are no type (variables) in the op.
+    fn subst_mut(&mut self, _subst: &Substitution) {}
 }
 
 /// Properties of child graphs of ops, if the op has children.

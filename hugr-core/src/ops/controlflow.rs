@@ -1,7 +1,7 @@
 //! Control flow operations.
 
 use crate::extension::ExtensionSet;
-use crate::types::{EdgeKind, Signature, Type, TypeRow};
+use crate::types::{EdgeKind, Signature, Substitution, Type, TypeRow};
 use crate::Direction;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
@@ -37,13 +37,11 @@ impl DataflowOpTrait for TailLoop {
         Signature::new(inputs, outputs).with_extension_delta(self.extension_delta.clone())
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            just_inputs: self.just_inputs.substitute(subst),
-            just_outputs: self.just_outputs.substitute(subst),
-            rest: self.rest.substitute(subst),
-            extension_delta: self.extension_delta.substitute(subst),
-        }
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.just_inputs = self.just_inputs.substitute(subst);
+        self.just_outputs = self.just_outputs.substitute(subst);
+        self.rest = self.rest.substitute(subst);
+        self.extension_delta = self.extension_delta.substitute(subst);
     }
 }
 
@@ -110,17 +108,13 @@ impl DataflowOpTrait for Conditional {
             .with_extension_delta(self.extension_delta.clone())
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            sum_rows: self
-                .sum_rows
-                .into_iter()
-                .map(|r| r.substitute(subst))
-                .collect(),
-            other_inputs: self.other_inputs.substitute(subst),
-            outputs: self.outputs.substitute(subst),
-            extension_delta: self.extension_delta.substitute(subst),
+    fn subst_mut(&mut self, subst: &Substitution) {
+        for row in self.sum_rows.iter_mut() {
+            *row = row.substitute(subst)
         }
+        self.other_inputs = self.other_inputs.substitute(subst);
+        self.outputs = self.outputs.substitute(subst);
+        self.extension_delta = self.extension_delta.substitute(subst);
     }
 }
 
@@ -152,10 +146,8 @@ impl DataflowOpTrait for CFG {
         self.signature.clone()
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            signature: self.signature.substitute(subst),
-        }
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.signature = self.signature.substitute(subst);
     }
 }
 
@@ -238,17 +230,13 @@ impl OpTrait for DataflowBlock {
         }
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            inputs: self.inputs.substitute(subst),
-            other_outputs: self.other_outputs.substitute(subst),
-            sum_rows: self
-                .sum_rows
-                .into_iter()
-                .map(|r| r.substitute(subst))
-                .collect(),
-            extension_delta: self.extension_delta.substitute(subst),
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.inputs = self.inputs.substitute(subst);
+        self.other_outputs = self.other_outputs.substitute(subst);
+        for r in self.sum_rows.iter_mut() {
+            *r = r.substitute(subst);
         }
+        self.extension_delta = self.extension_delta.substitute(subst);
     }
 }
 
@@ -276,10 +264,8 @@ impl OpTrait for ExitBlock {
         }
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            cfg_outputs: self.cfg_outputs.substitute(subst),
-        }
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.cfg_outputs = self.cfg_outputs.substitute(subst);
     }
 }
 
@@ -345,10 +331,8 @@ impl OpTrait for Case {
         <Self as StaticTag>::TAG
     }
 
-    fn substitute(self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            signature: self.signature.substitute(subst),
-        }
+    fn subst_mut(&mut self, subst: &Substitution) {
+        self.signature = self.signature.substitute(subst);
     }
 }
 
