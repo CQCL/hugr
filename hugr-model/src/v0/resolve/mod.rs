@@ -29,21 +29,18 @@
 // and make the deduplication process respect this; or we should figure out a solution
 // on how to deal with this otherwise.
 
-use std::hash::BuildHasherDefault;
-
 use super::{
-    ExtSetPart, LinkRef, ListPart, MetaItem, ModelError, Module, Node, NodeId, Operation, Param,
-    RegionId, SymbolIntroError, SymbolRef, SymbolRefError, Term, TermId, VarRef, VarRefError,
+    ExtSetPart, ListPart, MetaItem, ModelError, Module, Node, NodeId, Operation, Param, RegionId,
+    SymbolRef, Term, TermId,
 };
 use bumpalo::{collections::Vec as BumpVec, Bump};
-use fxhash::{FxHashMap, FxHasher};
+use fxhash::FxHashMap;
 
 mod bindings;
 mod symbols;
-use indexmap::IndexMap;
+mod vars;
 use symbols::Symbols;
-
-type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
+use vars::Vars;
 
 /// Resolve all names in the module.
 ///
@@ -73,13 +70,7 @@ struct Resolver<'m, 'a> {
     /// that we have already created.
     symbol_import: FxHashMap<&'a str, NodeId>,
 
-    /// Stack of entered variable scopes.
-    var_scopes: Vec<VarScope>,
-    var_names: FxHashMap<(NodeId, &'a str), u16>,
-
-    link_scopes: Vec<LinkScope>,
-    link_table: FxHashMap<(RegionId, LinkRef<'a>), u32>,
-
+    vars: Vars<'a>,
     symbols: Symbols<'a>,
 
     term_to_region: FxHashMap<TermId, RegionId>,
@@ -95,11 +86,8 @@ impl<'m, 'a> Resolver<'m, 'a> {
     fn new(module: &'m mut Module<'a>, bump: &'a Bump) -> Self {
         Self {
             term_to_region: FxHashMap::default(),
-            var_names: FxHashMap::default(),
-            var_scopes: Vec::new(),
             symbols: Symbols::new(),
-            link_table: FxHashMap::default(),
-            link_scopes: Vec::new(),
+            vars: Vars::new(),
             module,
             bump,
             symbol_import: FxHashMap::default(),
@@ -121,14 +109,11 @@ impl<'m, 'a> Resolver<'m, 'a> {
     }
 
     fn resolve_region_inner(&mut self, region: RegionId) -> Result<(), ModelError> {
-        let mut region_data = self
+        let region_data = self
             .module
             .get_region(region)
             .ok_or_else(|| ModelError::RegionNotFound(region))?
             .clone();
-
-        region_data.sources = self.resolve_links(region_data.sources);
-        region_data.targets = self.resolve_links(region_data.targets);
 
         if let Some(signature) = region_data.signature {
             self.resolve_term(signature)?;
@@ -141,19 +126,14 @@ impl<'m, 'a> Resolver<'m, 'a> {
         // and outputs. This is to ensure that resolution is independent of the
         // order of the nodes.
         for child in region_data.children {
-            let mut child_data = self
+            let child_data = self
                 .module
                 .get_node(*child)
-                .ok_or_else(|| ModelError::NodeNotFound(*child))?
-                .clone();
+                .ok_or_else(|| ModelError::NodeNotFound(*child))?;
 
             if let Some(name) = child_data.operation.symbol() {
                 self.symbols.insert(name, *child)?;
             }
-
-            child_data.inputs = self.resolve_links(child_data.inputs);
-            child_data.outputs = self.resolve_links(child_data.outputs);
-            self.module.nodes[child.index()] = child_data;
         }
 
         // In a second pass, we resolve the remaining properties of the nodes.
@@ -162,7 +142,6 @@ impl<'m, 'a> Resolver<'m, 'a> {
         }
 
         self.symbols.exit();
-        self.module.regions[region.index()] = region_data;
 
         Ok(())
     }
@@ -190,49 +169,49 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             Operation::DefineFunc { decl } => {
-                self.enter_var_scope(node);
+                self.vars.enter(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
                 self.resolve_term(decl.signature)?;
                 for region in node_data.regions {
                     self.resolve_isolated_region(*region)?;
                 }
-                self.exit_var_scope();
+                self.vars.exit();
             }
 
             Operation::DeclareFunc { decl } => {
-                self.enter_var_scope(node);
+                self.vars.enter(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
                 self.resolve_term(decl.signature)?;
-                self.exit_var_scope();
+                self.vars.exit();
             }
 
             Operation::DefineAlias { decl, value } => {
-                self.enter_var_scope(node);
+                self.vars.enter(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_term(value)?;
-                self.exit_var_scope();
+                self.vars.exit();
             }
 
             Operation::DeclareAlias { decl } => {
-                self.enter_var_scope(node);
+                self.vars.enter(node);
                 self.resolve_params(decl.params)?;
-                self.exit_var_scope();
+                self.vars.exit();
             }
 
             Operation::DeclareConstructor { decl } => {
-                self.enter_var_scope(node);
+                self.vars.enter(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
-                self.exit_var_scope();
+                self.vars.exit();
             }
 
             Operation::DeclareOperation { decl } => {
-                self.enter_var_scope(node);
+                self.vars.enter(node);
                 self.resolve_params(decl.params)?;
                 self.resolve_terms(decl.constraints)?;
-                self.exit_var_scope();
+                self.vars.exit();
             }
 
             Operation::CallFunc { func } => {
@@ -277,55 +256,13 @@ impl<'m, 'a> Resolver<'m, 'a> {
         Ok(())
     }
 
-    fn enter_var_scope(&mut self, node: NodeId) {
-        self.var_scopes.push(VarScope {
-            node,
-            parameters: 0,
-        })
-    }
-
-    fn exit_var_scope(&mut self) {
-        self.var_scopes.pop();
-    }
-
     fn resolve_params(&mut self, params: &'a [Param<'a>]) -> Result<(), ModelError> {
-        for (index, param) in params.iter().enumerate() {
+        for param in params {
             self.resolve_term(param.r#type)?;
-            let var_scope = self.var_scopes.last_mut().unwrap();
-            let node = var_scope.node;
-            var_scope.parameters += 1;
-            let other = self
-                .var_names
-                .insert((var_scope.node, param.name), index as u16);
-
-            if let Some(other) = other {
-                return Err(SymbolIntroError::DuplicateVar(
-                    node,
-                    other,
-                    index as u16,
-                    param.name.to_string(),
-                )
-                .into());
-            }
+            self.vars.insert(param.name)?;
         }
 
         Ok(())
-    }
-
-    fn resolve_links(&mut self, link_refs: &'a [LinkRef<'a>]) -> &'a [LinkRef<'a>] {
-        // Short circuit if all links are already resolved.
-        if link_refs.iter().all(|l| matches!(l, LinkRef::Index(_))) {
-            return link_refs;
-        }
-
-        // There are non-resolved links. To resolve them we need to reallocate the links slice.
-        let mut resolved = BumpVec::with_capacity_in(link_refs.len(), self.bump);
-
-        for link_ref in link_refs {
-            todo!()
-        }
-
-        resolved.into_bump_slice()
     }
 
     fn resolve_terms(&mut self, terms: &'a [TermId]) -> Result<(), ModelError> {
@@ -364,8 +301,8 @@ impl<'m, 'a> Resolver<'m, 'a> {
             | super::Term::ControlType => {}
 
             super::Term::Var(var) => {
-                let local = self.resolve_var_ref(var)?;
-                self.module.terms[term.index()] = Term::Var(local);
+                let var = self.vars.resolve(var)?;
+                self.module.terms[term.index()] = Term::Var(var);
             }
 
             super::Term::Apply { symbol, args } => {
@@ -448,34 +385,6 @@ impl<'m, 'a> Resolver<'m, 'a> {
         Ok(scope_depth)
     }
 
-    fn resolve_var_ref(&self, local_ref: VarRef<'a>) -> Result<VarRef<'a>, VarRefError> {
-        match local_ref {
-            VarRef::Index(node, index) => {
-                // Check if this variable is in scope.
-                self.var_scopes
-                    .last()
-                    .filter(|scope| scope.node == node)
-                    .filter(|scope| index < scope.parameters)
-                    .ok_or(VarRefError::NotVisible(node, index))?;
-
-                Ok(local_ref)
-            }
-            VarRef::Named(name) => {
-                let var_scope = self
-                    .var_scopes
-                    .last()
-                    .ok_or_else(|| VarRefError::NameNotFound(name.to_string()))?;
-
-                let index = *self
-                    .var_names
-                    .get(&(var_scope.node, name))
-                    .ok_or_else(|| VarRefError::NameNotFound(name.to_string()))?;
-
-                Ok(VarRef::Index(var_scope.node, index))
-            }
-        }
-    }
-
     fn resolve_symbol_ref(
         &mut self,
         symbol_ref: SymbolRef<'a>,
@@ -530,15 +439,3 @@ impl<'m, 'a> Resolver<'m, 'a> {
 
 type Error = ModelError;
 type ScopeDepth = u16;
-
-#[derive(Debug, Clone, Copy)]
-struct VarScope {
-    node: NodeId,
-    parameters: u16,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct LinkScope {
-    region: RegionId,
-    links: u32,
-}
