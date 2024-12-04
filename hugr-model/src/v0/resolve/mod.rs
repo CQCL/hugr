@@ -39,7 +39,9 @@ use bumpalo::{collections::Vec as BumpVec, Bump};
 use fxhash::{FxHashMap, FxHasher};
 
 mod bindings;
+mod symbols;
 use indexmap::IndexMap;
+use symbols::Symbols;
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -75,10 +77,12 @@ struct Resolver<'m, 'a> {
     var_scopes: Vec<VarScope>,
     var_names: FxHashMap<(NodeId, &'a str), u16>,
 
-    symbols: FxIndexMap<&'a str, NodeId>,
-    node_data: FxIndexMap<NodeId, NodeData>,
-    region_data: FxIndexMap<RegionId, RegionData>,
-    term_data: FxHashMap<TermId, TermData>,
+    link_scopes: Vec<LinkScope>,
+    link_table: FxHashMap<(RegionId, LinkRef<'a>), u32>,
+
+    symbols: Symbols<'a>,
+
+    term_to_region: FxHashMap<TermId, RegionId>,
 }
 
 macro_rules! set_max {
@@ -90,12 +94,12 @@ macro_rules! set_max {
 impl<'m, 'a> Resolver<'m, 'a> {
     fn new(module: &'m mut Module<'a>, bump: &'a Bump) -> Self {
         Self {
-            node_data: FxIndexMap::default(),
-            region_data: FxIndexMap::default(),
-            term_data: FxHashMap::default(),
-            symbols: FxIndexMap::default(),
+            term_to_region: FxHashMap::default(),
             var_names: FxHashMap::default(),
             var_scopes: Vec::new(),
+            symbols: Symbols::new(),
+            link_table: FxHashMap::default(),
+            link_scopes: Vec::new(),
             module,
             bump,
             symbol_import: FxHashMap::default(),
@@ -130,7 +134,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             self.resolve_term(signature)?;
         }
 
-        self.enter_region(region);
+        self.symbols.enter(region);
 
         // In a first pass over the region's children, we resolve the symbols
         // that are defined by the nodes as well as the links in their inputs
@@ -144,7 +148,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 .clone();
 
             if let Some(name) = child_data.operation.symbol() {
-                self.introduce_symbol(name, *child)?;
+                self.symbols.insert(name, *child)?;
             }
 
             child_data.inputs = self.resolve_links(child_data.inputs);
@@ -157,7 +161,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             self.resolve_node(*child)?;
         }
 
-        self.exit_region();
+        self.symbols.exit();
         self.module.regions[region.index()] = region_data;
 
         Ok(())
@@ -318,7 +322,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
         let mut resolved = BumpVec::with_capacity_in(link_refs.len(), self.bump);
 
         for link_ref in link_refs {
-            todo!();
+            todo!()
         }
 
         resolved.into_bump_slice()
@@ -332,9 +336,9 @@ impl<'m, 'a> Resolver<'m, 'a> {
     }
 
     fn resolve_term(&mut self, term: TermId) -> Result<ScopeDepth, ModelError> {
-        if let Some(term_data) = self.term_data.get(&term) {
-            match self.region_data.get_full(&term_data.region) {
-                Some((scope_depth, _, _)) => return Ok(scope_depth),
+        if let Some(region) = self.term_to_region.get(&term) {
+            match self.symbols.region_to_depth(*region) {
+                Some(scope_depth) => return Ok(scope_depth),
                 None => panic!("this should be an error"),
             }
         }
@@ -439,8 +443,8 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
         };
 
-        let (region, _) = self.region_data.get_index(scope_depth as _).unwrap();
-        self.term_data.insert(term, TermData { region: *region });
+        let region = self.symbols.depth_to_region(scope_depth).unwrap();
+        self.term_to_region.insert(term, region);
         Ok(scope_depth)
     }
 
@@ -476,29 +480,14 @@ impl<'m, 'a> Resolver<'m, 'a> {
         &mut self,
         symbol_ref: SymbolRef<'a>,
     ) -> Result<(SymbolRef<'a>, ScopeDepth), Error> {
-        match symbol_ref {
-            SymbolRef::Direct(node) => {
-                let node_data = self
-                    .node_data
-                    .get(&node)
-                    .ok_or(SymbolRefError::NotVisible(node))?;
+        let (mut symbol_ref, scope_depth) = self.symbols.try_resolve(symbol_ref)?;
 
-                // Check if the symbol has been shadowed at this point.
-                if self.symbols[node_data.position] != node {
-                    return Err(SymbolRefError::NotVisible(node).into());
-                }
-
-                Ok((symbol_ref, node_data.scope_depth))
-            }
-            SymbolRef::Named(name) => {
-                if let Some(node) = self.symbols.get(name) {
-                    let node_data = self.node_data.get(node).unwrap();
-                    return Ok((SymbolRef::Direct(*node), node_data.scope_depth));
-                }
-
-                Ok((SymbolRef::Direct(self.make_symbol_import(name)), 0))
-            }
+        if let SymbolRef::Named(name) = symbol_ref {
+            let node = self.make_symbol_import(name);
+            symbol_ref = SymbolRef::Direct(node);
         }
+
+        Ok((symbol_ref, scope_depth))
     }
 
     /// Creates an import node for the given symbol name and returns its id.
@@ -537,80 +526,19 @@ impl<'m, 'a> Resolver<'m, 'a> {
         children.extend(root_region.children.iter().copied());
         root_region.children = children.into_bump_slice();
     }
-
-    fn enter_region(&mut self, region: RegionId) {
-        let region_data = RegionData { binding_count: 0 };
-        self.region_data.insert(region, region_data);
-    }
-
-    fn exit_region(&mut self) {
-        let (_, region_data) = self.region_data.pop().unwrap();
-
-        for _ in 0..region_data.binding_count {
-            let (node, node_data) = self.node_data.pop().unwrap();
-
-            if let Some(shadows) = node_data.shadows {
-                self.symbols[node_data.position] = shadows;
-            } else {
-                debug_assert_eq!(self.symbols.last().unwrap().1, &node);
-                self.symbols.pop();
-            }
-        }
-    }
-
-    fn introduce_symbol(&mut self, name: &'a str, node: NodeId) -> Result<(), SymbolIntroError> {
-        let mut region_entry = self.region_data.last_entry().unwrap();
-        let (position, shadowed) = self.symbols.insert_full(name, node);
-
-        if let Some(shadowed) = shadowed {
-            if self.node_data[&shadowed].scope_depth == region_entry.index() {
-                return Err(SymbolIntroError::DuplicateSymbol(
-                    node,
-                    shadowed,
-                    name.to_string(),
-                ));
-            }
-        }
-
-        region_entry.get_mut().binding_count += 1;
-
-        self.node_data.insert(
-            node,
-            NodeData {
-                scope_depth: region_entry.index(),
-                shadows: shadowed,
-                position,
-                parameters: 0,
-            },
-        );
-
-        Ok(())
-    }
 }
 
 type Error = ModelError;
-type ScopeDepth = usize;
-
-#[derive(Debug, Clone, Copy)]
-struct TermData {
-    region: RegionId,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct NodeData {
-    scope_depth: ScopeDepth,
-    shadows: Option<NodeId>,
-    position: usize,
-    parameters: u16,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct RegionData {
-    binding_count: u32,
-}
+type ScopeDepth = u16;
 
 #[derive(Debug, Clone, Copy)]
 struct VarScope {
     node: NodeId,
     parameters: u16,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LinkScope {
+    region: RegionId,
+    links: u32,
 }
