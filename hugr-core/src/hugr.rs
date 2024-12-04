@@ -19,7 +19,7 @@ pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
@@ -213,7 +213,7 @@ impl Hugr {
         //
         // This is not something we want to expose it the API, so we manually
         // iterate instead of writing it as a method.
-        for n in 0..self.node_count() {
+        for n in 0..self.graph.node_capacity() {
             let pg_node = portgraph::NodeIndex::new(n);
             let node: Node = pg_node.into();
             if !self.contains_node(node) {

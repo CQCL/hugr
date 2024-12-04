@@ -3,8 +3,10 @@
 //!
 //! For a non-mutating option see [`super::collect_op_types_extensions`].
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
+use super::types::collect_type_exts;
 use super::{ExtensionRegistry, ExtensionResolutionError};
 use crate::ops::OpType;
 use crate::types::type_row::TypeRowBase;
@@ -35,8 +37,16 @@ pub fn update_op_types_extensions(
         OpType::FuncDecl(f) => {
             update_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?
         }
-        OpType::Const(_c) => {
-            // TODO: Is it OK to assume that `Value::get_type` returns a well-resolved value?
+        OpType::Const(c) => {
+            let typ = c.get_type();
+            let mut missing = HashSet::new();
+            collect_type_exts(&typ, used_extensions, &mut missing);
+            // We expect that the `CustomConst::get_type` binary calls always return valid extensions.
+            // As we cannot update the `CustomConst` type, we ignore the result.
+            //
+            // Some exotic consts may need https://github.com/CQCL/hugr/issues/1742 to be implemented
+            // to pass this test.
+            //assert!(missing.is_empty());
         }
         OpType::Input(inp) => {
             update_type_row_exts(node, &mut inp.types, extensions, used_extensions)?

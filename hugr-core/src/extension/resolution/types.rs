@@ -43,8 +43,9 @@ pub fn collect_op_types_extensions(
         }
         OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
         OpType::FuncDecl(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
-        OpType::Const(_c) => {
-            // TODO: Is it OK to assume that `Value::get_type` returns a well-resolved value
+        OpType::Const(c) => {
+            let typ = c.get_type();
+            collect_type_exts(&typ, &mut used, &mut missing);
         }
         OpType::Input(inp) => collect_type_row_exts(&inp.types, &mut used, &mut missing),
         OpType::Output(out) => collect_type_row_exts(&out.types, &mut used, &mut missing),
@@ -153,7 +154,7 @@ fn collect_type_row_exts<RV: MaybeRV>(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-fn collect_type_exts<RV: MaybeRV>(
+pub(super) fn collect_type_exts<RV: MaybeRV>(
     typ: &TypeBase<RV>,
     used_extensions: &mut ExtensionRegistry,
     missing_extensions: &mut HashSet<ExtensionId>,

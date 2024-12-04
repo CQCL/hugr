@@ -30,6 +30,8 @@ pub(crate) fn collect_op_extensions(
     op: &OpType,
 ) -> Result<Option<Arc<Extension>>, ExtensionCollectionError> {
     let OpType::ExtensionOp(ext_op) = op else {
+        // TODO: Extract the extension when the operation is a `Const`.
+        // https://github.com/CQCL/hugr/issues/1742
         return Ok(None);
     };
     let ext = ext_op.def().extension();
