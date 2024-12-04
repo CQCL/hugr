@@ -28,13 +28,13 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
-pub struct ConstFoldPass {
+pub struct ConstantFoldPass {
     validation: ValidationLevel,
     allow_increase_termination: bool,
     inputs: HashMap<IncomingPort, Value>,
 }
 
-impl ConstFoldPass {
+impl ConstantFoldPass {
     /// Sets the validation level used before and after the pass is run
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
@@ -214,7 +214,7 @@ fn might_diverge<V: AbstractValue>(results: &AnalysisResults<V, impl HugrView>, 
 
 /// Exhaustively apply constant folding to a HUGR.
 pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
-    ConstFoldPass::default().run(h, reg).unwrap()
+    ConstantFoldPass::default().run(h, reg).unwrap()
 }
 
 struct ConstFoldContext<'a, H>(&'a H);

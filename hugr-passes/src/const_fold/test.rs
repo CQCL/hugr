@@ -31,7 +31,7 @@ use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 use crate::dataflow::{partial_from_const, DFContext, PartialValue};
 use crate::test::TEST_REG;
 
-use super::{constant_fold_pass, ConstFoldContext, ConstFoldPass, ValueHandle};
+use super::{constant_fold_pass, ConstFoldContext, ConstantFoldPass, ValueHandle};
 
 #[rstest]
 #[case(ConstInt::new_u(4, 2).unwrap(), true)]
@@ -1562,7 +1562,7 @@ fn test_tail_loop_unknown() {
 #[test]
 fn test_tail_loop_never_iterates() {
     let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
-    ConstFoldPass::default()
+    ConstantFoldPass::default()
         .with_inputs([(0, Value::true_val())]) // true = 1 = break
         .run(&mut h, &TEST_REG)
         .unwrap();
@@ -1572,7 +1572,7 @@ fn test_tail_loop_never_iterates() {
 #[test]
 fn test_tail_loop_increase_termination() {
     let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
-    ConstFoldPass::default()
+    ConstantFoldPass::default()
         .allow_increase_termination()
         .run(&mut h, &TEST_REG)
         .unwrap();
@@ -1636,7 +1636,7 @@ fn test_cfg(
 ) {
     let backup = cfg_hugr();
     let mut hugr = backup.clone();
-    let pass = ConstFoldPass::default()
+    let pass = ConstantFoldPass::default()
         .with_inputs(inputs.iter().map(|(p, b)| (*p, Value::from_bool(*b))));
     pass.run(&mut hugr, &TEST_REG).unwrap();
     // CFG inside DFG retained
