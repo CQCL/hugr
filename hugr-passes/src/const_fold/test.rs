@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
