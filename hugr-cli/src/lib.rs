@@ -126,24 +126,12 @@ impl HugrArgs {
         // We need to read the input twice; once to try to load it as a HUGR, and if that fails, as a package.
         // If `input` is a file, we can reuse the reader by seeking back to the start.
         // Else, we need to read the file into a buffer.
-        trait SeekRead: Seek + Read {}
-        impl<T: Seek + Read> SeekRead for T {}
-
-        let mut buffer = Vec::new();
-        let mut seekable_input: Box<dyn SeekRead> = match self.input.can_seek() {
-            true => Box::new(&mut self.input),
+        match self.input.can_seek() {
+            true => get_package_or_hugr_seek(&mut self.input, extensions),
             false => {
+                let mut buffer = Vec::new();
                 self.input.read_to_end(&mut buffer)?;
-                Box::new(Cursor::new(buffer))
-            }
-        };
-
-        match Hugr::load_json(&mut seekable_input, extensions) {
-            Ok(hugr) => Ok(PackageOrHugr::Hugr(hugr)),
-            Err(_) => {
-                seekable_input.seek(SeekFrom::Start(0))?;
-                let pkg = Package::from_json_reader(seekable_input, extensions)?;
-                Ok(PackageOrHugr::Package(pkg))
+                get_package_or_hugr_seek(Cursor::new(buffer), extensions)
             }
         }
     }
@@ -159,5 +147,20 @@ impl HugrArgs {
         let val: serde_json::Value = serde_json::from_reader(&mut self.input)?;
         let pkg = serde_json::from_value::<Package>(val.clone())?;
         Ok(pkg)
+    }
+}
+
+/// Load a package or hugr from a seekable input.
+fn get_package_or_hugr_seek<I: Seek + Read>(
+    mut input: I,
+    extensions: &ExtensionRegistry,
+) -> Result<PackageOrHugr, CliError> {
+    match Hugr::load_json(&mut input, extensions) {
+        Ok(hugr) => Ok(PackageOrHugr::Hugr(hugr)),
+        Err(_) => {
+            input.seek(SeekFrom::Start(0))?;
+            let pkg = Package::from_json_reader(input, extensions)?;
+            Ok(PackageOrHugr::Package(pkg))
+        }
     }
 }
