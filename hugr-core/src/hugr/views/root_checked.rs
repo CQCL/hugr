@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::hugr::internal::HugrMutInternals;
+use delegate::delegate;
+use portgraph::MultiPortGraph;
+
+use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::{Hugr, Node};
@@ -42,6 +45,20 @@ impl<Root> RootChecked<&mut Hugr, Root> {
     /// Allows immutably borrowing the underlying mutable reference
     pub fn borrow(&self) -> RootChecked<&Hugr, Root> {
         RootChecked(&*self.0, PhantomData)
+    }
+}
+
+impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
+    type Portgraph<'p>
+        = &'p MultiPortGraph
+    where
+        Self: 'p;
+    delegate! {
+        to self.as_ref() {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
     }
 }
 
