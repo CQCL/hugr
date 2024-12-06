@@ -49,6 +49,15 @@ pub use vars::VarTable;
 /// to names which can not be found are resolved by inserting an import node
 /// into the root region. Depending on the context, this may indicate an error or
 /// provide an opportunity for linking.
+///
+/// # Terms and Sharing
+///
+/// Through sharing the same term may appear in multiple places in the module.
+/// Since these places can have different symbols in scope, a symbol or variable
+/// that resolves in one place may not resolve to the same node in another or
+/// may not resolve at all. This function checks for this by fully traversing
+/// all terms at every place they occur and so does not exploit sharing. This can
+/// be improved in the future.
 pub fn resolve<'a>(module: &mut Module<'a>, bump: &'a Bump) -> Result<(), ModelError> {
     let mut resolver = Resolver::new(module, bump);
     resolver.resolve_region(resolver.module.root)?;
@@ -72,20 +81,11 @@ struct Resolver<'m, 'a> {
 
     vars: VarTable<'a>,
     symbols: SymbolTable<'a>,
-
-    term_to_region: FxHashMap<TermId, RegionId>,
-}
-
-macro_rules! set_max {
-    ($name:ident, $e:expr) => {
-        $name = ::std::cmp::max($name, $e);
-    };
 }
 
 impl<'m, 'a> Resolver<'m, 'a> {
     fn new(module: &'m mut Module<'a>, bump: &'a Bump) -> Self {
         Self {
-            term_to_region: FxHashMap::default(),
             symbols: SymbolTable::new(),
             vars: VarTable::new(),
             module,
@@ -209,7 +209,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             Operation::Custom { operation } => {
-                let (operation, _) = self.resolve_symbol_ref(operation)?;
+                let operation = self.resolve_symbol_ref(operation)?;
                 node_data.operation = Operation::Custom { operation };
 
                 for region in node_data.regions {
@@ -218,7 +218,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             Operation::CustomFull { operation } => {
-                let (operation, _) = self.resolve_symbol_ref(operation)?;
+                let operation = self.resolve_symbol_ref(operation)?;
                 node_data.operation = Operation::CustomFull { operation };
 
                 for region in node_data.regions {
@@ -258,14 +258,7 @@ impl<'m, 'a> Resolver<'m, 'a> {
         })
     }
 
-    fn resolve_term(&mut self, term: TermId) -> Result<ScopeDepth, ModelError> {
-        if let Some(region) = self.term_to_region.get(&term) {
-            match self.symbols.region_to_depth(*region) {
-                Some(scope_depth) => return Ok(scope_depth),
-                None => panic!("this should be an error"),
-            }
-        }
-
+    fn resolve_term(&mut self, term: TermId) -> Result<(), ModelError> {
         let term_data = self
             .module
             .get_term(term)
@@ -292,59 +285,51 @@ impl<'m, 'a> Resolver<'m, 'a> {
             }
 
             super::Term::Apply { symbol, args } => {
-                let (symbol, symbol_depth) = self.resolve_symbol_ref(symbol)?;
+                let symbol = self.resolve_symbol_ref(symbol)?;
                 self.module.terms[term.index()] = Term::Apply { symbol, args };
-                set_max!(scope_depth, symbol_depth);
 
                 for arg in args {
-                    set_max!(scope_depth, self.resolve_term(*arg)?);
+                    self.resolve_term(*arg)?;
                 }
             }
 
             super::Term::ApplyFull { symbol, args } => {
-                let (symbol, symbol_depth) = self.resolve_symbol_ref(symbol)?;
+                let symbol = self.resolve_symbol_ref(symbol)?;
                 self.module.terms[term.index()] = Term::ApplyFull { symbol, args };
-                set_max!(scope_depth, symbol_depth);
 
                 for arg in args {
-                    set_max!(scope_depth, self.resolve_term(*arg)?);
+                    self.resolve_term(*arg)?;
                 }
             }
 
             super::Term::Quote { r#type } => {
-                set_max!(scope_depth, self.resolve_term(r#type)?);
+                self.resolve_term(r#type)?;
             }
 
             super::Term::List { parts } => {
                 for part in parts {
-                    set_max!(
-                        scope_depth,
-                        match part {
-                            ListPart::Item(term) => self.resolve_term(*term)?,
-                            ListPart::Splice(term) => self.resolve_term(*term)?,
-                        }
-                    );
+                    match part {
+                        ListPart::Item(term) => self.resolve_term(*term)?,
+                        ListPart::Splice(term) => self.resolve_term(*term)?,
+                    }
                 }
             }
 
             super::Term::ListType { item_type } => {
-                set_max!(scope_depth, self.resolve_term(item_type)?);
+                self.resolve_term(item_type)?;
             }
 
             super::Term::ExtSet { parts } => {
                 for part in parts {
-                    set_max!(
-                        scope_depth,
-                        match part {
-                            ExtSetPart::Extension(_) => 0,
-                            ExtSetPart::Splice(term) => self.resolve_term(*term)?,
-                        }
-                    );
+                    match part {
+                        ExtSetPart::Extension(_) => {}
+                        ExtSetPart::Splice(term) => self.resolve_term(*term)?,
+                    }
                 }
             }
 
             super::Term::Adt { variants } => {
-                set_max!(scope_depth, self.resolve_term(variants)?);
+                self.resolve_term(variants)?;
             }
 
             super::Term::FuncType {
@@ -352,37 +337,32 @@ impl<'m, 'a> Resolver<'m, 'a> {
                 outputs,
                 extensions,
             } => {
-                set_max!(scope_depth, self.resolve_term(inputs)?);
-                set_max!(scope_depth, self.resolve_term(outputs)?);
-                set_max!(scope_depth, self.resolve_term(extensions)?);
+                self.resolve_term(inputs)?;
+                self.resolve_term(outputs)?;
+                self.resolve_term(extensions)?;
             }
 
             super::Term::Control { values } => {
-                set_max!(scope_depth, self.resolve_term(values)?);
+                self.resolve_term(values)?;
             }
 
             super::Term::NonLinearConstraint { term } => {
-                set_max!(scope_depth, self.resolve_term(term)?);
+                self.resolve_term(term)?;
             }
         };
 
-        let region = self.symbols.depth_to_region(scope_depth).unwrap();
-        self.term_to_region.insert(term, region);
-        Ok(scope_depth)
+        Ok(())
     }
 
-    fn resolve_symbol_ref(
-        &mut self,
-        symbol_ref: SymbolRef<'a>,
-    ) -> Result<(SymbolRef<'a>, ScopeDepth), Error> {
-        let (mut symbol_ref, scope_depth) = self.symbols.try_resolve(symbol_ref)?;
+    fn resolve_symbol_ref(&mut self, symbol_ref: SymbolRef<'a>) -> Result<SymbolRef<'a>, Error> {
+        let (mut symbol_ref, _) = self.symbols.try_resolve(symbol_ref)?;
 
         if let SymbolRef::Named(name) = symbol_ref {
             let node = self.make_symbol_import(name);
             symbol_ref = SymbolRef::Direct(node);
         }
 
-        Ok((symbol_ref, scope_depth))
+        Ok(symbol_ref)
     }
 
     /// Creates an import node for the given symbol name and returns its id.
