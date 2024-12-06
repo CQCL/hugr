@@ -451,7 +451,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     fn print_link_ref(&mut self, link_ref: LinkRef<'a>) -> PrintResult<()> {
         match link_ref {
             LinkRef::Index(link_index) => {
-                self.print_text(format!("%:{}", link_index.0));
+                self.print_text(format!("%{}", link_index.0));
                 Ok(())
             }
             LinkRef::Named(name) => {

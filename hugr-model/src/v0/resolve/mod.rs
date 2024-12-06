@@ -36,7 +36,6 @@ use super::{
 use bumpalo::{collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
 
-mod bindings;
 mod symbols;
 mod vars;
 pub use symbols::SymbolTable;
