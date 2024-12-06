@@ -415,19 +415,11 @@ pub trait OpTrait: Sized + Clone {
         .is_some() as usize
     }
 
-    /// Like [Self::subst_mut] but returns a substituted clone of `self`.
-    /// The default impl is correct so long as `subst_mut` is, so trait
-    /// `impl`s should/must override that if the op may contain type variables.
-    fn substitute(&self, subst: &Substitution) -> Self {
-        let mut s = self.clone();
-        s.subst_mut(subst);
-        s
-    }
-
     /// Apply a type-level substitution to this OpType, i.e. replace
     /// [type variables](crate::types::TypeArg::new_var_use) with new types.
-    /// The default is appropriate when there are no type (variables) in the op.
-    fn subst_mut(&mut self, _subst: &Substitution) {}
+    fn substitute(&self, _subst: &Substitution) -> Self {
+        self.clone()
+    }
 }
 
 /// Properties of child graphs of ops, if the op has children.

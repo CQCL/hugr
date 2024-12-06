@@ -11,7 +11,7 @@ use crate::IncomingPort;
 use ::proptest_derive::Arbitrary;
 
 /// Trait implemented by all dataflow operations.
-pub trait DataflowOpTrait: Sized + Clone {
+pub trait DataflowOpTrait: Sized {
     /// Tag identifying the operation.
     const TAG: OpTag;
 
@@ -52,7 +52,7 @@ pub trait DataflowOpTrait: Sized + Clone {
 
     /// Apply a type-level substitution to this OpType, i.e. replace
     /// [type variables](TypeArg::new_var_use) with new types.
-    fn subst_mut(&mut self, _subst: &Substitution) {}
+    fn substitute(&self, _subst: &Substitution) -> Self;
 }
 
 /// Helpers to construct input and output nodes
@@ -113,8 +113,10 @@ impl DataflowOpTrait for Input {
         Signature::new(TypeRow::new(), self.types.clone())
     }
 
-    fn subst_mut(&mut self, subst: &Substitution) {
-        self.types = self.types.substitute(subst);
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            types: self.types.substitute(subst),
+        }
     }
 }
 impl DataflowOpTrait for Output {
@@ -134,12 +136,14 @@ impl DataflowOpTrait for Output {
         None
     }
 
-    fn subst_mut(&mut self, subst: &Substitution) {
-        self.types = self.types.substitute(subst);
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            types: self.types.substitute(subst),
+        }
     }
 }
 
-impl<T: DataflowOpTrait> OpTrait for T {
+impl<T: DataflowOpTrait + Clone> OpTrait for T {
     fn description(&self) -> &str {
         DataflowOpTrait::description(self)
     }
@@ -164,8 +168,8 @@ impl<T: DataflowOpTrait> OpTrait for T {
         DataflowOpTrait::static_input(self)
     }
 
-    fn subst_mut(&mut self, subst: &Substitution) {
-        DataflowOpTrait::subst_mut(self, subst)
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        DataflowOpTrait::substitute(self, subst)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -204,17 +208,24 @@ impl DataflowOpTrait for Call {
         Some(EdgeKind::Function(self.called_function_type().clone()))
     }
 
-    fn subst_mut(&mut self, subst: &Substitution) {
-        for ta in self.type_args.iter_mut() {
-            *ta = ta.substitute(subst);
-        }
-        self.instantiation = self.instantiation.substitute(subst);
+    fn substitute(&self, subst: &Substitution) -> Self {
+        let type_args = self
+            .type_args
+            .iter()
+            .map(|ta| ta.substitute(subst))
+            .collect::<Vec<_>>();
+        let instantiation = self.instantiation.substitute(subst);
         debug_assert_eq!(
             self.func_sig
-                .instantiate(&self.type_args, subst.extension_registry())
+                .instantiate(&type_args, subst.extension_registry())
                 .as_ref(),
-            Ok(&self.instantiation)
+            Ok(&instantiation)
         );
+        Self {
+            type_args,
+            instantiation,
+            func_sig: self.func_sig.clone(),
+        }
     }
 }
 impl Call {
@@ -309,8 +320,10 @@ impl DataflowOpTrait for CallIndirect {
         s
     }
 
-    fn subst_mut(&mut self, subst: &Substitution) {
-        self.signature = self.signature.substitute(subst);
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
     }
 }
 
@@ -322,7 +335,6 @@ pub struct LoadConstant {
     pub datatype: Type,
 }
 impl_op_name!(LoadConstant);
-// Constants cannot contain type variables, so no substitution required
 impl DataflowOpTrait for LoadConstant {
     const TAG: OpTag = OpTag::LoadConst;
 
@@ -336,6 +348,11 @@ impl DataflowOpTrait for LoadConstant {
 
     fn static_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Const(self.constant_type().clone()))
+    }
+
+    fn substitute(&self, _subst: &Substitution) -> Self {
+        // Constants cannot refer to TypeArgs, so neither can loading them
+        self.clone()
     }
 }
 
@@ -394,17 +411,24 @@ impl DataflowOpTrait for LoadFunction {
         Some(EdgeKind::Function(self.func_sig.clone()))
     }
 
-    fn subst_mut(&mut self, subst: &Substitution) {
-        for ta in self.type_args.iter_mut() {
-            *ta = ta.substitute(subst);
-        }
-        self.signature = self.signature.substitute(subst);
+    fn substitute(&self, subst: &Substitution) -> Self {
+        let type_args = self
+            .type_args
+            .iter()
+            .map(|ta| ta.substitute(subst))
+            .collect::<Vec<_>>();
+        let signature = self.signature.substitute(subst);
         debug_assert_eq!(
             self.func_sig
-                .instantiate(&self.type_args, subst.extension_registry())
+                .instantiate(&type_args, subst.extension_registry())
                 .as_ref(),
-            Ok(&self.signature)
+            Ok(&signature)
         );
+        Self {
+            func_sig: self.func_sig.clone(),
+            type_args,
+            signature,
+        }
     }
 }
 impl LoadFunction {
@@ -496,7 +520,9 @@ impl DataflowOpTrait for DFG {
         self.inner_signature()
     }
 
-    fn subst_mut(&mut self, subst: &Substitution) {
-        self.signature = self.signature.substitute(subst)
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
     }
 }
