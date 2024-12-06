@@ -98,8 +98,8 @@ pub(crate) fn resolve_op_extensions<'e>(
             node,
             extension: opaque.extension().clone(),
             op: def.name().clone(),
-            computed: ext_op.signature().clone(),
-            stored: opaque.signature().clone(),
+            computed: ext_op.signature().into_owned(),
+            stored: opaque.signature().into_owned(),
         }
         .into());
     };

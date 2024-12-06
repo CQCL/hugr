@@ -116,7 +116,12 @@ pub fn emit_array_op<'c, H: HugrView>(
 ) -> Result<()> {
     let builder = ctx.builder();
     let ts = ctx.typing_session();
-    let sig = op.clone().to_extension_op().unwrap().signature();
+    let sig = op
+        .clone()
+        .to_extension_op()
+        .unwrap()
+        .signature()
+        .into_owned();
     let ArrayOp {
         def,
         ref elem_ty,

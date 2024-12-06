@@ -83,7 +83,7 @@ fn mk_rep(
     let dfg1 = replacement.add_node_with_parent(
         merged,
         DFG {
-            signature: pred_ty.inner_signature().clone(),
+            signature: pred_ty.inner_signature().into_owned(),
         },
     );
     for (i, _) in pred_ty.inputs.iter().enumerate() {
@@ -93,7 +93,7 @@ fn mk_rep(
     let dfg2 = replacement.add_node_with_parent(
         merged,
         DFG {
-            signature: succ_sig.clone(),
+            signature: succ_sig.as_ref().clone(),
         },
     );
     for (i, _) in succ_sig.output.iter().enumerate() {
@@ -323,6 +323,7 @@ mod test {
         let [res_t] = tst_op
             .dataflow_signature()
             .unwrap()
+            .into_owned()
             .output
             .into_owned()
             .try_into()

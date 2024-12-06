@@ -332,6 +332,8 @@ impl<Root: NodeHandle> HugrMut for SiblingMut<'_, Root> {}
 
 #[cfg(test)]
 mod test {
+    use std::borrow::Cow;
+
     use rstest::rstest;
 
     use crate::builder::test::simple_dfg_hugr;
@@ -376,7 +378,7 @@ mod test {
         );
 
         assert_eq!(
-            inner_region.inner_function_type(),
+            inner_region.inner_function_type().map(Cow::into_owned),
             Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
@@ -487,7 +489,7 @@ mod test {
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
         simple_dfg_hugr.validate().unwrap();
         let root = simple_dfg_hugr.root();
-        let signature = simple_dfg_hugr.inner_function_type().unwrap().clone();
+        let signature = simple_dfg_hugr.inner_function_type().unwrap().into_owned();
 
         let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
         assert_eq!(
@@ -517,7 +519,11 @@ mod test {
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
         let case_nodetype = crate::ops::Case {
-            signature: simple_dfg_hugr.root_type().dataflow_signature().unwrap(),
+            signature: simple_dfg_hugr
+                .root_type()
+                .dataflow_signature()
+                .unwrap()
+                .into_owned(),
         };
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
         // As expected, we cannot replace the root with a Case

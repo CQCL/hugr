@@ -1,6 +1,7 @@
 //! Extensible operations.
 
 use itertools::Itertools;
+use std::borrow::Cow;
 use std::sync::Arc;
 use thiserror::Error;
 #[cfg(test)]
@@ -68,7 +69,7 @@ impl ExtensionOp {
             Ok(sig) => sig,
             Err(SignatureError::MissingComputeFunc) => {
                 // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-                opaque.signature()
+                opaque.signature().into_owned()
             }
             Err(e) => return Err(e),
         };
@@ -162,8 +163,8 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn signature(&self) -> Signature {
-        self.signature.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -204,6 +205,7 @@ impl OpaqueOp {
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
+        let signature = signature.with_extension_delta(extension.clone());
         Self {
             extension,
             name: name.into(),
@@ -254,10 +256,8 @@ impl DataflowOpTrait for OpaqueOp {
         &self.description
     }
 
-    fn signature(&self) -> Signature {
-        self.signature
-            .clone()
-            .with_extension_delta(self.extension().clone())
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -345,8 +345,8 @@ mod test {
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
         assert_eq!(
-            op.signature(),
-            sig.with_extension_delta(op.extension().clone())
+            op.signature().as_ref(),
+            &sig.with_extension_delta(op.extension().clone())
         );
     }
 

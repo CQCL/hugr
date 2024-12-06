@@ -244,7 +244,7 @@ fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
             root,
             FuncDefn {
                 name: "main".to_string(),
-                signature: signature.into(),
+                signature: signature.into_owned().into(),
             },
         )
         .expect("Hugr accepts any root node");
@@ -259,7 +259,8 @@ fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
     if OpTag::DataflowChild.is_superset(tag) && !root_op.is_input() && !root_op.is_output() {
         let signature = root_op
             .dataflow_signature()
-            .unwrap_or_else(|| panic!("Dataflow child {} without signature", root_op.name()));
+            .unwrap_or_else(|| panic!("Dataflow child {} without signature", root_op.name()))
+            .into_owned();
         let mut new_hugr = ModuleBuilder::new();
         let mut func = new_hugr.define_function("main", signature).unwrap();
         let dataflow_node = func.add_hugr_with_wires(hugr, func.input_wires()).unwrap();

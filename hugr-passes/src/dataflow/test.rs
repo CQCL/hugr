@@ -165,8 +165,8 @@ fn test_tail_loop_two_iters() {
         )
         .unwrap();
     assert_eq!(
-        tlb.loop_signature().unwrap().signature(),
-        Signature::new_endo(vec![bool_t(); 2])
+        tlb.loop_signature().unwrap().signature().as_ref(),
+        &Signature::new_endo(vec![bool_t(); 2])
     );
     let [in_w1, in_w2] = tlb.input_wires_arr();
     let tail_loop = tlb.finish_with_outputs(in_w1, [in_w2, in_w1]).unwrap();
