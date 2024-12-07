@@ -998,5 +998,28 @@ pub(crate) mod test {
             }
             s
         }
+
+        struct MakePair<S, T>(S, T);
+
+        impl<A, B, S: VarEnvState<A>, T: VarEnvState<B> + Clone> VarEnvState<(A, B)> for MakePair<S, T>
+        where
+            A: std::fmt::Debug + Clone,
+            B: std::fmt::Debug,
+        {
+            fn with_env(
+                self,
+                env: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = ((A, B), Vec<TypeParam>)> + Clone {
+                self.0
+                    .with_env(env, reg.clone())
+                    .prop_flat_map(move |(v1, env)| {
+                        self.1
+                            .clone()
+                            .with_env(env, reg.clone())
+                            .prop_map(move |(v2, env)| ((v1.clone(), v2), env))
+                    })
+            }
+        }
     }
 }
