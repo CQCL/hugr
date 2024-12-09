@@ -296,6 +296,7 @@ impl<'a> Context<'a> {
         match global_ref {
             model::GlobalRef::Direct(node_id) => Ok(*node_id),
             model::GlobalRef::Named(name) => {
+                panic!("remaining named global ref");
                 let item = self
                     .names
                     .items
@@ -316,19 +317,10 @@ impl<'a> Context<'a> {
         match global_ref {
             model::GlobalRef::Direct(node_id) => {
                 let node_data = self.get_node(node_id)?;
-
-                let name = match node_data.operation {
-                    model::Operation::DefineFunc { decl } => decl.name,
-                    model::Operation::DeclareFunc { decl } => decl.name,
-                    model::Operation::DefineAlias { decl, .. } => decl.name,
-                    model::Operation::DeclareAlias { decl } => decl.name,
-                    model::Operation::DeclareConstructor { decl } => decl.name,
-                    model::Operation::DeclareOperation { decl } => decl.name,
-                    _ => {
-                        return Err(model::ModelError::InvalidGlobal(global_ref.to_string()).into());
-                    }
-                };
-
+                let name = node_data
+                    .operation
+                    .symbol()
+                    .ok_or_else(|| model::ModelError::InvalidGlobal(global_ref.to_string()))?;
                 Ok(name)
             }
             model::GlobalRef::Named(name) => Ok(name),
@@ -1310,7 +1302,8 @@ impl<'a> Context<'a> {
             _ => return Err(model::ModelError::TypeError(term_id).into()),
         };
 
-        if global != &GlobalRef::Named(TERM_JSON) {
+        let global = self.get_global_name(*global)?;
+        if global != TERM_JSON {
             return Err(model::ModelError::TypeError(term_id).into());
         }
 

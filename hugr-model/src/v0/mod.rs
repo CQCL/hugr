@@ -367,6 +367,21 @@ pub enum Operation<'a> {
     },
 }
 
+impl<'a> Operation<'a> {
+    pub fn symbol(&self) -> Option<&'a str> {
+        match self {
+            Operation::DefineFunc { decl } => Some(decl.name),
+            Operation::DeclareFunc { decl } => Some(decl.name),
+            Operation::DefineAlias { decl, value } => Some(decl.name),
+            Operation::DeclareAlias { decl } => Some(decl.name),
+            Operation::DeclareConstructor { decl } => Some(decl.name),
+            Operation::DeclareOperation { decl } => Some(decl.name),
+            Operation::Import { name } => Some(name),
+            _ => None,
+        }
+    }
+}
+
 /// A region in the hugr.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Region<'a> {

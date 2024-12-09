@@ -658,13 +658,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     .get_node(node_id)
                     .ok_or(PrintError::NodeNotFound(node_id))?;
 
-                let name = match &node_data.operation {
-                    Operation::DefineFunc { decl } => decl.name,
-                    Operation::DeclareFunc { decl } => decl.name,
-                    Operation::DefineAlias { decl, .. } => decl.name,
-                    Operation::DeclareAlias { decl } => decl.name,
-                    _ => return Err(PrintError::UnexpectedOperation(node_id)),
-                };
+                let name = node_data
+                    .operation
+                    .symbol()
+                    .ok_or(PrintError::UnexpectedOperation(node_id))?;
 
                 self.print_text(name)
             }

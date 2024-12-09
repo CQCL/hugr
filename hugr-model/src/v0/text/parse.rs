@@ -1,4 +1,5 @@
 use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
+use fxhash::FxHashMap;
 use pest::{
     iterators::{Pair, Pairs},
     Parser, RuleType,
@@ -6,9 +7,10 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    scope::SymbolTable, AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef,
-    ListPart, LocalRef, MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort,
-    Region, RegionId, RegionKind, Term, TermId,
+    scope::{SymbolResolveError, SymbolTable},
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef, ListPart, LocalRef,
+    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
+    RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -51,6 +53,7 @@ struct ParseContext<'a> {
     module: Module<'a>,
     bump: &'a Bump,
     symbols: SymbolTable<'a>,
+    implicit_imports: FxHashMap<&'a str, NodeId>,
 }
 
 impl<'a> ParseContext<'a> {
@@ -58,6 +61,7 @@ impl<'a> ParseContext<'a> {
         Self {
             module: Module::default(),
             symbols: SymbolTable::default(),
+            implicit_imports: FxHashMap::default(),
             bump,
         }
     }
@@ -71,7 +75,15 @@ impl<'a> ParseContext<'a> {
 
         // TODO: What scope does the metadata live in?
         let meta = self.parse_meta(&mut inner)?;
-        let children = self.parse_nodes(&mut inner)?;
+        let explicit_children = self.parse_nodes(&mut inner)?;
+
+        let mut children = BumpVec::with_capacity_in(
+            explicit_children.len() + self.implicit_imports.len(),
+            self.bump,
+        );
+        children.extend(explicit_children);
+        children.extend(self.implicit_imports.drain().map(|(_, node)| node));
+        let children = children.into_bump_slice();
 
         self.symbols.exit();
 
@@ -110,7 +122,7 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_apply => {
-                let name = GlobalRef::Named(self.parse_symbol(&mut inner)?);
+                let name = self.parse_symbol_use(&mut inner)?;
                 let mut args = Vec::new();
 
                 for token in inner {
@@ -124,7 +136,7 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_apply_full => {
-                let name = GlobalRef::Named(self.parse_symbol(&mut inner)?);
+                let name = self.parse_symbol_use(&mut inner)?;
                 let mut args = Vec::new();
 
                 for token in inner {
@@ -436,7 +448,7 @@ impl<'a> ParseContext<'a> {
                 let op_rule = op.as_rule();
                 let mut op_inner = op.into_inner();
 
-                let name = GlobalRef::Named(self.parse_symbol(&mut op_inner)?);
+                let name = self.parse_symbol_use(&mut op_inner)?;
 
                 let mut params = Vec::new();
 
@@ -781,6 +793,26 @@ impl<'a> ParseContext<'a> {
         }
 
         Ok(self.bump.alloc_slice_copy(&items))
+    }
+
+    fn parse_symbol_use(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<GlobalRef<'a>> {
+        let name = self.parse_symbol(pairs)?;
+        let resolved = self.symbols.resolve(GlobalRef::Named(name));
+
+        let node = match resolved {
+            Ok(node) => node,
+            Err(SymbolResolveError::NotVisible(_)) => unreachable!(),
+            Err(SymbolResolveError::NotFound(_)) => {
+                *self.implicit_imports.entry(name).or_insert_with(|| {
+                    self.module.insert_node(Node {
+                        operation: Operation::Import { name },
+                        ..Node::default()
+                    })
+                })
+            }
+        };
+
+        Ok(GlobalRef::Direct(node))
     }
 
     fn parse_symbol(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a str> {
