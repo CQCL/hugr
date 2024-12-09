@@ -211,6 +211,8 @@ fn collect_typearg_exts(
                 collect_typearg_exts(elem, used_extensions, missing_extensions);
             }
         }
+        // We ignore the `TypeArg::Extension` case, as it is not required to
+        // **define** the hugr.
         _ => {}
     }
 }
