@@ -23,75 +23,50 @@ struct Module {
 }
 
 struct Node {
-    operation @0 :Operation;
-    inputs @1 :List(LinkRef);
-    outputs @2 :List(LinkRef);
-    params @3 :List(TermId);
-    regions @4 :List(RegionId);
-    meta @5 :List(MetaItem);
-    signature @6 :OptionalTermId;
-}
-
-struct Operation {
     union {
         invalid @0 :Void;
-        dfg @1 :Void;
-        cfg @2 :Void;
-        block @3 :Void;
-        funcDefn @4 :FuncDecl;
-        funcDecl @5 :FuncDecl;
-        aliasDefn @6 :AliasDefn;
-        aliasDecl @7 :AliasDecl;
-        custom @8 :GlobalRef;
-        customFull @9 :GlobalRef;
-        tag @10 :UInt16;
-        tailLoop @11 :Void;
-        conditional @12 :Void;
-        callFunc @13 :TermId;
-        loadFunc @14 :TermId;
-        constructorDecl @15 :ConstructorDecl;
-        operationDecl @16 :OperationDecl;
+        instruction @1 :Instruction;
+        symbol @2 :Symbol;
     }
+}
 
-    struct FuncDefn {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        signature @3 :TermId;
+struct Instruction {
+    inputs @0 :List(LinkRef);
+    outputs @1 :List(LinkRef);
+    params @2 :List(TermId);
+    regions @3 :List(RegionId);
+    meta @4 :List(MetaItem);
+    signature @5 :OptionalTermId;
+
+    union {
+        dfg @6 :Void;
+        cfg @7 :Void;
+        block @8 :Void;
+        custom @9 :GlobalRef;
+        customFull @10 :GlobalRef;
+        tag @11 :UInt16;
+        tailLoop @12 :Void;
+        conditional @13 :Void;
+        callFunc @14 :TermId;
+        loadFunc @15 :TermId;
     }
+}
 
-    struct FuncDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        signature @3 :TermId;
-    }
+struct Symbol {
+    name @0 :Text;
+    params @1 :List(Param);
+    constraints @2 :List(TermId);
+    signature @3 :OptionalTermId;
+    meta @4 :List(MetaItem);
 
-    struct AliasDefn {
-        name @0 :Text;
-        params @1 :List(Param);
-        type @2 :TermId;
-        value @3 :TermId;
-    }
-
-    struct AliasDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        type @2 :TermId;
-    }
-
-    struct ConstructorDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        type @3 :TermId;
-    }
-
-    struct OperationDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        type @3 :TermId;
+    union {
+        import @5 :Void;
+        funcDefn @6 :RegionId;
+        funcDecl @7 :Void;
+        aliasDefn @8 :TermId;
+        aliasDecl @9 :Void;
+        constructorDecl @10 :Void;
+        operationDecl @11 :Void;
     }
 }
 
@@ -99,9 +74,10 @@ struct Region {
     kind @0 :RegionKind;
     sources @1 :List(LinkRef);
     targets @2 :List(LinkRef);
-    children @3 :List(NodeId);
-    meta @4 :List(MetaItem);
-    signature @5 :OptionalTermId;
+    symbols @3 :List(NodeId);
+    instructions @4 :List(NodeId);
+    meta @5 :List(MetaItem);
+    signature @6 :OptionalTermId;
 }
 
 enum RegionKind {
