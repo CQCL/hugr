@@ -431,6 +431,9 @@
           {
             "tp": "Type",
             "b": "A"
+          },
+          {
+            "tp": "Extensions"
           }
         ],
         "body": {
@@ -445,7 +448,9 @@
                   "b": "A"
                 }
               ],
-              "extension_reqs": []
+              "extension_reqs": [
+                "2"
+              ]
             }
           ],
           "output": [
@@ -503,6 +508,9 @@
               "tp": "Type",
               "b": "A"
             }
+          },
+          {
+            "tp": "Extensions"
           }
         ],
         "body": {
@@ -557,7 +565,9 @@
                   "b": "A"
                 }
               ],
-              "extension_reqs": []
+              "extension_reqs": [
+                "4"
+              ]
             },
             {
               "t": "R",
