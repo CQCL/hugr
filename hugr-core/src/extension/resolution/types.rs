@@ -37,6 +37,9 @@ pub fn collect_op_types_extensions(
 
     match op {
         OpType::ExtensionOp(ext) => {
+            for arg in ext.args() {
+                collect_typearg_exts(arg, &mut used, &mut missing);
+            }
             collect_signature_exts(&ext.signature(), &mut used, &mut missing)
         }
         OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
@@ -58,7 +61,12 @@ pub fn collect_op_types_extensions(
             collect_signature_exts(&lf.signature, &mut used, &mut missing);
         }
         OpType::DFG(dfg) => collect_signature_exts(&dfg.signature, &mut used, &mut missing),
-        OpType::OpaqueOp(op) => collect_signature_exts(&op.signature(), &mut used, &mut missing),
+        OpType::OpaqueOp(op) => {
+            for arg in op.args() {
+                collect_typearg_exts(arg, &mut used, &mut missing);
+            }
+            collect_signature_exts(&op.signature(), &mut used, &mut missing)
+        }
         OpType::Tag(t) => {
             for variant in t.variants.iter() {
                 collect_type_row_exts(variant, &mut used, &mut missing)

@@ -29,6 +29,9 @@ pub fn update_op_types_extensions(
 ) -> Result<(), ExtensionResolutionError> {
     match op {
         OpType::ExtensionOp(ext) => {
+            for arg in ext.args_mut() {
+                update_typearg_exts(node, arg, extensions, used_extensions)?;
+            }
             update_signature_exts(node, ext.signature_mut(), extensions, used_extensions)?
         }
         OpType::FuncDefn(f) => {
@@ -72,6 +75,9 @@ pub fn update_op_types_extensions(
             update_signature_exts(node, &mut dfg.signature, extensions, used_extensions)?
         }
         OpType::OpaqueOp(op) => {
+            for arg in op.args_mut() {
+                update_typearg_exts(node, arg, extensions, used_extensions)?;
+            }
             update_signature_exts(node, op.signature_mut(), extensions, used_extensions)?
         }
         OpType::Tag(t) => {

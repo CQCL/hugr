@@ -116,6 +116,11 @@ impl ExtensionOp {
     pub fn signature_mut(&mut self) -> &mut Signature {
         &mut self.signature
     }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
@@ -234,6 +239,11 @@ impl OpaqueOp {
     /// Parent extension.
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
+    }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
     }
 }
 
