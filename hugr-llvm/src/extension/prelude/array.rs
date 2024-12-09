@@ -445,13 +445,12 @@ mod test {
     }
 
     fn exec_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([
+        ExtensionRegistry::new([
             int_types::EXTENSION.to_owned(),
             int_ops::EXTENSION.to_owned(),
             logic::EXTENSION.to_owned(),
             prelude::PRELUDE.to_owned(),
         ])
-        .unwrap()
     }
 
     #[rstest]

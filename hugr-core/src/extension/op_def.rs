@@ -658,7 +658,8 @@ pub(super) mod test {
             Ok(())
         })?;
 
-        let reg = ExtensionRegistry::try_new([PRELUDE.clone(), EXTENSION.clone(), ext]).unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), EXTENSION.clone(), ext]);
+        reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =

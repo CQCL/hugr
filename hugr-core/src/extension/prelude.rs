@@ -127,8 +127,7 @@ lazy_static! {
     };
 
     /// An extension registry containing only the prelude
-    pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
-        ExtensionRegistry::try_new([PRELUDE.clone()]).unwrap();
+    pub static ref PRELUDE_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([PRELUDE.clone()]);
 }
 
 pub(crate) fn usize_custom_t(extension_ref: &Weak<Extension>) -> CustomType {

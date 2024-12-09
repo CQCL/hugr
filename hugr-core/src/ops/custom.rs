@@ -383,7 +383,8 @@ mod test {
         });
         let ext_id = ext.name().clone();
 
-        let registry = ExtensionRegistry::try_new([ext]).unwrap();
+        let registry = ExtensionRegistry::new([ext]);
+        registry.validate().unwrap();
         let opaque_val = OpaqueOp::new(
             ext_id.clone(),
             val_name,

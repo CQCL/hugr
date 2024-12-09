@@ -110,8 +110,7 @@ lazy_static! {
     /// Reference to the pointer Extension.
     pub static ref EXTENSION: Arc<Extension> = extension();
     /// Registry required to validate pointer extension.
-    pub static ref PTR_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
+    pub static ref PTR_REG: ExtensionRegistry = ExtensionRegistry::new([EXTENSION.clone()]);
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).  Depending on
@@ -272,8 +271,7 @@ pub(crate) mod test {
     fn test_build() {
         let in_row = vec![bool_t(), float64_type()];
 
-        let reg =
-            ExtensionRegistry::try_new([EXTENSION.to_owned(), FLOAT_EXTENSION.to_owned()]).unwrap();
+        let reg = ExtensionRegistry::new([EXTENSION.to_owned(), FLOAT_EXTENSION.to_owned()]);
         let hugr = {
             let mut builder = DFGBuilder::new(
                 Signature::new(in_row.clone(), type_row![]).with_extension_delta(EXTENSION_ID),

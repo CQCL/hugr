@@ -614,7 +614,7 @@ mod test {
     }
 
     fn test_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap()
+        ExtensionRegistry::new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()])
     }
 
     /// Constructs a DFG hugr defining a sum constant, and returning the loaded value.

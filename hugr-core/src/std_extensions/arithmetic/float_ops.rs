@@ -117,12 +117,11 @@ lazy_static! {
     };
 
     /// Registry of extensions required to validate float operations.
-    pub static ref FLOAT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+    pub static ref FLOAT_OPS_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([
         PRELUDE.clone(),
         super::float_types::EXTENSION.clone(),
         EXTENSION.clone(),
-    ])
-    .unwrap();
+    ]);
 }
 
 impl MakeRegisteredOp for FloatOps {

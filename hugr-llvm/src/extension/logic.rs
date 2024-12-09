@@ -110,7 +110,7 @@ mod test {
         SimpleHugrConfig::new()
             .with_ins(vec![bool_t(); arity])
             .with_outs(vec![bool_t()])
-            .with_extensions(ExtensionRegistry::try_new(vec![logic::EXTENSION.to_owned()]).unwrap())
+            .with_extensions(ExtensionRegistry::new(vec![logic::EXTENSION.to_owned()]))
             .finish(|mut builder| {
                 let outputs = builder
                     .add_dataflow_op(op, builder.input_wires())

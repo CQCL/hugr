@@ -231,7 +231,8 @@ mod test {
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
-        let reg = ExtensionRegistry::try_new([PRELUDE.clone(), e])?;
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), e]);
+        reg.validate()?;
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
         let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
@@ -358,7 +359,8 @@ mod test {
         h.branch(&bb2, 0, &bb3)?;
         h.branch(&bb3, 0, &h.exit_block())?;
 
-        let reg = ExtensionRegistry::try_new([e, PRELUDE.clone()])?;
+        let reg = ExtensionRegistry::new([e, PRELUDE.clone()]);
+        reg.validate()?;
         let mut h = h.finish_hugr(&reg)?;
         let root = h.root();
         merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);

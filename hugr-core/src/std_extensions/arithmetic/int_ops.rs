@@ -260,12 +260,11 @@ lazy_static! {
     };
 
     /// Registry of extensions required to validate integer operations.
-    pub static ref INT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+    pub static ref INT_OPS_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([
         PRELUDE.clone(),
         super::int_types::EXTENSION.clone(),
         EXTENSION.clone(),
-    ])
-    .unwrap();
+    ]);
 }
 
 impl HasConcrete for IntOpDef {
