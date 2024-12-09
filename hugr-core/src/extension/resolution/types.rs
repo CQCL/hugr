@@ -104,13 +104,12 @@ pub fn collect_op_types_extensions(
         _ => {}
     };
 
-    if missing.is_empty() {
-        Ok(used)
-    } else {
-        Err(ExtensionCollectionError::dropped_op_extension(
+    missing
+        .is_empty()
+        .then_some(used)
+        .ok_or(ExtensionCollectionError::dropped_op_extension(
             node, op, missing,
         ))
-    }
 }
 
 /// Collect the Extension pointers in the [`CustomType`]s inside a signature.
