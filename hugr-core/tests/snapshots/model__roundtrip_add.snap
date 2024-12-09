@@ -1,8 +1,12 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"fixtures/model-add.edn\"))"
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-add.edn\"))"
 ---
 (hugr 0)
+
+(import arithmetic.int.iadd)
+
+(import arithmetic.int.types.int)
 
 (define-func example.add
   [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)]

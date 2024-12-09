@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, GlobalRef, LinkRef, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId,
-    Operation, Param, ParamSort, RegionId, RegionKind, Term, TermId,
+    ExtSetPart, LinkIndex, ListPart, MetaItem, ModelError, Module, NodeId, Operation, Param,
+    ParamSort, RegionId, RegionKind, Term, TermId, VarId,
 };
 
 type PrintError = ModelError;
@@ -247,10 +247,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Operation::Custom { operation } => {
                 this.print_group(|this| {
                     if node_data.params.is_empty() {
-                        this.print_global_ref(*operation)?;
+                        this.print_symbol(*operation)?;
                     } else {
                         this.print_parens(|this| {
-                            this.print_global_ref(*operation)?;
+                            this.print_symbol(*operation)?;
 
                             for param in node_data.params {
                                 this.print_term(*param)?;
@@ -271,7 +271,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_parens(|this| {
                         this.print_text("@");
-                        this.print_global_ref(*operation)?;
+                        this.print_symbol(*operation)?;
 
                         for param in node_data.params {
                             this.print_term(*param)?;
@@ -364,6 +364,12 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)
             }
+
+            Operation::Import { name } => {
+                this.print_text("import");
+                this.print_text(*name);
+                this.print_meta(node_data.meta)
+            }
         })
     }
 
@@ -413,8 +419,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
     fn print_port_lists(
         &mut self,
-        first: &'a [LinkRef<'a>],
-        second: &'a [LinkRef<'a>],
+        first: &'a [LinkIndex],
+        second: &'a [LinkIndex],
     ) -> PrintResult<()> {
         if !first.is_empty() && !second.is_empty() {
             self.print_group(|this| {
@@ -426,20 +432,17 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         }
     }
 
-    fn print_port_list(&mut self, links: &'a [LinkRef<'a>]) -> PrintResult<()> {
+    fn print_port_list(&mut self, links: &'a [LinkIndex]) -> PrintResult<()> {
         self.print_brackets(|this| {
             for link in links {
-                this.print_link_ref(*link);
+                this.print_link_index(*link);
             }
             Ok(())
         })
     }
 
-    fn print_link_ref(&mut self, link_ref: LinkRef<'a>) {
-        match link_ref {
-            LinkRef::Id(link_id) => self.print_text(format!("%{}", link_id.0)),
-            LinkRef::Named(name) => self.print_text(format!("%{}", name)),
-        }
+    fn print_link_index(&mut self, link_index: LinkIndex) {
+        self.print_text(format!("%{}", link_index.0));
     }
 
     fn print_params(&mut self, params: &'a [Param<'a>]) -> PrintResult<()> {
@@ -492,13 +495,13 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("constraint");
                 Ok(())
             }
-            Term::Var(local_ref) => self.print_local_ref(*local_ref),
-            Term::Apply { global: name, args } => {
+            Term::Var(var) => self.print_var(*var),
+            Term::Apply { symbol, args } => {
                 if args.is_empty() {
-                    self.print_global_ref(*name)?;
+                    self.print_symbol(*symbol)?;
                 } else {
                     self.print_parens(|this| {
-                        this.print_global_ref(*name)?;
+                        this.print_symbol(*symbol)?;
                         for arg in args.iter() {
                             this.print_term(*arg)?;
                         }
@@ -508,9 +511,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }
-            Term::ApplyFull { global: name, args } => self.print_parens(|this| {
+            Term::ApplyFull { symbol, args } => self.print_parens(|this| {
                 this.print_text("@");
-                this.print_global_ref(*name)?;
+                this.print_symbol(*symbol)?;
                 for arg in args.iter() {
                     this.print_term(*arg)?;
                 }
@@ -628,44 +631,27 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_local_ref(&mut self, local_ref: LocalRef<'a>) -> PrintResult<()> {
-        let name = match local_ref {
-            LocalRef::Index(_, i) => {
-                let Some(name) = self.locals.get(i as usize) else {
-                    return Err(PrintError::InvalidLocal(local_ref.to_string()));
-                };
-
-                name
-            }
-            LocalRef::Named(name) => name,
+    fn print_var(&mut self, var: VarId) -> PrintResult<()> {
+        let Some(name) = self.locals.get(var.1 as usize) else {
+            return Err(PrintError::InvalidVar(var));
         };
 
         self.print_text(format!("?{}", name));
         Ok(())
     }
 
-    fn print_global_ref(&mut self, global_ref: GlobalRef<'a>) -> PrintResult<()> {
-        match global_ref {
-            GlobalRef::Direct(node_id) => {
-                let node_data = self
-                    .module
-                    .get_node(node_id)
-                    .ok_or(PrintError::NodeNotFound(node_id))?;
+    fn print_symbol(&mut self, node_id: NodeId) -> PrintResult<()> {
+        let node_data = self
+            .module
+            .get_node(node_id)
+            .ok_or(PrintError::NodeNotFound(node_id))?;
 
-                let name = match &node_data.operation {
-                    Operation::DefineFunc { decl } => decl.name,
-                    Operation::DeclareFunc { decl } => decl.name,
-                    Operation::DefineAlias { decl, .. } => decl.name,
-                    Operation::DeclareAlias { decl } => decl.name,
-                    _ => return Err(PrintError::UnexpectedOperation(node_id)),
-                };
+        let name = node_data
+            .operation
+            .symbol()
+            .ok_or(PrintError::UnexpectedOperation(node_id))?;
 
-                self.print_text(name)
-            }
-
-            GlobalRef::Named(symbol) => self.print_text(symbol),
-        }
-
+        self.print_text(name);
         Ok(())
     }
 

@@ -71,8 +71,8 @@ fn read_module<'a>(
 
 fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult<model::Node<'a>> {
     let operation = read_operation(bump, reader.get_operation()?)?;
-    let inputs = read_list!(bump, reader, get_inputs, read_link_ref);
-    let outputs = read_list!(bump, reader, get_outputs, read_link_ref);
+    let inputs = read_scalar_list!(bump, reader, get_inputs, model::LinkIndex);
+    let outputs = read_scalar_list!(bump, reader, get_outputs, model::LinkIndex);
     let params = read_scalar_list!(bump, reader, get_params, model::TermId);
     let regions = read_scalar_list!(bump, reader, get_regions, model::RegionId);
     let meta = read_list!(bump, reader, get_meta, read_meta_item);
@@ -86,43 +86,6 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
         regions,
         meta,
         signature,
-    })
-}
-
-fn read_local_ref<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::local_ref::Reader,
-) -> ReadResult<model::LocalRef<'a>> {
-    use hugr_capnp::local_ref::Which;
-    Ok(match reader.which()? {
-        Which::Direct(reader) => {
-            let index = reader.get_index();
-            let node = model::NodeId(reader.get_node());
-            model::LocalRef::Index(node, index)
-        }
-        Which::Named(name) => model::LocalRef::Named(bump.alloc_str(name?.to_str()?)),
-    })
-}
-
-fn read_global_ref<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::global_ref::Reader,
-) -> ReadResult<model::GlobalRef<'a>> {
-    use hugr_capnp::global_ref::Which;
-    Ok(match reader.which()? {
-        Which::Node(node) => model::GlobalRef::Direct(model::NodeId(node)),
-        Which::Named(name) => model::GlobalRef::Named(bump.alloc_str(name?.to_str()?)),
-    })
-}
-
-fn read_link_ref<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::link_ref::Reader,
-) -> ReadResult<model::LinkRef<'a>> {
-    use hugr_capnp::link_ref::Which;
-    Ok(match reader.which()? {
-        Which::Id(id) => model::LinkRef::Id(model::LinkId(id)),
-        Which::Named(name) => model::LinkRef::Named(bump.alloc_str(name?.to_str()?)),
     })
 }
 
@@ -217,11 +180,11 @@ fn read_operation<'a>(
             });
             model::Operation::DeclareOperation { decl }
         }
-        Which::Custom(name) => model::Operation::Custom {
-            operation: read_global_ref(bump, name?)?,
+        Which::Custom(operation) => model::Operation::Custom {
+            operation: model::NodeId(operation),
         },
-        Which::CustomFull(name) => model::Operation::CustomFull {
-            operation: read_global_ref(bump, name?)?,
+        Which::CustomFull(operation) => model::Operation::CustomFull {
+            operation: model::NodeId(operation),
         },
         Which::Tag(tag) => model::Operation::Tag { tag },
         Which::TailLoop(()) => model::Operation::TailLoop,
@@ -231,6 +194,9 @@ fn read_operation<'a>(
         },
         Which::LoadFunc(func) => model::Operation::LoadFunc {
             func: model::TermId(func),
+        },
+        Which::Import(name) => model::Operation::Import {
+            name: bump.alloc_str(name?.to_str()?),
         },
     })
 }
@@ -245,11 +211,17 @@ fn read_region<'a>(
         hugr_capnp::RegionKind::Module => model::RegionKind::Module,
     };
 
-    let sources = read_list!(bump, reader, get_sources, read_link_ref);
-    let targets = read_list!(bump, reader, get_targets, read_link_ref);
+    let sources = read_scalar_list!(bump, reader, get_sources, model::LinkIndex);
+    let targets = read_scalar_list!(bump, reader, get_targets, model::LinkIndex);
     let children = read_scalar_list!(bump, reader, get_children, model::NodeId);
     let meta = read_list!(bump, reader, get_meta, read_meta_item);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
+
+    let scope = if reader.has_scope() {
+        Some(read_region_scope(reader.get_scope()?)?)
+    } else {
+        None
+    };
 
     Ok(model::Region {
         kind,
@@ -258,7 +230,14 @@ fn read_region<'a>(
         children,
         meta,
         signature,
+        scope,
     })
+}
+
+fn read_region_scope(reader: hugr_capnp::region_scope::Reader) -> ReadResult<model::RegionScope> {
+    let links = reader.get_links();
+    let ports = reader.get_ports();
+    Ok(model::RegionScope { links, ports })
 }
 
 fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult<model::Term<'a>> {
@@ -274,20 +253,25 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::NatType(()) => model::Term::NatType,
         Which::ExtSetType(()) => model::Term::ExtSetType,
         Which::ControlType(()) => model::Term::ControlType,
-        Which::Variable(local_ref) => model::Term::Var(read_local_ref(bump, local_ref?)?),
+
+        Which::Variable(reader) => {
+            let node = model::NodeId(reader.get_variable_node());
+            let index = reader.get_variable_index();
+            model::Term::Var(model::VarId(node, index))
+        }
 
         Which::Apply(reader) => {
             let reader = reader?;
-            let global = read_global_ref(bump, reader.get_global()?)?;
+            let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::Apply { global, args }
+            model::Term::Apply { symbol, args }
         }
 
         Which::ApplyFull(reader) => {
             let reader = reader?;
-            let global = read_global_ref(bump, reader.get_global()?)?;
+            let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::ApplyFull { global, args }
+            model::Term::ApplyFull { symbol, args }
         }
 
         Which::Quote(r#type) => model::Term::Quote {
