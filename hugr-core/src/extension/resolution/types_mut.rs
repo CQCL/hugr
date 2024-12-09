@@ -114,7 +114,7 @@ pub fn update_op_types_extensions(
             update_signature_exts(node, &mut case.signature, extensions, used_extensions)?;
         }
         // Ignore optypes that do not store a signature.
-        _ => {}
+        OpType::Module(_) | OpType::AliasDecl(_) | OpType::AliasDefn(_) => {}
     }
     Ok(())
 }

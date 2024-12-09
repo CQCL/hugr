@@ -101,7 +101,7 @@ pub fn collect_op_types_extensions(
             collect_signature_exts(&case.signature, &mut used, &mut missing);
         }
         // Ignore optypes that do not store a signature.
-        _ => {}
+        OpType::Module(_) | OpType::AliasDecl(_) | OpType::AliasDefn(_) => {}
     };
 
     missing
