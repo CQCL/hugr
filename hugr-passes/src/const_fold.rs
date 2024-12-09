@@ -4,6 +4,7 @@
 
 pub mod value_handle;
 use std::collections::{HashMap, HashSet, VecDeque};
+use thiserror::Error;
 
 use hugr_core::{
     extension::ExtensionRegistry,
@@ -32,6 +33,14 @@ pub struct ConstantFoldPass {
     validation: ValidationLevel,
     allow_increase_termination: bool,
     inputs: HashMap<IncomingPort, Value>,
+}
+
+#[derive(Debug, Error)]
+/// Errors produced by [ConstantFoldPass].
+pub enum ConstFoldError {
+    #[error(transparent)]
+    #[allow(missing_docs)]
+    Validation(#[from] ValidatePassError),
 }
 
 impl ConstantFoldPass {
@@ -63,7 +72,7 @@ impl ConstantFoldPass {
     }
 
     /// Run the Constant Folding pass.
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
@@ -132,7 +141,7 @@ impl ConstantFoldPass {
         &self,
         hugr: &mut H,
         reg: &ExtensionRegistry,
-    ) -> Result<(), ValidatePassError> {
+    ) -> Result<(), ConstFoldError> {
         self.validation
             .run_validated_pass(hugr, reg, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
