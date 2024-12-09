@@ -171,12 +171,9 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
             }
             match custom.extension_ref().upgrade() {
                 Some(ext) => {
-                    // The extension pointer is still valid.
                     used_extensions.register_updated(ext);
                 }
                 None => {
-                    // The extension has been dropped.
-                    // Register it in the missing set.
                     missing_extensions.insert(custom.extension().clone());
                 }
             }
