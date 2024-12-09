@@ -779,7 +779,7 @@ impl<'a> ParseContext<'a> {
 
             self.vars
                 .insert(param.name)
-                .map_err(|err| ParseError::custom(&err.to_string(), param_span));
+                .map_err(|err| ParseError::custom(&err.to_string(), param_span))?;
 
             params.push(param);
         }

@@ -234,9 +234,7 @@ fn read_region<'a>(
     })
 }
 
-fn read_region_scope<'a>(
-    reader: hugr_capnp::region_scope::Reader,
-) -> ReadResult<model::RegionScope> {
+fn read_region_scope(reader: hugr_capnp::region_scope::Reader) -> ReadResult<model::RegionScope> {
     let links = reader.get_links();
     let ports = reader.get_ports();
     Ok(model::RegionScope { links, ports })

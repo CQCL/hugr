@@ -1069,7 +1069,7 @@ impl<'a> Context<'a> {
                 )))
             }
 
-            model::Term::Var { node, index } => {
+            model::Term::Var { index, .. } => {
                 Ok(TypeBase::new_var_use(*index as _, TypeBound::Copyable))
             }
 
