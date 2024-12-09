@@ -368,7 +368,7 @@ pub enum Operation<'a> {
 }
 
 /// A region in the hugr.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Region<'a> {
     /// The kind of the region. See [`RegionKind`] for details.
     pub kind: RegionKind,
@@ -387,9 +387,10 @@ pub struct Region<'a> {
 }
 
 /// The kind of a region.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum RegionKind {
     /// Data flow region.
+    #[default]
     DataFlow = 0,
     /// Control flow region.
     ControlFlow = 1,

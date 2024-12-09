@@ -6,9 +6,9 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef, ListPart, LocalRef,
-    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
-    RegionKind, Term, TermId,
+    scope::SymbolTable, AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef,
+    ListPart, LocalRef, MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort,
+    Region, RegionId, RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -50,12 +50,14 @@ pub fn parse<'a>(input: &'a str, bump: &'a Bump) -> Result<ParsedModule<'a>, Par
 struct ParseContext<'a> {
     module: Module<'a>,
     bump: &'a Bump,
+    symbols: SymbolTable<'a>,
 }
 
 impl<'a> ParseContext<'a> {
     fn new(bump: &'a Bump) -> Self {
         Self {
             module: Module::default(),
+            symbols: SymbolTable::default(),
             bump,
         }
     }
@@ -63,20 +65,24 @@ impl<'a> ParseContext<'a> {
     fn parse_module(&mut self, pair: Pair<'a, Rule>) -> ParseResult<()> {
         debug_assert_eq!(pair.as_rule(), Rule::module);
         let mut inner = pair.into_inner();
-        let meta = self.parse_meta(&mut inner)?;
 
+        self.module.root = self.module.insert_region(Region::default());
+        self.symbols.enter(self.module.root);
+
+        // TODO: What scope does the metadata live in?
+        let meta = self.parse_meta(&mut inner)?;
         let children = self.parse_nodes(&mut inner)?;
 
-        let root_region = self.module.insert_region(Region {
+        self.symbols.exit();
+
+        self.module.regions[self.module.root.index()] = Region {
             kind: RegionKind::Module,
             sources: &[],
             targets: &[],
             children,
             meta,
             signature: None,
-        });
-
-        self.module.root = root_region;
+        };
 
         Ok(())
     }
@@ -223,7 +229,54 @@ impl<'a> ParseContext<'a> {
         Ok(self.module.insert_term(term))
     }
 
-    fn parse_node(&mut self, pair: Pair<'a, Rule>) -> ParseResult<NodeId> {
+    fn parse_node_shallow(&mut self, pair: Pair<'a, Rule>) -> ParseResult<NodeId> {
+        debug_assert_eq!(pair.as_rule(), Rule::node);
+        let pair = pair.into_inner().next().unwrap();
+        let span = pair.as_span();
+        let rule = pair.as_rule();
+        let mut inner = pair.into_inner();
+
+        let symbol = match rule {
+            Rule::node_define_func => {
+                let mut func_header = inner.next().unwrap().into_inner();
+                Some(self.parse_symbol(&mut func_header)?)
+            }
+            Rule::node_declare_func => {
+                let mut func_header = inner.next().unwrap().into_inner();
+                Some(self.parse_symbol(&mut func_header)?)
+            }
+            Rule::node_define_alias => {
+                let mut alias_header = inner.next().unwrap().into_inner();
+                Some(self.parse_symbol(&mut alias_header)?)
+            }
+            Rule::node_declare_alias => {
+                let mut alias_header = inner.next().unwrap().into_inner();
+                Some(self.parse_symbol(&mut alias_header)?)
+            }
+            Rule::node_declare_ctr => {
+                let mut ctr_header = inner.next().unwrap().into_inner();
+                Some(self.parse_symbol(&mut ctr_header)?)
+            }
+            Rule::node_declare_operation => {
+                let mut op_header = inner.next().unwrap().into_inner();
+                Some(self.parse_symbol(&mut op_header)?)
+            }
+            Rule::node_import => Some(self.parse_symbol(&mut inner)?),
+            _ => None,
+        };
+
+        let node = self.module.insert_node(Node::default());
+
+        if let Some(symbol) = symbol {
+            self.symbols
+                .insert(symbol, node)
+                .map_err(|err| ParseError::custom(&err.to_string(), span))?;
+        }
+
+        Ok(node)
+    }
+
+    fn parse_node_deep(&mut self, pair: Pair<'a, Rule>) -> ParseResult<Node<'a>> {
         debug_assert_eq!(pair.as_rule(), Rule::node);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
@@ -495,9 +548,7 @@ impl<'a> ParseContext<'a> {
             _ => unreachable!(),
         };
 
-        let node_id = self.module.insert_node(node);
-
-        Ok(node_id)
+        Ok(node)
     }
 
     fn parse_regions(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [RegionId]> {
@@ -514,6 +565,9 @@ impl<'a> ParseContext<'a> {
         let rule = pair.as_rule();
         let mut inner = pair.into_inner();
 
+        let region = self.module.insert_region(Region::default());
+        self.symbols.enter(region);
+
         let kind = match rule {
             Rule::region_cfg => RegionKind::ControlFlow,
             Rule::region_dfg => RegionKind::DataFlow,
@@ -526,24 +580,38 @@ impl<'a> ParseContext<'a> {
         let meta = self.parse_meta(&mut inner)?;
         let children = self.parse_nodes(&mut inner)?;
 
-        Ok(self.module.insert_region(Region {
+        self.symbols.exit();
+
+        self.module.regions[region.index()] = Region {
             kind,
             sources,
             targets,
             children,
             meta,
             signature,
-        }))
+        };
+
+        Ok(region)
     }
 
     fn parse_nodes(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [NodeId]> {
-        let mut nodes = Vec::new();
+        let nodes = {
+            let mut pairs = pairs.clone();
+            let mut nodes = BumpVec::with_capacity_in(pairs.len(), self.bump);
 
-        for pair in filter_rule(pairs, Rule::node) {
-            nodes.push(self.parse_node(pair)?);
+            for pair in filter_rule(&mut pairs, Rule::node) {
+                nodes.push(self.parse_node_shallow(pair)?);
+            }
+
+            nodes.into_bump_slice()
+        };
+
+        for (i, pair) in filter_rule(pairs, Rule::node).enumerate() {
+            let node_data = self.parse_node_deep(pair)?;
+            self.module.nodes[nodes[i].index()] = node_data;
         }
 
-        Ok(self.bump.alloc_slice_copy(&nodes))
+        Ok(nodes)
     }
 
     fn parse_func_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a FuncDecl<'a>> {
