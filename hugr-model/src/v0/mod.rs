@@ -368,11 +368,12 @@ pub enum Operation<'a> {
 }
 
 impl<'a> Operation<'a> {
+    /// Returns the symbol introduced by the operation, if any.
     pub fn symbol(&self) -> Option<&'a str> {
         match self {
             Operation::DefineFunc { decl } => Some(decl.name),
             Operation::DeclareFunc { decl } => Some(decl.name),
-            Operation::DefineAlias { decl, value } => Some(decl.name),
+            Operation::DefineAlias { decl, .. } => Some(decl.name),
             Operation::DeclareAlias { decl } => Some(decl.name),
             Operation::DeclareConstructor { decl } => Some(decl.name),
             Operation::DeclareOperation { decl } => Some(decl.name),

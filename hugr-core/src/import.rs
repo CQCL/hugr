@@ -76,15 +76,12 @@ pub fn import_hugr(
     module: &model::Module,
     extensions: &ExtensionRegistry,
 ) -> Result<Hugr, ImportError> {
-    let names = Names::new(module)?;
-
     // TODO: Module should know about the number of edges, so that we can use a vector here.
     // For now we use a hashmap, which will be slower.
     let edge_ports = FxHashMap::default();
 
     let mut ctx = Context {
         module,
-        names,
         hugr: Hugr::new(OpType::Module(Module {})),
         link_ports: edge_ports,
         static_edges: Vec::new(),
@@ -104,8 +101,6 @@ pub fn import_hugr(
 struct Context<'a> {
     /// The module being imported.
     module: &'a model::Module<'a>,
-
-    names: Names<'a>,
 
     /// The HUGR graph being constructed.
     hugr: Hugr,
@@ -1287,51 +1282,6 @@ impl<'a> Context<'a> {
             serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
 
         Ok(json_value)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum NamedItem {
-    FuncDecl(model::NodeId),
-    FuncDefn(model::NodeId),
-    CtrDecl(model::NodeId),
-    OperationDecl(model::NodeId),
-}
-
-struct Names<'a> {
-    items: FxHashMap<&'a str, NamedItem>,
-}
-
-impl<'a> Names<'a> {
-    pub fn new(module: &model::Module<'a>) -> Result<Self, ImportError> {
-        let mut items = FxHashMap::default();
-
-        for (node_id, node_data) in module.nodes.iter().enumerate() {
-            let node_id = model::NodeId(node_id as _);
-
-            let item = match node_data.operation {
-                model::Operation::DefineFunc { decl } => {
-                    Some((decl.name, NamedItem::FuncDecl(node_id)))
-                }
-                model::Operation::DeclareFunc { decl } => {
-                    Some((decl.name, NamedItem::FuncDefn(node_id)))
-                }
-                model::Operation::DeclareConstructor { decl } => {
-                    Some((decl.name, NamedItem::CtrDecl(node_id)))
-                }
-                model::Operation::DeclareOperation { decl } => {
-                    Some((decl.name, NamedItem::OperationDecl(node_id)))
-                }
-                _ => None,
-            };
-
-            if let Some((name, item)) = item {
-                // TODO: Deal with duplicates
-                items.insert(name, item);
-            }
-        }
-
-        Ok(Self { items })
     }
 }
 

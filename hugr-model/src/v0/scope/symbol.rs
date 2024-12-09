@@ -93,6 +93,7 @@ impl<'a> SymbolTable<'a> {
         Ok(())
     }
 
+    /// Check whether a symbol is currently visible in the current scope.
     pub fn is_visible(&self, node: NodeId) -> bool {
         let Some(binding) = self.bindings.get(&node) else {
             return false;
@@ -174,16 +175,18 @@ type SymbolIndex = usize;
 
 pub type ScopeDepth = u16;
 
+/// Error while resolving a symbol.
 #[derive(Debug, Clone, Error)]
 pub enum SymbolResolveError<'a> {
+    /// Symbol not found in the current scope.
     #[error("symbol name `{0}` not found in this scope")]
     NotFound(Cow<'a, str>),
-    #[error("node `{0}` does not define a visible symbol in this scope")]
-    NotVisible(NodeId),
 }
 
+/// Error while introducing a symbol.
 #[derive(Debug, Clone, Error)]
 pub enum SymbolIntroError<'a> {
+    /// Duplicate symbol definition in the same scope.
     #[error("symbol `{0}` is already defined in this scope")]
     Duplicate(Cow<'a, str>, NodeId, NodeId),
 }

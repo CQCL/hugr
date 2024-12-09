@@ -801,7 +801,6 @@ impl<'a> ParseContext<'a> {
 
         Ok(match resolved {
             Ok(node) => node,
-            Err(SymbolResolveError::NotVisible(_)) => unreachable!(),
             Err(SymbolResolveError::NotFound(_)) => {
                 *self.implicit_imports.entry(name).or_insert_with(|| {
                     self.module.insert_node(Node {
