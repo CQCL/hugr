@@ -582,6 +582,8 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
+            model::Operation::Import { .. } => Ok(None),
+
             model::Operation::DeclareConstructor { .. } => Ok(None),
             model::Operation::DeclareOperation { .. } => Ok(None),
         }

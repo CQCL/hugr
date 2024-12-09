@@ -232,6 +232,9 @@ fn read_operation<'a>(
         Which::LoadFunc(func) => model::Operation::LoadFunc {
             func: model::TermId(func),
         },
+        Which::Import(name) => model::Operation::Import {
+            name: bump.alloc_str(name?.to_str()?),
+        },
     })
 }
 

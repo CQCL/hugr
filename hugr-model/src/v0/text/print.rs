@@ -364,6 +364,12 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)
             }
+
+            Operation::Import { name } => {
+                this.print_text("import");
+                this.print_text(*name);
+                this.print_meta(node_data.meta)
+            }
         })
     }
 

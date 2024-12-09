@@ -34,6 +34,7 @@ node = {
   | node_tail_loop
   | node_cond
   | node_tag
+  | node_import
   | node_custom
 }
 
@@ -51,6 +52,7 @@ node_declare_operation = { "(" ~ "declare-operation" ~ operation_header ~ meta* 
 node_tail_loop         = { "(" ~ "tail-loop" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_tag               = { "(" ~ "tag" ~ tag ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_import            = { "(" ~ "import" ~ symbol ~ meta* ~ ")" }
 node_custom            = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
 signature        = { "(" ~ "signature" ~ term ~ ")" }

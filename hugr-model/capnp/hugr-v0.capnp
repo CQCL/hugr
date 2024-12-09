@@ -51,6 +51,7 @@ struct Operation {
         loadFunc @14 :TermId;
         constructorDecl @15 :ConstructorDecl;
         operationDecl @16 :OperationDecl;
+        import @17 :Text;
     }
 
     struct FuncDefn {

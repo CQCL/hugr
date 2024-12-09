@@ -359,6 +359,12 @@ pub enum Operation<'a> {
         /// The declaration of the operation.
         decl: &'a OperationDecl<'a>,
     },
+
+    /// Import a symbol.
+    Import {
+        /// The name of the symbol to be imported.
+        name: &'a str,
+    },
 }
 
 /// A region in the hugr.

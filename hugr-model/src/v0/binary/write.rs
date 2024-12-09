@@ -100,6 +100,10 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             builder.set_type(decl.r#type.0);
         }
 
+        model::Operation::Import { name } => {
+            builder.set_import(*name);
+        }
+
         model::Operation::Invalid => builder.set_invalid(()),
     }
 }
