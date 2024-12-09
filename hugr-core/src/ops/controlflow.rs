@@ -355,3 +355,100 @@ impl Case {
         &self.signature.output
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        extension::{
+            prelude::{qb_t, usize_t, PRELUDE_ID},
+            ExtensionSet, PRELUDE_REGISTRY,
+        },
+        ops::{Conditional, DataflowOpTrait, DataflowParent},
+        types::{Signature, Substitution, Type, TypeArg, TypeBound, TypeRV},
+    };
+
+    use super::{DataflowBlock, TailLoop};
+
+    #[test]
+    fn test_subst_dataflow_block() {
+        use crate::ops::OpTrait;
+        let tv0 = Type::new_var_use(0, TypeBound::Any);
+        let dfb = DataflowBlock {
+            inputs: vec![usize_t(), tv0.clone()].into(),
+            other_outputs: vec![tv0.clone()].into(),
+            sum_rows: vec![usize_t().into(), vec![qb_t(), tv0.clone()].into()],
+            extension_delta: ExtensionSet::type_var(1),
+        };
+        let dfb2 = dfb.substitute(&Substitution::new(
+            &[
+                qb_t().into(),
+                TypeArg::Extensions {
+                    es: PRELUDE_ID.into(),
+                },
+            ],
+            &PRELUDE_REGISTRY,
+        ));
+        let st = Type::new_sum(vec![vec![usize_t()], vec![qb_t(); 2]]);
+        assert_eq!(
+            dfb2.inner_signature(),
+            Signature::new(vec![usize_t(), qb_t()], vec![st, qb_t()])
+                .with_extension_delta(PRELUDE_ID)
+        );
+    }
+
+    #[test]
+    fn test_subst_conditional() {
+        let tv1 = Type::new_var_use(1, TypeBound::Any);
+        let cond = Conditional {
+            sum_rows: vec![usize_t().into(), tv1.clone().into()],
+            other_inputs: vec![Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any))].into(),
+            outputs: vec![usize_t(), tv1].into(),
+            extension_delta: ExtensionSet::new(),
+        };
+        let cond2 = cond.substitute(&Substitution::new(
+            &[
+                TypeArg::Sequence {
+                    elems: vec![usize_t().into(); 3],
+                },
+                qb_t().into(),
+            ],
+            &PRELUDE_REGISTRY,
+        ));
+        let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants
+        assert_eq!(
+            cond2.signature(),
+            Signature::new(
+                vec![st, Type::new_tuple(vec![usize_t(); 3])],
+                vec![usize_t(), qb_t()]
+            )
+        );
+    }
+
+    #[test]
+    fn test_tail_loop() {
+        let tv0 = Type::new_var_use(0, TypeBound::Copyable);
+        let tail_loop = TailLoop {
+            just_inputs: vec![qb_t(), tv0.clone()].into(),
+            just_outputs: vec![tv0.clone(), qb_t()].into(),
+            rest: vec![tv0.clone()].into(),
+            extension_delta: ExtensionSet::type_var(1),
+        };
+        let tail2 = tail_loop.substitute(&Substitution::new(
+            &[
+                usize_t().into(),
+                TypeArg::Extensions {
+                    es: PRELUDE_ID.into(),
+                },
+            ],
+            &PRELUDE_REGISTRY,
+        ));
+        assert_eq!(
+            tail2.signature(),
+            Signature::new(
+                vec![qb_t(), usize_t(), usize_t()],
+                vec![usize_t(), qb_t(), usize_t()]
+            )
+            .with_extension_delta(PRELUDE_ID)
+        );
+    }
+}
