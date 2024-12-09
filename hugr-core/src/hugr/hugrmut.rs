@@ -249,7 +249,7 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Registers a new extension in the set used by the hugr, keeping the one
-    /// most up to date if the extension already exists.
+    /// most recent one if the extension already exists.
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
@@ -261,8 +261,8 @@ pub trait HugrMut: HugrMutInternals {
     /// Extend the set of extensions used by the hugr with the extensions in the
     /// registry.
     ///
-    /// For each extension, keeps the one most up to date if the extension
-    /// already exists.
+    /// For each extension, keeps the most recent version if the id already
+    /// exists.
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
