@@ -713,13 +713,12 @@ pub enum ModelError {
     /// There is a reference to a region that does not exist.
     #[error("region not found: {0}")]
     RegionNotFound(RegionId),
-    /// There is a local reference that does not resolve.
-    #[error("local variable invalid: {0}")]
-    InvalidLocal(String),
-    /// There is a global reference that does not resolve to a node
-    /// that defines a global variable.
-    #[error("global variable invalid: {0}")]
-    InvalidGlobal(String),
+    /// Invalid variable reference.
+    #[error("variable {0}#{1} invalid")]
+    InvalidVar(NodeId, VarIndex),
+    /// Invalid symbol reference.
+    #[error("symbol reference {0} invalid")]
+    InvalidSymbol(NodeId),
     /// The model contains an operation in a place where it is not allowed.
     #[error("unexpected operation on node: {0}")]
     UnexpectedOperation(NodeId),

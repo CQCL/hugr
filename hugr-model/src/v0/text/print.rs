@@ -631,9 +631,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_var(&mut self, _node: NodeId, index: VarIndex) -> PrintResult<()> {
+    fn print_var(&mut self, node: NodeId, index: VarIndex) -> PrintResult<()> {
         let Some(name) = self.locals.get(index as usize) else {
-            return Err(PrintError::InvalidLocal(index.to_string()));
+            return Err(PrintError::InvalidVar(node, index));
         };
 
         self.print_text(format!("?{}", name));

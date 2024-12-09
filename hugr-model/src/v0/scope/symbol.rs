@@ -104,7 +104,7 @@ impl<'a> SymbolTable<'a> {
         self.symbols[binding.symbol_index] == binding.symbol_index
     }
 
-    /// Tries to resolve a [`SymbolRef`] in the current scope.
+    /// Tries to resolve a symbol name in the current scope.
     pub fn resolve(&self, name: &'a str) -> Result<NodeId, SymbolResolveError> {
         let index = *self
             .symbols

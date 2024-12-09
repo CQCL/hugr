@@ -109,8 +109,6 @@ struct Context<'a> {
     /// These are collected during the import process and connected at the end.
     static_edges: Vec<(model::NodeId, model::NodeId)>,
 
-    // /// The `(Node, Port)` pairs for each `PortId` in the module.
-    // imported_ports: Vec<Option<(Node, Port)>>,
     /// The ambient extension registry to use for importing.
     extensions: &'a ExtensionRegistry,
 
@@ -261,7 +259,7 @@ impl<'a> Context<'a> {
         let name = node_data
             .operation
             .symbol()
-            .ok_or_else(|| model::ModelError::InvalidGlobal(node_id.to_string()))?;
+            .ok_or_else(|| model::ModelError::InvalidSymbol(node_id))?;
         Ok(name)
     }
 
@@ -869,7 +867,7 @@ impl<'a> Context<'a> {
 
                     self.local_vars
                         .get_mut(&(*node, *index))
-                        .ok_or_else(|| model::ModelError::InvalidLocal("TODO".to_string()))?
+                        .ok_or_else(|| model::ModelError::InvalidVar(*node, *index))?
                         .bound = TypeBound::Copyable;
                 }
                 _ => return Err(error_unsupported!("constraint other than copy or discard")),
@@ -946,7 +944,7 @@ impl<'a> Context<'a> {
                 let var = self
                     .local_vars
                     .get(&(*node, *index))
-                    .ok_or(model::ModelError::InvalidLocal("TODO".to_string()))?;
+                    .ok_or(model::ModelError::InvalidVar(*node, *index))?;
                 let decl = self.import_type_param(var.r#type, var.bound)?;
                 Ok(TypeArg::new_var_use(*index as _, decl))
             }
