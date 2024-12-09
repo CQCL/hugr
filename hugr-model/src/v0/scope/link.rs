@@ -7,6 +7,7 @@ use crate::v0::{LinkIndex, RegionId};
 
 type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 
+/// Table for tracking links between ports.
 pub struct LinkTable<K> {
     links: FxIndexSet<(RegionId, K)>,
     scopes: Vec<LinkScope>,
@@ -16,6 +17,7 @@ impl<K> LinkTable<K>
 where
     K: Copy + Eq + Hash,
 {
+    /// Create a new empty link table.
     pub fn new() -> Self {
         Self {
             links: FxIndexSet::default(),
@@ -23,6 +25,7 @@ where
         }
     }
 
+    /// Enter a new scope for the given region.
     pub fn enter(&mut self, region: RegionId) {
         self.scopes.push(LinkScope {
             link_stack: self.links.len(),
@@ -31,13 +34,19 @@ where
         });
     }
 
-    pub fn exit(&mut self) -> usize {
+    /// Exit a previously entered scope, returning the number of links in the scope.
+    pub fn exit(&mut self) -> u32 {
         let scope = self.scopes.pop().unwrap();
         self.links.drain(scope.link_stack..);
         debug_assert_eq!(self.links.len(), scope.link_stack);
         scope.link_count
     }
 
+    /// Resolve a link key to a link index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no open scopes.
     pub fn resolve(&mut self, key: K) -> LinkIndex {
         let scope = self.scopes.last_mut().unwrap();
         let (map_index, inserted) = self.links.insert_full((scope.region, key));
@@ -49,6 +58,7 @@ where
         LinkIndex::new(map_index - scope.link_stack)
     }
 
+    /// Reset the link table to an empty state while preserving allocated memory.
     pub fn clear(&mut self) {
         self.links.clear();
         self.scopes.clear();
@@ -66,6 +76,6 @@ where
 
 struct LinkScope {
     link_stack: usize,
-    link_count: usize,
+    link_count: u32,
     region: RegionId,
 }

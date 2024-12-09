@@ -31,8 +31,8 @@ fn write_module(mut builder: hugr_capnp::module::Builder, module: &model::Module
 
 fn write_node(mut builder: hugr_capnp::node::Builder, node: &model::Node) {
     write_operation(builder.reborrow().init_operation(), &node.operation);
-    write_list!(builder, init_inputs, write_link_ref, node.inputs);
-    write_list!(builder, init_outputs, write_link_ref, node.outputs);
+    let _ = builder.set_inputs(model::LinkIndex::unwrap_slice(node.inputs));
+    let _ = builder.set_outputs(model::LinkIndex::unwrap_slice(node.outputs));
     write_list!(builder, init_meta, write_meta_item, node.meta);
     let _ = builder.set_params(model::TermId::unwrap_slice(node.params));
     let _ = builder.set_regions(model::RegionId::unwrap_slice(node.regions));
@@ -115,13 +115,6 @@ fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
     });
 }
 
-fn write_link_ref(mut builder: hugr_capnp::link_ref::Builder, link_ref: &model::LinkRef) {
-    match link_ref {
-        model::LinkRef::Id(id) => builder.set_id(id.0),
-        model::LinkRef::Named(name) => builder.set_named(name),
-    }
-}
-
 fn write_local_ref(mut builder: hugr_capnp::local_ref::Builder, local_ref: &model::LocalRef) {
     match local_ref {
         model::LocalRef::Index(node, index) => {
@@ -145,11 +138,16 @@ fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region
         model::RegionKind::Module => hugr_capnp::RegionKind::Module,
     });
 
-    write_list!(builder, init_sources, write_link_ref, region.sources);
-    write_list!(builder, init_targets, write_link_ref, region.targets);
+    let _ = builder.set_sources(model::LinkIndex::unwrap_slice(region.sources));
+    let _ = builder.set_targets(model::LinkIndex::unwrap_slice(region.targets));
     let _ = builder.set_children(model::NodeId::unwrap_slice(region.children));
     write_list!(builder, init_meta, write_meta_item, region.meta);
     builder.set_signature(region.signature.map_or(0, |t| t.0 + 1));
+
+    builder.set_link_scope(match region.link_scope {
+        model::LinkScope::Open => 0,
+        model::LinkScope::Closed(link_count) => link_count + 1,
+    });
 }
 
 fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {

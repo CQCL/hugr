@@ -15,6 +15,9 @@ using NodeId = UInt32;
 # The id of a `Link`.
 using LinkId = UInt32;
 
+# The index of a `Link`.
+using LinkIndex = UInt32;
+
 struct Module {
     root @0 :RegionId;
     nodes @1 :List(Node);
@@ -24,8 +27,8 @@ struct Module {
 
 struct Node {
     operation @0 :Operation;
-    inputs @1 :List(LinkRef);
-    outputs @2 :List(LinkRef);
+    inputs @1 :List(LinkIndex);
+    outputs @2 :List(LinkIndex);
     params @3 :List(TermId);
     regions @4 :List(RegionId);
     meta @5 :List(MetaItem);
@@ -98,12 +101,16 @@ struct Operation {
 
 struct Region {
     kind @0 :RegionKind;
-    sources @1 :List(LinkRef);
-    targets @2 :List(LinkRef);
+    sources @1 :List(LinkIndex);
+    targets @2 :List(LinkIndex);
     children @3 :List(NodeId);
     meta @4 :List(MetaItem);
     signature @5 :OptionalTermId;
+    linkScope @6 :LinkScope;
 }
+
+# Either `0` for an open scope, or the number of links in the closed scope incremented by `1`.
+using LinkScope = UInt32;
 
 enum RegionKind {
     dataFlow @0;
@@ -114,13 +121,6 @@ enum RegionKind {
 struct MetaItem {
     name @0 :Text;
     value @1 :UInt32;
-}
-
-struct LinkRef {
-    union {
-        id @0 :LinkId;
-        named @1 :Text;
-    }
 }
 
 struct LocalRef {

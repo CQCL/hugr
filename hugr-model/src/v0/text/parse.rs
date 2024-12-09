@@ -7,10 +7,10 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    scope::{SymbolResolveError, SymbolTable},
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkRef, ListPart, LocalRef, MetaItem,
-    Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind,
-    Term, TermId,
+    scope::{LinkTable, SymbolResolveError, SymbolTable},
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, LinkScope, ListPart, LocalRef,
+    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
+    RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -52,6 +52,7 @@ pub fn parse<'a>(input: &'a str, bump: &'a Bump) -> Result<ParsedModule<'a>, Par
 struct ParseContext<'a> {
     module: Module<'a>,
     bump: &'a Bump,
+    links: LinkTable<&'a str>,
     symbols: SymbolTable<'a>,
     implicit_imports: FxHashMap<&'a str, NodeId>,
 }
@@ -61,6 +62,7 @@ impl<'a> ParseContext<'a> {
         Self {
             module: Module::default(),
             symbols: SymbolTable::default(),
+            links: LinkTable::default(),
             implicit_imports: FxHashMap::default(),
             bump,
         }
@@ -72,6 +74,7 @@ impl<'a> ParseContext<'a> {
 
         self.module.root = self.module.insert_region(Region::default());
         self.symbols.enter(self.module.root);
+        self.links.enter(self.module.root);
 
         // TODO: What scope does the metadata live in?
         let meta = self.parse_meta(&mut inner)?;
@@ -85,6 +88,7 @@ impl<'a> ParseContext<'a> {
         children.extend(self.implicit_imports.drain().map(|(_, node)| node));
         let children = children.into_bump_slice();
 
+        let link_count = self.links.exit();
         self.symbols.exit();
 
         self.module.regions[self.module.root.index()] = Region {
@@ -94,6 +98,7 @@ impl<'a> ParseContext<'a> {
             children,
             meta,
             signature: None,
+            link_scope: LinkScope::Closed(link_count),
         };
 
         Ok(())
@@ -301,7 +306,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Dfg,
                     inputs,
@@ -318,7 +323,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Cfg,
                     inputs,
@@ -335,7 +340,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Block,
                     inputs,
@@ -350,7 +355,7 @@ impl<'a> ParseContext<'a> {
             Rule::node_define_func => {
                 let decl = self.parse_func_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, true)?;
                 Node {
                     operation: Operation::DefineFunc { decl },
                     inputs: &[],
@@ -466,7 +471,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, true)?;
                 Node {
                     operation,
                     inputs,
@@ -483,7 +488,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, true)?;
                 Node {
                     operation: Operation::TailLoop,
                     inputs,
@@ -500,7 +505,7 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner)?;
+                let regions = self.parse_regions(&mut inner, false)?;
                 Node {
                     operation: Operation::Conditional,
                     inputs,
@@ -563,15 +568,23 @@ impl<'a> ParseContext<'a> {
         Ok(node)
     }
 
-    fn parse_regions(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [RegionId]> {
+    fn parse_regions(
+        &mut self,
+        pairs: &mut Pairs<'a, Rule>,
+        closed_link_scope: bool,
+    ) -> ParseResult<&'a [RegionId]> {
         let mut regions = Vec::new();
         for pair in filter_rule(pairs, Rule::region) {
-            regions.push(self.parse_region(pair)?);
+            regions.push(self.parse_region(pair, closed_link_scope)?);
         }
         Ok(self.bump.alloc_slice_copy(&regions))
     }
 
-    fn parse_region(&mut self, pair: Pair<'a, Rule>) -> ParseResult<RegionId> {
+    fn parse_region(
+        &mut self,
+        pair: Pair<'a, Rule>,
+        closed_link_scope: bool,
+    ) -> ParseResult<RegionId> {
         debug_assert_eq!(pair.as_rule(), Rule::region);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
@@ -579,6 +592,10 @@ impl<'a> ParseContext<'a> {
 
         let region = self.module.insert_region(Region::default());
         self.symbols.enter(region);
+
+        if closed_link_scope {
+            self.links.enter(region);
+        }
 
         let kind = match rule {
             Rule::region_cfg => RegionKind::ControlFlow,
@@ -592,6 +609,12 @@ impl<'a> ParseContext<'a> {
         let meta = self.parse_meta(&mut inner)?;
         let children = self.parse_nodes(&mut inner)?;
 
+        let link_scope = if closed_link_scope {
+            LinkScope::Closed(self.links.exit())
+        } else {
+            LinkScope::Open
+        };
+
         self.symbols.exit();
 
         self.module.regions[region.index()] = Region {
@@ -601,6 +624,7 @@ impl<'a> ParseContext<'a> {
             children,
             meta,
             signature,
+            link_scope,
         };
 
         Ok(region)
@@ -759,27 +783,27 @@ impl<'a> ParseContext<'a> {
         Ok(Some(signature))
     }
 
-    fn parse_port_list(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [LinkRef<'a>]> {
+    fn parse_port_list(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [LinkIndex]> {
         let Some(Rule::port_list) = pairs.peek().map(|p| p.as_rule()) else {
             return Ok(&[]);
         };
 
         let pair = pairs.next().unwrap();
         let inner = pair.into_inner();
-        let mut links = Vec::new();
+        let mut links = BumpVec::with_capacity_in(inner.len(), self.bump);
 
         for token in inner {
             links.push(self.parse_port(token)?);
         }
 
-        Ok(self.bump.alloc_slice_copy(&links))
+        Ok(links.into_bump_slice())
     }
 
-    fn parse_port(&mut self, pair: Pair<'a, Rule>) -> ParseResult<LinkRef<'a>> {
+    fn parse_port(&mut self, pair: Pair<'a, Rule>) -> ParseResult<LinkIndex> {
         debug_assert_eq!(pair.as_rule(), Rule::port);
         let mut inner = pair.into_inner();
-        let link = LinkRef::Named(&inner.next().unwrap().as_str()[1..]);
-        Ok(link)
+        let name = &inner.next().unwrap().as_str()[1..];
+        Ok(self.links.resolve(name))
     }
 
     fn parse_meta(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [MetaItem<'a>]> {

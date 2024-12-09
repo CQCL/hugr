@@ -2,7 +2,7 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, LinkRef, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId, Operation,
+    ExtSetPart, LinkIndex, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId, Operation,
     Param, ParamSort, RegionId, RegionKind, Term, TermId,
 };
 
@@ -419,8 +419,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
     fn print_port_lists(
         &mut self,
-        first: &'a [LinkRef<'a>],
-        second: &'a [LinkRef<'a>],
+        first: &'a [LinkIndex],
+        second: &'a [LinkIndex],
     ) -> PrintResult<()> {
         if !first.is_empty() && !second.is_empty() {
             self.print_group(|this| {
@@ -432,20 +432,17 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         }
     }
 
-    fn print_port_list(&mut self, links: &'a [LinkRef<'a>]) -> PrintResult<()> {
+    fn print_port_list(&mut self, links: &'a [LinkIndex]) -> PrintResult<()> {
         self.print_brackets(|this| {
             for link in links {
-                this.print_link_ref(*link);
+                this.print_link_index(*link);
             }
             Ok(())
         })
     }
 
-    fn print_link_ref(&mut self, link_ref: LinkRef<'a>) {
-        match link_ref {
-            LinkRef::Id(link_id) => self.print_text(format!("%{}", link_id.0)),
-            LinkRef::Named(name) => self.print_text(format!("%{}", name)),
-        }
+    fn print_link_index(&mut self, link_index: LinkIndex) {
+        self.print_text(format!("%{}", link_index.0));
     }
 
     fn print_params(&mut self, params: &'a [Param<'a>]) -> PrintResult<()> {

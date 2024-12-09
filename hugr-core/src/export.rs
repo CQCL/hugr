@@ -14,10 +14,7 @@ use crate::{
 use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
 use hugr_model::v0::{self as model};
-use indexmap::IndexSet;
 use std::fmt::Write;
-
-type FxIndexSet<T> = IndexSet<T, fxhash::FxBuildHasher>;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
@@ -37,9 +34,6 @@ struct Context<'a> {
     hugr: &'a Hugr,
     /// The module that is being built.
     module: model::Module<'a>,
-    /// Mapping from ports to link indices.
-    /// This only includes the minimum port among groups of linked ports.
-    links: FxIndexSet<(Node, Port)>,
     /// The arena in which the model is allocated.
     bump: &'a Bump,
     /// Stores the terms that we have already seen to avoid duplicates.
@@ -62,8 +56,11 @@ struct Context<'a> {
     /// Mapping from extension operations to their declarations.
     decl_operations: FxHashMap<(ExtensionId, OpName), model::NodeId>,
 
+    links: model::scope::LinkTable<(Node, Port)>,
+
     /// The symbol table tracking symbols that are currently in scope.
     symbols: model::scope::SymbolTable<'a>,
+
     /// Mapping from implicit imports to their node ids.
     implicit_imports: FxHashMap<&'a str, model::NodeId>,
 
@@ -79,7 +76,6 @@ impl<'a> Context<'a> {
             hugr,
             module,
             bump,
-            links: IndexSet::default(),
             term_map: FxHashMap::default(),
             local_scope: None,
             decl_operations: FxHashMap::default(),
@@ -87,6 +83,7 @@ impl<'a> Context<'a> {
             symbols: model::scope::SymbolTable::default(),
             implicit_imports: FxHashMap::default(),
             node_indices: FxHashMap::default(),
+            links: model::scope::LinkTable::default(),
         }
     }
 
@@ -94,6 +91,7 @@ impl<'a> Context<'a> {
     pub fn export_root(&mut self) {
         self.module.root = self.module.insert_region(model::Region::default());
         self.symbols.enter(self.module.root);
+        self.links.enter(self.module.root);
 
         let hugr_children = self.hugr.children(self.hugr.root());
         let mut children = Vec::with_capacity(hugr_children.size_hint().0);
@@ -115,6 +113,7 @@ impl<'a> Context<'a> {
         all_children.extend(self.decl_operations.values().copied());
         all_children.extend(children);
 
+        let link_count = self.links.exit();
         self.symbols.exit();
 
         self.module.regions[self.module.root.index()] = model::Region {
@@ -124,21 +123,21 @@ impl<'a> Context<'a> {
             children: all_children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
             signature: None,
+            link_scope: model::LinkScope::Closed(link_count),
         };
     }
 
     /// Returns the edge id for a given port, creating a new edge if necessary.
     ///
     /// Any two ports that are linked will be represented by the same link.
-    fn get_link_id(&mut self, node: Node, port: impl Into<Port>) -> model::LinkId {
+    fn get_link_index(&mut self, node: Node, port: impl Into<Port>) -> model::LinkIndex {
         // To ensure that linked ports are represented by the same edge, we take the minimum port
         // among all the linked ports, including the one we started with.
         let port = port.into();
         let linked_ports = self.hugr.linked_ports(node, port);
         let all_ports = std::iter::once((node, port)).chain(linked_ports);
         let repr = all_ports.min().unwrap();
-        let edge = self.links.insert_full(repr).0 as _;
-        model::LinkId(edge)
+        self.links.resolve(repr)
     }
 
     pub fn make_ports(
@@ -146,12 +145,12 @@ impl<'a> Context<'a> {
         node: Node,
         direction: Direction,
         num_ports: usize,
-    ) -> &'a [model::LinkRef<'a>] {
+    ) -> &'a [model::LinkIndex] {
         let ports = self.hugr.node_ports(node, direction);
         let mut links = BumpVec::with_capacity_in(ports.size_hint().0, self.bump);
 
         for port in ports.take(num_ports) {
-            links.push(model::LinkRef::Id(self.get_link_id(node, port)));
+            links.push(self.get_link_index(node, port));
         }
 
         links.into_bump_slice()
@@ -265,12 +264,12 @@ impl<'a> Context<'a> {
                 let extensions = self.export_ext_set(&dfg.signature.extension_reqs);
                 regions = self
                     .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
                 model::Operation::Dfg
             }
 
             OpType::CFG(_) => {
-                regions = self.bump.alloc_slice_copy(&[self.export_cfg(node)]);
+                regions = self.bump.alloc_slice_copy(&[self.export_cfg(node, false)]);
                 model::Operation::Cfg
             }
 
@@ -286,7 +285,7 @@ impl<'a> Context<'a> {
                 let extensions = self.export_ext_set(&block.extension_delta);
                 regions = self
                     .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
                 model::Operation::Block
             }
 
@@ -302,7 +301,7 @@ impl<'a> Context<'a> {
                 let extensions = this.export_ext_set(&func.signature.body().extension_reqs);
                 regions = this
                     .bump
-                    .alloc_slice_copy(&[this.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[this.export_dfg(node, extensions, true)]);
                 model::Operation::DefineFunc { decl }
             }),
 
@@ -379,7 +378,7 @@ impl<'a> Context<'a> {
                 let extensions = self.export_ext_set(&tail_loop.extension_delta);
                 regions = self
                     .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
                 model::Operation::TailLoop
             }
 
@@ -404,7 +403,7 @@ impl<'a> Context<'a> {
                 // as that of the node. This might change in the future.
                 let extensions = self.export_ext_set(&op.extension_delta());
 
-                if let Some(region) = self.export_dfg_if_present(node, extensions) {
+                if let Some(region) = self.export_dfg_if_present(node, extensions, true) {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
@@ -424,7 +423,7 @@ impl<'a> Context<'a> {
                 // as that of the node. This might change in the future.
                 let extensions = self.export_ext_set(&op.extension_delta());
 
-                if let Some(region) = self.export_dfg_if_present(node, extensions) {
+                if let Some(region) = self.export_dfg_if_present(node, extensions, true) {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
@@ -583,19 +582,30 @@ impl<'a> Context<'a> {
         &mut self,
         node: Node,
         extensions: model::TermId,
+        link_scope_closed: bool,
     ) -> Option<model::RegionId> {
         if self.hugr.children(node).next().is_none() {
             None
         } else {
-            Some(self.export_dfg(node, extensions))
+            Some(self.export_dfg(node, extensions, link_scope_closed))
         }
     }
 
     /// Creates a data flow region from the given node's children.
     ///
     /// `Input` and `Output` nodes are used to determine the source and target ports of the region.
-    pub fn export_dfg(&mut self, node: Node, extensions: model::TermId) -> model::RegionId {
+    pub fn export_dfg(
+        &mut self,
+        node: Node,
+        extensions: model::TermId,
+        link_scope_closed: bool,
+    ) -> model::RegionId {
         let region = self.module.insert_region(model::Region::default());
+
+        self.symbols.enter(region);
+        if link_scope_closed {
+            self.links.enter(region);
+        }
 
         let region_children = {
             let children = self.hugr.children(node);
@@ -639,6 +649,13 @@ impl<'a> Context<'a> {
             }))
         };
 
+        let link_scope = if link_scope_closed {
+            model::LinkScope::Closed(self.links.exit())
+        } else {
+            model::LinkScope::Open
+        };
+        self.symbols.exit();
+
         self.module.regions[region.index()] = model::Region {
             kind: model::RegionKind::DataFlow,
             sources,
@@ -646,13 +663,21 @@ impl<'a> Context<'a> {
             children: region_children,
             meta: &[], // TODO: Export metadata
             signature,
+            link_scope,
         };
 
         region
     }
 
     /// Creates a control flow region from the given node's children.
-    pub fn export_cfg(&mut self, node: Node) -> model::RegionId {
+    pub fn export_cfg(&mut self, node: Node, link_scope_closed: bool) -> model::RegionId {
+        let region = self.module.insert_region(model::Region::default());
+        self.symbols.enter(region);
+
+        if link_scope_closed {
+            self.links.enter(region);
+        }
+
         let region_children = {
             let children = self.hugr.children(node);
             let mut region_children =
@@ -686,7 +711,7 @@ impl<'a> Context<'a> {
             };
 
             self.export_node_deep(entry_block, entry_node_id);
-            model::LinkRef::Id(self.get_link_id(entry_block, IncomingPort::from(0)))
+            self.get_link_index(entry_block, IncomingPort::from(0))
         };
 
         // The second child is the exit block.
@@ -710,14 +735,24 @@ impl<'a> Context<'a> {
         // This is the same as the signature of the parent node.
         let signature = Some(self.export_func_type(&self.hugr.signature(node).unwrap()));
 
-        self.module.insert_region(model::Region {
+        let link_scope = if link_scope_closed {
+            model::LinkScope::Closed(self.links.exit())
+        } else {
+            model::LinkScope::Open
+        };
+        self.symbols.exit();
+
+        self.module.regions[region.index()] = model::Region {
             kind: model::RegionKind::ControlFlow,
             sources: self.bump.alloc_slice_copy(&[source]),
             targets,
             children: region_children,
             meta: &[], // TODO: Export metadata
             signature,
-        })
+            link_scope,
+        };
+
+        region
     }
 
     /// Export the `Case` node children of a `Conditional` node as data flow regions.
@@ -731,7 +766,7 @@ impl<'a> Context<'a> {
             };
 
             let extensions = self.export_ext_set(&case_op.signature.extension_reqs);
-            regions.push(self.export_dfg(child, extensions));
+            regions.push(self.export_dfg(child, extensions, false));
         }
 
         regions.into_bump_slice()

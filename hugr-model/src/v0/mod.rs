@@ -141,12 +141,6 @@ define_index! {
 define_index! {
     /// Index of a link in a hugr graph.
     #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-    pub struct LinkId(pub u32);
-}
-
-define_index! {
-    /// Index of a link in a hugr graph.
-    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct LinkIndex(pub u32);
 }
 
@@ -240,9 +234,9 @@ pub struct Node<'a> {
     /// The operation that the node performs.
     pub operation: Operation<'a>,
     /// The input ports of the node.
-    pub inputs: &'a [LinkRef<'a>],
+    pub inputs: &'a [LinkIndex],
     /// The output ports of the node.
-    pub outputs: &'a [LinkRef<'a>],
+    pub outputs: &'a [LinkIndex],
     /// The parameters of the node.
     pub params: &'a [TermId],
     /// The regions of the node.
@@ -395,9 +389,9 @@ pub struct Region<'a> {
     /// The kind of the region. See [`RegionKind`] for details.
     pub kind: RegionKind,
     /// The source ports of the region.
-    pub sources: &'a [LinkRef<'a>],
+    pub sources: &'a [LinkIndex],
     /// The target ports of the region.
-    pub targets: &'a [LinkRef<'a>],
+    pub targets: &'a [LinkIndex],
     /// The nodes in the region. The order of the nodes is not significant.
     pub children: &'a [NodeId],
     /// The metadata attached to the region.
@@ -406,6 +400,18 @@ pub struct Region<'a> {
     ///
     /// Can be `None` to indicate that the region signature should be inferred.
     pub signature: Option<TermId>,
+    /// The link scope of the region.
+    pub link_scope: LinkScope,
+}
+
+/// The link scope of a region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum LinkScope {
+    /// The region is open and shares its scope of links with its parent region.
+    #[default]
+    Open,
+    /// The region is closed and has its own scope with the given number of links.
+    Closed(u32),
 }
 
 /// The kind of a region.
@@ -495,24 +501,6 @@ impl std::fmt::Display for LocalRef<'_> {
         match self {
             LocalRef::Index(node, index) => write!(f, "?:{}:{}", node.index(), index),
             LocalRef::Named(name) => write!(f, "?{}", name),
-        }
-    }
-}
-
-/// A reference to a link.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LinkRef<'a> {
-    /// Reference to the link by its id.
-    Id(LinkId),
-    /// Reference to the link by its name.
-    Named(&'a str),
-}
-
-impl std::fmt::Display for LinkRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LinkRef::Id(id) => write!(f, "%:{})", id.index()),
-            LinkRef::Named(name) => write!(f, "%{}", name),
         }
     }
 }

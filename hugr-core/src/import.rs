@@ -78,17 +78,16 @@ pub fn import_hugr(
 ) -> Result<Hugr, ImportError> {
     // TODO: Module should know about the number of edges, so that we can use a vector here.
     // For now we use a hashmap, which will be slower.
-    let edge_ports = FxHashMap::default();
-
     let mut ctx = Context {
         module,
         hugr: Hugr::new(OpType::Module(Module {})),
-        link_ports: edge_ports,
+        link_ports: FxHashMap::default(),
         static_edges: Vec::new(),
         extensions,
         nodes: FxHashMap::default(),
         local_variables: IndexMap::default(),
         custom_name_cache: FxHashMap::default(),
+        region_scope: model::RegionId::default(),
     };
 
     ctx.import_root()?;
@@ -107,7 +106,7 @@ struct Context<'a> {
 
     /// The ports that are part of each link. This is used to connect the ports at the end of the
     /// import process.
-    link_ports: FxHashMap<model::LinkRef<'a>, Vec<(Node, Port)>>,
+    link_ports: FxHashMap<(model::RegionId, model::LinkIndex), Vec<(Node, Port)>>,
 
     /// Pairs of nodes that should be connected by a static edge.
     /// These are collected during the import process and connected at the end.
@@ -125,6 +124,8 @@ struct Context<'a> {
     local_variables: FxIndexMap<&'a str, LocalVar>,
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
+
+    region_scope: model::RegionId,
 }
 
 impl<'a> Context<'a> {
@@ -204,13 +205,16 @@ impl<'a> Context<'a> {
     }
 
     /// Associate links with the ports of the given node in the given direction.
-    fn record_links(&mut self, node: Node, direction: Direction, links: &'a [model::LinkRef<'a>]) {
+    fn record_links(&mut self, node: Node, direction: Direction, links: &'a [model::LinkIndex]) {
         let optype = self.hugr.get_optype(node);
         // NOTE: `OpType::port_count` copies the signature, which significantly slows down the import.
         debug_assert!(links.len() <= optype.port_count(direction));
 
         for (link, port) in links.iter().zip(self.hugr.node_ports(node, direction)) {
-            self.link_ports.entry(*link).or_default().push((node, port));
+            self.link_ports
+                .entry((self.region_scope, *link))
+                .or_default()
+                .push((node, port));
         }
     }
 
@@ -237,8 +241,9 @@ impl<'a> Context<'a> {
 
             if inputs.is_empty() || outputs.is_empty() {
                 return Err(error_unsupported!(
-                    "link {} is missing either an input or an output port",
-                    link_id
+                    "link {}#{} is missing either an input or an output port",
+                    link_id.0,
+                    link_id.1
                 ));
             }
 
@@ -308,6 +313,7 @@ impl<'a> Context<'a> {
 
     /// Import the root region of the module.
     fn import_root(&mut self) -> Result<(), ImportError> {
+        self.region_scope = self.module.root;
         let region_data = self.get_region(self.module.root)?;
 
         for node in region_data.children {
@@ -552,6 +558,11 @@ impl<'a> Context<'a> {
     ) -> Result<(), ImportError> {
         let region_data = self.get_region(region)?;
 
+        let prev_region = self.region_scope;
+        if let model::LinkScope::Closed(_) = region_data.link_scope {
+            self.region_scope = region;
+        }
+
         if region_data.kind != model::RegionKind::DataFlow {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
@@ -583,6 +594,8 @@ impl<'a> Context<'a> {
         for child in region_data.children {
             self.import_node(*child, node)?;
         }
+
+        self.region_scope = prev_region;
 
         Ok(())
     }
@@ -716,6 +729,11 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
+        let prev_region = self.region_scope;
+        if let model::LinkScope::Closed(_) = region_data.link_scope {
+            self.region_scope = region;
+        }
+
         let (region_source, region_targets, _) = self.get_func_type(
             region_data
                 .signature
@@ -821,6 +839,8 @@ impl<'a> Context<'a> {
                 .add_node_with_parent(node, OpType::ExitBlock(ExitBlock { cfg_outputs }));
             self.record_links(exit, Direction::Incoming, region_data.targets);
         }
+
+        self.region_scope = prev_region;
 
         Ok(())
     }

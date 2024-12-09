@@ -71,8 +71,8 @@ fn read_module<'a>(
 
 fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult<model::Node<'a>> {
     let operation = read_operation(bump, reader.get_operation()?)?;
-    let inputs = read_list!(bump, reader, get_inputs, read_link_ref);
-    let outputs = read_list!(bump, reader, get_outputs, read_link_ref);
+    let inputs = read_scalar_list!(bump, reader, get_inputs, model::LinkIndex);
+    let outputs = read_scalar_list!(bump, reader, get_outputs, model::LinkIndex);
     let params = read_scalar_list!(bump, reader, get_params, model::TermId);
     let regions = read_scalar_list!(bump, reader, get_regions, model::RegionId);
     let meta = read_list!(bump, reader, get_meta, read_meta_item);
@@ -101,17 +101,6 @@ fn read_local_ref<'a>(
             model::LocalRef::Index(node, index)
         }
         Which::Named(name) => model::LocalRef::Named(bump.alloc_str(name?.to_str()?)),
-    })
-}
-
-fn read_link_ref<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::link_ref::Reader,
-) -> ReadResult<model::LinkRef<'a>> {
-    use hugr_capnp::link_ref::Which;
-    Ok(match reader.which()? {
-        Which::Id(id) => model::LinkRef::Id(model::LinkId(id)),
-        Which::Named(name) => model::LinkRef::Named(bump.alloc_str(name?.to_str()?)),
     })
 }
 
@@ -237,11 +226,16 @@ fn read_region<'a>(
         hugr_capnp::RegionKind::Module => model::RegionKind::Module,
     };
 
-    let sources = read_list!(bump, reader, get_sources, read_link_ref);
-    let targets = read_list!(bump, reader, get_targets, read_link_ref);
+    let sources = read_scalar_list!(bump, reader, get_sources, model::LinkIndex);
+    let targets = read_scalar_list!(bump, reader, get_targets, model::LinkIndex);
     let children = read_scalar_list!(bump, reader, get_children, model::NodeId);
     let meta = read_list!(bump, reader, get_meta, read_meta_item);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
+
+    let link_scope = match reader.get_link_scope().checked_sub(1) {
+        Some(count) => model::LinkScope::Closed(count),
+        None => model::LinkScope::Open,
+    };
 
     Ok(model::Region {
         kind,
@@ -250,6 +244,7 @@ fn read_region<'a>(
         children,
         meta,
         signature,
+        link_scope,
     })
 }
 
