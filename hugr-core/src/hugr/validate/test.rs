@@ -788,7 +788,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let call = d.call(
         f.handle(),
         &[TypeArg::Extensions {
-            es: ExtensionSet::singleton(&PRELUDE_ID),
+            es: ExtensionSet::singleton(PRELUDE_ID),
         }],
         [func, tup],
         &reg,

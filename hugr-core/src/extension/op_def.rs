@@ -245,7 +245,7 @@ impl SignatureFunc {
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
         let mut res = pf.instantiate(args, exts)?;
-        res.extension_reqs.insert(&def.extension);
+        res.extension_reqs.insert(def.extension.clone());
 
         // If there are any row variables left, this will fail with an error:
         res.try_into()
@@ -823,7 +823,7 @@ pub(super) mod test {
             )?;
 
             // Concrete extension set
-            let es = ExtensionSet::singleton(&EXT_ID);
+            let es = ExtensionSet::singleton(EXT_ID);
             let exp_fun_ty = Signature::new_endo(bool_t()).with_extension_delta(es.clone());
             let args = [TypeArg::Extensions { es }];
 

@@ -705,7 +705,7 @@ impl ExtensionSet {
     }
 
     /// Adds a extension to the set.
-    pub fn insert(&mut self, extension: &ExtensionId) {
+    pub fn insert(&mut self, extension: ExtensionId) {
         self.0.insert(extension.clone());
     }
 
@@ -733,7 +733,7 @@ impl ExtensionSet {
     }
 
     /// Create a extension set with a single element.
-    pub fn singleton(extension: &ExtensionId) -> Self {
+    pub fn singleton(extension: ExtensionId) -> Self {
         let mut set = Self::new();
         set.insert(extension);
         set
@@ -797,7 +797,25 @@ impl ExtensionSet {
 
 impl From<ExtensionId> for ExtensionSet {
     fn from(id: ExtensionId) -> Self {
-        Self::singleton(&id)
+        Self::singleton(id)
+    }
+}
+
+impl IntoIterator for ExtensionSet {
+    type Item = ExtensionId;
+    type IntoIter = std::collections::btree_set::IntoIter<ExtensionId>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExtensionSet {
+    type Item = &'a ExtensionId;
+    type IntoIter = std::collections::btree_set::Iter<'a, ExtensionId>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 

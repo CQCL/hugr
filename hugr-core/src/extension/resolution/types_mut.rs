@@ -3,11 +3,11 @@
 //!
 //! For a non-mutating option see [`super::collect_op_types_extensions`].
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::types::collect_type_exts;
 use super::{ExtensionRegistry, ExtensionResolutionError};
+use crate::extension::ExtensionSet;
 use crate::ops::OpType;
 use crate::types::type_row::TypeRowBase;
 use crate::types::{MaybeRV, Signature, SumType, TypeArg, TypeBase, TypeEnum};
@@ -39,7 +39,7 @@ pub fn update_op_types_extensions(
         }
         OpType::Const(c) => {
             let typ = c.get_type();
-            let mut missing = HashSet::new();
+            let mut missing = ExtensionSet::new();
             collect_type_exts(&typ, used_extensions, &mut missing);
             // We expect that the `CustomConst::get_type` binary calls always return valid extensions.
             // As we cannot update the `CustomConst` type, we ignore the result.

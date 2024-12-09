@@ -2,7 +2,6 @@
 
 use itertools::Either;
 
-use std::collections::HashSet;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
@@ -11,7 +10,7 @@ use super::{MaybeRV, NoRV, RowVariable, Substitution, Type, TypeRow};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{collect_signature_exts, ExtensionCollectionError};
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[cfg(test)]
@@ -132,7 +131,7 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     /// manipulate a HUGR.
     pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
         let mut used = ExtensionRegistry::default();
-        let mut missing = HashSet::<ExtensionId>::new();
+        let mut missing = ExtensionSet::new();
 
         collect_signature_exts(self, &mut used, &mut missing);
 

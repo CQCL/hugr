@@ -162,7 +162,7 @@ impl Hugr {
                 return Ok(es.clone()); // Can't neither add nor remove, so nothing to do
             }
             let merged = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
-            *es = ExtensionSet::singleton(&TO_BE_INFERRED).missing_from(&merged);
+            *es = ExtensionSet::singleton(TO_BE_INFERRED).missing_from(&merged);
 
             Ok(es.clone())
         }

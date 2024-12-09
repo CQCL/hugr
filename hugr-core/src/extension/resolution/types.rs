@@ -6,10 +6,8 @@
 //! See [`super::update_op_types_extensions`] for a mutating version that
 //! updates the weak links to point to the correct extensions.
 
-use std::collections::HashSet;
-
 use super::ExtensionCollectionError;
-use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
@@ -35,7 +33,7 @@ pub fn collect_op_types_extensions(
     op: &OpType,
 ) -> Result<ExtensionRegistry, ExtensionCollectionError> {
     let mut used = ExtensionRegistry::default();
-    let mut missing = HashSet::<ExtensionId>::new();
+    let mut missing = ExtensionSet::new();
 
     match op {
         OpType::ExtensionOp(ext) => {
@@ -118,7 +116,7 @@ pub fn collect_op_types_extensions(
 pub(crate) fn collect_signature_exts<RV: MaybeRV>(
     signature: &FuncTypeBase<RV>,
     used_extensions: &mut ExtensionRegistry,
-    missing_extensions: &mut HashSet<ExtensionId>,
+    missing_extensions: &mut ExtensionSet,
 ) {
     // Note that we do not include the signature's `extension_reqs` here, as those refer
     // to _runtime_ requirements that may not be currently present.
@@ -139,7 +137,7 @@ pub(crate) fn collect_signature_exts<RV: MaybeRV>(
 fn collect_type_row_exts<RV: MaybeRV>(
     row: &TypeRowBase<RV>,
     used_extensions: &mut ExtensionRegistry,
-    missing_extensions: &mut HashSet<ExtensionId>,
+    missing_extensions: &mut ExtensionSet,
 ) {
     for ty in row.iter() {
         collect_type_exts(ty, used_extensions, missing_extensions);
@@ -157,7 +155,7 @@ fn collect_type_row_exts<RV: MaybeRV>(
 pub(super) fn collect_type_exts<RV: MaybeRV>(
     typ: &TypeBase<RV>,
     used_extensions: &mut ExtensionRegistry,
-    missing_extensions: &mut HashSet<ExtensionId>,
+    missing_extensions: &mut ExtensionSet,
 ) {
     match typ.as_type_enum() {
         TypeEnum::Extension(custom) => {
@@ -200,7 +198,7 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
 fn collect_typearg_exts(
     arg: &TypeArg,
     used_extensions: &mut ExtensionRegistry,
-    missing_extensions: &mut HashSet<ExtensionId>,
+    missing_extensions: &mut ExtensionSet,
 ) {
     match arg {
         TypeArg::Type { ty } => collect_type_exts(ty, used_extensions, missing_extensions),
