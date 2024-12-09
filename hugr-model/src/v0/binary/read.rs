@@ -104,17 +104,6 @@ fn read_local_ref<'a>(
     })
 }
 
-fn read_global_ref<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::global_ref::Reader,
-) -> ReadResult<model::GlobalRef<'a>> {
-    use hugr_capnp::global_ref::Which;
-    Ok(match reader.which()? {
-        Which::Node(node) => model::GlobalRef::Direct(model::NodeId(node)),
-        Which::Named(name) => model::GlobalRef::Named(bump.alloc_str(name?.to_str()?)),
-    })
-}
-
 fn read_link_ref<'a>(
     bump: &'a Bump,
     reader: hugr_capnp::link_ref::Reader,

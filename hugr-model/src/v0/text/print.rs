@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, GlobalRef, LinkRef, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId,
-    Operation, Param, ParamSort, RegionId, RegionKind, Term, TermId,
+    ExtSetPart, LinkRef, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId, Operation,
+    Param, ParamSort, RegionId, RegionKind, Term, TermId,
 };
 
 type PrintError = ModelError;

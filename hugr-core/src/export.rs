@@ -996,7 +996,7 @@ impl<'a> Context<'a> {
     }
 
     fn resolve_symbol(&mut self, name: &'a str) -> model::NodeId {
-        let result = self.symbols.resolve(model::GlobalRef::Named(name));
+        let result = self.symbols.resolve(name);
 
         match result {
             Ok(node) => node,

@@ -8,9 +8,9 @@ use thiserror::Error;
 
 use crate::v0::{
     scope::{SymbolResolveError, SymbolTable},
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef, ListPart, LocalRef,
-    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
-    RegionKind, Term, TermId,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkRef, ListPart, LocalRef, MetaItem,
+    Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind,
+    Term, TermId,
 };
 
 mod pest_parser {
@@ -797,7 +797,7 @@ impl<'a> ParseContext<'a> {
 
     fn parse_symbol_use(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<NodeId> {
         let name = self.parse_symbol(pairs)?;
-        let resolved = self.symbols.resolve(GlobalRef::Named(name));
+        let resolved = self.symbols.resolve(name);
 
         Ok(match resolved {
             Ok(node) => node,

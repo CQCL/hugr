@@ -472,26 +472,6 @@ pub struct MetaItem<'a> {
     pub value: TermId,
 }
 
-/// A reference to a global variable.
-///
-/// Global variables are defined in nodes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum GlobalRef<'a> {
-    /// Reference to the global that is defined by the given node.
-    Direct(NodeId),
-    /// Reference to the global with the given name.
-    Named(&'a str),
-}
-
-impl std::fmt::Display for GlobalRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GlobalRef::Direct(id) => write!(f, ":{}", id.index()),
-            GlobalRef::Named(name) => write!(f, "{}", name),
-        }
-    }
-}
-
 /// A reference to a local variable.
 ///
 /// Local variables are defined as parameters to nodes.

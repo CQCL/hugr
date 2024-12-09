@@ -123,13 +123,6 @@ struct LinkRef {
     }
 }
 
-struct GlobalRef {
-    union {
-        node @0 :NodeId;
-        named @1 :Text;
-    }
-}
-
 struct LocalRef {
     union {
         direct :group {

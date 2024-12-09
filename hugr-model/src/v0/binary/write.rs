@@ -115,13 +115,6 @@ fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
     });
 }
 
-fn write_global_ref(mut builder: hugr_capnp::global_ref::Builder, global_ref: &model::GlobalRef) {
-    match global_ref {
-        model::GlobalRef::Direct(node) => builder.set_node(node.0),
-        model::GlobalRef::Named(name) => builder.set_named(name),
-    }
-}
-
 fn write_link_ref(mut builder: hugr_capnp::link_ref::Builder, link_ref: &model::LinkRef) {
     match link_ref {
         model::LinkRef::Id(id) => builder.set_id(id.0),

@@ -22,7 +22,7 @@ use crate::{
     Direction, Hugr, HugrView, Node, Port,
 };
 use fxhash::FxHashMap;
-use hugr_model::v0::{self as model, GlobalRef};
+use hugr_model::v0::{self as model};
 use indexmap::IndexMap;
 use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
@@ -287,30 +287,6 @@ impl<'a> Context<'a> {
         let result = f(self);
         self.local_variables = previous;
         result
-    }
-
-    fn resolve_global_ref(
-        &self,
-        global_ref: &model::GlobalRef,
-    ) -> Result<model::NodeId, ImportError> {
-        match global_ref {
-            model::GlobalRef::Direct(node_id) => Ok(*node_id),
-            model::GlobalRef::Named(name) => {
-                panic!("remaining named global ref");
-                let item = self
-                    .names
-                    .items
-                    .get(name)
-                    .ok_or_else(|| model::ModelError::InvalidGlobal(global_ref.to_string()))?;
-
-                match item {
-                    NamedItem::FuncDecl(node) => Ok(*node),
-                    NamedItem::FuncDefn(node) => Ok(*node),
-                    NamedItem::CtrDecl(node) => Ok(*node),
-                    NamedItem::OperationDecl(node) => Ok(*node),
-                }
-            }
-        }
     }
 
     fn get_global_name(&self, node_id: model::NodeId) -> Result<&'a str, ImportError> {

@@ -4,7 +4,7 @@ use fxhash::FxHasher;
 use indexmap::IndexMap;
 use thiserror::Error;
 
-use crate::v0::{GlobalRef, NodeId, RegionId};
+use crate::v0::{NodeId, RegionId};
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -93,34 +93,31 @@ impl<'a> SymbolTable<'a> {
         Ok(())
     }
 
+    pub fn is_visible(&self, node: NodeId) -> bool {
+        let Some(binding) = self.bindings.get(&node) else {
+            return false;
+        };
+
+        // Check that the symbol has not been shadowed at this point.
+        self.symbols[binding.symbol_index] == binding.symbol_index
+    }
+
     /// Tries to resolve a [`SymbolRef`] in the current scope.
-    pub fn resolve(&self, symbol_ref: GlobalRef<'a>) -> Result<NodeId, SymbolResolveError> {
-        match symbol_ref {
-            GlobalRef::Direct(node) => {
-                let binding = self
-                    .bindings
-                    .get(&node)
-                    .ok_or(SymbolResolveError::NotVisible(node))?;
+    pub fn resolve(&self, name: &'a str) -> Result<NodeId, SymbolResolveError> {
+        // match symbol_ref {
+        //     GlobalRef::Direct(node) => {
 
-                // Check if the symbol has been shadowed at this point.
-                if self.symbols[binding.symbol_index] != binding.symbol_index {
-                    return Err(SymbolResolveError::NotVisible(node));
-                }
+        //         Ok(node)
+        //     }
+        let index = *self
+            .symbols
+            .get(name)
+            .ok_or(SymbolResolveError::NotFound(name.into()))?;
 
-                Ok(node)
-            }
-            GlobalRef::Named(name) => {
-                let index = *self
-                    .symbols
-                    .get(name)
-                    .ok_or(SymbolResolveError::NotFound(name.into()))?;
-
-                // NOTE: The unwrap is safe because the `symbols` map
-                // points to valid indices in the `bindings` map.
-                let (node, _) = self.bindings.get_index(index).unwrap();
-                Ok(*node)
-            }
-        }
+        // NOTE: The unwrap is safe because the `symbols` map
+        // points to valid indices in the `bindings` map.
+        let (node, _) = self.bindings.get_index(index).unwrap();
+        Ok(*node)
     }
 
     /// Returns the depth of the given region, if it corresponds to a currently open scope.
