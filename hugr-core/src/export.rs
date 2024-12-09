@@ -66,6 +66,8 @@ struct Context<'a> {
     symbols: model::scope::SymbolTable<'a>,
     /// Mapping from implicit imports to their node ids.
     implicit_imports: FxHashMap<&'a str, model::NodeId>,
+
+    node_indices: FxHashMap<Node, model::NodeId>,
 }
 
 impl<'a> Context<'a> {
@@ -84,6 +86,7 @@ impl<'a> Context<'a> {
             local_constraints: Vec::new(),
             symbols: model::scope::SymbolTable::default(),
             implicit_imports: FxHashMap::default(),
+            node_indices: FxHashMap::default(),
         }
     }
 
@@ -103,8 +106,14 @@ impl<'a> Context<'a> {
             self.export_node_deep(child, child_node_id);
         }
 
-        children.extend(self.decl_operations.values().copied());
-        children.extend(self.implicit_imports.drain().map(|(_, id)| id));
+        let mut all_children = BumpVec::with_capacity_in(
+            children.len() + self.decl_operations.len() + self.implicit_imports.len(),
+            self.bump,
+        );
+
+        all_children.extend(self.implicit_imports.drain().map(|(_, id)| id));
+        all_children.extend(self.decl_operations.values().copied());
+        all_children.extend(children);
 
         self.symbols.exit();
 
@@ -112,7 +121,7 @@ impl<'a> Context<'a> {
             kind: model::RegionKind::Module,
             sources: &[],
             targets: &[],
-            children: self.bump.alloc_slice_copy(&children),
+            children: all_children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
             signature: None,
         };
@@ -176,7 +185,8 @@ impl<'a> Context<'a> {
         extension: &IdentList,
         name: impl AsRef<str>,
     ) -> model::GlobalRef<'a> {
-        model::GlobalRef::Named(self.make_qualified_name(extension, name))
+        let symbol = self.make_qualified_name(extension, name);
+        self.resolve_symbol(symbol)
     }
 
     /// Get the node that declares or defines the function associated with the given
@@ -212,6 +222,7 @@ impl<'a> Context<'a> {
 
     fn export_node_shallow(&mut self, node: Node) -> model::NodeId {
         let node_id = self.module.insert_node(model::Node::default());
+        self.node_indices.insert(node, node_id);
 
         let symbol = match self.hugr.get_optype(node) {
             OpType::FuncDefn(func_defn) => Some(func_defn.name.as_str()),
@@ -333,26 +344,25 @@ impl<'a> Context<'a> {
             OpType::Call(call) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let name = model::GlobalRef::Named(self.get_func_name(node).unwrap());
-
+                let global = model::GlobalRef::Direct(self.node_indices[&node]);
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { global: name, args });
+                let func = self.make_term(model::Term::ApplyFull { global, args });
                 model::Operation::CallFunc { func }
             }
 
             OpType::LoadFunction(load) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let name = model::GlobalRef::Named(self.get_func_name(node).unwrap());
+                let global = model::GlobalRef::Direct(self.node_indices[&node]);
 
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { global: name, args });
+                let func = self.make_term(model::Term::ApplyFull { global, args });
                 model::Operation::LoadFunc { func }
             }
 
@@ -360,7 +370,7 @@ impl<'a> Context<'a> {
             OpType::LoadConstant(_) => todo!("Export load constant?"),
 
             OpType::CallIndirect(_) => model::Operation::CustomFull {
-                operation: model::GlobalRef::Named(OP_FUNC_CALL_INDIRECT),
+                operation: self.resolve_symbol(OP_FUNC_CALL_INDIRECT),
             },
 
             OpType::Tag(tag) => model::Operation::Tag { tag: tag.tag as _ },
@@ -769,9 +779,9 @@ impl<'a> Context<'a> {
         match t {
             TypeEnum::Extension(ext) => self.export_custom_type(ext),
             TypeEnum::Alias(alias) => {
-                let name = model::GlobalRef::Named(self.bump.alloc_str(alias.name()));
+                let global = self.resolve_symbol(self.bump.alloc_str(alias.name()));
                 let args = &[];
-                self.make_term(model::Term::ApplyFull { global: name, args })
+                self.make_term(model::Term::ApplyFull { global, args })
             }
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
@@ -923,8 +933,9 @@ impl<'a> Context<'a> {
                         .map(|param| model::ListPart::Item(self.export_type_param(param, None))),
                 );
                 let types = self.make_term(model::Term::List { parts });
+                let global = self.resolve_symbol(TERM_PARAM_TUPLE);
                 self.make_term(model::Term::ApplyFull {
-                    global: model::GlobalRef::Named(TERM_PARAM_TUPLE),
+                    global,
                     args: self.bump.alloc_slice_copy(&[types]),
                 })
             }
@@ -976,10 +987,27 @@ impl<'a> Context<'a> {
         let value = serde_json::to_string(value).expect("json values are always serializable");
         let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
         let value = self.bump.alloc_slice_copy(&[value]);
+        let global = self.resolve_symbol(TERM_JSON);
         self.make_term(model::Term::ApplyFull {
-            global: model::GlobalRef::Named(TERM_JSON),
+            global,
             args: value,
         })
+    }
+
+    fn resolve_symbol(&mut self, name: &'a str) -> model::GlobalRef<'a> {
+        let result = self.symbols.resolve(model::GlobalRef::Named(name));
+
+        let node = match result {
+            Ok(node) => node,
+            Err(_) => *self.implicit_imports.entry(name).or_insert_with(|| {
+                self.module.insert_node(model::Node {
+                    operation: model::Operation::Import { name },
+                    ..model::Node::default()
+                })
+            }),
+        };
+
+        model::GlobalRef::Direct(node)
     }
 }
 
