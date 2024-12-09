@@ -3,7 +3,7 @@
 //!
 //! Fails if any of the weak extension pointers have been invalidated.
 //!
-//! See [`super::update_op_types_extensions`] for a mutating version that
+//! See [`super::resolve_op_types_extensions`] for a mutating version that
 //! updates the weak links to point to the correct extensions.
 
 use super::ExtensionCollectionError;

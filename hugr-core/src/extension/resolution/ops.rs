@@ -1,7 +1,7 @@
 //! Resolve `OpaqueOp`s into `ExtensionOp`s and return an operation's required
 //! extension.
 //!
-//! Contains both mutable ([`update_op_extensions`]) and immutable
+//! Contains both mutable ([`resolve_op_extensions`]) and immutable
 //! ([`collect_operation_extension`]) methods to resolve operations and collect
 //! the required extensions respectively.
 
@@ -58,7 +58,7 @@ pub(crate) fn collect_op_extensions(
 ///
 /// If the serialized opaque resolves to a definition that conflicts with what
 /// was serialized. Or if the operation is not found in the registry.
-pub(crate) fn update_op_extensions<'e>(
+pub(crate) fn resolve_op_extensions<'e>(
     node: Node,
     op: &mut OpType,
     extensions: &'e ExtensionRegistry,

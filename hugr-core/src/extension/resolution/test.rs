@@ -12,8 +12,8 @@ use crate::builder::{
 };
 use crate::extension::prelude::{bool_t, ConstUsize};
 use crate::extension::resolution::{
-    collect_op_extensions, collect_op_types_extensions, update_op_extensions,
-    update_op_types_extensions, ExtensionCollectionError,
+    collect_op_extensions, collect_op_types_extensions, resolve_op_extensions,
+    resolve_op_types_extensions, ExtensionCollectionError,
 };
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE};
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
@@ -51,8 +51,8 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
     let dummy_node = portgraph::NodeIndex::new(0).into();
 
     let mut used_exts = ExtensionRegistry::default();
-    update_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
-    update_op_types_extensions(dummy_node, &mut deser_op, &extensions, &mut used_exts).unwrap();
+    resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
+    resolve_op_types_extensions(dummy_node, &mut deser_op, &extensions, &mut used_exts).unwrap();
 
     let deser_extensions = deser_op.used_extensions().unwrap();
 

@@ -309,7 +309,7 @@ mod test {
 
     use ops::OpType;
 
-    use crate::extension::resolution::update_op_extensions;
+    use crate::extension::resolution::resolve_op_extensions;
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{
@@ -359,7 +359,7 @@ mod test {
             Signature::new(i0.clone(), bool_t()),
         );
         let mut resolved = opaque.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
             &mut resolved,
             registry,
@@ -404,7 +404,7 @@ mod test {
         );
         let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
         let mut resolved_val = opaque_val.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
             &mut resolved_val,
             &registry,
@@ -413,7 +413,7 @@ mod test {
         assert_eq!(resolve_res_definition(&resolved_val).name(), val_name);
 
         let mut resolved_comp = opaque_comp.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(2)),
             &mut resolved_comp,
             &registry,
