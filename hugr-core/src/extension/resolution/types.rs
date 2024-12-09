@@ -126,7 +126,8 @@ pub(crate) fn collect_signature_exts<RV: MaybeRV>(
     missing_extensions: &mut ExtensionSet,
 ) {
     // Note that we do not include the signature's `extension_reqs` here, as those refer
-    // to _runtime_ requirements that may not be currently present.
+    // to _runtime_ requirements that we do not be require to be defined.
+    //
     // See https://github.com/CQCL/hugr/issues/1734
     // TODO: Update comment once that issue gets implemented.
     collect_type_row_exts(&signature.input, used_extensions, missing_extensions);
