@@ -7,10 +7,10 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    scope::{LinkTable, SymbolResolveError, SymbolTable},
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, LocalRef, MetaItem,
-    Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind,
-    RegionScope, Term, TermId,
+    scope::{LinkTable, SymbolResolveError, SymbolTable, VarTable},
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, MetaItem, Module, Node,
+    NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
+    Term, TermId,
 };
 
 mod pest_parser {
@@ -52,6 +52,7 @@ pub fn parse<'a>(input: &'a str, bump: &'a Bump) -> Result<ParsedModule<'a>, Par
 struct ParseContext<'a> {
     module: Module<'a>,
     bump: &'a Bump,
+    vars: VarTable<'a>,
     links: LinkTable<&'a str>,
     symbols: SymbolTable<'a>,
     implicit_imports: FxHashMap<&'a str, NodeId>,
@@ -63,6 +64,7 @@ impl<'a> ParseContext<'a> {
             module: Module::default(),
             symbols: SymbolTable::default(),
             links: LinkTable::default(),
+            vars: VarTable::default(),
             implicit_imports: FxHashMap::default(),
             bump,
         }
@@ -113,138 +115,143 @@ impl<'a> ParseContext<'a> {
         let rule = pair.as_rule();
         let mut inner = pair.into_inner();
 
-        let term = match rule {
-            Rule::term_wildcard => Term::Wildcard,
-            Rule::term_type => Term::Type,
-            Rule::term_static => Term::StaticType,
-            Rule::term_constraint => Term::Constraint,
-            Rule::term_str_type => Term::StrType,
-            Rule::term_nat_type => Term::NatType,
-            Rule::term_ctrl_type => Term::ControlType,
-            Rule::term_ext_set_type => Term::ExtSetType,
+        let term =
+            match rule {
+                Rule::term_wildcard => Term::Wildcard,
+                Rule::term_type => Term::Type,
+                Rule::term_static => Term::StaticType,
+                Rule::term_constraint => Term::Constraint,
+                Rule::term_str_type => Term::StrType,
+                Rule::term_nat_type => Term::NatType,
+                Rule::term_ctrl_type => Term::ControlType,
+                Rule::term_ext_set_type => Term::ExtSetType,
 
-            Rule::term_var => {
-                let name_token = inner.next().unwrap();
-                let name = name_token.as_str();
-                Term::Var(LocalRef::Named(name))
-            }
+                Rule::term_var => {
+                    let name_token = inner.next().unwrap();
+                    let name = name_token.as_str();
 
-            Rule::term_apply => {
-                let symbol = self.parse_symbol_use(&mut inner)?;
-                let mut args = Vec::new();
+                    let (node, index) = self.vars.resolve(name).map_err(|err| {
+                        ParseError::custom(&err.to_string(), name_token.as_span())
+                    })?;
 
-                for token in inner {
-                    args.push(self.parse_term(token)?);
+                    Term::Var { node, index }
                 }
 
-                Term::Apply {
-                    symbol,
-                    args: self.bump.alloc_slice_copy(&args),
-                }
-            }
+                Rule::term_apply => {
+                    let symbol = self.parse_symbol_use(&mut inner)?;
+                    let mut args = Vec::new();
 
-            Rule::term_apply_full => {
-                let symbol = self.parse_symbol_use(&mut inner)?;
-                let mut args = Vec::new();
+                    for token in inner {
+                        args.push(self.parse_term(token)?);
+                    }
 
-                for token in inner {
-                    args.push(self.parse_term(token)?);
-                }
-
-                Term::ApplyFull {
-                    symbol,
-                    args: self.bump.alloc_slice_copy(&args),
-                }
-            }
-
-            Rule::term_quote => {
-                let r#type = self.parse_term(inner.next().unwrap())?;
-                Term::Quote { r#type }
-            }
-
-            Rule::term_list => {
-                let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
-
-                for token in inner {
-                    match token.as_rule() {
-                        Rule::term => parts.push(ListPart::Item(self.parse_term(token)?)),
-                        Rule::spliced_term => {
-                            let term_token = token.into_inner().next().unwrap();
-                            parts.push(ListPart::Splice(self.parse_term(term_token)?))
-                        }
-                        _ => unreachable!(),
+                    Term::Apply {
+                        symbol,
+                        args: self.bump.alloc_slice_copy(&args),
                     }
                 }
 
-                Term::List {
-                    parts: parts.into_bump_slice(),
-                }
-            }
+                Rule::term_apply_full => {
+                    let symbol = self.parse_symbol_use(&mut inner)?;
+                    let mut args = Vec::new();
 
-            Rule::term_list_type => {
-                let item_type = self.parse_term(inner.next().unwrap())?;
-                Term::ListType { item_type }
-            }
+                    for token in inner {
+                        args.push(self.parse_term(token)?);
+                    }
 
-            Rule::term_str => {
-                let value = self.parse_string(inner.next().unwrap())?;
-                Term::Str(value)
-            }
-
-            Rule::term_nat => {
-                let value = inner.next().unwrap().as_str().parse().unwrap();
-                Term::Nat(value)
-            }
-
-            Rule::term_ext_set => {
-                let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
-
-                for token in inner {
-                    match token.as_rule() {
-                        Rule::ext_name => {
-                            parts.push(ExtSetPart::Extension(self.bump.alloc_str(token.as_str())))
-                        }
-                        Rule::spliced_term => {
-                            let term_token = token.into_inner().next().unwrap();
-                            parts.push(ExtSetPart::Splice(self.parse_term(term_token)?))
-                        }
-                        _ => unreachable!(),
+                    Term::ApplyFull {
+                        symbol,
+                        args: self.bump.alloc_slice_copy(&args),
                     }
                 }
 
-                Term::ExtSet {
-                    parts: parts.into_bump_slice(),
+                Rule::term_quote => {
+                    let r#type = self.parse_term(inner.next().unwrap())?;
+                    Term::Quote { r#type }
                 }
-            }
 
-            Rule::term_adt => {
-                let variants = self.parse_term(inner.next().unwrap())?;
-                Term::Adt { variants }
-            }
+                Rule::term_list => {
+                    let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
 
-            Rule::term_func_type => {
-                let inputs = self.parse_term(inner.next().unwrap())?;
-                let outputs = self.parse_term(inner.next().unwrap())?;
-                let extensions = self.parse_term(inner.next().unwrap())?;
-                Term::FuncType {
-                    inputs,
-                    outputs,
-                    extensions,
+                    for token in inner {
+                        match token.as_rule() {
+                            Rule::term => parts.push(ListPart::Item(self.parse_term(token)?)),
+                            Rule::spliced_term => {
+                                let term_token = token.into_inner().next().unwrap();
+                                parts.push(ListPart::Splice(self.parse_term(term_token)?))
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+
+                    Term::List {
+                        parts: parts.into_bump_slice(),
+                    }
                 }
-            }
 
-            Rule::term_ctrl => {
-                let values = self.parse_term(inner.next().unwrap())?;
-                Term::Control { values }
-            }
+                Rule::term_list_type => {
+                    let item_type = self.parse_term(inner.next().unwrap())?;
+                    Term::ListType { item_type }
+                }
 
-            Rule::term_non_linear => {
-                let term = self.parse_term(inner.next().unwrap())?;
-                Term::NonLinearConstraint { term }
-            }
+                Rule::term_str => {
+                    let value = self.parse_string(inner.next().unwrap())?;
+                    Term::Str(value)
+                }
 
-            r => unreachable!("term: {:?}", r),
-        };
+                Rule::term_nat => {
+                    let value = inner.next().unwrap().as_str().parse().unwrap();
+                    Term::Nat(value)
+                }
+
+                Rule::term_ext_set => {
+                    let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
+
+                    for token in inner {
+                        match token.as_rule() {
+                            Rule::ext_name => parts
+                                .push(ExtSetPart::Extension(self.bump.alloc_str(token.as_str()))),
+                            Rule::spliced_term => {
+                                let term_token = token.into_inner().next().unwrap();
+                                parts.push(ExtSetPart::Splice(self.parse_term(term_token)?))
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+
+                    Term::ExtSet {
+                        parts: parts.into_bump_slice(),
+                    }
+                }
+
+                Rule::term_adt => {
+                    let variants = self.parse_term(inner.next().unwrap())?;
+                    Term::Adt { variants }
+                }
+
+                Rule::term_func_type => {
+                    let inputs = self.parse_term(inner.next().unwrap())?;
+                    let outputs = self.parse_term(inner.next().unwrap())?;
+                    let extensions = self.parse_term(inner.next().unwrap())?;
+                    Term::FuncType {
+                        inputs,
+                        outputs,
+                        extensions,
+                    }
+                }
+
+                Rule::term_ctrl => {
+                    let values = self.parse_term(inner.next().unwrap())?;
+                    Term::Control { values }
+                }
+
+                Rule::term_non_linear => {
+                    let term = self.parse_term(inner.next().unwrap())?;
+                    Term::NonLinearConstraint { term }
+                }
+
+                r => unreachable!("term: {:?}", r),
+            };
 
         Ok(self.module.insert_term(term))
     }
@@ -296,7 +303,7 @@ impl<'a> ParseContext<'a> {
         Ok(node)
     }
 
-    fn parse_node_deep(&mut self, pair: Pair<'a, Rule>) -> ParseResult<Node<'a>> {
+    fn parse_node_deep(&mut self, pair: Pair<'a, Rule>, node: NodeId) -> ParseResult<Node<'a>> {
         debug_assert_eq!(pair.as_rule(), Rule::node);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
@@ -356,9 +363,11 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_define_func => {
+                self.vars.enter(node);
                 let decl = self.parse_func_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner, true)?;
+                self.vars.exit();
                 Node {
                     operation: Operation::DefineFunc { decl },
                     inputs: &[],
@@ -371,8 +380,10 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_declare_func => {
+                self.vars.enter(node);
                 let decl = self.parse_func_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
+                self.vars.exit();
                 Node {
                     operation: Operation::DeclareFunc { decl },
                     inputs: &[],
@@ -419,9 +430,11 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_define_alias => {
+                self.vars.enter(node);
                 let decl = self.parse_alias_header(inner.next().unwrap())?;
                 let value = self.parse_term(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
+                self.vars.exit();
                 Node {
                     operation: Operation::DefineAlias { decl, value },
                     inputs: &[],
@@ -434,8 +447,10 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_declare_alias => {
+                self.vars.enter(node);
                 let decl = self.parse_alias_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
+                self.vars.exit();
                 Node {
                     operation: Operation::DeclareAlias { decl },
                     inputs: &[],
@@ -538,8 +553,10 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_declare_ctr => {
+                self.vars.enter(node);
                 let decl = self.parse_ctr_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
+                self.vars.exit();
                 Node {
                     operation: Operation::DeclareConstructor { decl },
                     inputs: &[],
@@ -552,8 +569,10 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_declare_operation => {
+                self.vars.enter(node);
                 let decl = self.parse_op_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
+                self.vars.exit();
                 Node {
                     operation: Operation::DeclareOperation { decl },
                     inputs: &[],
@@ -643,8 +662,9 @@ impl<'a> ParseContext<'a> {
         };
 
         for (i, pair) in filter_rule(pairs, Rule::node).enumerate() {
-            let node_data = self.parse_node_deep(pair)?;
-            self.module.nodes[nodes[i].index()] = node_data;
+            let node = nodes[i];
+            let node_data = self.parse_node_deep(pair, node)?;
+            self.module.nodes[node.index()] = node_data;
         }
 
         Ok(nodes)
@@ -731,6 +751,7 @@ impl<'a> ParseContext<'a> {
 
         for pair in filter_rule(pairs, Rule::param) {
             let param = pair.into_inner().next().unwrap();
+            let param_span = param.as_span();
 
             let param = match param.as_rule() {
                 Rule::param_implicit => {
@@ -755,6 +776,10 @@ impl<'a> ParseContext<'a> {
                 }
                 _ => unreachable!(),
             };
+
+            self.vars
+                .insert(param.name)
+                .map_err(|err| ParseError::custom(&err.to_string(), param_span));
 
             params.push(param);
         }

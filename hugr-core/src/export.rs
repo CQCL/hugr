@@ -791,7 +791,7 @@ impl<'a> Context<'a> {
 
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
-            let r#type = self.export_type_param(param, Some(model::LocalRef::Index(scope, i as _)));
+            let r#type = self.export_type_param(param, Some((scope, i as _)));
             let param = model::Param {
                 name,
                 r#type,
@@ -824,7 +824,10 @@ impl<'a> Context<'a> {
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
                 let node = self.local_scope.expect("local variable out of scope");
-                self.make_term(model::Term::Var(model::LocalRef::Index(node, *index as _)))
+                self.make_term(model::Term::Var {
+                    node,
+                    index: *index as _,
+                })
             }
             TypeEnum::RowVar(rv) => self.export_row_var(rv.as_rv()),
             TypeEnum::Sum(sum) => self.export_sum_type(sum),
@@ -873,15 +876,18 @@ impl<'a> Context<'a> {
 
     pub fn export_type_arg_var(&mut self, var: &TypeArgVariable) -> model::TermId {
         let node = self.local_scope.expect("local variable out of scope");
-        self.make_term(model::Term::Var(model::LocalRef::Index(
+        self.make_term(model::Term::Var {
             node,
-            var.index() as _,
-        )))
+            index: var.index() as _,
+        })
     }
 
     pub fn export_row_var(&mut self, t: &RowVariable) -> model::TermId {
         let node = self.local_scope.expect("local variable out of scope");
-        self.make_term(model::Term::Var(model::LocalRef::Index(node, t.0 as _)))
+        self.make_term(model::Term::Var {
+            node,
+            index: t.0 as _,
+        })
     }
 
     pub fn export_sum_type(&mut self, t: &SumType) -> model::TermId {
@@ -945,12 +951,12 @@ impl<'a> Context<'a> {
     pub fn export_type_param(
         &mut self,
         t: &TypeParam,
-        var: Option<model::LocalRef<'static>>,
+        var: Option<(model::NodeId, model::VarIndex)>,
     ) -> model::TermId {
         match t {
             TypeParam::Type { b } => {
-                if let (Some(var), TypeBound::Copyable) = (var, b) {
-                    let term = self.make_term(model::Term::Var(var));
+                if let (Some((node, index)), TypeBound::Copyable) = (var, b) {
+                    let term = self.make_term(model::Term::Var { node, index });
                     let non_linear = self.make_term(model::Term::NonLinearConstraint { term });
                     self.local_constraints.push(non_linear);
                 }
@@ -991,10 +997,9 @@ impl<'a> Context<'a> {
         for ext in ext_set.iter() {
             // `ExtensionSet`s represent variables by extension names that parse to integers.
             match ext.parse::<u16>() {
-                Ok(var) => {
+                Ok(index) => {
                     let node = self.local_scope.expect("local variable out of scope");
-                    let local_ref = model::LocalRef::Index(node, var);
-                    let term = self.make_term(model::Term::Var(local_ref));
+                    let term = self.make_term(model::Term::Var { node, index });
                     parts.push(model::ExtSetPart::Splice(term));
                 }
                 Err(_) => parts.push(model::ExtSetPart::Extension(self.bump.alloc_str(ext))),

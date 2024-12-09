@@ -115,17 +115,6 @@ fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
     });
 }
 
-fn write_local_ref(mut builder: hugr_capnp::local_ref::Builder, local_ref: &model::LocalRef) {
-    match local_ref {
-        model::LocalRef::Index(node, index) => {
-            let mut builder = builder.init_direct();
-            builder.set_node(node.0);
-            builder.set_index(*index);
-        }
-        model::LocalRef::Named(name) => builder.set_named(name),
-    }
-}
-
 fn write_meta_item(mut builder: hugr_capnp::meta_item::Builder, meta_item: &model::MetaItem) {
     builder.set_name(meta_item.name);
     builder.set_value(meta_item.value.0)
@@ -160,7 +149,11 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::Type => builder.set_runtime_type(()),
         model::Term::StaticType => builder.set_static_type(()),
         model::Term::Constraint => builder.set_constraint(()),
-        model::Term::Var(local_ref) => write_local_ref(builder.init_variable(), local_ref),
+        model::Term::Var { node, index } => {
+            let mut builder = builder.init_variable();
+            builder.set_variable_node(node.0);
+            builder.set_variable_index(*index);
+        }
         model::Term::ListType { item_type } => builder.set_list_type(item_type.0),
         model::Term::Str(value) => builder.set_string(value),
         model::Term::StrType => builder.set_string_type(()),

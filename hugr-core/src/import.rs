@@ -23,14 +23,11 @@ use crate::{
 };
 use fxhash::FxHashMap;
 use hugr_model::v0::{self as model};
-use indexmap::IndexMap;
 use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
 const TERM_JSON: &str = "prelude.json";
-
-type FxIndexMap<K, V> = IndexMap<K, V, fxhash::FxBuildHasher>;
 
 /// Error during import.
 #[derive(Debug, Clone, Error)]
@@ -85,7 +82,7 @@ pub fn import_hugr(
         static_edges: Vec::new(),
         extensions,
         nodes: FxHashMap::default(),
-        local_variables: IndexMap::default(),
+        local_vars: FxHashMap::default(),
         custom_name_cache: FxHashMap::default(),
         region_scope: model::RegionId::default(),
     };
@@ -120,8 +117,7 @@ struct Context<'a> {
     /// A map from `NodeId` to the imported `Node`.
     nodes: FxHashMap<model::NodeId, Node>,
 
-    /// The local variables that are currently in scope.
-    local_variables: FxIndexMap<&'a str, LocalVar>,
+    local_vars: FxHashMap<(model::NodeId, model::VarIndex), LocalVar>,
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 
@@ -160,25 +156,6 @@ impl<'a> Context<'a> {
         self.module
             .get_region(region_id)
             .ok_or_else(|| model::ModelError::RegionNotFound(region_id).into())
-    }
-
-    /// Looks up a [`LocalRef`] within the current scope.
-    fn resolve_local_ref(
-        &self,
-        local_ref: &model::LocalRef,
-    ) -> Result<(usize, LocalVar), ImportError> {
-        let term = match local_ref {
-            model::LocalRef::Index(_, index) => self
-                .local_variables
-                .get_index(*index as usize)
-                .map(|(_, v)| (*index as usize, *v)),
-            model::LocalRef::Named(name) => self
-                .local_variables
-                .get_full(name)
-                .map(|(index, _, v)| (index, *v)),
-        };
-
-        term.ok_or_else(|| model::ModelError::InvalidLocal(local_ref.to_string()).into())
     }
 
     fn make_node(
@@ -279,16 +256,6 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    fn with_local_socpe<T>(
-        &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ImportError>,
-    ) -> Result<T, ImportError> {
-        let previous = std::mem::take(&mut self.local_variables);
-        let result = f(self);
-        self.local_variables = previous;
-        result
-    }
-
     fn get_global_name(&self, node_id: model::NodeId) -> Result<&'a str, ImportError> {
         let node_data = self.get_node(node_id)?;
         let name = node_data
@@ -308,7 +275,7 @@ impl<'a> Context<'a> {
             _ => return Err(model::ModelError::UnexpectedOperation(func_node).into()),
         };
 
-        self.import_poly_func_type(*decl, |_, signature| Ok(signature))
+        self.import_poly_func_type(func_node, *decl, |_, signature| Ok(signature))
     }
 
     /// Import the root region of the module.
@@ -364,7 +331,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::DefineFunc { decl } => {
-                self.import_poly_func_type(*decl, |ctx, signature| {
+                self.import_poly_func_type(node_id, *decl, |ctx, signature| {
                     let optype = OpType::FuncDefn(FuncDefn {
                         name: decl.name.to_string(),
                         signature,
@@ -383,7 +350,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::DeclareFunc { decl } => {
-                self.import_poly_func_type(*decl, |ctx, signature| {
+                self.import_poly_func_type(node_id, *decl, |ctx, signature| {
                     let optype = OpType::FuncDecl(FuncDecl {
                         name: decl.name.to_string(),
                         signature,
@@ -494,7 +461,7 @@ impl<'a> Context<'a> {
                 "custom operation with implicit parameters"
             )),
 
-            model::Operation::DefineAlias { decl, value } => self.with_local_socpe(|ctx| {
+            model::Operation::DefineAlias { decl, value } => {
                 if !decl.params.is_empty() {
                     return Err(error_unsupported!(
                         "parameters or constraints in alias definition"
@@ -503,14 +470,14 @@ impl<'a> Context<'a> {
 
                 let optype = OpType::AliasDefn(AliasDefn {
                     name: decl.name.to_smolstr(),
-                    definition: ctx.import_type(value)?,
+                    definition: self.import_type(value)?,
                 });
 
-                let node = ctx.make_node(node_id, optype, parent)?;
+                let node = self.make_node(node_id, optype, parent)?;
                 Ok(Some(node))
-            }),
+            }
 
-            model::Operation::DeclareAlias { decl } => self.with_local_socpe(|ctx| {
+            model::Operation::DeclareAlias { decl } => {
                 if !decl.params.is_empty() {
                     return Err(error_unsupported!(
                         "parameters or constraints in alias declaration"
@@ -522,9 +489,9 @@ impl<'a> Context<'a> {
                     bound: TypeBound::Copyable,
                 });
 
-                let node = ctx.make_node(node_id, optype, parent)?;
+                let node = self.make_node(node_id, optype, parent)?;
                 Ok(Some(node))
-            }),
+            }
 
             model::Operation::Tag { tag } => {
                 let signature = node_data
@@ -880,43 +847,43 @@ impl<'a> Context<'a> {
 
     fn import_poly_func_type<RV: MaybeRV, T>(
         &mut self,
+        node: model::NodeId,
         decl: model::FuncDecl<'a>,
         in_scope: impl FnOnce(&mut Self, PolyFuncTypeBase<RV>) -> Result<T, ImportError>,
     ) -> Result<T, ImportError> {
-        self.with_local_socpe(|ctx| {
-            let mut imported_params = Vec::with_capacity(decl.params.len());
+        let mut imported_params = Vec::with_capacity(decl.params.len());
 
-            ctx.local_variables.extend(
-                decl.params
-                    .iter()
-                    .map(|param| (param.name, LocalVar::new(param.r#type))),
-            );
+        for (index, param) in decl.params.iter().enumerate() {
+            self.local_vars
+                .insert((node, index as _), LocalVar::new(param.r#type));
+        }
 
-            for constraint in decl.constraints {
-                match ctx.get_term(*constraint)? {
-                    model::Term::NonLinearConstraint { term } => {
-                        let model::Term::Var(var) = ctx.get_term(*term)? else {
-                            return Err(error_unsupported!(
-                                "constraint on term that is not a variable"
-                            ));
-                        };
+        for constraint in decl.constraints {
+            match self.get_term(*constraint)? {
+                model::Term::NonLinearConstraint { term } => {
+                    let model::Term::Var { node, index } = self.get_term(*term)? else {
+                        return Err(error_unsupported!(
+                            "constraint on term that is not a variable"
+                        ));
+                    };
 
-                        let var = ctx.resolve_local_ref(var)?.0;
-                        ctx.local_variables[var].bound = TypeBound::Copyable;
-                    }
-                    _ => return Err(error_unsupported!("constraint other than copy or discard")),
+                    self.local_vars
+                        .get_mut(&(*node, *index))
+                        .ok_or_else(|| model::ModelError::InvalidLocal("TODO".to_string()))?
+                        .bound = TypeBound::Copyable;
                 }
+                _ => return Err(error_unsupported!("constraint other than copy or discard")),
             }
+        }
 
-            for (index, param) in decl.params.iter().enumerate() {
-                // NOTE: `PolyFuncType` only has explicit type parameters at present.
-                let bound = ctx.local_variables[index].bound;
-                imported_params.push(ctx.import_type_param(param.r#type, bound)?);
-            }
+        for (index, param) in decl.params.iter().enumerate() {
+            // NOTE: `PolyFuncType` only has explicit type parameters at present.
+            let bound = self.local_vars[&(node, index as model::VarIndex)].bound;
+            imported_params.push(self.import_type_param(param.r#type, bound)?);
+        }
 
-            let body = ctx.import_func_type::<RV>(decl.signature)?;
-            in_scope(ctx, PolyFuncTypeBase::new(imported_params, body))
-        })
+        let body = self.import_func_type::<RV>(decl.signature)?;
+        in_scope(self, PolyFuncTypeBase::new(imported_params, body))
     }
 
     /// Import a [`TypeParam`] from a term that represents a static type.
@@ -932,7 +899,7 @@ impl<'a> Context<'a> {
 
             model::Term::StaticType => Err(error_unsupported!("`type` as `TypeParam`")),
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeParam`")),
-            model::Term::Var(_) => Err(error_unsupported!("type variable as `TypeParam`")),
+            model::Term::Var { .. } => Err(error_unsupported!("type variable as `TypeParam`")),
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
 
@@ -975,10 +942,13 @@ impl<'a> Context<'a> {
                 Err(error_uninferred!("application with implicit parameters"))
             }
 
-            model::Term::Var(var) => {
-                let (index, var) = self.resolve_local_ref(var)?;
+            model::Term::Var { node, index } => {
+                let var = self
+                    .local_vars
+                    .get(&(*node, *index))
+                    .ok_or(model::ModelError::InvalidLocal("TODO".to_string()))?;
                 let decl = self.import_type_param(var.r#type, var.bound)?;
-                Ok(TypeArg::new_var_use(index, decl))
+                Ok(TypeArg::new_var_use(*index as _, decl))
             }
 
             model::Term::List { .. } => {
@@ -1033,9 +1003,8 @@ impl<'a> Context<'a> {
             match self.get_term(term_id)? {
                 model::Term::Wildcard => return Err(error_uninferred!("wildcard")),
 
-                model::Term::Var(var) => {
-                    let (index, _) = self.resolve_local_ref(var)?;
-                    es.insert_type_var(index);
+                model::Term::Var { index, .. } => {
+                    es.insert_type_var(*index as _);
                 }
 
                 model::Term::ExtSet { parts } => {
@@ -1100,10 +1069,8 @@ impl<'a> Context<'a> {
                 )))
             }
 
-            model::Term::Var(var) => {
-                // We pretend that all `TypeBound`s are copyable.
-                let (index, _) = self.resolve_local_ref(var)?;
-                Ok(TypeBase::new_var_use(index, TypeBound::Copyable))
+            model::Term::Var { node, index } => {
+                Ok(TypeBase::new_var_use(*index as _, TypeBound::Copyable))
             }
 
             model::Term::FuncType { .. } => {
@@ -1236,9 +1203,8 @@ impl<'a> Context<'a> {
                         }
                     }
                 }
-                model::Term::Var(var) => {
-                    let (index, _) = ctx.resolve_local_ref(var)?;
-                    let var = RV::try_from_rv(RowVariable(index, TypeBound::Any))
+                model::Term::Var { index, .. } => {
+                    let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Any))
                         .map_err(|_| model::ModelError::TypeError(term_id))?;
                     types.push(TypeBase::new(TypeEnum::RowVar(var)));
                 }

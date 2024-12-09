@@ -497,26 +497,6 @@ pub struct MetaItem<'a> {
 /// An index of a variable within a node's parameter list.
 pub type VarIndex = u16;
 
-/// A reference to a local variable.
-///
-/// Local variables are defined as parameters to nodes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LocalRef<'a> {
-    /// Reference to the local variable by its parameter index and its defining node.
-    Index(NodeId, u16),
-    /// Reference to the local variable by its name.
-    Named(&'a str),
-}
-
-impl std::fmt::Display for LocalRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LocalRef::Index(node, index) => write!(f, "?:{}:{}", node.index(), index),
-            LocalRef::Named(name) => write!(f, "?{}", name),
-        }
-    }
-}
-
 /// A term in the compile time meta language.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Term<'a> {
@@ -540,7 +520,12 @@ pub enum Term<'a> {
     Constraint,
 
     /// A local variable.
-    Var(LocalRef<'a>),
+    Var {
+        /// The node that defines the variable as a parameter.
+        node: NodeId,
+        /// The index of the variable in the parameter list of the node.
+        index: VarIndex,
+    },
 
     /// A symbolic function application.
     ///

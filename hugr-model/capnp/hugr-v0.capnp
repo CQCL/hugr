@@ -128,23 +128,16 @@ struct MetaItem {
     value @1 :UInt32;
 }
 
-struct LocalRef {
-    union {
-        direct :group {
-            index @0 :UInt16;
-            node @1 :NodeId;
-        }
-        named @2 :Text;
-    }
-}
-
 struct Term {
     union {
         wildcard @0 :Void;
         runtimeType @1 :Void;
         staticType @2 :Void;
         constraint @3 :Void;
-        variable @4 :LocalRef;
+        variable :group {
+            variableNode @4 :NodeId;
+            variableIndex @21 :UInt16;
+        }
         apply @5 :Apply;
         applyFull @6 :ApplyFull;
         quote @7 :TermId;

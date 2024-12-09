@@ -22,11 +22,16 @@ impl<'a> VarTable<'a> {
     }
 
     pub fn enter(&mut self, node: NodeId) {
-        todo!()
+        self.scopes.push(VarScope {
+            node,
+            var_count: 0,
+            var_stack: self.vars.len(),
+        })
     }
 
     pub fn exit(&mut self) {
-        todo!()
+        let scope = self.scopes.pop().unwrap();
+        self.vars.drain(scope.var_stack..);
     }
 
     pub fn resolve(&self, name: &'a str) -> Result<(NodeId, VarIndex), UnknownVarError<'a>> {

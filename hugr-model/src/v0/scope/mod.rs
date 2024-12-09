@@ -5,3 +5,4 @@ mod vars;
 
 pub use link::LinkTable;
 pub use symbol::{SymbolIntroError, SymbolResolveError, SymbolTable};
+pub use vars::{DuplicateVarError, UnknownVarError, VarTable};

@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, LinkIndex, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId, Operation,
-    Param, ParamSort, RegionId, RegionKind, Term, TermId,
+    ExtSetPart, LinkIndex, ListPart, MetaItem, ModelError, Module, NodeId, Operation, Param,
+    ParamSort, RegionId, RegionKind, Term, TermId, VarIndex,
 };
 
 type PrintError = ModelError;
@@ -495,7 +495,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("constraint");
                 Ok(())
             }
-            Term::Var(local_ref) => self.print_local_ref(*local_ref),
+            Term::Var { node, index } => self.print_var(*node, *index),
             Term::Apply { symbol, args } => {
                 if args.is_empty() {
                     self.print_symbol(*symbol)?;
@@ -631,16 +631,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_local_ref(&mut self, local_ref: LocalRef<'a>) -> PrintResult<()> {
-        let name = match local_ref {
-            LocalRef::Index(_, i) => {
-                let Some(name) = self.locals.get(i as usize) else {
-                    return Err(PrintError::InvalidLocal(local_ref.to_string()));
-                };
-
-                name
-            }
-            LocalRef::Named(name) => name,
+    fn print_var(&mut self, _node: NodeId, index: VarIndex) -> PrintResult<()> {
+        let Some(name) = self.locals.get(index as usize) else {
+            return Err(PrintError::InvalidLocal(index.to_string()));
         };
 
         self.print_text(format!("?{}", name));

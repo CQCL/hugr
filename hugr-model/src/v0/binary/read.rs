@@ -89,21 +89,6 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
     })
 }
 
-fn read_local_ref<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::local_ref::Reader,
-) -> ReadResult<model::LocalRef<'a>> {
-    use hugr_capnp::local_ref::Which;
-    Ok(match reader.which()? {
-        Which::Direct(reader) => {
-            let index = reader.get_index();
-            let node = model::NodeId(reader.get_node());
-            model::LocalRef::Index(node, index)
-        }
-        Which::Named(name) => model::LocalRef::Named(bump.alloc_str(name?.to_str()?)),
-    })
-}
-
 fn read_operation<'a>(
     bump: &'a Bump,
     reader: hugr_capnp::operation::Reader,
@@ -270,7 +255,12 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::NatType(()) => model::Term::NatType,
         Which::ExtSetType(()) => model::Term::ExtSetType,
         Which::ControlType(()) => model::Term::ControlType,
-        Which::Variable(local_ref) => model::Term::Var(read_local_ref(bump, local_ref?)?),
+
+        Which::Variable(reader) => {
+            let node = model::NodeId(reader.get_variable_node());
+            let index = reader.get_variable_index();
+            model::Term::Var { node, index }
+        }
 
         Which::Apply(reader) => {
             let reader = reader?;
