@@ -20,7 +20,7 @@ use crate::Node;
 /// happens when deserializing a HUGR. On such cases, we return an error with
 /// the missing extension names.
 ///
-/// Use [`collect_op_types_extensions`] instead to update the weak references and
+/// Use [`super::resolve_op_types_extensions`] instead to update the weak references and
 /// ensure they point to valid extensions.
 ///
 /// # Attributes
