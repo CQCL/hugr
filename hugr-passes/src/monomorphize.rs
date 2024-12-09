@@ -10,39 +10,14 @@ use hugr_core::{
 use hugr_core::hugr::{hugrmut::HugrMut, internal::HugrMutInternals, Hugr, HugrView, OpType};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
-/// instantiations of the polymorphic ones.
-///
-/// If the Hugr is [Module](OpType::Module)-rooted,
-/// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
-///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
-/// * else, the originals are removed (they are invisible from outside the Hugr).
+/// instantiations of the polymorphic ones. The original polymorphic [FuncDefn]s
+/// are left untouched, although with fewer calls (they may still have calls
+/// from *other* polymorphic functions still present).
 pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
     let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
         mono_scan(&mut h, root, None, &mut HashMap::new(), reg);
-        if !h.get_optype(root).is_module() {
-            return remove_polyfuncs(h);
-        }
-    }
-    h
-}
-
-/// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
-/// calls from *monomorphic* code, this will make the Hugr invalid (call [monomorphize]
-/// first).
-pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
-    let mut pfs_to_delete = Vec::new();
-    let mut to_scan = Vec::from_iter(h.children(h.root()));
-    while let Some(n) = to_scan.pop() {
-        if is_polymorphic_funcdefn(h.get_optype(n)) {
-            pfs_to_delete.push(n)
-        } else {
-            to_scan.extend(h.children(n));
-        }
-    }
-    for n in pfs_to_delete {
-        h.remove_subtree(n);
     }
     h
 }
@@ -227,7 +202,7 @@ mod test {
     use hugr_core::types::{PolyFuncType, Signature, Type, TypeBound, TypeRow};
     use hugr_core::{Hugr, HugrView, Node};
 
-    use super::{is_polymorphic, mangle_inner_func, mangle_name, monomorphize, remove_polyfuncs};
+    use super::{is_polymorphic, mangle_inner_func, mangle_name, monomorphize};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -312,6 +287,7 @@ mod test {
                 .count(),
             3
         );
+        assert_eq!(hugr.static_targets(db.node()).unwrap().count(), 3); // from double (recursive), triple, main
         let mono = monomorphize(hugr, &PRELUDE_REGISTRY);
         mono.validate(&PRELUDE_REGISTRY)?;
 
@@ -332,16 +308,22 @@ mod test {
             ["double", "main", "triple"]
         );
 
+        // Original double/triple retained, but call to double from main now lost
+        assert!(is_polymorphic(
+            mono.get_optype(db.node()).as_func_defn().unwrap()
+        ));
+        assert!(is_polymorphic(
+            mono.get_optype(tr.node()).as_func_defn().unwrap()
+        ));
+        assert_eq!(
+            mono.static_targets(db.node())
+                .unwrap()
+                .map(|(call, _port)| mono.get_parent(call))
+                .collect_vec(),
+            vec![Some(db.node()), Some(tr.node())]
+        );
+
         assert_eq!(monomorphize(mono.clone(), &PRELUDE_REGISTRY), mono); // Idempotent
-
-        let nopoly = remove_polyfuncs(mono);
-        let mut funcs = list_funcs(&nopoly);
-
-        assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
-        for n in expected_mangled_names {
-            assert!(funcs.remove(&n).is_some());
-        }
-        assert_eq!(funcs.keys().collect_vec(), vec![&"main"]);
         Ok(())
     }
 
@@ -402,15 +384,23 @@ mod test {
                 &mangle_name(&pf2_name, &[ity().into()]), // from pf1<int>
                 &mangle_name(&pf2_name, &[usize_t().into()]), // from pf1<int> and (2*)pf1<usize_t>
                 &mangle_inner_func(&pf2_name, "get_usz"),
-                "mainish"
+                "mainish",
+                "pf1",
+                &pf2_name,
             ]
             .into_iter()
             .sorted()
             .collect_vec()
         );
         for (n, fd) in funcs.into_values() {
-            assert!(!is_polymorphic(fd));
-            assert!(mono_hugr.get_parent(n) == (fd.name != "mainish").then_some(mono_hugr.root()));
+            assert_eq!(
+                is_polymorphic(fd),
+                ["pf1", &pf2_name].contains(&fd.name.as_str())
+            );
+            assert_eq!(
+                mono_hugr.get_parent(n),
+                (fd.name != "mainish").then_some(mono_hugr.root())
+            );
         }
         Ok(())
     }
@@ -428,33 +418,35 @@ mod test {
             ExtensionRegistry::try_new([PRELUDE.to_owned(), int_types::EXTENSION.to_owned()])?;
         let sig = Signature::new_endo(vec![usize_t(), ity()]);
         let mut dfg = DFGBuilder::new(sig.clone())?;
-        let mut mono = dfg.define_function("id2", sig)?;
-        let pf = mono.define_function(
+        let mut monof = dfg.define_function("id2", sig)?;
+        let polyf = monof.define_function(
             "id",
             PolyFuncType::new(
                 [TypeBound::Any.into()],
                 Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
             ),
         )?;
-        let outs = pf.input_wires();
-        let pf = pf.finish_with_outputs(outs)?;
-        let [a, b] = mono.input_wires_arr();
-        let [a] = mono
-            .call(pf.handle(), &[usize_t().into()], [a], &reg)?
+        let outs = polyf.input_wires();
+        let polyf = polyf.finish_with_outputs(outs)?;
+        let [a, b] = monof.input_wires_arr();
+        let [a] = monof
+            .call(polyf.handle(), &[usize_t().into()], [a], &reg)?
             .outputs_arr();
-        let [b] = mono
-            .call(pf.handle(), &[ity().into()], [b], &reg)?
+        let [b] = monof
+            .call(polyf.handle(), &[ity().into()], [b], &reg)?
             .outputs_arr();
-        let mono = mono.finish_with_outputs([a, b])?;
-        let c = dfg.call(mono.handle(), &[], dfg.input_wires(), &reg)?;
+        let monof = monof.finish_with_outputs([a, b])?;
+        let c = dfg.call(monof.handle(), &[], dfg.input_wires(), &reg)?;
         let hugr = dfg.finish_hugr_with_outputs(c.outputs(), &reg)?;
         let mono_hugr = monomorphize(hugr, &reg);
 
         let mut funcs = list_funcs(&mono_hugr);
-        assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
+        for (n, fd) in funcs.values() {
+            assert_eq!(is_polymorphic(fd), *n == polyf.node());
+        }
         #[allow(clippy::unnecessary_to_owned)] // It is necessary
         let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
-        assert_eq!(m, mono.handle().node());
+        assert_eq!(m, monof.node());
         assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.root()));
         for t in [usize_t(), ity()] {
             let (n, _) = funcs.remove(&mangle_name("id", &[t.into()])).unwrap();

@@ -7,7 +7,7 @@ mod half_node;
 pub mod lower;
 pub mod merge_bbs;
 mod monomorphize;
-pub use monomorphize::{monomorphize, remove_polyfuncs};
+pub use monomorphize::monomorphize;
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod validation;
