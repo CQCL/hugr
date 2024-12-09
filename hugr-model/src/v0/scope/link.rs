@@ -8,6 +8,7 @@ use crate::v0::{LinkIndex, RegionId};
 type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 
 /// Table for tracking links between ports.
+#[derive(Debug, Clone)]
 pub struct LinkTable<K> {
     links: FxIndexSet<(RegionId, K)>,
     scopes: Vec<LinkScope>,
@@ -78,6 +79,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 struct LinkScope {
     link_stack: usize,
     link_count: u32,

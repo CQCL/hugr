@@ -494,6 +494,9 @@ pub struct MetaItem<'a> {
     pub value: TermId,
 }
 
+/// An index of a variable within a node's parameter list.
+pub type VarIndex = u16;
+
 /// A reference to a local variable.
 ///
 /// Local variables are defined as parameters to nodes.

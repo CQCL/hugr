@@ -8,9 +8,9 @@ use thiserror::Error;
 
 use crate::v0::{
     scope::{LinkTable, SymbolResolveError, SymbolTable},
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, LinkScope, ListPart, LocalRef,
-    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
-    RegionKind, RegionScope, Term, TermId,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, LocalRef, MetaItem,
+    Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind,
+    RegionScope, Term, TermId,
 };
 
 mod pest_parser {

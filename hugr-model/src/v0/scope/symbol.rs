@@ -9,6 +9,7 @@ use crate::v0::{NodeId, RegionId};
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
 /// Symbol binding table that keeps track of symbol resolution and scoping.
+#[derive(Debug, Clone)]
 pub struct SymbolTable<'a> {
     symbols: FxIndexMap<&'a str, BindingIndex>,
     bindings: FxIndexMap<NodeId, Binding>,
@@ -105,11 +106,6 @@ impl<'a> SymbolTable<'a> {
 
     /// Tries to resolve a [`SymbolRef`] in the current scope.
     pub fn resolve(&self, name: &'a str) -> Result<NodeId, SymbolResolveError> {
-        // match symbol_ref {
-        //     GlobalRef::Direct(node) => {
-
-        //         Ok(node)
-        //     }
         let index = *self
             .symbols
             .get(name)
