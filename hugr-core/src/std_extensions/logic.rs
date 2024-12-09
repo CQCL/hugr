@@ -130,8 +130,7 @@ lazy_static! {
     /// Reference to the logic Extension.
     pub static ref EXTENSION: Arc<Extension> = extension();
     /// Registry required to validate logic extension.
-    pub static ref LOGIC_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
+    pub static ref LOGIC_REG: ExtensionRegistry = ExtensionRegistry::new([EXTENSION.clone()]);
 }
 
 impl MakeRegisteredOp for LogicOp {

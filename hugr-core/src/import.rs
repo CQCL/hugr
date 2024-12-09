@@ -1068,7 +1068,7 @@ impl<'a> Context<'a> {
                                 let ext_ident = IdentList::new(*ext).map_err(|_| {
                                     model::ModelError::MalformedName(ext.to_smolstr())
                                 })?;
-                                es.insert(&ext_ident);
+                                es.insert(ext_ident);
                             }
                             model::ExtSetPart::Splice(term_id) => {
                                 // The order in an extension set does not matter.

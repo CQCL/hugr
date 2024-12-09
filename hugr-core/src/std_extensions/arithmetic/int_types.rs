@@ -182,7 +182,7 @@ impl CustomConst for ConstInt {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&EXTENSION_ID)
+        ExtensionSet::singleton(EXTENSION_ID)
     }
 
     fn get_type(&self) -> Type {

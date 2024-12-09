@@ -9,8 +9,11 @@ pub mod module;
 pub mod sum;
 pub mod tag;
 pub mod validate;
+use crate::extension::resolution::{
+    collect_op_extensions, collect_op_types_extensions, ExtensionCollectionError,
+};
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::{ExtensionId, ExtensionSet};
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
 use crate::types::{EdgeKind, Signature};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -308,6 +311,20 @@ impl OpType {
             OpType::ExtensionOp(e) => Some(e.def().extension_id()),
             _ => None,
         }
+    }
+
+    /// Returns a register with all the extensions required by the operation.
+    ///
+    /// This includes the operation extension in [`OpType::extension_id`], and any
+    /// extension required by the operation's signature types.
+    pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
+        // Collect extensions on the types.
+        let mut reg = collect_op_types_extensions(None, self)?;
+        // And on the operation definition itself.
+        if let Some(ext) = collect_op_extensions(None, self)? {
+            reg.register_updated(ext);
+        }
+        Ok(reg)
     }
 }
 

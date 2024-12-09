@@ -5,7 +5,7 @@ use hugr_core::builder::{
     BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use hugr_core::extension::prelude::PRELUDE_ID;
-use hugr_core::extension::{ExtensionRegistry, ExtensionSet, EMPTY_REG};
+use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
 use hugr_core::ops::handle::FuncID;
 use hugr_core::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
@@ -108,7 +108,7 @@ impl SimpleHugrConfig {
         Self {
             ins: Default::default(),
             outs: Default::default(),
-            extensions: EMPTY_REG,
+            extensions: Default::default(),
         }
     }
 

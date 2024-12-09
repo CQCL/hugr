@@ -25,7 +25,7 @@ pub(crate) mod test {
 
     lazy_static! {
         /// A registry containing various extensions for testing.
-        pub(crate) static ref TEST_REG: ExtensionRegistry = ExtensionRegistry::try_new([
+        pub(crate) static ref TEST_REG: ExtensionRegistry = ExtensionRegistry::new([
             PRELUDE.to_owned(),
             arithmetic::int_ops::EXTENSION.to_owned(),
             arithmetic::int_types::EXTENSION.to_owned(),
@@ -34,7 +34,6 @@ pub(crate) mod test {
             logic::EXTENSION.to_owned(),
             arithmetic::conversions::EXTENSION.to_owned(),
             collections::EXTENSION.to_owned(),
-        ])
-        .unwrap();
+        ]);
     }
 }

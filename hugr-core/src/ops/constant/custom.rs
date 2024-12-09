@@ -41,7 +41,7 @@ use super::{Value, ValueName};
 /// #[typetag::serde]
 /// impl CustomConst for CC {
 ///   fn name(&self) -> ValueName { "CC".into() }
-///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(&int_types::EXTENSION_ID) }
+///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(int_types::EXTENSION_ID) }
 ///   fn get_type(&self) -> Type { int_types::INT_TYPES[5].clone() }
 /// }
 ///

@@ -358,8 +358,7 @@ mod test {
                     .unwrap();
             })
         };
-        static ref DUMMY_REG: ExtensionRegistry =
-            ExtensionRegistry::try_new([EXT.clone()]).unwrap();
+        static ref DUMMY_REG: ExtensionRegistry = ExtensionRegistry::new([EXT.clone()]);
     }
     impl MakeRegisteredOp for DummyEnum {
         fn extension_id(&self) -> ExtensionId {

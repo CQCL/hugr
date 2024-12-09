@@ -466,9 +466,8 @@ mod test {
     #[test]
     #[ignore] // FIXME: This needs a rewrite now that `pop` returns an optional value -.-'
     fn cfg() -> Result<(), Box<dyn std::error::Error>> {
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()])
-                .unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()]);
+        reg.validate()?;
         let listy = list_type(usize_t());
         let pop: ExtensionOp = ListOp::pop
             .with_type(usize_t())

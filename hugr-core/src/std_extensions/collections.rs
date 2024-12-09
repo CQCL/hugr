@@ -287,11 +287,10 @@ lazy_static! {
     };
 
     /// Registry of extensions required to validate list operations.
-    pub static ref COLLECTIONS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+    pub static ref COLLECTIONS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::new([
         PRELUDE.clone(),
         EXTENSION.clone(),
-    ])
-    .unwrap();
+    ]);
 }
 
 impl MakeRegisteredOp for ListOp {
@@ -367,15 +366,14 @@ impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
     /// registry to validate the element type against.
     pub fn to_extension_op(self, elem_type_registry: &ExtensionRegistry) -> Option<ExtensionOp> {
-        let registry = ExtensionRegistry::try_new(
+        let registry = ExtensionRegistry::new(
             elem_type_registry
                 .clone()
                 .into_iter()
                 // ignore self if already in registry
                 .filter(|ext| ext.name() != EXTENSION.name())
                 .chain(std::iter::once(EXTENSION.to_owned())),
-        )
-        .unwrap();
+        );
         ExtensionOp::new(
             registry.get(&EXTENSION_ID)?.get_op(&self.name())?.clone(),
             self.type_args(),
@@ -438,9 +436,7 @@ mod test {
 
     #[test]
     fn test_list_ops() {
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()])
-                .unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]);
         let pop_op = ListOp::pop.with_type(qb_t());
         let pop_ext = pop_op.clone().to_extension_op(&reg).unwrap();
         assert_eq!(ListOpInst::from_extension_op(&pop_ext).unwrap(), pop_op);

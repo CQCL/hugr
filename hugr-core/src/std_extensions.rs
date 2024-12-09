@@ -11,7 +11,7 @@ pub mod ptr;
 
 /// Extension registry with all standard extensions and prelude.
 pub fn std_reg() -> ExtensionRegistry {
-    ExtensionRegistry::try_new([
+    let reg = ExtensionRegistry::new([
         crate::extension::prelude::PRELUDE.clone(),
         arithmetic::int_ops::EXTENSION.to_owned(),
         arithmetic::int_types::EXTENSION.to_owned(),
@@ -21,8 +21,10 @@ pub fn std_reg() -> ExtensionRegistry {
         collections::EXTENSION.to_owned(),
         logic::EXTENSION.to_owned(),
         ptr::EXTENSION.to_owned(),
-    ])
-    .unwrap()
+    ]);
+    reg.validate()
+        .expect("Standard extension registry is valid");
+    reg
 }
 
 lazy_static::lazy_static! {

@@ -177,7 +177,7 @@ pub(crate) mod test {
 
     lazy_static! {
         static ref REGISTRY: ExtensionRegistry =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
+            ExtensionRegistry::new([PRELUDE.to_owned(), EXTENSION.to_owned()]);
     }
 
     impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
@@ -345,7 +345,8 @@ pub(crate) mod test {
             .unwrap();
         });
 
-        let reg = ExtensionRegistry::try_new([ext.clone()]).unwrap();
+        let reg = ExtensionRegistry::new([ext.clone()]);
+        reg.validate().unwrap();
 
         let make_scheme = |tp: TypeParam| {
             PolyFuncTypeBase::new_validated(

@@ -170,13 +170,12 @@ lazy_static! {
     };
 
     /// Registry of extensions required to validate integer operations.
-    pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+    pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::new([
         PRELUDE.clone(),
         super::int_types::EXTENSION.clone(),
         super::float_types::EXTENSION.clone(),
         EXTENSION.clone(),
-    ])
-    .unwrap();
+    ]);
 }
 
 impl MakeRegisteredOp for ConvertOpType {

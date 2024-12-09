@@ -169,12 +169,12 @@ mod test {
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
         use crate::extension::prelude::Lift;
 
-        let reg = ExtensionRegistry::try_new([
+        let reg = ExtensionRegistry::new([
             PRELUDE.to_owned(),
             int_ops::EXTENSION.to_owned(),
             int_types::EXTENSION.to_owned(),
-        ])
-        .unwrap();
+        ]);
+        reg.validate()?;
         let int_ty = &int_types::INT_TYPES[6];
 
         let mut outer = DFGBuilder::new(inout_sig(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
@@ -256,12 +256,12 @@ mod test {
         };
         let [q, p] = swap.outputs_arr();
         let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
-        let reg = ExtensionRegistry::try_new([
+        let reg = ExtensionRegistry::new([
             test_quantum_extension::EXTENSION.clone(),
             PRELUDE.clone(),
             float_types::EXTENSION.clone(),
-        ])
-        .unwrap();
+        ]);
+        reg.validate()?;
 
         let mut h = h.finish_hugr_with_outputs(cx.outputs(), &reg)?;
         assert_eq!(find_dfgs(&h), vec![h.root(), swap.node()]);
@@ -333,12 +333,12 @@ mod test {
          *              CX
          */
         // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
-        let reg = ExtensionRegistry::try_new([
+        let reg = ExtensionRegistry::new([
             test_quantum_extension::EXTENSION.to_owned(),
             float_types::EXTENSION.to_owned(),
             PRELUDE.to_owned(),
-        ])
-        .unwrap();
+        ]);
+        reg.validate()?;
         let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;

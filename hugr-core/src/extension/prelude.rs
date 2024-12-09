@@ -128,8 +128,7 @@ lazy_static! {
     };
 
     /// An extension registry containing only the prelude
-    pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
-        ExtensionRegistry::try_new([PRELUDE.clone()]).unwrap();
+    pub static ref PRELUDE_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([PRELUDE.clone()]);
 }
 
 pub(crate) fn usize_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
@@ -225,7 +224,7 @@ impl CustomConst for ConstString {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
 
     fn get_type(&self) -> Type {
@@ -418,7 +417,7 @@ impl CustomConst for ConstUsize {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
 
     fn get_type(&self) -> Type {
@@ -464,7 +463,7 @@ impl CustomConst for ConstError {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
     fn get_type(&self) -> Type {
         error_type()
@@ -510,7 +509,7 @@ impl CustomConst for ConstExternalSymbol {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
     fn get_type(&self) -> Type {
         self.typ.clone()
@@ -1022,7 +1021,7 @@ mod test {
     #[test]
     fn test_lift() {
         const XA: ExtensionId = ExtensionId::new_unchecked("xa");
-        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(&XA));
+        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(XA));
         let optype: OpType = op.clone().into();
         assert_eq!(
             optype.dataflow_signature().unwrap(),
@@ -1102,7 +1101,7 @@ mod test {
 
         assert_eq!(
             error_val.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
@@ -1171,7 +1170,7 @@ mod test {
         assert!(string_const.validate().is_ok());
         assert_eq!(
             string_const.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(string_const.equal_consts(&ConstString::new("Lorem ipsum".into())));
         assert!(!string_const.equal_consts(&ConstString::new("Lorem ispum".into())));
@@ -1198,7 +1197,7 @@ mod test {
         assert!(subject.validate().is_ok());
         assert_eq!(
             subject.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("bar", Type::UNIT, false)));
