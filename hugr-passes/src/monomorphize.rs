@@ -315,10 +315,7 @@ mod test {
         let mono = monomorphize(hugr, &PRELUDE_REGISTRY);
         mono.validate(&PRELUDE_REGISTRY)?;
 
-        let mut funcs = mono
-            .nodes()
-            .filter_map(|n| mono.get_optype(n).as_func_defn().map(|fd| (&fd.name, fd)))
-            .collect::<HashMap<_, _>>();
+        let mut funcs = list_funcs(&mono);
         let expected_mangled_names = [
             mangle_name("double", &[usize_t().into()]),
             mangle_name("triple", &[usize_t().into()]),
@@ -327,12 +324,12 @@ mod test {
         ];
 
         for n in expected_mangled_names.iter() {
-            assert!(!is_polymorphic(funcs.remove(n).unwrap()));
+            assert!(!is_polymorphic(funcs.remove(n).unwrap().1));
         }
 
         assert_eq!(
-            funcs.keys().sorted().collect_vec(),
-            ["double", "main", "triple"].iter().collect_vec()
+            funcs.into_keys().sorted().collect_vec(),
+            ["double", "main", "triple"]
         );
 
         assert_eq!(monomorphize(mono.clone(), &PRELUDE_REGISTRY), mono); // Idempotent
