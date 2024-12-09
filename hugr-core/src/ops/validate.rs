@@ -288,7 +288,7 @@ fn validate_io_nodes<'a>(
     if &first_sig.output != expected_input {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: first,
-            actual: first_sig.output,
+            actual: first_sig.into_owned().output,
             expected: expected_input.clone(),
             node_desc: "Input",
             container_desc,
@@ -299,7 +299,7 @@ fn validate_io_nodes<'a>(
     if &second_sig.input != expected_output {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: second,
-            actual: second_sig.input,
+            actual: second_sig.into_owned().input,
             expected: expected_output.clone(),
             node_desc: "Output",
             container_desc,
