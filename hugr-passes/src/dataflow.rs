@@ -87,7 +87,7 @@ pub trait ConstLoader<V> {
 /// to their leaves ([Value::Extension] and [Value::Function]),
 /// converts these using [ConstLoader::value_from_opaque] and [ConstLoader::value_from_const_hugr],
 /// and builds nested [PartialValue::new_variant] to represent the structure.
-fn partial_from_const<'a, V>(
+pub fn partial_from_const<'a, V>(
     cl: &impl ConstLoader<V>,
     loc: impl Into<ConstLocation<'a>>,
     cst: &Value,

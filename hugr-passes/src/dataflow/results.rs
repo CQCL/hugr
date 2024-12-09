@@ -15,6 +15,11 @@ pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
 }
 
 impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
+    /// Allows reading the Hugr(View) for which the results were computed
+    pub fn hugr(&self) -> &H {
+        &self.hugr
+    }
+
     /// Gets the lattice value computed for the given wire
     pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
         self.out_wire_values.get(&w).cloned()
