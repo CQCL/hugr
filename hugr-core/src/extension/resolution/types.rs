@@ -28,7 +28,7 @@ use crate::Node;
 /// - `node`: The node where the operation is located, if available.
 ///   This is used to provide context in the error message.
 /// - `op`: The operation to collect the extensions from.
-pub fn collect_op_types_extensions(
+pub(crate) fn collect_op_types_extensions(
     node: Option<Node>,
     op: &OpType,
 ) -> Result<ExtensionRegistry, ExtensionCollectionError> {
