@@ -16,8 +16,8 @@
 //! Note: These procedures are only temporary until `hugr-model` is stabilized.
 //! Once that happens, hugrs will no longer be directly deserialized using serde
 //! but instead will be created by the methods in `crate::import`. As these
-//! (will) automatically resolve extensions as the operations are created, we
-//! will no longer require this post-facto resolution step.
+//! (will) automatically resolve extensions as the operations are created,
+//! we will no longer require this post-facto resolution step.
 
 mod ops;
 mod types;
