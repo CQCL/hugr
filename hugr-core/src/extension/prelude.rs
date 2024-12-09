@@ -122,6 +122,7 @@ lazy_static! {
             NoopDef.add_to_extension(prelude, extension_ref).unwrap();
             LiftDef.add_to_extension(prelude, extension_ref).unwrap();
             array::ArrayOpDef::load_all_ops(prelude, extension_ref).unwrap();
+            array::ArrayRepeatDef.add_to_extension(prelude, extension_ref).unwrap();
             array::ArrayScanDef.add_to_extension(prelude, extension_ref).unwrap();
         })
     };
