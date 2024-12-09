@@ -91,6 +91,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 pub mod binary;
+pub mod scope;
 pub mod text;
 
 macro_rules! define_index {
