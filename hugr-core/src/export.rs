@@ -61,6 +61,11 @@ struct Context<'a> {
 
     /// Mapping from extension operations to their declarations.
     decl_operations: FxHashMap<(ExtensionId, OpName), model::NodeId>,
+
+    /// The symbol table tracking symbols that are currently in scope.
+    symbols: model::scope::SymbolTable<'a>,
+    /// Mapping from implicit imports to their node ids.
+    implicit_imports: FxHashMap<&'a str, model::NodeId>,
 }
 
 impl<'a> Context<'a> {
@@ -77,30 +82,40 @@ impl<'a> Context<'a> {
             local_scope: None,
             decl_operations: FxHashMap::default(),
             local_constraints: Vec::new(),
+            symbols: model::scope::SymbolTable::default(),
+            implicit_imports: FxHashMap::default(),
         }
     }
 
     /// Exports the root module of the HUGR graph.
     pub fn export_root(&mut self) {
+        self.module.root = self.module.insert_region(model::Region::default());
+        self.symbols.enter(self.module.root);
+
         let hugr_children = self.hugr.children(self.hugr.root());
         let mut children = Vec::with_capacity(hugr_children.size_hint().0);
 
-        for child in self.hugr.children(self.hugr.root()) {
-            children.push(self.export_node(child));
+        for child in hugr_children.clone() {
+            children.push(self.export_node_shallow(child));
+        }
+
+        for (child, child_node_id) in hugr_children.zip(children.iter().copied()) {
+            self.export_node_deep(child, child_node_id);
         }
 
         children.extend(self.decl_operations.values().copied());
+        children.extend(self.implicit_imports.drain().map(|(_, id)| id));
 
-        let root = self.module.insert_region(model::Region {
+        self.symbols.exit();
+
+        self.module.regions[self.module.root.index()] = model::Region {
             kind: model::RegionKind::Module,
             sources: &[],
             targets: &[],
             children: self.bump.alloc_slice_copy(&children),
             meta: &[], // TODO: Export metadata
             signature: None,
-        });
-
-        self.module.root = root;
+        };
     }
 
     /// Returns the edge id for a given port, creating a new edge if necessary.
@@ -195,12 +210,30 @@ impl<'a> Context<'a> {
         result
     }
 
-    pub fn export_node(&mut self, node: Node) -> model::NodeId {
+    fn export_node_shallow(&mut self, node: Node) -> model::NodeId {
+        let node_id = self.module.insert_node(model::Node::default());
+
+        let symbol = match self.hugr.get_optype(node) {
+            OpType::FuncDefn(func_defn) => Some(func_defn.name.as_str()),
+            OpType::FuncDecl(func_decl) => Some(func_decl.name.as_str()),
+            OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
+            OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),
+            _ => None,
+        };
+
+        if let Some(symbol) = symbol {
+            self.symbols
+                .insert(symbol, node_id)
+                .expect("duplicate symbol");
+        }
+
+        node_id
+    }
+
+    fn export_node_deep(&mut self, node: Node, node_id: model::NodeId) {
         // We insert a dummy node with the invalid operation at this point to reserve
         // the node id. This is necessary to establish the correct node id for the
         // local scope introduced by some operations. We will overwrite this node later.
-        let node_id = self.module.insert_node(model::Node::default());
-
         let mut params: &[_] = &[];
         let mut regions: &[_] = &[];
 
@@ -417,8 +450,7 @@ impl<'a> Context<'a> {
             None => &[],
         };
 
-        // Replace the placeholder node with the actual node.
-        *self.module.get_node_mut(node_id).unwrap() = model::Node {
+        self.module.nodes[node_id.index()] = model::Node {
             operation,
             inputs,
             outputs,
@@ -427,8 +459,6 @@ impl<'a> Context<'a> {
             meta,
             signature,
         };
-
-        node_id
     }
 
     /// Export an `OpDef` as an operation declaration.
@@ -557,6 +587,18 @@ impl<'a> Context<'a> {
     ///
     /// `Input` and `Output` nodes are used to determine the source and target ports of the region.
     pub fn export_dfg(&mut self, node: Node, extensions: model::TermId) -> model::RegionId {
+        let region = self.module.insert_region(model::Region::default());
+
+        let region_children = {
+            let children = self.hugr.children(node);
+            let mut region_children =
+                BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
+            for child in children.skip(2) {
+                region_children.push(self.export_node_shallow(child));
+            }
+            region_children.into_bump_slice()
+        };
+
         let mut children = self.hugr.children(node);
 
         // The first child is an `Input` node, which we use to determine the region's sources.
@@ -574,10 +616,8 @@ impl<'a> Context<'a> {
         let targets = self.make_ports(output_node, Direction::Incoming, output_op.types.len());
 
         // Export the remaining children of the node.
-        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0, self.bump);
-
-        for child in children {
-            region_children.push(self.export_node(child));
+        for (child, child_node_id) in children.zip(region_children.iter().copied()) {
+            self.export_node_deep(child, child_node_id);
         }
 
         let signature = {
@@ -591,47 +631,70 @@ impl<'a> Context<'a> {
             }))
         };
 
-        self.module.insert_region(model::Region {
+        self.module.regions[region.index()] = model::Region {
             kind: model::RegionKind::DataFlow,
             sources,
             targets,
-            children: region_children.into_bump_slice(),
+            children: region_children,
             meta: &[], // TODO: Export metadata
             signature,
-        })
+        };
+
+        region
     }
 
     /// Creates a control flow region from the given node's children.
     pub fn export_cfg(&mut self, node: Node) -> model::RegionId {
-        let mut children = self.hugr.children(node);
-        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 + 1, self.bump);
+        let region_children = {
+            let children = self.hugr.children(node);
+            let mut region_children =
+                BumpVec::with_capacity_in(children.size_hint().0 - 1, self.bump);
+
+            // First export the children shallowly to allocate their IDs and register symbols.
+            for (i, child) in children.enumerate() {
+                // The second node is the exit block, which is not exported as a node itself.
+                if i == 1 {
+                    continue;
+                }
+
+                region_children.push(self.export_node_shallow(child));
+            }
+
+            region_children.into_bump_slice()
+        };
+
+        let mut children_iter = self.hugr.children(node);
+        let mut region_children_iter = region_children.iter().copied();
 
         // The first child is the entry block.
         // We create a source port on the control flow region and connect it to the
         // first input port of the exported entry block.
-        let entry_block = children.next().unwrap();
+        let source = {
+            let entry_block = children_iter.next().unwrap();
+            let entry_node_id = region_children_iter.next().unwrap();
 
-        let OpType::DataflowBlock(_) = self.hugr.get_optype(entry_block) else {
-            panic!("expected a `DataflowBlock` node as the first child node");
+            let OpType::DataflowBlock(_) = self.hugr.get_optype(entry_block) else {
+                panic!("expected a `DataflowBlock` node as the first child node");
+            };
+
+            self.export_node_deep(entry_block, entry_node_id);
+            model::LinkRef::Id(self.get_link_id(entry_block, IncomingPort::from(0)))
         };
 
-        let source = model::LinkRef::Id(self.get_link_id(entry_block, IncomingPort::from(0)));
-        region_children.push(self.export_node(entry_block));
-
-        // The last child is the exit block.
+        // The second child is the exit block.
         // Contrary to the entry block, the exit block does not have a dataflow subgraph.
         // We therefore do not export the block itself, but simply use its output ports
         // as the target ports of the control flow region.
-        let exit_block = children.next_back().unwrap();
-
-        // Export the remaining children of the node, except for the last one.
-        for child in children {
-            region_children.push(self.export_node(child));
-        }
+        let exit_block = children_iter.next_back().unwrap();
 
         let OpType::ExitBlock(_) = self.hugr.get_optype(exit_block) else {
-            panic!("expected an `ExitBlock` node as the last child node");
+            panic!("expected an `ExitBlock` node as the second child node");
         };
+
+        // Export the remaining children of the node, except for the last one.
+        for (child, child_node_id) in children_iter.zip(region_children_iter) {
+            self.export_node_deep(child, child_node_id);
+        }
 
         let targets = self.make_ports(exit_block, Direction::Incoming, 1);
 
@@ -643,7 +706,7 @@ impl<'a> Context<'a> {
             kind: model::RegionKind::ControlFlow,
             sources: self.bump.alloc_slice_copy(&[source]),
             targets,
-            children: region_children.into_bump_slice(),
+            children: region_children,
             meta: &[], // TODO: Export metadata
             signature,
         })
