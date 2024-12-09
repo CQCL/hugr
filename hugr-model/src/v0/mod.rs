@@ -145,6 +145,12 @@ define_index! {
 }
 
 define_index! {
+    /// Index of a link in a hugr graph.
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    pub struct LinkIndex(pub u32);
+}
+
+define_index! {
     /// Index of a region in a hugr graph.
     #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct RegionId(pub u32);
