@@ -104,7 +104,7 @@ pub trait PreludeCodegen: Clone {
     }
 
     /// Emit a [hugr_core::extension::prelude::array::ArrayScan] op.
-    /// 
+    ///
     /// Returns the resulting array and the final values of the accumulators.
     fn emit_array_scan<'c, H: HugrView>(
         &self,

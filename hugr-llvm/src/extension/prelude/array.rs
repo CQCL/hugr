@@ -30,7 +30,9 @@ use super::PreludeCodegen;
 
 /// Helper function to allocate an array on the stack.
 ///
-/// Returns two pointers: The first one
+/// Returns two pointers: The first one is a pointer to the first element of the
+/// array (i.e. it is of type `array.get_element_type().ptr_type()`) whereas the
+/// second one points to the whole array value, i.e. it is of type `array.ptr_type()`.
 fn build_array_alloca<'c>(
     builder: &Builder<'c>,
     array: ArrayValue<'c>,
