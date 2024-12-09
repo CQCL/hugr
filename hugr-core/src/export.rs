@@ -184,7 +184,7 @@ impl<'a> Context<'a> {
         &mut self,
         extension: &IdentList,
         name: impl AsRef<str>,
-    ) -> model::GlobalRef<'a> {
+    ) -> model::NodeId {
         let symbol = self.make_qualified_name(extension, name);
         self.resolve_symbol(symbol)
     }
@@ -344,25 +344,25 @@ impl<'a> Context<'a> {
             OpType::Call(call) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let global = model::GlobalRef::Direct(self.node_indices[&node]);
+                let symbol = self.node_indices[&node];
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { global, args });
+                let func = self.make_term(model::Term::ApplyFull { symbol, args });
                 model::Operation::CallFunc { func }
             }
 
             OpType::LoadFunction(load) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let global = model::GlobalRef::Direct(self.node_indices[&node]);
+                let symbol = self.node_indices[&node];
 
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { global, args });
+                let func = self.make_term(model::Term::ApplyFull { symbol, args });
                 model::Operation::LoadFunc { func }
             }
 
@@ -478,7 +478,7 @@ impl<'a> Context<'a> {
     /// of the operation. The node is added to the `decl_operations` map so that
     /// at the end of the export, the operation declaration nodes can be added
     /// to the module as children of the module region.
-    pub fn export_opdef(&mut self, opdef: &OpDef) -> model::GlobalRef<'a> {
+    pub fn export_opdef(&mut self, opdef: &OpDef) -> model::NodeId {
         use std::collections::hash_map::Entry;
 
         let poly_func_type = match opdef.signature_func() {
@@ -490,9 +490,7 @@ impl<'a> Context<'a> {
         let entry = self.decl_operations.entry(key);
 
         let node = match entry {
-            Entry::Occupied(occupied_entry) => {
-                return model::GlobalRef::Direct(*occupied_entry.get())
-            }
+            Entry::Occupied(occupied_entry) => return *occupied_entry.get(),
             Entry::Vacant(vacant_entry) => {
                 *vacant_entry.insert(self.module.insert_node(model::Node {
                     operation: model::Operation::Invalid,
@@ -542,7 +540,7 @@ impl<'a> Context<'a> {
         node_data.operation = model::Operation::DeclareOperation { decl };
         node_data.meta = meta;
 
-        model::GlobalRef::Direct(node)
+        node
     }
 
     /// Export the signature of a `DataflowBlock`. Here we can't use `OpType::dataflow_signature`
@@ -781,7 +779,10 @@ impl<'a> Context<'a> {
             TypeEnum::Alias(alias) => {
                 let global = self.resolve_symbol(self.bump.alloc_str(alias.name()));
                 let args = &[];
-                self.make_term(model::Term::ApplyFull { global, args })
+                self.make_term(model::Term::ApplyFull {
+                    symbol: global,
+                    args,
+                })
             }
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
@@ -805,12 +806,12 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_custom_type(&mut self, t: &CustomType) -> model::TermId {
-        let global = self.make_named_global_ref(t.extension(), t.name());
+        let symbol = self.make_named_global_ref(t.extension(), t.name());
 
         let args = self
             .bump
             .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_type_arg(p)));
-        let term = model::Term::ApplyFull { global, args };
+        let term = model::Term::ApplyFull { symbol, args };
         self.make_term(term)
     }
 
@@ -933,9 +934,9 @@ impl<'a> Context<'a> {
                         .map(|param| model::ListPart::Item(self.export_type_param(param, None))),
                 );
                 let types = self.make_term(model::Term::List { parts });
-                let global = self.resolve_symbol(TERM_PARAM_TUPLE);
+                let symbol = self.resolve_symbol(TERM_PARAM_TUPLE);
                 self.make_term(model::Term::ApplyFull {
-                    global,
+                    symbol,
                     args: self.bump.alloc_slice_copy(&[types]),
                 })
             }
@@ -987,17 +988,17 @@ impl<'a> Context<'a> {
         let value = serde_json::to_string(value).expect("json values are always serializable");
         let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
         let value = self.bump.alloc_slice_copy(&[value]);
-        let global = self.resolve_symbol(TERM_JSON);
+        let symbol = self.resolve_symbol(TERM_JSON);
         self.make_term(model::Term::ApplyFull {
-            global,
+            symbol,
             args: value,
         })
     }
 
-    fn resolve_symbol(&mut self, name: &'a str) -> model::GlobalRef<'a> {
+    fn resolve_symbol(&mut self, name: &'a str) -> model::NodeId {
         let result = self.symbols.resolve(model::GlobalRef::Named(name));
 
-        let node = match result {
+        match result {
             Ok(node) => node,
             Err(_) => *self.implicit_imports.entry(name).or_insert_with(|| {
                 self.module.insert_node(model::Node {
@@ -1005,9 +1006,7 @@ impl<'a> Context<'a> {
                     ..model::Node::default()
                 })
             }),
-        };
-
-        model::GlobalRef::Direct(node)
+        }
     }
 }
 

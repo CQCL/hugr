@@ -42,8 +42,8 @@ struct Operation {
         funcDecl @5 :FuncDecl;
         aliasDefn @6 :AliasDefn;
         aliasDecl @7 :AliasDecl;
-        custom @8 :GlobalRef;
-        customFull @9 :GlobalRef;
+        custom @8 :NodeId;
+        customFull @9 :NodeId;
         tag @10 :UInt16;
         tailLoop @11 :Void;
         conditional @12 :Void;
@@ -166,12 +166,12 @@ struct Term {
     }
 
     struct Apply {
-        global @0 :GlobalRef;
+        symbol @0 :NodeId;
         args @1 :List(TermId);
     }
 
     struct ApplyFull {
-        global @0 :GlobalRef;
+        symbol @0 :NodeId;
         args @1 :List(TermId);
     }
 

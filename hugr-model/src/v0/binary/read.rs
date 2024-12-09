@@ -217,11 +217,11 @@ fn read_operation<'a>(
             });
             model::Operation::DeclareOperation { decl }
         }
-        Which::Custom(name) => model::Operation::Custom {
-            operation: read_global_ref(bump, name?)?,
+        Which::Custom(operation) => model::Operation::Custom {
+            operation: model::NodeId(operation),
         },
-        Which::CustomFull(name) => model::Operation::CustomFull {
-            operation: read_global_ref(bump, name?)?,
+        Which::CustomFull(operation) => model::Operation::CustomFull {
+            operation: model::NodeId(operation),
         },
         Which::Tag(tag) => model::Operation::Tag { tag },
         Which::TailLoop(()) => model::Operation::TailLoop,
@@ -281,16 +281,16 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
 
         Which::Apply(reader) => {
             let reader = reader?;
-            let global = read_global_ref(bump, reader.get_global()?)?;
+            let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::Apply { global, args }
+            model::Term::Apply { symbol, args }
         }
 
         Which::ApplyFull(reader) => {
             let reader = reader?;
-            let global = read_global_ref(bump, reader.get_global()?)?;
+            let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::ApplyFull { global, args }
+            model::Term::ApplyFull { symbol, args }
         }
 
         Which::Quote(r#type) => model::Term::Quote {

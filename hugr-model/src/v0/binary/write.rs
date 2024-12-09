@@ -47,11 +47,9 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
         model::Operation::TailLoop => builder.set_tail_loop(()),
         model::Operation::Conditional => builder.set_conditional(()),
         model::Operation::Tag { tag } => builder.set_tag(*tag),
-        model::Operation::Custom { operation } => {
-            write_global_ref(builder.init_custom(), operation)
-        }
+        model::Operation::Custom { operation } => builder.set_custom(operation.0),
         model::Operation::CustomFull { operation } => {
-            write_global_ref(builder.init_custom_full(), operation)
+            builder.set_custom_full(operation.0);
         }
         model::Operation::CallFunc { func } => builder.set_call_func(func.0),
         model::Operation::LoadFunc { func } => builder.set_load_func(func.0),
@@ -179,15 +177,15 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::Control { values } => builder.set_control(values.0),
         model::Term::ControlType => builder.set_control_type(()),
 
-        model::Term::Apply { global, args } => {
+        model::Term::Apply { symbol, args } => {
             let mut builder = builder.init_apply();
-            write_global_ref(builder.reborrow().init_global(), global);
+            builder.set_symbol(symbol.0);
             let _ = builder.set_args(model::TermId::unwrap_slice(args));
         }
 
-        model::Term::ApplyFull { global, args } => {
+        model::Term::ApplyFull { symbol, args } => {
             let mut builder = builder.init_apply_full();
-            write_global_ref(builder.reborrow().init_global(), global);
+            builder.set_symbol(symbol.0);
             let _ = builder.set_args(model::TermId::unwrap_slice(args));
         }
 

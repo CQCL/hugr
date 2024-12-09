@@ -291,8 +291,8 @@ pub enum Operation<'a> {
     /// becomes known by resolving the reference, the node can be transformed into a [`Operation::CustomFull`]
     /// by inferring terms for the implicit parameters or at least filling them in with a wildcard term.
     Custom {
-        /// The name of the custom operation.
-        operation: GlobalRef<'a>,
+        /// The symbol of the custom operation.
+        operation: NodeId,
     },
     /// Custom operation with full parameters.
     ///
@@ -300,8 +300,8 @@ pub enum Operation<'a> {
     /// Since this can be tedious to write, the [`Operation::Custom`] variant can be used to indicate that
     /// the implicit parameters should be inferred.
     CustomFull {
-        /// The name of the custom operation.
-        operation: GlobalRef<'a>,
+        /// The symbol of the custom operation.
+        operation: NodeId,
     },
     /// Alias definitions.
     DefineAlias {
@@ -563,8 +563,8 @@ pub enum Term<'a> {
     ///
     /// `(GLOBAL ARG-0 ... ARG-n)`
     Apply {
-        /// Reference to the global declaration to apply.
-        global: GlobalRef<'a>,
+        /// Reference to the symbol to apply.
+        symbol: NodeId,
         /// Arguments to the function, covering only the explicit parameters.
         args: &'a [TermId],
     },
@@ -576,8 +576,8 @@ pub enum Term<'a> {
     ///
     /// `(@GLOBAL ARG-0 ... ARG-n)`
     ApplyFull {
-        /// Reference to the global declaration to apply.
-        global: GlobalRef<'a>,
+        /// Reference to the symbol to apply.
+        symbol: NodeId,
         /// Arguments to the function, covering both implicit and explicit parameters.
         args: &'a [TermId],
     },

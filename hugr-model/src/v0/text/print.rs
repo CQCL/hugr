@@ -247,10 +247,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Operation::Custom { operation } => {
                 this.print_group(|this| {
                     if node_data.params.is_empty() {
-                        this.print_global_ref(*operation)?;
+                        this.print_symbol(*operation)?;
                     } else {
                         this.print_parens(|this| {
-                            this.print_global_ref(*operation)?;
+                            this.print_symbol(*operation)?;
 
                             for param in node_data.params {
                                 this.print_term(*param)?;
@@ -271,7 +271,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_parens(|this| {
                         this.print_text("@");
-                        this.print_global_ref(*operation)?;
+                        this.print_symbol(*operation)?;
 
                         for param in node_data.params {
                             this.print_term(*param)?;
@@ -499,12 +499,12 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 Ok(())
             }
             Term::Var(local_ref) => self.print_local_ref(*local_ref),
-            Term::Apply { global: name, args } => {
+            Term::Apply { symbol, args } => {
                 if args.is_empty() {
-                    self.print_global_ref(*name)?;
+                    self.print_symbol(*symbol)?;
                 } else {
                     self.print_parens(|this| {
-                        this.print_global_ref(*name)?;
+                        this.print_symbol(*symbol)?;
                         for arg in args.iter() {
                             this.print_term(*arg)?;
                         }
@@ -514,9 +514,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }
-            Term::ApplyFull { global: name, args } => self.print_parens(|this| {
+            Term::ApplyFull { symbol, args } => self.print_parens(|this| {
                 this.print_text("@");
-                this.print_global_ref(*name)?;
+                this.print_symbol(*symbol)?;
                 for arg in args.iter() {
                     this.print_term(*arg)?;
                 }
@@ -650,25 +650,18 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_global_ref(&mut self, global_ref: GlobalRef<'a>) -> PrintResult<()> {
-        match global_ref {
-            GlobalRef::Direct(node_id) => {
-                let node_data = self
-                    .module
-                    .get_node(node_id)
-                    .ok_or(PrintError::NodeNotFound(node_id))?;
+    fn print_symbol(&mut self, node_id: NodeId) -> PrintResult<()> {
+        let node_data = self
+            .module
+            .get_node(node_id)
+            .ok_or(PrintError::NodeNotFound(node_id))?;
 
-                let name = node_data
-                    .operation
-                    .symbol()
-                    .ok_or(PrintError::UnexpectedOperation(node_id))?;
+        let name = node_data
+            .operation
+            .symbol()
+            .ok_or(PrintError::UnexpectedOperation(node_id))?;
 
-                self.print_text(name)
-            }
-
-            GlobalRef::Named(symbol) => self.print_text(symbol),
-        }
-
+        self.print_text(name);
         Ok(())
     }
 

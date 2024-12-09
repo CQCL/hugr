@@ -122,7 +122,7 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_apply => {
-                let name = self.parse_symbol_use(&mut inner)?;
+                let symbol = self.parse_symbol_use(&mut inner)?;
                 let mut args = Vec::new();
 
                 for token in inner {
@@ -130,13 +130,13 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Term::Apply {
-                    global: name,
+                    symbol,
                     args: self.bump.alloc_slice_copy(&args),
                 }
             }
 
             Rule::term_apply_full => {
-                let name = self.parse_symbol_use(&mut inner)?;
+                let symbol = self.parse_symbol_use(&mut inner)?;
                 let mut args = Vec::new();
 
                 for token in inner {
@@ -144,7 +144,7 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Term::ApplyFull {
-                    global: name,
+                    symbol,
                     args: self.bump.alloc_slice_copy(&args),
                 }
             }
@@ -448,7 +448,7 @@ impl<'a> ParseContext<'a> {
                 let op_rule = op.as_rule();
                 let mut op_inner = op.into_inner();
 
-                let name = self.parse_symbol_use(&mut op_inner)?;
+                let operation = self.parse_symbol_use(&mut op_inner)?;
 
                 let mut params = Vec::new();
 
@@ -457,8 +457,8 @@ impl<'a> ParseContext<'a> {
                 }
 
                 let operation = match op_rule {
-                    Rule::term_apply_full => Operation::CustomFull { operation: name },
-                    Rule::term_apply => Operation::Custom { operation: name },
+                    Rule::term_apply_full => Operation::CustomFull { operation },
+                    Rule::term_apply => Operation::Custom { operation },
                     _ => unreachable!(),
                 };
 
@@ -795,11 +795,11 @@ impl<'a> ParseContext<'a> {
         Ok(self.bump.alloc_slice_copy(&items))
     }
 
-    fn parse_symbol_use(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<GlobalRef<'a>> {
+    fn parse_symbol_use(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<NodeId> {
         let name = self.parse_symbol(pairs)?;
         let resolved = self.symbols.resolve(GlobalRef::Named(name));
 
-        let node = match resolved {
+        Ok(match resolved {
             Ok(node) => node,
             Err(SymbolResolveError::NotVisible(_)) => unreachable!(),
             Err(SymbolResolveError::NotFound(_)) => {
@@ -810,9 +810,7 @@ impl<'a> ParseContext<'a> {
                     })
                 })
             }
-        };
-
-        Ok(GlobalRef::Direct(node))
+        })
     }
 
     fn parse_symbol(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a str> {

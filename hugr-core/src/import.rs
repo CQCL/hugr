@@ -313,18 +313,13 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn get_global_name(&self, global_ref: model::GlobalRef<'a>) -> Result<&'a str, ImportError> {
-        match global_ref {
-            model::GlobalRef::Direct(node_id) => {
-                let node_data = self.get_node(node_id)?;
-                let name = node_data
-                    .operation
-                    .symbol()
-                    .ok_or_else(|| model::ModelError::InvalidGlobal(global_ref.to_string()))?;
-                Ok(name)
-            }
-            model::GlobalRef::Named(name) => Ok(name),
-        }
+    fn get_global_name(&self, node_id: model::NodeId) -> Result<&'a str, ImportError> {
+        let node_data = self.get_node(node_id)?;
+        let name = node_data
+            .operation
+            .symbol()
+            .ok_or_else(|| model::ModelError::InvalidGlobal(node_id.to_string()))?;
+        Ok(name)
     }
 
     fn get_func_signature(
@@ -424,19 +419,18 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::CallFunc { func } => {
-                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
-                let func_node = self.resolve_global_ref(name)?;
-                let func_sig = self.get_func_signature(func_node)?;
+                let func_sig = self.get_func_signature(*symbol)?;
 
                 let type_args = args
                     .iter()
                     .map(|term| self.import_type_arg(*term))
                     .collect::<Result<Vec<TypeArg>, _>>()?;
 
-                self.static_edges.push((func_node, node_id));
+                self.static_edges.push((*symbol, node_id));
                 let optype = OpType::Call(Call::try_new(func_sig, type_args, self.extensions)?);
 
                 let node = self.make_node(node_id, optype, parent)?;
@@ -444,19 +438,18 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::LoadFunc { func } => {
-                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
-                let func_node = self.resolve_global_ref(name)?;
-                let func_sig = self.get_func_signature(func_node)?;
+                let func_sig = self.get_func_signature(*symbol)?;
 
                 let type_args = args
                     .iter()
                     .map(|term| self.import_type_arg(*term))
                     .collect::<Result<Vec<TypeArg>, _>>()?;
 
-                self.static_edges.push((func_node, node_id));
+                self.static_edges.push((*symbol, node_id));
 
                 let optype = OpType::LoadFunction(LoadFunction::try_new(
                     func_sig,
@@ -477,16 +470,16 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::CustomFull {
-                operation: GlobalRef::Named(name),
-            } if name == OP_FUNC_CALL_INDIRECT => {
-                let signature = self.get_node_signature(node_id)?;
-                let optype = OpType::CallIndirect(CallIndirect { signature });
-                let node = self.make_node(node_id, optype, parent)?;
-                Ok(Some(node))
-            }
-
             model::Operation::CustomFull { operation } => {
+                let name = self.get_global_name(operation)?;
+
+                if name == OP_FUNC_CALL_INDIRECT {
+                    let signature = self.get_node_signature(node_id)?;
+                    let optype = OpType::CallIndirect(CallIndirect { signature });
+                    let node = self.make_node(node_id, optype, parent)?;
+                    return Ok(Some(node));
+                }
+
                 let signature = self.get_node_signature(node_id)?;
                 let args = node_data
                     .params
@@ -494,7 +487,6 @@ impl<'a> Context<'a> {
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = self.get_global_name(operation)?;
                 let (extension, name) = self.import_custom_name(name)?;
 
                 // TODO: Currently we do not have the description or any other metadata for
@@ -1089,13 +1081,13 @@ impl<'a> Context<'a> {
                 Err(error_uninferred!("application with implicit parameters"))
             }
 
-            model::Term::ApplyFull { global: name, args } => {
+            model::Term::ApplyFull { symbol, args } => {
                 let args = args
                     .iter()
                     .map(|arg| self.import_type_arg(*arg))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = self.get_global_name(*name)?;
+                let name = self.get_global_name(*symbol)?;
                 let (extension, id) = self.import_custom_name(name)?;
 
                 let extension_ref =
@@ -1296,8 +1288,8 @@ impl<'a> Context<'a> {
         term_id: model::TermId,
     ) -> Result<serde_json::Value, ImportError> {
         let (global, args) = match self.get_term(term_id)? {
-            model::Term::Apply { global, args } | model::Term::ApplyFull { global, args } => {
-                (global, args)
+            model::Term::Apply { symbol, args } | model::Term::ApplyFull { symbol, args } => {
+                (symbol, args)
             }
             _ => return Err(model::ModelError::TypeError(term_id).into()),
         };
