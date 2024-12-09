@@ -1,11 +1,13 @@
 use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
+use crate::std_extensions::logic::LOGIC_REG;
+use crate::utils::test_quantum_extension;
 use crate::{
     builder::{
         endo_sig, inout_sig, BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr,
     },
-    extension::prelude::QB_T,
+    extension::prelude::qb_t,
     ops::{
         handle::{DataflowOpID, NodeHandle},
         Value,
@@ -22,7 +24,7 @@ use crate::{
 /// Returns the Hugr and the two CX node ids.
 #[fixture]
 pub(crate) fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>) {
-    let mut dfg = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T])).unwrap();
+    let mut dfg = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()])).unwrap();
 
     let [q1, q2] = dfg.input_wires_arr();
 
@@ -32,7 +34,8 @@ pub(crate) fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dat
     dfg.add_other_wire(n1.node(), n2.node());
 
     (
-        dfg.finish_prelude_hugr_with_outputs(n2.outputs()).unwrap(),
+        dfg.finish_hugr_with_outputs(n2.outputs(), &test_quantum_extension::REG)
+            .unwrap(),
         n1,
         n2,
     )
@@ -130,36 +133,39 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
 #[test]
 fn value_types() {
     use crate::builder::Container;
-    use crate::extension::prelude::BOOL_T;
+    use crate::extension::prelude::bool_t;
 
     use crate::utils::test_quantum_extension::h_gate;
     use itertools::Itertools;
 
     let mut dfg =
-        DFGBuilder::new(inout_sig(type_row![QB_T, BOOL_T], type_row![BOOL_T, QB_T])).unwrap();
+        DFGBuilder::new(inout_sig(vec![qb_t(), bool_t()], vec![bool_t(), qb_t()])).unwrap();
 
     let [q, b] = dfg.input_wires_arr();
     let n1 = dfg.add_dataflow_op(h_gate(), [q]).unwrap();
     let n2 = dfg.add_dataflow_op(LogicOp::Not, [b]).unwrap();
     dfg.add_other_wire(n1.node(), n2.node());
     let h = dfg
-        .finish_prelude_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
+        .finish_hugr_with_outputs(
+            [n2.out_wire(0), n1.out_wire(0)],
+            &test_quantum_extension::REG,
+        )
         .unwrap();
 
     let [_, o] = h.get_io(h.root()).unwrap();
     let n1_out_types = h.out_value_types(n1.node()).collect_vec();
 
-    assert_eq!(&n1_out_types[..], &[(0.into(), QB_T)]);
+    assert_eq!(&n1_out_types[..], &[(0.into(), qb_t())]);
     let out_types = h.in_value_types(o).collect_vec();
 
-    assert_eq!(&out_types[..], &[(0.into(), BOOL_T), (1.into(), QB_T)]);
+    assert_eq!(&out_types[..], &[(0.into(), bool_t()), (1.into(), qb_t())]);
 }
 
 #[test]
 fn static_targets() {
-    use crate::extension::prelude::{ConstUsize, USIZE_T};
+    use crate::extension::prelude::{usize_t, ConstUsize};
     use itertools::Itertools;
-    let mut dfg = DFGBuilder::new(inout_sig(type_row![], type_row![USIZE_T])).unwrap();
+    let mut dfg = DFGBuilder::new(inout_sig(type_row![], vec![usize_t()])).unwrap();
 
     let c = dfg.add_constant(Value::extension(ConstUsize::new(1)));
 
@@ -178,18 +184,15 @@ fn static_targets() {
 #[test]
 fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
-    use crate::extension::{prelude::BOOL_T, PRELUDE_REGISTRY};
+    use crate::extension::prelude::bool_t;
     use crate::hugr::views::PortIterator;
 
     use itertools::Itertools;
 
-    let mut dfg = DFGBuilder::new(endo_sig(BOOL_T)).unwrap();
+    let mut dfg = DFGBuilder::new(endo_sig(bool_t())).unwrap();
     let local_and = {
         let local_and = dfg
-            .define_function(
-                "and",
-                Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T]),
-            )
+            .define_function("and", Signature::new(vec![bool_t(); 2], vec![bool_t()]))
             .unwrap();
         let first_input = local_and.input().out_wire(0);
         local_and.finish_with_outputs([first_input]).unwrap()
@@ -198,16 +201,11 @@ fn test_dataflow_ports_only() {
 
     let not = dfg.add_dataflow_op(LogicOp::Not, [in_bool]).unwrap();
     let call = dfg
-        .call(
-            local_and.handle(),
-            &[],
-            [not.out_wire(0); 2],
-            &PRELUDE_REGISTRY,
-        )
+        .call(local_and.handle(), &[], [not.out_wire(0); 2], &LOGIC_REG)
         .unwrap();
     dfg.add_other_wire(not.node(), call.node());
     let h = dfg
-        .finish_hugr_with_outputs(not.outputs(), &PRELUDE_REGISTRY)
+        .finish_hugr_with_outputs(not.outputs(), &LOGIC_REG)
         .unwrap();
     let filtered_ports = h
         .all_linked_outputs(call.node())

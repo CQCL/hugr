@@ -1,8 +1,7 @@
 //! The `validate` subcommand.
 
 use clap::Parser;
-use clap_verbosity_flag::Level;
-use hugr::package::PackageValidationError;
+use clap_verbosity_flag::log::Level;
 use hugr::{extension::ExtensionRegistry, Extension, Hugr};
 
 use crate::{CliError, HugrArgs};
@@ -64,8 +63,7 @@ impl HugrArgs {
         for ext in &self.extensions {
             let f = std::fs::File::open(ext)?;
             let ext: Extension = serde_json::from_reader(f)?;
-            reg.register_updated(ext)
-                .map_err(PackageValidationError::Extension)?;
+            reg.register_updated(ext);
         }
 
         package.update_validate(&mut reg)?;

@@ -1,13 +1,13 @@
 use std::str::FromStr;
+use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
 use strum_macros::EnumIter;
 use strum_macros::EnumString;
 use strum_macros::IntoStaticStr;
 
-use crate::extension::prelude::either_type;
 use crate::extension::prelude::option_type;
-use crate::extension::prelude::USIZE_T;
+use crate::extension::prelude::{either_type, usize_custom_t};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -113,7 +113,11 @@ impl ArrayOpDef {
     }
 
     /// To avoid recursion when defining the extension, take the type definition as an argument.
-    fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
+    fn signature_from_def(
+        &self,
+        array_def: &TypeDef,
+        extension_ref: &Weak<Extension>,
+    ) -> SignatureFunc {
         use ArrayOpDef::*;
         if let new_array | pop_left | pop_right = self {
             // implements SignatureFromArgs
@@ -125,6 +129,12 @@ impl ArrayOpDef {
             let array_ty = instantiate(array_def, size_var.clone(), elem_ty_var.clone());
             let standard_params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
 
+            // Construct the usize type using the passed extension reference.
+            //
+            // If we tried to use `usize_t()` directly it would try to access
+            // the `PRELUDE` lazy static recursively, causing a deadlock.
+            let usize_t: Type = usize_custom_t(extension_ref).into();
+
             match self {
                 get => {
                     let params = vec![TypeParam::max_nat(), TypeBound::Copyable.into()];
@@ -133,7 +143,7 @@ impl ArrayOpDef {
                     let option_type: Type = option_type(copy_elem_ty).into();
                     PolyFuncTypeRV::new(
                         params,
-                        FuncValueType::new(vec![copy_array_ty, USIZE_T], option_type),
+                        FuncValueType::new(vec![copy_array_ty, usize_t], option_type),
                     )
                 }
                 set => {
@@ -142,7 +152,7 @@ impl ArrayOpDef {
                     PolyFuncTypeRV::new(
                         standard_params,
                         FuncValueType::new(
-                            vec![array_ty.clone(), USIZE_T, elem_ty_var],
+                            vec![array_ty.clone(), usize_t, elem_ty_var],
                             result_type,
                         ),
                     )
@@ -151,7 +161,7 @@ impl ArrayOpDef {
                     let result_type: Type = either_type(array_ty.clone(), array_ty.clone()).into();
                     PolyFuncTypeRV::new(
                         standard_params,
-                        FuncValueType::new(vec![array_ty, USIZE_T, USIZE_T], result_type),
+                        FuncValueType::new(vec![array_ty, usize_t.clone(), usize_t], result_type),
                     )
                 }
                 discard_empty => PolyFuncTypeRV::new(
@@ -173,11 +183,15 @@ impl MakeOpDef for ArrayOpDef {
     where
         Self: Sized,
     {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
-    fn signature(&self) -> SignatureFunc {
-        self.signature_from_def(array_type_def())
+    fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
+        self.signature_from_def(array_type_def(), extension_ref)
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 
     fn extension(&self) -> ExtensionId {
@@ -205,9 +219,11 @@ impl MakeOpDef for ArrayOpDef {
     fn add_to_extension(
         &self,
         extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
-        let sig = self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig)?;
+        let sig =
+            self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap(), extension_ref);
+        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -368,11 +384,15 @@ impl MakeOpDef for ArrayRepeatDef {
     where
         Self: Sized,
     {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         self.signature_from_def(array_type_def())
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 
     fn extension(&self) -> ExtensionId {
@@ -393,9 +413,10 @@ impl MakeOpDef for ArrayRepeatDef {
     fn add_to_extension(
         &self,
         extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig)?;
+        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -504,7 +525,8 @@ impl FromStr for ArrayScanDef {
 }
 
 impl ArrayScanDef {
-    /// To avoid recursion when defining the extension, take the type definition as an argument.
+    /// To avoid recursion when defining the extension, take the type definition
+    /// and a reference to the extension as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
         // array<N, T1>, (T1, *A -> T2, *A), -> array<N, T2>, *A
         let params = vec![
@@ -546,11 +568,15 @@ impl MakeOpDef for ArrayScanDef {
     where
         Self: Sized,
     {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         self.signature_from_def(array_type_def())
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 
     fn extension(&self) -> ExtensionId {
@@ -573,9 +599,10 @@ impl MakeOpDef for ArrayScanDef {
     fn add_to_extension(
         &self,
         extension: &mut Extension,
+        extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(ARRAY_TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig)?;
+        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -692,9 +719,10 @@ impl HasConcrete for ArrayScanDef {
 mod tests {
     use strum::IntoEnumIterator;
 
+    use crate::extension::prelude::usize_t;
     use crate::{
         builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{BOOL_T, QB_T},
+        extension::prelude::{bool_t, qb_t},
         ops::{OpTrait, OpType},
         types::Signature,
     };
@@ -704,7 +732,11 @@ mod tests {
     #[test]
     fn test_array_ops() {
         for def in ArrayOpDef::iter() {
-            let ty = if def == ArrayOpDef::get { BOOL_T } else { QB_T };
+            let ty = if def == ArrayOpDef::get {
+                bool_t()
+            } else {
+                qb_t()
+            };
             let size = if def == ArrayOpDef::discard_empty {
                 0
             } else {
@@ -721,14 +753,14 @@ mod tests {
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array() {
         let mut b = DFGBuilder::new(inout_sig(
-            vec![QB_T, QB_T],
-            array_type(TypeArg::BoundedNat { n: 2 }, QB_T),
+            vec![qb_t(), qb_t()],
+            array_type(TypeArg::BoundedNat { n: 2 }, qb_t()),
         ))
         .unwrap();
 
         let [q1, q2] = b.input_wires_arr();
 
-        let op = new_array_op(QB_T, 2);
+        let op = new_array_op(qb_t(), 2);
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
@@ -738,7 +770,7 @@ mod tests {
     #[test]
     fn test_get() {
         let size = 2;
-        let element_ty = BOOL_T;
+        let element_ty = bool_t();
         let op = ArrayOpDef::get.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
@@ -748,7 +780,7 @@ mod tests {
         assert_eq!(
             sig.io(),
             (
-                &vec![array_type(size, element_ty.clone()), USIZE_T].into(),
+                &vec![array_type(size, element_ty.clone()), usize_t()].into(),
                 &vec![option_type(element_ty.clone()).into()].into()
             )
         );
@@ -757,7 +789,7 @@ mod tests {
     #[test]
     fn test_set() {
         let size = 2;
-        let element_ty = BOOL_T;
+        let element_ty = bool_t();
         let op = ArrayOpDef::set.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
@@ -768,7 +800,7 @@ mod tests {
         assert_eq!(
             sig.io(),
             (
-                &vec![array_ty.clone(), USIZE_T, element_ty.clone()].into(),
+                &vec![array_ty.clone(), usize_t(), element_ty.clone()].into(),
                 &vec![either_type(result_row.clone(), result_row).into()].into()
             )
         );
@@ -777,7 +809,7 @@ mod tests {
     #[test]
     fn test_swap() {
         let size = 2;
-        let element_ty = BOOL_T;
+        let element_ty = bool_t();
         let op = ArrayOpDef::swap.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
@@ -787,7 +819,7 @@ mod tests {
         assert_eq!(
             sig.io(),
             (
-                &vec![array_ty.clone(), USIZE_T, USIZE_T].into(),
+                &vec![array_ty.clone(), usize_t(), usize_t()].into(),
                 &vec![either_type(array_ty.clone(), array_ty).into()].into()
             )
         );
@@ -796,7 +828,7 @@ mod tests {
     #[test]
     fn test_pops() {
         let size = 2;
-        let element_ty = BOOL_T;
+        let element_ty = bool_t();
         for op in [ArrayOpDef::pop_left, ArrayOpDef::pop_right].iter() {
             let op = op.to_concrete(element_ty.clone(), size);
 
@@ -821,7 +853,7 @@ mod tests {
     #[test]
     fn test_discard_empty() {
         let size = 0;
-        let element_ty = BOOL_T;
+        let element_ty = bool_t();
         let op = ArrayOpDef::discard_empty.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
@@ -839,7 +871,7 @@ mod tests {
 
     #[test]
     fn test_repeat_def() {
-        let op = ArrayRepeat::new(QB_T, 2, ExtensionSet::singleton(&PRELUDE_ID));
+        let op = ArrayRepeat::new(qb_t(), 2, ExtensionSet::singleton(&PRELUDE_ID));
         let optype: OpType = op.clone().into();
         let new_op: ArrayRepeat = optype.cast().unwrap();
         assert_eq!(new_op, op);
@@ -848,7 +880,7 @@ mod tests {
     #[test]
     fn test_repeat() {
         let size = 2;
-        let element_ty = QB_T;
+        let element_ty = qb_t();
         let es = ExtensionSet::singleton(&PRELUDE_ID);
         let op = ArrayRepeat::new(element_ty.clone(), size, es.clone());
 
@@ -860,7 +892,7 @@ mod tests {
             sig.io(),
             (
                 &vec![Type::new_function(
-                    Signature::new(vec![], vec![QB_T]).with_extension_delta(es)
+                    Signature::new(vec![], vec![qb_t()]).with_extension_delta(es)
                 )]
                 .into(),
                 &vec![array_type(size, element_ty.clone())].into(),
@@ -871,9 +903,9 @@ mod tests {
     #[test]
     fn test_scan_def() {
         let op = ArrayScan::new(
-            BOOL_T,
-            QB_T,
-            vec![USIZE_T],
+            bool_t(),
+            qb_t(),
+            vec![usize_t()],
             2,
             ExtensionSet::singleton(&PRELUDE_ID),
         );
@@ -885,8 +917,8 @@ mod tests {
     #[test]
     fn test_scan_map() {
         let size = 2;
-        let src_ty = QB_T;
-        let tgt_ty = BOOL_T;
+        let src_ty = qb_t();
+        let tgt_ty = bool_t();
         let es = ExtensionSet::singleton(&PRELUDE_ID);
 
         let op = ArrayScan::new(src_ty.clone(), tgt_ty.clone(), vec![], size, es.clone());
@@ -911,10 +943,10 @@ mod tests {
     #[test]
     fn test_scan_accs() {
         let size = 2;
-        let src_ty = QB_T;
-        let tgt_ty = BOOL_T;
-        let acc_ty1 = USIZE_T;
-        let acc_ty2 = QB_T;
+        let src_ty = qb_t();
+        let tgt_ty = bool_t();
+        let acc_ty1 = usize_t();
+        let acc_ty2 = qb_t();
         let es = ExtensionSet::singleton(&PRELUDE_ID);
 
         let op = ArrayScan::new(

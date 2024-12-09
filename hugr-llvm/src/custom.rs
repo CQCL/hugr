@@ -156,7 +156,7 @@ pub struct CodegenExtsMap<'a, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        extension::prelude::{ConstString, PRELUDE_ID, PRINT_OP_ID, STRING_TYPE, STRING_TYPE_NAME},
+        extension::prelude::{string_type, ConstString, PRELUDE_ID, PRINT_OP_ID, STRING_TYPE_NAME},
         Hugr,
     };
     use inkwell::{
@@ -187,7 +187,7 @@ mod test {
         let ty = cem
             .type_converter
             .session(&ctx)
-            .llvm_type(&STRING_TYPE)
+            .llvm_type(&string_type())
             .unwrap()
             .into_struct_type();
         let ty_n = ty.get_name().unwrap().to_str().unwrap();

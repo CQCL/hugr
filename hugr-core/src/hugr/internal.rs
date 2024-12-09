@@ -1,7 +1,11 @@
 //! Internal traits, not exposed in the public `hugr` API.
 
+use std::borrow::Cow;
 use std::ops::Range;
+use std::rc::Rc;
+use std::sync::Arc;
 
+use delegate::delegate;
 use portgraph::{LinkView, MultiPortGraph, PortMut, PortView};
 
 use crate::ops::handle::NodeHandle;
@@ -31,7 +35,7 @@ pub trait HugrInternals {
     fn root_node(&self) -> Node;
 }
 
-impl<T: AsRef<Hugr>> HugrInternals for T {
+impl HugrInternals for Hugr {
     type Portgraph<'p>
         = &'p MultiPortGraph
     where
@@ -39,20 +43,103 @@ impl<T: AsRef<Hugr>> HugrInternals for T {
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
-        &self.as_ref().graph
+        &self.graph
     }
 
     #[inline]
     fn base_hugr(&self) -> &Hugr {
-        self.as_ref()
+        self
     }
 
     #[inline]
     fn root_node(&self) -> Node {
-        self.as_ref().root.into()
+        self.root.into()
     }
 }
 
+impl<T: HugrInternals> HugrInternals for &T {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
+impl<T: HugrInternals> HugrInternals for &mut T {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
+impl<T: HugrInternals> HugrInternals for Rc<T> {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
+impl<T: HugrInternals> HugrInternals for Arc<T> {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
+impl<T: HugrInternals> HugrInternals for Box<T> {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
+
+impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
+    type Portgraph<'p>
+        = T::Portgraph<'p>
+    where
+        Self: 'p;
+    delegate! {
+        to self.as_ref() {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
 /// Trait for accessing the mutable internals of a Hugr(Mut).
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may

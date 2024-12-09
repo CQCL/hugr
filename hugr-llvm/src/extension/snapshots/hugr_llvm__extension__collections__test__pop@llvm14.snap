@@ -1,0 +1,26 @@
+---
+source: hugr-llvm/src/extension/collections.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i8*, { i32, {}, { i16 } } } @_hl.main.1(i8* %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %1 = alloca i16, align 2
+  %2 = bitcast i16* %1 to i8*
+  %3 = call i1 @__rt__list__pop(i8* %0, i8* %2)
+  %4 = bitcast i8* %2 to i16*
+  %5 = load i16, i16* %4, align 2
+  %6 = insertvalue { i16 } undef, i16 %5, 0
+  %7 = insertvalue { i32, {}, { i16 } } { i32 1, {} poison, { i16 } poison }, { i16 } %6, 2
+  %8 = select i1 %3, { i32, {}, { i16 } } %7, { i32, {}, { i16 } } { i32 0, {} undef, { i16 } poison }
+  %mrv = insertvalue { i8*, { i32, {}, { i16 } } } undef, i8* %0, 0
+  %mrv6 = insertvalue { i8*, { i32, {}, { i16 } } } %mrv, { i32, {}, { i16 } } %8, 1
+  ret { i8*, { i32, {}, { i16 } } } %mrv6
+}
+
+declare i1 @__rt__list__pop(i8*, i8*)

@@ -7,6 +7,8 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
+use std::sync::Weak;
+
 use crate::extension::{TypeDef, TypeDefBound};
 use crate::types::type_param::TypeParam;
 use crate::types::{TypeBound, TypeName};
@@ -49,10 +51,14 @@ impl TypeDeclaration {
     ///
     /// Types in the definition will be resolved using the extensions in `scope`
     /// and the current extension.
+    ///
+    /// Requires a [`Weak`] reference to the extension defining the operation.
+    /// This method is intended to be used inside the closure passed to [`Extension::new_arc`].
     pub fn register<'ext>(
         &self,
         ext: &'ext mut Extension,
         ctx: DeclarationContext<'_>,
+        extension_ref: &Weak<Extension>,
     ) -> Result<&'ext TypeDef, ExtensionDeclarationError> {
         let params = self
             .params
@@ -64,6 +70,7 @@ impl TypeDeclaration {
             params,
             self.description.clone(),
             self.bound.into(),
+            extension_ref,
         )?;
         Ok(type_def)
     }
