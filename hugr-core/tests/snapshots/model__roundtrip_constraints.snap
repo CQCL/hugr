@@ -4,6 +4,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 ---
 (hugr 0)
 
+(import prelude.Array)
+
 (declare-func array.replicate
   (forall ?0 type)
   (forall ?1 nat)

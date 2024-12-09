@@ -1,8 +1,12 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"fixtures/model-cond.edn\"))"
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cond.edn\"))"
 ---
 (hugr 0)
+
+(import arithmetic.int.types.int)
+
+(import arithmetic.int.ineg)
 
 (define-func example.cond
   [(adt [[] []]) (@ arithmetic.int.types.int)]

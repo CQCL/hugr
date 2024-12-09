@@ -15,6 +15,9 @@ using NodeId = UInt32;
 # The id of a `Link`.
 using LinkId = UInt32;
 
+# The index of a `Link`.
+using LinkIndex = UInt32;
+
 struct Module {
     root @0 :RegionId;
     nodes @1 :List(Node);
@@ -24,8 +27,8 @@ struct Module {
 
 struct Node {
     operation @0 :Operation;
-    inputs @1 :List(LinkRef);
-    outputs @2 :List(LinkRef);
+    inputs @1 :List(LinkIndex);
+    outputs @2 :List(LinkIndex);
     params @3 :List(TermId);
     regions @4 :List(RegionId);
     meta @5 :List(MetaItem);
@@ -42,8 +45,8 @@ struct Operation {
         funcDecl @5 :FuncDecl;
         aliasDefn @6 :AliasDefn;
         aliasDecl @7 :AliasDecl;
-        custom @8 :GlobalRef;
-        customFull @9 :GlobalRef;
+        custom @8 :NodeId;
+        customFull @9 :NodeId;
         tag @10 :UInt16;
         tailLoop @11 :Void;
         conditional @12 :Void;
@@ -51,6 +54,7 @@ struct Operation {
         loadFunc @14 :TermId;
         constructorDecl @15 :ConstructorDecl;
         operationDecl @16 :OperationDecl;
+        import @17 :Text;
     }
 
     struct FuncDefn {
@@ -97,12 +101,21 @@ struct Operation {
 
 struct Region {
     kind @0 :RegionKind;
-    sources @1 :List(LinkRef);
-    targets @2 :List(LinkRef);
+    sources @1 :List(LinkIndex);
+    targets @2 :List(LinkIndex);
     children @3 :List(NodeId);
     meta @4 :List(MetaItem);
     signature @5 :OptionalTermId;
+    scope @6 :RegionScope;
 }
+
+struct RegionScope {
+    links @0 :UInt32;
+    ports @1 :UInt32;
+}
+
+# Either `0` for an open scope, or the number of links in the closed scope incremented by `1`.
+using LinkScope = UInt32;
 
 enum RegionKind {
     dataFlow @0;
@@ -115,37 +128,16 @@ struct MetaItem {
     value @1 :UInt32;
 }
 
-struct LinkRef {
-    union {
-        id @0 :LinkId;
-        named @1 :Text;
-    }
-}
-
-struct GlobalRef {
-    union {
-        node @0 :NodeId;
-        named @1 :Text;
-    }
-}
-
-struct LocalRef {
-    union {
-        direct :group {
-            index @0 :UInt16;
-            node @1 :NodeId;
-        }
-        named @2 :Text;
-    }
-}
-
 struct Term {
     union {
         wildcard @0 :Void;
         runtimeType @1 :Void;
         staticType @2 :Void;
         constraint @3 :Void;
-        variable @4 :LocalRef;
+        variable :group {
+            variableNode @4 :NodeId;
+            variableIndex @21 :UInt16;
+        }
         apply @5 :Apply;
         applyFull @6 :ApplyFull;
         quote @7 :TermId;
@@ -165,12 +157,12 @@ struct Term {
     }
 
     struct Apply {
-        global @0 :GlobalRef;
+        symbol @0 :NodeId;
         args @1 :List(TermId);
     }
 
     struct ApplyFull {
-        global @0 :GlobalRef;
+        symbol @0 :NodeId;
         args @1 :List(TermId);
     }
 
