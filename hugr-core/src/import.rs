@@ -559,7 +559,7 @@ impl<'a> Context<'a> {
         let region_data = self.get_region(region)?;
 
         let prev_region = self.region_scope;
-        if let model::LinkScope::Closed(_) = region_data.link_scope {
+        if region_data.scope.is_some() {
             self.region_scope = region;
         }
 
@@ -730,7 +730,7 @@ impl<'a> Context<'a> {
         }
 
         let prev_region = self.region_scope;
-        if let model::LinkScope::Closed(_) = region_data.link_scope {
+        if region_data.scope.is_some() {
             self.region_scope = region;
         }
 

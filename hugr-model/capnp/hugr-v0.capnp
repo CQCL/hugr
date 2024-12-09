@@ -106,7 +106,12 @@ struct Region {
     children @3 :List(NodeId);
     meta @4 :List(MetaItem);
     signature @5 :OptionalTermId;
-    linkScope @6 :LinkScope;
+    scope @6 :RegionScope;
+}
+
+struct RegionScope {
+    links @0 :UInt32;
+    ports @1 :UInt32;
 }
 
 # Either `0` for an open scope, or the number of links in the closed scope incremented by `1`.

@@ -144,10 +144,14 @@ fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region
     write_list!(builder, init_meta, write_meta_item, region.meta);
     builder.set_signature(region.signature.map_or(0, |t| t.0 + 1));
 
-    builder.set_link_scope(match region.link_scope {
-        model::LinkScope::Open => 0,
-        model::LinkScope::Closed(link_count) => link_count + 1,
-    });
+    if let Some(scope) = &region.scope {
+        write_region_scope(builder.init_scope(), scope);
+    }
+}
+
+fn write_region_scope(mut builder: hugr_capnp::region_scope::Builder, scope: &model::RegionScope) {
+    builder.set_links(scope.links);
+    builder.set_ports(scope.ports);
 }
 
 fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {

@@ -113,7 +113,7 @@ impl<'a> Context<'a> {
         all_children.extend(self.decl_operations.values().copied());
         all_children.extend(children);
 
-        let link_count = self.links.exit();
+        let (links, ports) = self.links.exit();
         self.symbols.exit();
 
         self.module.regions[self.module.root.index()] = model::Region {
@@ -123,7 +123,7 @@ impl<'a> Context<'a> {
             children: all_children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
             signature: None,
-            link_scope: model::LinkScope::Closed(link_count),
+            scope: Some(model::RegionScope { links, ports }),
         };
     }
 
@@ -137,7 +137,7 @@ impl<'a> Context<'a> {
         let linked_ports = self.hugr.linked_ports(node, port);
         let all_ports = std::iter::once((node, port)).chain(linked_ports);
         let repr = all_ports.min().unwrap();
-        self.links.resolve(repr)
+        self.links.use_link(repr)
     }
 
     pub fn make_ports(
@@ -649,10 +649,11 @@ impl<'a> Context<'a> {
             }))
         };
 
-        let link_scope = if link_scope_closed {
-            model::LinkScope::Closed(self.links.exit())
+        let scope = if link_scope_closed {
+            let (links, ports) = self.links.exit();
+            Some(model::RegionScope { links, ports })
         } else {
-            model::LinkScope::Open
+            None
         };
         self.symbols.exit();
 
@@ -663,7 +664,7 @@ impl<'a> Context<'a> {
             children: region_children,
             meta: &[], // TODO: Export metadata
             signature,
-            link_scope,
+            scope,
         };
 
         region
@@ -735,10 +736,11 @@ impl<'a> Context<'a> {
         // This is the same as the signature of the parent node.
         let signature = Some(self.export_func_type(&self.hugr.signature(node).unwrap()));
 
-        let link_scope = if link_scope_closed {
-            model::LinkScope::Closed(self.links.exit())
+        let scope = if link_scope_closed {
+            let (links, ports) = self.links.exit();
+            Some(model::RegionScope { links, ports })
         } else {
-            model::LinkScope::Open
+            None
         };
         self.symbols.exit();
 
@@ -749,7 +751,7 @@ impl<'a> Context<'a> {
             children: region_children,
             meta: &[], // TODO: Export metadata
             signature,
-            link_scope,
+            scope,
         };
 
         region

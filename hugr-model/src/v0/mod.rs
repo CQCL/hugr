@@ -400,8 +400,17 @@ pub struct Region<'a> {
     ///
     /// Can be `None` to indicate that the region signature should be inferred.
     pub signature: Option<TermId>,
-    /// The link scope of the region.
-    pub link_scope: LinkScope,
+    /// Information about the scope defined by this region, if the region is closed.
+    pub scope: Option<RegionScope>,
+}
+
+/// Information about the scope defined by a closed region.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RegionScope {
+    /// The number of links in the scope.
+    pub links: u32,
+    /// The number of ports in the scope.
+    pub ports: u32,
 }
 
 /// The link scope of a region.

@@ -232,9 +232,10 @@ fn read_region<'a>(
     let meta = read_list!(bump, reader, get_meta, read_meta_item);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
-    let link_scope = match reader.get_link_scope().checked_sub(1) {
-        Some(count) => model::LinkScope::Closed(count),
-        None => model::LinkScope::Open,
+    let scope = if reader.has_scope() {
+        Some(read_region_scope(reader.get_scope()?)?)
+    } else {
+        None
     };
 
     Ok(model::Region {
@@ -244,8 +245,16 @@ fn read_region<'a>(
         children,
         meta,
         signature,
-        link_scope,
+        scope,
     })
+}
+
+fn read_region_scope<'a>(
+    reader: hugr_capnp::region_scope::Reader,
+) -> ReadResult<model::RegionScope> {
+    let links = reader.get_links();
+    let ports = reader.get_ports();
+    Ok(model::RegionScope { links, ports })
 }
 
 fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult<model::Term<'a>> {

@@ -10,7 +10,7 @@ use crate::v0::{
     scope::{LinkTable, SymbolResolveError, SymbolTable},
     AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, LinkScope, ListPart, LocalRef,
     MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
-    RegionKind, Term, TermId,
+    RegionKind, RegionScope, Term, TermId,
 };
 
 mod pest_parser {
@@ -88,7 +88,7 @@ impl<'a> ParseContext<'a> {
         children.extend(self.implicit_imports.drain().map(|(_, node)| node));
         let children = children.into_bump_slice();
 
-        let link_count = self.links.exit();
+        let (link_count, port_count) = self.links.exit();
         self.symbols.exit();
 
         self.module.regions[self.module.root.index()] = Region {
@@ -98,7 +98,10 @@ impl<'a> ParseContext<'a> {
             children,
             meta,
             signature: None,
-            link_scope: LinkScope::Closed(link_count),
+            scope: Some(RegionScope {
+                links: link_count,
+                ports: port_count,
+            }),
         };
 
         Ok(())
@@ -571,20 +574,16 @@ impl<'a> ParseContext<'a> {
     fn parse_regions(
         &mut self,
         pairs: &mut Pairs<'a, Rule>,
-        closed_link_scope: bool,
+        closed: bool,
     ) -> ParseResult<&'a [RegionId]> {
         let mut regions = Vec::new();
         for pair in filter_rule(pairs, Rule::region) {
-            regions.push(self.parse_region(pair, closed_link_scope)?);
+            regions.push(self.parse_region(pair, closed)?);
         }
         Ok(self.bump.alloc_slice_copy(&regions))
     }
 
-    fn parse_region(
-        &mut self,
-        pair: Pair<'a, Rule>,
-        closed_link_scope: bool,
-    ) -> ParseResult<RegionId> {
+    fn parse_region(&mut self, pair: Pair<'a, Rule>, closed: bool) -> ParseResult<RegionId> {
         debug_assert_eq!(pair.as_rule(), Rule::region);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
@@ -593,7 +592,7 @@ impl<'a> ParseContext<'a> {
         let region = self.module.insert_region(Region::default());
         self.symbols.enter(region);
 
-        if closed_link_scope {
+        if closed {
             self.links.enter(region);
         }
 
@@ -609,10 +608,11 @@ impl<'a> ParseContext<'a> {
         let meta = self.parse_meta(&mut inner)?;
         let children = self.parse_nodes(&mut inner)?;
 
-        let link_scope = if closed_link_scope {
-            LinkScope::Closed(self.links.exit())
+        let scope = if closed {
+            let (links, ports) = self.links.exit();
+            Some(RegionScope { links, ports })
         } else {
-            LinkScope::Open
+            None
         };
 
         self.symbols.exit();
@@ -624,7 +624,7 @@ impl<'a> ParseContext<'a> {
             children,
             meta,
             signature,
-            link_scope,
+            scope,
         };
 
         Ok(region)
@@ -803,7 +803,7 @@ impl<'a> ParseContext<'a> {
         debug_assert_eq!(pair.as_rule(), Rule::port);
         let mut inner = pair.into_inner();
         let name = &inner.next().unwrap().as_str()[1..];
-        Ok(self.links.resolve(name))
+        Ok(self.links.use_link(name))
     }
 
     fn parse_meta(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [MetaItem<'a>]> {
