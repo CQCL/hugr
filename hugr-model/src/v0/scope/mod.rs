@@ -4,5 +4,5 @@ mod symbol;
 mod vars;
 
 pub use link::LinkTable;
-pub use symbol::{SymbolIntroError, SymbolResolveError, SymbolTable};
+pub use symbol::{DuplicateSymbolError, SymbolTable, UnknownSymbolError};
 pub use vars::{DuplicateVarError, UnknownVarError, VarTable};

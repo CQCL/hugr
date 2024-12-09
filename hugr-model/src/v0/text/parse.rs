@@ -7,7 +7,7 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    scope::{LinkTable, SymbolResolveError, SymbolTable, VarTable},
+    scope::{LinkTable, SymbolTable, UnknownSymbolError, VarTable},
     AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, MetaItem, Module, Node,
     NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
     Term, TermId,
@@ -850,14 +850,12 @@ impl<'a> ParseContext<'a> {
 
         Ok(match resolved {
             Ok(node) => node,
-            Err(SymbolResolveError::NotFound(_)) => {
-                *self.implicit_imports.entry(name).or_insert_with(|| {
-                    self.module.insert_node(Node {
-                        operation: Operation::Import { name },
-                        ..Node::default()
-                    })
+            Err(UnknownSymbolError(_)) => *self.implicit_imports.entry(name).or_insert_with(|| {
+                self.module.insert_node(Node {
+                    operation: Operation::Import { name },
+                    ..Node::default()
                 })
-            }
+            }),
         })
     }
 

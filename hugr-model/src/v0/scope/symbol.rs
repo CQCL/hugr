@@ -66,7 +66,7 @@ impl<'a> SymbolTable<'a> {
     /// # Panics
     ///
     /// Panics if there is no current scope.
-    pub fn insert(&mut self, name: &'a str, node: NodeId) -> Result<(), SymbolIntroError> {
+    pub fn insert(&mut self, name: &'a str, node: NodeId) -> Result<(), DuplicateSymbolError> {
         let scope_depth = self.scopes.len() as u16 - 1;
         let (symbol_index, shadowed) = self.symbols.insert_full(name, self.bindings.len());
 
@@ -74,11 +74,7 @@ impl<'a> SymbolTable<'a> {
             let (shadowed_node, shadowed_binding) = self.bindings.get_index(shadowed).unwrap();
             if shadowed_binding.scope_depth == scope_depth {
                 self.symbols.insert(name, shadowed);
-                return Err(SymbolIntroError::Duplicate(
-                    name.into(),
-                    node,
-                    *shadowed_node,
-                ));
+                return Err(DuplicateSymbolError(name.into(), node, *shadowed_node));
             }
         }
 
@@ -105,11 +101,11 @@ impl<'a> SymbolTable<'a> {
     }
 
     /// Tries to resolve a symbol name in the current scope.
-    pub fn resolve(&self, name: &'a str) -> Result<NodeId, SymbolResolveError> {
+    pub fn resolve(&self, name: &'a str) -> Result<NodeId, UnknownSymbolError> {
         let index = *self
             .symbols
             .get(name)
-            .ok_or(SymbolResolveError::NotFound(name.into()))?;
+            .ok_or(UnknownSymbolError(name.into()))?;
 
         // NOTE: The unwrap is safe because the `symbols` map
         // points to valid indices in the `bindings` map.
@@ -171,18 +167,12 @@ type SymbolIndex = usize;
 
 pub type ScopeDepth = u16;
 
-/// Error while resolving a symbol.
+/// Error that occurs when trying to resolve an unknown symbol.
 #[derive(Debug, Clone, Error)]
-pub enum SymbolResolveError<'a> {
-    /// Symbol not found in the current scope.
-    #[error("symbol name `{0}` not found in this scope")]
-    NotFound(Cow<'a, str>),
-}
+#[error("symbol name `{0}` not found in this scope")]
+pub struct UnknownSymbolError<'a>(pub Cow<'a, str>);
 
-/// Error while introducing a symbol.
+/// Error that occurs when trying to introduce a symbol that is already defined in the current scope.
 #[derive(Debug, Clone, Error)]
-pub enum SymbolIntroError<'a> {
-    /// Duplicate symbol definition in the same scope.
-    #[error("symbol `{0}` is already defined in this scope")]
-    Duplicate(Cow<'a, str>, NodeId, NodeId),
-}
+#[error("symbol `{0}` is already defined in this scope")]
+pub struct DuplicateSymbolError<'a>(pub Cow<'a, str>, pub NodeId, pub NodeId);
