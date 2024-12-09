@@ -12,8 +12,7 @@ use crate::builder::{
 };
 use crate::extension::prelude::{bool_t, ConstUsize};
 use crate::extension::resolution::{
-    collect_op_extensions, collect_op_types_extensions, resolve_op_extensions,
-    resolve_op_types_extensions, ExtensionCollectionError,
+    resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
 };
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE};
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
@@ -221,8 +220,7 @@ fn resolve_hugr_extensions() {
     let mut collected_exts = ExtensionRegistry::default();
     for node in hugr.nodes() {
         let op = hugr.get_optype(node);
-        collected_exts.extend(collect_op_extensions(Some(node), op).unwrap());
-        collected_exts.extend(collect_op_types_extensions(Some(node), op).unwrap());
+        collected_exts.extend(op.used_extensions().unwrap());
     }
     assert_eq!(
         collected_exts, build_extensions,
