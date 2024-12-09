@@ -40,8 +40,9 @@ impl Hugr {
     /// variables (see github issue #457)
     pub fn validate(&self) -> Result<(), ValidationError> {
         self.validate_no_extensions()?;
-        #[cfg(feature = "extension_inference")]
-        self.validate_extensions()?;
+        if cfg!(feature = "extension_inference") {
+            self.validate_extensions()?;
+        }
         Ok(())
     }
 
