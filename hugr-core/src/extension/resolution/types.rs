@@ -188,7 +188,11 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
                 collect_type_row_exts(row, used_extensions, missing_extensions);
             }
         }
-        _ => {}
+        // Other types do not store extensions.
+        TypeEnum::Alias(_)
+        | TypeEnum::RowVar(_)
+        | TypeEnum::Variable(_, _)
+        | TypeEnum::Sum(SumType::Unit { .. }) => {}
     }
 }
 

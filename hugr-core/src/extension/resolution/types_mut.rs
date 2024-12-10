@@ -191,7 +191,11 @@ fn resolve_type_exts<RV: MaybeRV>(
                 resolve_type_row_exts(node, row, extensions, used_extensions)?;
             }
         }
-        _ => {}
+        // Other types do not store extensions.
+        TypeEnum::Alias(_)
+        | TypeEnum::RowVar(_)
+        | TypeEnum::Variable(_, _)
+        | TypeEnum::Sum(SumType::Unit { .. }) => {}
     }
     Ok(())
 }
