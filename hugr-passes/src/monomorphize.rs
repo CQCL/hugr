@@ -2,12 +2,13 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use hugr_core::{
     extension::ExtensionRegistry,
-    ops::{Call, FuncDefn, OpTrait},
+    ops::{Call, FuncDefn, LoadFunction, OpTrait},
     types::{Signature, Substitution, TypeArg},
     Node,
 };
 
 use hugr_core::hugr::{hugrmut::HugrMut, internal::HugrMutInternals, Hugr, HugrView, OpType};
+use itertools::Itertools as _;
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -17,6 +18,9 @@ use hugr_core::hugr::{hugrmut::HugrMut, internal::HugrMutInternals, Hugr, HugrVi
 ///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
 /// * else, the originals are removed (they are invisible from outside the Hugr).
 pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
+    #[cfg(debug_assertions)]
+    h.validate(reg).unwrap_or_else(|e| panic!("{e}"));
+
     let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
@@ -24,6 +28,13 @@ pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
         if !h.get_optype(root).is_module() {
             return remove_polyfuncs(h);
         }
+    }
+    #[cfg(debug_assertions)]
+    {
+        h.validate(reg).unwrap_or_else(|e| {
+            eprintln!("{}", h.mermaid_string());
+            panic!("{e}");
+        });
     }
     h
 }
@@ -74,7 +85,7 @@ fn mono_scan(
     cache: &mut Instantiations,
     reg: &ExtensionRegistry,
 ) {
-    for old_ch in h.children(parent).collect::<Vec<_>>() {
+    for old_ch in h.children(parent).collect_vec() {
         let ch_op = h.get_optype(old_ch);
         debug_assert!(!ch_op.is_func_defn() || subst_into.is_none()); // If substituting, should have flattened already
         if is_polymorphic_funcdefn(ch_op) {
@@ -99,9 +110,16 @@ fn mono_scan(
 
         // Now instantiate the target of any Call/LoadFunction to a polymorphic function...
         let ch_op = h.get_optype(ch);
-        let (type_args, mono_sig) = match ch_op {
-            OpType::Call(c) => (&c.type_args, c.instantiation.clone()),
-            OpType::LoadFunction(lf) => (&lf.type_args, lf.signature.clone()),
+        let (type_args, mono_sig, new_op) = match ch_op {
+            OpType::Call(c) => {
+                let mono_sig = c.instantiation.clone();
+                (&c.type_args, mono_sig.clone(), OpType::from(Call::try_new(mono_sig.into(), [], reg).unwrap()))
+            }
+            OpType::LoadFunction(lf) => {
+                eprintln!("{lf:?}");
+                let mono_sig = lf.instantiation();
+                (&lf.type_args, mono_sig.clone(), LoadFunction::try_new(mono_sig.into(), [], reg).unwrap().into())
+            }
             _ => continue,
         };
         if type_args.is_empty() {
@@ -110,11 +128,16 @@ fn mono_scan(
         let fn_inp = ch_op.static_input_port().unwrap();
         let tgt = h.static_source(old_ch).unwrap(); // Use old_ch as edges not copied yet
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache, reg);
-        let fn_out = h.get_optype(new_tgt).static_output_port().unwrap();
+        let fn_out = {
+            let func = h.get_optype(new_tgt).as_func_defn().unwrap();
+            debug_assert_eq!(func.signature, mono_sig.into());
+            h.get_optype(new_tgt).static_output_port().unwrap()
+        };
         h.disconnect(ch, fn_inp); // No-op if copying+substituting
         h.connect(new_tgt, fn_out, ch, fn_inp);
 
-        h.replace_op(ch, Call::try_new(mono_sig.into(), vec![], reg).unwrap())
+
+        h.replace_op(ch, new_op)
             .unwrap();
     }
 }
@@ -462,4 +485,31 @@ mod test {
         }
         Ok(())
     }
+
+    #[test]
+    fn load_function() {
+        let hugr = {
+            let mut module_builder = ModuleBuilder::new();
+            let foo = {
+                let builder = module_builder.define_function("foo", PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(Type::new_var_use(0,TypeBound::Any)))).unwrap();
+                let inputs = builder.input_wires();
+                builder.finish_with_outputs(inputs).unwrap()
+            };
+
+            let _main = {
+                let mut builder = module_builder.define_function("main", Signature::new_endo(Type::UNIT)).unwrap();
+                let func_ptr = builder.load_func(foo.handle(), &[Type::UNIT.into()], &EMPTY_REG).unwrap();
+                let  [r] = builder.call_indirect(Signature::new_endo(Type::UNIT), func_ptr, builder.input_wires()).unwrap().outputs_arr();
+                builder.finish_with_outputs([r]).unwrap()
+            };
+            module_builder.finish_hugr(&EMPTY_REG).unwrap()
+        };
+
+        let mono_hugr = remove_polyfuncs(monomorphize(hugr, &EMPTY_REG));
+
+        let funcs = list_funcs(&mono_hugr);
+        assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
+    }
 }
+
+// TODO LoadFunction

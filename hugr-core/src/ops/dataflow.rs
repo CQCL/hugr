@@ -4,7 +4,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
+use crate::types::{EdgeKind, FuncValueType, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeEnum, TypeRow};
 use crate::IncomingPort;
 
 #[cfg(test)]
@@ -392,7 +392,7 @@ pub struct LoadFunction {
     pub func_sig: PolyFuncType,
     /// The type arguments that instantiate `func_sig`.
     pub type_args: Vec<TypeArg>,
-    /// The instantiation of `func_sig`.
+    /// The signature of the op.
     pub signature: Signature, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(LoadFunction);
@@ -455,6 +455,15 @@ impl LoadFunction {
     /// Return the type of the function loaded by this op.
     pub fn function_type(&self) -> &PolyFuncType {
         &self.func_sig
+    }
+
+    #[inline]
+    /// TODO docs
+    pub fn instantiation(&self) -> Signature {
+        let TypeEnum::Function (ty) = self.signature.output[0].as_type_enum() else {
+            panic!("")
+        };
+        ty.as_ref().clone().try_into().unwrap()
     }
 
     /// The IncomingPort which links to the loaded function.
