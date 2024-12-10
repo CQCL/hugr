@@ -9,12 +9,13 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
+use crate::extension::resolution::ExtensionResolutionError;
 use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
 use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, NamedOp, OpName, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::{EdgeKind, Signature};
 use crate::{Direction, Hugr, Node, Port};
@@ -259,7 +260,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         self.validate_port_kind(&port_kind, var_decls)
-            .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            .map_err(|cause| ValidationError::SignatureError {
+                node,
+                op: op_type.name(),
+                cause,
+            })?;
 
         let mut link_cnt = 0;
         for (_, link) in links {
@@ -579,7 +584,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             ext_op
                 .def()
                 .validate_args(ext_op.args(), self.extension_registry, var_decls)
-                .map_err(|cause| ValidationError::SignatureError { node, cause })
+                .map_err(|cause| ValidationError::SignatureError {
+                    node,
+                    op: op_type.name(),
+                    cause,
+                })
         };
         match op_type {
             OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
@@ -591,12 +600,22 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 ))?;
             }
             OpType::Call(c) => {
-                c.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                c.validate(self.extension_registry).map_err(|cause| {
+                    ValidationError::SignatureError {
+                        node,
+                        op: op_type.name(),
+                        cause,
+                    }
+                })?;
             }
             OpType::LoadFunction(c) => {
-                c.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                c.validate(self.extension_registry).map_err(|cause| {
+                    ValidationError::SignatureError {
+                        node,
+                        op: op_type.name(),
+                        cause,
+                    }
+                })?;
             }
             _ => (),
         }
@@ -738,9 +757,10 @@ pub enum ValidationError {
     #[error("Node {node} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only")]
     ExtensionsNotInferred { node: Node },
     /// Error in a node signature
-    #[error("Error in signature of node {node}: {cause}")]
+    #[error("Error in signature of operation {op} at {node}: {cause}")]
     SignatureError {
         node: Node,
+        op: OpName,
         #[source]
         cause: SignatureError,
     },
@@ -757,6 +777,11 @@ pub enum ValidationError {
     /// [Type]: crate::types::Type
     #[error(transparent)]
     ConstTypeError(#[from] ConstTypeError),
+    /// Some operations or types in the HUGR reference invalid extensions.
+    //
+    // TODO: Remove once `hugr::update_validate` is removed.
+    #[error(transparent)]
+    ExtensionResolutionError(#[from] ExtensionResolutionError),
 }
 
 /// Errors related to the inter-graph edge validations.

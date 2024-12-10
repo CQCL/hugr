@@ -4,6 +4,7 @@
 //! are not designed for efficient traversal or modification, but for simplicity and serialization.
 pub mod v0;
 
+#[allow(clippy::needless_lifetimes)]
 pub(crate) mod hugr_v0_capnp {
     include!(concat!(env!("OUT_DIR"), "/hugr_v0_capnp.rs"));
 }

@@ -251,14 +251,14 @@ mod test {
         BlockBuilder, BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::usize_t;
     use crate::extension::PRELUDE_REGISTRY;
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::constant::Value;
     use crate::ops::handle::{BasicBlockID, CfgID, ConstID, NodeHandle};
     use crate::types::Signature;
-    use crate::{type_row, Hugr, HugrView, Node};
+    use crate::{Hugr, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
     use rstest::rstest;
@@ -278,7 +278,7 @@ mod test {
     }
     impl CondThenLoopCfg {
         fn new() -> Result<CondThenLoopCfg, BuildError> {
-            let block_ty = Signature::new_endo(USIZE_T);
+            let block_ty = Signature::new_endo(usize_t());
             let mut cfg_builder = CFGBuilder::new(block_ty.clone())?;
             let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
             let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
@@ -295,7 +295,7 @@ mod test {
             };
 
             let entry = n_identity(
-                cfg_builder.simple_entry_builder(USIZE_T.into(), 2)?,
+                cfg_builder.simple_entry_builder(usize_t().into(), 2)?,
                 &pred_const,
             )?;
 
@@ -311,7 +311,7 @@ mod test {
             let head = id_block(&mut cfg_builder)?;
             cfg_builder.branch(&merge, 0, &head)?;
             let tail = n_identity(
-                cfg_builder.simple_block_builder(Signature::new_endo(USIZE_T), 2)?,
+                cfg_builder.simple_block_builder(Signature::new_endo(usize_t()), 2)?,
                 &pred_const,
             )?;
             cfg_builder.branch(&tail, 1, &head)?;
@@ -439,10 +439,7 @@ mod test {
         // operating via a SiblingMut
         let mut module_builder = ModuleBuilder::new();
         let mut fbuild = module_builder
-            .define_function(
-                "main",
-                Signature::new(type_row![USIZE_T], type_row![USIZE_T]),
-            )
+            .define_function("main", Signature::new(vec![usize_t()], vec![usize_t()]))
             .unwrap();
         let [i1] = fbuild.input_wires_arr();
         let cfg = fbuild

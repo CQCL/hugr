@@ -438,7 +438,7 @@ mod test {
     use itertools::Itertools;
 
     use super::{check_type_arg, Substitution, TypeArg, TypeParam};
-    use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY, USIZE_T};
+    use crate::extension::prelude::{bool_t, usize_t, PRELUDE_REGISTRY};
     use crate::types::{type_param::TypeArgError, TypeBound, TypeRV};
 
     #[test]
@@ -455,10 +455,10 @@ mod test {
             check_type_arg(&arg, param)
         }
         // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
-        check(USIZE_T, &TypeBound::Copyable.into()).unwrap();
+        check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let seq_param = TypeParam::new_list(TypeBound::Copyable);
-        check(USIZE_T, &seq_param).unwrap_err();
-        check_seq(&[USIZE_T], &TypeBound::Any.into()).unwrap_err();
+        check(usize_t(), &seq_param).unwrap_err();
+        check_seq(&[usize_t()], &TypeBound::Any.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
@@ -468,7 +468,7 @@ mod test {
         check_seq(
             &[
                 rowvar(1, TypeBound::Any),
-                USIZE_T.into(),
+                usize_t().into(),
                 rowvar(0, TypeBound::Copyable),
             ],
             &TypeParam::new_list(TypeBound::Any),
@@ -478,7 +478,7 @@ mod test {
         check_seq(
             &[
                 rowvar(1, TypeBound::Any),
-                USIZE_T.into(),
+                usize_t().into(),
                 rowvar(0, TypeBound::Copyable),
             ],
             &seq_param,
@@ -486,7 +486,7 @@ mod test {
         .unwrap_err();
         // seq of seq of types is not allowed
         check(
-            vec![USIZE_T.into(), vec![USIZE_T.into()].into()],
+            vec![usize_t().into(), vec![usize_t().into()].into()],
             &seq_param,
         )
         .unwrap_err();
@@ -509,8 +509,8 @@ mod test {
         let usize_and_ty = TypeParam::Tuple {
             params: vec![TypeParam::max_nat(), TypeBound::Copyable.into()],
         };
-        check(vec![5.into(), USIZE_T.into()], &usize_and_ty).unwrap();
-        check(vec![USIZE_T.into(), 5.into()], &usize_and_ty).unwrap_err(); // Wrong way around
+        check(vec![5.into(), usize_t().into()], &usize_and_ty).unwrap();
+        check(vec![usize_t().into(), 5.into()], &usize_and_ty).unwrap_err(); // Wrong way around
         let two_types = TypeParam::Tuple {
             params: vec![TypeBound::Any.into(), TypeBound::Any.into()],
         };
@@ -522,7 +522,7 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = TypeParam::new_list(TypeBound::Copyable);
-        let row_arg: TypeArg = vec![BOOL_T.into(), TypeArg::UNIT].into();
+        let row_arg: TypeArg = vec![bool_t().into(), TypeArg::UNIT].into();
         check_type_arg(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
@@ -531,7 +531,7 @@ mod test {
         let outer_arg = TypeArg::Sequence {
             elems: vec![
                 TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
-                USIZE_T.into(),
+                usize_t().into(),
             ],
         };
         check_type_arg(&outer_arg, &outer_param).unwrap();
@@ -539,7 +539,7 @@ mod test {
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg], &PRELUDE_REGISTRY));
         assert_eq!(
             outer_arg2,
-            vec![BOOL_T.into(), TypeArg::UNIT, USIZE_T.into()].into()
+            vec![bool_t().into(), TypeArg::UNIT, usize_t().into()].into()
         );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
@@ -554,9 +554,9 @@ mod test {
         let good_arg = TypeArg::Sequence {
             elems: vec![
                 // The row variables here refer to `row_var_decl` above
-                vec![USIZE_T.into()].into(),
+                vec![usize_t().into()].into(),
                 row_var_use.clone(),
-                vec![row_var_use, USIZE_T.into()].into(),
+                vec![row_var_use, usize_t().into()].into(),
             ],
         };
         check_type_arg(&good_arg, &outer_param).unwrap();
@@ -565,18 +565,18 @@ mod test {
         let TypeArg::Sequence { mut elems } = good_arg.clone() else {
             panic!()
         };
-        elems.push(USIZE_T.into());
+        elems.push(usize_t().into());
         assert_eq!(
             check_type_arg(&TypeArg::Sequence { elems }, &outer_param),
             Err(TypeArgError::TypeMismatch {
-                arg: USIZE_T.into(),
+                arg: usize_t().into(),
                 // The error reports the type expected for each element of the list:
                 param: TypeParam::new_list(TypeBound::Any)
             })
         );
 
         // Now substitute a list of two types for that row-variable
-        let row_var_arg = vec![USIZE_T.into(), BOOL_T.into()].into();
+        let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
         check_type_arg(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg =
             good_arg.substitute(&Substitution(&[row_var_arg.clone()], &PRELUDE_REGISTRY));
@@ -585,9 +585,9 @@ mod test {
             subst_arg,
             TypeArg::Sequence {
                 elems: vec![
-                    vec![USIZE_T.into()].into(),
+                    vec![usize_t().into()].into(),
                     row_var_arg,
-                    vec![USIZE_T.into(), BOOL_T.into(), USIZE_T.into()].into()
+                    vec![usize_t().into(), bool_t().into(), usize_t().into()].into()
                 ]
             }
         );

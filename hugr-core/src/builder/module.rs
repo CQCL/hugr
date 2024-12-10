@@ -159,13 +159,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 mod test {
     use cool_asserts::assert_matches;
 
+    use crate::extension::prelude::usize_t;
     use crate::{
-        builder::{
-            test::{n_identity, NAT},
-            Dataflow, DataflowSubContainer,
-        },
+        builder::{test::n_identity, Dataflow, DataflowSubContainer},
         extension::{EMPTY_REG, PRELUDE_REGISTRY},
-        type_row,
         types::Signature,
     };
 
@@ -177,7 +174,7 @@ mod test {
 
             let f_id = module_builder.declare(
                 "main",
-                Signature::new(type_row![NAT], type_row![NAT]).into(),
+                Signature::new(vec![usize_t()], vec![usize_t()]).into(),
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
@@ -217,10 +214,14 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let mut f_build = module_builder
-                .define_function("main", Signature::new(type_row![NAT], type_row![NAT, NAT]))?;
-            let local_build = f_build
-                .define_function("local", Signature::new(type_row![NAT], type_row![NAT, NAT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
+            )?;
+            let local_build = f_build.define_function(
+                "local",
+                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
+            )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire, wire])?;
 

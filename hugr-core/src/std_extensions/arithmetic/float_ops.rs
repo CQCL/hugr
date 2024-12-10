@@ -1,17 +1,16 @@
 //! Basic floating-point operations.
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-use super::float_types::FLOAT64_TYPE;
+use super::float_types::float64_type;
 use crate::{
     extension::{
-        prelude::{BOOL_T, STRING_TYPE},
+        prelude::{bool_t, string_type},
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, PRELUDE,
     },
-    type_row,
     types::Signature,
     Extension,
 };
@@ -50,25 +49,29 @@ pub enum FloatOps {
 
 impl MakeOpDef for FloatOps {
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         use FloatOps::*;
 
         match self {
             feq | fne | flt | fgt | fle | fge => {
-                Signature::new(type_row![FLOAT64_TYPE; 2], type_row![BOOL_T])
+                Signature::new(vec![float64_type(); 2], vec![bool_t()])
             }
             fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
-                Signature::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE])
+                Signature::new(vec![float64_type(); 2], vec![float64_type()])
             }
-            fneg | fabs | ffloor | fceil | fround => Signature::new_endo(type_row![FLOAT64_TYPE]),
-            ftostring => Signature::new(type_row![FLOAT64_TYPE], STRING_TYPE),
+            fneg | fabs | ffloor | fceil | fround => Signature::new_endo(vec![float64_type()]),
+            ftostring => Signature::new(vec![float64_type()], string_type()),
         }
         .into()
     }
@@ -107,15 +110,10 @@ impl MakeOpDef for FloatOps {
 lazy_static! {
     /// Extension for basic float operations.
     pub static ref EXTENSION: Arc<Extension> = {
-        let mut extension = Extension::new(
-            EXTENSION_ID,
-            VERSION).with_reqs(
-            ExtensionSet::singleton(&super::int_types::EXTENSION_ID),
-        );
-
-        FloatOps::load_all_ops(&mut extension).unwrap();
-
-        Arc::new(extension)
+        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+            extension.add_requirements(ExtensionSet::singleton(&super::int_types::EXTENSION_ID));
+            FloatOps::load_all_ops(extension, extension_ref).unwrap();
+        })
     };
 
     /// Registry of extensions required to validate float operations.

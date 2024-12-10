@@ -44,7 +44,7 @@ fn build_array_alloca<'c>(
     };
     let ptr = builder.build_array_alloca(array_ty.get_element_type(), array_len, "")?;
     let array_ptr = builder
-        .build_bitcast(ptr, array_ty.ptr_type(Default::default()), "")?
+        .build_bit_cast(ptr, array_ty.ptr_type(Default::default()), "")?
         .into_pointer_value();
     builder.build_store(array_ptr, array)?;
     Result::Ok((ptr, array_ptr))
@@ -235,7 +235,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                         let elem_v = builder.build_load(elem_addr, "")?;
                         builder.build_store(elem_addr, value_v)?;
                         let ptr = builder
-                            .build_bitcast(
+                            .build_bit_cast(
                                 ptr,
                                 array_v.get_type().ptr_type(Default::default()),
                                 "",
@@ -320,7 +320,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                         builder.build_store(elem1_addr, elem2_v)?;
                         builder.build_store(elem2_addr, elem1_v)?;
                         let ptr = builder
-                            .build_bitcast(
+                            .build_bit_cast(
                                 ptr,
                                 array_v.get_type().ptr_type(Default::default()),
                                 "",
@@ -435,7 +435,7 @@ fn emit_pop_op<'c>(
             .get_element_type()
             .array_type(size as u32 - 1);
         let ptr = builder
-            .build_bitcast(ptr, new_array_ty.ptr_type(Default::default()), "")?
+            .build_bit_cast(ptr, new_array_ty.ptr_type(Default::default()), "")?
             .into_pointer_value();
         let array_v = builder.build_load(ptr, "")?;
         Ok((elem_v, array_v))
@@ -538,8 +538,8 @@ mod test {
         builder::{Dataflow, DataflowSubContainer, SubContainer},
         extension::{
             prelude::{
-                self, array::ArrayScan, array_type, option_type, ConstUsize, UnwrapBuilder as _,
-                BOOL_T, USIZE_T,
+                self, array::ArrayScan, array_type, bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder as _,
+               
             },
             ExtensionRegistry,
         },
@@ -586,8 +586,8 @@ mod test {
             .finish(|mut builder| {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let us2 = builder.add_load_value(ConstUsize::new(2));
-                let arr = builder.add_new_array(USIZE_T, [us1, us2]).unwrap();
-                builder.add_array_get(USIZE_T, 2, arr, us1).unwrap();
+                let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
+                builder.add_array_get(usize_t(), 2, arr, us1).unwrap();
                 builder.finish_with_outputs([]).unwrap()
             });
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
@@ -624,22 +624,22 @@ mod test {
         // - Gets the element at the given index
         // - Returns the element if the index is in bounds, otherwise 0
         let hugr = SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let us0 = builder.add_load_value(ConstUsize::new(0));
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let us2 = builder.add_load_value(ConstUsize::new(2));
-                let arr = builder.add_new_array(USIZE_T, [us1, us2]).unwrap();
+                let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
                 let i = builder.add_load_value(ConstUsize::new(index));
-                let get_r = builder.add_array_get(USIZE_T, 2, arr, i).unwrap();
+                let get_r = builder.add_array_get(usize_t(), 2, arr, i).unwrap();
                 let r = {
-                    let ot = option_type(USIZE_T);
+                    let ot = option_type(usize_t());
                     let variants = (0..ot.num_variants())
                         .map(|i| ot.get_variant(i).cloned().unwrap().try_into().unwrap())
                         .collect_vec();
                     let mut builder = builder
-                        .conditional_builder((variants, get_r), [], USIZE_T.into())
+                        .conditional_builder((variants, get_r), [], usize_t().into())
                         .unwrap();
                     {
                         let failure_case = builder.case_builder(0).unwrap();
@@ -680,7 +680,7 @@ mod test {
         use hugr_core::extension::prelude::either_type;
         let int_ty = int_type(3);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(exec_registry())
             .finish_with_exts(|mut builder, reg| {
                 let us0 = builder.add_load_value(ConstUsize::new(0));
@@ -709,7 +709,7 @@ mod test {
                         })
                         .collect_vec();
                     let mut builder = builder
-                        .conditional_builder((variants, get_r), [], BOOL_T.into())
+                        .conditional_builder((variants, get_r), [], bool_t().into())
                         .unwrap();
                     for i in 0..2 {
                         let mut builder = builder.case_builder(i).unwrap();
@@ -743,7 +743,7 @@ mod test {
                 };
                 let r = {
                     let mut conditional = builder
-                        .conditional_builder(([type_row![], type_row![]], r), [], USIZE_T.into())
+                        .conditional_builder(([type_row![], type_row![]], r), [], usize_t().into())
                         .unwrap();
                     conditional
                         .case_builder(0)
@@ -790,7 +790,7 @@ mod test {
         let int_ty = int_type(3);
         let arr_ty = array_type(2, int_ty.clone());
         let hugr = SimpleHugrConfig::new()
-            .with_outs(USIZE_T)
+            .with_outs(usize_t())
             .with_extensions(exec_registry())
             .finish_with_exts(|mut builder, reg| {
                 let us0 = builder.add_load_value(ConstUsize::new(0));
@@ -812,7 +812,7 @@ mod test {
                                 r,
                             ),
                             [],
-                            vec![arr_ty, BOOL_T].into(),
+                            vec![arr_ty, bool_t()].into(),
                         )
                         .unwrap();
                     for i in 0..2 {
@@ -851,7 +851,7 @@ mod test {
                 let r = builder.add_and(r, elem_1_ok).unwrap();
                 let r = {
                     let mut conditional = builder
-                        .conditional_builder(([type_row![], type_row![]], r), [], USIZE_T.into())
+                        .conditional_builder(([type_row![], type_row![]], r), [], usize_t().into())
                         .unwrap();
                     conditional
                         .case_builder(0)

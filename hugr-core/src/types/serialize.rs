@@ -2,7 +2,7 @@ use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeArg, TypeBase, Typ
 
 use super::custom::CustomType;
 
-use crate::extension::prelude::{array_type, QB_T, USIZE_T};
+use crate::extension::prelude::{array_type, qb_t, usize_t};
 use crate::extension::SignatureError;
 use crate::ops::AliasDecl;
 
@@ -22,10 +22,10 @@ pub(super) enum SerSimpleType {
 
 impl<RV: MaybeRV> From<TypeBase<RV>> for SerSimpleType {
     fn from(value: TypeBase<RV>) -> Self {
-        if value == QB_T {
+        if value == qb_t() {
             return SerSimpleType::Q;
         };
-        if value == USIZE_T {
+        if value == usize_t() {
             return SerSimpleType::I;
         };
         match value.0 {
@@ -46,8 +46,8 @@ impl<RV: MaybeRV> TryFrom<SerSimpleType> for TypeBase<RV> {
     type Error = SignatureError;
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerSimpleType::Q => QB_T.into_(),
-            SerSimpleType::I => USIZE_T.into_(),
+            SerSimpleType::Q => qb_t().into_(),
+            SerSimpleType::I => usize_t().into_(),
             SerSimpleType::G(sig) => TypeBase::new_function(*sig),
             SerSimpleType::Sum(st) => st.into(),
             SerSimpleType::Array { inner, len } => {

@@ -364,7 +364,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
         Self::new(TypeEnum::Alias(alias))
     }
 
-    fn new(type_e: TypeEnum<RV>) -> Self {
+    pub(crate) fn new(type_e: TypeEnum<RV>) -> Self {
         let bound = type_e.least_upper_bound();
         Self(type_e, bound)
     }
@@ -393,6 +393,12 @@ impl<RV: MaybeRV> TypeBase<RV> {
     #[inline(always)]
     pub const fn as_type_enum(&self) -> &TypeEnum<RV> {
         &self.0
+    }
+
+    /// Report a mutable reference to the component TypeEnum.
+    #[inline(always)]
+    pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
+        &mut self.0
     }
 
     /// Report if the type is copyable - i.e.the least upper bound of the type
@@ -613,20 +619,24 @@ pub(crate) fn check_typevar_decl(
 #[cfg(test)]
 pub(crate) mod test {
 
+    use std::sync::Weak;
+
     use super::*;
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::usize_t;
     use crate::type_row;
 
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
-            USIZE_T,
+            usize_t(),
             Type::new_function(Signature::new_endo(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
                 "my_extension".try_into().unwrap(),
                 TypeBound::Copyable,
+                // Dummy extension reference.
+                &Weak::default(),
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);
