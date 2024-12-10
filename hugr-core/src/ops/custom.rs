@@ -160,6 +160,26 @@ impl DataflowOpTrait for ExtensionOp {
     fn signature(&self) -> Signature {
         self.signature.clone()
     }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        let args = self
+            .args
+            .iter()
+            .map(|ta| ta.substitute(subst))
+            .collect::<Vec<_>>();
+        let signature = self.signature.substitute(subst);
+        debug_assert_eq!(
+            self.def
+                .compute_signature(&args, subst.extension_registry())
+                .as_ref(),
+            Ok(&signature)
+        );
+        Self {
+            def: self.def.clone(),
+            args,
+            signature,
+        }
+    }
 }
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
@@ -248,6 +268,14 @@ impl DataflowOpTrait for OpaqueOp {
         self.signature
             .clone()
             .with_extension_delta(self.extension().clone())
+    }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            args: self.args.iter().map(|ta| ta.substitute(subst)).collect(),
+            signature: self.signature.substitute(subst),
+            ..self.clone()
+        }
     }
 }
 
