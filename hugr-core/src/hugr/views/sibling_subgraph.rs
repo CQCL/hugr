@@ -785,9 +785,11 @@ mod tests {
     use cool_asserts::assert_matches;
 
     use crate::builder::inout_sig;
+    use crate::hugr::Rewrite;
     use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::std_extensions::logic::{self, LogicOp};
+    use crate::type_row;
     use crate::utils::test_quantum_extension::{self, cx_gate, rz_f64};
     use crate::{
         builder::{
@@ -1154,5 +1156,30 @@ mod tests {
         let view = SiblingGraph::<DfgID>::try_new(&h, h.root()).unwrap();
         let subg = SiblingSubgraph::try_new_dataflow_subgraph(&view).unwrap();
         assert_eq!(subg.nodes().len(), 2);
+    }
+
+    #[test]
+    fn test_unconnected() {
+        // test a replacement on a subgraph with a discarded output
+        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
+        let inw = b.input_wires().exactly_one().unwrap();
+        let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
+        // Unconnected output, discarded
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        let subg = SiblingSubgraph::from_node(not_n.node(), &h);
+
+        assert_eq!(subg.nodes().len(), 1);
+        //  TODO create a valid replacement
+        let replacement = {
+            let mut rep_b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+            let inw = rep_b.input_wires().exactly_one().unwrap();
+
+            let not_n = rep_b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
+
+            rep_b.finish_hugr_with_outputs(not_n.outputs()).unwrap()
+        };
+        let rep = subg.create_simple_replacement(&h, replacement).unwrap();
+        rep.apply(&mut h).unwrap();
     }
 }
