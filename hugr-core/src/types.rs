@@ -700,4 +700,328 @@ pub(crate) mod test {
             }
         }
     }
+
+    mod proptest2 {
+        use std::{iter::once, sync::Arc};
+
+        use crate::extension::{ExtensionRegistry, ExtensionSet};
+        use crate::types::{
+            type_param::TypeParam, FuncValueType, Type, TypeArg, TypeBound, TypeRow,
+        };
+        use itertools::Itertools;
+        use proptest::sample::Index;
+        use proptest::string::string_regex;
+        use proptest::{
+            collection::vec,
+            prelude::{any, Just, Strategy},
+            prop_oneof,
+            sample::select,
+        };
+
+        trait VarEnvState<T>: Send + Sync {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (T, Vec<TypeParam>)> + Clone;
+        }
+
+        struct MakeTypeVar(TypeParam);
+
+        impl VarEnvState<TypeArg> for MakeTypeVar {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                _reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (TypeArg, Vec<TypeParam>)> + Clone {
+                let mut opts = vars
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| self.0.contains(p))
+                    .map(|(i, p)| (TypeArg::new_var_use(i, p.clone()), vars.clone()))
+                    .collect_vec();
+                let mut env_with_new = vars.clone();
+                env_with_new.push(self.0.clone());
+                opts.push((
+                    TypeArg::new_var_use(vars.len(), self.0.clone()),
+                    env_with_new,
+                ));
+                select(opts)
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct MakeType(TypeBound);
+
+        impl VarEnvState<Type> for MakeType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                prop_oneof![
+                    // no Alias
+                    MakeCustomType.with_env(vars.clone(), reg.clone()),
+                    MakeFuncType.with_env(vars.clone(), reg.clone()),
+                    MakeTypeVar(self.0.into())
+                        .with_env(vars.clone(), reg.clone())
+                        .prop_map(|(ta, vars)| match ta {
+                            TypeArg::Type { ty } => (ty, vars),
+                            _ => panic!("Passed in a TypeBound, expected a Type"),
+                        }),
+                    // Type has no row_variable; consider joining with TypeRV
+                    MakeSumType(self.0).with_env(vars, reg)
+                ]
+            }
+        }
+
+        struct MakeSumType(TypeBound);
+        const MAX_NUM_VARIANTS: usize = 5;
+        impl VarEnvState<Type> for MakeSumType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                let b = self.0;
+                (1..MAX_NUM_VARIANTS)
+                    .prop_flat_map(move |nv| {
+                        MakeVec(vec![MakeTypeRow(b); nv]).with_env(vars.clone(), reg.clone())
+                    })
+                    .prop_map(|(rows, vars)| (Type::new_sum(rows), vars))
+            }
+        }
+
+        #[derive(Clone, Debug)]
+        struct MakeTypeArg(TypeParam);
+        const MAX_LIST_LEN: usize = 4;
+        impl VarEnvState<TypeArg> for MakeTypeArg {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (TypeArg, Vec<TypeParam>)> + Clone {
+                match &self.0 {
+                    TypeParam::Type { b } => MakeType(*b)
+                        .with_env(vars, reg)
+                        .prop_map(|(ty, vars)| (TypeArg::Type { ty }, vars))
+                        .sboxed(),
+                    TypeParam::BoundedNat { bound } => {
+                        let vars2 = vars.clone();
+                        prop_oneof![
+                            match bound.value() {
+                                Some(max) => (0..max.get()).sboxed(),
+                                None => proptest::num::u64::ANY.sboxed(),
+                            }
+                            .prop_map(move |n| (TypeArg::BoundedNat { n }, vars.clone())),
+                            MakeTypeVar(self.0).with_env(vars2, reg)
+                        ]
+                        .sboxed()
+                    }
+                    TypeParam::String => {
+                        let vars2 = vars.clone();
+                        prop_oneof![
+                            string_regex("[a-z]+")
+                                .unwrap()
+                                .prop_map(move |arg| (TypeArg::String { arg }, vars.clone())),
+                            MakeTypeVar(self.0).with_env(vars2, reg)
+                        ]
+                        .sboxed()
+                    }
+                    TypeParam::List { param } => {
+                        fold_n(MakeTypeArg((**param).clone()), 0..MAX_LIST_LEN, vars, reg)
+                            .prop_map(|(elems, vars)| (TypeArg::Sequence { elems }, vars))
+                            .sboxed()
+                    }
+                    TypeParam::Tuple { params } => {
+                        MakeVec(params.iter().cloned().map(MakeTypeArg).collect())
+                            .with_env(vars, reg)
+                            .prop_map(|(elems, vars)| (TypeArg::Sequence { elems }, vars))
+                            .sboxed()
+                    }
+                    TypeParam::Extensions => make_extensions(vars, reg)
+                        .prop_map(|(es, vars)| (TypeArg::Extensions { es }, vars))
+                        .sboxed(),
+                }
+            }
+        }
+
+        struct MakeFuncType;
+        const MAX_TYPE_ROW_LEN: usize = 5;
+        impl VarEnvState<Type> for MakeFuncType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                MakeTypeRow(TypeBound::Any)
+                    .with_env(vars, reg.clone())
+                    .prop_flat_map(move |(inputs, vars)| {
+                        let reg2 = reg.clone();
+                        MakeTypeRow(TypeBound::Any)
+                            .with_env(vars, reg.clone())
+                            .prop_flat_map(move |(outputs, vars)| {
+                                let inputs = inputs.clone();
+                                make_extensions(vars, reg2.clone()).prop_map(move |(exts, vars)| {
+                                    (
+                                        Type::new_function(
+                                            FuncValueType::new(inputs.clone(), outputs.clone())
+                                                .with_extension_delta(exts),
+                                        ),
+                                        vars,
+                                    )
+                                })
+                            })
+                    })
+            }
+        }
+
+        fn make_extensions(
+            vars: Vec<TypeParam>,
+            reg: Arc<ExtensionRegistry>,
+        ) -> impl Strategy<Value = (ExtensionSet, Vec<TypeParam>)> {
+            // Some number of extensions from the registry
+            let es = vec(
+                select(
+                    reg.iter()
+                        .map(|e| ExtensionSet::singleton(e.name()))
+                        .collect_vec(),
+                ),
+                0..2,
+            )
+            .prop_map(ExtensionSet::union_over);
+            let vars2 = vars.clone();
+            prop_oneof![
+                es.clone().prop_map(move |es| (es, vars2.clone())),
+                es.prop_flat_map(move |es2| MakeTypeVar(TypeParam::Extensions)
+                    .with_env(vars.clone(), reg.clone())
+                    .prop_map(move |(ta, vars)| (
+                        match ta {
+                            TypeArg::Extensions { es } => es2.clone().union(es),
+                            _ => panic!("Asked for TypeParam::Extensions"),
+                        },
+                        vars
+                    )))
+            ]
+        }
+
+        struct MakeCustomType;
+
+        impl VarEnvState<Type> for MakeCustomType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                any::<Index>().prop_flat_map(move |idx| {
+                    let (ext, typ) = *idx.get(
+                        &reg.iter()
+                            .flat_map(|e| e.types().map(|(name, _)| (e.name(), name)))
+                            .collect_vec(),
+                    );
+                    let typedef = reg.get(ext).unwrap().get_type(typ).unwrap();
+                    // Make unborrowed things that inner closure can take ownership op:
+                    let (ext, typ, reg) = (ext.clone(), typ.clone(), reg.clone());
+                    MakeVec(typedef.params().iter().cloned().map(MakeTypeArg).collect())
+                        .with_env(vars.clone(), reg.clone())
+                        .prop_map(move |(v, vars)| {
+                            (
+                                Type::new_extension(
+                                    reg.get(&ext)
+                                        .unwrap()
+                                        .get_type(&typ)
+                                        .unwrap()
+                                        .instantiate(v)
+                                        .unwrap(),
+                                ),
+                                vars,
+                            )
+                        })
+                })
+            }
+        }
+
+        #[derive(Clone)]
+        struct MakeTypeRow(TypeBound);
+
+        impl VarEnvState<TypeRow> for MakeTypeRow {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (TypeRow, Vec<TypeParam>)> + Clone {
+                (0..MAX_TYPE_ROW_LEN)
+                    .prop_flat_map(move |sz| {
+                        MakeVec(vec![MakeType(self.0); sz]).with_env(vars.clone(), reg.clone())
+                    })
+                    .prop_map(|(vec, vars)| (TypeRow::from(vec), vars))
+            }
+        }
+
+        fn fold_n<
+            E: Clone + std::fmt::Debug + 'static + Send + Sync,
+            T: VarEnvState<E> + Clone + Send + Sync + 'static,
+        >(
+            elem_strat: T,
+            size_strat: impl Strategy<Value = usize>,
+            params: Vec<TypeParam>,
+            reg: Arc<ExtensionRegistry>,
+        ) -> impl Strategy<Value = (Vec<E>, Vec<TypeParam>)> {
+            size_strat.prop_flat_map(move |sz| {
+                MakeVec(vec![elem_strat.clone(); sz]).with_env(params.clone(), reg.clone())
+            })
+        }
+
+        struct MakeVec<T>(Vec<T>);
+
+        impl<E, T: VarEnvState<E>> VarEnvState<Vec<E>> for MakeVec<T>
+        where
+            E: Clone + std::fmt::Debug + 'static + Send + Sync,
+            T: VarEnvState<E> + Clone + Send + Sync + 'static,
+        {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Vec<E>, Vec<TypeParam>)> + Clone {
+                let mut s = Just((Vec::<E>::new(), vars)).sboxed();
+                for strat in self.0 {
+                    let reg2 = reg.clone();
+                    s = s
+                        .prop_flat_map(move |(v, vars)| {
+                            strat.clone().with_env(vars, reg2.clone()).prop_map(
+                                move |(elem, vars)| {
+                                    (v.iter().cloned().chain(once(elem)).collect(), vars)
+                                },
+                            )
+                        })
+                        .sboxed();
+                }
+                s
+            }
+        }
+
+        struct MakePair<S, T>(S, T);
+
+        impl<A, B, S: VarEnvState<A>, T: VarEnvState<B> + Clone> VarEnvState<(A, B)> for MakePair<S, T>
+        where
+            A: std::fmt::Debug + Clone,
+            B: std::fmt::Debug,
+        {
+            fn with_env(
+                self,
+                env: Vec<TypeParam>,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = ((A, B), Vec<TypeParam>)> + Clone {
+                self.0
+                    .with_env(env, reg.clone())
+                    .prop_flat_map(move |(v1, env)| {
+                        self.1
+                            .clone()
+                            .with_env(env, reg.clone())
+                            .prop_map(move |(v2, env)| ((v1.clone(), v2), env))
+                    })
+            }
+        }
+    }
 }
