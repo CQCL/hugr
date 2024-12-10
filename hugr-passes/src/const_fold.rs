@@ -280,6 +280,7 @@ impl<H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'_, H> {
             .filter_map(|((i, ty), pv)| {
                 pv.clone()
                     .try_into_concrete(ty)
+                    .ok()
                     .map(|v| (IncomingPort::from(i), v))
             })
             .collect::<Vec<_>>();
