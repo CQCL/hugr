@@ -1,7 +1,6 @@
 use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder};
-use hugr_core::extension::PRELUDE_REGISTRY;
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::handle::DfgID;
 use hugr_core::ops::TailLoop;
@@ -10,7 +9,7 @@ use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
         prelude::{bool_t, UnpackTuple},
-        ExtensionSet, EMPTY_REG,
+        ExtensionSet,
     },
     ops::{handle::NodeHandle, DataflowOpTrait, Tag, Value},
     type_row,
@@ -58,7 +57,7 @@ fn test_make_tuple() {
     let v1 = builder.add_load_value(Value::false_val());
     let v2 = builder.add_load_value(Value::true_val());
     let v3 = builder.make_tuple([v1, v2]).unwrap();
-    let hugr = builder.finish_hugr(&PRELUDE_REGISTRY).unwrap();
+    let hugr = builder.finish_hugr().unwrap();
 
     let results = Machine::new(&hugr).run(TestContext, []);
 
@@ -74,7 +73,7 @@ fn test_unpack_tuple_const() {
         .add_dataflow_op(UnpackTuple::new(vec![bool_t(); 2].into()), [v])
         .unwrap()
         .outputs_arr();
-    let hugr = builder.finish_hugr(&PRELUDE_REGISTRY).unwrap();
+    let hugr = builder.finish_hugr().unwrap();
 
     let results = Machine::new(&hugr).run(TestContext, []);
 
@@ -100,7 +99,7 @@ fn test_tail_loop_never_iterates() {
         .unwrap();
     let tail_loop = tlb.finish_with_outputs(tagged.out_wire(0), []).unwrap();
     let [tl_o] = tail_loop.outputs_arr();
-    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+    let hugr = builder.finish_hugr().unwrap();
 
     let results = Machine::new(&hugr).run(TestContext, []);
 
@@ -135,7 +134,7 @@ fn test_tail_loop_always_iterates() {
     let tail_loop = tlb.finish_with_outputs(r_w, [true_w]).unwrap();
 
     let [tl_o1, tl_o2] = tail_loop.outputs_arr();
-    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+    let hugr = builder.finish_hugr().unwrap();
 
     let results = Machine::new(&hugr).run(TestContext, []);
 
@@ -172,7 +171,7 @@ fn test_tail_loop_two_iters() {
     let [in_w1, in_w2] = tlb.input_wires_arr();
     let tail_loop = tlb.finish_with_outputs(in_w1, [in_w2, in_w1]).unwrap();
 
-    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+    let hugr = builder.finish_hugr().unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let results = Machine::new(&hugr).run(TestContext, []);
@@ -235,7 +234,7 @@ fn test_tail_loop_containing_conditional() {
 
     let tail_loop = tlb.finish_with_outputs(r, []).unwrap();
 
-    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+    let hugr = builder.finish_hugr().unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let results = Machine::new(&hugr).run(TestContext, []);
@@ -284,7 +283,7 @@ fn test_conditional() {
 
     let [cond_o1, cond_o2] = cond.outputs_arr();
 
-    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+    let hugr = builder.finish_hugr().unwrap();
 
     let arg_pv = PartialValue::new_variant(1, []).join(PartialValue::new_variant(
         2,
@@ -363,7 +362,7 @@ fn xor_and_cfg() -> Hugr {
     builder.branch(&a, tru, &b).unwrap(); // if true
     builder.branch(&a, fals, &x).unwrap(); // if false
     builder.branch(&b, 0, &x).unwrap();
-    builder.finish_hugr(&EMPTY_REG).unwrap()
+    builder.finish_hugr().unwrap()
 }
 
 #[rstest]
@@ -410,16 +409,14 @@ fn test_call(
     let func_defn = func_bldr.finish_with_outputs([v]).unwrap();
     let [a, b] = builder.input_wires_arr();
     let [a2] = builder
-        .call(func_defn.handle(), &[], [a], &EMPTY_REG)
+        .call(func_defn.handle(), &[], [a])
         .unwrap()
         .outputs_arr();
     let [b2] = builder
-        .call(func_defn.handle(), &[], [b], &EMPTY_REG)
+        .call(func_defn.handle(), &[], [b])
         .unwrap()
         .outputs_arr();
-    let hugr = builder
-        .finish_hugr_with_outputs([a2, b2], &EMPTY_REG)
-        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs([a2, b2]).unwrap();
 
     let results = Machine::new(&hugr).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
 
@@ -439,9 +436,7 @@ fn test_region() {
         .unwrap();
     let nested_ins = nested.input_wires();
     let nested = nested.finish_with_outputs(nested_ins).unwrap();
-    let hugr = builder
-        .finish_prelude_hugr_with_outputs(nested.outputs())
-        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs(nested.outputs()).unwrap();
     let [nested_input, _] = hugr.get_io(nested.node()).unwrap();
     let whole_hugr_results = Machine::new(&hugr).run(TestContext, [(0.into(), pv_true())]);
     assert_eq!(
@@ -494,9 +489,7 @@ fn test_module() {
         .unwrap();
     let [inp] = f2.input_wires_arr();
     let cst_true = f2.add_load_value(Value::true_val());
-    let f2_call = f2
-        .call(leaf_fn.handle(), &[], [inp, cst_true], &EMPTY_REG)
-        .unwrap();
+    let f2_call = f2.call(leaf_fn.handle(), &[], [inp, cst_true]).unwrap();
     let f2 = f2.finish_with_outputs(f2_call.outputs()).unwrap();
 
     let mut main = modb
@@ -504,11 +497,9 @@ fn test_module() {
         .unwrap();
     let [inp] = main.input_wires_arr();
     let cst_false = main.add_load_value(Value::false_val());
-    let main_call = main
-        .call(leaf_fn.handle(), &[], [inp, cst_false], &EMPTY_REG)
-        .unwrap();
+    let main_call = main.call(leaf_fn.handle(), &[], [inp, cst_false]).unwrap();
     main.finish_with_outputs(main_call.outputs()).unwrap();
-    let hugr = modb.finish_hugr(&EMPTY_REG).unwrap();
+    let hugr = modb.finish_hugr().unwrap();
     let [f2_inp, _] = hugr.get_io(f2.node()).unwrap();
 
     let results_just_main = Machine::new(&hugr).run(TestContext, [(0.into(), pv_true())]);

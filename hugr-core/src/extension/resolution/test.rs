@@ -15,7 +15,7 @@ use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
 };
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
-use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
+use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
@@ -222,12 +222,6 @@ fn resolve_hugr_extensions() {
 #[rstest]
 fn dropped_weak_extensions() {
     let (ext_a, op_a) = make_extension("dummy.a", "op_a");
-    let build_extensions = ExtensionRegistry::new([
-        PRELUDE.to_owned(),
-        ext_a.clone(),
-        float_types::EXTENSION.to_owned(),
-    ]);
-
     let mut func = FunctionBuilder::new(
         "dummy_fn",
         Signature::new(vec![float64_type(), bool_t()], vec![]).with_extension_delta(
@@ -241,7 +235,7 @@ fn dropped_weak_extensions() {
     let [_func_i0, func_i1] = func.input_wires_arr();
     func.add_dataflow_op(op_a, vec![func_i1]).unwrap();
 
-    let hugr = func.finish_hugr(&build_extensions).unwrap();
+    let hugr = func.finish_hugr().unwrap();
 
     // Do a serialization roundtrip to drop the references.
     let ser = serde_json::to_string(&hugr).unwrap();
