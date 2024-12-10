@@ -538,8 +538,8 @@ mod test {
         builder::{Dataflow, DataflowSubContainer, SubContainer},
         extension::{
             prelude::{
-                self, array::ArrayScan, array_type, bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder as _,
-               
+                self, array::ArrayScan, array_type, bool_t, option_type, usize_t, ConstUsize,
+                UnwrapBuilder as _,
             },
             ExtensionRegistry,
         },
@@ -999,8 +999,7 @@ mod test {
         // We build a HUGR that:
         // - Creates an array [1, 2, 3, ..., size]
         // - Maps a function that increments each element by `inc`
-        // - Returns the sum of the
-
+        // - Returns the sum of the array elements
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
             .with_outs(int_ty.clone())

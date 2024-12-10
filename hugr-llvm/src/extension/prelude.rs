@@ -5,9 +5,9 @@ use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
 use hugr_core::{
     extension::{
         prelude::{
-            self, error_type,
+            self,
             array::{ArrayRepeat, ArrayScan},
-            ArrayOp, ArrayOpDef, ConstError, ConstExternalSymbol, ConstString,
+            error_type, ArrayOp, ArrayOpDef, ConstError, ConstExternalSymbol, ConstString,
             ConstUsize, MakeTuple, TupleOpDef, UnpackTuple, ARRAY_TYPE_NAME,
         },
         simple_op::MakeExtensionOp as _,
