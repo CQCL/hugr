@@ -280,7 +280,7 @@ impl<H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'_, H> {
             .filter_map(|((i, ty), pv)| {
                 pv.clone()
                     .try_into_concrete(ty)
-                    .map_or(None, |v| Some((IncomingPort::from(i), v)))
+                    .map(|v| (IncomingPort::from(i), v))
             })
             .collect::<Vec<_>>();
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
