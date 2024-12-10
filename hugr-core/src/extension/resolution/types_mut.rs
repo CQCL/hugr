@@ -13,12 +13,12 @@ use crate::types::type_row::TypeRowBase;
 use crate::types::{MaybeRV, Signature, SumType, TypeArg, TypeBase, TypeEnum};
 use crate::Node;
 
-/// Replace the dangling extension pointer in the [`CustomType`]s inside a
-/// signature with a valid pointer to the extension in the `extensions`
+/// Replace the dangling extension pointer in the [`CustomType`]s inside an
+/// optype with a valid pointer to the extension in the `extensions`
 /// registry.
 ///
 /// When a pointer is replaced, the extension is added to the
-/// `used_extensions` registry and the new type definition is returned.
+/// `used_extensions` registry.
 ///
 /// This is a helper function used right after deserializing a Hugr.
 pub fn resolve_op_types_extensions(

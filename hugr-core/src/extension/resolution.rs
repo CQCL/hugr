@@ -23,7 +23,7 @@ mod ops;
 mod types;
 mod types_mut;
 
-pub(crate) use ops::{collect_op_extensions, resolve_op_extensions};
+pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
 pub(crate) use types::{collect_op_types_extensions, collect_signature_exts};
 pub(crate) use types_mut::resolve_op_types_extensions;
 

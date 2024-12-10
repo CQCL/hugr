@@ -20,12 +20,12 @@ use crate::Node;
 /// invalidated if the original `Arc<Extension>` is dropped. On such cases, we
 /// return an error with the missing extension names.
 ///
-/// # Attributes
+/// # Parameters
 ///
 /// - `node`: The node where the operation is located, if available. This is
 ///   used to provide context in the error message.
 /// - `op`: The operation to collect the extensions from.
-pub(crate) fn collect_op_extensions(
+pub(crate) fn collect_op_extension(
     node: Option<Node>,
     op: &OpType,
 ) -> Result<Option<Arc<Extension>>, ExtensionCollectionError> {

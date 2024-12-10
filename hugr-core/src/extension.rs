@@ -52,8 +52,9 @@ pub struct ExtensionRegistry {
     /// A flag indicating whether the current set of extensions has been
     /// validated.
     ///
-    /// This is used to avoid re-validating the extensions every time they are
-    /// used, and is set to `false` whenever a new extension is added.
+    /// This is used to avoid re-validating the extensions every time the
+    /// registry is validated, and is set to `false` whenever a new extension is
+    /// added.
     valid: AtomicBool,
 }
 

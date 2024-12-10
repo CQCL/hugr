@@ -10,7 +10,7 @@ pub mod sum;
 pub mod tag;
 pub mod validate;
 use crate::extension::resolution::{
-    collect_op_extensions, collect_op_types_extensions, ExtensionCollectionError,
+    collect_op_extension, collect_op_types_extensions, ExtensionCollectionError,
 };
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
@@ -313,7 +313,7 @@ impl OpType {
         }
     }
 
-    /// Returns a register with all the extensions required by the operation.
+    /// Returns a registry with all the extensions required by the operation.
     ///
     /// This includes the operation extension in [`OpType::extension_id`], and any
     /// extension required by the operation's signature types.
@@ -321,7 +321,7 @@ impl OpType {
         // Collect extensions on the types.
         let mut reg = collect_op_types_extensions(None, self)?;
         // And on the operation definition itself.
-        if let Some(ext) = collect_op_extensions(None, self)? {
+        if let Some(ext) = collect_op_extension(None, self)? {
             reg.register_updated(ext);
         }
         Ok(reg)
