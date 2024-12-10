@@ -1,5 +1,7 @@
 //! Dataflow operations.
 
+use std::borrow::Cow;
+
 use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -19,7 +21,7 @@ pub trait DataflowOpTrait {
     fn description(&self) -> &str;
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature;
+    fn signature(&self) -> Cow<'_, Signature>;
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -105,8 +107,9 @@ impl DataflowOpTrait for Input {
         None
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(TypeRow::new(), self.types.clone())
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(Signature::new(TypeRow::new(), self.types.clone()))
     }
 }
 impl DataflowOpTrait for Output {
@@ -118,8 +121,9 @@ impl DataflowOpTrait for Output {
 
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
-    fn signature(&self) -> Signature {
-        Signature::new(self.types.clone(), TypeRow::new())
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(Signature::new(self.types.clone(), TypeRow::new()))
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -134,7 +138,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn dataflow_signature(&self) -> Option<Signature> {
+    fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         Some(DataflowOpTrait::signature(self))
     }
     fn extension_delta(&self) -> ExtensionSet {
@@ -180,8 +184,8 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
-    fn signature(&self) -> Signature {
-        self.instantiation.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.instantiation)
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -198,7 +202,7 @@ impl Call {
         type_args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let type_args = type_args.into();
+        let type_args: Vec<_> = type_args.into();
         let instantiation = func_sig.instantiate(&type_args, exts)?;
         Ok(Self {
             func_sig,
@@ -272,12 +276,13 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
         let mut s = self.signature.clone();
         s.input
             .to_mut()
             .insert(0, Type::new_function(self.signature.clone()));
-        s
+        Cow::Owned(s)
     }
 }
 
@@ -296,8 +301,9 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(TypeRow::new(), vec![self.datatype.clone()])
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(Signature::new(TypeRow::new(), vec![self.datatype.clone()]))
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -351,8 +357,8 @@ impl DataflowOpTrait for LoadFunction {
         "Load a static function in to the local dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
-        self.signature.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -369,7 +375,7 @@ impl LoadFunction {
         type_args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let type_args = type_args.into();
+        let type_args: Vec<_> = type_args.into();
         let instantiation = func_sig.instantiate(&type_args, exts)?;
         let signature = Signature::new(TypeRow::new(), vec![Type::new_function(instantiation)]);
         Ok(Self {
@@ -418,7 +424,7 @@ impl LoadFunction {
 /// Operations that is the parent of a dataflow graph.
 pub trait DataflowParent {
     /// Signature of the inner dataflow graph.
-    fn inner_signature(&self) -> Signature;
+    fn inner_signature(&self) -> Cow<'_, Signature>;
 }
 
 /// A simply nested dataflow graph.
@@ -432,8 +438,8 @@ pub struct DFG {
 impl_op_name!(DFG);
 
 impl DataflowParent for DFG {
-    fn inner_signature(&self) -> Signature {
-        self.signature.clone()
+    fn inner_signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -444,7 +450,7 @@ impl DataflowOpTrait for DFG {
         "A simply nested dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> Cow<'_, Signature> {
         self.inner_signature()
     }
 }

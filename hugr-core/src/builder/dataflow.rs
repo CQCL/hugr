@@ -248,7 +248,7 @@ impl FunctionBuilder<Hugr> {
             .get_optype(parent)
             .as_func_defn()
             .expect("FunctionBuilder node must be a FuncDefn");
-        let signature = old_optype.inner_signature();
+        let signature = old_optype.inner_signature().into_owned();
         let name = old_optype.name.clone();
         self.hugr_mut()
             .replace_op(

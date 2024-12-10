@@ -615,9 +615,9 @@ mod test {
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder_exts(op_sig.output, 1, op_sig.extension_reqs.clone())?
+            h.simple_entry_builder_exts(op_sig.output.clone(), 1, op_sig.extension_reqs.clone())?
         } else {
-            h.simple_block_builder(op_sig, 1)?
+            h.simple_block_builder(op_sig.into_owned(), 1)?
         };
         let op: OpType = op.into();
         let op = bb.add_dataflow_op(op, bb.input_wires())?;

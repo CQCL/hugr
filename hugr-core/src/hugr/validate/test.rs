@@ -784,7 +784,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let exp_fun_ty = Signature::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
         .with_extension_delta(EXT_ID)
         .with_prelude();
-    assert_eq!(call_ty, exp_fun_ty);
+    assert_eq!(call_ty.as_ref(), &exp_fun_ty);
     Ok(())
 }
 

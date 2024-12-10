@@ -1022,8 +1022,8 @@ mod test {
         let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(XA));
         let optype: OpType = op.clone().into();
         assert_eq!(
-            optype.dataflow_signature().unwrap(),
-            Signature::new_endo(type_row![Type::UNIT])
+            optype.dataflow_signature().unwrap().as_ref(),
+            &Signature::new_endo(type_row![Type::UNIT])
                 .with_extension_delta(XA)
                 .with_prelude()
         );

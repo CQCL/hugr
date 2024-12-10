@@ -11,6 +11,8 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
+use std::borrow::Cow;
+
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
@@ -311,7 +313,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// In contrast to [`poly_func_type`][HugrView::poly_func_type], this
     /// method always return a concrete [`Signature`].
-    fn inner_function_type(&self) -> Option<Signature> {
+    fn inner_function_type(&self) -> Option<Cow<'_, Signature>> {
         self.root_type().inner_function_type()
     }
 
@@ -408,7 +410,7 @@ pub trait HugrView: HugrInternals {
 
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
     /// kind ports will be missing.
-    fn signature(&self, node: Node) -> Option<Signature> {
+    fn signature(&self, node: Node) -> Option<Cow<'_, Signature>> {
         self.get_optype(node).dataflow_signature()
     }
 

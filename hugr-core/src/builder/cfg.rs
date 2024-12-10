@@ -391,7 +391,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
             .get_optype(block_n)
             .as_dataflow_block()
             .unwrap();
-        let signature = block_op.inner_signature();
+        let signature = block_op.inner_signature().into_owned();
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }

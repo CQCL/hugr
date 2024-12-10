@@ -173,6 +173,8 @@ where
 
 #[cfg(test)]
 pub(super) mod test {
+    use std::borrow::Cow;
+
     use rstest::rstest;
 
     use crate::extension::prelude::{qb_t, usize_t};
@@ -241,7 +243,7 @@ pub(super) mod test {
 
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
-            inner_region.inner_function_type(),
+            inner_region.inner_function_type().map(Cow::into_owned),
             Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);

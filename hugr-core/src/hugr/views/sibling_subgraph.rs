@@ -388,7 +388,7 @@ impl SiblingSubgraph {
         {
             return Err(InvalidReplacement::InvalidSignature {
                 expected: self.signature(hugr),
-                actual: dfg_optype.dataflow_signature(),
+                actual: dfg_optype.dataflow_signature().map(|s| s.into_owned()),
             });
         }
 
