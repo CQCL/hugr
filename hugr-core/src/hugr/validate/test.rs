@@ -388,7 +388,8 @@ fn invalid_types() {
         )
         .unwrap();
     });
-    let reg = ExtensionRegistry::try_new([ext.clone(), PRELUDE.clone()]).unwrap();
+    let reg = ExtensionRegistry::new([ext.clone(), PRELUDE.clone()]);
+    reg.validate().unwrap();
 
     let validate_to_sig_error = |t: CustomType| {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));
@@ -569,7 +570,8 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .instantiate(vec![TypeArg::new_var_use(0, BOUND)])?,
     );
-    let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned()]).unwrap();
+    let reg = ExtensionRegistry::new([collections::EXTENSION.to_owned()]);
+    reg.validate()?;
     let mut def = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
@@ -653,7 +655,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let eval2 = dfb.add_dataflow_op(eval2, [par_func, a, b])?;
     dfb.finish_hugr_with_outputs(
         eval2.outputs(),
-        &ExtensionRegistry::try_new([PRELUDE.clone(), e]).unwrap(),
+        &ExtensionRegistry::new([PRELUDE.clone(), e]),
     )?;
     Ok(())
 }
@@ -693,7 +695,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(
         par_func.outputs(),
-        &ExtensionRegistry::try_new([PRELUDE.clone(), e]).unwrap(),
+        &ExtensionRegistry::new([PRELUDE.clone(), e]),
     )?;
     Ok(())
 }
@@ -780,12 +782,13 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         f.finish_with_outputs([tup])?
     };
 
-    let reg = ExtensionRegistry::try_new([e, PRELUDE.clone()])?;
+    let reg = ExtensionRegistry::new([e, PRELUDE.clone()]);
+    reg.validate()?;
     let [func, tup] = d.input_wires_arr();
     let call = d.call(
         f.handle(),
         &[TypeArg::Extensions {
-            es: ExtensionSet::singleton(&PRELUDE_ID),
+            es: ExtensionSet::singleton(PRELUDE_ID),
         }],
         [func, tup],
         &reg,

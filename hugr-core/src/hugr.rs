@@ -19,13 +19,13 @@ pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
 use crate::extension::resolution::{
-    update_op_extensions, update_op_types_extensions, ExtensionResolutionError,
+    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{OpTag, OpTrait};
@@ -162,7 +162,7 @@ impl Hugr {
                 return Ok(es.clone()); // Can't neither add nor remove, so nothing to do
             }
             let merged = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
-            *es = ExtensionSet::singleton(&TO_BE_INFERRED).missing_from(&merged);
+            *es = ExtensionSet::singleton(TO_BE_INFERRED).missing_from(&merged);
 
             Ok(es.clone())
         }
@@ -213,7 +213,11 @@ impl Hugr {
         //
         // This is not something we want to expose it the API, so we manually
         // iterate instead of writing it as a method.
-        for n in 0..self.node_count() {
+        //
+        // Since we don't have a non-borrowing iterator over all the possible
+        // NodeIds, we have to simulate it by iterating over all possible
+        // indices and checking if the node exists.
+        for n in 0..self.graph.node_capacity() {
             let pg_node = portgraph::NodeIndex::new(n);
             let node: Node = pg_node.into();
             if !self.contains_node(node) {
@@ -222,10 +226,10 @@ impl Hugr {
 
             let op = &mut self.op_types[pg_node];
 
-            if let Some(extension) = update_op_extensions(node, op, extensions)? {
+            if let Some(extension) = resolve_op_extensions(node, op, extensions)? {
                 used_extensions.register_updated_ref(extension);
             }
-            update_op_types_extensions(node, op, extensions, &mut used_extensions)?;
+            resolve_op_types_extensions(node, op, extensions, &mut used_extensions)?;
         }
 
         Ok(used_extensions)

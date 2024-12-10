@@ -849,14 +849,11 @@ mod tests {
             dfg.finish_with_outputs([w0, w1, w2])?
         };
         let hugr = mod_builder
-            .finish_hugr(
-                &ExtensionRegistry::try_new([
-                    prelude::PRELUDE.to_owned(),
-                    test_quantum_extension::EXTENSION.to_owned(),
-                    float_types::EXTENSION.to_owned(),
-                ])
-                .unwrap(),
-            )
+            .finish_hugr(&ExtensionRegistry::new([
+                prelude::PRELUDE.to_owned(),
+                test_quantum_extension::EXTENSION.to_owned(),
+                float_types::EXTENSION.to_owned(),
+            ]))
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -1139,14 +1136,11 @@ mod tests {
         let extracted = subgraph.extract_subgraph(&hugr, "region");
 
         extracted
-            .validate(
-                &ExtensionRegistry::try_new([
-                    prelude::PRELUDE.to_owned(),
-                    test_quantum_extension::EXTENSION.to_owned(),
-                    float_types::EXTENSION.to_owned(),
-                ])
-                .unwrap(),
-            )
+            .validate(&ExtensionRegistry::new([
+                prelude::PRELUDE.to_owned(),
+                test_quantum_extension::EXTENSION.to_owned(),
+                float_types::EXTENSION.to_owned(),
+            ]))
             .unwrap();
     }
 

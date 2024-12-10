@@ -17,7 +17,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
-pub use signature::{FuncValueType, Signature};
+pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::{TypeRow, TypeRowRV};
@@ -25,8 +25,6 @@ pub use type_row::{TypeRow, TypeRowRV};
 // Unused in --no-features
 #[allow(unused_imports)]
 pub(crate) use poly_func::PolyFuncTypeBase;
-#[allow(unused_imports)]
-pub(crate) use signature::FuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};

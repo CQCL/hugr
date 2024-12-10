@@ -116,6 +116,11 @@ impl ExtensionOp {
     pub fn signature_mut(&mut self) -> &mut Signature {
         &mut self.signature
     }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
@@ -235,6 +240,11 @@ impl OpaqueOp {
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
+    }
 }
 
 impl DataflowOpTrait for OpaqueOp {
@@ -299,7 +309,7 @@ mod test {
 
     use ops::OpType;
 
-    use crate::extension::resolution::update_op_extensions;
+    use crate::extension::resolution::resolve_op_extensions;
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{
@@ -349,7 +359,7 @@ mod test {
             Signature::new(i0.clone(), bool_t()),
         );
         let mut resolved = opaque.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
             &mut resolved,
             registry,
@@ -383,7 +393,8 @@ mod test {
         });
         let ext_id = ext.name().clone();
 
-        let registry = ExtensionRegistry::try_new([ext]).unwrap();
+        let registry = ExtensionRegistry::new([ext]);
+        registry.validate().unwrap();
         let opaque_val = OpaqueOp::new(
             ext_id.clone(),
             val_name,
@@ -393,7 +404,7 @@ mod test {
         );
         let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
         let mut resolved_val = opaque_val.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
             &mut resolved_val,
             &registry,
@@ -402,7 +413,7 @@ mod test {
         assert_eq!(resolve_res_definition(&resolved_val).name(), val_name);
 
         let mut resolved_comp = opaque_comp.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(2)),
             &mut resolved_comp,
             &registry,

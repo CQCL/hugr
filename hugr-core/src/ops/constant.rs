@@ -594,7 +594,7 @@ mod test {
         }
 
         fn extension_reqs(&self) -> ExtensionSet {
-            ExtensionSet::singleton(self.0.extension())
+            ExtensionSet::singleton(self.0.extension().clone())
         }
 
         fn get_type(&self) -> Type {
@@ -614,7 +614,7 @@ mod test {
     }
 
     fn test_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap()
+        ExtensionRegistry::new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()])
     }
 
     /// Constructs a DFG hugr defining a sum constant, and returning the loaded value.

@@ -254,18 +254,17 @@ lazy_static! {
     /// Extension for basic integer operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(ExtensionSet::singleton(&super::int_types::EXTENSION_ID));
+            extension.add_requirements(ExtensionSet::singleton(super::int_types::EXTENSION_ID));
             IntOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
 
     /// Registry of extensions required to validate integer operations.
-    pub static ref INT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+    pub static ref INT_OPS_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([
         PRELUDE.clone(),
         super::int_types::EXTENSION.clone(),
         EXTENSION.clone(),
-    ])
-    .unwrap();
+    ]);
 }
 
 impl HasConcrete for IntOpDef {
