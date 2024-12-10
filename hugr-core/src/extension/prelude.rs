@@ -35,6 +35,9 @@ pub use unwrap_builder::UnwrapBuilder;
 pub mod array;
 pub use array::{array_type, new_array_op, ArrayOp, ArrayOpDef, ARRAY_TYPE_NAME, NEW_ARRAY_OP_ID};
 
+/// Operation to load generic bounded nat parameter.
+pub mod generic;
+
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
@@ -124,6 +127,7 @@ lazy_static! {
             array::ArrayOpDef::load_all_ops(prelude, extension_ref).unwrap();
             array::ArrayRepeatDef.add_to_extension(prelude, extension_ref).unwrap();
             array::ArrayScanDef.add_to_extension(prelude, extension_ref).unwrap();
+            generic::LoadNatDef.add_to_extension(prelude, extension_ref).unwrap();
         })
     };
 
