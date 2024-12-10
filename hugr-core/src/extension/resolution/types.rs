@@ -53,7 +53,7 @@ pub fn update_op_types_extensions(
         }
         OpType::LoadFunction(lf) => {
             update_signature_exts(node, lf.func_sig.body_mut(), extensions, used_extensions)?;
-            update_signature_exts(node, &mut lf.signature, extensions, used_extensions)?;
+            update_signature_exts(node, &mut lf.instantiation, extensions, used_extensions)?;
         }
         OpType::DFG(dfg) => {
             update_signature_exts(node, &mut dfg.signature, extensions, used_extensions)?

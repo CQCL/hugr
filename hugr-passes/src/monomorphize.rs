@@ -113,12 +113,22 @@ fn mono_scan(
         let (type_args, mono_sig, new_op) = match ch_op {
             OpType::Call(c) => {
                 let mono_sig = c.instantiation.clone();
-                (&c.type_args, mono_sig.clone(), OpType::from(Call::try_new(mono_sig.into(), [], reg).unwrap()))
+                (
+                    &c.type_args,
+                    mono_sig.clone(),
+                    OpType::from(Call::try_new(mono_sig.into(), [], reg).unwrap()),
+                )
             }
             OpType::LoadFunction(lf) => {
                 eprintln!("{lf:?}");
-                let mono_sig = lf.instantiation();
-                (&lf.type_args, mono_sig.clone(), LoadFunction::try_new(mono_sig.into(), [], reg).unwrap().into())
+                let mono_sig = lf.instantiation.clone();
+                (
+                    &lf.type_args,
+                    mono_sig.clone(),
+                    LoadFunction::try_new(mono_sig.into(), [], reg)
+                        .unwrap()
+                        .into(),
+                )
             }
             _ => continue,
         };
@@ -136,9 +146,7 @@ fn mono_scan(
         h.disconnect(ch, fn_inp); // No-op if copying+substituting
         h.connect(new_tgt, fn_out, ch, fn_inp);
 
-
-        h.replace_op(ch, new_op)
-            .unwrap();
+        h.replace_op(ch, new_op).unwrap();
     }
 }
 
@@ -491,15 +499,34 @@ mod test {
         let hugr = {
             let mut module_builder = ModuleBuilder::new();
             let foo = {
-                let builder = module_builder.define_function("foo", PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(Type::new_var_use(0,TypeBound::Any)))).unwrap();
+                let builder = module_builder
+                    .define_function(
+                        "foo",
+                        PolyFuncType::new(
+                            [TypeBound::Any.into()],
+                            Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
+                        ),
+                    )
+                    .unwrap();
                 let inputs = builder.input_wires();
                 builder.finish_with_outputs(inputs).unwrap()
             };
 
             let _main = {
-                let mut builder = module_builder.define_function("main", Signature::new_endo(Type::UNIT)).unwrap();
-                let func_ptr = builder.load_func(foo.handle(), &[Type::UNIT.into()], &EMPTY_REG).unwrap();
-                let  [r] = builder.call_indirect(Signature::new_endo(Type::UNIT), func_ptr, builder.input_wires()).unwrap().outputs_arr();
+                let mut builder = module_builder
+                    .define_function("main", Signature::new_endo(Type::UNIT))
+                    .unwrap();
+                let func_ptr = builder
+                    .load_func(foo.handle(), &[Type::UNIT.into()], &EMPTY_REG)
+                    .unwrap();
+                let [r] = builder
+                    .call_indirect(
+                        Signature::new_endo(Type::UNIT),
+                        func_ptr,
+                        builder.input_wires(),
+                    )
+                    .unwrap()
+                    .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap()
             };
             module_builder.finish_hugr(&EMPTY_REG).unwrap()

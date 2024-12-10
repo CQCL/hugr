@@ -690,8 +690,16 @@ pub trait Dataflow: Container {
     }
 
     /// TODO docs
-    fn call_indirect(&mut self, signature: Signature, function: Wire, input_wires: impl IntoIterator<Item = Wire>) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_op(CallIndirect { signature }, iter::once(function).chain(input_wires))
+    fn call_indirect(
+        &mut self,
+        signature: Signature,
+        function: Wire,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        self.add_dataflow_op(
+            CallIndirect { signature },
+            iter::once(function).chain(input_wires),
+        )
     }
 
     /// For the vector of `wires`, produce a `CircuitBuilder` where ops can be

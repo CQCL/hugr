@@ -528,7 +528,7 @@ impl ArrayScanDef {
     /// To avoid recursion when defining the extension, take the type definition
     /// and a reference to the extension as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        // array<N, T1>, (T1, *A -> T2, *A), -> array<N, T2>, *A
+        // array<N, T1>, (T1, *A -> T2, *A), *A, -> array<N, T2>, *A
         let params = vec![
             TypeParam::max_nat(),
             TypeBound::Any.into(),

@@ -4,8 +4,8 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, FuncValueType, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeEnum, TypeRow};
-use crate::IncomingPort;
+use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
+use crate::{type_row, IncomingPort};
 
 #[cfg(test)]
 use ::proptest_derive::Arbitrary;
@@ -392,8 +392,8 @@ pub struct LoadFunction {
     pub func_sig: PolyFuncType,
     /// The type arguments that instantiate `func_sig`.
     pub type_args: Vec<TypeArg>,
-    /// The signature of the op.
-    pub signature: Signature, // Cache, so we can fail in try_new() not in signature()
+    /// The instantiation of `func_sig`.
+    pub instantiation: Signature, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(LoadFunction);
 impl DataflowOpTrait for LoadFunction {
@@ -404,7 +404,7 @@ impl DataflowOpTrait for LoadFunction {
     }
 
     fn signature(&self) -> Signature {
-        self.signature.clone()
+        Signature::new(type_row![], Type::new_function(self.instantiation.clone()))
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -417,17 +417,17 @@ impl DataflowOpTrait for LoadFunction {
             .iter()
             .map(|ta| ta.substitute(subst))
             .collect::<Vec<_>>();
-        let signature = self.signature.substitute(subst);
+        let instantiation = self.instantiation.substitute(subst);
         debug_assert_eq!(
             self.func_sig
                 .instantiate(&type_args, subst.extension_registry())
                 .as_ref(),
-            Ok(&signature)
+            Ok(&instantiation)
         );
         Self {
             func_sig: self.func_sig.clone(),
             type_args,
-            signature,
+            instantiation,
         }
     }
 }
@@ -443,11 +443,10 @@ impl LoadFunction {
     ) -> Result<Self, SignatureError> {
         let type_args = type_args.into();
         let instantiation = func_sig.instantiate(&type_args, exts)?;
-        let signature = Signature::new(TypeRow::new(), vec![Type::new_function(instantiation)]);
         Ok(Self {
             func_sig,
             type_args,
-            signature,
+            instantiation,
         })
     }
 
@@ -455,15 +454,6 @@ impl LoadFunction {
     /// Return the type of the function loaded by this op.
     pub fn function_type(&self) -> &PolyFuncType {
         &self.func_sig
-    }
-
-    #[inline]
-    /// TODO docs
-    pub fn instantiation(&self) -> Signature {
-        let TypeEnum::Function (ty) = self.signature.output[0].as_type_enum() else {
-            panic!("")
-        };
-        ty.as_ref().clone().try_into().unwrap()
     }
 
     /// The IncomingPort which links to the loaded function.
@@ -485,12 +475,12 @@ impl LoadFunction {
             self.type_args.clone(),
             extension_registry,
         )?;
-        if other.signature == self.signature {
+        if other.instantiation == self.instantiation {
             Ok(())
         } else {
             Err(SignatureError::LoadFunctionIncorrectlyAppliesType {
-                cached: self.signature.clone(),
-                expected: other.signature.clone(),
+                cached: self.instantiation.clone(),
+                expected: other.instantiation.clone(),
             })
         }
     }
