@@ -257,7 +257,14 @@ impl DataflowOpTrait for OpaqueOp {
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
-        Cow::Borrowed(&self.signature)
+        // TODO: Return a borrowed cow once
+        // https://github.com/CQCL/hugr/issues/1758
+        // gets fixed
+        Cow::Owned(
+            self.signature
+                .clone()
+                .with_extension_delta(self.extension.clone()),
+        )
     }
 }
 
