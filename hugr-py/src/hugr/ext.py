@@ -160,7 +160,13 @@ class FixedHugr:
 
 @dataclass
 class OpDefSig:
-    """Type signature of an :class:`OpDef`."""
+    """Type signature of an :class:`OpDef`.
+
+    Args:
+        poly_func: The polymorphic function type of the operation.
+        binary: If no static type scheme known, flag indicates a computation of the
+            signature
+    """
 
     #: The polymorphic function type of the operation (type scheme).
     poly_func: tys.PolyFuncType | None
@@ -311,6 +317,12 @@ class Extension:
         Returns:
             The added operation definition, now associated with the extension.
         """
+        if op_def.signature.poly_func is not None:
+            # Ensure the op def signature has the extension as a requirement
+            op_def.signature.poly_func = op_def.signature.poly_func.with_extension_reqs(
+                [self.name]
+            )
+
         op_def._extension = self
         self.operations[op_def.name] = op_def
         return self.operations[op_def.name]

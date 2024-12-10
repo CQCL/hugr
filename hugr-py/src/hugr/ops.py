@@ -453,7 +453,11 @@ class MakeTuple(AsExtOp, _PartialOp):
         return std.PRELUDE.get_op("MakeTuple")
 
     def cached_signature(self) -> tys.FunctionType | None:
-        return tys.FunctionType(input=self.types, output=[tys.Tuple(*self.types)])
+        return tys.FunctionType(
+            input=self.types,
+            output=[tys.Tuple(*self.types)],
+            extension_reqs=["prelude"],
+        )
 
     def type_args(self) -> list[tys.TypeArg]:
         return [tys.SequenceArg([t.type_arg() for t in self.types])]
@@ -492,7 +496,11 @@ class UnpackTuple(AsExtOp, _PartialOp):
         return std.PRELUDE.get_op("UnpackTuple")
 
     def cached_signature(self) -> tys.FunctionType | None:
-        return tys.FunctionType(input=[tys.Tuple(*self.types)], output=self.types)
+        return tys.FunctionType(
+            input=[tys.Tuple(*self.types)],
+            output=self.types,
+            extension_reqs=["prelude"],
+        )
 
     def type_args(self) -> list[tys.TypeArg]:
         return [tys.SequenceArg([t.type_arg() for t in self.types])]
@@ -1266,10 +1274,16 @@ class Noop(AsExtOp, _PartialOp):
         return std.PRELUDE.get_op("Noop")
 
     def cached_signature(self) -> tys.FunctionType | None:
-        return tys.FunctionType.endo([self.type_])
+        return tys.FunctionType.endo(
+            [self.type_],
+            extension_reqs=["prelude"],
+        )
 
     def outer_signature(self) -> tys.FunctionType:
-        return tys.FunctionType.endo([self.type_])
+        return tys.FunctionType.endo(
+            [self.type_],
+            extension_reqs=["prelude"],
+        )
 
     def _set_in_types(self, types: tys.TypeRow) -> None:
         (t,) = types
