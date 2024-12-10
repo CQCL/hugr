@@ -1,10 +1,11 @@
-use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeArg, TypeBase, TypeBound, TypeEnum};
+use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeBase, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
 
-use crate::extension::prelude::{array_type, qb_t, usize_t};
+use crate::extension::prelude::{qb_t, usize_t};
 use crate::extension::SignatureError;
 use crate::ops::AliasDecl;
+use crate::std_extensions::collections::array::array_type;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -51,7 +52,7 @@ impl<RV: MaybeRV> TryFrom<SerSimpleType> for TypeBase<RV> {
             SerSimpleType::G(sig) => TypeBase::new_function(*sig),
             SerSimpleType::Sum(st) => st.into(),
             SerSimpleType::Array { inner, len } => {
-                array_type(TypeArg::BoundedNat { n: len }, (*inner).try_into().unwrap()).into_()
+                array_type(len, (*inner).try_into().unwrap()).into_()
             }
             SerSimpleType::Opaque(o) => TypeBase::new_extension(o),
             SerSimpleType::Alias(a) => TypeBase::new_alias(a),
