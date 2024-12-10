@@ -670,7 +670,7 @@ pub(super) mod test {
                 .unwrap(),
             dfg.input_wires(),
         )?;
-        dfg.finish_hugr_with_outputs(rev.outputs(), &reg)?;
+        dfg.finish_hugr_with_outputs(rev.outputs())?;
 
         Ok(())
     }

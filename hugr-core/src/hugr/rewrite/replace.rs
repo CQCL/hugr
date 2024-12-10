@@ -491,7 +491,7 @@ mod test {
         cfg.branch(&entry, 0, &bb2)?;
         cfg.branch(&bb2, 0, &exit)?;
 
-        let mut h = cfg.finish_hugr(&reg).unwrap();
+        let mut h = cfg.finish_hugr().unwrap();
         {
             let pop = find_node(&h, "pop");
             let push = find_node(&h, "push");
@@ -571,7 +571,7 @@ mod test {
             }],
             mu_new: vec![],
         })?;
-        h.update_validate(&reg)?;
+        h.validate()?;
         {
             let pop = find_node(&h, "pop");
             let push = find_node(&h, "push");
@@ -684,9 +684,7 @@ mod test {
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs()).unwrap();
         let case2 = case2.finish_with_outputs(baz_dfg.outputs()).unwrap().node();
         let cond = cond.finish_sub_container().unwrap();
-        let h = h
-            .finish_hugr_with_outputs(cond.outputs(), &registry)
-            .unwrap();
+        let h = h.finish_hugr_with_outputs(cond.outputs()).unwrap();
 
         let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());
         let r1 = r_hugr.add_node_with_parent(

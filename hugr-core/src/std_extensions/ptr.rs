@@ -235,9 +235,7 @@ pub(crate) mod test {
     use strum::IntoEnumIterator;
 
     use super::*;
-    use crate::std_extensions::arithmetic::float_types::{
-        float64_type, EXTENSION as FLOAT_EXTENSION,
-    };
+    use crate::std_extensions::arithmetic::float_types::float64_type;
     fn get_opdef(op: impl NamedOp) -> Option<&'static Arc<OpDef>> {
         EXTENSION.get_op(&op.name())
     }
@@ -271,7 +269,6 @@ pub(crate) mod test {
     fn test_build() {
         let in_row = vec![bool_t(), float64_type()];
 
-        let reg = ExtensionRegistry::new([EXTENSION.to_owned(), FLOAT_EXTENSION.to_owned()]);
         let hugr = {
             let mut builder = DFGBuilder::new(
                 Signature::new(in_row.clone(), type_row![]).with_extension_delta(EXTENSION_ID),
@@ -285,8 +282,8 @@ pub(crate) mod test {
                 builder.add_write_ptr(new_ptr, read).unwrap();
             }
 
-            builder.finish_hugr_with_outputs([], &reg).unwrap()
+            builder.finish_hugr_with_outputs([]).unwrap()
         };
-        assert_matches!(hugr.validate(&reg), Ok(_));
+        assert_matches!(hugr.validate(), Ok(_));
     }
 }

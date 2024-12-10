@@ -1,4 +1,4 @@
-use crate::extension::{ExtensionRegistry, TO_BE_INFERRED};
+use crate::extension::TO_BE_INFERRED;
 use crate::hugr::views::HugrView;
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::types::{Signature, TypeRow};
@@ -142,11 +142,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 }
 
 impl HugrBuilder for ConditionalBuilder<Hugr> {
-    fn finish_hugr(
-        mut self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.update_validate(extension_registry)?;
+    fn finish_hugr(mut self) -> Result<Hugr, crate::hugr::ValidationError> {
+        if cfg!(feature = "extension_inference") {
+            self.base.infer_extensions(false)?;
+        }
+        self.base.validate()?;
         Ok(self.base)
     }
 }
@@ -264,7 +264,7 @@ mod test {
                 let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
-            Ok(module_builder.finish_prelude_hugr()?)
+            Ok(module_builder.finish_hugr()?)
         };
 
         assert_matches!(build_result, Ok(_));

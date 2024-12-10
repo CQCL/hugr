@@ -14,9 +14,9 @@ use crate::extension::prelude::{bool_t, ConstUsize};
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
 };
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE};
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
-use crate::std_extensions::arithmetic::float_types::{self, float64_type};
+use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::types::{Signature, Type};
@@ -88,17 +88,6 @@ fn resolve_hugr_extensions() {
     let (ext_d, op_d) = make_extension("dummy.d", "op_d");
     let (ext_e, op_e) = make_extension("dummy.e", "op_e");
 
-    let build_extensions = ExtensionRegistry::new([
-        PRELUDE.to_owned(),
-        ext_a.clone(),
-        ext_b.clone(),
-        ext_c.clone(),
-        ext_d.clone(),
-        ext_e.clone(),
-        float_types::EXTENSION.to_owned(),
-        int_types::EXTENSION.to_owned(),
-    ]);
-
     let mut module = ModuleBuilder::new();
 
     // A constant op using the prelude extension.
@@ -133,20 +122,8 @@ fn resolve_hugr_extensions() {
     let [func_i0, func_i1] = func.input_wires_arr();
 
     // Call the function declaration directly, and load & call indirectly.
-    func.call(
-        &decl,
-        &[],
-        vec![func_i0],
-        &ExtensionRegistry::new([float_types::EXTENSION.to_owned()]),
-    )
-    .unwrap();
-    let loaded_func = func
-        .load_func(
-            &decl,
-            &[],
-            &ExtensionRegistry::new([float_types::EXTENSION.to_owned()]),
-        )
-        .unwrap();
+    func.call(&decl, &[], vec![func_i0]).unwrap();
+    let loaded_func = func.load_func(&decl, &[]).unwrap();
     func.add_dataflow_op(
         CallIndirect {
             signature: Signature::new_endo(vec![float64_type()]),
@@ -212,9 +189,13 @@ fn resolve_hugr_extensions() {
 
     // Finally, finish the hugr and ensure it's using the right extensions.
     func.finish_with_outputs(vec![]).unwrap();
-    let mut hugr = module
-        .finish_hugr(&build_extensions)
-        .unwrap_or_else(|e| panic!("{e}"));
+    let mut hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
+
+    let build_extensions = hugr.extensions().clone();
+    assert!(build_extensions.contains(ext_a.name()));
+    assert!(build_extensions.contains(ext_b.name()));
+    assert!(build_extensions.contains(ext_c.name()));
+    assert!(build_extensions.contains(ext_d.name()));
 
     // Check that the read-only methods collect the same extensions.
     let mut collected_exts = ExtensionRegistry::default();
@@ -228,14 +209,12 @@ fn resolve_hugr_extensions() {
     );
 
     // Check that the mutable methods collect the same extensions.
-    assert_matches!(
-        hugr.resolve_extension_defs(&ExtensionRegistry::default()),
-        Err(_)
-    );
-    let resolved = hugr.resolve_extension_defs(&build_extensions).unwrap();
+    hugr.resolve_extension_defs(&build_extensions).unwrap();
     assert_eq!(
-        &resolved, &build_extensions,
-        "{resolved} != {build_extensions}"
+        hugr.extensions(),
+        &build_extensions,
+        "{} != {build_extensions}",
+        hugr.extensions()
     );
 }
 
@@ -243,12 +222,6 @@ fn resolve_hugr_extensions() {
 #[rstest]
 fn dropped_weak_extensions() {
     let (ext_a, op_a) = make_extension("dummy.a", "op_a");
-    let build_extensions = ExtensionRegistry::new([
-        PRELUDE.to_owned(),
-        ext_a.clone(),
-        float_types::EXTENSION.to_owned(),
-    ]);
-
     let mut func = FunctionBuilder::new(
         "dummy_fn",
         Signature::new(vec![float64_type(), bool_t()], vec![]).with_extension_delta(
@@ -262,7 +235,7 @@ fn dropped_weak_extensions() {
     let [_func_i0, func_i1] = func.input_wires_arr();
     func.add_dataflow_op(op_a, vec![func_i1]).unwrap();
 
-    let hugr = func.finish_hugr(&build_extensions).unwrap();
+    let hugr = func.finish_hugr().unwrap();
 
     // Do a serialization roundtrip to drop the references.
     let ser = serde_json::to_string(&hugr).unwrap();

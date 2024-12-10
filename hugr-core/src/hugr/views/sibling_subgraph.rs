@@ -785,7 +785,6 @@ mod tests {
     use cool_asserts::assert_matches;
 
     use crate::builder::inout_sig;
-    use crate::extension::{prelude, ExtensionRegistry};
     use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::std_extensions::logic::{self, LogicOp};
@@ -849,11 +848,7 @@ mod tests {
             dfg.finish_with_outputs([w0, w1, w2])?
         };
         let hugr = mod_builder
-            .finish_hugr(&ExtensionRegistry::new([
-                prelude::PRELUDE.to_owned(),
-                test_quantum_extension::EXTENSION.to_owned(),
-                float_types::EXTENSION.to_owned(),
-            ]))
+            .finish_hugr()
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -875,7 +870,7 @@ mod tests {
             dfg.finish_with_outputs(outs3.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr(&test_quantum_extension::REG)
+            .finish_hugr()
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -897,7 +892,7 @@ mod tests {
             dfg.finish_with_outputs([b1, b2])?
         };
         let hugr = mod_builder
-            .finish_hugr(&test_quantum_extension::REG)
+            .finish_hugr()
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -918,7 +913,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr(&test_quantum_extension::REG)
+            .finish_hugr()
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -951,7 +946,7 @@ mod tests {
             let builder =
                 DFGBuilder::new(Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])).unwrap();
             let inputs = builder.input_wires();
-            builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
+            builder.finish_hugr_with_outputs(inputs).unwrap()
         };
 
         let rep = sub.create_simple_replacement(&func, empty_dfg).unwrap();
@@ -991,7 +986,7 @@ mod tests {
         let empty_dfg = {
             let builder = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
             let inputs = builder.input_wires();
-            builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
+            builder.finish_hugr_with_outputs(inputs).unwrap()
         };
 
         assert_matches!(
@@ -1135,13 +1130,7 @@ mod tests {
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
         let extracted = subgraph.extract_subgraph(&hugr, "region");
 
-        extracted
-            .validate(&ExtensionRegistry::new([
-                prelude::PRELUDE.to_owned(),
-                test_quantum_extension::EXTENSION.to_owned(),
-                float_types::EXTENSION.to_owned(),
-            ]))
-            .unwrap();
+        extracted.validate().unwrap();
     }
 
     #[test]
@@ -1161,9 +1150,7 @@ mod tests {
             .unwrap()
             .outputs();
         let outw = [outw1].into_iter().chain(outw2);
-        let h = builder
-            .finish_hugr_with_outputs(outw, &test_quantum_extension::REG)
-            .unwrap();
+        let h = builder.finish_hugr_with_outputs(outw).unwrap();
         let view = SiblingGraph::<DfgID>::try_new(&h, h.root()).unwrap();
         let subg = SiblingSubgraph::try_new_dataflow_subgraph(&view).unwrap();
         assert_eq!(subg.nodes().len(), 2);

@@ -102,7 +102,7 @@
 //!     }
 //! }
 //!
-//! use mini_quantum_extension::{cx_gate, h_gate, measure, REG};
+//! use mini_quantum_extension::{cx_gate, h_gate, measure};
 //!
 //! //      ┌───┐
 //! // q_0: ┤ H ├──■─────
@@ -120,7 +120,7 @@
 //!     let h1 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
 //!     let cx = dfg_builder.add_dataflow_op(cx_gate(), h0.outputs().chain(h1.outputs()))?;
 //!     let measure = dfg_builder.add_dataflow_op(measure(), cx.outputs().last())?;
-//!     dfg_builder.finish_hugr_with_outputs(cx.outputs().take(1).chain(measure.outputs()), &REG)
+//!     dfg_builder.finish_hugr_with_outputs(cx.outputs().take(1).chain(measure.outputs()))
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().unwrap();

@@ -8,15 +8,13 @@ use crate::builder::{
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
 use crate::extension::simple_op::MakeRegisteredOp;
-use crate::extension::ExtensionId;
-use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
+use crate::extension::ExtensionRegistry;
+use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
-use crate::hugr::ExtensionResolutionError;
-use crate::ops::custom::{ExtensionOp, OpaqueOp};
+use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::float64_type;
-use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
 use crate::types::type_param::TypeParam;
@@ -24,7 +22,6 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
-use crate::utils::test_quantum_extension;
 use crate::{type_row, OutgoingPort};
 
 use itertools::Itertools;
@@ -289,6 +286,7 @@ fn simpleser() {
         root,
         op_types,
         metadata: Default::default(),
+        extensions: ExtensionRegistry::default(),
     };
 
     check_hugr_roundtrip(&hugr, true);
@@ -317,7 +315,7 @@ fn weighted_hugr_ser() {
         f_build.set_metadata("val", 42);
         f_build.finish_with_outputs(outputs).unwrap();
 
-        module_builder.finish_prelude_hugr().unwrap()
+        module_builder.finish_hugr().unwrap()
     };
 
     check_hugr_roundtrip(&hugr, true);
@@ -334,7 +332,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .out_wire(0);
     }
-    let hugr = dfg.finish_hugr_with_outputs(params, &test_quantum_extension::REG)?;
+    let hugr = dfg.finish_hugr_with_outputs(params)?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -353,7 +351,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .out_wire(0);
 
-    let hugr = dfg.finish_hugr_with_outputs([wire], &test_quantum_extension::REG)?;
+    let hugr = dfg.finish_hugr_with_outputs([wire])?;
 
     check_hugr_roundtrip(&hugr, true);
     Ok(())
@@ -371,7 +369,6 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(extension_op.clone(), [wire])
         .unwrap()
         .out_wire(0);
-    let not_node = wire.node();
 
     // Add an unresolved opaque operation
     let opaque_op: OpaqueOp = extension_op.into();
@@ -379,15 +376,12 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
     let wire = dfg.add_dataflow_op(opaque_op, [wire]).unwrap().out_wire(0);
 
     assert_eq!(
-        dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY),
-        Err(ValidationError::ExtensionResolutionError(
-            ExtensionResolutionError::MissingOpExtension {
-                node: not_node,
-                op: "logic.Not".into(),
-                missing_extension: ext_name,
-                available_extensions: vec![ExtensionId::new("prelude").unwrap()]
-            }
-        )
+        dfg.finish_hugr_with_outputs([wire]),
+        Err(ValidationError::OpaqueOpError(OpaqueOpError::UnresolvedOp(
+            wire.node(),
+            "Not".into(),
+            ext_name,
+        ))
         .into())
     );
 
@@ -399,7 +393,7 @@ fn function_type() -> Result<(), Box<dyn std::error::Error>> {
     let fn_ty = Type::new_function(Signature::new_endo(vec![bool_t()]).with_prelude());
     let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]).with_prelude())?;
     let op = bldr.add_dataflow_op(Noop(fn_ty), bldr.input_wires())?;
-    let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
+    let h = bldr.finish_hugr_with_outputs(op.outputs())?;
 
     check_hugr_roundtrip(&h, true);
     Ok(())
@@ -417,11 +411,10 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     hugr.connect(new_in, 0, out, 0);
     hugr.move_before_sibling(new_in, old_in);
     hugr.remove_node(old_in);
-    hugr.update_validate(&PRELUDE_REGISTRY)?;
+    hugr.validate()?;
 
     let rhs: Hugr = check_hugr_roundtrip(&hugr, true);
-    rhs.validate(&EMPTY_REG).unwrap_err();
-    rhs.validate(&PRELUDE_REGISTRY)?;
+    rhs.validate()?;
     Ok(())
 }
 
@@ -429,10 +422,10 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
 fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let mut builder = DFGBuilder::new(inout_sig(vec![], INT_TYPES[4].clone())).unwrap();
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
-    let hugr = builder.finish_hugr_with_outputs([w], &INT_OPS_REGISTRY)?;
+    let hugr = builder.finish_hugr_with_outputs([w])?;
 
-    let ser = serde_json::to_string(&hugr)?;
-    let deser = serde_json::from_str(&ser)?;
+    let ser = serde_json::to_vec(&hugr)?;
+    let deser = Hugr::load_json(ser.as_slice(), hugr.extensions())?;
 
     assert_eq!(hugr, deser);
 

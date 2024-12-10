@@ -117,7 +117,7 @@ mod test {
     use crate::extension::prelude::PRELUDE_ID;
     use crate::{
         builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::{prelude::ConstUsize, PRELUDE_REGISTRY},
+        extension::prelude::ConstUsize,
         ops::{handle::NodeHandle, Value},
         type_row,
         types::Signature,
@@ -136,7 +136,7 @@ mod test {
         let tup = dfg_build.make_tuple([load_1, load_2])?;
         dfg_build.finish_sub_container()?;
 
-        let mut h = build.finish_prelude_hugr()?;
+        let mut h = build.finish_hugr()?;
         // nodes are Module, Function, Input, Output, Const, LoadConstant*2, MakeTuple
         assert_eq!(h.node_count(), 8);
         let tup_node = tup.node();
@@ -194,7 +194,7 @@ mod test {
         assert_eq!(h.apply_rewrite(remove_con)?, h.root());
 
         assert_eq!(h.node_count(), 4);
-        assert!(h.validate(&PRELUDE_REGISTRY).is_ok());
+        assert!(h.validate().is_ok());
         Ok(())
     }
 }
