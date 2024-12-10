@@ -213,6 +213,10 @@ impl Hugr {
         //
         // This is not something we want to expose it the API, so we manually
         // iterate instead of writing it as a method.
+        //
+        // Since we don't have a non-borrowing iterator over all the possible
+        // NodeIds, we have to simulate it by iterating over all possible
+        // indices and checking if the node exists.
         for n in 0..self.graph.node_capacity() {
             let pg_node = portgraph::NodeIndex::new(n);
             let node: Node = pg_node.into();
