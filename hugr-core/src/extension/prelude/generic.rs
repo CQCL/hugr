@@ -158,3 +158,27 @@ impl HasConcrete for LoadNatDef {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+        extension::prelude::usize_t,
+        type_row,
+        types::TypeArg,
+    };
+
+    use super::LoadNat;
+
+    #[test]
+    fn test_load_nat() {
+        let mut b = DFGBuilder::new(inout_sig(type_row![], vec![usize_t()])).unwrap();
+
+        let arg = TypeArg::BoundedNat { n: 4 };
+        let op = LoadNat::new(arg);
+
+        let out = b.add_dataflow_op(op, []).unwrap();
+
+        b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+    }
+}
