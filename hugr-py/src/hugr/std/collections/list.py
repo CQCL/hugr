@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import hugr.tys as tys
 from hugr import val
@@ -12,10 +12,22 @@ from hugr.utils import comma_sep_str
 EXTENSION = _load_extension("collections.list")
 
 
-def list_type(ty: tys.Type) -> tys.ExtType:
-    """Returns a list type with a fixed element type."""
-    arg = tys.TypeTypeArg(ty)
-    return EXTENSION.types["List"].instantiate([arg])
+@dataclass(eq=False)
+class List(tys.ExtType):
+    """List type with a fixed element type."""
+
+    ty: tys.Type = field(default_factory=lambda: tys.Unit)
+
+    def __init__(self, ty: tys.Type | tys.TypeTypeArg) -> None:
+        if isinstance(ty, tys.Type):
+            ty = tys.TypeTypeArg(ty)
+
+        self.type_def = EXTENSION.types["List"]
+        self.args = [ty]
+        self.ty = ty.ty
+
+    def type_bound(self) -> tys.TypeBound:
+        return self.ty.type_bound()
 
 
 @dataclass
@@ -27,7 +39,7 @@ class ListVal(val.ExtensionValue):
 
     def __init__(self, v: list[val.Value], elem_ty: tys.Type) -> None:
         self.v = v
-        self.ty = list_type(elem_ty)
+        self.ty = List(elem_ty)
 
     def to_value(self) -> val.Extension:
         name = "ListValue"

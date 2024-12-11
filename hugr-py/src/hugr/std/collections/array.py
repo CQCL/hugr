@@ -10,9 +10,9 @@ from hugr.std import _load_extension
 EXTENSION = _load_extension("collections.array")
 
 
-@dataclass
+@dataclass(eq=False)
 class Array(tys.ExtType):
-    """Prelude fixed `size` array of `ty` elements."""
+    """Fixed `size` array of `ty` elements."""
 
     ty: tys.Type = field(default_factory=lambda: tys.Unit)
     size: int = field(default=0)

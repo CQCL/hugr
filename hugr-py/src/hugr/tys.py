@@ -594,6 +594,12 @@ class ExtType(Type):
     def __str__(self) -> str:
         return _type_str(self.type_def.name, self.args)
 
+    def __eq__(self, value):
+        # Ignore extra attributes on subclasses
+        if isinstance(value, ExtType):
+            return self.type_def == value.type_def and self.args == value.args
+        return super().__eq__(value)
+
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
     if len(args) == 0:
