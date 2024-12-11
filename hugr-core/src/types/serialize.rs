@@ -5,7 +5,6 @@ use super::custom::CustomType;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::extension::SignatureError;
 use crate::ops::AliasDecl;
-use crate::std_extensions::collections::array::array_type;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -14,7 +13,6 @@ pub(super) enum SerSimpleType {
     I,
     G(Box<FuncValueType>),
     Sum(SumType),
-    Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
     Alias(AliasDecl),
     V { i: usize, b: TypeBound },
@@ -51,9 +49,6 @@ impl<RV: MaybeRV> TryFrom<SerSimpleType> for TypeBase<RV> {
             SerSimpleType::I => usize_t().into_(),
             SerSimpleType::G(sig) => TypeBase::new_function(*sig),
             SerSimpleType::Sum(st) => st.into(),
-            SerSimpleType::Array { inner, len } => {
-                array_type(len, (*inner).try_into().unwrap()).into_()
-            }
             SerSimpleType::Opaque(o) => TypeBase::new_extension(o),
             SerSimpleType::Alias(a) => TypeBase::new_alias(a),
             SerSimpleType::V { i, b } => TypeBase::new_var_use(i, b),
