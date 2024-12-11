@@ -260,23 +260,6 @@ class VariableArg(TypeArg):
 # ----------------------------------------------
 
 
-@dataclass(frozen=True)
-class Array(Type):
-    """Prelude fixed `size` array of `ty` elements."""
-
-    ty: Type
-    size: int
-
-    def _to_serial(self) -> stys.Array:
-        return stys.Array(inner=self.ty._to_serial_root(), len=self.size)
-
-    def type_bound(self) -> TypeBound:
-        return self.ty.type_bound()
-
-    def __repr__(self) -> str:
-        return f"Array<{self.ty}, {self.size}>"
-
-
 @dataclass()
 class Sum(Type):
     """Algebraic sum-over-product type. Instances of this type correspond to

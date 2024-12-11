@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from hugr.std.collections.array import Array
 from hugr.std.float import FLOAT_T
 from hugr.std.int import INT_T, _int_tv
 from hugr.tys import (
     Alias,
-    Array,
     Bool,
     BoundedNatArg,
     BoundedNatParam,
@@ -120,7 +120,7 @@ def test_args_str(arg: TypeArg, string: str):
 @pytest.mark.parametrize(
     ("ty", "string"),
     [
-        (Array(Bool, 3), "Array<Bool, 3>"),
+        (Array(Bool, 3), "array<3, Type(Bool)>"),
         (Variable(2, TypeBound.Any), "$2"),
         (RowVariable(4, TypeBound.Copyable), "$4"),
         (USize(), "USize"),
