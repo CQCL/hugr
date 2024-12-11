@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-v0.13.3...hugr-v0.14.0) - 2024-12-11
+
+### Bug Fixes
+
+- hierarchical simple replacement using insert_hugr (#1718)
+- hugr-py not adding extension-reqs on custom ops (#1759)
+
+### Documentation
+
+- Fix comment for scan op (#1751)
+
+### New Features
+
+- Dataflow analysis framework (#1476)
+- Export/import of JSON metadata (#1622)
+- Add `SiblingSubgraph::from_node` (#1655)
+- [**breaking**] Replace GATs with `impl Iterator` returns (RPITIT) on `HugrView` (#1660)
+- Emulate `TypeBound`s on parameters via constraints. (#1624)
+- Add array `repeat` and `scan` ops (#1633)
+- move unwrap builder to hugr core (#1674)
+- Lists and extension sets with splicing (#1657)
+- add HugrView::first_child and HugrMut::remove_subtree (#1721)
+- Lower collections extension (#1720)
+- [**breaking**] impl HugrView for any &(mut) to a HugrView (#1678)
+- [**breaking**] Make array repeat and scan ops generic over extension reqs (#1716)
+- Print []+[] as Bool and [] as Unit in user-facing messages (#1745)
+- export llvm test utilities under llvm-test feature (#1677)
+- [**breaking**] Share `Extension`s under `Arc`s (#1647)
+- [**breaking**] OpDefs and TypeDefs keep a reference to their extension (#1719)
+- [**breaking**] Have `CustomType`s reference their `Extension` definition (#1723)
+- [**breaking**] Resolve OpaqueOps and CustomType extensions  (#1735)
+- [**breaking**] `used_extensions` calls for both ops and signatures (#1739)
+- [**breaking**] Hugrs now keep a `ExtensionRegistry` with their requirements (#1738)
+
+### Performance
+
+- Return `Cow<Signature>` where possible (#1743)
+- Faster singleton SiblingSubgraph construction (#1654)
+
+### Refactor
+
+- avoid hugr clone in simple replace (#1724)
+- [trivial] replace.rs: use HugrView::first_child  (#1737)
+
 ## [0.13.3](https://github.com/CQCL/hugr/compare/hugr-v0.13.2...hugr-v0.13.3) - 2024-11-06
 
 ### Bug Fixes

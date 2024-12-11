@@ -1,6 +1,24 @@
 # Changelog
 
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.13.3...hugr-passes-v0.14.0) - 2024-12-11
+
+### New Features
+
+- [**breaking**] Replace GATs with `impl Iterator` returns (RPITIT) on `HugrView` (#1660)
+- [**breaking**] Share `Extension`s under `Arc`s (#1647)
+- [**breaking**] OpDefs and TypeDefs keep a reference to their extension (#1719)
+- [**breaking**] Have `CustomType`s reference their `Extension` definition (#1723)
+- [**breaking**] Resolve OpaqueOps and CustomType extensions  (#1735)
+- Dataflow analysis framework (#1476)
+- [**breaking**] `used_extensions` calls for both ops and signatures (#1739)
+- [**breaking**] Hugrs now keep a `ExtensionRegistry` with their requirements (#1738)
+
+### Performance
+
+- Faster singleton SiblingSubgraph construction (#1654)
+- Return `Cow<Signature>` where possible (#1743)
+
 ## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.13.1...hugr-passes-v0.13.2) - 2024-10-22
 
 ### New Features
