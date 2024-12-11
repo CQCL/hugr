@@ -181,7 +181,7 @@ mod tests {
 
         let out = b.add_dataflow_op(op, []).unwrap();
 
-        b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+        b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }
 
     #[test]
