@@ -7,10 +7,10 @@ use super::{impl_op_name, OpTag, OpTrait};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeArg, TypeRow};
-use crate::IncomingPort;
+use crate::{type_row, IncomingPort};
 
 #[cfg(test)]
-use ::proptest_derive::Arbitrary;
+use proptest_derive::Arbitrary;
 
 /// Trait implemented by all dataflow operations.
 pub trait DataflowOpTrait {
@@ -347,7 +347,7 @@ pub struct LoadFunction {
     /// The type arguments that instantiate `func_sig`.
     pub type_args: Vec<TypeArg>,
     /// The instantiation of `func_sig`.
-    pub signature: Signature, // Cache, so we can fail in try_new() not in signature()
+    pub instantiation: Signature, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(LoadFunction);
 impl DataflowOpTrait for LoadFunction {
@@ -358,7 +358,10 @@ impl DataflowOpTrait for LoadFunction {
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
-        Cow::Borrowed(&self.signature)
+        Cow::Owned(Signature::new(
+            type_row![],
+            Type::new_function(self.instantiation.clone()),
+        ))
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -377,11 +380,10 @@ impl LoadFunction {
     ) -> Result<Self, SignatureError> {
         let type_args: Vec<_> = type_args.into();
         let instantiation = func_sig.instantiate(&type_args, exts)?;
-        let signature = Signature::new(TypeRow::new(), vec![Type::new_function(instantiation)]);
         Ok(Self {
             func_sig,
             type_args,
-            signature,
+            instantiation,
         })
     }
 
@@ -410,12 +412,12 @@ impl LoadFunction {
             self.type_args.clone(),
             extension_registry,
         )?;
-        if other.signature == self.signature {
+        if other.instantiation == self.instantiation {
             Ok(())
         } else {
             Err(SignatureError::LoadFunctionIncorrectlyAppliesType {
-                cached: self.signature.clone(),
-                expected: other.signature.clone(),
+                cached: self.instantiation.clone(),
+                expected: other.instantiation.clone(),
             })
         }
     }

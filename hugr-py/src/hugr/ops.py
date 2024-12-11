@@ -1237,7 +1237,7 @@ class LoadFunc(_CallOrLoad, DataflowOp):
             parent=parent.idx,
             func_sig=self.signature._to_serial(),
             type_args=ser_it(self.type_args),
-            signature=self.outer_signature()._to_serial(),
+            instantiation=self.instantiation._to_serial(),
         )
 
     def outer_signature(self) -> tys.FunctionType:

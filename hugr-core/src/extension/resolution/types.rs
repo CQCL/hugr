@@ -58,7 +58,7 @@ pub(crate) fn collect_op_types_extensions(
         OpType::LoadConstant(lc) => collect_type_exts(&lc.datatype, &mut used, &mut missing),
         OpType::LoadFunction(lf) => {
             collect_signature_exts(lf.func_sig.body(), &mut used, &mut missing);
-            collect_signature_exts(&lf.signature, &mut used, &mut missing);
+            collect_signature_exts(&lf.instantiation, &mut used, &mut missing);
         }
         OpType::DFG(dfg) => collect_signature_exts(&dfg.signature, &mut used, &mut missing),
         OpType::OpaqueOp(op) => {
