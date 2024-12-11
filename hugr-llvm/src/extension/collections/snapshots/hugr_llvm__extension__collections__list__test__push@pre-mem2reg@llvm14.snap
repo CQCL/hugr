@@ -1,5 +1,5 @@
 ---
-source: hugr-llvm/src/extension/collections.rs
+source: hugr-llvm/src/extension/collections/list.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'

@@ -9,7 +9,7 @@ from hugr import val
 from hugr.std import _load_extension
 from hugr.utils import comma_sep_str
 
-EXTENSION = _load_extension("collections")
+EXTENSION = _load_extension("collections.list")
 
 
 def list_type(ty: tys.Type) -> tys.ExtType:

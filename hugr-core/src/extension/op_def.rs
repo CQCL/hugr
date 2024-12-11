@@ -539,7 +539,7 @@ pub(super) mod test {
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::OpName;
-    use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::std_extensions::collections::list;
     use crate::types::type_param::{TypeArgError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
     use crate::{const_extension_ids, Extension};
@@ -636,7 +636,7 @@ pub(super) mod test {
 
     #[test]
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
-        let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
@@ -658,7 +658,7 @@ pub(super) mod test {
             Ok(())
         })?;
 
-        let reg = ExtensionRegistry::new([PRELUDE.clone(), EXTENSION.clone(), ext]);
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), list::EXTENSION.clone(), ext]);
         reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 

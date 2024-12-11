@@ -813,7 +813,7 @@ mod test {
         use crate::{
             ops::{constant::CustomSerialized, Value},
             std_extensions::arithmetic::int_types::ConstInt,
-            std_extensions::collections::ListValue,
+            std_extensions::collections::list::ListValue,
             types::{SumType, Type},
         };
         use ::proptest::{collection::vec, prelude::*};

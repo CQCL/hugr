@@ -165,7 +165,7 @@ pub(crate) mod test {
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, EMPTY_REG, PRELUDE,
         PRELUDE_REGISTRY,
     };
-    use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{
@@ -177,7 +177,7 @@ pub(crate) mod test {
 
     lazy_static! {
         static ref REGISTRY: ExtensionRegistry =
-            ExtensionRegistry::new([PRELUDE.to_owned(), EXTENSION.to_owned()]);
+            ExtensionRegistry::new([PRELUDE.to_owned(), list::EXTENSION.to_owned()]);
     }
 
     impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
@@ -194,7 +194,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_opaque() -> Result<(), SignatureError> {
-        let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         let tyvar = TypeArg::new_var_use(0, TypeBound::Any.into());
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let list_len = PolyFuncTypeBase::new_validated(
@@ -291,7 +291,7 @@ pub(crate) mod test {
     fn test_misused_variables() -> Result<(), SignatureError> {
         // Variables in args have different bounds from variable declaration
         let tv = TypeArg::new_var_use(0, TypeBound::Copyable.into());
-        let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         let body_type = Signature::new_endo(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
             TypeParam::Extensions,

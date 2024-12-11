@@ -171,7 +171,7 @@ fn test_big() {
 #[ignore = "Waiting for `unwrap` operation"]
 // TODO: https://github.com/CQCL/hugr/issues/1486
 fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
-    use hugr_core::std_extensions::collections::{ListOp, ListValue};
+    use hugr_core::std_extensions::collections::list::{ListOp, ListValue};
 
     let base_list: Value = ListValue::new(bool_t(), [Value::false_val()]).into();
     let mut build = DFGBuilder::new(Signature::new(

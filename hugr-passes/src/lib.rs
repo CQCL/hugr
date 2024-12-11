@@ -33,7 +33,7 @@ pub(crate) mod test {
             arithmetic::float_ops::EXTENSION.to_owned(),
             logic::EXTENSION.to_owned(),
             arithmetic::conversions::EXTENSION.to_owned(),
-            collections::EXTENSION.to_owned(),
+            collections::list::EXTENSION.to_owned(),
         ]);
     }
 }
