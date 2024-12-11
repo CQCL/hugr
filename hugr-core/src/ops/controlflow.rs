@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::types::{EdgeKind, Signature, Type, TypeRow};
 use crate::Direction;
 
@@ -42,11 +42,11 @@ impl DataflowOpTrait for TailLoop {
         )
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            just_inputs: self.just_inputs.substitute(subst),
-            just_outputs: self.just_outputs.substitute(subst),
-            rest: self.rest.substitute(subst),
+            just_inputs: self.just_inputs.substitute(subst, reg),
+            just_outputs: self.just_outputs.substitute(subst, reg),
+            rest: self.rest.substitute(subst, reg),
             extension_delta: self.extension_delta.substitute(subst),
         }
     }
@@ -121,11 +121,11 @@ impl DataflowOpTrait for Conditional {
         )
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst)).collect(),
-            other_inputs: self.other_inputs.substitute(subst),
-            outputs: self.outputs.substitute(subst),
+            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst, reg)).collect(),
+            other_inputs: self.other_inputs.substitute(subst, reg),
+            outputs: self.outputs.substitute(subst, reg),
             extension_delta: self.extension_delta.substitute(subst),
         }
     }
@@ -159,9 +159,9 @@ impl DataflowOpTrait for CFG {
         Cow::Borrowed(&self.signature)
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            signature: self.signature.substitute(subst),
+            signature: self.signature.substitute(subst, reg),
         }
     }
 }
@@ -248,11 +248,11 @@ impl OpTrait for DataflowBlock {
         }
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            inputs: self.inputs.substitute(subst),
-            other_outputs: self.other_outputs.substitute(subst),
-            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst)).collect(),
+            inputs: self.inputs.substitute(subst, reg),
+            other_outputs: self.other_outputs.substitute(subst, reg),
+            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst, reg)).collect(),
             extension_delta: self.extension_delta.substitute(subst),
         }
     }
@@ -282,9 +282,9 @@ impl OpTrait for ExitBlock {
         }
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            cfg_outputs: self.cfg_outputs.substitute(subst),
+            cfg_outputs: self.cfg_outputs.substitute(subst, reg),
         }
     }
 }
@@ -351,9 +351,9 @@ impl OpTrait for Case {
         <Self as StaticTag>::TAG
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            signature: self.signature.substitute(subst),
+            signature: self.signature.substitute(subst, reg),
         }
     }
 }
@@ -372,6 +372,8 @@ impl Case {
 
 #[cfg(test)]
 mod test {
+    use std::borrow::Borrow;
+
     use crate::{
         extension::{
             prelude::{qb_t, usize_t, PRELUDE_ID},
@@ -399,9 +401,9 @@ mod test {
                 TypeArg::Extensions {
                     es: PRELUDE_ID.into(),
                 },
-            ],
+            ]),
             &PRELUDE_REGISTRY,
-        ));
+        );
         let st = Type::new_sum(vec![vec![usize_t()], vec![qb_t(); 2]]);
         assert_eq!(
             dfb2.inner_signature(),
@@ -425,9 +427,9 @@ mod test {
                     elems: vec![usize_t().into(); 3],
                 },
                 qb_t().into(),
-            ],
+            ]),
             &PRELUDE_REGISTRY,
-        ));
+        );
         let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants
         assert_eq!(
             cond2.signature(),
@@ -453,12 +455,12 @@ mod test {
                 TypeArg::Extensions {
                     es: PRELUDE_ID.into(),
                 },
-            ],
+            ]),
             &PRELUDE_REGISTRY,
-        ));
+        );
         assert_eq!(
             tail2.signature(),
-            Signature::new(
+            ow r::new(
                 vec![qb_t(), usize_t(), usize_t()],
                 vec![usize_t(), qb_t(), usize_t()]
             )

@@ -61,10 +61,10 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         self.with_extension_delta(crate::extension::prelude::PRELUDE_ID)
     }
 
-    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+    pub(crate) fn substitute(&self, tr: &Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            input: self.input.substitute(tr),
-            output: self.output.substitute(tr),
+            input: self.input.substitute(tr, reg),
+            output: self.output.substitute(tr, reg),
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }

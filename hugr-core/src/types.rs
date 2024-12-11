@@ -448,7 +448,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// * If [Type::validate]`(false)` returns successfully, this method will return a Vec containing exactly one type
     /// * If [Type::validate]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
     ///   return a Vec containing any number of [Type]s. These may (or not) pass [Type::validate]
-    fn substitute(&self, t: &Substitution) -> Vec<Self> {
+    fn substitute(&self, t: &Substitution, reg: &ExtensionRegistry) -> Vec<Self> {
         match &self.0 {
             TypeEnum::RowVar(rv) => rv.substitute(t),
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
@@ -458,18 +458,18 @@ impl<RV: MaybeRV> TypeBase<RV> {
                 };
                 vec![ty.into_()]
             }
-            TypeEnum::Extension(cty) => vec![TypeBase::new_extension(cty.substitute(t))],
-            TypeEnum::Function(bf) => vec![TypeBase::new_function(bf.substitute(t))],
+            TypeEnum::Extension(cty) => vec![TypeBase::new_extension(cty.substitute(t, reg))],
+            TypeEnum::Function(bf) => vec![TypeBase::new_function(bf.substitute(t, reg))],
             TypeEnum::Sum(SumType::General { rows }) => {
-                vec![TypeBase::new_sum(rows.iter().map(|r| r.substitute(t)))]
+                vec![TypeBase::new_sum(rows.iter().map(|r| r.substitute(t, reg)))]
             }
         }
     }
 }
 
 impl Type {
-    fn substitute1(&self, s: &Substitution) -> Self {
-        let v = self.substitute(s);
+    fn substitute1(&self, s: &Substitution, reg: &ExtensionRegistry) -> Self {
+        let v = self.substitute(s, reg);
         let [r] = v.try_into().unwrap(); // No row vars, so every Type<false> produces exactly one
         r
     }
@@ -548,7 +548,7 @@ impl From<Type> for TypeRV {
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
-pub struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+pub struct Substitution<'a>(&'a [TypeArg]);
 
 impl<'a> Substitution<'a> {
     /// Create a new Substitution given the replacement values (indexed
@@ -557,8 +557,8 @@ impl<'a> Substitution<'a> {
     /// containing a type-variable.
     ///
     /// [TypeDef]: crate::extension::TypeDef
-    pub fn new(items: &'a [TypeArg], exts: &'a ExtensionRegistry) -> Self {
-        Self(items, exts)
+    pub fn new(items: &'a [TypeArg]) -> Self {
+        Self(items)
     }
 
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
@@ -598,10 +598,6 @@ impl<'a> Substitution<'a> {
             }
             _ => panic!("Not a type or list of types - call validate() ?"),
         }
-    }
-
-    pub(crate) fn extension_registry(&self) -> &ExtensionRegistry {
-        self.1
     }
 }
 

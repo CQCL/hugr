@@ -15,9 +15,8 @@ use crate::extension::resolution::{
 use std::borrow::Cow;
 
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::{ExtensionId, ExtensionSet};
+use crate::extension::{ExtensionId, ExtensionSet, ExtensionRegistry};
 use crate::types::{EdgeKind, Signature, Substitution};
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use derive_more::Display;
@@ -437,7 +436,7 @@ pub trait OpTrait: Sized + Clone {
 
     /// Apply a type-level substitution to this OpType, i.e. replace
     /// [type variables](crate::types::TypeArg::new_var_use) with new types.
-    fn substitute(&self, _subst: &Substitution) -> Self {
+    fn substitute(&self, _subst: &Substitution, _reg: &ExtensionRegistry) -> Self {
         self.clone()
     }
 }

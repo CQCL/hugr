@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use super::dataflow::DataflowOpTrait;
 use super::{impl_op_name, OpTag};
+use crate::extension::ExtensionRegistry;
 use crate::types::{EdgeKind, Signature, Type, TypeRow};
 
 /// An operation that creates a tagged sum value from one of its variants.
@@ -56,9 +57,9 @@ impl DataflowOpTrait for Tag {
         Some(EdgeKind::StateOrder)
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
         Self {
-            variants: self.variants.iter().map(|r| r.substitute(subst)).collect(),
+            variants: self.variants.iter().map(|r| r.substitute(subst, reg)).collect(),
             tag: self.tag,
         }
     }

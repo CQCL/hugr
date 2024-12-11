@@ -295,11 +295,11 @@ impl TypeArg {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
+    pub(crate) fn substitute(&self, t: &Substitution, reg: &ExtensionRegistry) -> Self {
         match self {
             TypeArg::Type { ty } => {
                 // RowVariables are represented as TypeArg::Variable
-                ty.substitute1(t).into()
+                ty.substitute1(t, reg).into()
             }
             TypeArg::BoundedNat { .. } | TypeArg::String { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Sequence { elems } => {
@@ -314,7 +314,7 @@ impl TypeArg {
                                                        // So, anything that doesn't produce a Type, was a row variable => multiple Types
                         elems
                             .iter()
-                            .flat_map(|ta| match ta.substitute(t) {
+                            .flat_map(|ta| match ta.substitute(t, reg) {
                                 ty @ TypeArg::Type { .. } => vec![ty],
                                 TypeArg::Sequence { elems } => elems,
                                 _ => panic!("Expected Type or row of Types"),
@@ -323,7 +323,7 @@ impl TypeArg {
                     }
                     _ => {
                         // not types, no need to flatten (and mustn't, in case of nested Sequences)
-                        elems.iter().map(|ta| ta.substitute(t)).collect()
+                        elems.iter().map(|ta| ta.substitute(t, reg)).collect()
                     }
                 };
                 TypeArg::Sequence { elems }
@@ -551,7 +551,7 @@ mod test {
         };
         check_type_arg(&outer_arg, &outer_param).unwrap();
 
-        let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg], &PRELUDE_REGISTRY));
+        let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]), &PRELUDE_REGISTRY);
         assert_eq!(
             outer_arg2,
             vec![bool_t().into(), TypeArg::UNIT, usize_t().into()].into()
@@ -594,7 +594,7 @@ mod test {
         let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
         check_type_arg(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg =
-            good_arg.substitute(&Substitution(&[row_var_arg.clone()], &PRELUDE_REGISTRY));
+            good_arg.substitute(&Substitution(&[row_var_arg.clone()]), &PRELUDE_REGISTRY);
         check_type_arg(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,

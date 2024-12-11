@@ -20,8 +20,8 @@ use itertools::Itertools as _;
 ///
 /// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
 /// signature then the hugr is untouched.
-pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
-    let validate = |h: &Hugr| h.validate(reg).unwrap_or_else(|e| panic!("{e}"));
+pub fn monomorphize(mut h: Hugr) -> Hugr {
+    let validate = |h: &Hugr| h.validate().unwrap_or_else(|e| panic!("{e}"));
 
     #[cfg(debug_assertions)]
     validate(&h);
@@ -29,7 +29,7 @@ pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
     let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
-        mono_scan(&mut h, root, None, &mut HashMap::new(), reg);
+        mono_scan(&mut h, root, None, &mut HashMap::new());
         if !h.get_optype(root).is_module() {
             return remove_polyfuncs(h);
         }
@@ -86,7 +86,6 @@ fn mono_scan(
     parent: Node,
     mut subst_into: Option<&mut Instantiating>,
     cache: &mut Instantiations,
-    reg: &ExtensionRegistry,
 ) {
     for old_ch in h.children(parent).collect_vec() {
         let ch_op = h.get_optype(old_ch);
@@ -97,17 +96,17 @@ fn mono_scan(
         // Perform substitution, and recurse into containers (mono_scan does nothing if no children)
         let ch = if let Some(ref mut inst) = subst_into {
             let new_ch =
-                h.add_node_with_parent(inst.target_container, ch_op.substitute(inst.subst));
+                h.add_node_with_parent(inst.target_container, ch_op.substitute(inst.subst, h.extensions()));
             inst.node_map.insert(old_ch, new_ch);
             let mut inst = Instantiating {
                 target_container: new_ch,
                 node_map: inst.node_map,
                 ..**inst
             };
-            mono_scan(h, old_ch, Some(&mut inst), cache, reg);
+            mono_scan(h, old_ch, Some(&mut inst), cache);
             new_ch
         } else {
-            mono_scan(h, old_ch, None, cache, reg);
+            mono_scan(h, old_ch, None, cache);
             old_ch
         };
 
@@ -119,7 +118,7 @@ fn mono_scan(
                 (
                     &c.type_args,
                     mono_sig.clone(),
-                    OpType::from(Call::try_new(mono_sig.into(), [], reg).unwrap()),
+                    OpType::from(Call::try_new(mono_sig.into(), [], h.extensions()).unwrap()),
                 )
             }
             OpType::LoadFunction(lf) => {
@@ -128,7 +127,7 @@ fn mono_scan(
                 (
                     &lf.type_args,
                     mono_sig.clone(),
-                    LoadFunction::try_new(mono_sig.into(), [], reg)
+                    LoadFunction::try_new(mono_sig.into(), [], h.extensions())
                         .unwrap()
                         .into(),
                 )
@@ -140,7 +139,7 @@ fn mono_scan(
         };
         let fn_inp = ch_op.static_input_port().unwrap();
         let tgt = h.static_source(old_ch).unwrap(); // Use old_ch as edges not copied yet
-        let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache, reg);
+        let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache);
         let fn_out = {
             let func = h.get_optype(new_tgt).as_func_defn().unwrap();
             debug_assert_eq!(func.signature, mono_sig.into());
@@ -159,7 +158,6 @@ fn instantiate(
     type_args: Vec<TypeArg>,
     mono_sig: Signature,
     cache: &mut Instantiations,
-    reg: &ExtensionRegistry,
 ) -> Node {
     let for_func = cache.entry(poly_func).or_insert_with(|| {
         // First time we've instantiated poly_func. Lift any nested FuncDefn's out to the same level.
@@ -201,11 +199,11 @@ fn instantiate(
     // Now make the instantiation
     let mut node_map = HashMap::new();
     let mut inst = Instantiating {
-        subst: &Substitution::new(&type_args, reg),
+        subst: &Substitution::new(&type_args),
         target_container: mono_tgt,
         node_map: &mut node_map,
     };
-    mono_scan(h, poly_func, Some(&mut inst), cache, reg);
+    mono_scan(h, poly_func, Some(&mut inst), cache);
     // Copy edges...we have built a node_map for every node in the function.
     // Note we could avoid building the "large" map (smaller than the Hugr we've just created)
     // by doing this during recursion, but we'd need to be careful with nonlocal edges -
@@ -324,8 +322,8 @@ mod test {
         let dfg_builder =
             DFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
-        let hugr = dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap();
-        let hugr2 = monomorphize(hugr.clone(), &PRELUDE_REGISTRY);
+        let hugr = dfg_builder.finish_hugr_with_outputs([i1]).unwrap();
+        let hugr2 = monomorphize(hugr.clone());
         assert_eq!(hugr, hugr2);
     }
 
@@ -348,7 +346,6 @@ mod test {
                 &FuncID::<true>::from(fb.container_node()),
                 &[tv0().into()],
                 [elem],
-                &EMPTY_REG,
             )?;
             fb.finish_with_outputs(tag.outputs())?
         };
@@ -360,7 +357,7 @@ mod test {
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),
             )?;
             let [elem] = fb.input_wires_arr();
-            let pair = fb.call(db.handle(), &[tv0().into()], [elem], &PRELUDE_REGISTRY)?;
+            let pair = fb.call(db.handle(), &[tv0().into()], [elem])?;
 
             let [elem1, elem2] = fb
                 .add_dataflow_op(UnpackTuple::new(vec![tv0(); 2].into()), pair.outputs())?
@@ -374,24 +371,24 @@ mod test {
             let mut fb = mb.define_function("main", prelusig(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
-                .call(tr.handle(), &[usize_t().into()], [elem], &PRELUDE_REGISTRY)?
+                .call(tr.handle(), &[usize_t().into()], [elem])?
                 .outputs_arr();
-            let pair = fb.call(db.handle(), &[usize_t().into()], [elem], &PRELUDE_REGISTRY)?;
+            let pair = fb.call(db.handle(), &[usize_t().into()], [elem])?;
             let pty = pair_type(usize_t()).into();
             let [res2] = fb
-                .call(tr.handle(), &[pty], pair.outputs(), &PRELUDE_REGISTRY)?
+                .call(tr.handle(), &[pty], pair.outputs())?
                 .outputs_arr();
             fb.finish_with_outputs([res1, res2])?;
         }
-        let hugr = mb.finish_hugr(&PRELUDE_REGISTRY)?;
+        let hugr = mb.finish_hugr()?;
         assert_eq!(
             hugr.nodes()
                 .filter(|n| hugr.get_optype(*n).is_func_defn())
                 .count(),
             3
         );
-        let mono = monomorphize(hugr, &PRELUDE_REGISTRY);
-        mono.validate(&PRELUDE_REGISTRY)?;
+        let mono = monomorphize(hugr);
+        mono.validate()?;
 
         let mut funcs = list_funcs(&mono);
         let expected_mangled_names = [
@@ -410,7 +407,7 @@ mod test {
             ["double", "main", "triple"]
         );
 
-        assert_eq!(monomorphize(mono.clone(), &PRELUDE_REGISTRY), mono); // Idempotent
+        assert_eq!(monomorphize(mono.clone()), mono); // Idempotent
 
         let nopoly = remove_polyfuncs(mono);
         let mut funcs = list_funcs(&nopoly);
@@ -427,8 +424,6 @@ mod test {
     fn test_flattening() -> Result<(), Box<dyn std::error::Error>> {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
-        let reg =
-            ExtensionRegistry::try_new([int_types::EXTENSION.to_owned(), PRELUDE.to_owned()])?;
         let tv0 = || Type::new_var_use(0, TypeBound::Any);
         let ity = || INT_TYPES[3].clone();
 
@@ -448,28 +443,28 @@ mod test {
         };
         let pf2 = {
             let [inw] = pf2.input_wires_arr();
-            let [usz] = pf2.call(mono_func.handle(), &[], [], &reg)?.outputs_arr();
+            let [usz] = pf2.call(mono_func.handle(), &[], [])?.outputs_arr();
             pf2.finish_with_outputs([inw, usz])?
         };
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
         let [a, u] = pf1
-            .call(pf2.handle(), &[tv0().into()], pf1.input_wires(), &reg)?
+            .call(pf2.handle(), &[tv0().into()], pf1.input_wires())?
             .outputs_arr();
         let [u1, u2] = pf1
-            .call(pf2.handle(), &[usize_t().into()], [u], &reg)?
+            .call(pf2.handle(), &[usize_t().into()], [u])?
             .outputs_arr();
         let pf1 = pf1.finish_with_outputs([a, u1, u2])?;
         // Outer: two calls to pf1 with different TypeArgs
         let [_, u, _] = outer
-            .call(pf1.handle(), &[ity().into()], outer.input_wires(), &reg)?
+            .call(pf1.handle(), &[ity().into()], outer.input_wires())?
             .outputs_arr();
         let [_, u, _] = outer
-            .call(pf1.handle(), &[usize_t().into()], [u], &reg)?
+            .call(pf1.handle(), &[usize_t().into()], [u])?
             .outputs_arr();
-        let hugr = outer.finish_hugr_with_outputs([u], &reg)?;
+        let hugr = outer.finish_hugr_with_outputs([u])?;
 
-        let mono_hugr = monomorphize(hugr, &reg);
-        mono_hugr.validate(&reg)?;
+        let mono_hugr = monomorphize(hugr);
+        mono_hugr.validate()?;
         let funcs = list_funcs(&mono_hugr);
         let pf2_name = mangle_inner_func("pf1", "pf2");
         assert_eq!(
@@ -502,8 +497,6 @@ mod test {
     #[test]
     fn test_no_flatten_out_of_mono_func() -> Result<(), Box<dyn std::error::Error>> {
         let ity = || INT_TYPES[4].clone();
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), int_types::EXTENSION.to_owned()])?;
         let sig = Signature::new_endo(vec![usize_t(), ity()]);
         let mut dfg = DFGBuilder::new(sig.clone())?;
         let mut mono = dfg.define_function("id2", sig)?;
@@ -518,15 +511,15 @@ mod test {
         let pf = pf.finish_with_outputs(outs)?;
         let [a, b] = mono.input_wires_arr();
         let [a] = mono
-            .call(pf.handle(), &[usize_t().into()], [a], &reg)?
+            .call(pf.handle(), &[usize_t().into()], [a])?
             .outputs_arr();
         let [b] = mono
-            .call(pf.handle(), &[ity().into()], [b], &reg)?
+            .call(pf.handle(), &[ity().into()], [b])?
             .outputs_arr();
         let mono = mono.finish_with_outputs([a, b])?;
-        let c = dfg.call(mono.handle(), &[], dfg.input_wires(), &reg)?;
-        let hugr = dfg.finish_hugr_with_outputs(c.outputs(), &reg)?;
-        let mono_hugr = monomorphize(hugr, &reg);
+        let c = dfg.call(mono.handle(), &[], dfg.input_wires())?;
+        let hugr = dfg.finish_hugr_with_outputs(c.outputs())?;
+        let mono_hugr = monomorphize(hugr);
 
         let mut funcs = list_funcs(&mono_hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -564,7 +557,7 @@ mod test {
                     .define_function("main", Signature::new_endo(Type::UNIT))
                     .unwrap();
                 let func_ptr = builder
-                    .load_func(foo.handle(), &[Type::UNIT.into()], &EMPTY_REG)
+                    .load_func(foo.handle(), &[Type::UNIT.into()])
                     .unwrap();
                 let [r] = builder
                     .call_indirect(
@@ -576,10 +569,10 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap()
             };
-            module_builder.finish_hugr(&EMPTY_REG).unwrap()
+            module_builder.finish_hugr().unwrap()
         };
 
-        let mono_hugr = remove_polyfuncs(monomorphize(hugr, &EMPTY_REG));
+        let mono_hugr = remove_polyfuncs(monomorphize(hugr));
 
         let funcs = list_funcs(&mono_hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
