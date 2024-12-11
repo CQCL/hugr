@@ -249,7 +249,7 @@ impl<'c> LLVMSumValue<'c> {
     pub fn build_destructure(
         &self,
         builder: &Builder<'c>,
-        handler: impl Fn(&Builder<'c>, usize, Vec<BasicValueEnum<'c>>) -> Result<()>,
+        mut handler: impl FnMut(&Builder<'c>, usize, Vec<BasicValueEnum<'c>>) -> Result<()>,
     ) -> Result<()> {
         let orig_bb = builder
             .get_insert_block()
