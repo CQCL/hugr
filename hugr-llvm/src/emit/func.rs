@@ -252,7 +252,7 @@ impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
         Ok(r)
     }
 
-    /// Returns a [RowMailBox] mapped to thie ouput wires of `node`. When emitting a node
+    /// Returns a [RowMailBox] mapped to the output wires of `node`. When emitting a node
     /// output values are written to this mailbox.
     pub fn node_outs_rmb<'hugr, OT: 'hugr>(
         &mut self,
