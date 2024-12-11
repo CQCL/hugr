@@ -35,6 +35,7 @@ pub struct ConstantFoldPass {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 /// Errors produced by [ConstantFoldPass].
 pub enum ConstFoldError {
     #[error(transparent)]
