@@ -66,6 +66,7 @@ fn inline_constant_functions_impl(
                     "Constant function hugr has no inner_func_type: {}",
                     konst_n.index()
                 ))?
+                .into_owned()
                 .into();
             let func_defn = FuncDefn {
                 name: const_fn_name(konst_n),
@@ -106,9 +107,7 @@ mod test {
         Value::function({
             let mut builder = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
             let r = go(&mut builder);
-            builder
-                .finish_hugr_with_outputs([r], &PRELUDE_REGISTRY)
-                .unwrap()
+            builder.finish_hugr_with_outputs([r]).unwrap()
         })
         .unwrap()
         .into()
@@ -138,7 +137,7 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
             };
-            builder.finish_hugr(&PRELUDE_REGISTRY).unwrap()
+            builder.finish_hugr().unwrap()
         };
 
         inline_constant_functions(&mut hugr, &PRELUDE_REGISTRY).unwrap();
@@ -187,7 +186,7 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
             };
-            builder.finish_hugr(&PRELUDE_REGISTRY).unwrap()
+            builder.finish_hugr().unwrap()
         };
 
         inline_constant_functions(&mut hugr, &PRELUDE_REGISTRY).unwrap();

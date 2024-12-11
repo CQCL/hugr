@@ -332,6 +332,8 @@ impl<Root: NodeHandle> HugrMut for SiblingMut<'_, Root> {}
 
 #[cfg(test)]
 mod test {
+    use std::borrow::Cow;
+
     use rstest::rstest;
 
     use crate::builder::test::simple_dfg_hugr;
@@ -341,7 +343,7 @@ mod test {
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::ops::{OpTrait, OpType};
     use crate::types::Signature;
-    use crate::utils::test_quantum_extension::{self, EXTENSION_ID};
+    use crate::utils::test_quantum_extension::EXTENSION_ID;
     use crate::IncomingPort;
 
     use super::super::descendants::test::make_module_hgr;
@@ -376,7 +378,7 @@ mod test {
         );
 
         assert_eq!(
-            inner_region.inner_function_type(),
+            inner_region.inner_function_type().map(Cow::into_owned),
             Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
@@ -456,7 +458,7 @@ mod test {
         let ins = dfg.input_wires();
         let sub_dfg = dfg.finish_with_outputs(ins)?;
         let fun = fbuild.finish_with_outputs(sub_dfg.outputs())?;
-        let h = module_builder.finish_hugr(&test_quantum_extension::REG)?;
+        let h = module_builder.finish_hugr()?;
         let sub_dfg = sub_dfg.node();
 
         // We can create a view from a child or grandchild of a hugr:
@@ -485,11 +487,9 @@ mod test {
     /// Mutate a SiblingMut wrapper
     #[rstest]
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
-        simple_dfg_hugr
-            .update_validate(&test_quantum_extension::REG)
-            .unwrap();
+        simple_dfg_hugr.validate().unwrap();
         let root = simple_dfg_hugr.root();
-        let signature = simple_dfg_hugr.inner_function_type().unwrap().clone();
+        let signature = simple_dfg_hugr.inner_function_type().unwrap().into_owned();
 
         let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
         assert_eq!(
@@ -512,16 +512,18 @@ mod test {
 
         // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
         simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
-        assert!(simple_dfg_hugr
-            .validate(&test_quantum_extension::REG)
-            .is_err());
+        assert!(simple_dfg_hugr.validate().is_err());
     }
 
     #[rstest]
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
         let case_nodetype = crate::ops::Case {
-            signature: simple_dfg_hugr.root_type().dataflow_signature().unwrap(),
+            signature: simple_dfg_hugr
+                .root_type()
+                .dataflow_signature()
+                .unwrap()
+                .into_owned(),
         };
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
         // As expected, we cannot replace the root with a Case
@@ -543,7 +545,7 @@ mod test {
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
         let extracted = region.extract_hugr();
-        extracted.validate(&test_quantum_extension::REG)?;
+        extracted.validate()?;
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
 

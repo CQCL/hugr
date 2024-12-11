@@ -245,7 +245,7 @@ impl SignatureFunc {
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
         let mut res = pf.instantiate(args, exts)?;
-        res.extension_reqs.insert(&def.extension);
+        res.extension_reqs.insert(def.extension.clone());
 
         // If there are any row variables left, this will fail with an error:
         res.try_into()
@@ -658,7 +658,8 @@ pub(super) mod test {
             Ok(())
         })?;
 
-        let reg = ExtensionRegistry::try_new([PRELUDE.clone(), EXTENSION.clone(), ext]).unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), EXTENSION.clone(), ext]);
+        reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =
@@ -669,7 +670,7 @@ pub(super) mod test {
                 .unwrap(),
             dfg.input_wires(),
         )?;
-        dfg.finish_hugr_with_outputs(rev.outputs(), &reg)?;
+        dfg.finish_hugr_with_outputs(rev.outputs())?;
 
         Ok(())
     }
@@ -822,7 +823,7 @@ pub(super) mod test {
             )?;
 
             // Concrete extension set
-            let es = ExtensionSet::singleton(&EXT_ID);
+            let es = ExtensionSet::singleton(EXT_ID);
             let exp_fun_ty = Signature::new_endo(bool_t()).with_extension_delta(es.clone());
             let args = [TypeArg::Extensions { es }];
 

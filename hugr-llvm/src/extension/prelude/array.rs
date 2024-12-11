@@ -116,7 +116,12 @@ pub fn emit_array_op<'c, H: HugrView>(
 ) -> Result<()> {
     let builder = ctx.builder();
     let ts = ctx.typing_session();
-    let sig = op.clone().to_extension_op().unwrap().signature();
+    let sig = op
+        .clone()
+        .to_extension_op()
+        .unwrap()
+        .signature()
+        .into_owned();
     let ArrayOp {
         def,
         ref elem_ty,
@@ -595,13 +600,12 @@ mod test {
     }
 
     fn exec_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([
+        ExtensionRegistry::new([
             int_types::EXTENSION.to_owned(),
             int_ops::EXTENSION.to_owned(),
             logic::EXTENSION.to_owned(),
             prelude::PRELUDE.to_owned(),
         ])
-        .unwrap()
     }
 
     fn exec_extension_set() -> ExtensionSet {
@@ -970,9 +974,7 @@ mod test {
                     .unwrap();
                 let v = func.add_load_value(ConstInt::new_u(6, value).unwrap());
                 let func_id = func.finish_with_outputs(vec![v]).unwrap();
-                let func_v = builder
-                    .load_func(func_id.handle(), &[], &exec_registry())
-                    .unwrap();
+                let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
                 let repeat = ArrayRepeat::new(int_ty.clone(), size, exec_extension_set());
                 let arr = builder
                     .add_dataflow_op(repeat, vec![func_v])
@@ -1024,9 +1026,7 @@ mod test {
                 let delta = func.add_load_value(ConstInt::new_u(6, inc).unwrap());
                 let out = func.add_iadd(6, elem, delta).unwrap();
                 let func_id = func.finish_with_outputs(vec![out]).unwrap();
-                let func_v = builder
-                    .load_func(func_id.handle(), &[], &exec_registry())
-                    .unwrap();
+                let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
                 let scan = ArrayScan::new(
                     int_ty.clone(),
                     int_ty.clone(),
@@ -1103,9 +1103,7 @@ mod test {
                     .unwrap()
                     .out_wire(0);
                 let func_id = func.finish_with_outputs(vec![unit, acc]).unwrap();
-                let func_v = builder
-                    .load_func(func_id.handle(), &[], &exec_registry())
-                    .unwrap();
+                let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
                 let scan = ArrayScan::new(
                     int_ty.clone(),
                     Type::UNIT,

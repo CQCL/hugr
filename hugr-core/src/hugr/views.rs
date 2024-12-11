@@ -11,6 +11,8 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
+use std::borrow::Cow;
+
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
@@ -311,7 +313,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// In contrast to [`poly_func_type`][HugrView::poly_func_type], this
     /// method always return a concrete [`Signature`].
-    fn inner_function_type(&self) -> Option<Signature> {
+    fn inner_function_type(&self) -> Option<Cow<'_, Signature>> {
         self.root_type().inner_function_type()
     }
 
@@ -408,7 +410,7 @@ pub trait HugrView: HugrInternals {
 
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
     /// kind ports will be missing.
-    fn signature(&self, node: Node) -> Option<Signature> {
+    fn signature(&self, node: Node) -> Option<Cow<'_, Signature>> {
         self.get_optype(node).dataflow_signature()
     }
 
@@ -434,16 +436,30 @@ pub trait HugrView: HugrInternals {
             .map(|(p, t)| (p.as_outgoing().unwrap(), t))
     }
 
+    /// Returns the set of extensions used by the HUGR.
+    ///
+    /// This set may contain extensions that are no longer required by the HUGR.
+    fn extensions(&self) -> &ExtensionRegistry {
+        &self.base_hugr().extensions
+    }
+
     /// Check the validity of the underlying HUGR.
-    fn validate(&self, reg: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.base_hugr().validate(reg)
+    ///
+    /// This includes checking consistency of extension requirements between
+    /// connected nodes and between parents and children.
+    /// See [`HugrView::validate_no_extensions`] for a version that doesn't check
+    /// extension requirements.
+    fn validate(&self) -> Result<(), ValidationError> {
+        self.base_hugr().validate()
     }
 
     /// Check the validity of the underlying HUGR, but don't check consistency
     /// of extension requirements between connected nodes or between parents and
     /// children.
-    fn validate_no_extensions(&self, reg: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.base_hugr().validate_no_extensions(reg)
+    ///
+    /// For a more thorough check, use [`HugrView::validate`].
+    fn validate_no_extensions(&self) -> Result<(), ValidationError> {
+        self.base_hugr().validate_no_extensions()
     }
 }
 

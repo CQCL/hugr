@@ -127,7 +127,7 @@ impl ExtensionSetDeclaration {
             registry.register(PRELUDE.clone())?;
         }
         if !scope.contains(&PRELUDE_ID) {
-            scope.insert(&PRELUDE_ID);
+            scope.insert(PRELUDE_ID);
         }
 
         // Registers extensions sequentially, adding them to the current scope.
@@ -137,7 +137,7 @@ impl ExtensionSetDeclaration {
                 registry,
             };
             let ext = decl.make_extension(&self.imports, ctx)?;
-            scope.insert(ext.name());
+            scope.insert(ext.name().clone());
             registry.register(ext)?;
         }
 
