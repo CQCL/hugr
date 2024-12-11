@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::{collections::{hash_map::Entry, HashMap}, ops::Deref};
 
 use hugr_core::{
     extension::ExtensionRegistry,
@@ -17,9 +17,14 @@ use itertools::Itertools as _;
 /// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
 ///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
 /// * else, the originals are removed (they are invisible from outside the Hugr).
+///
+/// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
+/// signature then the hugr is untouched.
 pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
+    let validate = |h: &Hugr| h.validate(reg).unwrap_or_else(|e| panic!("{e}"));
+
     #[cfg(debug_assertions)]
-    h.validate(reg).unwrap_or_else(|e| panic!("{e}"));
+    validate(&h);
 
     let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
@@ -30,18 +35,16 @@ pub fn monomorphize(mut h: Hugr, reg: &ExtensionRegistry) -> Hugr {
         }
     }
     #[cfg(debug_assertions)]
-    {
-        h.validate(reg).unwrap_or_else(|e| {
-            eprintln!("{}", h.mermaid_string());
-            panic!("{e}");
-        });
-    }
+    validate(&h);
     h
 }
 
 /// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
 /// calls from *monomorphic* code, this will make the Hugr invalid (call [monomorphize]
 /// first).
+///
+/// TODO replace this with a more general remove-unused-functions pass
+/// https://github.com/CQCL/hugr/issues/1753
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
@@ -231,19 +234,62 @@ fn instantiate(
     mono_tgt
 }
 
-fn mangle_name(name: &str, type_args: &[TypeArg]) -> String {
-    let s = format!("__{name}_{type_args:?}");
-    s.replace(['[', ']', '{', '}', ' '], "_")
+struct TypeArgsList<'a>(&'a[TypeArg]);
+
+impl<'a> std::fmt::Display for TypeArgsList<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for arg in self.0 {
+            f.write_str("$")?;
+            write_type_arg_str(arg, f)?;
+        }
+        Ok(())
+    }
+}
+
+fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match arg {
+        TypeArg::Type { ty } => {
+            f.write_str(&ty.to_string().replace("$", "\\$"))
+        },
+        TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
+        TypeArg::String { arg } => f.write_fmt(format_args!("s({})", arg.replace("$", "\\$"))),
+        TypeArg::Sequence { elems } => {
+            f.write_str("seq(")?;
+            let mut first = true;
+            for arg in elems.iter() {
+                if first {
+                    first = false;
+                } else {
+                    f.write_str(",")?;
+                }
+                write_type_arg_str(arg, f)?;
+            }
+            f.write_str(")")?;
+            Ok(())
+        }
+        TypeArg::Extensions { es } => f.write_fmt(format_args!("es({})", es.iter().map(|x| x.deref()).join(","))),
+        TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
+        _ => panic!("unknown type arg: {arg}"),
+    }
+}
+
+/// We do our best to generate unique names.
+///
+/// We depend on the [Display] impl of [TypeArg].
+///
+fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
+    format!("${name}${}", TypeArgsList(type_args.as_ref()))
 }
 
 fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
-    format!("$_{outer_name}_$_{inner_name}")
+    format!("${outer_name}${inner_name}")
 }
 
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
 
+    use hugr_core::types::type_param::TypeParam;
     use itertools::Itertools;
 
     use hugr_core::builder::{
@@ -251,12 +297,13 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, PRELUDE_ID};
-    use hugr_core::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY};
+    use hugr_core::extension::{ExtensionRegistry, ExtensionSet, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{FuncDefn, Tag};
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
-    use hugr_core::types::{PolyFuncType, Signature, Type, TypeBound, TypeRow};
+    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{Hugr, HugrView, Node};
+    use rstest::rstest;
 
     use super::{is_polymorphic, mangle_inner_func, mangle_name, monomorphize, remove_polyfuncs};
 
@@ -537,6 +584,20 @@ mod test {
         let funcs = list_funcs(&mono_hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
     }
-}
 
-// TODO LoadFunction
+    #[rstest]
+    #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
+    #[case::type_(vec![Type::UNIT.into()], "$foo$$[]")]
+    #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
+    #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
+    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq(n(0),[])")]
+    #[case::extensionset(vec![ExtensionSet::from_iter([PRELUDE_ID,int_types::EXTENSION_ID]).into()],
+                         "$foo$$es(arithmetic.int.types,prelude)")] // alphabetic ordering of extension names
+    #[should_panic]
+    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String).into()],
+                            "$foo$$v(1)")]
+    #[case::multiple(vec![0.into(), "arg".into()], "$foo$$n(0)$s(arg)")]
+    fn test_mangle_name(#[case] args: Vec<TypeArg>, #[case] expected: String) {
+        assert_eq!(mangle_name("foo", &args), expected);
+    }
+}

@@ -155,18 +155,26 @@ pub enum TypeArg {
         n: u64,
     },
     ///Instance of [TypeParam::String]. UTF-8 encoded string argument.
+    #[display("\"{arg}\"")]
     String {
         #[allow(missing_docs)]
         arg: String,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of elements.
-    #[display("Sequence({})", "elems.iter().map(|t|t.to_string()).join(\", \")")]
+    #[display("Sequence({})", {
+        use itertools::Itertools as _;
+        elems.iter().map(|t|t.to_string()).join(",")
+    })]
     Sequence {
         #[allow(missing_docs)]
         elems: Vec<TypeArg>,
     },
     /// Instance of [TypeParam::Extensions], providing the extension ids.
+    #[display("Exts({})", {
+        use itertools::Itertools as _;
+        es.iter().map(|t|t.to_string()).join(",")
+    })]
     Extensions {
         #[allow(missing_docs)]
         es: ExtensionSet,
@@ -200,6 +208,13 @@ impl From<String> for TypeArg {
     fn from(arg: String) -> Self {
         TypeArg::String { arg }
     }
+}
+
+impl From<&str> for TypeArg {
+    fn from(arg: &str) -> Self {
+        TypeArg::String { arg: arg.to_string() }
+    }
+
 }
 
 impl From<Vec<TypeArg>> for TypeArg {
