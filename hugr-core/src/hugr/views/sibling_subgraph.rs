@@ -277,9 +277,6 @@ impl SiblingSubgraph {
     ///
     /// The subgraph signature will be given by signature of the node.
     pub fn from_node(node: Node, hugr: &impl HugrView) -> Self {
-        // TODO once https://github.com/CQCL/portgraph/issues/155
-        // is fixed we can just call try_from_nodes here.
-        // Until then, doing this saves a lot of work.
         let nodes = vec![node];
         let inputs = hugr
             .node_inputs(node)
@@ -288,7 +285,17 @@ impl SiblingSubgraph {
             .collect_vec();
         let outputs = hugr
             .node_outputs(node)
-            .filter_map(|p| hugr.is_linked(node, p).then_some((node, p)))
+            .filter_map(|p| {
+                // accept linked outputs or unlinked value outputs
+                {
+                    hugr.is_linked(node, p)
+                        || hugr
+                            .get_optype(node)
+                            .port_kind(p)
+                            .is_some_and(|k| k.is_value())
+                }
+                .then_some((node, p))
+            })
             .collect_vec();
 
         Self {
@@ -1161,7 +1168,12 @@ mod tests {
     #[test]
     fn test_unconnected() {
         // test a replacement on a subgraph with a discarded output
-        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
+        let mut b = DFGBuilder::new(
+            Signature::new(bool_t(), type_row![])
+                // .with_prelude()
+                .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
+        )
+        .unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded
@@ -1172,7 +1184,11 @@ mod tests {
         assert_eq!(subg.nodes().len(), 1);
         //  TODO create a valid replacement
         let replacement = {
-            let mut rep_b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+            let mut rep_b = DFGBuilder::new(
+                Signature::new_endo(bool_t())
+                    .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
+            )
+            .unwrap();
             let inw = rep_b.input_wires().exactly_one().unwrap();
 
             let not_n = rep_b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();

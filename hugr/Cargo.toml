@@ -44,4 +44,3 @@ bumpalo = { workspace = true, features = ["collections"] }
 [[bench]]
 name = "bench_main"
 harness = false
-
