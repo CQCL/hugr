@@ -165,7 +165,7 @@ impl SimpleHugrConfig {
         // unvalidated.
         // println!("{}", mod_b.hugr().mermaid_string());
 
-        mod_b.finish_hugr().unwrap()
+        mod_b.finish_hugr().unwrap_or_else(|e| panic!("{e}"))
     }
 }
 
@@ -261,7 +261,7 @@ mod test_fns {
     use hugr_core::{type_row, Hugr};
 
     use itertools::Itertools;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
     use std::iter;
 
     use crate::test::*;
@@ -551,14 +551,11 @@ mod test_fns {
 
     #[rstest]
     fn tail_loop_simple(mut llvm_ctx: TestContext) {
-        // Infinite loop
         let hugr = {
             let just_input = usize_t();
             let just_output = Type::UNIT;
             let input_v = TypeRow::from(vec![just_input.clone()]);
             let output_v = TypeRow::from(vec![just_output.clone()]);
-
-            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
 
             SimpleHugrConfig::new()
                 .with_extensions(PRELUDE_REGISTRY.clone())
@@ -590,121 +587,155 @@ mod test_fns {
                     builder.finish_with_outputs(outs).unwrap()
                 })
         };
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
+
         check_emission!(hugr, llvm_ctx);
     }
 
-    #[rstest]
-    fn tail_loop(mut llvm_ctx: TestContext) {
-        // Implement the hugr equivalent of the program:
-        let hugr = {
-            let int_ty = int_types::int_type(6);
-            let just_input = int_ty.clone();
-            let just_output = Type::UNIT;
-            let other_ty = int_ty.clone();
-            let sum_ty = HugrSumType::new(vec![just_input.clone(), just_output.clone()]);
-            let input_v = TypeRow::from(vec![just_input.clone(), other_ty.clone()]);
-            let output_v = TypeRow::from(vec![just_output.clone(), other_ty.clone()]);
+    #[fixture]
+    fn terminal_loop(#[default(3)] iters: u64, #[default(7)] input: u64) -> Hugr {
+        /*
+        Computes roughly the following:
+        ```python
+        def terminal_loop(counter: int, val: int) -> int:
+            while True:
+                val = val * 2
+                if counter == 0:
+                    break
+                else:
+                    counter -= 1
+            return val
+        ```
+         */
+        let int_ty = int_types::int_type(6);
+        let just_input = int_ty.clone();
+        let other_ty = int_ty.clone();
 
-            llvm_ctx.add_extensions(add_int_extensions);
+        let mut registry = PRELUDE_REGISTRY.clone();
+        registry.register(int_ops::EXTENSION.clone()).unwrap();
+        registry.register(int_types::EXTENSION.clone()).unwrap();
 
-            let mut registry = PRELUDE_REGISTRY.clone();
-            registry.register(int_ops::EXTENSION.clone()).unwrap();
-            registry.register(int_types::EXTENSION.clone()).unwrap();
+        SimpleHugrConfig::new()
+            .with_extensions(registry)
+            .with_outs(int_ty.clone())
+            .finish(|mut builder: DFGW| {
+                let just_in_w = builder.add_load_value(ConstInt::new_u(6, iters).unwrap());
+                let other_w = builder.add_load_value(ConstInt::new_u(6, input).unwrap());
 
-            SimpleHugrConfig::new()
-                .with_extensions(registry)
-                .with_ins(input_v)
-                .with_outs(output_v)
-                .finish(|mut builder: DFGW| {
-                    let [just_in_w, other_w] = builder.input_wires_arr();
+                let tail_l = {
                     let mut tail_b = builder
                         .tail_loop_builder(
                             [(just_input.clone(), just_in_w)],
                             [(other_ty.clone(), other_w)],
-                            vec![just_output.clone()].into(),
+                            type_row![],
                         )
                         .unwrap();
-                    let [sum_inp_w, _other_w] = tail_b.input_wires_arr();
+                    let [loop_int_w, other_w] = tail_b.input_wires_arr();
 
                     let zero = ConstInt::new_u(6, 0).unwrap();
                     let zero_w = tail_b.add_load_value(zero);
-                    let [_result] = tail_b
+                    let [eq_0] = tail_b
                         .add_dataflow_op(
-                            int_ops::IntOpDef::ile_u.with_log_width(6),
-                            [sum_inp_w, zero_w],
+                            int_ops::IntOpDef::ieq.with_log_width(6),
+                            [loop_int_w, zero_w],
                         )
                         .unwrap()
                         .outputs_arr();
-                    let input = tail_b.input();
-                    let [inp_w, other_w] = input.outputs_arr();
 
                     let loop_sig = tail_b.loop_signature().unwrap().clone();
 
-                    let sum_inp_w = tail_b.make_continue(loop_sig.clone(), [inp_w]).unwrap();
+                    let two = ConstInt::new_u(6, 2).unwrap();
+                    let two_w = tail_b.add_load_value(two);
 
+                    let [other_mul_2] = tail_b
+                        .add_dataflow_op(
+                            int_ops::IntOpDef::imul.with_log_width(6),
+                            [other_w, two_w],
+                        )
+                        .unwrap()
+                        .outputs_arr();
                     let cond = {
                         let mut cond_b = tail_b
                             .conditional_builder(
-                                ([just_input.into(), just_output.into()], sum_inp_w),
-                                vec![(other_ty.clone(), other_w)],
-                                vec![sum_ty.into(), other_ty.clone()].into(),
+                                ([type_row![], type_row![]], eq_0),
+                                vec![(just_input.clone(), loop_int_w)],
+                                vec![HugrSumType::new(vec![
+                                    vec![just_input.clone()].into(),
+                                    vec![],
+                                ])
+                                .into()]
+                                .into(),
                             )
                             .unwrap();
 
-                        // If the check is false, we add 1 and continue
-                        let mut false_case_b = cond_b.case_builder(0).unwrap();
-                        let [counter, val] = false_case_b.input_wires_arr();
-                        let one = ConstInt::new_u(6, 1).unwrap();
-                        let one_w = false_case_b.add_load_value(one);
+                        // If the check is false, we subtract 1 and continue
+                        let _false_case = {
+                            let mut false_case_b = cond_b.case_builder(0).unwrap();
+                            let [counter] = false_case_b.input_wires_arr();
+                            let one = ConstInt::new_u(6, 1).unwrap();
+                            let one_w = false_case_b.add_load_value(one);
 
-                        let two = ConstInt::new_u(6, 2).unwrap();
-                        let two_w = false_case_b.add_load_value(two);
-                        let [val] = false_case_b
-                            .add_dataflow_op(
-                                int_ops::IntOpDef::imul.with_log_width(6),
-                                [val, two_w],
-                            )
-                            .unwrap()
-                            .outputs_arr();
+                            let [counter] = false_case_b
+                                .add_dataflow_op(
+                                    int_ops::IntOpDef::isub.with_log_width(6),
+                                    [counter, one_w],
+                                )
+                                .unwrap()
+                                .outputs_arr();
+                            let tag_continue = false_case_b
+                                .make_continue(loop_sig.clone(), [counter])
+                                .unwrap();
 
-                        let [counter] = false_case_b
-                            .add_dataflow_op(
-                                int_ops::IntOpDef::isub.with_log_width(6),
-                                [counter, one_w],
-                            )
-                            .unwrap()
-                            .outputs_arr();
-                        let tagged_counter = false_case_b
-                            .make_continue(loop_sig.clone(), [counter])
-                            .unwrap();
+                            false_case_b.finish_with_outputs([tag_continue]).unwrap()
+                        };
+                        let _true_case = {
+                            // In the true case, we break and output true along with the "other" input wire
+                            let mut true_case_b = cond_b.case_builder(1).unwrap();
 
-                        false_case_b
-                            .finish_with_outputs([tagged_counter, val])
-                            .unwrap();
+                            let [_counter] = true_case_b.input_wires_arr();
 
-                        // In the true case, we break and output true along with the "other" input wire
-                        let mut true_case_b = cond_b.case_builder(1).unwrap();
-
-                        let [_, val_w] = true_case_b.input_wires_arr();
-                        let unit_v = Value::unit_sum(0, 1).unwrap();
-                        let unit_w = true_case_b.add_load_value(unit_v);
-                        let tagged_output =
-                            true_case_b.make_break(loop_sig.clone(), [unit_w]).unwrap();
-                        true_case_b
-                            .finish_with_outputs([tagged_output, val_w])
-                            .unwrap();
+                            let tagged_break =
+                                true_case_b.make_break(loop_sig.clone(), []).unwrap();
+                            true_case_b.finish_with_outputs([tagged_break]).unwrap()
+                        };
 
                         cond_b.finish_sub_container().unwrap()
                     };
-                    let [sum, rest] = cond.outputs_arr();
-                    let outs @ [_, _] = tail_b
-                        .finish_with_outputs(sum, [rest])
+                    tail_b
+                        .finish_with_outputs(cond.out_wire(0), [other_mul_2])
                         .unwrap()
-                        .outputs_arr();
-                    builder.finish_with_outputs(outs).unwrap()
-                })
-        };
-        check_emission!(hugr, llvm_ctx);
+                };
+                let [out_int] = tail_l.outputs_arr();
+                println!("{}", builder.hugr().mermaid_string());
+                builder
+                    .finish_with_outputs([out_int])
+                    .unwrap_or_else(|e| panic!("{e}"))
+            })
+    }
+
+    #[rstest]
+    fn tail_loop(mut llvm_ctx: TestContext, #[with(3, 7)] terminal_loop: Hugr) {
+        llvm_ctx.add_extensions(add_int_extensions);
+        println!("{}", terminal_loop.mermaid_string());
+
+        check_emission!(terminal_loop, llvm_ctx);
+    }
+
+    #[rstest]
+    #[case(3, 7)]
+    #[case(2, 1)]
+    #[case(20, 0)]
+    fn tail_loop_exec(
+        mut exec_ctx: TestContext,
+        #[case] iters: u64,
+        #[case] input: u64,
+        #[with(iters, input)] terminal_loop: Hugr,
+    ) {
+        exec_ctx.add_extensions(add_int_extensions);
+        assert_eq!(
+            input * 1 << (iters + 1),
+            exec_ctx.exec_hugr_u64(terminal_loop, "main")
+        );
     }
 
     #[rstest]
