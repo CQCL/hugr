@@ -8,8 +8,8 @@ use hugr_core::{
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
 };
-use inkwell::types::{BasicTypeEnum, IntType};
-use inkwell::values::{BasicValueEnum, CallableValue, IntValue};
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::{BasicValueEnum, CallableValue};
 use itertools::{zip_eq, Itertools};
 use petgraph::visit::Walker;
 
@@ -21,7 +21,7 @@ use crate::{
 
 use super::{
     deaggregate_call_result,
-    func::{EmitFuncContext, RowMailBox, RowPromise},
+    func::{EmitFuncContext, RowPromise},
     EmitOpArgs,
 };
 
@@ -31,7 +31,6 @@ struct DataflowParentEmitter<'c, 'hugr, OT, H> {
     node: FatNode<'hugr, OT, H>,
     inputs: Option<Vec<BasicValueEnum<'c>>>,
     outputs: Option<RowPromise<'c>>,
-    output_vals: Option<Vec<BasicValueEnum<'c>>>,
 }
 
 impl<'c, 'hugr, OT: OpTrait, H: HugrView> DataflowParentEmitter<'c, 'hugr, OT, H>
@@ -43,7 +42,6 @@ where
             node: args.node,
             inputs: Some(args.inputs),
             outputs: Some(args.outputs),
-            output_vals: None,
         }
     }
 
@@ -310,12 +308,11 @@ fn emit_cfg<'c, H: HugrView>(
 
 fn emit_tail_loop<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, '_, H>,
-    args: EmitOpArgs<'c, '_, TailLoop, H>
+    args: EmitOpArgs<'c, '_, TailLoop, H>,
 ) -> Result<()> {
     // TODO: Switch on the tag in loop_body to see where to go next
     // TODO: Handle "other" args
     let node = args.node();
-
 
     // Make a block to jump to when we `Break`
     let out_bb = context.new_basic_block("loop_out", None);

@@ -4,14 +4,14 @@ use anyhow::{anyhow, Result};
 use hugr_core::builder::{
     BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use hugr_core::extension::prelude::{bool_t, usize_t, PRELUDE, PRELUDE_ID};
+use hugr_core::extension::prelude::PRELUDE_ID;
 use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
 use hugr_core::ops::handle::FuncID;
 use hugr_core::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
 };
 use hugr_core::std_extensions::{collections, logic};
-use hugr_core::types::{SumType, TypeRow};
+use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView};
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
@@ -246,7 +246,7 @@ mod test_fns {
     use super::*;
     use crate::custom::CodegenExtsBuilder;
     use crate::extension::int::add_int_extensions;
-    use crate::types::HugrFuncType;
+    use crate::types::{HugrFuncType, HugrSumType};
 
     use hugr_core::builder::DataflowSubContainer;
     use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
@@ -555,7 +555,6 @@ mod test_fns {
         let hugr = {
             let just_input = usize_t();
             let just_output = Type::UNIT;
-            let sum_ty = SumType::new(vec![just_input.clone(), just_output.clone()]);
             let input_v = TypeRow::from(vec![just_input.clone()]);
             let output_v = TypeRow::from(vec![just_output.clone()]);
 
@@ -602,7 +601,7 @@ mod test_fns {
             let just_input = int_ty.clone();
             let just_output = Type::UNIT;
             let other_ty = int_ty.clone();
-            let sum_ty = SumType::new(vec![just_input.clone(), just_output.clone()]);
+            let sum_ty = HugrSumType::new(vec![just_input.clone(), just_output.clone()]);
             let input_v = TypeRow::from(vec![just_input.clone(), other_ty.clone()]);
             let output_v = TypeRow::from(vec![just_output.clone(), other_ty.clone()]);
 
@@ -625,11 +624,11 @@ mod test_fns {
                             vec![just_output.clone()].into(),
                         )
                         .unwrap();
-                    let [sum_inp_w, other_w] = tail_b.input_wires_arr();
+                    let [sum_inp_w, _other_w] = tail_b.input_wires_arr();
 
                     let zero = ConstInt::new_u(6, 0).unwrap();
                     let zero_w = tail_b.add_load_value(zero);
-                    let [result] = tail_b
+                    let [_result] = tail_b
                         .add_dataflow_op(
                             int_ops::IntOpDef::ile_u.with_log_width(6),
                             [sum_inp_w, zero_w],
