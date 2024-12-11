@@ -357,7 +357,7 @@ impl DataflowOpTrait for LoadFunction {
         "Load a static function in to the local dataflow graph"
     }
 
-    fn signature(&self) -> Cow<'static, Signature> {
+    fn signature(&self) -> Cow<'_, Signature> {
         Cow::Owned(Signature::new(
             type_row![],
             Type::new_function(self.instantiation.clone()),
