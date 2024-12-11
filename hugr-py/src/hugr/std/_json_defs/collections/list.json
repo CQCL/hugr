@@ -1,10 +1,10 @@
 {
   "version": "0.1.0",
-  "name": "collections",
+  "name": "collections.list",
   "extension_reqs": [],
   "types": {
     "List": {
-      "extension": "collections",
+      "extension": "collections.list",
       "name": "List",
       "params": [
         {
@@ -24,7 +24,7 @@
   "values": {},
   "operations": {
     "get": {
-      "extension": "collections",
+      "extension": "collections.list",
       "name": "get",
       "description": "Lookup an element in a list by index. Panics if the index is out of bounds.",
       "signature": {
@@ -38,7 +38,7 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -78,7 +78,7 @@
       "binary": false
     },
     "insert": {
-      "extension": "collections",
+      "extension": "collections.list",
       "name": "insert",
       "description": "Insert an element at index `i`. Elements at higher indices are shifted one position to the right. Panics if the index is out of bounds.",
       "signature": {
@@ -92,7 +92,7 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -118,7 +118,7 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -159,7 +159,7 @@
       "binary": false
     },
     "length": {
-      "extension": "collections",
+      "extension": "collections.list",
       "name": "length",
       "description": "Get the length of a list",
       "signature": {
@@ -173,7 +173,7 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -191,7 +191,7 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -215,7 +215,7 @@
       "binary": false
     },
     "pop": {
-      "extension": "collections",
+      "extension": "collections.list",
       "name": "pop",
       "description": "Pop from the back of list. Returns an optional value.",
       "signature": {
@@ -229,7 +229,7 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -247,7 +247,7 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -282,7 +282,7 @@
       "binary": false
     },
     "push": {
-      "extension": "collections",
+      "extension": "collections.list",
       "name": "push",
       "description": "Push to the back of list",
       "signature": {
@@ -296,7 +296,7 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -319,7 +319,7 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -340,7 +340,7 @@
       "binary": false
     },
     "set": {
-      "extension": "collections",
+      "extension": "collections.list",
       "name": "set",
       "description": "Replace the element at index `i` with value `v`.",
       "signature": {
@@ -354,7 +354,7 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
@@ -380,7 +380,7 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections",
+              "extension": "collections.list",
               "id": "List",
               "args": [
                 {
