@@ -1054,7 +1054,7 @@
                     "title": "Type Args",
                     "type": "array"
                 },
-                "signature": {
+                "instantiation": {
                     "$ref": "#/$defs/FunctionType"
                 }
             },
@@ -1062,7 +1062,7 @@
                 "parent",
                 "func_sig",
                 "type_args",
-                "signature"
+                "instantiation"
             ],
             "title": "LoadFunction",
             "type": "object"

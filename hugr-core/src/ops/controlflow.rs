@@ -1,5 +1,7 @@
 //! Control flow operations.
 
+use std::borrow::Cow;
+
 use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, Signature, Type, TypeRow};
 use crate::Direction;
@@ -31,10 +33,13 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
-        Signature::new(inputs, outputs).with_extension_delta(self.extension_delta.clone())
+        Cow::Owned(
+            Signature::new(inputs, outputs).with_extension_delta(self.extension_delta.clone()),
+        )
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
@@ -73,9 +78,12 @@ impl TailLoop {
 }
 
 impl DataflowParent for TailLoop {
-    fn inner_signature(&self) -> Signature {
-        Signature::new(self.body_input_row(), self.body_output_row())
-            .with_extension_delta(self.extension_delta.clone())
+    fn inner_signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(
+            Signature::new(self.body_input_row(), self.body_output_row())
+                .with_extension_delta(self.extension_delta.clone()),
+        )
     }
 }
 
@@ -101,13 +109,16 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
             .insert(0, Type::new_sum(self.sum_rows.clone()));
-        Signature::new(inputs, self.outputs.clone())
-            .with_extension_delta(self.extension_delta.clone())
+        Cow::Owned(
+            Signature::new(inputs, self.outputs.clone())
+                .with_extension_delta(self.extension_delta.clone()),
+        )
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
@@ -144,8 +155,8 @@ impl DataflowOpTrait for CFG {
         "A dataflow node defined by a child CFG"
     }
 
-    fn signature(&self) -> Signature {
-        self.signature.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
@@ -196,13 +207,16 @@ impl StaticTag for ExitBlock {
 }
 
 impl DataflowParent for DataflowBlock {
-    fn inner_signature(&self) -> Signature {
+    fn inner_signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
         // The node outputs a Sum before the data outputs of the block node
         let sum_type = Type::new_sum(self.sum_rows.clone());
         let mut node_outputs = vec![sum_type];
         node_outputs.extend_from_slice(&self.other_outputs);
-        Signature::new(self.inputs.clone(), TypeRow::from(node_outputs))
-            .with_extension_delta(self.extension_delta.clone())
+        Cow::Owned(
+            Signature::new(self.inputs.clone(), TypeRow::from(node_outputs))
+                .with_extension_delta(self.extension_delta.clone()),
+        )
     }
 }
 
@@ -319,8 +333,8 @@ impl StaticTag for Case {
 }
 
 impl DataflowParent for Case {
-    fn inner_signature(&self) -> Signature {
-        self.signature.clone()
+    fn inner_signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 

@@ -244,13 +244,10 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), t2.clone()])
             .with_outs(t2.clone())
-            .with_extensions(
-                ExtensionRegistry::try_new([
-                    int_types::EXTENSION.to_owned(),
-                    prelude::PRELUDE.to_owned(),
-                ])
-                .unwrap(),
-            )
+            .with_extensions(ExtensionRegistry::new([
+                int_types::EXTENSION.to_owned(),
+                prelude::PRELUDE.to_owned(),
+            ]))
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let mut cfg_builder = builder

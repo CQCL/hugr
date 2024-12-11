@@ -101,15 +101,19 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
     lower_funcs: list[FixedHugr] = pd.Field(default_factory=list)
 
     def deserialize(self, extension: ext.Extension) -> ext.OpDef:
+        signature = ext.OpDefSig(
+            self.signature.deserialize().with_extension_reqs([extension.name])
+            if self.signature
+            else None,
+            self.binary,
+        )
+
         return extension.add_op_def(
             ext.OpDef(
                 name=self.name,
                 description=self.description,
                 misc=self.misc or {},
-                signature=ext.OpDefSig(
-                    self.signature.deserialize() if self.signature else None,
-                    self.binary,
-                ),
+                signature=signature,
                 lower_funcs=[f.deserialize() for f in self.lower_funcs],
             )
         )

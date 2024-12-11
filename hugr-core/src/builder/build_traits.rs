@@ -4,9 +4,10 @@ use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, CallIndirect, OpTag, OpTrait, OpType, Tag, TailLoop};
 use crate::utils::collect_array;
-use crate::{IncomingPort, Node, OutgoingPort};
+use crate::{Extension, IncomingPort, Node, OutgoingPort};
 
 use std::iter;
+use std::sync::Arc;
 
 use super::{
     handle::{BuildHandle, Outputs},
@@ -19,7 +20,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
+use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
@@ -45,7 +46,17 @@ pub trait Container {
     /// Immutable reference to HUGR being built
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
+    ///
+    /// Adds the extensions required by the op to the HUGR, if they are not already present.
     fn add_child_node(&mut self, node: impl Into<OpType>) -> Node {
+        let node: OpType = node.into();
+
+        // Add the extension the operation is defined in to the HUGR.
+        let used_extensions = node
+            .used_extensions()
+            .unwrap_or_else(|e| panic!("Build-time signatures should have valid extensions. {e}"));
+        self.use_extensions(used_extensions);
+
         let parent = self.container_node();
         self.hugr_mut().add_node_with_parent(parent, node)
     }
@@ -60,6 +71,8 @@ pub trait Container {
     }
 
     /// Add a constant value to the container and return a handle to it.
+    ///
+    /// Adds the extensions required by the op to the HUGR, if they are not already present.
     ///
     /// # Errors
     ///
@@ -87,6 +100,13 @@ pub trait Container {
             name: name.into(),
             signature,
         });
+
+        // Add the extensions used by the function types.
+        self.use_extensions(
+            body.used_extensions().unwrap_or_else(|e| {
+                panic!("Build-time signatures should have valid extensions. {e}")
+            }),
+        );
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
@@ -122,24 +142,26 @@ pub trait Container {
     ) {
         self.hugr_mut().set_metadata(child, key, meta);
     }
+
+    /// Add an extension to the set of extensions used by the hugr.
+    fn use_extension(&mut self, ext: impl Into<Arc<Extension>>) {
+        self.hugr_mut().use_extension(ext);
+    }
+
+    /// Extend the set of extensions used by the hugr with the extensions in the registry.
+    fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>)
+    where
+        ExtensionRegistry: Extend<Reg>,
+    {
+        self.hugr_mut().extensions_mut().extend(registry);
+    }
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
 /// (with varying root node types)
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
-    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError>;
-
-    /// Finish building the HUGR (as [HugrBuilder::finish_hugr]),
-    /// validating against the [prelude] extension only
-    ///
-    /// [prelude]: crate::extension::prelude
-    fn finish_prelude_hugr(self) -> Result<Hugr, ValidationError>
-    where
-        Self: Sized,
-    {
-        self.finish_hugr(&PRELUDE_REGISTRY)
-    }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR
@@ -178,6 +200,8 @@ pub trait Dataflow: Container {
     }
     /// Add a dataflow [`OpType`] to the sibling graph, wiring up the `input_wires` to the
     /// incoming ports of the resulting node.
+    ///
+    /// Adds the extensions required by the op to the HUGR, if they are not already present.
     ///
     /// # Errors
     ///
@@ -398,8 +422,6 @@ pub trait Dataflow: Container {
         &mut self,
         fid: &FuncID<DEFINED>,
         type_args: &[TypeArg],
-        // Sadly required as we substituting in type_args may result in recomputing bounds of types:
-        exts: &ExtensionRegistry,
     ) -> Result<Wire, BuildError> {
         let func_node = fid.node();
         let func_op = self.hugr().get_optype(func_node);
@@ -415,7 +437,7 @@ pub trait Dataflow: Container {
         };
 
         let load_n = self.add_dataflow_op(
-            ops::LoadFunction::try_new(func_sig, type_args, exts)?,
+            ops::LoadFunction::try_new(func_sig, type_args, self.hugr().extensions())?,
             // Static wire from the function node
             vec![Wire::new(func_node, func_op.static_output_port().unwrap())],
         )?;
@@ -664,8 +686,6 @@ pub trait Dataflow: Container {
         function: &FuncID<DEFINED>,
         type_args: &[TypeArg],
         input_wires: impl IntoIterator<Item = Wire>,
-        // Sadly required as we substituting in type_args may result in recomputing bounds of types:
-        exts: &ExtensionRegistry,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
@@ -679,7 +699,8 @@ pub trait Dataflow: Container {
                 })
             }
         };
-        let op: OpType = ops::Call::try_new(type_scheme, type_args, exts)?.into();
+        let op: OpType =
+            ops::Call::try_new(type_scheme, type_args, self.hugr().extensions())?.into();
         let const_in_port = op.static_input_port().unwrap();
         let op_id = self.add_dataflow_op(op, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
@@ -710,6 +731,8 @@ pub trait Dataflow: Container {
 }
 
 /// Add a node to the graph, wiring up the `inputs` to the input ports of the resulting node.
+///
+/// Adds the extensions required by the op to the HUGR, if they are not already present.
 ///
 /// # Errors
 ///
@@ -839,27 +862,12 @@ pub trait DataflowHugr: HugrBuilder + Dataflow {
     fn finish_hugr_with_outputs(
         mut self,
         outputs: impl IntoIterator<Item = Wire>,
-        extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, BuildError>
     where
         Self: Sized,
     {
         self.set_outputs(outputs)?;
-        Ok(self.finish_hugr(extension_registry)?)
-    }
-
-    /// Sets the outputs of a dataflow Hugr, validates against
-    /// the [prelude] extension only, and return the Hugr
-    ///
-    /// [prelude]: crate::extension::prelude
-    fn finish_prelude_hugr_with_outputs(
-        self,
-        outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<Hugr, BuildError>
-    where
-        Self: Sized,
-    {
-        self.finish_hugr_with_outputs(outputs, &PRELUDE_REGISTRY)
+        Ok(self.finish_hugr()?)
     }
 }
 

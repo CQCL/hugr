@@ -367,18 +367,12 @@ class LoadFunction(DataflowOp):
     op: Literal["LoadFunction"] = "LoadFunction"
     func_sig: PolyFuncType
     type_args: list[stys.TypeArg]
-    signature: FunctionType
+    instantiation: FunctionType
 
     def deserialize(self) -> ops.LoadFunc:
-        signature = self.signature.deserialize()
-        assert len(signature.input) == 0
-        (f_ty,) = signature.output
-        assert isinstance(
-            f_ty, tys.FunctionType
-        ), "Expected single function type output"
         return ops.LoadFunc(
             self.func_sig.deserialize(),
-            f_ty,
+            self.instantiation.deserialize(),
             deser_it(self.type_args),
         )
 

@@ -1,5 +1,7 @@
 //! Module-level operations
 
+use std::borrow::Cow;
+
 use smol_str::SmolStr;
 #[cfg(test)]
 use {
@@ -64,8 +66,8 @@ impl StaticTag for FuncDefn {
 }
 
 impl DataflowParent for FuncDefn {
-    fn inner_signature(&self) -> Signature {
-        self.signature.body().clone()
+    fn inner_signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(self.signature.body())
     }
 }
 

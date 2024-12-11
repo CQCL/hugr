@@ -2,6 +2,7 @@
 
 mod custom;
 
+use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
 use std::hash::{Hash, Hasher};
 
@@ -350,12 +351,15 @@ pub enum ConstTypeError {
 }
 
 /// Hugrs (even functions) inside Consts must be monomorphic
-fn mono_fn_type(h: &Hugr) -> Result<Signature, ConstTypeError> {
+fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
         hugr_root_type: h.root_type().clone(),
     };
     if let Some(pf) = h.poly_func_type() {
-        return pf.try_into().map_err(|_| err());
+        match pf.try_into() {
+            Ok(sig) => return Ok(Cow::Owned(sig)),
+            Err(_) => return Err(err()),
+        };
     }
 
     h.inner_function_type().ok_or_else(err)
@@ -369,7 +373,7 @@ impl Value {
             Self::Sum(Sum { sum_type, .. }) => sum_type.clone().into(),
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
-                Type::new_function(func_type)
+                Type::new_function(func_type.into_owned())
             }
         }
     }
@@ -568,14 +572,15 @@ mod test {
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
     use crate::extension::prelude::{bool_t, usize_custom_t};
+    use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
             prelude::{usize_t, ConstUsize},
-            ExtensionId, ExtensionRegistry, PRELUDE,
+            ExtensionId,
         },
-        std_extensions::arithmetic::float_types::{self, float64_type, ConstF64},
+        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
         type_row,
         types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
@@ -596,7 +601,7 @@ mod test {
         }
 
         fn extension_reqs(&self) -> ExtensionSet {
-            ExtensionSet::singleton(self.0.extension())
+            ExtensionSet::singleton(self.0.extension().clone())
         }
 
         fn get_type(&self) -> Type {
@@ -613,10 +618,6 @@ mod test {
         CustomSerialized::try_from_custom_const(ConstF64::new(f))
             .unwrap()
             .into()
-    }
-
-    fn test_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap()
     }
 
     /// Constructs a DFG hugr defining a sum constant, and returning the loaded value.
@@ -640,7 +641,7 @@ mod test {
             pred_ty.clone(),
         )?);
         let w = b.load_const(&c);
-        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
+        b.finish_hugr_with_outputs([w]).unwrap();
 
         let mut b = DFGBuilder::new(Signature::new(
             type_row![],
@@ -648,7 +649,7 @@ mod test {
         ))?;
         let c = b.add_constant(Value::sum(1, [], pred_ty.clone())?);
         let w = b.load_const(&c);
-        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
+        b.finish_hugr_with_outputs([w]).unwrap();
 
         Ok(())
     }

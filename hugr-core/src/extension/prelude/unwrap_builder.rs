@@ -104,6 +104,6 @@ mod tests {
         let [res] = builder
             .build_unwrap_sum(&PRELUDE_REGISTRY, 1, option_type(bool_t()), opt)
             .unwrap();
-        builder.finish_prelude_hugr_with_outputs([res]).unwrap();
+        builder.finish_hugr_with_outputs([res]).unwrap();
     }
 }

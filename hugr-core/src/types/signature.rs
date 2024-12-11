@@ -9,6 +9,7 @@ use super::type_row::TypeRowBase;
 use super::{MaybeRV, NoRV, RowVariable, Substitution, Type, TypeRow};
 
 use crate::core::PortIndex;
+use crate::extension::resolution::{collect_signature_exts, ExtensionCollectionError};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
@@ -117,6 +118,28 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         self.input.validate(extension_registry, var_decls)?;
         self.output.validate(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
+    }
+
+    /// Returns a registry with the concrete extensions used by this signature.
+    ///
+    /// Note that extension type parameters are not included, as they have not
+    /// been instantiated yet.
+    ///
+    /// This method only returns extensions actually used by the types in the
+    /// signature. The extension deltas added via [`Self::with_extension_delta`]
+    /// refer to _runtime_ extensions, which may not be in all places that
+    /// manipulate a HUGR.
+    pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
+        let mut used = ExtensionRegistry::default();
+        let mut missing = ExtensionSet::new();
+
+        collect_signature_exts(self, &mut used, &mut missing);
+
+        if missing.is_empty() {
+            Ok(used)
+        } else {
+            Err(ExtensionCollectionError::dropped_signature(self, missing))
+        }
     }
 }
 

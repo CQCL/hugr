@@ -764,7 +764,7 @@ mod tests {
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
-        b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+        b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }
 
     #[test]
@@ -871,7 +871,7 @@ mod tests {
 
     #[test]
     fn test_repeat_def() {
-        let op = ArrayRepeat::new(qb_t(), 2, ExtensionSet::singleton(&PRELUDE_ID));
+        let op = ArrayRepeat::new(qb_t(), 2, ExtensionSet::singleton(PRELUDE_ID));
         let optype: OpType = op.clone().into();
         let new_op: ArrayRepeat = optype.cast().unwrap();
         assert_eq!(new_op, op);
@@ -881,7 +881,7 @@ mod tests {
     fn test_repeat() {
         let size = 2;
         let element_ty = qb_t();
-        let es = ExtensionSet::singleton(&PRELUDE_ID);
+        let es = ExtensionSet::singleton(PRELUDE_ID);
         let op = ArrayRepeat::new(element_ty.clone(), size, es.clone());
 
         let optype: OpType = op.into();
@@ -907,7 +907,7 @@ mod tests {
             qb_t(),
             vec![usize_t()],
             2,
-            ExtensionSet::singleton(&PRELUDE_ID),
+            ExtensionSet::singleton(PRELUDE_ID),
         );
         let optype: OpType = op.clone().into();
         let new_op: ArrayScan = optype.cast().unwrap();
@@ -919,7 +919,7 @@ mod tests {
         let size = 2;
         let src_ty = qb_t();
         let tgt_ty = bool_t();
-        let es = ExtensionSet::singleton(&PRELUDE_ID);
+        let es = ExtensionSet::singleton(PRELUDE_ID);
 
         let op = ArrayScan::new(src_ty.clone(), tgt_ty.clone(), vec![], size, es.clone());
         let optype: OpType = op.into();
@@ -947,7 +947,7 @@ mod tests {
         let tgt_ty = bool_t();
         let acc_ty1 = usize_t();
         let acc_ty2 = qb_t();
-        let es = ExtensionSet::singleton(&PRELUDE_ID);
+        let es = ExtensionSet::singleton(PRELUDE_ID);
 
         let op = ArrayScan::new(
             src_ty.clone(),
