@@ -1,29 +1,73 @@
-use crate::const_fold::constant_fold_pass;
-use crate::test::TEST_REG;
-use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
-use hugr_core::extension::prelude::{
-    bool_t, const_ok, error_type, string_type, sum_with_error, ConstError, ConstString, UnpackTuple,
-};
-use hugr_core::ops::Value;
-use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
-use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use hugr_core::std_extensions::logic::LogicOp;
-use hugr_core::type_row;
-use hugr_core::types::{Signature, Type, TypeRow, TypeRowRV};
+use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 
+use itertools::Itertools;
+use lazy_static::lazy_static;
 use rstest::rstest;
 
-use lazy_static::lazy_static;
+use hugr_core::builder::{
+    endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    SubContainer,
+};
+use hugr_core::extension::prelude::{
+    bool_t, const_ok, error_type, string_type, sum_with_error, ConstError, ConstString, MakeTuple,
+    UnpackTuple,
+};
 
-use super::*;
-use hugr_core::builder::Container;
-use hugr_core::ops::OpType;
-use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
-use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr_core::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
+use hugr_core::ops::{constant::CustomConst, handle::BasicBlockID, OpTag, OpTrait, OpType, Value};
+use hugr_core::std_extensions::arithmetic::{
+    conversions::ConvertOpDef,
+    float_ops::FloatOps,
+    float_types::{float64_type, ConstF64},
+    int_ops::IntOpDef,
+    int_types::{ConstInt, INT_TYPES},
+};
+use hugr_core::std_extensions::logic::LogicOp;
+use hugr_core::types::{Signature, SumType, Type, TypeRow, TypeRowRV};
+use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
+
+use crate::dataflow::{partial_from_const, DFContext, PartialValue};
+use crate::test::TEST_REG;
+
+use super::{constant_fold_pass, ConstFoldContext, ConstantFoldPass, ValueHandle};
+
+#[rstest]
+#[case(ConstInt::new_u(4, 2).unwrap(), true)]
+#[case(ConstF64::new(std::f64::consts::PI), false)]
+fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
+    let n = Node::from(portgraph::NodeIndex::new(7));
+    let st = SumType::new([vec![k.get_type()], vec![]]);
+    let subject_val = Value::sum(0, [k.clone().into()], st).unwrap();
+    let temp = Hugr::default();
+    let ctx: ConstFoldContext<Hugr> = ConstFoldContext(&temp);
+    let v1 = partial_from_const(&ctx, n, &subject_val);
+
+    let v1_subfield = {
+        let PartialValue::PartialSum(ps1) = v1 else {
+            panic!()
+        };
+        ps1.0
+            .into_iter()
+            .exactly_one()
+            .unwrap()
+            .1
+            .into_iter()
+            .exactly_one()
+            .unwrap()
+    };
+
+    let v2 = partial_from_const(&ctx, n, &k.into());
+    if eq {
+        assert_eq!(v1_subfield, v2);
+    } else {
+        assert_ne!(v1_subfield, v2);
+    }
+}
 
 /// Check that a hugr just loads and returns a single expected constant.
-pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
+pub fn assert_fully_folded(h: &impl HugrView, expected_value: &Value) {
     assert_fully_folded_with(h, |v| v == expected_value)
 }
 
@@ -32,7 +76,7 @@ pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
 ///
 /// [CustomConst::equals_const] is not required to be implemented. Use this
 /// function for Values containing such a `CustomConst`.
-fn assert_fully_folded_with(h: &Hugr, check_value: impl Fn(&Value) -> bool) {
+fn assert_fully_folded_with(h: &impl HugrView, check_value: impl Fn(&Value) -> bool) {
     let mut node_count = 0;
 
     for node in h.children(h.root()) {
@@ -63,15 +107,25 @@ fn f2c(f: f64) -> Value {
 #[case(23.5, 435.5, 459.0)]
 // c = a + b
 fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
-    let consts = vec![(0.into(), f2c(a)), (1.into(), f2c(b))];
-    let add_op: OpType = FloatOps::fadd.into();
-    let outs = fold_leaf_op(&add_op, &consts)
-        .unwrap()
-        .into_iter()
-        .map(|(p, v)| (p, v.get_custom_value::<ConstF64>().unwrap().value()))
-        .collect_vec();
+    fn unwrap_float(pv: PartialValue<ValueHandle>) -> f64 {
+        let v: Value = pv.try_into_concrete(&float64_type()).unwrap();
+        v.get_custom_value::<ConstF64>().unwrap().value()
+    }
+    let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
+    let temp = Hugr::default();
+    let mut ctx = ConstFoldContext(&temp);
+    let v_a = partial_from_const(&ctx, n_a, &f2c(a));
+    let v_b = partial_from_const(&ctx, n_b, &f2c(b));
+    assert_eq!(unwrap_float(v_a.clone()), a);
+    assert_eq!(unwrap_float(v_b.clone()), b);
 
-    assert_eq!(outs.as_slice(), &[(0.into(), c)]);
+    let mut outs = [PartialValue::Bottom];
+    let OpType::ExtensionOp(add_op) = OpType::from(FloatOps::fadd) else {
+        panic!()
+    };
+    ctx.interpret_leaf_op(n, &add_op, &[v_a, v_b], &mut outs);
+
+    assert_eq!(unwrap_float(outs[0].clone()), c);
 }
 
 fn noargfn(outputs: impl Into<TypeRow>) -> Signature {
@@ -1239,4 +1293,297 @@ fn test_fold_int_ops() {
     constant_fold_pass(&mut h);
     let expected = Value::true_val();
     assert_fully_folded(&h, &expected);
+}
+
+#[test]
+fn test_via_part_unknown_tuple() {
+    // fn(x) -> let (a,_b,c) = (4,x,5) // make tuple, unpack tuple
+    //          in a+b
+    let mut builder = DFGBuilder::new(endo_sig(INT_TYPES[3].clone())).unwrap();
+    let [x] = builder.input_wires_arr();
+    let cst4 = builder.add_load_value(ConstInt::new_u(3, 4).unwrap());
+    let cst5 = builder.add_load_value(ConstInt::new_u(3, 5).unwrap());
+    let tuple_ty = TypeRow::from(vec![INT_TYPES[3].clone(); 3]);
+    let tup = builder
+        .add_dataflow_op(MakeTuple::new(tuple_ty.clone()), [cst4, x, cst5])
+        .unwrap();
+    let untup = builder
+        .add_dataflow_op(UnpackTuple::new(tuple_ty), tup.outputs())
+        .unwrap();
+    let [a, _b, c] = untup.outputs_arr();
+    let res = builder
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(3), [a, c])
+        .unwrap();
+    let mut hugr = builder.finish_hugr_with_outputs(res.outputs()).unwrap();
+
+    constant_fold_pass(&mut hugr);
+
+    // We expect: root dfg, input, output, const 9, load constant, iadd
+    let mut expected_op_tags: HashSet<_, RandomState> = [
+        OpTag::Dfg,
+        OpTag::Input,
+        OpTag::Output,
+        OpTag::Const,
+        OpTag::LoadConst,
+    ]
+    .map(|t| t.to_string())
+    .into_iter()
+    .collect();
+    for n in hugr.nodes() {
+        let t = hugr.get_optype(n);
+        let removed = expected_op_tags.remove(&t.tag().to_string());
+        assert!(removed);
+        if let Some(c) = t.as_const() {
+            assert_eq!(c.value, ConstInt::new_u(3, 9).unwrap().into())
+        }
+    }
+    assert!(expected_op_tags.is_empty());
+}
+
+fn tail_loop_hugr(int_cst: ConstInt) -> Hugr {
+    let int_ty = int_cst.get_type();
+    let lw = int_cst.log_width();
+    let mut builder = DFGBuilder::new(inout_sig(bool_t(), int_ty.clone())).unwrap();
+    let [bool_w] = builder.input_wires_arr();
+    let lcst = builder.add_load_value(int_cst);
+    let tlb = builder
+        .tail_loop_builder([], [(int_ty, lcst)], type_row![])
+        .unwrap();
+    let [i] = tlb.input_wires_arr();
+    // Loop either always breaks, or always iterates, depending on the boolean input
+    let [loop_out_w] = tlb.finish_with_outputs(bool_w, [i]).unwrap().outputs_arr();
+    // The output of the loop is the constant, if the loop terminates
+    let add = builder
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(lw), [lcst, loop_out_w])
+        .unwrap();
+
+    builder.finish_hugr_with_outputs(add.outputs()).unwrap()
+}
+
+#[test]
+fn test_tail_loop_unknown() {
+    let cst5 = ConstInt::new_u(3, 5).unwrap();
+    let mut h = tail_loop_hugr(cst5.clone());
+
+    constant_fold_pass(&mut h);
+    // Must keep the loop, even though we know the output, in case the output doesn't happen
+    assert_eq!(h.node_count(), 12);
+    let tl = h
+        .nodes()
+        .filter(|n| h.get_optype(*n).is_tail_loop())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let mut dfg_nodes = Vec::new();
+    let mut loop_nodes = Vec::new();
+    for n in h.nodes() {
+        if let Some(p) = h.get_parent(n) {
+            if p == h.root() {
+                dfg_nodes.push(n)
+            } else {
+                assert_eq!(p, tl);
+                loop_nodes.push(n);
+            }
+        }
+    }
+    let tag_string = |n: &Node| format!("{:?}", h.get_optype(*n).tag());
+    assert_eq!(
+        dfg_nodes
+            .iter()
+            .map(tag_string)
+            .sorted()
+            .collect::<Vec<_>>(),
+        vec![
+            "Const",
+            "Const",
+            "Input",
+            "LoadConst",
+            "LoadConst",
+            "Output",
+            "TailLoop"
+        ]
+    );
+
+    assert_eq!(
+        loop_nodes.iter().map(tag_string).collect::<Vec<_>>(),
+        Vec::from(["Input", "Output", "Const", "LoadConst"])
+    );
+
+    // In the loop, we have a new constant 5 instead of using the loop input
+    let [loop_in, loop_out] = h.get_io(tl).unwrap();
+    assert!(h.input_neighbours(loop_in).next().is_none());
+    let (loop_cst, v) = loop_nodes
+        .into_iter()
+        .filter_map(|n| h.get_optype(n).as_const().map(|c| (n, c.value())))
+        .exactly_one()
+        .unwrap();
+    assert_eq!(v, &cst5.clone().into());
+    let loop_lcst = h.output_neighbours(loop_cst).exactly_one().ok().unwrap();
+    assert_eq!(h.get_parent(loop_lcst), Some(tl));
+    assert_eq!(
+        h.all_linked_inputs(loop_lcst).collect::<Vec<_>>(),
+        vec![(loop_out, IncomingPort::from(1))]
+    );
+
+    // Outer DFG contains two constants (we know) - a 5, used by the loop, and a 10, output.
+    let [_, root_out] = h.get_io(h.root()).unwrap();
+    let mut cst5 = Some(cst5.into());
+    for n in dfg_nodes {
+        let Some(cst) = h.get_optype(n).as_const() else {
+            continue;
+        };
+        let lcst = h.output_neighbours(n).exactly_one().ok().unwrap();
+        let target = h.output_neighbours(lcst).exactly_one().ok().unwrap();
+        if Some(cst.value()) == cst5.as_ref() {
+            cst5 = None;
+            assert_eq!(target, tl);
+        } else {
+            assert_eq!(cst.value(), &ConstInt::new_u(3, 10).unwrap().into());
+            assert_eq!(target, root_out)
+        }
+    }
+    assert!(cst5.is_none()); // Found in loop
+}
+
+#[test]
+fn test_tail_loop_never_iterates() {
+    let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
+    ConstantFoldPass::default()
+        .with_inputs([(0, Value::true_val())]) // true = 1 = break
+        .run(&mut h)
+        .unwrap();
+    assert_fully_folded(&h, &ConstInt::new_u(4, 12).unwrap().into());
+}
+
+#[test]
+fn test_tail_loop_increase_termination() {
+    let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
+    ConstantFoldPass::default()
+        .allow_increase_termination()
+        .run(&mut h)
+        .unwrap();
+    assert_fully_folded(&h, &ConstInt::new_u(4, 12).unwrap().into());
+}
+
+fn cfg_hugr() -> Hugr {
+    let int_ty = INT_TYPES[4].clone();
+    let mut builder = DFGBuilder::new(inout_sig(vec![bool_t(); 2], int_ty.clone())).unwrap();
+    let [p, q] = builder.input_wires_arr();
+    let int_cst = builder.add_load_value(ConstInt::new_u(4, 1).unwrap());
+    let mut nested = builder
+        .dfg_builder_endo([(int_ty.clone(), int_cst)])
+        .unwrap();
+    let [i] = nested.input_wires_arr();
+    let mut cfg = nested
+        .cfg_builder([(int_ty.clone(), i)], int_ty.clone().into())
+        .unwrap();
+    let mut entry = cfg.simple_entry_builder(int_ty.clone().into(), 2).unwrap();
+    let [e_i] = entry.input_wires_arr();
+    let e_cst7 = entry.add_load_value(ConstInt::new_u(4, 7).unwrap());
+    let e_add = entry
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(4), [e_cst7, e_i])
+        .unwrap();
+    let entry = entry.finish_with_outputs(p, e_add.outputs()).unwrap();
+
+    let mut a = cfg
+        .simple_block_builder(endo_sig(int_ty.clone()), 2)
+        .unwrap();
+    let [a_i] = a.input_wires_arr();
+    let a_cst3 = a.add_load_value(ConstInt::new_u(4, 3).unwrap());
+    let a_add = a
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(4), [a_cst3, a_i])
+        .unwrap();
+    let a = a.finish_with_outputs(q, a_add.outputs()).unwrap();
+
+    let x = cfg.exit_block();
+    let [tru, fals] = [1, 0];
+    cfg.branch(&entry, tru, &a).unwrap();
+    cfg.branch(&entry, fals, &x).unwrap();
+    cfg.branch(&a, tru, &entry).unwrap();
+    cfg.branch(&a, fals, &x).unwrap();
+    let cfg = cfg.finish_sub_container().unwrap();
+    let nested = nested.finish_with_outputs(cfg.outputs()).unwrap();
+
+    builder.finish_hugr_with_outputs(nested.outputs()).unwrap()
+}
+
+#[rstest]
+#[case(&[(0,false)], true, false, Some(8))]
+#[case(&[(0,true), (1,false)], true, true, Some(11))]
+#[case(&[(1,false)], true, true, None)]
+#[case(&[], false, false, None)]
+fn test_cfg(
+    #[case] inputs: &[(usize, bool)],
+    #[case] fold_entry: bool,
+    #[case] fold_blk: bool,
+    #[case] fold_res: Option<u16>,
+) {
+    let backup = cfg_hugr();
+    let mut hugr = backup.clone();
+    let pass = ConstantFoldPass::default()
+        .with_inputs(inputs.iter().map(|(p, b)| (*p, Value::from_bool(*b))));
+    pass.run(&mut hugr).unwrap();
+    // CFG inside DFG retained
+    let nested = hugr
+        .children(hugr.root())
+        .filter(|n| hugr.get_optype(*n).is_dfg())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let cfg = hugr
+        .nodes()
+        .filter(|n| hugr.get_optype(*n).is_cfg())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    assert_eq!(hugr.get_parent(cfg), Some(nested));
+    let [entry, exit, a] = hugr.children(cfg).collect::<Vec<_>>().try_into().unwrap();
+    assert!(hugr.get_optype(exit).is_exit_block());
+    for (blk, is_folded, folded_cst, unfolded_cst) in
+        [(entry, fold_entry, 8, 7), (a, fold_blk, 11, 3)]
+    {
+        if is_folded {
+            assert_fully_folded(
+                &DescendantsGraph::<BasicBlockID>::try_new(&hugr, blk).unwrap(),
+                &ConstInt::new_u(4, folded_cst).unwrap().into(),
+            );
+        } else {
+            let mut expected_tags =
+                HashSet::from(["Input", "Output", "Leaf", "Const", "LoadConst"]);
+            for ch in hugr.children(blk) {
+                let tag = format!("{:?}", hugr.get_optype(ch).tag());
+                assert!(expected_tags.remove(tag.as_str()), "Not found: {}", tag);
+                if let Some(cst) = hugr.get_optype(ch).as_const() {
+                    assert_eq!(
+                        cst.value(),
+                        &ConstInt::new_u(4, unfolded_cst).unwrap().into()
+                    );
+                } else if let Some(op) = hugr.get_optype(ch).as_extension_op() {
+                    assert_eq!(op.def().name(), "iadd");
+                }
+            }
+        }
+    }
+    let output_src = hugr
+        .input_neighbours(hugr.get_io(hugr.root()).unwrap()[1])
+        .exactly_one()
+        .ok()
+        .unwrap();
+    if let Some(res_int) = fold_res {
+        let res_v = ConstInt::new_u(4, res_int as _).unwrap().into();
+        assert!(hugr.get_optype(output_src).is_load_constant());
+        let output_cst = hugr
+            .input_neighbours(output_src)
+            .exactly_one()
+            .ok()
+            .unwrap();
+        let cst = hugr.get_optype(output_cst).as_const().unwrap();
+        assert_eq!(cst.value(), &res_v);
+
+        let mut hugr2 = backup;
+        pass.allow_increase_termination().run(&mut hugr2).unwrap();
+        assert_fully_folded(&hugr2, &res_v);
+    } else {
+        assert_eq!(output_src, nested);
+    }
 }
