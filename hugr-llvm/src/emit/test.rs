@@ -716,7 +716,6 @@ mod test_fns {
     #[rstest]
     fn tail_loop(mut llvm_ctx: TestContext, #[with(3, 7)] terminal_loop: Hugr) {
         llvm_ctx.add_extensions(add_int_extensions);
-        println!("{}", terminal_loop.mermaid_string());
 
         check_emission!(terminal_loop, llvm_ctx);
     }

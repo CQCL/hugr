@@ -310,8 +310,6 @@ fn emit_tail_loop<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, TailLoop, H>,
 ) -> Result<()> {
-    // TODO: Switch on the tag in loop_body to see where to go next
-    // TODO: Handle "other" args
     let node = args.node();
 
     // Make a block to jump to when we `Break`
