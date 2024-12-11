@@ -4,6 +4,10 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 ---
 (hugr 0)
 
+(import prelude.json)
+
+(import arithmetic.int.types.int)
+
 (declare-func example.callee
   (forall ?0 ext-set)
   [(@ arithmetic.int.types.int)]

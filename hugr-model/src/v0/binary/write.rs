@@ -31,8 +31,8 @@ fn write_module(mut builder: hugr_capnp::module::Builder, module: &model::Module
 
 fn write_node(mut builder: hugr_capnp::node::Builder, node: &model::Node) {
     write_operation(builder.reborrow().init_operation(), &node.operation);
-    write_list!(builder, init_inputs, write_link_ref, node.inputs);
-    write_list!(builder, init_outputs, write_link_ref, node.outputs);
+    let _ = builder.set_inputs(model::LinkIndex::unwrap_slice(node.inputs));
+    let _ = builder.set_outputs(model::LinkIndex::unwrap_slice(node.outputs));
     write_list!(builder, init_meta, write_meta_item, node.meta);
     let _ = builder.set_params(model::TermId::unwrap_slice(node.params));
     let _ = builder.set_regions(model::RegionId::unwrap_slice(node.regions));
@@ -47,11 +47,9 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
         model::Operation::TailLoop => builder.set_tail_loop(()),
         model::Operation::Conditional => builder.set_conditional(()),
         model::Operation::Tag { tag } => builder.set_tag(*tag),
-        model::Operation::Custom { operation } => {
-            write_global_ref(builder.init_custom(), operation)
-        }
+        model::Operation::Custom { operation } => builder.set_custom(operation.0),
         model::Operation::CustomFull { operation } => {
-            write_global_ref(builder.init_custom_full(), operation)
+            builder.set_custom_full(operation.0);
         }
         model::Operation::CallFunc { func } => builder.set_call_func(func.0),
         model::Operation::LoadFunc { func } => builder.set_load_func(func.0),
@@ -100,6 +98,10 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             builder.set_type(decl.r#type.0);
         }
 
+        model::Operation::Import { name } => {
+            builder.set_import(*name);
+        }
+
         model::Operation::Invalid => builder.set_invalid(()),
     }
 }
@@ -111,31 +113,6 @@ fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
         model::ParamSort::Implicit => hugr_capnp::ParamSort::Implicit,
         model::ParamSort::Explicit => hugr_capnp::ParamSort::Explicit,
     });
-}
-
-fn write_global_ref(mut builder: hugr_capnp::global_ref::Builder, global_ref: &model::GlobalRef) {
-    match global_ref {
-        model::GlobalRef::Direct(node) => builder.set_node(node.0),
-        model::GlobalRef::Named(name) => builder.set_named(name),
-    }
-}
-
-fn write_link_ref(mut builder: hugr_capnp::link_ref::Builder, link_ref: &model::LinkRef) {
-    match link_ref {
-        model::LinkRef::Id(id) => builder.set_id(id.0),
-        model::LinkRef::Named(name) => builder.set_named(name),
-    }
-}
-
-fn write_local_ref(mut builder: hugr_capnp::local_ref::Builder, local_ref: &model::LocalRef) {
-    match local_ref {
-        model::LocalRef::Index(node, index) => {
-            let mut builder = builder.init_direct();
-            builder.set_node(node.0);
-            builder.set_index(*index);
-        }
-        model::LocalRef::Named(name) => builder.set_named(name),
-    }
 }
 
 fn write_meta_item(mut builder: hugr_capnp::meta_item::Builder, meta_item: &model::MetaItem) {
@@ -150,11 +127,20 @@ fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region
         model::RegionKind::Module => hugr_capnp::RegionKind::Module,
     });
 
-    write_list!(builder, init_sources, write_link_ref, region.sources);
-    write_list!(builder, init_targets, write_link_ref, region.targets);
+    let _ = builder.set_sources(model::LinkIndex::unwrap_slice(region.sources));
+    let _ = builder.set_targets(model::LinkIndex::unwrap_slice(region.targets));
     let _ = builder.set_children(model::NodeId::unwrap_slice(region.children));
     write_list!(builder, init_meta, write_meta_item, region.meta);
     builder.set_signature(region.signature.map_or(0, |t| t.0 + 1));
+
+    if let Some(scope) = &region.scope {
+        write_region_scope(builder.init_scope(), scope);
+    }
+}
+
+fn write_region_scope(mut builder: hugr_capnp::region_scope::Builder, scope: &model::RegionScope) {
+    builder.set_links(scope.links);
+    builder.set_ports(scope.ports);
 }
 
 fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
@@ -163,7 +149,11 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::Type => builder.set_runtime_type(()),
         model::Term::StaticType => builder.set_static_type(()),
         model::Term::Constraint => builder.set_constraint(()),
-        model::Term::Var(local_ref) => write_local_ref(builder.init_variable(), local_ref),
+        model::Term::Var(model::VarId(node, index)) => {
+            let mut builder = builder.init_variable();
+            builder.set_variable_node(node.0);
+            builder.set_variable_index(*index);
+        }
         model::Term::ListType { item_type } => builder.set_list_type(item_type.0),
         model::Term::Str(value) => builder.set_string(value),
         model::Term::StrType => builder.set_string_type(()),
@@ -175,15 +165,15 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::Control { values } => builder.set_control(values.0),
         model::Term::ControlType => builder.set_control_type(()),
 
-        model::Term::Apply { global, args } => {
+        model::Term::Apply { symbol, args } => {
             let mut builder = builder.init_apply();
-            write_global_ref(builder.reborrow().init_global(), global);
+            builder.set_symbol(symbol.0);
             let _ = builder.set_args(model::TermId::unwrap_slice(args));
         }
 
-        model::Term::ApplyFull { global, args } => {
+        model::Term::ApplyFull { symbol, args } => {
             let mut builder = builder.init_apply_full();
-            write_global_ref(builder.reborrow().init_global(), global);
+            builder.set_symbol(symbol.0);
             let _ = builder.set_args(model::TermId::unwrap_slice(args));
         }
 
