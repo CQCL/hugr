@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import hugr.tys as tys
 from hugr import val
@@ -16,15 +16,19 @@ EXTENSION = _load_extension("collections.list")
 class List(tys.ExtType):
     """List type with a fixed element type."""
 
-    ty: tys.Type = field(default_factory=lambda: tys.Unit)
-
-    def __init__(self, ty: tys.Type | tys.TypeTypeArg) -> None:
-        if isinstance(ty, tys.Type):
-            ty = tys.TypeTypeArg(ty)
+    def __init__(self, ty: tys.Type) -> None:
+        ty_arg = tys.TypeTypeArg(ty)
 
         self.type_def = EXTENSION.types["List"]
-        self.args = [ty]
-        self.ty = ty.ty
+        self.args = [ty_arg]
+
+    @property
+    def ty(self) -> tys.Type:
+        """Returns the type of the list."""
+        assert isinstance(
+            self.args[0], tys.TypeTypeArg
+        ), "List elements must have a valid type"
+        return self.args[0].ty
 
     def type_bound(self) -> tys.TypeBound:
         return self.ty.type_bound()

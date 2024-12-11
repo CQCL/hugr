@@ -19,6 +19,7 @@ ExtensionSet = stys.ExtensionSet
 TypeBound = stys.TypeBound
 
 
+@runtime_checkable
 class TypeParam(Protocol):
     """A HUGR type parameter."""
 
@@ -30,6 +31,7 @@ class TypeParam(Protocol):
         return stys.TypeParam(root=self._to_serial())  # type: ignore[arg-type]
 
 
+@runtime_checkable
 class TypeArg(Protocol):
     """A HUGR type argument, which can be bound to a :class:TypeParam."""
 
@@ -106,7 +108,7 @@ class TypeTypeParam(TypeParam):
 class BoundedNatParam(TypeParam):
     """A type parameter indicating a natural number with an optional upper bound."""
 
-    upper_bound: int | None
+    upper_bound: int | None = None
 
     def _to_serial(self) -> stys.BoundedNatParam:
         return stys.BoundedNatParam(bound=self.upper_bound)
