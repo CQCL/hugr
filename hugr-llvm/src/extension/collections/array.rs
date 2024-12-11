@@ -1,23 +1,21 @@
 //! Codegen for prelude array operations.
+use std::iter;
+
 use anyhow::{anyhow, Ok, Result};
-use hugr_core::{
-    extension::{
-        prelude::{
-            array::{ArrayRepeat, ArrayScan},
-            array_type, option_type, ArrayOp, ArrayOpDef,
-        },
-        simple_op::MakeRegisteredOp,
-    },
-    ops::DataflowOpTrait as _,
-    types::TypeEnum,
-    HugrView,
+use hugr_core::extension::prelude::option_type;
+use hugr_core::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
+use hugr_core::ops::DataflowOpTrait;
+use hugr_core::std_extensions::collections::array::{
+    self, array_type, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan,
 };
-use inkwell::{
-    builder::{Builder, BuilderError},
-    types::BasicType,
-    values::{ArrayValue, BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue},
-    IntPredicate,
+use hugr_core::types::{TypeArg, TypeEnum};
+use hugr_core::HugrView;
+use inkwell::builder::{Builder, BuilderError};
+use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::values::{
+    ArrayValue, BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue,
 };
+use inkwell::IntPredicate;
 use itertools::Itertools;
 
 use crate::{
@@ -25,8 +23,147 @@ use crate::{
     sum::LLVMSumType,
     types::{HugrType, TypingSession},
 };
+use crate::{CodegenExtension, CodegenExtsBuilder};
 
-use super::PreludeCodegen;
+impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+    /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
+    /// as the implementation.
+    pub fn add_default_array_extensions(self) -> Self {
+        self.add_array_extensions(DefaultArrayCodegen)
+    }
+
+    /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using
+    /// [DefaultArrayCodegen] as the implementation.
+    pub fn add_array_extensions(self, ccg: impl ArrayCodegen + 'a) -> Self {
+        self.add_extension(ArrayCodegenExtension::from(ccg))
+    }
+}
+
+/// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::array]
+/// types, [hugr_core::ops::constant::CustomConst]s, and ops.
+pub trait ArrayCodegen: Clone {
+    /// Return the llvm type of [hugr_core::std_extensions::collections::array::ARRAY_TYPENAME].
+    fn array_type<'c>(
+        &self,
+        _session: &TypingSession<'c, '_>,
+        elem_ty: BasicTypeEnum<'c>,
+        size: u64,
+    ) -> impl BasicType<'c> {
+        elem_ty.array_type(size as u32)
+    }
+
+    /// Emit a [hugr_core::std_extensions::collections::array::ArrayOp].
+    fn emit_array_op<'c, H: HugrView>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        op: ArrayOp,
+        inputs: Vec<BasicValueEnum<'c>>,
+        outputs: RowPromise<'c>,
+    ) -> Result<()> {
+        emit_array_op(self, ctx, op, inputs, outputs)
+    }
+
+    /// Emit a [hugr_core::std_extensions::collections::array::ArrayRepeat] op.
+    fn emit_array_repeat<'c, H: HugrView>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        op: ArrayRepeat,
+        func: BasicValueEnum<'c>,
+    ) -> Result<BasicValueEnum<'c>> {
+        emit_repeat_op(ctx, op, func)
+    }
+
+    /// Emit a [hugr_core::std_extensions::collections::array::ArrayScan] op.
+    ///
+    /// Returns the resulting array and the final values of the accumulators.
+    fn emit_array_scan<'c, H: HugrView>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        op: ArrayScan,
+        src_array: BasicValueEnum<'c>,
+        func: BasicValueEnum<'c>,
+        initial_accs: &[BasicValueEnum<'c>],
+    ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
+        emit_scan_op(ctx, op, src_array, func, initial_accs)
+    }
+}
+
+/// A trivial implementation of [ArrayCodegen] which passes all methods
+/// through to their default implementations.
+#[derive(Default, Clone)]
+pub struct DefaultArrayCodegen;
+
+impl ArrayCodegen for DefaultArrayCodegen {}
+
+#[derive(Clone, Debug, Default)]
+pub struct ArrayCodegenExtension<CCG>(CCG);
+
+impl<CCG: ArrayCodegen> ArrayCodegenExtension<CCG> {
+    pub fn new(ccg: CCG) -> Self {
+        Self(ccg)
+    }
+}
+
+impl<CCG: ArrayCodegen> From<CCG> for ArrayCodegenExtension<CCG> {
+    fn from(ccg: CCG) -> Self {
+        Self::new(ccg)
+    }
+}
+
+impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
+    fn add_extension<'a, H: HugrView + 'a>(
+        self,
+        builder: CodegenExtsBuilder<'a, H>,
+    ) -> CodegenExtsBuilder<'a, H>
+    where
+        Self: 'a,
+    {
+        builder
+            .custom_type((array::EXTENSION_ID, array::ARRAY_TYPENAME), {
+                let ccg = self.0.clone();
+                move |ts, hugr_type| {
+                    let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = hugr_type.args() else {
+                        return Err(anyhow!("Invalid type args for array type"));
+                    };
+                    let elem_ty = ts.llvm_type(ty)?;
+                    Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
+                }
+            })
+            .simple_extension_op::<ArrayOpDef>({
+                let ccg = self.0.clone();
+                move |context, args, _| {
+                    ccg.emit_array_op(
+                        context,
+                        ArrayOp::from_extension_op(args.node().as_ref())?,
+                        args.inputs,
+                        args.outputs,
+                    )
+                }
+            })
+            .extension_op(array::EXTENSION_ID, array::ARRAY_REPEAT_OP_ID, {
+                let ccg = self.0.clone();
+                move |context, args| {
+                    let func = args.inputs[0];
+                    let op = ArrayRepeat::from_extension_op(args.node().as_ref())?;
+                    let arr = ccg.emit_array_repeat(context, op, func)?;
+                    args.outputs.finish(context.builder(), [arr])
+                }
+            })
+            .extension_op(array::EXTENSION_ID, array::ARRAY_SCAN_OP_ID, {
+                let ccg = self.0.clone();
+                move |context, args| {
+                    let src_array = args.inputs[0];
+                    let func = args.inputs[1];
+                    let initial_accs = &args.inputs[2..];
+                    let op = ArrayScan::from_extension_op(args.node().as_ref())?;
+                    let (tgt_array, final_accs) =
+                        ccg.emit_array_scan(context, op, src_array, func, initial_accs)?;
+                    args.outputs
+                        .finish(context.builder(), iter::once(tgt_array).chain(final_accs))
+                }
+            })
+    }
+}
 
 /// Helper function to allocate an array on the stack.
 ///
@@ -108,7 +245,7 @@ fn build_loop<'c, T, H: HugrView>(
 }
 
 pub fn emit_array_op<'c, H: HugrView>(
-    pcg: &impl PreludeCodegen,
+    ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     op: ArrayOp,
     inputs: Vec<BasicValueEnum<'c>>,
@@ -127,7 +264,7 @@ pub fn emit_array_op<'c, H: HugrView>(
         ref elem_ty,
         size,
     } = op;
-    let llvm_array_ty = pcg
+    let llvm_array_ty = ccg
         .array_type(&ts, ts.llvm_type(elem_ty)?, size)
         .as_basic_type_enum()
         .into_array_type();
@@ -535,17 +672,14 @@ pub fn emit_scan_op<'c, H: HugrView>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::Container as _;
-    use hugr_core::extension::prelude::array::ArrayRepeat;
     use hugr_core::extension::ExtensionSet;
     use hugr_core::ops::Tag;
+    use hugr_core::std_extensions::collections::array::{self, array_type, ArrayRepeat, ArrayScan};
     use hugr_core::types::Type;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer, SubContainer},
         extension::{
-            prelude::{
-                self, array::ArrayScan, array_type, bool_t, option_type, usize_t, ConstUsize,
-                UnwrapBuilder as _,
-            },
+            prelude::{self, bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
             ExtensionRegistry,
         },
         ops::Value,
@@ -564,7 +698,6 @@ mod test {
 
     use crate::{
         check_emission,
-        custom::CodegenExtsBuilder,
         emit::test::SimpleHugrConfig,
         test::{exec_ctx, llvm_ctx, TestContext},
         utils::{array_op_builder, ArrayOpBuilder, IntOpBuilder, LogicOpBuilder},
@@ -580,14 +713,17 @@ mod test {
                     .unwrap();
                 builder.finish_sub_container().unwrap()
             });
-        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
+        llvm_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+        });
         check_emission!(hugr, llvm_ctx);
     }
 
     #[rstest]
     fn emit_get(mut llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .with_extensions(array::ARRAY_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let us2 = builder.add_load_value(ConstUsize::new(2));
@@ -595,7 +731,10 @@ mod test {
                 builder.add_array_get(usize_t(), 2, arr, us1).unwrap();
                 builder.finish_with_outputs([]).unwrap()
             });
-        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
+        llvm_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+        });
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -605,6 +744,7 @@ mod test {
             int_ops::EXTENSION.to_owned(),
             logic::EXTENSION.to_owned(),
             prelude::PRELUDE.to_owned(),
+            array::EXTENSION.to_owned(),
         ])
     }
 
@@ -614,6 +754,7 @@ mod test {
             int_ops::EXTENSION_ID,
             logic::EXTENSION_ID,
             prelude::PRELUDE_ID,
+            array::EXTENSION_ID,
         ])
     }
 
@@ -658,7 +799,10 @@ mod test {
                 };
                 builder.finish_with_outputs([r]).unwrap()
             });
-        exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+        });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 
@@ -765,6 +909,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
                 .add_int_extensions()
                 .add_logic_extensions()
         });
@@ -791,6 +936,7 @@ mod test {
         // - Checks the following, returning 1 iff the following are all true:
         //  - The element at index 0 is `expected_elem_0`
         //  - The swap operation succeeded iff `expected_succeeded`
+
         let int_ty = int_type(3);
         let arr_ty = array_type(2, int_ty.clone());
         let hugr = SimpleHugrConfig::new()
@@ -873,6 +1019,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
                 .add_int_extensions()
                 .add_logic_extensions()
         });
@@ -898,6 +1045,7 @@ mod test {
         // - Creates an array: [1,2,4]
         // - Pops `num` elements from the left or right
         // - Returns the sum of the popped elements
+
         let array_contents = [1, 2, 4];
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
@@ -939,7 +1087,11 @@ mod test {
                 }
                 builder.finish_with_outputs([r]).unwrap()
             });
-        exec_ctx.add_extensions(|cge| cge.add_default_prelude_extensions().add_int_extensions());
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+                .add_int_extensions()
+        });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 
@@ -989,7 +1141,11 @@ mod test {
                     .unwrap();
                 builder.finish_with_outputs([elem]).unwrap()
             });
-        exec_ctx.add_extensions(|cge| cge.add_default_prelude_extensions().add_int_extensions());
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+                .add_int_extensions()
+        });
         assert_eq!(value, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 
@@ -1002,6 +1158,7 @@ mod test {
         // - Creates an array [1, 2, 3, ..., size]
         // - Maps a function that increments each element by `inc`
         // - Returns the sum of the array elements
+
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
             .with_outs(int_ty.clone())
@@ -1060,7 +1217,11 @@ mod test {
                 }
                 builder.finish_with_outputs([r]).unwrap()
             });
-        exec_ctx.add_extensions(|cge| cge.add_default_prelude_extensions().add_int_extensions());
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+                .add_int_extensions()
+        });
         let expected: u64 = (inc..size + inc).sum();
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -1118,7 +1279,11 @@ mod test {
                     .out_wire(1);
                 builder.finish_with_outputs([sum]).unwrap()
             });
-        exec_ctx.add_extensions(|cge| cge.add_default_prelude_extensions().add_int_extensions());
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+                .add_int_extensions()
+        });
         let expected: u64 = (0..size).sum();
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }

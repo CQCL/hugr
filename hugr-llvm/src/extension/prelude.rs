@@ -1,23 +1,15 @@
-use std::iter::once;
-
 use anyhow::{anyhow, bail, ensure, Ok, Result};
+use hugr_core::extension::prelude::{
+    self, error_type, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple,
+    TupleOpDef, UnpackTuple,
+};
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
 use hugr_core::{
-    extension::{
-        prelude::{
-            self,
-            array::{ArrayRepeat, ArrayScan},
-            error_type, ArrayOp, ArrayOpDef, ConstError, ConstExternalSymbol, ConstString,
-            ConstUsize, MakeTuple, TupleOpDef, UnpackTuple, ARRAY_TYPE_NAME,
-        },
-        simple_op::MakeExtensionOp as _,
-    },
-    ops::constant::CustomConst,
-    types::{SumType, TypeArg},
+    extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst, types::SumType,
     HugrView,
 };
 use inkwell::{
-    types::{BasicType, BasicTypeEnum, IntType, PointerType},
+    types::{BasicType, IntType, PointerType},
     values::{BasicValue as _, BasicValueEnum, StructValue},
     AddressSpace,
 };
@@ -28,13 +20,10 @@ use crate::{
     emit::{
         func::EmitFuncContext,
         libc::{emit_libc_abort, emit_libc_printf},
-        RowPromise,
     },
     sum::LLVMSumValue,
     types::TypingSession,
 };
-
-pub mod array;
 
 /// A helper trait for customising the lowering [hugr_core::extension::prelude]
 /// types, [CustomConst]s, and ops.
@@ -70,51 +59,6 @@ pub trait PreludeCodegen: Clone {
             ],
             false,
         ))
-    }
-
-    /// Return the llvm type of [hugr_core::extension::prelude::array_type].
-    fn array_type<'c>(
-        &self,
-        _session: &TypingSession<'c, '_>,
-        elem_ty: BasicTypeEnum<'c>,
-        size: u64,
-    ) -> impl BasicType<'c> {
-        elem_ty.array_type(size as u32)
-    }
-
-    /// Emit a [hugr_core::extension::prelude::ArrayOp].
-    fn emit_array_op<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayOp,
-        inputs: Vec<BasicValueEnum<'c>>,
-        outputs: RowPromise<'c>,
-    ) -> Result<()> {
-        array::emit_array_op(self, ctx, op, inputs, outputs)
-    }
-
-    /// Emit a [hugr_core::extension::prelude::array::ArrayRepeat] op.
-    fn emit_array_repeat<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayRepeat,
-        func: BasicValueEnum<'c>,
-    ) -> Result<BasicValueEnum<'c>> {
-        array::emit_repeat_op(ctx, op, func)
-    }
-
-    /// Emit a [hugr_core::extension::prelude::array::ArrayScan] op.
-    ///
-    /// Returns the resulting array and the final values of the accumulators.
-    fn emit_array_scan<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayScan,
-        src_array: BasicValueEnum<'c>,
-        func: BasicValueEnum<'c>,
-        initial_accs: &[BasicValueEnum<'c>],
-    ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
-        array::emit_scan_op(ctx, op, src_array, func, initial_accs)
     }
 
     /// Emit a [hugr_core::extension::prelude::PRINT_OP_ID] node.
@@ -264,16 +208,6 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.error_type(&ts)?.as_basic_type_enum())
     })
-    .custom_type((prelude::PRELUDE_ID, ARRAY_TYPE_NAME.into()), {
-        let pcg = pcg.clone();
-        move |ts, hugr_type| {
-            let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = hugr_type.args() else {
-                return Err(anyhow!("Invalid type args for array type"));
-            };
-            let elem_ty = ts.llvm_type(ty)?;
-            Ok(pcg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
-        }
-    })
     .custom_const::<ConstUsize>(|context, k| {
         let ty: IntType = context
             .llvm_type(&k.get_type())?
@@ -328,39 +262,6 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             args.outputs.finish(context.builder(), [r])
         }
         _ => Err(anyhow!("Unsupported TupleOpDef")),
-    })
-    .simple_extension_op::<ArrayOpDef>({
-        let pcg = pcg.clone();
-        move |context, args, _| {
-            pcg.emit_array_op(
-                context,
-                ArrayOp::from_extension_op(args.node().as_ref())?,
-                args.inputs,
-                args.outputs,
-            )
-        }
-    })
-    .extension_op(prelude::PRELUDE_ID, prelude::array::ARRAY_REPEAT_OP_ID, {
-        let pcg = pcg.clone();
-        move |context, args| {
-            let func = args.inputs[0];
-            let op = ArrayRepeat::from_extension_op(args.node().as_ref())?;
-            let arr = pcg.emit_array_repeat(context, op, func)?;
-            args.outputs.finish(context.builder(), [arr])
-        }
-    })
-    .extension_op(prelude::PRELUDE_ID, prelude::array::ARRAY_SCAN_OP_ID, {
-        let pcg = pcg.clone();
-        move |context, args| {
-            let src_array = args.inputs[0];
-            let func = args.inputs[1];
-            let initial_accs = &args.inputs[2..];
-            let op = ArrayScan::from_extension_op(args.node().as_ref())?;
-            let (tgt_array, final_accs) =
-                pcg.emit_array_scan(context, op, src_array, func, initial_accs)?;
-            args.outputs
-                .finish(context.builder(), once(tgt_array).chain(final_accs))
-        }
     })
     .extension_op(prelude::PRELUDE_ID, prelude::PRINT_OP_ID, {
         let pcg = pcg.clone();

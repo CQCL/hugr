@@ -224,17 +224,6 @@ class BaseType(ABC, ConfiguredBaseModel):
     def deserialize(self) -> tys.Type: ...
 
 
-class Array(BaseType):
-    """Known size array whose elements are of the same type."""
-
-    t: Literal["Array"] = "Array"
-    inner: Type
-    len: int
-
-    def deserialize(self) -> tys.Array:
-        return tys.Array(ty=self.inner.deserialize(), size=self.len)
-
-
 class UnitSum(BaseType):
     """Simple sum type where all variants are empty tuples."""
 
@@ -447,15 +436,7 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit
-        | Variable
-        | RowVar
-        | USize
-        | FunctionType
-        | Array
-        | SumType
-        | Opaque
-        | Alias,
+        Qubit | Variable | RowVar | USize | FunctionType | SumType | Opaque | Alias,
         WrapValidator(_json_custom_error_validator),
         Field(discriminator="t"),
     ]

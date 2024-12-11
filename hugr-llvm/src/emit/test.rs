@@ -153,6 +153,7 @@ impl SimpleHugrConfig {
                         float_ops::EXTENSION_ID,
                         conversions::EXTENSION_ID,
                         logic::EXTENSION_ID,
+                        collections::array::EXTENSION_ID,
                         collections::list::EXTENSION_ID,
                     ]),
                 ),

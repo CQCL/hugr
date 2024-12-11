@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+from hugr import val
+from hugr.std.collections.array import Array
+from hugr.std.collections.list import List, ListVal
 from hugr.std.float import FLOAT_T
 from hugr.std.int import INT_T, _int_tv
 from hugr.tys import (
     Alias,
-    Array,
     Bool,
     BoundedNatArg,
     BoundedNatParam,
@@ -120,7 +122,7 @@ def test_args_str(arg: TypeArg, string: str):
 @pytest.mark.parametrize(
     ("ty", "string"),
     [
-        (Array(Bool, 3), "Array<Bool, 3>"),
+        (Array(Bool, 3), "array<3, Type(Bool)>"),
         (Variable(2, TypeBound.Any), "$2"),
         (RowVariable(4, TypeBound.Copyable), "$4"),
         (USize(), "USize"),
@@ -141,3 +143,30 @@ def test_tys_str(ty: Type, string: str):
     assert str(ty) == string
     if isinstance(ty, ExtType):
         assert str(ty._to_opaque()) == string
+
+
+def test_list():
+    ty_var = Variable(0, TypeBound.Copyable)
+
+    ls = List(Bool)
+    assert ls.ty == Bool
+
+    ls = List(ty_var)
+    assert ls.ty == ty_var
+
+    l_val = ListVal([val.TRUE, val.FALSE], Bool)
+    assert l_val.v == [val.TRUE, val.FALSE]
+    assert l_val.ty == List(Bool)
+
+
+def test_array():
+    ty_var = Variable(0, TypeBound.Copyable)
+    len_var = VariableArg(1, BoundedNatParam())
+
+    ls = Array(Bool, 3)
+    assert ls.ty == Bool
+    assert ls.size == 3
+
+    ls = Array(ty_var, len_var)
+    assert ls.ty == ty_var
+    assert ls.size is None

@@ -31,10 +31,6 @@ mod unwrap_builder;
 
 pub use unwrap_builder::UnwrapBuilder;
 
-/// Array type and operations.
-pub mod array;
-pub use array::{array_type, new_array_op, ArrayOp, ArrayOpDef, ARRAY_TYPE_NAME, NEW_ARRAY_OP_ID};
-
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
@@ -77,14 +73,6 @@ lazy_static! {
                     extension_ref,
                 )
                 .unwrap();
-            prelude.add_type(
-                    TypeName::new_inline(ARRAY_TYPE_NAME),
-                    vec![ TypeParam::max_nat(), TypeBound::Any.into()],
-                    "array".into(),
-                    TypeDefBound::from_params(vec![1] ),
-                    extension_ref,
-                )
-                .unwrap();
             prelude
                 .add_type(
                     TypeName::new_inline("qubit"),
@@ -121,9 +109,6 @@ lazy_static! {
             TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
             NoopDef.add_to_extension(prelude, extension_ref).unwrap();
             LiftDef.add_to_extension(prelude, extension_ref).unwrap();
-            array::ArrayOpDef::load_all_ops(prelude, extension_ref).unwrap();
-            array::ArrayRepeatDef.add_to_extension(prelude, extension_ref).unwrap();
-            array::ArrayScanDef.add_to_extension(prelude, extension_ref).unwrap();
         })
     };
 
@@ -1030,24 +1015,6 @@ mod test {
 
         let new_op = Lift::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
         assert_eq!(new_op, op);
-    }
-
-    #[test]
-    /// Test building a HUGR involving a new_array operation.
-    fn test_new_array() {
-        let mut b = DFGBuilder::new(inout_sig(
-            vec![qb_t(), qb_t()],
-            array_type(TypeArg::BoundedNat { n: 2 }, qb_t()),
-        ))
-        .unwrap();
-
-        let [q1, q2] = b.input_wires_arr();
-
-        let op = new_array_op(qb_t(), 2);
-
-        let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
-
-        b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }
 
     #[test]
