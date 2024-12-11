@@ -39,7 +39,7 @@ pub struct ConstantFoldPass {
 pub enum ConstFoldError {
     #[error(transparent)]
     #[allow(missing_docs)]
-    Validation(#[from] ValidatePassError),
+    ValidationError(#[from] ValidatePassError),
 }
 
 impl ConstantFoldPass {
