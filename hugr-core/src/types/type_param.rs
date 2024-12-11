@@ -10,7 +10,7 @@ use std::num::NonZeroU64;
 use thiserror::Error;
 
 use super::row_var::MaybeRV;
-use super::{check_typevar_decl, RowVariable, Substitution, Type, TypeBase, TypeBound};
+use super::{check_typevar_decl, NoRV, RowVariable, Substitution, Type, TypeBase, TypeBound};
 use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
@@ -249,6 +249,30 @@ impl TypeArg {
                     cached_decl: decl,
                 },
             },
+        }
+    }
+
+    /// Returns an integer if the TypeArg is an instance of BoundedNat.
+    pub fn as_nat(&self) -> Option<u64> {
+        match self {
+            TypeArg::BoundedNat { n } => Some(*n),
+            _ => None,
+        }
+    }
+
+    /// Returns a type if the TypeArg is an instance of Type.
+    pub fn as_type(&self) -> Option<TypeBase<NoRV>> {
+        match self {
+            TypeArg::Type { ty } => Some(ty.clone()),
+            _ => None,
+        }
+    }
+
+    /// Returns a string if the TypeArg is an instance of String.
+    pub fn as_string(&self) -> Option<String> {
+        match self {
+            TypeArg::String { arg } => Some(arg.clone()),
+            _ => None,
         }
     }
 
