@@ -2,8 +2,10 @@
 //!
 //! [`Type`]: super::Type
 use std::fmt::{self, Display};
+use std::sync::Weak;
 
 use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
+use crate::Extension;
 
 use super::{
     type_param::{TypeArg, TypeParam},
@@ -12,9 +14,13 @@ use super::{
 use super::{Type, TypeName};
 
 /// An opaque type element. Contains the unique identifier of its definition.
-#[derive(Debug, PartialEq, Eq, Clone, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
+    /// The identifier for the extension owning this type.
     extension: ExtensionId,
+    /// A weak reference to the extension defining this type.
+    #[serde(skip)]
+    extension_ref: Weak<Extension>,
     /// Unique identifier of the opaque type.
     /// Same as the corresponding [`TypeDef`]
     ///
@@ -28,6 +34,26 @@ pub struct CustomType {
     bound: TypeBound,
 }
 
+impl std::hash::Hash for CustomType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.extension.hash(state);
+        self.id.hash(state);
+        self.args.hash(state);
+        self.bound.hash(state);
+    }
+}
+
+impl PartialEq for CustomType {
+    fn eq(&self, other: &Self) -> bool {
+        self.extension == other.extension
+            && self.id == other.id
+            && self.args == other.args
+            && self.bound == other.bound
+    }
+}
+
+impl Eq for CustomType {}
+
 impl CustomType {
     /// Creates a new opaque type.
     pub fn new(
@@ -35,22 +61,14 @@ impl CustomType {
         args: impl Into<Vec<TypeArg>>,
         extension: ExtensionId,
         bound: TypeBound,
+        extension_ref: &Weak<Extension>,
     ) -> Self {
         Self {
             id: id.into(),
             args: args.into(),
             extension,
             bound,
-        }
-    }
-
-    /// Creates a new opaque type (constant version, no type arguments)
-    pub const fn new_simple(id: TypeName, extension: ExtensionId, bound: TypeBound) -> Self {
-        Self {
-            id,
-            args: vec![],
-            extension,
-            bound,
+            extension_ref: extension_ref.clone(),
         }
     }
 
@@ -80,7 +98,10 @@ impl CustomType {
         let ex = extension_registry.get(&self.extension);
         // Even if OpDef's (+binaries) are not available, the part of the Extension definition
         // describing the TypeDefs can easily be passed around (serialized), so should be available.
-        let ex = ex.ok_or(SignatureError::ExtensionNotFound(self.extension.clone()))?;
+        let ex = ex.ok_or(SignatureError::ExtensionNotFound {
+            missing: self.extension.clone(),
+            available: extension_registry.ids().cloned().collect(),
+        })?;
         ex.get_type(&self.id)
             .ok_or(SignatureError::ExtensionTypeNotFound {
                 exn: self.extension.clone(),
@@ -116,9 +137,24 @@ impl CustomType {
         &self.args
     }
 
+    /// Returns a mutable reference to the type arguments.
+    pub(crate) fn args_mut(&mut self) -> &mut Vec<TypeArg> {
+        &mut self.args
+    }
+
     /// Parent extension.
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
+    }
+
+    /// Returns a weak reference to the extension defining this type.
+    pub fn extension_ref(&self) -> Weak<Extension> {
+        self.extension_ref.clone()
+    }
+
+    /// Update the internal extension reference with a new weak pointer.
+    pub fn update_extension(&mut self, extension_ref: Weak<Extension>) {
+        self.extension_ref = extension_ref;
     }
 }
 
@@ -142,6 +178,8 @@ impl From<CustomType> for Type {
 mod test {
 
     pub mod proptest {
+        use std::sync::Weak;
+
         use crate::extension::ExtensionId;
         use crate::proptest::any_nonempty_string;
         use crate::proptest::RecursionDepth;
@@ -184,7 +222,9 @@ mod test {
                     vec(any_with::<TypeArg>(depth.descend()), 0..3).boxed()
                 };
                 (any_nonempty_string(), args, any::<ExtensionId>(), bound)
-                    .prop_map(|(id, args, extension, bound)| Self::new(id, args, extension, bound))
+                    .prop_map(|(id, args, extension, bound)| {
+                        Self::new(id, args, extension, bound, &Weak::default())
+                    })
                     .boxed()
             }
         }

@@ -80,5 +80,5 @@ pub mod test;
 
 pub use custom::{CodegenExtension, CodegenExtsBuilder};
 
-pub use inkwell::llvm_sys;
 pub use inkwell;
+pub use inkwell::llvm_sys;

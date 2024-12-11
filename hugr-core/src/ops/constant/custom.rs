@@ -41,7 +41,7 @@ use super::{Value, ValueName};
 /// #[typetag::serde]
 /// impl CustomConst for CC {
 ///   fn name(&self) -> ValueName { "CC".into() }
-///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(&int_types::EXTENSION_ID) }
+///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(int_types::EXTENSION_ID) }
 ///   fn get_type(&self) -> Type { int_types::INT_TYPES[5].clone() }
 /// }
 ///
@@ -62,7 +62,7 @@ pub trait CustomConst:
     /// (a set to allow, say, a [List] of [USize])
     ///
     /// [List]: crate::std_extensions::collections::LIST_TYPENAME
-    /// [USize]: crate::extension::prelude::USIZE_T
+    /// [USize]: crate::extension::prelude::usize_t
     fn extension_reqs(&self) -> ExtensionSet;
 
     /// Check the value.
@@ -360,7 +360,7 @@ mod test {
     use rstest::rstest;
 
     use crate::{
-        extension::prelude::{ConstUsize, USIZE_T},
+        extension::prelude::{usize_t, ConstUsize},
         ops::{constant::custom::serialize_custom_const, Value},
         std_extensions::collections::ListValue,
     };
@@ -386,7 +386,7 @@ mod test {
 
     fn scce_list() -> SerializeCustomConstExample<ListValue> {
         let cc = ListValue::new(
-            USIZE_T,
+            usize_t(),
             [ConstUsize::new(1), ConstUsize::new(2)]
                 .into_iter()
                 .map(Value::extension),

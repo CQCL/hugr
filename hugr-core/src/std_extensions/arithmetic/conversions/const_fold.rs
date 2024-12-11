@@ -4,7 +4,7 @@ use crate::ops::Value;
 use crate::std_extensions::arithmetic::int_types::INT_TYPES;
 use crate::{
     extension::{
-        prelude::{const_ok, ConstError, ERROR_TYPE},
+        prelude::{const_ok, error_type, ConstError},
         ConstFold, ConstFoldResult, OpDef,
     },
     ops,
@@ -59,7 +59,7 @@ fn fold_trunc(
     } else {
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
-            const_ok(cv, ERROR_TYPE)
+            const_ok(cv, error_type())
         } else {
             err_value()
         }

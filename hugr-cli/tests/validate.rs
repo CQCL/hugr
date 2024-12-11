@@ -4,17 +4,14 @@
 //! calling the CLI binary, which Miri doesn't support.
 #![cfg(all(test, not(miri)))]
 
-use std::sync::Arc;
-
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr::builder::{DFGBuilder, DataflowSubContainer, ModuleBuilder};
 use hugr::types::Type;
 use hugr::{
     builder::{Container, Dataflow},
-    extension::prelude::{BOOL_T, QB_T},
-    std_extensions::arithmetic::float_types::FLOAT64_TYPE,
-    type_row,
+    extension::prelude::{bool_t, qb_t},
+    std_extensions::arithmetic::float_types::float64_type,
     types::Signature,
     Hugr,
 };
@@ -41,7 +38,7 @@ const FLOAT_EXT_FILE: &str = concat!(
 
 /// A test package, containing a module-rooted HUGR.
 #[fixture]
-fn test_package(#[default(BOOL_T)] id_type: Type) -> Package {
+fn test_package(#[default(bool_t())] id_type: Type) -> Package {
     let mut module = ModuleBuilder::new();
     let df = module
         .define_function("test", Signature::new_endo(id_type))
@@ -50,14 +47,12 @@ fn test_package(#[default(BOOL_T)] id_type: Type) -> Package {
     df.finish_with_outputs([i]).unwrap();
     let hugr = module.hugr().clone(); // unvalidated
 
-    let rdr = std::fs::File::open(FLOAT_EXT_FILE).unwrap();
-    let float_ext: Arc<hugr::Extension> = serde_json::from_reader(rdr).unwrap();
-    Package::new(vec![hugr], vec![float_ext]).unwrap()
+    Package::new(vec![hugr]).unwrap()
 }
 
 /// A DFG-rooted HUGR.
 #[fixture]
-fn test_hugr(#[default(BOOL_T)] id_type: Type) -> Hugr {
+fn test_hugr(#[default(bool_t())] id_type: Type) -> Hugr {
     let mut df = DFGBuilder::new(Signature::new_endo(id_type)).unwrap();
     let [i] = df.input_wires_arr();
     df.set_outputs([i]).unwrap();
@@ -120,7 +115,7 @@ fn test_mermaid(test_hugr_file: NamedTempFile, mut cmd: Command) {
 
 #[fixture]
 fn bad_hugr_string() -> String {
-    let df = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
+    let df = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
     let bad_hugr = df.hugr().clone();
 
     serde_json::to_string(&bad_hugr).unwrap()
@@ -131,7 +126,9 @@ fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
     cmd.arg("mermaid");
     cmd.arg("--validate");
     cmd.write_stdin(bad_hugr_string);
-    cmd.assert().failure().stderr(contains("UnconnectedPort"));
+    cmd.assert()
+        .failure()
+        .stderr(contains("has an unconnected port"));
 }
 
 #[rstest]
@@ -142,7 +139,7 @@ fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error validating HUGR").and(contains("unconnected port")));
+        .stderr(contains("Node(1)").and(contains("unconnected port")));
 }
 
 #[rstest]
@@ -178,7 +175,7 @@ fn test_no_std(test_hugr_string: String, mut val_cmd: Command) {
 }
 
 #[fixture]
-fn float_hugr_string(#[with(FLOAT64_TYPE)] test_hugr: Hugr) -> String {
+fn float_hugr_string(#[with(float64_type())] test_hugr: Hugr) -> String {
     serde_json::to_string(&test_hugr).unwrap()
 }
 
@@ -191,7 +188,7 @@ fn test_no_std_fail(float_hugr_string: String, mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains(" Extension 'arithmetic.float.types' not found"));
+        .stderr(contains(" requires extension arithmetic.float.types"));
 }
 
 #[rstest]
@@ -205,7 +202,7 @@ fn test_float_extension(float_hugr_string: String, mut val_cmd: Command) {
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 #[fixture]
-fn package_string(#[with(FLOAT64_TYPE)] test_package: Package) -> String {
+fn package_string(#[with(float64_type())] test_package: Package) -> String {
     serde_json::to_string(&test_package).unwrap()
 }
 

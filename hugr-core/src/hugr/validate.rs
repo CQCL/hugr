@@ -9,14 +9,14 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
+use crate::extension::{SignatureError, TO_BE_INFERRED};
 
 use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, NamedOp, OpName, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
-use crate::types::{EdgeKind, Signature};
+use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -27,12 +27,10 @@ use super::ExtensionError;
 ///
 /// TODO: Consider implementing updatable dominator trees and storing it in the
 /// Hugr to avoid recomputing it every time.
-struct ValidationContext<'a, 'b> {
+struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
-    /// Registry of available Extensions
-    extension_registry: &'b ExtensionRegistry,
 }
 
 impl Hugr {
@@ -40,20 +38,18 @@ impl Hugr {
     /// variables.
     /// TODO: Add a version of validation which allows for open extension
     /// variables (see github issue #457)
-    pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.validate_no_extensions(extension_registry)?;
-        #[cfg(feature = "extension_inference")]
-        self.validate_extensions()?;
+    pub fn validate(&self) -> Result<(), ValidationError> {
+        self.validate_no_extensions()?;
+        if cfg!(feature = "extension_inference") {
+            self.validate_extensions()?;
+        }
         Ok(())
     }
 
     /// Check the validity of the HUGR, but don't check consistency of extension
     /// requirements between connected nodes or between parents and children.
-    pub fn validate_no_extensions(
-        &self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(), ValidationError> {
-        let mut validator = ValidationContext::new(self, extension_registry);
+    pub fn validate_no_extensions(&self) -> Result<(), ValidationError> {
+        let mut validator = ValidationContext::new(self);
         validator.validate()
     }
 
@@ -65,7 +61,7 @@ impl Hugr {
                 return Err(ValidationError::ExtensionsNotInferred { node: parent });
             }
             let parent_extensions = match parent_op.inner_function_type() {
-                Some(Signature { extension_reqs, .. }) => extension_reqs,
+                Some(s) => s.extension_reqs.clone(),
                 None => match parent_op.tag() {
                     OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
                     // ModuleRoot holds but does not execute its children, so allow any extensions
@@ -95,17 +91,14 @@ impl Hugr {
     }
 }
 
-impl<'a, 'b> ValidationContext<'a, 'b> {
+impl<'a> ValidationContext<'a> {
     /// Create a new validation context.
     // Allow unused "extension_closure" variable for when
     // the "extension_inference" feature is disabled.
     #[allow(unused_variables)]
-    pub fn new(hugr: &'a Hugr, extension_registry: &'b ExtensionRegistry) -> Self {
-        Self {
-            hugr,
-            dominators: HashMap::new(),
-            extension_registry,
-        }
+    pub fn new(hugr: &'a Hugr) -> Self {
+        let dominators = HashMap::new();
+        Self { hugr, dominators }
     }
 
     /// Check the validity of the HUGR.
@@ -259,7 +252,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         self.validate_port_kind(&port_kind, var_decls)
-            .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            .map_err(|cause| ValidationError::SignatureError {
+                node,
+                op: op_type.name(),
+                cause,
+            })?;
 
         let mut link_cnt = 0;
         for (_, link) in links {
@@ -303,11 +300,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match &port_kind {
-            EdgeKind::Value(ty) => ty.validate(self.extension_registry, var_decls),
+            EdgeKind::Value(ty) => ty.validate(self.hugr.extensions(), var_decls),
             // Static edges must *not* refer to type variables declared by enclosing FuncDefns
             // as these are only types at runtime.
-            EdgeKind::Const(ty) => ty.validate(self.extension_registry, &[]),
-            EdgeKind::Function(pf) => pf.validate(self.extension_registry),
+            EdgeKind::Const(ty) => ty.validate(self.hugr.extensions(), &[]),
+            EdgeKind::Function(pf) => pf.validate(self.hugr.extensions()),
             _ => Ok(()),
         }
     }
@@ -578,8 +575,12 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             // Check TypeArgs are valid, and if we can, fit the declared TypeParams
             ext_op
                 .def()
-                .validate_args(ext_op.args(), self.extension_registry, var_decls)
-                .map_err(|cause| ValidationError::SignatureError { node, cause })
+                .validate_args(ext_op.args(), self.hugr.extensions(), var_decls)
+                .map_err(|cause| ValidationError::SignatureError {
+                    node,
+                    op: op_type.name(),
+                    cause,
+                })
         };
         match op_type {
             OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
@@ -591,12 +592,22 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 ))?;
             }
             OpType::Call(c) => {
-                c.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                c.validate(self.hugr.extensions()).map_err(|cause| {
+                    ValidationError::SignatureError {
+                        node,
+                        op: op_type.name(),
+                        cause,
+                    }
+                })?;
             }
             OpType::LoadFunction(c) => {
-                c.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                c.validate(self.hugr.extensions()).map_err(|cause| {
+                    ValidationError::SignatureError {
+                        node,
+                        op: op_type.name(),
+                        cause,
+                    }
+                })?;
             }
             _ => (),
         }
@@ -738,9 +749,10 @@ pub enum ValidationError {
     #[error("Node {node} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only")]
     ExtensionsNotInferred { node: Node },
     /// Error in a node signature
-    #[error("Error in signature of node {node}: {cause}")]
+    #[error("Error in signature of operation {op} at {node}: {cause}")]
     SignatureError {
         node: Node,
+        op: OpName,
         #[source]
         cause: SignatureError,
     },

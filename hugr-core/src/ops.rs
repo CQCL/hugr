@@ -9,8 +9,13 @@ pub mod module;
 pub mod sum;
 pub mod tag;
 pub mod validate;
+use crate::extension::resolution::{
+    collect_op_extension, collect_op_types_extensions, ExtensionCollectionError,
+};
+use std::borrow::Cow;
+
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
 use crate::types::{EdgeKind, Signature};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -300,6 +305,29 @@ impl OpType {
         self.as_extension_op()
             .and_then(|o| T::from_extension_op(o).ok())
     }
+
+    /// Returns the extension where the operation is defined, if any.
+    pub fn extension_id(&self) -> Option<&ExtensionId> {
+        match self {
+            OpType::OpaqueOp(opaque) => Some(opaque.extension()),
+            OpType::ExtensionOp(e) => Some(e.def().extension_id()),
+            _ => None,
+        }
+    }
+
+    /// Returns a registry with all the extensions required by the operation.
+    ///
+    /// This includes the operation extension in [`OpType::extension_id`], and any
+    /// extension required by the operation's signature types.
+    pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
+        // Collect extensions on the types.
+        let mut reg = collect_op_types_extensions(None, self)?;
+        // And on the operation definition itself.
+        if let Some(ext) = collect_op_extension(None, self)? {
+            reg.register_updated(ext);
+        }
+        Ok(reg)
+    }
 }
 
 /// Macro used by operations that want their
@@ -351,7 +379,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a signature, otherwise returns None.
-    fn dataflow_signature(&self) -> Option<Signature> {
+    fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         None
     }
 
@@ -414,13 +442,13 @@ pub trait OpParent {
     /// sibling graph.
     ///
     /// Non-container ops like `FuncDecl` return `None` even though they represent a function.
-    fn inner_function_type(&self) -> Option<Signature> {
+    fn inner_function_type(&self) -> Option<Cow<'_, Signature>> {
         None
     }
 }
 
 impl<T: DataflowParent> OpParent for T {
-    fn inner_function_type(&self) -> Option<Signature> {
+    fn inner_function_type(&self) -> Option<Cow<'_, Signature>> {
         Some(DataflowParent::inner_signature(self))
     }
 }

@@ -368,7 +368,7 @@ mod test {
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::{
-            prelude::{self, ConstUsize, QB_T, USIZE_T},
+            prelude::{self, qb_t, usize_t, ConstUsize},
             ExtensionRegistry,
         },
         ops::{DataflowOpTrait, NamedOp, Value},
@@ -394,15 +394,15 @@ mod test {
         let ext_op = collections::EXTENSION
             .instantiate_extension_op(
                 op.name().as_ref(),
-                [QB_T.into()],
+                [qb_t().into()],
                 &collections::COLLECTIONS_REGISTRY,
             )
             .unwrap();
-        let es = ExtensionRegistry::try_new([
+        let es = ExtensionRegistry::new([
             collections::EXTENSION.to_owned(),
             prelude::PRELUDE.to_owned(),
-        ])
-        .unwrap();
+        ]);
+        es.validate().unwrap();
         let hugr = SimpleHugrConfig::new()
             .with_ins(ext_op.signature().input().clone())
             .with_outs(ext_op.signature().output().clone())
@@ -421,13 +421,13 @@ mod test {
 
     #[rstest]
     fn test_const_list_emmission(mut llvm_ctx: TestContext) {
-        let elem_ty = USIZE_T;
+        let elem_ty = usize_t();
         let contents = (1..4).map(|i| Value::extension(ConstUsize::new(i)));
-        let es = ExtensionRegistry::try_new([
+        let es = ExtensionRegistry::new([
             collections::EXTENSION.to_owned(),
             prelude::PRELUDE.to_owned(),
-        ])
-        .unwrap();
+        ]);
+        es.validate().unwrap();
 
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![])

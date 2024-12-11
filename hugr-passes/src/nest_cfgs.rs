@@ -570,17 +570,14 @@ pub(crate) mod test {
     use hugr_core::builder::{
         endo_sig, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
     };
-    use hugr_core::extension::PRELUDE_REGISTRY;
-    use hugr_core::extension::{prelude::USIZE_T, ExtensionSet};
+    use hugr_core::extension::{prelude::usize_t, ExtensionSet};
 
     use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::ops::Value;
-    use hugr_core::type_row;
-    use hugr_core::types::{EdgeKind, Signature, Type};
+    use hugr_core::types::{EdgeKind, Signature};
     use hugr_core::utils::depth;
-    const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
@@ -601,23 +598,27 @@ pub(crate) mod test {
         //               /-> left --\
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
-        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(usize_t()))?;
 
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
-            cfg_builder.simple_entry_builder_exts(type_row![NAT], 1, ExtensionSet::new())?,
+            cfg_builder.simple_entry_builder_exts(
+                vec![usize_t()].into(),
+                1,
+                ExtensionSet::new(),
+            )?,
             &const_unit,
         )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
         cfg_builder.branch(&entry, 0, &split)?;
         let head = n_identity(
-            cfg_builder.simple_block_builder(endo_sig(NAT), 1)?,
+            cfg_builder.simple_block_builder(endo_sig(usize_t()), 1)?,
             &const_unit,
         )?;
         let tail = n_identity(
-            cfg_builder.simple_block_builder(endo_sig(NAT), 2)?,
+            cfg_builder.simple_block_builder(endo_sig(usize_t()), 2)?,
             &pred_const,
         )?;
         cfg_builder.branch(&tail, 1, &head)?;
@@ -626,7 +627,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let mut h = cfg_builder.finish_prelude_hugr()?;
+        let mut h = cfg_builder.finish_hugr()?;
         let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
@@ -652,7 +653,7 @@ pub(crate) mod test {
             ])
         );
         transform_cfg_to_nested(&mut IdentityCfgMap::new(rc));
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate().unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
         for n in [split, left, right, merge, head, tail] {
@@ -756,7 +757,7 @@ pub(crate) mod test {
         let root = h.root();
         let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate().unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
         for n in [split, left, right, merge] {
@@ -844,7 +845,10 @@ pub(crate) mod test {
         const_pred: &ConstID,
         unit_const: &ConstID,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let split = n_identity(cfg.simple_block_builder(endo_sig(NAT), 2)?, const_pred)?;
+        let split = n_identity(
+            cfg.simple_block_builder(endo_sig(usize_t()), 2)?,
+            const_pred,
+        )?;
         let merge = build_then_else_merge_from_if(cfg, unit_const, split)?;
         Ok((split, merge))
     }
@@ -854,9 +858,18 @@ pub(crate) mod test {
         unit_const: &ConstID,
         split: BasicBlockID,
     ) -> Result<BasicBlockID, BuildError> {
-        let merge = n_identity(cfg.simple_block_builder(endo_sig(NAT), 1)?, unit_const)?;
-        let left = n_identity(cfg.simple_block_builder(endo_sig(NAT), 1)?, unit_const)?;
-        let right = n_identity(cfg.simple_block_builder(endo_sig(NAT), 1)?, unit_const)?;
+        let merge = n_identity(
+            cfg.simple_block_builder(endo_sig(usize_t()), 1)?,
+            unit_const,
+        )?;
+        let left = n_identity(
+            cfg.simple_block_builder(endo_sig(usize_t()), 1)?,
+            unit_const,
+        )?;
+        let right = n_identity(
+            cfg.simple_block_builder(endo_sig(usize_t()), 1)?,
+            unit_const,
+        )?;
         cfg.branch(&split, 0, &left)?;
         cfg.branch(&split, 1, &right)?;
         cfg.branch(&left, 0, &merge)?;
@@ -869,18 +882,18 @@ pub(crate) mod test {
     //      \-> right -/     \-<--<-/
     // Result is Hugr plus merge and tail blocks
     fn build_cond_then_loop_cfg() -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(usize_t()))?;
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
-            cfg_builder.simple_entry_builder(type_row![NAT], 2)?,
+            cfg_builder.simple_entry_builder(vec![usize_t()].into(), 2)?,
             &pred_const,
         )?;
         let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
         // The merge block is also the loop header (so it merges three incoming control-flow edges)
         let tail = n_identity(
-            cfg_builder.simple_block_builder(endo_sig(NAT), 2)?,
+            cfg_builder.simple_block_builder(endo_sig(usize_t()), 2)?,
             &pred_const,
         )?;
         cfg_builder.branch(&tail, 1, &merge)?;
@@ -888,7 +901,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_prelude_hugr()?;
+        let h = cfg_builder.finish_hugr()?;
         Ok((h, merge, tail))
     }
 
@@ -896,9 +909,9 @@ pub(crate) mod test {
     pub(crate) fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(usize_t()))?;
         let (head, tail) = build_conditional_in_loop(&mut cfg_builder, separate_headers)?;
-        let h = cfg_builder.finish_prelude_hugr()?;
+        let h = cfg_builder.finish_hugr()?;
         Ok((h, head, tail))
     }
 
@@ -910,14 +923,14 @@ pub(crate) mod test {
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
-            cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
+            cfg_builder.simple_entry_builder(vec![usize_t()].into(), 1)?,
             &const_unit,
         )?;
         let (split, merge) = build_if_then_else_merge(cfg_builder, &pred_const, &const_unit)?;
 
         let head = if separate_headers {
             let head = n_identity(
-                cfg_builder.simple_block_builder(endo_sig(NAT), 1)?,
+                cfg_builder.simple_block_builder(endo_sig(usize_t()), 1)?,
                 &const_unit,
             )?;
             cfg_builder.branch(&head, 0, &split)?;
@@ -927,7 +940,7 @@ pub(crate) mod test {
             split
         };
         let tail = n_identity(
-            cfg_builder.simple_block_builder(endo_sig(NAT), 2)?,
+            cfg_builder.simple_block_builder(endo_sig(usize_t()), 2)?,
             &pred_const,
         )?;
         cfg_builder.branch(&tail, 1, &head)?;

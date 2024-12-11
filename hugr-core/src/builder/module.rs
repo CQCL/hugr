@@ -4,7 +4,6 @@ use super::{
     BuildError, Container,
 };
 
-use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
 use crate::hugr::ValidationError;
@@ -51,11 +50,11 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(
-        mut self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Hugr, ValidationError> {
-        self.0.update_validate(extension_registry)?;
+    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
+        if cfg!(feature = "extension_inference") {
+            self.0.infer_extensions(false)?;
+        }
+        self.0.validate()?;
         Ok(self.0)
     }
 }
@@ -102,11 +101,19 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<String>,
         signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
+        let body = signature.body().clone();
         // TODO add param names to metadata
         let declare_n = self.add_child_node(ops::FuncDecl {
             signature,
             name: name.into(),
         });
+
+        // Add the extensions used by the function types.
+        self.use_extensions(
+            body.used_extensions().unwrap_or_else(|e| {
+                panic!("Build-time signatures should have valid extensions. {e}")
+            }),
+        );
 
         Ok(declare_n.into())
     }
@@ -159,13 +166,9 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 mod test {
     use cool_asserts::assert_matches;
 
+    use crate::extension::prelude::usize_t;
     use crate::{
-        builder::{
-            test::{n_identity, NAT},
-            Dataflow, DataflowSubContainer,
-        },
-        extension::{EMPTY_REG, PRELUDE_REGISTRY},
-        type_row,
+        builder::{test::n_identity, Dataflow, DataflowSubContainer},
         types::Signature,
     };
 
@@ -177,14 +180,14 @@ mod test {
 
             let f_id = module_builder.declare(
                 "main",
-                Signature::new(type_row![NAT], type_row![NAT]).into(),
+                Signature::new(vec![usize_t()], vec![usize_t()]).into(),
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
-            let call = f_build.call(&f_id, &[], f_build.input_wires(), &PRELUDE_REGISTRY)?;
+            let call = f_build.call(&f_id, &[], f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_prelude_hugr()
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -206,7 +209,7 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
-            module_builder.finish_hugr(&EMPTY_REG)
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -217,18 +220,21 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let mut f_build = module_builder
-                .define_function("main", Signature::new(type_row![NAT], type_row![NAT, NAT]))?;
-            let local_build = f_build
-                .define_function("local", Signature::new(type_row![NAT], type_row![NAT, NAT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
+            )?;
+            let local_build = f_build.define_function(
+                "local",
+                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
+            )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire, wire])?;
 
-            let call =
-                f_build.call(f_id.handle(), &[], f_build.input_wires(), &PRELUDE_REGISTRY)?;
+            let call = f_build.call(f_id.handle(), &[], f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_prelude_hugr()
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())

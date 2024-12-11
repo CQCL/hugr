@@ -1,5 +1,7 @@
 //! Extensible operations.
 
+use itertools::Itertools;
+use std::borrow::Cow;
 use std::sync::Arc;
 use thiserror::Error;
 #[cfg(test)]
@@ -11,14 +13,12 @@ use {
 };
 
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
-use crate::hugr::internal::HugrMutInternals;
-use crate::hugr::HugrView;
 use crate::types::{type_param::TypeArg, Signature};
-use crate::{ops, Hugr, IncomingPort, Node};
+use crate::{ops, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
-use super::{NamedOp, OpName, OpNameRef, OpTrait, OpType};
+use super::{NamedOp, OpName, OpNameRef};
 
 /// An operation defined by an [OpDef] from a loaded [Extension].
 ///
@@ -56,20 +56,20 @@ impl ExtensionOp {
     }
 
     /// If OpDef is missing binary computation, trust the cached signature.
-    fn new_with_cached(
+    pub(crate) fn new_with_cached(
         def: Arc<OpDef>,
-        args: impl Into<Vec<TypeArg>>,
+        args: impl IntoIterator<Item = TypeArg>,
         opaque: &OpaqueOp,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let args: Vec<TypeArg> = args.into();
+        let args: Vec<TypeArg> = args.into_iter().collect();
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
         let signature = match def.compute_signature(&args, exts) {
             Ok(sig) => sig,
             Err(SignatureError::MissingComputeFunc) => {
                 // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-                opaque.signature()
+                opaque.signature().into_owned()
             }
             Err(e) => return Err(e),
         };
@@ -99,7 +99,8 @@ impl ExtensionOp {
     /// [`ExtensionOp`].
     ///
     /// Regenerating the [`ExtensionOp`] back from the [`OpaqueOp`] requires a
-    /// registry with the appropriate extension. See [`resolve_opaque_op`].
+    /// registry with the appropriate extension. See
+    /// [`crate::Hugr::resolve_extension_defs`].
     ///
     /// For a non-cloning version of this operation, use [`OpaqueOp::from`].
     pub fn make_opaque(&self) -> OpaqueOp {
@@ -110,6 +111,16 @@ impl ExtensionOp {
             args: self.args.clone(),
             signature: self.signature.clone(),
         }
+    }
+
+    /// Returns a mutable reference to the cached signature of the operation.
+    pub fn signature_mut(&mut self) -> &mut Signature {
+        &mut self.signature
+    }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
     }
 }
 
@@ -152,8 +163,8 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn signature(&self) -> Signature {
-        self.signature.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -194,6 +205,7 @@ impl OpaqueOp {
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
+        let signature = signature.with_extension_delta(extension.clone());
         Self {
             extension,
             name: name.into(),
@@ -201,6 +213,11 @@ impl OpaqueOp {
             args: args.into(),
             signature,
         }
+    }
+
+    /// Returns a mutable reference to the signature of the operation.
+    pub fn signature_mut(&mut self) -> &mut Signature {
+        &mut self.signature
     }
 }
 
@@ -225,6 +242,11 @@ impl OpaqueOp {
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
+    }
 }
 
 impl DataflowOpTrait for OpaqueOp {
@@ -234,85 +256,8 @@ impl DataflowOpTrait for OpaqueOp {
         &self.description
     }
 
-    fn signature(&self) -> Signature {
-        self.signature
-            .clone()
-            .with_extension_delta(self.extension().clone())
-    }
-}
-
-/// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
-pub fn resolve_extension_ops(
-    h: &mut Hugr,
-    extension_registry: &ExtensionRegistry,
-) -> Result<(), OpaqueOpError> {
-    let mut replacements = Vec::new();
-    for n in h.nodes() {
-        if let OpType::OpaqueOp(opaque) = h.get_optype(n) {
-            let resolved = resolve_opaque_op(n, opaque, extension_registry)?;
-            replacements.push((n, resolved));
-        }
-    }
-    // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
-    for (n, op) in replacements {
-        debug_assert_eq!(h.get_optype(n).tag(), OpTag::Leaf);
-        debug_assert_eq!(op.tag(), OpTag::Leaf);
-        h.replace_op(n, op).unwrap();
-    }
-    Ok(())
-}
-
-/// Try to resolve a [`OpaqueOp`] to a [`ExtensionOp`] by looking the op up in
-/// the registry.
-///
-/// # Return
-/// Some if the serialized opaque resolves to an extension-defined op and all is
-/// ok; None if the serialized opaque doesn't identify an extension
-///
-/// # Errors
-/// If the serialized opaque resolves to a definition that conflicts with what
-/// was serialized
-pub fn resolve_opaque_op(
-    node: Node,
-    opaque: &OpaqueOp,
-    extension_registry: &ExtensionRegistry,
-) -> Result<ExtensionOp, OpaqueOpError> {
-    if let Some(r) = extension_registry.get(&opaque.extension) {
-        // Fail if the Extension was found but did not have the expected operation
-        let Some(def) = r.get_op(&opaque.name) else {
-            return Err(OpaqueOpError::OpNotFoundInExtension(
-                node,
-                opaque.name.clone(),
-                r.name().clone(),
-            ));
-        };
-        let ext_op = ExtensionOp::new_with_cached(
-            def.clone(),
-            opaque.args.clone(),
-            opaque,
-            extension_registry,
-        )
-        .map_err(|e| OpaqueOpError::SignatureError {
-            node,
-            name: opaque.name.clone(),
-            cause: e,
-        })?;
-        if opaque.signature() != ext_op.signature() {
-            return Err(OpaqueOpError::SignatureMismatch {
-                node,
-                extension: opaque.extension.clone(),
-                op: def.name().clone(),
-                computed: ext_op.signature.clone(),
-                stored: opaque.signature.clone(),
-            });
-        };
-        Ok(ext_op)
-    } else {
-        Err(OpaqueOpError::UnresolvedOp(
-            node,
-            opaque.name.clone(),
-            opaque.extension.clone(),
-        ))
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -322,8 +267,19 @@ pub fn resolve_opaque_op(
 #[non_exhaustive]
 pub enum OpaqueOpError {
     /// The Extension was found but did not contain the expected OpDef
-    #[error("Operation '{1}' in {0} not found in Extension {2}")]
-    OpNotFoundInExtension(Node, OpName, ExtensionId),
+    #[error("Operation '{op}' in {node} not found in Extension {extension}. Available operations: {}",
+            available_ops.iter().join(", ")
+    )]
+    OpNotFoundInExtension {
+        /// The node where the error occurred.
+        node: Node,
+        /// The missing operation.
+        op: OpName,
+        /// The extension where the operation was expected.
+        extension: ExtensionId,
+        /// The available operations in the extension.
+        available_ops: Vec<OpName>,
+    },
     /// Extension and OpDef found, but computed signature did not match stored
     #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
     #[allow(missing_docs)]
@@ -346,15 +302,21 @@ pub enum OpaqueOpError {
     /// Unresolved operation encountered during validation.
     #[error("Unexpected unresolved opaque operation '{1}' in {0}, from Extension {2}.")]
     UnresolvedOp(Node, OpName, ExtensionId),
+    /// Error updating the extension registry in the Hugr while resolving opaque ops.
+    #[error("Error updating extension registry: {0}")]
+    ExtensionRegistryError(#[from] crate::extension::ExtensionRegistryError),
 }
 
 #[cfg(test)]
 mod test {
 
+    use ops::OpType;
+
+    use crate::extension::resolution::resolve_op_extensions;
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{
-            prelude::{BOOL_T, QB_T, USIZE_T},
+            prelude::{bool_t, qb_t, usize_t},
             SignatureFunc,
         },
         std_extensions::arithmetic::int_types::INT_TYPES,
@@ -364,22 +326,27 @@ mod test {
 
     use super::*;
 
+    /// Unwrap the replacement type's `OpDef` from the return type of `resolve_op_definition`.
+    fn resolve_res_definition(res: &OpType) -> &OpDef {
+        res.as_extension_op().unwrap().def()
+    }
+
     #[test]
     fn new_opaque_op() {
-        let sig = Signature::new_endo(vec![QB_T]);
+        let sig = Signature::new_endo(vec![qb_t()]);
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
             "desc".into(),
-            vec![TypeArg::Type { ty: USIZE_T }],
+            vec![TypeArg::Type { ty: usize_t() }],
             sig.clone(),
         );
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
-        assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
+        assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
         assert_eq!(
-            op.signature(),
-            sig.with_extension_delta(op.extension().clone())
+            op.signature().as_ref(),
+            &sig.with_extension_delta(op.extension().clone())
         );
     }
 
@@ -392,19 +359,23 @@ mod test {
             "itobool",
             "description".into(),
             vec![],
-            Signature::new(i0.clone(), BOOL_T),
+            Signature::new(i0.clone(), bool_t()),
         );
-        let resolved =
-            super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
-                .unwrap();
-        assert_eq!(resolved.def().name(), "itobool");
+        let mut resolved = opaque.into();
+        resolve_op_extensions(
+            Node::from(portgraph::NodeIndex::new(1)),
+            &mut resolved,
+            registry,
+        )
+        .unwrap();
+        assert_eq!(resolve_res_definition(&resolved).name(), "itobool");
     }
 
     #[test]
     fn resolve_missing() {
         let val_name = "missing_val";
         let comp_name = "missing_comp";
-        let endo_sig = Signature::new_endo(BOOL_T);
+        let endo_sig = Signature::new_endo(bool_t());
 
         let ext = Extension::new_test_arc("ext".try_into().unwrap(), |ext, extension_ref| {
             ext.add_op(
@@ -425,7 +396,8 @@ mod test {
         });
         let ext_id = ext.name().clone();
 
-        let registry = ExtensionRegistry::try_new([ext]).unwrap();
+        let registry = ExtensionRegistry::new([ext]);
+        registry.validate().unwrap();
         let opaque_val = OpaqueOp::new(
             ext_id.clone(),
             val_name,
@@ -434,20 +406,22 @@ mod test {
             endo_sig.clone(),
         );
         let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
-        let resolved_val = super::resolve_opaque_op(
+        let mut resolved_val = opaque_val.into();
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
-            &opaque_val,
+            &mut resolved_val,
             &registry,
         )
         .unwrap();
-        assert_eq!(resolved_val.def().name(), val_name);
+        assert_eq!(resolve_res_definition(&resolved_val).name(), val_name);
 
-        let resolved_comp = super::resolve_opaque_op(
+        let mut resolved_comp = opaque_comp.into();
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(2)),
-            &opaque_comp,
+            &mut resolved_comp,
             &registry,
         )
         .unwrap();
-        assert_eq!(resolved_comp.def().name(), comp_name);
+        assert_eq!(resolve_res_definition(&resolved_comp).name(), comp_name);
     }
 }

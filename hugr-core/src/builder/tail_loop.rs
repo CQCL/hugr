@@ -106,12 +106,10 @@ impl TailLoopBuilder<Hugr> {
 mod test {
     use cool_asserts::assert_matches;
 
+    use crate::extension::prelude::bool_t;
     use crate::{
-        builder::{
-            test::{BIT, NAT},
-            DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
-        },
-        extension::prelude::{ConstUsize, Lift, PRELUDE_ID, USIZE_T},
+        builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
+        extension::prelude::{usize_t, ConstUsize, Lift, PRELUDE_ID},
         hugr::ValidationError,
         ops::Value,
         type_row,
@@ -123,13 +121,13 @@ mod test {
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
             let mut loop_b =
-                TailLoopBuilder::new_exts(vec![], vec![BIT], vec![USIZE_T], PRELUDE_ID)?;
+                TailLoopBuilder::new_exts(vec![], vec![bool_t()], vec![usize_t()], PRELUDE_ID)?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_value(ConstUsize::new(1));
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
-            loop_b.finish_prelude_hugr()
+            loop_b.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));
@@ -142,15 +140,21 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder.define_function(
                 "main",
-                Signature::new(type_row![BIT], type_row![NAT]).with_prelude(),
+                Signature::new(vec![bool_t()], vec![usize_t()]).with_prelude(),
             )?;
             let _fdef = {
                 let [b1] = fbuild
-                    .add_dataflow_op(Lift::new(type_row![BIT], PRELUDE_ID), fbuild.input_wires())?
+                    .add_dataflow_op(
+                        Lift::new(vec![bool_t()].into(), PRELUDE_ID),
+                        fbuild.input_wires(),
+                    )?
                     .outputs_arr();
                 let loop_id = {
-                    let mut loop_b =
-                        fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
+                    let mut loop_b = fbuild.tail_loop_builder(
+                        vec![(bool_t(), b1)],
+                        vec![],
+                        vec![usize_t()].into(),
+                    )?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_val = Value::true_val();
                     let const_wire = loop_b.add_load_const(Value::true_val());
@@ -164,7 +168,7 @@ mod test {
                         let output_row = loop_b.internal_output_row()?;
                         let mut conditional_b = loop_b.conditional_builder(
                             ([type_row![], type_row![]], const_wire),
-                            vec![(BIT, b1)],
+                            vec![(bool_t(), b1)],
                             output_row,
                         )?;
 
@@ -187,7 +191,7 @@ mod test {
                 };
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish_prelude_hugr()
+            module_builder.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));

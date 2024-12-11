@@ -2,14 +2,16 @@
 
 use core::panic;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
+use crate::extension::ExtensionRegistry;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
-use crate::{Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
+use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
 use super::NodeMetadataMap;
@@ -245,6 +247,37 @@ pub trait HugrMut: HugrMutInternals {
     {
         rw.apply(self)
     }
+
+    /// Registers a new extension in the set used by the hugr, keeping the one
+    /// most recent one if the extension already exists.
+    ///
+    /// These can be queried using [`HugrView::extensions`].
+    ///
+    /// See [`ExtensionRegistry::register_updated`] for more information.
+    fn use_extension(&mut self, extension: impl Into<Arc<Extension>>) {
+        self.hugr_mut().extensions.register_updated(extension);
+    }
+
+    /// Extend the set of extensions used by the hugr with the extensions in the
+    /// registry.
+    ///
+    /// For each extension, keeps the most recent version if the id already
+    /// exists.
+    ///
+    /// These can be queried using [`HugrView::extensions`].
+    ///
+    /// See [`ExtensionRegistry::register_updated`] for more information.
+    fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>)
+    where
+        ExtensionRegistry: Extend<Reg>,
+    {
+        self.hugr_mut().extensions.extend(registry);
+    }
+
+    /// Returns a mutable reference to the extension registry for this hugr.
+    fn extensions_mut(&mut self) -> &mut ExtensionRegistry {
+        &mut self.hugr_mut().extensions
+    }
 }
 
 /// Records the result of inserting a Hugr or view
@@ -349,6 +382,8 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> InsertionResult {
         let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other);
         // Update the optypes and metadata, taking them from the other graph.
+        //
+        // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
             self.as_mut().op_types.set(new_node, optype);
@@ -368,6 +403,8 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> InsertionResult {
         let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, other);
         // Update the optypes and metadata, copying them from the other graph.
+        //
+        // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
             let nodetype = other.get_optype(node.into());
             self.as_mut().op_types.set(new_node, nodetype.clone());
@@ -404,6 +441,10 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
             self.as_mut().metadata.set(new_node, meta.clone());
+            // Add the required extensions to the registry.
+            if let Ok(exts) = nodetype.used_extensions() {
+                self.use_extensions(exts);
+            }
         }
         translate_indices(node_map)
     }
@@ -440,13 +481,8 @@ fn insert_hugr_internal(
         });
     }
 
-    // The root node didn't have any ports.
-    let root_optype = other.get_optype(other.root());
-    hugr.set_num_ports(
-        other_root.into(),
-        root_optype.input_count(),
-        root_optype.output_count(),
-    );
+    // Merge the extension sets.
+    hugr.extensions.extend(other.extensions());
 
     (other_root.into(), node_map)
 }
@@ -533,23 +569,19 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
 
 #[cfg(test)]
 mod test {
+    use crate::extension::PRELUDE;
     use crate::{
-        extension::{
-            prelude::{Noop, USIZE_T},
-            PRELUDE_REGISTRY,
-        },
-        macros::type_row,
+        extension::prelude::{usize_t, Noop},
         ops::{self, dataflow::IOTrait, FuncDefn, Input, Output},
-        types::{Signature, Type},
+        types::Signature,
     };
 
     use super::*;
 
-    const NAT: Type = USIZE_T;
-
     #[test]
     fn simple_function() -> Result<(), Box<dyn std::error::Error>> {
         let mut hugr = Hugr::default();
+        hugr.use_extension(PRELUDE.to_owned());
 
         // Create the root module definition
         let module: Node = hugr.root();
@@ -559,23 +591,23 @@ mod test {
             module,
             ops::FuncDefn {
                 name: "main".into(),
-                signature: Signature::new(type_row![NAT], type_row![NAT, NAT])
+                signature: Signature::new(vec![usize_t()], vec![usize_t(), usize_t()])
                     .with_prelude()
                     .into(),
             },
         );
 
         {
-            let f_in = hugr.add_node_with_parent(f, ops::Input::new(type_row![NAT]));
-            let f_out = hugr.add_node_with_parent(f, ops::Output::new(type_row![NAT, NAT]));
-            let noop = hugr.add_node_with_parent(f, Noop(NAT));
+            let f_in = hugr.add_node_with_parent(f, ops::Input::new(vec![usize_t()]));
+            let f_out = hugr.add_node_with_parent(f, ops::Output::new(vec![usize_t(), usize_t()]));
+            let noop = hugr.add_node_with_parent(f, Noop(usize_t()));
 
             hugr.connect(f_in, 0, noop, 0);
             hugr.connect(noop, 0, f_out, 0);
             hugr.connect(noop, 0, f_out, 1);
         }
 
-        hugr.update_validate(&PRELUDE_REGISTRY)?;
+        hugr.validate()?;
 
         Ok(())
     }
@@ -602,29 +634,30 @@ mod test {
     #[test]
     fn remove_subtree() {
         let mut hugr = Hugr::default();
+        hugr.use_extension(PRELUDE.to_owned());
         let root = hugr.root();
         let [foo, bar] = ["foo", "bar"].map(|name| {
             let fd = hugr.add_node_with_parent(
                 root,
                 FuncDefn {
                     name: name.to_string(),
-                    signature: Signature::new_endo(NAT).into(),
+                    signature: Signature::new_endo(usize_t()).into(),
                 },
             );
-            let inp = hugr.add_node_with_parent(fd, Input::new(NAT));
-            let out = hugr.add_node_with_parent(fd, Output::new(NAT));
+            let inp = hugr.add_node_with_parent(fd, Input::new(usize_t()));
+            let out = hugr.add_node_with_parent(fd, Output::new(usize_t()));
             hugr.connect(inp, 0, out, 0);
             fd
         });
-        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        hugr.validate().unwrap();
         assert_eq!(hugr.node_count(), 7);
 
         hugr.remove_subtree(foo);
-        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        hugr.validate().unwrap();
         assert_eq!(hugr.node_count(), 4);
 
         hugr.remove_subtree(bar);
-        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        hugr.validate().unwrap();
         assert_eq!(hugr.node_count(), 1);
     }
 }

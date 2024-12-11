@@ -106,10 +106,12 @@ pub(crate) mod test_quantum_extension {
     use std::sync::Arc;
 
     use crate::ops::{OpName, OpNameRef};
+    use crate::std_extensions::arithmetic::float_ops;
+    use crate::std_extensions::logic;
     use crate::types::FuncValueType;
     use crate::{
         extension::{
-            prelude::{BOOL_T, QB_T},
+            prelude::{bool_t, qb_t},
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
         ops::ExtensionOp,
@@ -122,11 +124,11 @@ pub(crate) mod test_quantum_extension {
     use lazy_static::lazy_static;
 
     fn one_qb_func() -> PolyFuncTypeRV {
-        FuncValueType::new_endo(QB_T).into()
+        FuncValueType::new_endo(qb_t()).into()
     }
 
     fn two_qb_func() -> PolyFuncTypeRV {
-        FuncValueType::new_endo(type_row![QB_T, QB_T]).into()
+        FuncValueType::new_endo(vec![qb_t(), qb_t()]).into()
     }
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");
@@ -144,7 +146,7 @@ pub(crate) mod test_quantum_extension {
                 .add_op(
                     OpName::new_inline("RzF64"),
                     "Rotation specified by float".into(),
-                    Signature::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T]),
+                    Signature::new(vec![qb_t(), float_types::float64_type()], vec![qb_t()]),
                     extension_ref,
                 )
                 .unwrap();
@@ -162,7 +164,7 @@ pub(crate) mod test_quantum_extension {
                 .add_op(
                     OpName::new_inline("Measure"),
                     "Measure a qubit, returning the qubit and the measurement result.".into(),
-                    Signature::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+                    Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
                     extension_ref,
                 )
                 .unwrap();
@@ -171,7 +173,7 @@ pub(crate) mod test_quantum_extension {
                 .add_op(
                     OpName::new_inline("QAlloc"),
                     "Allocate a new qubit.".into(),
-                    Signature::new(type_row![], type_row![QB_T]),
+                    Signature::new(type_row![], vec![qb_t()]),
                     extension_ref,
                 )
                 .unwrap();
@@ -180,7 +182,7 @@ pub(crate) mod test_quantum_extension {
                 .add_op(
                     OpName::new_inline("QDiscard"),
                     "Discard a qubit.".into(),
-                    Signature::new(type_row![QB_T], type_row![]),
+                    Signature::new(vec![qb_t()], type_row![]),
                     extension_ref,
                 )
                 .unwrap();
@@ -190,7 +192,15 @@ pub(crate) mod test_quantum_extension {
     lazy_static! {
         /// Quantum extension definition.
         pub static ref EXTENSION: Arc<Extension> = extension();
-        static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.clone(), PRELUDE.clone(), float_types::EXTENSION.clone()]).unwrap();
+
+        /// A registry with all necessary extensions to run tests internally, including the test quantum extension.
+        pub static ref REG: ExtensionRegistry = ExtensionRegistry::new([
+            EXTENSION.clone(),
+            PRELUDE.clone(),
+            float_types::EXTENSION.clone(),
+            float_ops::EXTENSION.clone(),
+            logic::EXTENSION.clone()
+        ]);
 
     }
 

@@ -1,28 +1,24 @@
 //! Conversions between integer and floating-point values.
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-use crate::extension::prelude::{BOOL_T, STRING_TYPE, USIZE_T};
+use crate::extension::prelude::sum_with_error;
+use crate::extension::prelude::{bool_t, string_type, usize_t};
 use crate::extension::simple_op::{HasConcrete, HasDef};
+use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
+use crate::extension::{
+    ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc, PRELUDE,
+};
 use crate::ops::OpName;
+use crate::ops::{custom::ExtensionOp, NamedOp};
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
 use crate::std_extensions::arithmetic::int_types::int_type;
-use crate::{
-    extension::{
-        prelude::sum_with_error,
-        simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
-        ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc,
-        PRELUDE,
-    },
-    ops::{custom::ExtensionOp, NamedOp},
-    type_row,
-    types::{TypeArg, TypeRV},
-    Extension,
-};
+use crate::types::{TypeArg, TypeRV};
+use crate::Extension;
 
-use super::float_types::FLOAT64_TYPE;
+use super::float_types::float64_type;
 use super::int_types::{get_log_width, int_tv};
 use lazy_static::lazy_static;
 mod const_fold;
@@ -57,20 +53,24 @@ impl MakeOpDef for ConvertOpDef {
         EXTENSION_ID.to_owned()
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         use ConvertOpDef::*;
         match self {
             trunc_s | trunc_u => int_polytype(
                 1,
-                type_row![FLOAT64_TYPE],
+                vec![float64_type()],
                 TypeRV::from(sum_with_error(int_tv(0))),
             ),
-            convert_s | convert_u => int_polytype(1, vec![int_tv(0)], type_row![FLOAT64_TYPE]),
-            itobool => int_polytype(0, vec![int_type(0)], vec![BOOL_T]),
-            ifrombool => int_polytype(0, vec![BOOL_T], vec![int_type(0)]),
-            itostring_u | itostring_s => int_polytype(1, vec![int_tv(0)], vec![STRING_TYPE]),
-            itousize => int_polytype(0, vec![int_type(6)], vec![USIZE_T]),
-            ifromusize => int_polytype(0, vec![USIZE_T], vec![int_type(6)]),
+            convert_s | convert_u => int_polytype(1, vec![int_tv(0)], vec![float64_type()]),
+            itobool => int_polytype(0, vec![int_type(0)], vec![bool_t()]),
+            ifrombool => int_polytype(0, vec![bool_t()], vec![int_type(0)]),
+            itostring_u | itostring_s => int_polytype(1, vec![int_tv(0)], vec![string_type()]),
+            itousize => int_polytype(0, vec![int_type(6)], vec![usize_t()]),
+            ifromusize => int_polytype(0, vec![usize_t()], vec![int_type(6)]),
         }
         .into()
     }
@@ -170,13 +170,12 @@ lazy_static! {
     };
 
     /// Registry of extensions required to validate integer operations.
-    pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+    pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::new([
         PRELUDE.clone(),
         super::int_types::EXTENSION.clone(),
         super::float_types::EXTENSION.clone(),
         EXTENSION.clone(),
-    ])
-    .unwrap();
+    ]);
 }
 
 impl MakeRegisteredOp for ConvertOpType {

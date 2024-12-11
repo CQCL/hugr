@@ -3,6 +3,8 @@
 //! **Warning**: This module is still under development and is expected to change.
 //! It is included in the library to allow for early experimentation, and for
 //! the core and model to converge incrementally.
+use std::sync::Arc;
+
 use crate::{
     export::OP_FUNC_CALL_INDIRECT,
     extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
@@ -45,6 +47,15 @@ pub enum ImportError {
     /// A signature mismatch was detected during import.
     #[error("signature error: {0}")]
     Signature(#[from] SignatureError),
+    /// A required extension is missing.
+    #[error("Importing the hugr requires extension {missing_ext}, which was not found in the registry. The available extensions are: [{}]",
+            available.iter().map(|ext| ext.to_string()).collect::<Vec<_>>().join(", "))]
+    Extension {
+        /// The missing extension.
+        missing_ext: ExtensionId,
+        /// The available extensions in the registry.
+        available: Vec<ExtensionId>,
+    },
     /// The model is not well-formed.
     #[error("validate error: {0}")]
     Model(#[from] model::ModelError),
@@ -1057,7 +1068,7 @@ impl<'a> Context<'a> {
                                 let ext_ident = IdentList::new(*ext).map_err(|_| {
                                     model::ModelError::MalformedName(ext.to_smolstr())
                                 })?;
-                                es.insert(&ext_ident);
+                                es.insert(ext_ident);
                             }
                             model::ExtSetPart::Splice(term_id) => {
                                 // The order in an extension set does not matter.
@@ -1093,6 +1104,14 @@ impl<'a> Context<'a> {
                 let name = self.get_global_name(*name)?;
                 let (extension, id) = self.import_custom_name(name)?;
 
+                let extension_ref =
+                    self.extensions.get(&extension.to_string()).ok_or_else(|| {
+                        ImportError::Extension {
+                            missing_ext: extension.clone(),
+                            available: self.extensions.ids().cloned().collect(),
+                        }
+                    })?;
+
                 Ok(TypeBase::new_extension(CustomType::new(
                     id,
                     args,
@@ -1100,6 +1119,7 @@ impl<'a> Context<'a> {
                     // As part of the migration from `TypeBound`s to constraints, we pretend that all
                     // `TypeBound`s are copyable.
                     TypeBound::Copyable,
+                    &Arc::downgrade(extension_ref),
                 )))
             }
 

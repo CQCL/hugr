@@ -136,8 +136,8 @@ mod test {
         endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         SubContainer,
     };
-    use crate::extension::prelude::QB_T;
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::extension::prelude::qb_t;
+    use crate::extension::ExtensionSet;
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
@@ -169,12 +169,6 @@ mod test {
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
         use crate::extension::prelude::Lift;
 
-        let reg = ExtensionRegistry::try_new([
-            PRELUDE.to_owned(),
-            int_ops::EXTENSION.to_owned(),
-            int_types::EXTENSION.to_owned(),
-        ])
-        .unwrap();
         let int_ty = &int_types::INT_TYPES[6];
 
         let mut outer = DFGBuilder::new(inout_sig(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
@@ -204,7 +198,7 @@ mod test {
         let [a1] = inner.outputs_arr();
 
         let a1_sub_b = outer.add_dataflow_op(IntOpDef::isub.with_log_width(6), [a1, b])?;
-        let mut outer = outer.finish_hugr_with_outputs(a1_sub_b.outputs(), &reg)?;
+        let mut outer = outer.finish_hugr_with_outputs(a1_sub_b.outputs())?;
 
         // Sanity checks
         assert_eq!(
@@ -229,7 +223,7 @@ mod test {
         }
 
         outer.apply_rewrite(InlineDFG(*inner.handle()))?;
-        outer.validate(&reg)?;
+        outer.validate()?;
         assert_eq!(outer.nodes().count(), 8);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
         let [_lift, add, sub] = extension_ops(&outer).try_into().unwrap();
@@ -244,26 +238,20 @@ mod test {
 
     #[test]
     fn permutation() -> Result<(), Box<dyn std::error::Error>> {
-        let mut h = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T]))?;
+        let mut h = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [p, q] = h.input_wires_arr();
         let [p_h] = h
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
         let swap = {
-            let swap = h.dfg_builder(Signature::new_endo(type_row![QB_T, QB_T]), [p_h, q])?;
+            let swap = h.dfg_builder(Signature::new_endo(vec![qb_t(), qb_t()]), [p_h, q])?;
             let [a, b] = swap.input_wires_arr();
             swap.finish_with_outputs([b, a])?
         };
         let [q, p] = swap.outputs_arr();
         let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
-        let reg = ExtensionRegistry::try_new([
-            test_quantum_extension::EXTENSION.clone(),
-            PRELUDE.clone(),
-            float_types::EXTENSION.clone(),
-        ])
-        .unwrap();
 
-        let mut h = h.finish_hugr_with_outputs(cx.outputs(), &reg)?;
+        let mut h = h.finish_hugr_with_outputs(cx.outputs())?;
         assert_eq!(find_dfgs(&h), vec![h.root(), swap.node()]);
         assert_eq!(h.nodes().count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
                                           // No permutation outside the swap DFG:
@@ -333,17 +321,11 @@ mod test {
          *              CX
          */
         // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
-        let reg = ExtensionRegistry::try_new([
-            test_quantum_extension::EXTENSION.to_owned(),
-            float_types::EXTENSION.to_owned(),
-            PRELUDE.to_owned(),
-        ])
-        .unwrap();
-        let mut outer = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T]))?;
+        let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
-        let mut inner = outer.dfg_builder(endo_sig(QB_T), h_b.outputs())?;
+        let mut inner = outer.dfg_builder(endo_sig(qb_t()), h_b.outputs())?;
         let [i] = inner.input_wires_arr();
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());
@@ -370,10 +352,10 @@ mod test {
             test_quantum_extension::cx_gate(),
             h_a2.outputs().chain(inner.outputs()),
         )?;
-        let mut outer = outer.finish_hugr_with_outputs(cx.outputs(), &reg)?;
+        let mut outer = outer.finish_hugr_with_outputs(cx.outputs())?;
 
         outer.apply_rewrite(InlineDFG(*inner.handle()))?;
-        outer.validate(&reg)?;
+        outer.validate()?;
         let order_neighbours = |n, d| {
             let p = outer.get_optype(n).other_port(d).unwrap();
             outer

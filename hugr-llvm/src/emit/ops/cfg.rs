@@ -218,7 +218,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer, SubContainer};
-    use hugr_core::extension::prelude::{self, BOOL_T};
+    use hugr_core::extension::prelude::{self, bool_t};
     use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
     use hugr_core::ops::Value;
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
@@ -244,10 +244,10 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), t2.clone()])
             .with_outs(t2.clone())
-            .with_extensions(
-                ExtensionRegistry::try_new([int_types::extension(), prelude::PRELUDE.to_owned()])
-                    .unwrap(),
-            )
+            .with_extensions(ExtensionRegistry::new([
+                int_types::EXTENSION.to_owned(),
+                prelude::PRELUDE.to_owned(),
+            ]))
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let mut cfg_builder = builder
@@ -295,14 +295,14 @@ mod test {
     fn nested(llvm_ctx: TestContext) {
         let t1 = HugrType::new_unit_sum(3);
         let hugr = SimpleHugrConfig::new()
-            .with_ins(vec![t1.clone(), BOOL_T])
-            .with_outs(BOOL_T)
+            .with_ins(vec![t1.clone(), bool_t()])
+            .with_outs(bool_t())
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let unit_val = builder.add_load_value(Value::unit());
                 let [outer_cfg_out] = {
                     let mut outer_cfg_builder = builder
-                        .cfg_builder([(t1.clone(), in1), (BOOL_T, in2)], BOOL_T.into())
+                        .cfg_builder([(t1.clone(), in1), (bool_t(), in2)], bool_t().into())
                         .unwrap();
 
                     let outer_entry_block = {
@@ -312,8 +312,9 @@ mod test {
                         let [outer_entry_in1, outer_entry_in2] =
                             outer_entry_builder.input_wires_arr();
                         let [outer_entry_out] = {
-                            let mut inner_cfg_builder =
-                                outer_entry_builder.cfg_builder([], BOOL_T.into()).unwrap();
+                            let mut inner_cfg_builder = outer_entry_builder
+                                .cfg_builder([], bool_t().into())
+                                .unwrap();
                             let inner_exit_block = inner_cfg_builder.exit_block();
                             let inner_entry_block = {
                                 let inner_entry_builder = inner_cfg_builder
@@ -333,7 +334,7 @@ mod test {
                                         .block_builder(
                                             type_row![],
                                             vec![type_row![]],
-                                            BOOL_T.into(),
+                                            bool_t().into(),
                                         )
                                         .unwrap();
                                     let output = match i {
@@ -373,7 +374,7 @@ mod test {
                     let [b1, b2] = (0..2)
                         .map(|i| {
                             let mut b_builder = outer_cfg_builder
-                                .block_builder(type_row![], vec![type_row![]], BOOL_T.into())
+                                .block_builder(type_row![], vec![type_row![]], bool_t().into())
                                 .unwrap();
                             let output = match i {
                                 0 => b_builder.add_load_value(Value::true_val()),

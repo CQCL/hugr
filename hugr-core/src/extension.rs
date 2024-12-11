@@ -3,13 +3,17 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
+use itertools::Itertools;
 pub use semver::Version;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::btree_map;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 use std::mem;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
+use derive_more::Display;
 use thiserror::Error;
 
 use crate::hugr::IdentList;
@@ -21,58 +25,92 @@ use crate::types::RowVariable;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
+mod const_fold;
 mod op_def;
+pub mod prelude;
+pub mod resolution;
+pub mod simple_op;
+mod type_def;
+
+pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,
 };
-mod type_def;
-pub use type_def::{TypeDef, TypeDefBound};
-mod const_fold;
-pub mod prelude;
-pub mod simple_op;
-pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
+pub use type_def::{TypeDef, TypeDefBound};
 
 #[cfg(feature = "declarative")]
 pub mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExtensionRegistry(BTreeMap<ExtensionId, Arc<Extension>>);
+#[derive(Debug, Display, Default)]
+#[display("ExtensionRegistry[{}]", exts.keys().join(", "))]
+pub struct ExtensionRegistry {
+    /// The extensions in the registry.
+    exts: BTreeMap<ExtensionId, Arc<Extension>>,
+    /// A flag indicating whether the current set of extensions has been
+    /// validated.
+    ///
+    /// This is used to avoid re-validating the extensions every time the
+    /// registry is validated, and is set to `false` whenever a new extension is
+    /// added.
+    valid: AtomicBool,
+}
+
+impl PartialEq for ExtensionRegistry {
+    fn eq(&self, other: &Self) -> bool {
+        self.exts == other.exts
+    }
+}
+
+impl Clone for ExtensionRegistry {
+    fn clone(&self) -> Self {
+        Self {
+            exts: self.exts.clone(),
+            valid: self.valid.load(Ordering::Relaxed).into(),
+        }
+    }
+}
 
 impl ExtensionRegistry {
+    /// Create a new empty extension registry.
+    pub fn new(extensions: impl IntoIterator<Item = Arc<Extension>>) -> Self {
+        let mut res = Self::default();
+        for ext in extensions.into_iter() {
+            res.register_updated(ext);
+        }
+        res
+    }
+
     /// Gets the Extension with the given name
     pub fn get(&self, name: &str) -> Option<&Arc<Extension>> {
-        self.0.get(name)
+        self.exts.get(name)
     }
 
     /// Returns `true` if the registry contains an extension with the given name.
     pub fn contains(&self, name: &str) -> bool {
-        self.0.contains_key(name)
+        self.exts.contains_key(name)
     }
 
-    /// Makes a new [ExtensionRegistry], validating all the extensions in it.
-    pub fn try_new(
-        value: impl IntoIterator<Item = Arc<Extension>>,
-    ) -> Result<Self, ExtensionRegistryError> {
-        let mut res = ExtensionRegistry(BTreeMap::new());
-
-        for ext in value.into_iter() {
-            res.register(ext)?;
+    /// Validate the set of extensions, ensuring that each extension requirements are also in the registry.
+    ///
+    /// Note this potentially asks extensions to validate themselves against other extensions that
+    /// may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
+    /// or at least to validate the types first - which we don't do at all yet:
+    //
+    // TODO https://github.com/CQCL/hugr/issues/624. However, parametrized types could be
+    // cyclically dependent, so there is no perfect solution, and this is at least simple.
+    pub fn validate(&self) -> Result<(), ExtensionRegistryError> {
+        if self.valid.load(Ordering::Relaxed) {
+            return Ok(());
         }
-
-        // Note this potentially asks extensions to validate themselves against other extensions that
-        // may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
-        // or at least to validate the types first - which we don't do at all yet:
-        // TODO https://github.com/CQCL/hugr/issues/624. However, parametrized types could be
-        // cyclically dependent, so there is no perfect solution, and this is at least simple.
-        for ext in res.0.values() {
-            ext.validate(&res)
+        for ext in self.exts.values() {
+            ext.validate(self)
                 .map_err(|e| ExtensionRegistryError::InvalidSignature(ext.name().clone(), e))?;
         }
-
-        Ok(res)
+        self.valid.store(true, Ordering::Relaxed);
+        Ok(())
     }
 
     /// Registers a new extension to the registry.
@@ -83,7 +121,7 @@ impl ExtensionRegistry {
         extension: impl Into<Arc<Extension>>,
     ) -> Result<(), ExtensionRegistryError> {
         let extension = extension.into();
-        match self.0.entry(extension.name().clone()) {
+        match self.exts.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(prev) => Err(ExtensionRegistryError::AlreadyRegistered(
                 extension.name().clone(),
                 prev.get().version().clone(),
@@ -91,22 +129,26 @@ impl ExtensionRegistry {
             )),
             btree_map::Entry::Vacant(ve) => {
                 ve.insert(extension);
+                // Clear the valid flag so that the registry is re-validated.
+                self.valid.store(false, Ordering::Relaxed);
+
                 Ok(())
             }
         }
     }
 
-    /// Registers a new extension to the registry, keeping most up to date if extension exists.
+    /// Registers a new extension to the registry, keeping the one most up to
+    /// date if the extension already exists.
     ///
     /// If extension IDs match, the extension with the higher version is kept.
-    /// If versions match, the original extension is kept.
-    /// Returns a reference to the registered extension if successful.
+    /// If versions match, the original extension is kept. Returns a reference
+    /// to the registered extension if successful.
     ///
-    /// Takes an Arc to the extension. To avoid cloning Arcs unless necessary, see
-    /// [`ExtensionRegistry::register_updated_ref`].
+    /// Takes an Arc to the extension. To avoid cloning Arcs unless necessary,
+    /// see [`ExtensionRegistry::register_updated_ref`].
     pub fn register_updated(&mut self, extension: impl Into<Arc<Extension>>) {
         let extension = extension.into();
-        match self.0.entry(extension.name().clone()) {
+        match self.exts.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(mut prev) => {
                 if prev.get().version() < extension.version() {
                     *prev.get_mut() = extension;
@@ -116,10 +158,12 @@ impl ExtensionRegistry {
                 ve.insert(extension);
             }
         }
+        // Clear the valid flag so that the registry is re-validated.
+        self.valid.store(false, Ordering::Relaxed);
     }
 
-    /// Registers a new extension to the registry, keeping most up to date if
-    /// extension exists.
+    /// Registers a new extension to the registry, keeping the one most up to
+    /// date if the extension already exists.
     ///
     /// If extension IDs match, the extension with the higher version is kept.
     /// If versions match, the original extension is kept. Returns a reference
@@ -128,7 +172,7 @@ impl ExtensionRegistry {
     /// Clones the Arc only when required. For no-cloning version see
     /// [`ExtensionRegistry::register_updated`].
     pub fn register_updated_ref(&mut self, extension: &Arc<Extension>) {
-        match self.0.entry(extension.name().clone()) {
+        match self.exts.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(mut prev) => {
                 if prev.get().version() < extension.version() {
                     *prev.get_mut() = extension.clone();
@@ -138,41 +182,102 @@ impl ExtensionRegistry {
                 ve.insert(extension.clone());
             }
         }
+        // Clear the valid flag so that the registry is re-validated.
+        self.valid.store(false, Ordering::Relaxed);
     }
 
     /// Returns the number of extensions in the registry.
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.exts.len()
     }
 
     /// Returns `true` if the registry contains no extensions.
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.exts.is_empty()
     }
 
     /// Returns an iterator over the extensions in the registry.
-    pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Arc<Extension>)> {
-        self.0.iter()
+    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.exts.values()
+    }
+
+    /// Returns an iterator over the extensions ids in the registry.
+    pub fn ids(&self) -> impl Iterator<Item = &ExtensionId> {
+        self.exts.keys()
     }
 
     /// Delete an extension from the registry and return it if it was present.
     pub fn remove_extension(&mut self, name: &ExtensionId) -> Option<Arc<Extension>> {
-        self.0.remove(name)
+        // Clear the valid flag so that the registry is re-validated.
+        self.valid.store(false, Ordering::Relaxed);
+
+        self.exts.remove(name)
     }
 }
 
 impl IntoIterator for ExtensionRegistry {
-    type Item = (ExtensionId, Arc<Extension>);
+    type Item = Arc<Extension>;
 
-    type IntoIter = <BTreeMap<ExtensionId, Arc<Extension>> as IntoIterator>::IntoIter;
+    type IntoIter = std::collections::btree_map::IntoValues<ExtensionId, Arc<Extension>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.exts.into_values()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExtensionRegistry {
+    type Item = &'a Arc<Extension>;
+
+    type IntoIter = std::collections::btree_map::Values<'a, ExtensionId, Arc<Extension>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.exts.values()
+    }
+}
+
+impl<'a> Extend<&'a Arc<Extension>> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = &'a Arc<Extension>>>(&mut self, iter: T) {
+        for ext in iter {
+            self.register_updated_ref(ext);
+        }
+    }
+}
+
+impl Extend<Arc<Extension>> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = Arc<Extension>>>(&mut self, iter: T) {
+        for ext in iter {
+            self.register_updated(ext);
+        }
+    }
+}
+
+// Encode/decode ExtensionRegistry as a list of extensions.
+// We can get the map key from the extension itself.
+impl<'de> Deserialize<'de> for ExtensionRegistry {
+    fn deserialize<D>(deserializer: D) -> Result<ExtensionRegistry, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let extensions: Vec<Arc<Extension>> = Vec::deserialize(deserializer)?;
+        Ok(ExtensionRegistry::new(extensions))
+    }
+}
+
+impl Serialize for ExtensionRegistry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let extensions: Vec<Arc<Extension>> = self.exts.values().cloned().collect();
+        extensions.serialize(serializer)
     }
 }
 
 /// An Extension Registry containing no extensions.
-pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
+pub static EMPTY_REG: ExtensionRegistry = ExtensionRegistry {
+    exts: BTreeMap::new(),
+    valid: AtomicBool::new(true),
+};
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
@@ -192,8 +297,13 @@ pub enum SignatureError {
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
     /// The Extension Registry did not contain an Extension referenced by the Signature
-    #[error("Extension '{0}' not found")]
-    ExtensionNotFound(ExtensionId),
+    #[error("Extension '{missing}' is not part of the declared HUGR extensions [{}]",
+        available.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ")
+    )]
+    ExtensionNotFound {
+        missing: ExtensionId,
+        available: Vec<ExtensionId>,
+    },
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
@@ -532,7 +642,7 @@ impl Extension {
         ExtensionOp::new(op_def.clone(), args, ext_reg)
     }
 
-    // Validates against a registry, which we can assume includes this extension itself.
+    /// Validates against a registry, which we can assume includes this extension itself.
     // (TODO deal with the registry itself containing invalid extensions!)
     fn validate(&self, all_exts: &ExtensionRegistry) -> Result<(), SignatureError> {
         // We should validate TypeParams of TypeDefs too - https://github.com/CQCL/hugr/issues/624
@@ -575,7 +685,10 @@ pub enum ExtensionBuildError {
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, Display, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+#[display("[{}]", _0.iter().join(", "))]
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 /// A special ExtensionId which indicates that the delta of a non-Function
@@ -593,7 +706,7 @@ impl ExtensionSet {
     }
 
     /// Adds a extension to the set.
-    pub fn insert(&mut self, extension: &ExtensionId) {
+    pub fn insert(&mut self, extension: ExtensionId) {
         self.0.insert(extension.clone());
     }
 
@@ -621,7 +734,7 @@ impl ExtensionSet {
     }
 
     /// Create a extension set with a single element.
-    pub fn singleton(extension: &ExtensionId) -> Self {
+    pub fn singleton(extension: ExtensionId) -> Self {
         let mut set = Self::new();
         set.insert(extension);
         set
@@ -685,7 +798,25 @@ impl ExtensionSet {
 
 impl From<ExtensionId> for ExtensionSet {
     fn from(id: ExtensionId) -> Self {
-        Self::singleton(&id)
+        Self::singleton(id)
+    }
+}
+
+impl IntoIterator for ExtensionSet {
+    type Item = ExtensionId;
+    type IntoIter = std::collections::btree_set::IntoIter<ExtensionId>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExtensionSet {
+    type Item = &'a ExtensionId;
+    type IntoIter = std::collections::btree_set::Iter<'a, ExtensionId>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
@@ -696,12 +827,6 @@ fn as_typevar(e: &ExtensionId) -> Option<usize> {
     match e.chars().next() {
         Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
         _ => None,
-    }
-}
-
-impl Display for ExtensionSet {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_list().entries(self.0.iter()).finish()
     }
 }
 
@@ -744,8 +869,8 @@ pub mod test {
     fn test_register_update() {
         // Two registers that should remain the same.
         // We use them to test both `register_updated` and `register_updated_ref`.
-        let mut reg = ExtensionRegistry::try_new([]).unwrap();
-        let mut reg_ref = ExtensionRegistry::try_new([]).unwrap();
+        let mut reg = ExtensionRegistry::default();
+        let mut reg_ref = ExtensionRegistry::default();
 
         let ext_1_id = ExtensionId::new("ext1").unwrap();
         let ext_2_id = ExtensionId::new("ext2").unwrap();

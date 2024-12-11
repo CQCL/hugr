@@ -8,9 +8,9 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
   (forall ?0 type)
   (forall ?1 nat)
   (where (nonlinear ?0))
-  [?0] [(@ array.Array ?0 ?1)] (ext))
+  [?0] [(@ prelude.Array ?0 ?1)] (ext))
 
 (declare-func array.copy
   (forall ?0 type)
   (where (nonlinear ?0))
-  [(@ array.Array ?0)] [(@ array.Array ?0) (@ array.Array ?0)] (ext))
+  [(@ prelude.Array ?0)] [(@ prelude.Array ?0) (@ prelude.Array ?0)] (ext))

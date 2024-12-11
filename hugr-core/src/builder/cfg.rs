@@ -5,14 +5,9 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{
-    extension::TO_BE_INFERRED,
-    ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType},
-};
-use crate::{
-    extension::{ExtensionRegistry, ExtensionSet},
-    types::Signature,
-};
+use crate::extension::TO_BE_INFERRED;
+use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
+use crate::{extension::ExtensionSet, types::Signature};
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
@@ -51,21 +46,20 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     ops, type_row,
 ///     types::{Signature, SumType, Type},
 ///     Hugr,
+///     extension::prelude::usize_t,
 /// };
 ///
-/// const NAT: Type = prelude::USIZE_T;
-///
 /// fn make_cfg() -> Result<Hugr, BuildError> {
-///     let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
+///     let mut cfg_builder = CFGBuilder::new(Signature::new_endo(usize_t()))?;
 ///
 ///     // Outputs from basic blocks must be packed in a sum which corresponds to
 ///     // which successor to pick. We'll either choose the first branch and pass
-///     // it a NAT, or the second branch and pass it nothing.
-///     let sum_variants = vec![type_row![NAT], type_row![]];
+///     // it a usize, or the second branch and pass it nothing.
+///     let sum_variants = vec![vec![usize_t()].into(), type_row![]];
 ///
 ///     // The second argument says what types will be passed through to every
 ///     // successor, in addition to the appropriate `sum_variants` type.
-///     let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT])?;
+///     let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), vec![usize_t()].into())?;
 ///
 ///     let [inw] = entry_b.input_wires_arr();
 ///     let entry = {
@@ -81,10 +75,10 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     };
 ///
 ///     // This block will be the first successor of the entry node. It takes two
-///     // `NAT` arguments: one from the `sum_variants` type, and another from the
+///     // `usize` arguments: one from the `sum_variants` type, and another from the
 ///     // entry node's `other_outputs`.
 ///     let mut successor_builder = cfg_builder.simple_block_builder(
-///         inout_sig(type_row![NAT, NAT], NAT),
+///         inout_sig(vec![usize_t(), usize_t()], usize_t()),
 ///         1, // only one successor to this block
 ///     )?;
 ///     let successor_a = {
@@ -98,7 +92,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     };
 ///
 ///     // The only argument to this block is the entry node's `other_outputs`.
-///     let mut successor_builder = cfg_builder.simple_block_builder(endo_sig(NAT), 1)?;
+///     let mut successor_builder = cfg_builder.simple_block_builder(endo_sig(usize_t()), 1)?;
 ///     let successor_b = {
 ///         let sum_unary = successor_builder.add_load_value(ops::Value::unary_unit_sum());
 ///         let [in_wire] = successor_builder.input_wires_arr();
@@ -109,7 +103,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     cfg_builder.branch(&entry, 1, &successor_b)?; // branch 1 goes to successor_b
 ///     cfg_builder.branch(&successor_a, 0, &exit)?;
 ///     cfg_builder.branch(&successor_b, 0, &exit)?;
-///     let hugr = cfg_builder.finish_prelude_hugr()?;
+///     let hugr = cfg_builder.finish_hugr()?;
 ///     Ok(hugr)
 /// };
 /// #[cfg(not(feature = "extension_inference"))]
@@ -163,11 +157,11 @@ impl CFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for CFGBuilder<Hugr> {
-    fn finish_hugr(
-        mut self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.update_validate(extension_registry)?;
+    fn finish_hugr(mut self) -> Result<Hugr, crate::hugr::ValidationError> {
+        if cfg!(feature = "extension_inference") {
+            self.base.infer_extensions(false)?;
+        }
+        self.base.validate()?;
         Ok(self.base)
     }
 }
@@ -392,8 +386,12 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
     fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
-        let block_op = base.get_optype(block_n).as_dataflow_block().unwrap();
-        let signature = block_op.inner_signature();
+        let block_op = base
+            .as_ref()
+            .get_optype(block_n)
+            .as_dataflow_block()
+            .unwrap();
+        let signature = block_op.inner_signature().into_owned();
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
@@ -452,11 +450,9 @@ impl BlockBuilder<Hugr> {
         mut self,
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
-        extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, BuildError> {
         self.set_outputs(branch_wire, outputs)?;
-        self.finish_hugr(extension_registry)
-            .map_err(BuildError::InvalidHUGR)
+        self.finish_hugr().map_err(BuildError::InvalidHUGR)
     }
 }
 
@@ -464,9 +460,10 @@ impl BlockBuilder<Hugr> {
 pub(crate) mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
+    use crate::extension::prelude::usize_t;
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::hugr::ValidationError;
-    use crate::{builder::test::NAT, type_row};
+    use crate::type_row;
     use cool_asserts::assert_matches;
 
     use super::*;
@@ -475,13 +472,13 @@ pub(crate) mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let mut func_builder = module_builder
-                .define_function("main", Signature::new(vec![NAT], type_row![NAT]))?;
+                .define_function("main", Signature::new(vec![usize_t()], vec![usize_t()]))?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 
                 let cfg_id = {
                     let mut cfg_builder =
-                        func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
+                        func_builder.cfg_builder(vec![(usize_t(), int)], vec![usize_t()].into())?;
                     build_basic_cfg(&mut cfg_builder)?;
 
                     cfg_builder.finish_sub_container()?
@@ -489,18 +486,18 @@ pub(crate) mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish_prelude_hugr()
+            module_builder.finish_hugr()
         };
 
-        assert_eq!(build_result.err(), None);
+        assert!(build_result.is_ok(), "{}", build_result.unwrap_err());
 
         Ok(())
     }
     #[test]
     fn basic_cfg_hugr() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()]))?;
         build_basic_cfg(&mut cfg_builder)?;
-        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
+        assert_matches!(cfg_builder.finish_hugr(), Ok(_));
 
         Ok(())
     }
@@ -508,7 +505,8 @@ pub(crate) mod test {
     pub(crate) fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
-        let sum2_variants = vec![type_row![NAT], type_row![NAT]];
+        let usize_row: TypeRow = vec![usize_t()].into();
+        let sum2_variants = vec![usize_row.clone(), usize_row];
         let mut entry_b = cfg_builder.entry_builder_exts(
             sum2_variants.clone(),
             type_row![],
@@ -520,8 +518,8 @@ pub(crate) mod test {
             let sum = entry_b.make_sum(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
-        let mut middle_b =
-            cfg_builder.simple_block_builder(Signature::new(type_row![NAT], type_row![NAT]), 1)?;
+        let mut middle_b = cfg_builder
+            .simple_block_builder(Signature::new(vec![usize_t()], vec![usize_t()]), 1)?;
         let middle = {
             let c = middle_b.add_load_const(ops::Value::unary_unit_sum());
             let [inw] = middle_b.input_wires_arr();
@@ -535,7 +533,7 @@ pub(crate) mod test {
     }
     #[test]
     fn test_dom_edge() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()]))?;
         let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
 
@@ -551,7 +549,7 @@ pub(crate) mod test {
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b =
-            cfg_builder.simple_block_builder(Signature::new(type_row![], type_row![NAT]), 1)?;
+            cfg_builder.simple_block_builder(Signature::new(type_row![], vec![usize_t()]), 1)?;
         let middle = {
             let c = middle_b.load_const(&sum_tuple_const);
             middle_b.finish_with_outputs(c, [inw])?
@@ -559,25 +557,26 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&entry, 0, &middle)?;
         cfg_builder.branch(&middle, 0, &exit)?;
-        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
+        assert_matches!(cfg_builder.finish_hugr(), Ok(_));
 
         Ok(())
     }
 
     #[test]
     fn test_non_dom_edge() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()]))?;
         let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
-        let mut middle_b =
-            cfg_builder.simple_block_builder(Signature::new(type_row![NAT], type_row![NAT]), 1)?;
+        let mut middle_b = cfg_builder
+            .simple_block_builder(Signature::new(vec![usize_t()], vec![usize_t()]), 1)?;
         let [inw] = middle_b.input_wires_arr();
         let middle = {
             let c = middle_b.load_const(&sum_tuple_const);
             middle_b.finish_with_outputs(c, [inw])?
         };
 
-        let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT])?;
+        let mut entry_b =
+            cfg_builder.entry_builder(sum_variants.clone(), vec![usize_t()].into())?;
         let entry = {
             let sum = entry_b.load_const(&sum_tuple_const);
             // entry block uses wire from middle block even though middle block
@@ -588,7 +587,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &middle)?;
         cfg_builder.branch(&middle, 0, &exit)?;
         assert_matches!(
-            cfg_builder.finish_prelude_hugr(),
+            cfg_builder.finish_hugr(),
             Err(ValidationError::InterGraphEdgeError(
                 InterGraphEdgeError::NonDominatedAncestor { .. }
             ))

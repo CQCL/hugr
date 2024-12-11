@@ -245,7 +245,7 @@ impl SignatureFunc {
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
         let mut res = pf.instantiate(args, exts)?;
-        res.extension_reqs.insert(&def.extension);
+        res.extension_reqs.insert(def.extension.clone());
 
         // If there are any row variables left, this will fail with an error:
         res.try_into()
@@ -535,7 +535,7 @@ pub(super) mod test {
     use super::SignatureFromArgs;
     use crate::builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::usize_t;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::OpName;
@@ -658,18 +658,19 @@ pub(super) mod test {
             Ok(())
         })?;
 
-        let reg = ExtensionRegistry::try_new([PRELUDE.clone(), EXTENSION.clone(), ext]).unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), EXTENSION.clone(), ext]);
+        reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =
-            Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
+            Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: usize_t() }])?);
         let mut dfg = DFGBuilder::new(endo_sig(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
+            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: usize_t() }], &reg)
                 .unwrap(),
             dfg.input_wires(),
         )?;
-        dfg.finish_hugr_with_outputs(rev.outputs(), &reg)?;
+        dfg.finish_hugr_with_outputs(rev.outputs())?;
 
         Ok(())
     }
@@ -710,13 +711,14 @@ pub(super) mod test {
                 ext.add_op("MyOp".into(), "".to_string(), SigFun(), extension_ref)?;
 
             // Base case, no type variables:
-            let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
+            let args = [TypeArg::BoundedNat { n: 3 }, usize_t().into()];
             assert_eq!(
                 def.compute_signature(&args, &PRELUDE_REGISTRY),
-                Ok(
-                    Signature::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
-                        .with_extension_delta(EXT_ID)
+                Ok(Signature::new(
+                    vec![usize_t(); 3],
+                    vec![Type::new_tuple(vec![usize_t(); 3])]
                 )
+                .with_extension_delta(EXT_ID))
             );
             assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
 
@@ -745,7 +747,7 @@ pub(super) mod test {
 
             // First arg must be concrete, not a variable
             let kind = TypeParam::bounded_nat(NonZeroU64::new(5).unwrap());
-            let args = [TypeArg::new_var_use(0, kind.clone()), USIZE_T.into()];
+            let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
             // We can't prevent this from getting into our compute_signature implementation:
             assert_eq!(
                 def.compute_signature(&args, &PRELUDE_REGISTRY),
@@ -806,12 +808,12 @@ pub(super) mod test {
 
     #[test]
     fn instantiate_extension_delta() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY};
+        use crate::extension::prelude::{bool_t, PRELUDE_REGISTRY};
 
         let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
             let params: Vec<TypeParam> = vec![TypeParam::Extensions];
             let db_set = ExtensionSet::type_var(0);
-            let fun_ty = Signature::new_endo(BOOL_T).with_extension_delta(db_set);
+            let fun_ty = Signature::new_endo(bool_t()).with_extension_delta(db_set);
 
             let def = ext.add_op(
                 "SimpleOp".into(),
@@ -821,8 +823,8 @@ pub(super) mod test {
             )?;
 
             // Concrete extension set
-            let es = ExtensionSet::singleton(&EXT_ID);
-            let exp_fun_ty = Signature::new_endo(BOOL_T).with_extension_delta(es.clone());
+            let es = ExtensionSet::singleton(EXT_ID);
+            let exp_fun_ty = Signature::new_endo(bool_t()).with_extension_delta(es.clone());
             let args = [TypeArg::Extensions { es }];
 
             def.validate_args(&args, &PRELUDE_REGISTRY, &params)

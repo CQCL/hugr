@@ -1,6 +1,6 @@
 //! Basic floating-point types
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
@@ -18,14 +18,23 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.flo
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Identifier for the 64-bit IEEE 754-2019 floating-point type.
-const FLOAT_TYPE_ID: TypeName = TypeName::new_inline("float64");
+pub const FLOAT_TYPE_ID: TypeName = TypeName::new_inline("float64");
 
 /// 64-bit IEEE 754-2019 floating-point type (as [CustomType])
-pub const FLOAT64_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(FLOAT_TYPE_ID, EXTENSION_ID, TypeBound::Copyable);
+pub fn float64_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
+    CustomType::new(
+        FLOAT_TYPE_ID,
+        vec![],
+        EXTENSION_ID,
+        TypeBound::Copyable,
+        extension_ref,
+    )
+}
 
 /// 64-bit IEEE 754-2019 floating-point type (as [Type])
-pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
+pub fn float64_type() -> Type {
+    float64_custom_type(&Arc::downgrade(&EXTENSION)).into()
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// A floating-point value.
@@ -67,7 +76,7 @@ impl CustomConst for ConstF64 {
     }
 
     fn get_type(&self) -> Type {
-        FLOAT64_TYPE
+        float64_type()
     }
 
     fn equal_consts(&self, _: &dyn CustomConst) -> bool {
@@ -75,7 +84,7 @@ impl CustomConst for ConstF64 {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&EXTENSION_ID)
+        ExtensionSet::singleton(EXTENSION_ID)
     }
 }
 

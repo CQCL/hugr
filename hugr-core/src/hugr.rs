@@ -10,6 +10,7 @@ pub mod validate;
 pub mod views;
 
 use std::collections::VecDeque;
+use std::io::Read;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
@@ -19,13 +20,15 @@ pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
+use crate::extension::resolution::{
+    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
+};
 use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
-use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
@@ -47,6 +50,9 @@ pub struct Hugr {
 
     /// Node metadata
     metadata: UnmanagedDenseMap<portgraph::NodeIndex, Option<NodeMetadataMap>>,
+
+    /// Extensions used by the operations in the Hugr.
+    extensions: ExtensionRegistry,
 }
 
 impl Default for Hugr {
@@ -82,19 +88,28 @@ impl Hugr {
         Self::with_capacity(root_node.into(), 0, 0)
     }
 
-    /// Resolve extension ops, infer extensions used, and pass the closure into validation
-    pub fn update_validate(
-        &mut self,
+    /// Load a Hugr from a json reader.
+    ///
+    /// Validates the Hugr against the provided extension registry, ensuring all
+    /// operations are resolved.
+    ///
+    /// If the feature `extension_inference` is enabled, we will ensure every function
+    /// correctly specifies the extensions required by its contained ops.
+    pub fn load_json(
+        reader: impl Read,
         extension_registry: &ExtensionRegistry,
-    ) -> Result<(), ValidationError> {
-        resolve_extension_ops(self, extension_registry)?;
-        self.validate_no_extensions(extension_registry)?;
-        #[cfg(feature = "extension_inference")]
-        {
-            self.infer_extensions(false)?;
-            self.validate_extensions()?;
+    ) -> Result<Self, LoadHugrError> {
+        let mut hugr: Hugr = serde_json::from_reader(reader)?;
+
+        hugr.resolve_extension_defs(extension_registry)?;
+        hugr.validate_no_extensions()?;
+
+        if cfg!(feature = "extension_inference") {
+            hugr.infer_extensions(false)?;
+            hugr.validate_extensions()?;
         }
-        Ok(())
+
+        Ok(hugr)
     }
 
     /// Infers an extension-delta for any non-function container node
@@ -160,11 +175,78 @@ impl Hugr {
                 return Ok(es.clone()); // Can't neither add nor remove, so nothing to do
             }
             let merged = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
-            *es = ExtensionSet::singleton(&TO_BE_INFERRED).missing_from(&merged);
+            *es = ExtensionSet::singleton(TO_BE_INFERRED).missing_from(&merged);
 
             Ok(es.clone())
         }
         infer(self, self.root(), remove)?;
+        Ok(())
+    }
+
+    /// Given a Hugr that has been deserialized, collect all extensions used to
+    /// define the HUGR while resolving all [`OpType::OpaqueOp`] operations into
+    /// [`OpType::ExtensionOp`]s and updating the extension pointer in all
+    /// internal [`crate::types::CustomType`]s to point to the extensions in the
+    /// register.
+    ///
+    /// When listing "used extensions" we only care about _definitional_
+    /// extension requirements, i.e., the operations and types that are required
+    /// to define the HUGR nodes and wire types. This is computed from the union
+    /// of all extension required across the HUGR.
+    ///
+    /// This is distinct from _runtime_ extension requirements computed in
+    /// [`Hugr::infer_extensions`], which are computed more granularly in each
+    /// function signature by the `required_extensions` field and define the set
+    /// of capabilities required by the runtime to execute each function.
+    ///
+    /// Updates the internal extension registry with the extensions used in the
+    /// definition.
+    ///
+    /// # Parameters
+    ///
+    /// - `extensions`: The extension set considered when resolving opaque
+    ///     operations and types. The original Hugr's internal extension
+    ///     registry is ignored and replaced with the newly computed one.
+    ///
+    /// # Errors
+    ///
+    /// - If an opaque operation cannot be resolved to an extension operation.
+    /// - If an extension operation references an extension that is missing from
+    ///   the registry.
+    /// - If a custom type references an extension that is missing from the
+    ///   registry.
+    pub fn resolve_extension_defs(
+        &mut self,
+        extensions: &ExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        let mut used_extensions = ExtensionRegistry::default();
+
+        // Here we need to iterate the optypes in the hugr mutably, to avoid
+        // having to clone and accumulate all replacements before finally
+        // applying them.
+        //
+        // This is not something we want to expose it the API, so we manually
+        // iterate instead of writing it as a method.
+        //
+        // Since we don't have a non-borrowing iterator over all the possible
+        // NodeIds, we have to simulate it by iterating over all possible
+        // indices and checking if the node exists.
+        for n in 0..self.graph.node_capacity() {
+            let pg_node = portgraph::NodeIndex::new(n);
+            let node: Node = pg_node.into();
+            if !self.contains_node(node) {
+                continue;
+            }
+
+            let op = &mut self.op_types[pg_node];
+
+            if let Some(extension) = resolve_op_extensions(node, op, extensions)? {
+                used_extensions.register_updated_ref(extension);
+            }
+            resolve_op_types_extensions(node, op, extensions, &mut used_extensions)?;
+        }
+
+        self.extensions = used_extensions;
         Ok(())
     }
 }
@@ -177,6 +259,7 @@ impl Hugr {
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(root_node.input_count(), root_node.output_count());
+        let extensions = root_node.used_extensions();
         op_types[root] = root_node;
 
         Self {
@@ -185,6 +268,7 @@ impl Hugr {
             root,
             op_types,
             metadata: UnmanagedDenseMap::with_capacity(nodes),
+            extensions: extensions.unwrap_or_default(),
         }
     }
 
@@ -291,6 +375,24 @@ pub enum HugrError {
     InvalidPortDirection(Direction),
 }
 
+/// Errors that can occur while loading and validating a Hugr json.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum LoadHugrError {
+    /// Error while loading the Hugr from JSON.
+    #[error("Error while loading the Hugr from JSON: {0}")]
+    Load(#[from] serde_json::Error),
+    /// Validation of the loaded Hugr failed.
+    #[error(transparent)]
+    Validation(#[from] ValidationError),
+    /// Error when resolving extension operations and types.
+    #[error(transparent)]
+    Extension(#[from] ExtensionResolutionError),
+    /// Error when inferring runtime extensions.
+    #[error(transparent)]
+    RuntimeInference(#[from] ExtensionError),
+}
+
 #[cfg(test)]
 mod test {
     use std::{fs::File, io::BufReader};
@@ -301,11 +403,10 @@ mod test {
     use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
     use crate::extension::prelude::Lift;
     use crate::extension::prelude::PRELUDE_ID;
-    use crate::extension::{
-        ExtensionId, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY, TO_BE_INFERRED,
-    };
+    use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
     use crate::types::{Signature, Type};
     use crate::{const_extension_ids, ops, test_file, type_row};
+    use cool_asserts::assert_matches;
     use rstest::rstest;
 
     #[test]
@@ -328,53 +429,46 @@ mod test {
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-    #[should_panic] // issue 1225: In serialization we do not distinguish between unknown CustomConst serialized value invalid but known CustomConst serialized values"
     fn hugr_validation_0() {
         // https://github.com/CQCL/hugr/issues/1091 bad case
-        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
-            File::open(test_file!("hugr-0.json")).unwrap(),
-        ))
-        .unwrap();
-        assert!(
-            hugr.update_validate(&PRELUDE_REGISTRY).is_err(),
-            "HUGR should not validate."
+        let hugr = Hugr::load_json(
+            BufReader::new(File::open(test_file!("hugr-0.json")).unwrap()),
+            &PRELUDE_REGISTRY,
         );
+        assert_matches!(hugr, Err(_));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_1() {
         // https://github.com/CQCL/hugr/issues/1091 good case
-        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
-            File::open(test_file!("hugr-1.json")).unwrap(),
-        ))
-        .unwrap();
-        assert!(hugr.update_validate(&PRELUDE_REGISTRY).is_ok());
+        let hugr = Hugr::load_json(
+            BufReader::new(File::open(test_file!("hugr-1.json")).unwrap()),
+            &PRELUDE_REGISTRY,
+        );
+        assert_matches!(&hugr, Ok(_));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_2() {
         // https://github.com/CQCL/hugr/issues/1185 bad case
-        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
-            File::open(test_file!("hugr-2.json")).unwrap(),
-        ))
-        .unwrap();
-        assert!(
-            hugr.update_validate(&PRELUDE_REGISTRY).is_err(),
-            "HUGR should not validate."
+        let hugr = Hugr::load_json(
+            BufReader::new(File::open(test_file!("hugr-2.json")).unwrap()),
+            &PRELUDE_REGISTRY,
         );
+        assert_matches!(hugr, Err(_));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_3() {
         // https://github.com/CQCL/hugr/issues/1185 good case
-        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
-            File::open(test_file!("hugr-3.json")).unwrap(),
-        ))
-        .unwrap();
-        assert!(hugr.update_validate(&PRELUDE_REGISTRY).is_ok());
+        let hugr = Hugr::load_json(
+            BufReader::new(File::open(test_file!("hugr-3.json")).unwrap()),
+            &PRELUDE_REGISTRY,
+        );
+        assert_matches!(&hugr, Ok(_));
     }
 
     const_extension_ids! {
@@ -418,7 +512,7 @@ mod test {
         let backup = h.clone();
         h.infer_extensions(false).unwrap();
         assert_eq!(h, backup); // did nothing
-        let val_res = h.validate(&EMPTY_REG);
+        let val_res = h.validate();
         let expected_err = ExtensionError {
             parent: h.root(),
             parent_extensions: XB.into(),

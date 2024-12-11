@@ -17,7 +17,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
-pub use signature::{FuncValueType, Signature};
+pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::{TypeRow, TypeRowRV};
@@ -25,8 +25,6 @@ pub use type_row::{TypeRow, TypeRowRV};
 // Unused in --no-features
 #[allow(unused_imports)]
 pub(crate) use poly_func::PolyFuncTypeBase;
-#[allow(unused_imports)]
-pub(crate) use signature::FuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
@@ -148,10 +146,16 @@ impl std::fmt::Display for SumType {
         }
 
         match self {
+            SumType::Unit { size: 1 } => write!(f, "Unit"),
+            SumType::Unit { size: 2 } => write!(f, "Bool"),
             SumType::Unit { size } => {
                 display_list_with_separator(repeat_n("[]", *size as usize), f, "+")
             }
-            SumType::General { rows } => display_list_with_separator(rows.iter(), f, "+"),
+            SumType::General { rows } => match rows.len() {
+                1 if rows[0].is_empty() => write!(f, "Unit"),
+                2 if rows[0].is_empty() && rows[1].is_empty() => write!(f, "Bool"),
+                _ => display_list_with_separator(rows.iter(), f, "+"),
+            },
         }
     }
 }
@@ -395,6 +399,12 @@ impl<RV: MaybeRV> TypeBase<RV> {
         &self.0
     }
 
+    /// Report a mutable reference to the component TypeEnum.
+    #[inline(always)]
+    pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
+        &mut self.0
+    }
+
     /// Report if the type is copyable - i.e.the least upper bound of the type
     /// is contained by the copyable bound.
     pub const fn copyable(&self) -> bool {
@@ -613,20 +623,24 @@ pub(crate) fn check_typevar_decl(
 #[cfg(test)]
 pub(crate) mod test {
 
+    use std::sync::Weak;
+
     use super::*;
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::usize_t;
     use crate::type_row;
 
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
-            USIZE_T,
+            usize_t(),
             Type::new_function(Signature::new_endo(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
                 "my_extension".try_into().unwrap(),
                 TypeBound::Copyable,
+                // Dummy extension reference.
+                &Weak::default(),
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);

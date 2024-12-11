@@ -314,11 +314,7 @@ impl Rewrite for Replacement {
         for (new_parent, &old_parent) in self.adoptions.iter() {
             let new_parent = node_map.get(new_parent).unwrap();
             debug_assert!(h.children(old_parent).next().is_some());
-            loop {
-                let ch = match h.children(old_parent).next() {
-                    None => break,
-                    Some(c) => c,
-                };
+            while let Some(ch) = h.first_child(old_parent) {
                 h.set_parent(ch, *new_parent);
             }
         }
@@ -451,7 +447,7 @@ mod test {
         endo_sig, BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
-    use crate::extension::prelude::{BOOL_T, USIZE_T};
+    use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
@@ -462,7 +458,7 @@ mod test {
     use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
     use crate::std_extensions::collections::{self, list_type, ListOp};
     use crate::types::{Signature, Type, TypeRow};
-    use crate::utils::depth;
+    use crate::utils::{depth, test_quantum_extension};
     use crate::{type_row, Direction, Extension, Hugr, HugrView, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
@@ -470,20 +466,19 @@ mod test {
     #[test]
     #[ignore] // FIXME: This needs a rewrite now that `pop` returns an optional value -.-'
     fn cfg() -> Result<(), Box<dyn std::error::Error>> {
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()])
-                .unwrap();
-        let listy = list_type(USIZE_T);
+        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()]);
+        reg.validate()?;
+        let listy = list_type(usize_t());
         let pop: ExtensionOp = ListOp::pop
-            .with_type(USIZE_T)
+            .with_type(usize_t())
             .to_extension_op(&reg)
             .unwrap();
         let push: ExtensionOp = ListOp::push
-            .with_type(USIZE_T)
+            .with_type(usize_t())
             .to_extension_op(&reg)
             .unwrap();
         let just_list = TypeRow::from(vec![listy.clone()]);
-        let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
+        let intermed = TypeRow::from(vec![listy.clone(), usize_t()]);
 
         let mut cfg = CFGBuilder::new(endo_sig(just_list.clone()))?;
 
@@ -496,7 +491,7 @@ mod test {
         cfg.branch(&entry, 0, &bb2)?;
         cfg.branch(&bb2, 0, &exit)?;
 
-        let mut h = cfg.finish_hugr(&reg).unwrap();
+        let mut h = cfg.finish_hugr().unwrap();
         {
             let pop = find_node(&h, "pop");
             let push = find_node(&h, "push");
@@ -576,7 +571,7 @@ mod test {
             }],
             mu_new: vec![],
         })?;
-        h.update_validate(&reg)?;
+        h.validate()?;
         {
             let pop = find_node(&h, "pop");
             let push = find_node(&h, "push");
@@ -620,9 +615,9 @@ mod test {
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder_exts(op_sig.output, 1, op_sig.extension_reqs.clone())?
+            h.simple_entry_builder_exts(op_sig.output.clone(), 1, op_sig.extension_reqs.clone())?
         } else {
-            h.simple_block_builder(op_sig, 1)?
+            h.simple_block_builder(op_sig.into_owned(), 1)?
         };
         let op: OpType = op.into();
         let op = bb.add_dataflow_op(op, bb.input_wires())?;
@@ -638,7 +633,7 @@ mod test {
 
     #[test]
     fn test_invalid() {
-        let utou = Signature::new_endo(vec![USIZE_T]);
+        let utou = Signature::new_endo(vec![usize_t()]);
         let ext = Extension::new_test_arc("new_ext".try_into().unwrap(), |ext, extension_ref| {
             ext.add_op("foo".into(), "".to_string(), utou.clone(), extension_ref)
                 .unwrap();
@@ -657,9 +652,11 @@ mod test {
         let baz = ext
             .instantiate_extension_op("baz", [], &PRELUDE_REGISTRY)
             .unwrap();
+        let mut registry = test_quantum_extension::REG.clone();
+        registry.register(ext).unwrap();
 
         let mut h = DFGBuilder::new(
-            Signature::new(type_row![USIZE_T, BOOL_T], type_row![USIZE_T])
+            Signature::new(vec![usize_t(), bool_t()], vec![usize_t()])
                 .with_extension_delta(ext_name.clone()),
         )
         .unwrap();
@@ -667,8 +664,8 @@ mod test {
         let mut cond = h
             .conditional_builder_exts(
                 (vec![type_row![]; 2], b),
-                [(USIZE_T, i)],
-                type_row![USIZE_T],
+                [(usize_t(), i)],
+                vec![usize_t()].into(),
                 ext_name.clone(),
             )
             .unwrap();
@@ -687,9 +684,7 @@ mod test {
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs()).unwrap();
         let case2 = case2.finish_with_outputs(baz_dfg.outputs()).unwrap().node();
         let cond = cond.finish_sub_container().unwrap();
-        let h = h
-            .finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)
-            .unwrap();
+        let h = h.finish_hugr_with_outputs(cond.outputs()).unwrap();
 
         let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());
         let r1 = r_hugr.add_node_with_parent(

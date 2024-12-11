@@ -66,6 +66,7 @@ fn inline_constant_functions_impl(
                     "Constant function hugr has no inner_func_type: {}",
                     konst_n.index()
                 ))?
+                .into_owned()
                 .into();
             let func_defn = FuncDefn {
                 name: const_fn_name(konst_n),
@@ -94,7 +95,7 @@ mod test {
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
-        extension::{prelude::QB_T, PRELUDE_REGISTRY},
+        extension::{prelude::qb_t, PRELUDE_REGISTRY},
         ops::{CallIndirect, Const, Value},
         types::Signature,
         Hugr, HugrView, Wire,
@@ -104,11 +105,9 @@ mod test {
 
     fn build_const(go: impl FnOnce(&mut DFGBuilder<Hugr>) -> Wire) -> Const {
         Value::function({
-            let mut builder = DFGBuilder::new(Signature::new_endo(QB_T)).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
             let r = go(&mut builder);
-            builder
-                .finish_hugr_with_outputs([r], &PRELUDE_REGISTRY)
-                .unwrap()
+            builder.finish_hugr_with_outputs([r]).unwrap()
         })
         .unwrap()
         .into()
@@ -116,7 +115,7 @@ mod test {
 
     #[test]
     fn simple() {
-        let qb_sig: Signature = Signature::new_endo(QB_T);
+        let qb_sig: Signature = Signature::new_endo(qb_t());
         let mut hugr = {
             let mut builder = ModuleBuilder::new();
             let const_node = builder.add_constant(build_const(|builder| {
@@ -138,7 +137,7 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
             };
-            builder.finish_hugr(&PRELUDE_REGISTRY).unwrap()
+            builder.finish_hugr().unwrap()
         };
 
         inline_constant_functions(&mut hugr, &PRELUDE_REGISTRY).unwrap();
@@ -152,7 +151,7 @@ mod test {
 
     #[test]
     fn nested() {
-        let qb_sig: Signature = Signature::new_endo(QB_T);
+        let qb_sig: Signature = Signature::new_endo(qb_t());
         let mut hugr = {
             let mut builder = ModuleBuilder::new();
             let const_node = builder.add_constant(build_const(|builder| {
@@ -187,7 +186,7 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
             };
-            builder.finish_hugr(&PRELUDE_REGISTRY).unwrap()
+            builder.finish_hugr().unwrap()
         };
 
         inline_constant_functions(&mut hugr, &PRELUDE_REGISTRY).unwrap();

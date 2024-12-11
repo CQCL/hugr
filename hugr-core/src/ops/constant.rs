@@ -2,6 +2,7 @@
 
 mod custom;
 
+use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
 use std::hash::{Hash, Hasher};
 
@@ -243,23 +244,23 @@ pub enum Value {
 /// use serde::{Serialize,Deserialize};
 /// use hugr::{
 ///   types::Type,ops::constant::{OpaqueValue, ValueName, CustomConst, CustomSerialized},
-///   extension::{ExtensionSet, prelude::{USIZE_T, ConstUsize}},
+///   extension::{ExtensionSet, prelude::{usize_t, ConstUsize}},
 ///   std_extensions::arithmetic::int_types};
 /// use serde_json::json;
 ///
 /// let expected_json = json!({
 ///     "extensions": ["prelude"],
-///     "typ": USIZE_T,
+///     "typ": usize_t(),
 ///     "value": {'c': "ConstUsize", 'v': 1}
 /// });
 /// let ev = OpaqueValue::new(ConstUsize::new(1));
 /// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 ///
-/// let ev = OpaqueValue::new(CustomSerialized::new(USIZE_T.clone(), serde_json::Value::Null, ExtensionSet::default()));
+/// let ev = OpaqueValue::new(CustomSerialized::new(usize_t().clone(), serde_json::Value::Null, ExtensionSet::default()));
 /// let expected_json = json!({
 ///     "extensions": [],
-///     "typ": USIZE_T,
+///     "typ": usize_t(),
 ///     "value": null
 /// });
 ///
@@ -348,12 +349,15 @@ pub enum ConstTypeError {
 }
 
 /// Hugrs (even functions) inside Consts must be monomorphic
-fn mono_fn_type(h: &Hugr) -> Result<Signature, ConstTypeError> {
+fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
         hugr_root_type: h.root_type().clone(),
     };
     if let Some(pf) = h.poly_func_type() {
-        return pf.try_into().map_err(|_| err());
+        match pf.try_into() {
+            Ok(sig) => return Ok(Cow::Owned(sig)),
+            Err(_) => return Err(err()),
+        };
     }
 
     h.inner_function_type().ok_or_else(err)
@@ -367,7 +371,7 @@ impl Value {
             Self::Sum(Sum { sum_type, .. }) => sum_type.clone().into(),
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
-                Type::new_function(func_type)
+                Type::new_function(func_type.into_owned())
             }
         }
     }
@@ -560,18 +564,21 @@ pub type ValueNameRef = str;
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::sync::{Arc, Weak};
 
     use super::Value;
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::extension::prelude::{bool_t, usize_custom_t};
+    use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
-            prelude::{ConstUsize, USIZE_CUSTOM_T, USIZE_T},
-            ExtensionId, ExtensionRegistry, PRELUDE,
+            prelude::{usize_t, ConstUsize},
+            ExtensionId,
         },
-        std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
+        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
         type_row,
         types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
@@ -592,7 +599,7 @@ mod test {
         }
 
         fn extension_reqs(&self) -> ExtensionSet {
-            ExtensionSet::singleton(self.0.extension())
+            ExtensionSet::singleton(self.0.extension().clone())
         }
 
         fn get_type(&self) -> Type {
@@ -604,38 +611,35 @@ mod test {
         }
     }
 
-    /// A [`CustomSerialized`] encoding a [`FLOAT64_TYPE`] float constant used in testing.
+    /// A [`CustomSerialized`] encoding a [`float64_type()`] float constant used in testing.
     pub(crate) fn serialized_float(f: f64) -> Value {
         CustomSerialized::try_from_custom_const(ConstF64::new(f))
             .unwrap()
             .into()
     }
 
-    fn test_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap()
-    }
-
     /// Constructs a DFG hugr defining a sum constant, and returning the loaded value.
     #[test]
     fn test_sum() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], Type::EMPTY_TYPEROW];
+        let pred_rows = vec![vec![usize_t(), float64_type()].into(), Type::EMPTY_TYPEROW];
         let pred_ty = SumType::new(pred_rows.clone());
 
         let mut b = DFGBuilder::new(inout_sig(
             type_row![],
             TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;
+        let usize_custom_t = usize_custom_t(&Arc::downgrade(&PRELUDE));
         let c = b.add_constant(Value::sum(
             0,
             [
-                CustomTestValue(USIZE_CUSTOM_T).into(),
+                CustomTestValue(usize_custom_t.clone()).into(),
                 ConstF64::new(5.1).into(),
             ],
             pred_ty.clone(),
         )?);
         let w = b.load_const(&c);
-        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
+        b.finish_hugr_with_outputs([w]).unwrap();
 
         let mut b = DFGBuilder::new(Signature::new(
             type_row![],
@@ -643,14 +647,14 @@ mod test {
         ))?;
         let c = b.add_constant(Value::sum(1, [], pred_ty.clone())?);
         let w = b.load_const(&c);
-        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
+        b.finish_hugr_with_outputs([w]).unwrap();
 
         Ok(())
     }
 
     #[test]
     fn test_bad_sum() {
-        let pred_ty = SumType::new([type_row![USIZE_T, FLOAT64_TYPE], type_row![]]);
+        let pred_ty = SumType::new([vec![usize_t(), float64_type()].into(), type_row![]]);
 
         let good_sum = const_usize();
         println!("{}", serde_json::to_string_pretty(&good_sum).unwrap());
@@ -686,7 +690,7 @@ mod test {
                 index: 1,
                 expected,
                 found,
-            })) if expected == FLOAT64_TYPE && found == const_usize()
+            })) if expected == float64_type() && found == const_usize()
         );
     }
 
@@ -694,9 +698,7 @@ mod test {
     fn function_value(simple_dfg_hugr: Hugr) {
         let v = Value::function(simple_dfg_hugr).unwrap();
 
-        let correct_type = Type::new_function(Signature::new_endo(type_row![
-            crate::extension::prelude::BOOL_T
-        ]));
+        let correct_type = Type::new_function(Signature::new_endo(vec![bool_t()]));
 
         assert_eq!(v.get_type(), correct_type);
         assert!(v.name().starts_with("const:function:"))
@@ -714,9 +716,9 @@ mod test {
 
     #[rstest]
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
-    #[case(const_usize(), USIZE_T, "const:custom:ConstUsize(")]
-    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:json:Object")]
-    #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]), "const:seq:{")]
+    #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
+    #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
+    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), float64_type()]), "const:seq:{")]
     fn const_type(
         #[case] const_value: Value,
         #[case] expected_type: Type,
@@ -749,6 +751,8 @@ mod test {
             vec![TypeArg::BoundedNat { n: 8 }],
             ex_id.clone(),
             TypeBound::Copyable,
+            // Dummy extension reference.
+            &Weak::default(),
         );
         let json_const: Value =
             CustomSerialized::new(typ_int.clone(), 6.into(), ex_id.clone()).into();
@@ -756,7 +760,13 @@ mod test {
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Copyable);
         assert_eq!(json_const.get_type(), classic_t);
 
-        let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Copyable);
+        let typ_qb = CustomType::new(
+            "my_type",
+            vec![],
+            ex_id,
+            TypeBound::Copyable,
+            &Weak::default(),
+        );
         let t = Type::new_extension(typ_qb.clone());
         assert_ne!(json_const.get_type(), t);
     }
@@ -937,7 +947,10 @@ mod test {
                 Value::sum(
                     1,
                     [Value::true_val()],
-                    SumType::new([vec![Type::UNIT], vec![Value::true_val().get_type()]]),
+                    SumType::new([
+                        type_row![Type::UNIT],
+                        vec![Value::true_val().get_type()].into()
+                    ]),
                 )
                 .unwrap()
             ])

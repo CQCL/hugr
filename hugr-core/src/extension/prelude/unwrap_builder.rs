@@ -86,7 +86,7 @@ mod tests {
     use crate::{
         builder::{DFGBuilder, DataflowHugr},
         extension::{
-            prelude::{option_type, BOOL_T},
+            prelude::{bool_t, option_type},
             PRELUDE_REGISTRY,
         },
         types::Signature,
@@ -94,15 +94,16 @@ mod tests {
 
     #[test]
     fn test_build_unwrap() {
-        let mut builder =
-            DFGBuilder::new(Signature::new(Type::from(option_type(BOOL_T)), BOOL_T).with_prelude())
-                .unwrap();
+        let mut builder = DFGBuilder::new(
+            Signature::new(Type::from(option_type(bool_t())), bool_t()).with_prelude(),
+        )
+        .unwrap();
 
         let [opt] = builder.input_wires_arr();
 
         let [res] = builder
-            .build_unwrap_sum(&PRELUDE_REGISTRY, 1, option_type(BOOL_T), opt)
+            .build_unwrap_sum(&PRELUDE_REGISTRY, 1, option_type(bool_t()), opt)
             .unwrap();
-        builder.finish_prelude_hugr_with_outputs([res]).unwrap();
+        builder.finish_hugr_with_outputs([res]).unwrap();
     }
 }

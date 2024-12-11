@@ -332,20 +332,19 @@ impl<Root: NodeHandle> HugrMut for SiblingMut<'_, Root> {}
 
 #[cfg(test)]
 mod test {
+    use std::borrow::Cow;
+
     use rstest::rstest;
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
-    use crate::extension::PRELUDE_REGISTRY;
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID};
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::ops::{OpTrait, OpType};
-    use crate::types::{Signature, Type};
+    use crate::types::Signature;
     use crate::utils::test_quantum_extension::EXTENSION_ID;
-    use crate::{type_row, IncomingPort};
-
-    const NAT: Type = crate::extension::prelude::USIZE_T;
-    const QB: Type = crate::extension::prelude::QB_T;
+    use crate::IncomingPort;
 
     use super::super::descendants::test::make_module_hgr;
     use super::*;
@@ -372,15 +371,15 @@ mod test {
         assert_eq!(
             region.poly_func_type(),
             Some(
-                Signature::new_endo(type_row![NAT, QB])
+                Signature::new_endo(vec![usize_t(), qb_t()])
                     .with_extension_delta(EXTENSION_ID)
                     .into()
             )
         );
 
         assert_eq!(
-            inner_region.inner_function_type(),
-            Some(Signature::new(type_row![NAT], type_row![NAT]))
+            inner_region.inner_function_type().map(Cow::into_owned),
+            Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
         assert_eq!(inner_region.edge_count(), 1);
@@ -453,13 +452,13 @@ mod test {
     #[test]
     fn nested_flat() -> Result<(), Box<dyn std::error::Error>> {
         let mut module_builder = ModuleBuilder::new();
-        let fty = Signature::new(type_row![NAT], type_row![NAT]);
+        let fty = Signature::new(vec![usize_t()], vec![usize_t()]);
         let mut fbuild = module_builder.define_function("main", fty.clone())?;
         let dfg = fbuild.dfg_builder(fty, fbuild.input_wires())?;
         let ins = dfg.input_wires();
         let sub_dfg = dfg.finish_with_outputs(ins)?;
         let fun = fbuild.finish_with_outputs(sub_dfg.outputs())?;
-        let h = module_builder.finish_hugr(&PRELUDE_REGISTRY)?;
+        let h = module_builder.finish_hugr()?;
         let sub_dfg = sub_dfg.node();
 
         // We can create a view from a child or grandchild of a hugr:
@@ -472,8 +471,8 @@ mod test {
 
         // Both ways work:
         let just_io = vec![
-            Input::new(type_row![NAT]).into(),
-            Output::new(type_row![NAT]).into(),
+            Input::new(vec![usize_t()]).into(),
+            Output::new(vec![usize_t()]).into(),
         ];
         for d in [dfg_view, nested_dfg_view] {
             assert_eq!(
@@ -488,9 +487,9 @@ mod test {
     /// Mutate a SiblingMut wrapper
     #[rstest]
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
-        simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
+        simple_dfg_hugr.validate().unwrap();
         let root = simple_dfg_hugr.root();
-        let signature = simple_dfg_hugr.inner_function_type().unwrap().clone();
+        let signature = simple_dfg_hugr.inner_function_type().unwrap().into_owned();
 
         let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
         assert_eq!(
@@ -513,14 +512,18 @@ mod test {
 
         // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
         simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
-        assert!(simple_dfg_hugr.validate(&PRELUDE_REGISTRY).is_err());
+        assert!(simple_dfg_hugr.validate().is_err());
     }
 
     #[rstest]
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
         let case_nodetype = crate::ops::Case {
-            signature: simple_dfg_hugr.root_type().dataflow_signature().unwrap(),
+            signature: simple_dfg_hugr
+                .root_type()
+                .dataflow_signature()
+                .unwrap()
+                .into_owned(),
         };
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
         // As expected, we cannot replace the root with a Case
@@ -542,7 +545,7 @@ mod test {
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
         let extracted = region.extract_hugr();
-        extracted.validate(&PRELUDE_REGISTRY)?;
+        extracted.validate()?;
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
 

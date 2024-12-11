@@ -12,7 +12,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-use crate::extension::prelude::{either_type, option_type, USIZE_T};
+use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc, PRELUDE};
 use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
@@ -175,21 +175,23 @@ impl ListOp {
                 .into(),
             push => self.list_polytype(vec![l.clone(), e], vec![l]).into(),
             get => self
-                .list_polytype(vec![l, USIZE_T], vec![Type::from(option_type(e))])
+                .list_polytype(vec![l, usize_t()], vec![Type::from(option_type(e))])
                 .into(),
             set => self
                 .list_polytype(
-                    vec![l.clone(), USIZE_T, e.clone()],
+                    vec![l.clone(), usize_t(), e.clone()],
                     vec![l, Type::from(either_type(e.clone(), e))],
                 )
                 .into(),
             insert => self
                 .list_polytype(
-                    vec![l.clone(), USIZE_T, e.clone()],
+                    vec![l.clone(), usize_t(), e.clone()],
                     vec![l, either_type(e, Type::UNIT).into()],
                 )
                 .into(),
-            length => self.list_polytype(vec![l.clone()], vec![l, USIZE_T]).into(),
+            length => self
+                .list_polytype(vec![l.clone()], vec![l, usize_t()])
+                .into(),
         }
     }
 
@@ -221,6 +223,10 @@ impl MakeOpDef for ListOp {
         EXTENSION_ID.to_owned()
     }
 
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+
     /// Add an operation implemented as an [MakeOpDef], which can provide the data
     /// required to define an [OpDef], to an extension.
     //
@@ -239,7 +245,7 @@ impl MakeOpDef for ListOp {
         Ok(())
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         self.compute_signature(list_type_def())
     }
 
@@ -281,11 +287,10 @@ lazy_static! {
     };
 
     /// Registry of extensions required to validate list operations.
-    pub static ref COLLECTIONS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+    pub static ref COLLECTIONS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::new([
         PRELUDE.clone(),
         EXTENSION.clone(),
-    ])
-    .unwrap();
+    ]);
 }
 
 impl MakeRegisteredOp for ListOp {
@@ -361,15 +366,14 @@ impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
     /// registry to validate the element type against.
     pub fn to_extension_op(self, elem_type_registry: &ExtensionRegistry) -> Option<ExtensionOp> {
-        let registry = ExtensionRegistry::try_new(
+        let registry = ExtensionRegistry::new(
             elem_type_registry
                 .clone()
                 .into_iter()
                 // ignore self if already in registry
-                .filter_map(|(_, ext)| (ext.name() != EXTENSION.name()).then_some(ext))
+                .filter(|ext| ext.name() != EXTENSION.name())
                 .chain(std::iter::once(EXTENSION.to_owned())),
-        )
-        .unwrap();
+        );
         ExtensionOp::new(
             registry.get(&EXTENSION_ID)?.get_op(&self.name())?.clone(),
             self.type_args(),
@@ -390,10 +394,10 @@ mod test {
     use crate::PortIndex;
     use crate::{
         extension::{
-            prelude::{ConstUsize, QB_T, USIZE_T},
+            prelude::{qb_t, usize_t, ConstUsize},
             PRELUDE,
         },
-        std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
+        std_extensions::arithmetic::float_types::{self, float64_type, ConstF64},
         types::TypeRow,
     };
 
@@ -414,7 +418,7 @@ mod test {
         let list_def = list_type_def();
 
         let list_type = list_def
-            .instantiate([TypeArg::Type { ty: USIZE_T }])
+            .instantiate([TypeArg::Type { ty: usize_t() }])
             .unwrap();
 
         assert!(list_def
@@ -422,39 +426,37 @@ mod test {
             .is_err());
 
         list_def.check_custom(&list_type).unwrap();
-        let list_value = ListValue(vec![ConstUsize::new(3).into()], USIZE_T);
+        let list_value = ListValue(vec![ConstUsize::new(3).into()], usize_t());
 
         list_value.validate().unwrap();
 
-        let wrong_list_value = ListValue(vec![ConstF64::new(1.2).into()], USIZE_T);
+        let wrong_list_value = ListValue(vec![ConstF64::new(1.2).into()], usize_t());
         assert!(wrong_list_value.validate().is_err());
     }
 
     #[test]
     fn test_list_ops() {
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()])
-                .unwrap();
-        let pop_op = ListOp::pop.with_type(QB_T);
+        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]);
+        let pop_op = ListOp::pop.with_type(qb_t());
         let pop_ext = pop_op.clone().to_extension_op(&reg).unwrap();
         assert_eq!(ListOpInst::from_extension_op(&pop_ext).unwrap(), pop_op);
         let pop_sig = pop_ext.dataflow_signature().unwrap();
 
-        let list_t = list_type(QB_T);
+        let list_t = list_type(qb_t());
 
-        let both_row: TypeRow = vec![list_t.clone(), option_type(QB_T).into()].into();
+        let both_row: TypeRow = vec![list_t.clone(), option_type(qb_t()).into()].into();
         let just_list_row: TypeRow = vec![list_t].into();
         assert_eq!(pop_sig.input(), &just_list_row);
         assert_eq!(pop_sig.output(), &both_row);
 
-        let push_op = ListOp::push.with_type(FLOAT64_TYPE);
+        let push_op = ListOp::push.with_type(float64_type());
         let push_ext = push_op.clone().to_extension_op(&reg).unwrap();
         assert_eq!(ListOpInst::from_extension_op(&push_ext).unwrap(), push_op);
         let push_sig = push_ext.dataflow_signature().unwrap();
 
-        let list_t = list_type(FLOAT64_TYPE);
+        let list_t = list_type(float64_type());
 
-        let both_row: TypeRow = vec![list_t.clone(), FLOAT64_TYPE].into();
+        let both_row: TypeRow = vec![list_t.clone(), float64_type()].into();
         let just_list_row: TypeRow = vec![list_t].into();
 
         assert_eq!(push_sig.input(), &both_row);
@@ -483,7 +485,7 @@ mod test {
                         .iter()
                         .map(|&i| Value::extension(ConstUsize::new(i as u64)))
                         .collect();
-                    Value::extension(ListValue(elems, USIZE_T))
+                    Value::extension(ListValue(elems, usize_t()))
                 }
                 TestVal::Some(l) => {
                     let elems = l.iter().map(TestVal::to_value);
@@ -504,13 +506,13 @@ mod test {
 
     #[rstest]
     #[case::pop(ListOp::pop, &[TestVal::List(vec![77,88, 42])], &[TestVal::List(vec![77,88]), TestVal::Some(vec![TestVal::Elem(42)])])]
-    #[case::pop_empty(ListOp::pop, &[TestVal::List(vec![])], &[TestVal::List(vec![]), TestVal::None(vec![USIZE_T].into())])]
+    #[case::pop_empty(ListOp::pop, &[TestVal::List(vec![])], &[TestVal::List(vec![]), TestVal::None(vec![usize_t()].into())])]
     #[case::push(ListOp::push, &[TestVal::List(vec![77,88]), TestVal::Elem(42)], &[TestVal::List(vec![77,88,42])])]
-    #[case::set(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,42]), TestVal::Ok(vec![TestVal::Elem(88)], vec![USIZE_T].into())])]
-    #[case::set_invalid(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(123), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(vec![USIZE_T].into(), vec![TestVal::Elem(99)])])]
+    #[case::set(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,42]), TestVal::Ok(vec![TestVal::Elem(88)], vec![usize_t()].into())])]
+    #[case::set_invalid(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(123), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(vec![usize_t()].into(), vec![TestVal::Elem(99)])])]
     #[case::get(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1)], &[TestVal::Some(vec![TestVal::Elem(88)])])]
-    #[case::get_invalid(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(99)], &[TestVal::None(vec![USIZE_T].into())])]
-    #[case::insert(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,88,42]), TestVal::Ok(vec![], vec![USIZE_T].into())])]
+    #[case::get_invalid(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(99)], &[TestVal::None(vec![usize_t()].into())])]
+    #[case::insert(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,88,42]), TestVal::Ok(vec![], vec![usize_t()].into())])]
     #[case::insert_invalid(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(52), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(Type::UNIT.into(), vec![TestVal::Elem(99)])])]
     #[case::length(ListOp::length, &[TestVal::List(vec![77,88,42])], &[TestVal::Elem(3)])]
     fn list_fold(#[case] op: ListOp, #[case] inputs: &[TestVal], #[case] outputs: &[TestVal]) {
@@ -521,7 +523,7 @@ mod test {
             .collect();
 
         let res = op
-            .with_type(USIZE_T)
+            .with_type(usize_t())
             .to_extension_op(&COLLECTIONS_REGISTRY)
             .unwrap()
             .constant_fold(&consts)

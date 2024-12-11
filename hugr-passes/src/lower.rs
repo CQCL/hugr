@@ -80,7 +80,7 @@ pub fn lower_ops(
 mod test {
     use hugr_core::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{Noop, BOOL_T},
+        extension::prelude::{bool_t, Noop},
         std_extensions::logic::LogicOp,
         types::Signature,
         HugrView,
@@ -91,26 +91,26 @@ mod test {
 
     #[fixture]
     fn noop_hugr() -> Hugr {
-        let mut b = DFGBuilder::new(Signature::new_endo(BOOL_T).with_prelude()).unwrap();
+        let mut b = DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
         let out = b
-            .add_dataflow_op(Noop::new(BOOL_T), [b.input_wires().next().unwrap()])
+            .add_dataflow_op(Noop::new(bool_t()), [b.input_wires().next().unwrap()])
             .unwrap()
             .out_wire(0);
-        b.finish_prelude_hugr_with_outputs([out]).unwrap()
+        b.finish_hugr_with_outputs([out]).unwrap()
     }
 
     #[fixture]
     fn identity_hugr() -> Hugr {
-        let b = DFGBuilder::new(Signature::new_endo(BOOL_T)).unwrap();
+        let b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
         let out = b.input_wires().next().unwrap();
-        b.finish_prelude_hugr_with_outputs([out]).unwrap()
+        b.finish_hugr_with_outputs([out]).unwrap()
     }
 
     #[rstest]
     fn test_replace(noop_hugr: Hugr) {
         let mut h = noop_hugr;
         let mut replaced = replace_many_ops(&mut h, |op| {
-            let noop = Noop::new(BOOL_T);
+            let noop = Noop::new(bool_t());
             if op.cast() == Some(noop) {
                 Some(LogicOp::Not)
             } else {
@@ -121,7 +121,7 @@ mod test {
 
         assert_eq!(replaced.len(), 1);
         let (n, op) = replaced.remove(0);
-        assert_eq!(op, Noop::new(BOOL_T).into());
+        assert_eq!(op, Noop::new(bool_t()).into());
         assert_eq!(h.get_optype(n), &LogicOp::Not.into());
     }
 
@@ -130,7 +130,7 @@ mod test {
         let mut h = noop_hugr;
 
         let lowered = lower_ops(&mut h, |op| {
-            let noop = Noop::new(BOOL_T);
+            let noop = Noop::new(bool_t());
             if op.cast() == Some(noop) {
                 Some(identity_hugr.clone())
             } else {
