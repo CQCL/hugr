@@ -659,11 +659,9 @@ mod test_fns {
                             .conditional_builder(
                                 ([type_row![], type_row![]], eq_0),
                                 vec![(just_input.clone(), loop_int_w)],
-                                vec![HugrSumType::new(vec![
-                                    vec![just_input.clone()].into(),
-                                    vec![],
-                                ])
-                                .into()]
+                                vec![
+                                    HugrSumType::new(vec![vec![just_input.clone()], vec![]]).into()
+                                ]
                                 .into(),
                             )
                             .unwrap();
@@ -732,7 +730,7 @@ mod test_fns {
     ) {
         exec_ctx.add_extensions(add_int_extensions);
         assert_eq!(
-            input * 1 << (iters + 1),
+            input << (iters + 1),
             exec_ctx.exec_hugr_u64(terminal_loop, "main")
         );
     }
