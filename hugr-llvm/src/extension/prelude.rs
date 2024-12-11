@@ -162,7 +162,7 @@ pub trait PreludeCodegen: Clone {
     /// The default implementation emits calls to libc's `printf` and `abort`.
     ///
     /// Note that implementations of `emit_panic` must not emit `unreachable`
-    /// terminators, that, if appropriate, is the responsibilitiy of the caller.
+    /// terminators, that, if appropriate, is the responsibility of the caller.
     fn emit_panic<H: HugrView>(
         &self,
         ctx: &mut EmitFuncContext<H>,
