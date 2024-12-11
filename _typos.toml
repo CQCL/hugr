@@ -6,4 +6,11 @@ strat = "strat" # common abbreviation for strategy
 # some arithmetic op names:
 inot = "inot"
 fle = "fle"
+flt = "flt"
+olt = "olt"
+OLT = "OLT"
+FLT = "FLT"
 ine = "ine"
+# llvm generic parameters
+OT = "OT"
+ot = "ot"
