@@ -1,6 +1,7 @@
 //! Extensible operations.
 
 use itertools::Itertools;
+use std::borrow::Cow;
 use std::sync::Arc;
 use thiserror::Error;
 #[cfg(test)]
@@ -68,7 +69,7 @@ impl ExtensionOp {
             Ok(sig) => sig,
             Err(SignatureError::MissingComputeFunc) => {
                 // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-                opaque.signature()
+                opaque.signature().into_owned()
             }
             Err(e) => return Err(e),
         };
@@ -116,6 +117,11 @@ impl ExtensionOp {
     pub fn signature_mut(&mut self) -> &mut Signature {
         &mut self.signature
     }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
@@ -157,8 +163,8 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn signature(&self) -> Signature {
-        self.signature.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -199,6 +205,7 @@ impl OpaqueOp {
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
+        let signature = signature.with_extension_delta(extension.clone());
         Self {
             extension,
             name: name.into(),
@@ -235,6 +242,11 @@ impl OpaqueOp {
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
+
+    /// Returns a mutable reference to the type arguments of the operation.
+    pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
+        self.args.as_mut_slice()
+    }
 }
 
 impl DataflowOpTrait for OpaqueOp {
@@ -244,10 +256,8 @@ impl DataflowOpTrait for OpaqueOp {
         &self.description
     }
 
-    fn signature(&self) -> Signature {
-        self.signature
-            .clone()
-            .with_extension_delta(self.extension().clone())
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -292,6 +302,9 @@ pub enum OpaqueOpError {
     /// Unresolved operation encountered during validation.
     #[error("Unexpected unresolved opaque operation '{1}' in {0}, from Extension {2}.")]
     UnresolvedOp(Node, OpName, ExtensionId),
+    /// Error updating the extension registry in the Hugr while resolving opaque ops.
+    #[error("Error updating extension registry: {0}")]
+    ExtensionRegistryError(#[from] crate::extension::ExtensionRegistryError),
 }
 
 #[cfg(test)]
@@ -299,7 +312,7 @@ mod test {
 
     use ops::OpType;
 
-    use crate::extension::resolution::update_op_extensions;
+    use crate::extension::resolution::resolve_op_extensions;
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{
@@ -332,8 +345,8 @@ mod test {
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
         assert_eq!(
-            op.signature(),
-            sig.with_extension_delta(op.extension().clone())
+            op.signature().as_ref(),
+            &sig.with_extension_delta(op.extension().clone())
         );
     }
 
@@ -349,7 +362,7 @@ mod test {
             Signature::new(i0.clone(), bool_t()),
         );
         let mut resolved = opaque.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
             &mut resolved,
             registry,
@@ -383,7 +396,8 @@ mod test {
         });
         let ext_id = ext.name().clone();
 
-        let registry = ExtensionRegistry::try_new([ext]).unwrap();
+        let registry = ExtensionRegistry::new([ext]);
+        registry.validate().unwrap();
         let opaque_val = OpaqueOp::new(
             ext_id.clone(),
             val_name,
@@ -393,7 +407,7 @@ mod test {
         );
         let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
         let mut resolved_val = opaque_val.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
             &mut resolved_val,
             &registry,
@@ -402,7 +416,7 @@ mod test {
         assert_eq!(resolve_res_definition(&resolved_val).name(), val_name);
 
         let mut resolved_comp = opaque_comp.into();
-        update_op_extensions(
+        resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(2)),
             &mut resolved_comp,
             &registry,

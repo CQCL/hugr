@@ -137,6 +137,11 @@ impl CustomType {
         &self.args
     }
 
+    /// Returns a mutable reference to the type arguments.
+    pub(crate) fn args_mut(&mut self) -> &mut Vec<TypeArg> {
+        &mut self.args
+    }
+
     /// Parent extension.
     pub fn extension(&self) -> &ExtensionId {
         &self.extension

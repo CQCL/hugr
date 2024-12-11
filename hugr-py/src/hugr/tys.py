@@ -514,6 +514,14 @@ class FunctionType(Type):
             extension_reqs=self.extension_reqs,
         )
 
+    def with_extension_reqs(self, extension_reqs: ExtensionSet) -> FunctionType:
+        """Adds a list of extension requirements to the function type, and
+        returns the new signature.
+        """
+        exts = set(self.extension_reqs)
+        exts = exts.union(extension_reqs)
+        return FunctionType(self.input, self.output, [*exts])
+
     def __str__(self) -> str:
         return f"{comma_sep_str(self.input)} -> {comma_sep_str(self.output)}"
 
@@ -541,6 +549,15 @@ class PolyFuncType(Type):
         return PolyFuncType(
             params=self.params,
             body=self.body.resolve(registry),
+        )
+
+    def with_extension_reqs(self, extension_reqs: ExtensionSet) -> PolyFuncType:
+        """Adds a list of extension requirements to the function type, and
+        returns the new signature.
+        """
+        return PolyFuncType(
+            params=self.params,
+            body=self.body.with_extension_reqs(extension_reqs),
         )
 
     def __str__(self) -> str:

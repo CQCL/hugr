@@ -7,7 +7,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use thiserror::Error;
 
 use hugr_core::{
-    extension::ExtensionRegistry,
     hugr::{
         hugrmut::HugrMut,
         views::{DescendantsGraph, ExtractHugr, HierarchyView},
@@ -137,13 +136,9 @@ impl ConstantFoldPass {
     }
 
     /// Run the pass using this configuration
-    pub fn run<H: HugrMut>(
-        &self,
-        hugr: &mut H,
-        reg: &ExtensionRegistry,
-    ) -> Result<(), ConstFoldError> {
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
         self.validation
-            .run_validated_pass(hugr, reg, |hugr: &mut H, _| self.run_no_validate(hugr))
+            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 
     fn find_needed_nodes<H: HugrView>(
@@ -222,8 +217,8 @@ fn might_diverge<V: AbstractValue>(results: &AnalysisResults<V, impl HugrView>, 
 }
 
 /// Exhaustively apply constant folding to a HUGR.
-pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
-    ConstantFoldPass::default().run(h, reg).unwrap()
+pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
+    ConstantFoldPass::default().run(h).unwrap()
 }
 
 struct ConstFoldContext<'a, H>(&'a H);

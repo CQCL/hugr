@@ -128,8 +128,7 @@ lazy_static! {
     };
 
     /// An extension registry containing only the prelude
-    pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
-        ExtensionRegistry::try_new([PRELUDE.clone()]).unwrap();
+    pub static ref PRELUDE_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([PRELUDE.clone()]);
 }
 
 pub(crate) fn usize_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
@@ -225,7 +224,7 @@ impl CustomConst for ConstString {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
 
     fn get_type(&self) -> Type {
@@ -418,7 +417,7 @@ impl CustomConst for ConstUsize {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
 
     fn get_type(&self) -> Type {
@@ -464,7 +463,7 @@ impl CustomConst for ConstError {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
     fn get_type(&self) -> Type {
         error_type()
@@ -510,7 +509,7 @@ impl CustomConst for ConstExternalSymbol {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
     fn get_type(&self) -> Type {
         self.typ.clone()
@@ -959,9 +958,7 @@ impl MakeRegisteredOp for Lift {
 #[cfg(test)]
 mod test {
     use crate::builder::inout_sig;
-    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
-    use crate::utils::test_quantum_extension;
     use crate::{
         builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
@@ -1022,11 +1019,11 @@ mod test {
     #[test]
     fn test_lift() {
         const XA: ExtensionId = ExtensionId::new_unchecked("xa");
-        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(&XA));
+        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(XA));
         let optype: OpType = op.clone().into();
         assert_eq!(
-            optype.dataflow_signature().unwrap(),
-            Signature::new_endo(type_row![Type::UNIT])
+            optype.dataflow_signature().unwrap().as_ref(),
+            &Signature::new_endo(type_row![Type::UNIT])
                 .with_extension_delta(XA)
                 .with_prelude()
         );
@@ -1050,7 +1047,7 @@ mod test {
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
-        b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+        b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }
 
     #[test]
@@ -1064,7 +1061,7 @@ mod test {
         let some = b.add_load_value(const_val1);
         let none = b.add_load_value(const_val2);
 
-        b.finish_prelude_hugr_with_outputs([some, none]).unwrap();
+        b.finish_hugr_with_outputs([some, none]).unwrap();
     }
 
     #[test]
@@ -1078,8 +1075,7 @@ mod test {
         let bool = b.add_load_value(const_bool);
         let float = b.add_load_value(const_float);
 
-        b.finish_hugr_with_outputs([bool, float], &FLOAT_OPS_REGISTRY)
-            .unwrap();
+        b.finish_hugr_with_outputs([bool, float]).unwrap();
     }
 
     #[test]
@@ -1102,7 +1098,7 @@ mod test {
 
         assert_eq!(
             error_val.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
@@ -1122,7 +1118,7 @@ mod test {
 
         b.add_dataflow_op(op, [err]).unwrap();
 
-        b.finish_prelude_hugr_with_outputs([]).unwrap();
+        b.finish_hugr_with_outputs([]).unwrap();
     }
 
     #[test]
@@ -1152,8 +1148,7 @@ mod test {
             .add_dataflow_op(panic_op, [err, q0, q1])
             .unwrap()
             .outputs_arr();
-        b.finish_hugr_with_outputs([q0, q1], &test_quantum_extension::REG)
-            .unwrap();
+        b.finish_hugr_with_outputs([q0, q1]).unwrap();
     }
 
     #[test]
@@ -1171,7 +1166,7 @@ mod test {
         assert!(string_const.validate().is_ok());
         assert_eq!(
             string_const.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(string_const.equal_consts(&ConstString::new("Lorem ipsum".into())));
         assert!(!string_const.equal_consts(&ConstString::new("Lorem ispum".into())));
@@ -1187,7 +1182,7 @@ mod test {
             .instantiate_extension_op(&PRINT_OP_ID, [], &PRELUDE_REGISTRY)
             .unwrap();
         b.add_dataflow_op(print_op, [greeting_out]).unwrap();
-        b.finish_prelude_hugr_with_outputs([]).unwrap();
+        b.finish_hugr_with_outputs([]).unwrap();
     }
 
     #[test]
@@ -1198,7 +1193,7 @@ mod test {
         assert!(subject.validate().is_ok());
         assert_eq!(
             subject.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("bar", Type::UNIT, false)));

@@ -84,7 +84,7 @@ impl CustomConst for ConstF64 {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&EXTENSION_ID)
+        ExtensionSet::singleton(EXTENSION_ID)
     }
 }
 

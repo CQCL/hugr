@@ -216,7 +216,7 @@ mod test {
     fn make_hugr(num_wires: usize) -> Hugr {
         let d = DFGBuilder::new(endo_sig(vec![usize_t(); num_wires])).unwrap();
         let inputs = d.input_wires();
-        d.finish_prelude_hugr_with_outputs(inputs).unwrap()
+        d.finish_hugr_with_outputs(inputs).unwrap()
     }
 
     #[test]

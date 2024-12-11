@@ -200,6 +200,6 @@ pub mod test {
 
     #[rstest]
     fn build_all_ops(all_array_ops: DFGBuilder<Hugr>) {
-        all_array_ops.finish_hugr(&PRELUDE_REGISTRY).unwrap();
+        all_array_ops.finish_hugr().unwrap();
     }
 }

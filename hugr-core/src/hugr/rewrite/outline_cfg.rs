@@ -71,7 +71,7 @@ impl OutlineCfg {
                     }
                 }
             }
-            extension_delta = extension_delta.union(o.signature().extension_reqs);
+            extension_delta = extension_delta.union(o.signature().extension_reqs.clone());
             let external_succs = h.output_neighbours(n).filter(|s| !self.blocks.contains(s));
             match external_succs.at_most_one() {
                 Ok(None) => (), // No external successors
@@ -252,7 +252,6 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::usize_t;
-    use crate::extension::PRELUDE_REGISTRY;
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::constant::Value;
@@ -319,7 +318,7 @@ mod test {
             let exit = cfg_builder.exit_block();
             cfg_builder.branch(&tail, 0, &exit)?;
 
-            let h = cfg_builder.finish_prelude_hugr()?;
+            let h = cfg_builder.finish_hugr()?;
             let (left, right) = (left.node(), right.node());
             let (merge, head, tail) = (merge.node(), head.node(), tail.node());
             Ok(Self {
@@ -446,7 +445,7 @@ mod test {
             .add_hugr_with_wires(cond_then_loop_cfg.h, [i1])
             .unwrap();
         fbuild.finish_with_outputs(cfg.outputs()).unwrap();
-        let mut h = module_builder.finish_prelude_hugr().unwrap();
+        let mut h = module_builder.finish_hugr().unwrap();
         // `add_hugr_with_wires` does not return an InsertionResult, so recover the nodes manually:
         let cfg = cfg.node();
         let exit_node = h.children(cfg).nth(1).unwrap();
@@ -463,7 +462,7 @@ mod test {
             cfg,
             vec![head, tail],
         );
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate().unwrap();
     }
 
     #[rstest]
@@ -486,7 +485,7 @@ mod test {
         let root = h.root();
         let (new_block, _, _) =
             outline_cfg_check_parents(&mut h, root, vec![entry, left, right, merge]);
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate().unwrap();
         assert_eq!(new_block, h.children(h.root()).next().unwrap());
         assert_eq!(h.output_neighbours(new_block).collect_vec(), [head]);
     }

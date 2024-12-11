@@ -75,11 +75,11 @@
 //!     // Finish building the HUGR, consuming the builder.
 //!     //
 //!     // Requires a registry with all the extensions used in the module.
-//!     module_builder.finish_hugr(&LOGIC_REG)
+//!     module_builder.finish_hugr()
 //! }?;
 //!
 //! // The built HUGR is always valid.
-//! hugr.validate(&LOGIC_REG).unwrap_or_else(|e| {
+//! hugr.validate().unwrap_or_else(|e| {
 //!     panic!("HUGR validation failed: {e}");
 //! });
 //! # Ok(())
@@ -242,7 +242,6 @@ pub(crate) mod test {
     use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
     use crate::types::{PolyFuncType, Signature};
-    use crate::utils::test_quantum_extension;
     use crate::Hugr;
 
     use super::handle::BuildHandle;
@@ -269,14 +268,14 @@ pub(crate) mod test {
 
         f(f_builder)?;
 
-        Ok(module_builder.finish_hugr(&test_quantum_extension::REG)?)
+        Ok(module_builder.finish_hugr()?)
     }
 
     #[fixture]
     pub(crate) fn simple_dfg_hugr() -> Hugr {
         let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
-        dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
+        dfg_builder.finish_hugr_with_outputs([i1]).unwrap()
     }
 
     #[fixture]
@@ -284,7 +283,7 @@ pub(crate) mod test {
         let fn_builder =
             FunctionBuilder::new("test", Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
         let [i1] = fn_builder.input_wires_arr();
-        fn_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
+        fn_builder.finish_hugr_with_outputs([i1]).unwrap()
     }
 
     #[fixture]
@@ -292,7 +291,7 @@ pub(crate) mod test {
         let mut builder = ModuleBuilder::new();
         let sig = Signature::new(vec![bool_t()], vec![bool_t()]);
         builder.declare("test", sig.into()).unwrap();
-        builder.finish_prelude_hugr().unwrap()
+        builder.finish_hugr().unwrap()
     }
 
     #[fixture]
@@ -300,7 +299,7 @@ pub(crate) mod test {
         let mut cfg_builder =
             CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
         super::cfg::test::build_basic_cfg(&mut cfg_builder).unwrap();
-        cfg_builder.finish_prelude_hugr().unwrap()
+        cfg_builder.finish_hugr().unwrap()
     }
 
     /// A helper method which creates a DFG rooted hugr with Input and Output node
