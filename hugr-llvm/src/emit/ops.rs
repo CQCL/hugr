@@ -45,7 +45,7 @@ where
         }
     }
 
-    /// safe because we are guarenteed only one input or output node
+    /// safe because we are guaranteed only one input or output node
     fn take_input(&mut self) -> Result<Vec<BasicValueEnum<'c>>> {
         self.inputs
             .take()

@@ -86,7 +86,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         result
     }
 
-    /// Print a sequence of elements that are preferrably laid out together in the same line.
+    /// Print a sequence of elements that are preferably laid out together in the same line.
     #[inline]
     fn print_group<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         self.print_delimited("", "", 0, f)
