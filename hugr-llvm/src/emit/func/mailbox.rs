@@ -1,6 +1,6 @@
 use std::{borrow::Cow, rc::Rc};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use delegate::delegate;
 use inkwell::{
     builder::Builder,
@@ -148,6 +148,19 @@ impl<'c> RowMailBox<'c> {
         builder: &Builder<'c>,
         vs: impl IntoIterator<Item = BasicValueEnum<'c>>,
     ) -> Result<()> {
+        let vs = vs.into_iter().collect_vec();
+        #[cfg(debug_assertions)]
+        {
+            let actual_types = vs.clone().into_iter().map(|x| x.get_type()).collect_vec();
+            let expected_types = self.get_types().collect_vec();
+            if actual_types != expected_types {
+                bail!(
+                    "RowMailbox::write: Expected types {:?}, got {:?}",
+                    expected_types,
+                    actual_types
+                );
+            }
+        }
         zip_eq(self.0.iter(), vs).try_for_each(|(mb, v)| mb.write(builder, v))
     }
 

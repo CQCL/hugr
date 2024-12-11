@@ -1,0 +1,71 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { { {} }, i64 } @_hl.main.1(i64 %0, i64 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %loop_body
+
+loop_body:                                        ; preds = %20, %entry_block
+  %"5_0.0" = phi i64 [ %0, %entry_block ], [ %22, %20 ]
+  %"5_1.0" = phi i64 [ %1, %entry_block ], [ %"19.0", %20 ]
+  %2 = insertvalue { i64 } undef, i64 %"5_0.0", 0
+  %3 = insertvalue { i32, { i64 }, { { {} } } } { i32 0, { i64 } poison, { { {} } } poison }, { i64 } %2, 1
+  %4 = extractvalue { i32, { i64 }, { { {} } } } %3, 0
+  switch i32 %4, label %5 [
+    i32 1, label %8
+  ]
+
+5:                                                ; preds = %loop_body
+  %6 = extractvalue { i32, { i64 }, { { {} } } } %3, 1
+  %7 = extractvalue { i64 } %6, 0
+  br label %cond_12_case_0
+
+8:                                                ; preds = %loop_body
+  %9 = extractvalue { i32, { i64 }, { { {} } } } %3, 2
+  %10 = extractvalue { { {} } } %9, 0
+  br label %cond_12_case_1
+
+loop_out:                                         ; preds = %23
+  %mrv = insertvalue { { {} }, i64 } undef, { {} } %25, 0
+  %mrv40 = insertvalue { { {} }, i64 } %mrv, i64 %"19.0", 1
+  ret { { {} }, i64 } %mrv40
+
+cond_12_case_0:                                   ; preds = %5
+  %11 = mul i64 %"5_1.0", 2
+  %12 = sub i64 %7, 1
+  %13 = insertvalue { i64 } undef, i64 %12, 0
+  %14 = insertvalue { i32, { i64 }, { { {} } } } { i32 0, { i64 } poison, { { {} } } poison }, { i64 } %13, 1
+  br label %cond_exit_12
+
+cond_12_case_1:                                   ; preds = %8
+  %15 = insertvalue { { {} } } undef, { {} } undef, 0
+  %16 = insertvalue { i32, { i64 }, { { {} } } } { i32 1, { i64 } poison, { { {} } } poison }, { { {} } } %15, 2
+  br label %cond_exit_12
+
+cond_exit_12:                                     ; preds = %cond_12_case_1, %cond_12_case_0
+  %"08.0" = phi { i32, { i64 }, { { {} } } } [ %14, %cond_12_case_0 ], [ %16, %cond_12_case_1 ]
+  %"19.0" = phi i64 [ %11, %cond_12_case_0 ], [ %"5_1.0", %cond_12_case_1 ]
+  %17 = icmp ule i64 %"5_0.0", 0
+  %18 = select i1 %17, { i32, {}, {} } { i32 1, {} poison, {} undef }, { i32, {}, {} } { i32 0, {} undef, {} poison }
+  %19 = extractvalue { i32, { i64 }, { { {} } } } %"08.0", 0
+  switch i32 %19, label %20 [
+    i32 1, label %23
+  ]
+
+20:                                               ; preds = %cond_exit_12
+  %21 = extractvalue { i32, { i64 }, { { {} } } } %"08.0", 1
+  %22 = extractvalue { i64 } %21, 0
+  br label %loop_body
+
+23:                                               ; preds = %cond_exit_12
+  %24 = extractvalue { i32, { i64 }, { { {} } } } %"08.0", 2
+  %25 = extractvalue { { {} } } %24, 0
+  br label %loop_out
+}

@@ -314,61 +314,53 @@ fn emit_tail_loop<'c, H: HugrView>(
 ) -> Result<()> {
     // TODO: Switch on the tag in loop_body to see where to go next
     // TODO: Handle "other" args
+    let node = args.node();
 
 
     // Make a block to jump to when we `Break`
     let out_bb = context.new_basic_block("loop_out", None);
     // A block for the body of the loop
     let body_bb = context.new_basic_block("loop_body", Some(out_bb));
-    // Pack input data into a sum type - do we need this?
-    let prep_bb = context.new_basic_block("loop_prep", Some(body_bb));
 
-    context.builder().build_unconditional_branch(prep_bb);
+    let (body_i_node, body_o_node) = node.get_io().unwrap();
+    let body_i_rmb = context.node_outs_rmb(body_i_node)?;
+    let body_o_rmb = context.node_ins_rmb(body_o_node)?;
 
-    let sum_ty = SumType::new([args.node().just_inputs.clone(), args.node().just_outputs.clone()]);
-    let outs_rmb = context.node_outs_rmb(args.node)?;
+    body_i_rmb.write(context.builder(), args.inputs)?;
+    context.builder().build_unconditional_branch(body_bb)?;
 
-    {
-        let builder = context.builder();
-        builder.position_at_end(prep_bb);
-        let body_in_row = args.node.just_inputs.clone();
-        let body_in_len = body_in_row.len();
-        let body_in_tuple = context.llvm_sum_type(SumType::new_tuple(body_in_row))?;
-
-        let mut loop_inputs = args.inputs.clone();
-        let other_inputs = loop_inputs.split_off(body_in_len);
-        let loop_input_ptr = builder.build_alloca(body_in_tuple.clone(), "loop_input")?;
-
-        let body_in_tup = body_in_tuple.build_tag(builder, 0, loop_inputs)?;
-        builder.build_store(loop_input_ptr, body_in_tup);
-        builder.build_unconditional_branch(body_bb);
-
-        builder.position_at_end(body_bb);
+    let control_llvm_sum_type = {
+        let sum_ty = SumType::new([node.just_inputs.clone(), node.just_outputs.clone()]);
+        context.llvm_sum_type(sum_ty)?
     };
 
+    context.build_positioned(body_bb, move |context| {
+        let inputs = body_i_rmb.read_vec(context.builder(), [])?;
+        emit_dataflow_parent(
+            context,
+            EmitOpArgs {
+                node,
+                inputs,
+                outputs: body_o_rmb.promise(),
+            },
+        )?;
+        let dataflow_outputs = body_o_rmb.read_vec(context.builder(), [])?;
+        let control_val = LLVMSumValue::try_new(dataflow_outputs[0], control_llvm_sum_type)?;
+        let mut outputs = Some(args.outputs);
 
-    // Emit the body of the loop into the right block
-    let mut dfpe = DataflowParentEmitter::new(args);
-    dfpe.emit_children(context)?;
-
-    // After the body we need to unpack the row type, then jump to the right block
-    let builder = context.builder();
-    let output_vals: Vec<BasicValueEnum> = outs_rmb.read(builder, []).unwrap();
-    let output_types: Vec<_> = outs_rmb.get_types().collect();
-    let llvm_sum_ty = LLVMSumType::try_new(&context.typing_session(), sum_ty)?;
-
-    println!("{:?}", output_vals);
-    let sum_output = LLVMSumValue::try_new(output_vals[0], llvm_sum_ty)?;
-    let tag = sum_output.build_get_tag(builder)?;
-
-    let tag = IntValue::try_from(output_vals[0]).unwrap();
-    let continue_tag = context.iw_context().i64_type().const_int(0, false);
-    let break_tag = context.iw_context().i64_type().const_int(1, false);
-    // TODO: Make this a conditional branch instead of switch
-    builder.build_switch(tag, out_bb, &[(break_tag, out_bb), (continue_tag, prep_bb)]);
-du
-    // Return Ok so we can see the insta emission with
-    // `cargo insta test` for debugging
+        control_val.build_destructure(context.builder(), |builder, tag, mut values| {
+            values.extend(dataflow_outputs[1..].iter().copied());
+            if tag == 0 {
+                body_i_rmb.write(builder, values)?;
+                builder.build_unconditional_branch(body_bb)?;
+            } else {
+                outputs.take().unwrap().finish(builder, values)?;
+                builder.build_unconditional_branch(out_bb)?;
+            }
+            Ok(())
+        })
+    })?;
+    context.builder().position_at_end(out_bb);
     Ok(())
 }
 
