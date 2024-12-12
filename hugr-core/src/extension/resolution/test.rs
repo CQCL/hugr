@@ -54,7 +54,8 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
 
     let mut used_exts = ExtensionRegistry::default();
     resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
-    resolve_op_types_extensions(dummy_node, &mut deser_op, &extensions, &mut used_exts).unwrap();
+    resolve_op_types_extensions(Some(dummy_node), &mut deser_op, &extensions, &mut used_exts)
+        .unwrap();
 
     let deser_extensions = deser_op.used_extensions().unwrap();
 

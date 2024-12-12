@@ -22,7 +22,7 @@ use crate::Node;
 ///
 /// This is a helper function used right after deserializing a Hugr.
 pub fn resolve_op_types_extensions(
-    node: Node,
+    node: Option<Node>,
     op: &mut OpType,
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,
@@ -113,7 +113,7 @@ pub fn resolve_op_types_extensions(
 ///
 /// Adds the extensions used in the signature to the `used_extensions` registry.
 fn resolve_signature_exts(
-    node: Node,
+    node: Option<Node>,
     signature: &mut Signature,
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,
@@ -129,7 +129,7 @@ fn resolve_signature_exts(
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
 fn resolve_type_row_exts<RV: MaybeRV>(
-    node: Node,
+    node: Option<Node>,
     row: &mut TypeRowBase<RV>,
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,
@@ -144,7 +144,7 @@ fn resolve_type_row_exts<RV: MaybeRV>(
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_type_exts<RV: MaybeRV>(
-    node: Node,
+    node: Option<Node>,
     typ: &mut TypeBase<RV>,
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,
@@ -175,7 +175,7 @@ pub(super) fn resolve_type_exts<RV: MaybeRV>(
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_custom_type_exts(
-    node: Node,
+    node: Option<Node>,
     custom: &mut CustomType,
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,
@@ -201,7 +201,7 @@ pub(super) fn resolve_custom_type_exts(
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_typearg_exts(
-    node: Node,
+    node: Option<Node>,
     arg: &mut TypeArg,
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,
@@ -222,7 +222,7 @@ pub(super) fn resolve_typearg_exts(
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
 pub(super) fn resolve_value_exts(
-    node: Node,
+    node: Option<Node>,
     value: &mut Value,
     extensions: &ExtensionRegistry,
     used_extensions: &mut ExtensionRegistry,

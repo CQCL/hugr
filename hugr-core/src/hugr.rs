@@ -243,7 +243,7 @@ impl Hugr {
             if let Some(extension) = resolve_op_extensions(node, op, extensions)? {
                 used_extensions.register_updated_ref(extension);
             }
-            resolve_op_types_extensions(node, op, extensions, &mut used_extensions)?;
+            resolve_op_types_extensions(Some(node), op, extensions, &mut used_extensions)?;
         }
 
         self.extensions = used_extensions;

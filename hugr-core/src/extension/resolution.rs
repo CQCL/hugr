@@ -44,11 +44,8 @@ pub fn resolve_type_extensions<RV: MaybeRV>(
     typ: &mut TypeBase<RV>,
     extensions: &ExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    // This public export is used for implementing `CustomConst::update_extensions`, so we don't need the full internal API here.
-    // TODO: Make `node` optional in `ExtensionResolutionError`
-    let node: Node = portgraph::NodeIndex::new(0).into();
     let mut used_extensions = ExtensionRegistry::default();
-    resolve_type_exts(node, typ, extensions, &mut used_extensions)
+    resolve_type_exts(None, typ, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers in a custom type.
@@ -56,11 +53,8 @@ pub fn resolve_custom_type_extensions(
     typ: &mut CustomType,
     extensions: &ExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    // This public export is used for implementing `CustomConst::update_extensions`, so we don't need the full internal API here.
-    // TODO: Make `node` optional in `ExtensionResolutionError`
-    let node: Node = portgraph::NodeIndex::new(0).into();
     let mut used_extensions = ExtensionRegistry::default();
-    resolve_custom_type_exts(node, typ, extensions, &mut used_extensions)
+    resolve_custom_type_exts(None, typ, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers inside a type argument.
@@ -68,11 +62,8 @@ pub fn resolve_typearg_extensions(
     arg: &mut TypeArg,
     extensions: &ExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    // This public export is used for implementing `CustomConst::update_extensions`, so we don't need the full internal API here.
-    // TODO: Make `node` optional in `ExtensionResolutionError`
-    let node: Node = portgraph::NodeIndex::new(0).into();
     let mut used_extensions = ExtensionRegistry::default();
-    resolve_typearg_exts(node, arg, extensions, &mut used_extensions)
+    resolve_typearg_exts(None, arg, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers inside a constant value.
@@ -80,11 +71,8 @@ pub fn resolve_value_extensions(
     value: &mut Value,
     extensions: &ExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    // This public export is used for implementing `CustomConst::update_extensions`, so we don't need the full internal API here.
-    // TODO: Make `node` optional in `ExtensionResolutionError`
-    let node: Node = portgraph::NodeIndex::new(0).into();
     let mut used_extensions = ExtensionRegistry::default();
-    resolve_value_exts(node, value, extensions, &mut used_extensions)
+    resolve_value_exts(None, value, extensions, &mut used_extensions)
 }
 
 /// Errors that can occur during extension resolution.
@@ -97,12 +85,13 @@ pub enum ExtensionResolutionError {
     OpaqueOpError(OpaqueOpError),
     /// An operation requires an extension that is not in the given registry.
     #[display(
-        "{op} ({node}) requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
+        "{op}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
+        node.map(|n| format!(" in {}", n)).unwrap_or_default(),
         available_extensions.join(", ")
     )]
     MissingOpExtension {
         /// The node that requires the extension.
-        node: Node,
+        node: Option<Node>,
         /// The operation that requires the extension.
         op: OpName,
         /// The missing extension
@@ -111,13 +100,14 @@ pub enum ExtensionResolutionError {
         available_extensions: Vec<ExtensionId>,
     },
     #[display(
-        "Type {ty} in {node} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
+        "Type {ty}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
+        node.map(|n| format!(" in {}", n)).unwrap_or_default(),
         available_extensions.join(", ")
     )]
     /// A type references an extension that is not in the given registry.
     MissingTypeExtension {
         /// The node that requires the extension.
-        node: Node,
+        node: Option<Node>,
         /// The type that requires the extension.
         ty: TypeName,
         /// The missing extension
@@ -138,7 +128,7 @@ pub enum ExtensionResolutionError {
 impl ExtensionResolutionError {
     /// Create a new error for missing operation extensions.
     pub fn missing_op_extension(
-        node: Node,
+        node: Option<Node>,
         op: &OpType,
         missing_extension: &ExtensionId,
         extensions: &ExtensionRegistry,
@@ -153,7 +143,7 @@ impl ExtensionResolutionError {
 
     /// Create a new error for missing type extensions.
     pub fn missing_type_extension(
-        node: Node,
+        node: Option<Node>,
         ty: &TypeName,
         missing_extension: &ExtensionId,
         extensions: &ExtensionRegistry,
