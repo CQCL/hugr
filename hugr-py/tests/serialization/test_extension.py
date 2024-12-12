@@ -24,7 +24,7 @@ EXAMPLE = r"""
 {
     "version": "0.1.0",
     "name": "ext",
-    "extension_reqs": [],
+    "runtime_reqs": [],
     "types": {
         "foo": {
             "extension": "ext",
@@ -64,7 +64,7 @@ EXAMPLE = r"""
                         }
                     ],
                     "output": [],
-                    "extension_reqs": []
+                    "runtime_reqs": []
                 }
             },
             "lower_funcs": []
@@ -98,7 +98,7 @@ def test_extension():
     ext = Extension(
         version=Version(0, 1, 0),
         name="ext",
-        extension_reqs=set(),
+        runtime_reqs=set(),
         types={"foo": type_def},
         values={},
         operations={"New": op_def},
@@ -120,7 +120,7 @@ def test_package():
     ext = Extension(
         version=Version(0, 1, 0),
         name="ext",
-        extension_reqs=set(),
+        runtime_reqs=set(),
         types={},
         values={},
         operations={},

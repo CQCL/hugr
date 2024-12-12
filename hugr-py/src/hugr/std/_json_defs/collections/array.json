@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "name": "collections.array",
-  "extension_reqs": [],
+  "runtime_reqs": [],
   "types": {
     "array": {
       "extension": "collections.array",
@@ -62,7 +62,7 @@
             }
           ],
           "output": [],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -128,7 +128,7 @@
               ]
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -184,7 +184,7 @@
                   "b": "A"
                 }
               ],
-              "extension_reqs": [
+              "runtime_reqs": [
                 "2"
               ]
             }
@@ -215,7 +215,7 @@
               "bound": "A"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -301,7 +301,7 @@
                   "b": "A"
                 }
               ],
-              "extension_reqs": [
+              "runtime_reqs": [
                 "4"
               ]
             },
@@ -342,7 +342,7 @@
               "b": "A"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -467,7 +467,7 @@
               ]
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -580,7 +580,7 @@
               ]
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false

@@ -37,7 +37,7 @@ class StringlyOp(AsExtOp):
         return [tys.StringArg(self.tag)]
 
     def cached_signature(self) -> tys.FunctionType | None:
-        return tys.FunctionType.endo([], extension_reqs=[STRINGLY_EXT.name])
+        return tys.FunctionType.endo([], runtime_reqs=[STRINGLY_EXT.name])
 
     @classmethod
     def from_ext(cls, custom: ops.ExtOp) -> "StringlyOp":

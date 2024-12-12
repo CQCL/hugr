@@ -273,7 +273,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             signature.input,
             vec![type_row![]; n_cases],
             signature.output,
-            signature.extension_reqs,
+            signature.runtime_reqs,
         )
     }
 

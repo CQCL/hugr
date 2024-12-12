@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "name": "ptr",
-  "extension_reqs": [],
+  "runtime_reqs": [],
   "types": {
     "ptr": {
       "extension": "ptr",
@@ -58,7 +58,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -100,7 +100,7 @@
               "b": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -141,7 +141,7 @@
             }
           ],
           "output": [],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false

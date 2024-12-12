@@ -549,11 +549,11 @@
                     "title": "Name",
                     "type": "string"
                 },
-                "extension_reqs": {
+                "runtime_reqs": {
                     "items": {
                         "type": "string"
                     },
-                    "title": "Extension Reqs",
+                    "title": "Runtime Reqs",
                     "type": "array",
                     "uniqueItems": true
                 },
@@ -582,7 +582,7 @@
             "required": [
                 "version",
                 "name",
-                "extension_reqs",
+                "runtime_reqs",
                 "types",
                 "values",
                 "operations"
@@ -841,11 +841,11 @@
                     "title": "Output",
                     "type": "array"
                 },
-                "extension_reqs": {
+                "runtime_reqs": {
                     "items": {
                         "type": "string"
                     },
-                    "title": "Extension Reqs",
+                    "title": "Runtime Reqs",
                     "type": "array"
                 }
             },

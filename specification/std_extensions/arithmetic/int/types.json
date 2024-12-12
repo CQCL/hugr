@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "name": "arithmetic.int.types",
-  "extension_reqs": [],
+  "runtime_reqs": [],
   "types": {
     "int": {
       "extension": "arithmetic.int.types",

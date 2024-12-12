@@ -33,8 +33,8 @@ pub struct FuncTypeBase<ROWVARS: MaybeRV> {
     /// Value outputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
     pub output: TypeRowBase<ROWVARS>,
-    /// The extension requirements which are added by the operation
-    pub extension_reqs: ExtensionSet,
+    /// The extensions the function specifies as required at runtime.
+    pub runtime_reqs: ExtensionSet,
 }
 
 /// The concept of "signature" in the spec - the edges required to/from a node
@@ -51,9 +51,9 @@ pub type Signature = FuncTypeBase<NoRV>;
 pub type FuncValueType = FuncTypeBase<RowVariable>;
 
 impl<RV: MaybeRV> FuncTypeBase<RV> {
-    /// Builder method, add extension_reqs to a FunctionType
+    /// Builder method, add runtime_reqs to a FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
-        self.extension_reqs = self.extension_reqs.union(rs.into());
+        self.runtime_reqs = self.runtime_reqs.union(rs.into());
         self
     }
 
@@ -66,7 +66,7 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         Self {
             input: self.input.substitute(tr),
             output: self.output.substitute(tr),
-            extension_reqs: self.extension_reqs.substitute(tr),
+            runtime_reqs: self.runtime_reqs.substitute(tr),
         }
     }
 
@@ -75,7 +75,7 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         Self {
             input: input.into(),
             output: output.into(),
-            extension_reqs: ExtensionSet::new(),
+            runtime_reqs: ExtensionSet::new(),
         }
     }
 
@@ -118,7 +118,7 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     ) -> Result<(), SignatureError> {
         self.input.validate(extension_registry, var_decls)?;
         self.output.validate(extension_registry, var_decls)?;
-        self.extension_reqs.validate(var_decls)
+        self.runtime_reqs.validate(var_decls)
     }
 
     /// Returns a registry with the concrete extensions used by this signature.
@@ -160,7 +160,7 @@ impl<RV: MaybeRV> Default for FuncTypeBase<RV> {
         Self {
             input: Default::default(),
             output: Default::default(),
-            extension_reqs: Default::default(),
+            runtime_reqs: Default::default(),
         }
     }
 }
@@ -286,7 +286,7 @@ impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
             f.write_str(" -> ")?;
         }
         f.write_char('[')?;
-        self.extension_reqs.fmt(f)?;
+        self.runtime_reqs.fmt(f)?;
         f.write_char(']')?;
         self.output.fmt(f)
     }
@@ -298,7 +298,7 @@ impl TryFrom<FuncValueType> for Signature {
     fn try_from(value: FuncValueType) -> Result<Self, Self::Error> {
         let input: TypeRow = value.input.try_into()?;
         let output: TypeRow = value.output.try_into()?;
-        Ok(Self::new(input, output).with_extension_delta(value.extension_reqs))
+        Ok(Self::new(input, output).with_extension_delta(value.runtime_reqs))
     }
 }
 
@@ -307,7 +307,7 @@ impl From<Signature> for FuncValueType {
         Self {
             input: value.input.into(),
             output: value.output.into(),
-            extension_reqs: value.extension_reqs,
+            runtime_reqs: value.runtime_reqs,
         }
     }
 }
@@ -316,7 +316,7 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<R
     fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
         self.input == other.input
             && self.output == other.output
-            && self.extension_reqs == other.extension_reqs
+            && self.runtime_reqs == other.runtime_reqs
     }
 }
 

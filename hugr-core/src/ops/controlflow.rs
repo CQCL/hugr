@@ -344,7 +344,7 @@ impl OpTrait for Case {
     }
 
     fn extension_delta(&self) -> ExtensionSet {
-        self.signature.extension_reqs.clone()
+        self.signature.runtime_reqs.clone()
     }
 
     fn tag(&self) -> OpTag {
