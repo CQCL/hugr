@@ -14,10 +14,7 @@ pub mod extensions;
 pub mod mermaid;
 pub mod validate;
 
-// TODO: Deprecated re-export. Remove on a breaking release.
-#[doc(inline)]
-#[deprecated(since = "0.13.2", note = "Use `hugr::package::Package` instead.")]
-pub use hugr::package::Package;
+use hugr::package::Package;
 
 /// CLI arguments.
 #[derive(Parser, Debug)]
@@ -134,19 +131,6 @@ impl HugrArgs {
                 get_package_or_hugr_seek(Cursor::new(buffer), extensions)
             }
         }
-    }
-
-    /// Read either a package from the input.
-    ///
-    /// deprecated: use [HugrArgs::get_package_or_hugr] instead.
-    #[deprecated(
-        since = "0.13.2",
-        note = "Use `HugrArgs::get_package_or_hugr` instead."
-    )]
-    pub fn get_package(&mut self) -> Result<Package, CliError> {
-        let val: serde_json::Value = serde_json::from_reader(&mut self.input)?;
-        let pkg = serde_json::from_value::<Package>(val.clone())?;
-        Ok(pkg)
     }
 }
 
