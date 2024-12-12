@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::{either_type, option_type, usize_t};
+use crate::extension::resolution::{
+    resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
+};
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc, PRELUDE};
 use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
@@ -125,6 +128,16 @@ impl CustomConst for ListValue {
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
             .union(EXTENSION_ID.into())
+    }
+
+    fn update_extensions(
+        &mut self,
+        extensions: &ExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        for val in &mut self.0 {
+            resolve_value_extensions(val, extensions)?;
+        }
+        resolve_type_extensions(&mut self.1, extensions)
     }
 }
 

@@ -25,6 +25,7 @@ use crate::{type_row, Extension};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use super::resolution::{resolve_type_extensions, ExtensionResolutionError};
 use super::ExtensionRegistry;
 
 mod unwrap_builder;
@@ -502,6 +503,13 @@ impl CustomConst for ConstExternalSymbol {
     }
     fn get_type(&self) -> Type {
         self.typ.clone()
+    }
+
+    fn update_extensions(
+        &mut self,
+        extensions: &ExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        resolve_type_extensions(&mut self.typ, extensions)
     }
 
     fn validate(&self) -> Result<(), CustomCheckFailure> {

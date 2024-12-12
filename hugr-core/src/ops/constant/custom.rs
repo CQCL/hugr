@@ -10,7 +10,8 @@ use std::hash::{Hash, Hasher};
 use downcast_rs::{impl_downcast, Downcast};
 use thiserror::Error;
 
-use crate::extension::ExtensionSet;
+use crate::extension::resolution::{resolve_type_extensions, ExtensionResolutionError};
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFailure, Type};
 use crate::IncomingPort;
@@ -82,6 +83,19 @@ pub trait CustomConst:
     fn equal_consts(&self, _other: &dyn CustomConst) -> bool {
         // false unless overridden
         false
+    }
+
+    /// Update the extensions associated with the internal values.
+    ///
+    /// This is used to ensure that any extension reference [`CustomConst::get_type`] remains
+    /// valid when serializing and deserializing the constant.
+    ///
+    /// See the helper methods in [`crate::extension::resolution`].
+    fn update_extensions(
+        &mut self,
+        _extensions: &ExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        Ok(())
     }
 
     /// Report the type.
@@ -299,6 +313,12 @@ impl CustomConst for CustomSerialized {
 
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
+    }
+    fn update_extensions(
+        &mut self,
+        extensions: &ExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        resolve_type_extensions(&mut self.typ, extensions)
     }
     fn get_type(&self) -> Type {
         self.typ.clone()

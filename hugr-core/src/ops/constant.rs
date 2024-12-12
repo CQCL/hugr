@@ -286,6 +286,11 @@ impl OpaqueValue {
         self.v.as_ref()
     }
 
+    /// Returns a reference to the internal [`CustomConst`].
+    pub(crate) fn value_mut(&mut self) -> &mut dyn CustomConst {
+        self.v.as_mut()
+    }
+
     delegate! {
         to self.value() {
             /// Returns the type of the internal [`CustomConst`].
@@ -572,7 +577,8 @@ mod test {
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
     use crate::extension::prelude::{bool_t, usize_custom_t};
-    use crate::extension::PRELUDE;
+    use crate::extension::resolution::{resolve_typearg_extensions, ExtensionResolutionError};
+    use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
@@ -602,6 +608,16 @@ mod test {
 
         fn extension_reqs(&self) -> ExtensionSet {
             ExtensionSet::singleton(self.0.extension().clone())
+        }
+
+        fn update_extensions(
+            &mut self,
+            extensions: &ExtensionRegistry,
+        ) -> Result<(), ExtensionResolutionError> {
+            for arg in self.0.args_mut() {
+                resolve_typearg_extensions(arg, extensions)?;
+            }
+            Ok(())
         }
 
         fn get_type(&self) -> Type {

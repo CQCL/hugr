@@ -143,7 +143,7 @@ fn resolve_type_row_exts<RV: MaybeRV>(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a type.
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-fn resolve_type_exts<RV: MaybeRV>(
+pub(super) fn resolve_type_exts<RV: MaybeRV>(
     node: Node,
     typ: &mut TypeBase<RV>,
     extensions: &ExtensionRegistry,
@@ -191,7 +191,7 @@ fn resolve_type_exts<RV: MaybeRV>(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a type arg.
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-fn resolve_typearg_exts(
+pub(super) fn resolve_typearg_exts(
     node: Node,
     arg: &mut TypeArg,
     extensions: &ExtensionRegistry,
@@ -212,7 +212,7 @@ fn resolve_typearg_exts(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a [`Value`].
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
-fn resolve_value_exts(
+pub(super) fn resolve_value_exts(
     node: Node,
     value: &mut Value,
     extensions: &ExtensionRegistry,
@@ -220,9 +220,10 @@ fn resolve_value_exts(
 ) -> Result<(), ExtensionResolutionError> {
     match value {
         Value::Extension { e } => {
-            // We expect that the `CustomConst::get_type` binary calls always
-            // return types with valid extensions.
-            // So here we just collect the used extensions.
+            e.value_mut().update_extensions(extensions)?;
+
+            // We expect that the `CustomConst::get_type` binary calls
+            // return types with valid extensions after we call `update_extensions`.
             let typ = e.get_type();
             let mut missing = ExtensionSet::new();
             collect_type_exts(&typ, used_extensions, &mut missing);
