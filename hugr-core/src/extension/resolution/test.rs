@@ -1,6 +1,6 @@
 //! Tests for extension resolution.
 
-use core::panic;
+use core::{f64, panic};
 use std::sync::Arc;
 
 use cool_asserts::assert_matches;
@@ -16,9 +16,10 @@ use crate::extension::resolution::{
 };
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
-use crate::std_extensions::arithmetic::float_types::float64_type;
+use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
+use crate::std_extensions::collections::list::ListValue;
 use crate::types::{Signature, Type};
 use crate::{type_row, Extension, Hugr, HugrView};
 
@@ -92,6 +93,12 @@ fn resolve_hugr_extensions() {
 
     // A constant op using the prelude extension.
     module.add_constant(Value::extension(ConstUsize::new(42)));
+
+    // A constant op using lists of non-prelude types.
+    module.add_constant(Value::extension(ListValue::new(
+        float64_type(),
+        [ConstF64::new(f64::consts::PI).into()],
+    )));
 
     // A function declaration using the floats extension in its signature.
     let decl = module
@@ -215,6 +222,17 @@ fn resolve_hugr_extensions() {
         &build_extensions,
         "{} != {build_extensions}",
         hugr.extensions()
+    );
+
+    // Rountrip serialize so all weak references are dropped.
+    let ser = serde_json::to_string(&hugr).unwrap();
+    let deser_hugr = Hugr::load_json(ser.as_bytes(), &build_extensions).unwrap();
+
+    assert_eq!(
+        deser_hugr.extensions(),
+        &build_extensions,
+        "{} != {build_extensions}",
+        deser_hugr.extensions()
     );
 }
 
