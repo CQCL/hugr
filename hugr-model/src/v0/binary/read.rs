@@ -73,7 +73,6 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
     let operation = read_operation(bump, reader.get_operation()?)?;
     let inputs = read_scalar_list!(bump, reader.get_inputs()?, model::LinkIndex);
     let outputs = read_scalar_list!(bump, reader.get_outputs()?, model::LinkIndex);
-    let params = read_scalar_list!(bump, reader.get_params()?, model::TermId);
     let meta = read_list!(bump, reader.get_meta()?, read_meta_item);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
@@ -81,7 +80,6 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
         operation,
         inputs,
         outputs,
-        params,
         meta,
         signature,
     })
@@ -185,12 +183,18 @@ fn read_operation<'a>(
             });
             model::Operation::DeclareOperation { decl }
         }
-        Which::Custom(operation) => model::Operation::Custom {
-            operation: model::NodeId(operation),
-        },
-        Which::CustomFull(operation) => model::Operation::CustomFull {
-            operation: model::NodeId(operation),
-        },
+        Which::Custom(reader) => {
+            let reader = reader?;
+            let operation = model::NodeId(reader.get_operation());
+            let params = read_scalar_list!(bump, reader.get_params()?, model::TermId);
+            model::Operation::Custom { operation, params }
+        }
+        Which::CustomFull(reader) => {
+            let reader = reader?;
+            let operation = model::NodeId(reader.get_operation());
+            let params = read_scalar_list!(bump, reader.get_params()?, model::TermId);
+            model::Operation::CustomFull { operation, params }
+        }
         Which::Tag(tag) => model::Operation::Tag { tag },
         Which::TailLoop(body) => model::Operation::TailLoop {
             body: model::RegionId(body),

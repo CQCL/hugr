@@ -247,8 +247,6 @@ pub struct Node<'a> {
     pub inputs: &'a [LinkIndex],
     /// The output ports of the node.
     pub outputs: &'a [LinkIndex],
-    /// The parameters of the node.
-    pub params: &'a [TermId],
     /// The meta information attached to the node.
     pub meta: &'a [MetaItem<'a>],
     /// The signature of the node.
@@ -303,6 +301,8 @@ pub enum Operation<'a> {
     Custom {
         /// The symbol of the custom operation.
         operation: NodeId,
+        /// The parameters for the custom operation.
+        params: &'a [TermId],
     },
     /// Custom operation with full parameters.
     ///
@@ -312,6 +312,8 @@ pub enum Operation<'a> {
     CustomFull {
         /// The symbol of the custom operation.
         operation: NodeId,
+        /// The parameters for the custom operation.
+        params: &'a [TermId],
     },
     /// Alias definitions.
     DefineAlias {

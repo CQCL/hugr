@@ -244,15 +244,15 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 Ok(())
             }
 
-            Operation::Custom { operation } => {
+            Operation::Custom { operation, params } => {
                 this.print_group(|this| {
-                    if node_data.params.is_empty() {
+                    if params.is_empty() {
                         this.print_symbol(*operation)?;
                     } else {
                         this.print_parens(|this| {
                             this.print_symbol(*operation)?;
 
-                            for param in node_data.params {
+                            for param in *params {
                                 this.print_term(*param)?;
                             }
 
@@ -266,13 +266,13 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_meta(node_data.meta)
             }
 
-            Operation::CustomFull { operation } => {
+            Operation::CustomFull { operation, params } => {
                 this.print_group(|this| {
                     this.print_parens(|this| {
                         this.print_text("@");
                         this.print_symbol(*operation)?;
 
-                        for param in node_data.params {
+                        for param in *params {
                             this.print_term(*param)?;
                         }
 

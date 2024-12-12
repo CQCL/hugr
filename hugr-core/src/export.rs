@@ -244,8 +244,6 @@ impl<'a> Context<'a> {
         // We insert a dummy node with the invalid operation at this point to reserve
         // the node id. This is necessary to establish the correct node id for the
         // local scope introduced by some operations. We will overwrite this node later.
-        let mut params: &[_] = &[];
-
         let optype = self.hugr.get_optype(node);
 
         let operation = match optype {
@@ -363,6 +361,7 @@ impl<'a> Context<'a> {
 
             OpType::CallIndirect(_) => model::Operation::CustomFull {
                 operation: self.resolve_symbol(OP_FUNC_CALL_INDIRECT),
+                params: &[],
             },
 
             OpType::Tag(tag) => model::Operation::Tag { tag: tag.tag as _ },
@@ -384,21 +383,21 @@ impl<'a> Context<'a> {
             OpType::ExtensionOp(op) => {
                 let operation = self.export_opdef(op.def());
 
-                params = self
+                let params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                model::Operation::CustomFull { operation }
+                model::Operation::CustomFull { operation, params }
             }
 
             OpType::OpaqueOp(op) => {
                 let operation = self.make_named_global_ref(op.extension(), op.op_name());
 
-                params = self
+                let params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                model::Operation::CustomFull { operation }
+                model::Operation::CustomFull { operation, params }
             }
         };
 
@@ -434,7 +433,6 @@ impl<'a> Context<'a> {
             operation,
             inputs,
             outputs,
-            params,
             meta,
             signature,
         };
@@ -465,7 +463,6 @@ impl<'a> Context<'a> {
                     operation: model::Operation::Invalid,
                     inputs: &[],
                     outputs: &[],
-                    params: &[],
                     meta: &[],
                     signature: None,
                 }))

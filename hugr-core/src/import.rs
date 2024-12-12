@@ -398,7 +398,7 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::CustomFull { operation } => {
+            model::Operation::CustomFull { operation, params } => {
                 let name = self.get_global_name(operation)?;
 
                 if name == OP_FUNC_CALL_INDIRECT {
@@ -409,8 +409,7 @@ impl<'a> Context<'a> {
                 }
 
                 let signature = self.get_node_signature(node_id)?;
-                let args = node_data
-                    .params
+                let args = params
                     .iter()
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;

@@ -34,7 +34,6 @@ fn write_node(mut builder: hugr_capnp::node::Builder, node: &model::Node) {
     let _ = builder.set_inputs(model::LinkIndex::unwrap_slice(node.inputs));
     let _ = builder.set_outputs(model::LinkIndex::unwrap_slice(node.outputs));
     write_list!(builder, init_meta, write_meta_item, node.meta);
-    let _ = builder.set_params(model::TermId::unwrap_slice(node.params));
     builder.set_signature(node.signature.map_or(0, |t| t.0 + 1));
 }
 
@@ -48,10 +47,19 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             let _ = builder.set_conditional(model::RegionId::unwrap_slice(branches));
         }
         model::Operation::Tag { tag } => builder.set_tag(*tag),
-        model::Operation::Custom { operation } => builder.set_custom(operation.0),
-        model::Operation::CustomFull { operation } => {
-            builder.set_custom_full(operation.0);
+
+        model::Operation::Custom { operation, params } => {
+            let mut builder = builder.init_custom();
+            builder.set_operation(operation.0);
+            let _ = builder.set_params(model::TermId::unwrap_slice(params));
         }
+
+        model::Operation::CustomFull { operation, params } => {
+            let mut builder = builder.init_custom_full();
+            builder.set_operation(operation.0);
+            let _ = builder.set_params(model::TermId::unwrap_slice(params));
+        }
+
         model::Operation::CallFunc { func } => builder.set_call_func(func.0),
         model::Operation::LoadFunc { func } => builder.set_load_func(func.0),
 

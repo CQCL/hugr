@@ -29,9 +29,8 @@ struct Node {
     operation @0 :Operation;
     inputs @1 :List(LinkIndex);
     outputs @2 :List(LinkIndex);
-    params @3 :List(TermId);
-    meta @4 :List(MetaItem);
-    signature @5 :OptionalTermId;
+    meta @3 :List(MetaItem);
+    signature @4 :OptionalTermId;
 }
 
 struct Operation {
@@ -44,8 +43,8 @@ struct Operation {
         funcDecl @5 :FuncDecl;
         aliasDefn @6 :AliasDefn;
         aliasDecl @7 :AliasDecl;
-        custom @8 :NodeId;
-        customFull @9 :NodeId;
+        custom @8 :Custom;
+        customFull @9 :Custom;
         tag @10 :UInt16;
         tailLoop @11 :RegionId;
         conditional @12 :List(RegionId);
@@ -97,6 +96,11 @@ struct Operation {
         params @1 :List(Param);
         constraints @2 :List(TermId);
         type @3 :TermId;
+    }
+
+    struct Custom {
+        operation @0 :NodeId;
+        params @1 :List(TermId);
     }
 }
 

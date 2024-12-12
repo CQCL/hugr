@@ -321,7 +321,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::Dfg { body },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -337,7 +336,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::Cfg { body },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -353,7 +351,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::Block { body },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -369,7 +366,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::DefineFunc { decl, body },
                     inputs: &[],
                     outputs: &[],
-                    params: &[],
                     meta,
                     signature: None,
                 }
@@ -384,7 +380,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::DeclareFunc { decl },
                     inputs: &[],
                     outputs: &[],
-                    params: &[],
                     meta,
                     signature: None,
                 }
@@ -400,7 +395,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::CallFunc { func },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -416,7 +410,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::LoadFunc { func },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -432,7 +425,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::DefineAlias { decl, value },
                     inputs: &[],
                     outputs: &[],
-                    params: &[],
                     meta,
                     signature: None,
                 }
@@ -447,7 +439,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::DeclareAlias { decl },
                     inputs: &[],
                     outputs: &[],
-                    params: &[],
                     meta,
                     signature: None,
                 }
@@ -470,9 +461,11 @@ impl<'a> ParseContext<'a> {
                     params.push(self.parse_term(token)?);
                 }
 
+                let params = self.bump.alloc_slice_copy(&params);
+
                 let operation = match op_rule {
-                    Rule::term_apply_full => Operation::CustomFull { operation },
-                    Rule::term_apply => Operation::Custom { operation },
+                    Rule::term_apply_full => Operation::CustomFull { operation, params },
+                    Rule::term_apply => Operation::Custom { operation, params },
                     _ => unreachable!(),
                 };
 
@@ -484,7 +477,6 @@ impl<'a> ParseContext<'a> {
                     operation,
                     inputs,
                     outputs,
-                    params: self.bump.alloc_slice_copy(&params),
                     meta,
                     signature,
                 }
@@ -500,7 +492,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::TailLoop { body },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -516,7 +507,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::Conditional { branches },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -532,7 +522,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::Tag { tag },
                     inputs,
                     outputs,
-                    params: &[],
                     meta,
                     signature,
                 }
@@ -547,7 +536,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::DeclareConstructor { decl },
                     inputs: &[],
                     outputs: &[],
-                    params: &[],
                     meta,
                     signature: None,
                 }
@@ -562,7 +550,6 @@ impl<'a> ParseContext<'a> {
                     operation: Operation::DeclareOperation { decl },
                     inputs: &[],
                     outputs: &[],
-                    params: &[],
                     meta,
                     signature: None,
                 }
