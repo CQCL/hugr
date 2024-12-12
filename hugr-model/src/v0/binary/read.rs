@@ -198,6 +198,9 @@ fn read_operation<'a>(
         Which::Import(name) => model::Operation::Import {
             name: bump.alloc_str(name?.to_str()?),
         },
+        Which::Const(value) => model::Operation::Const {
+            value: model::TermId(value),
+        },
     })
 }
 
@@ -274,7 +277,7 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             model::Term::ApplyFull { symbol, args }
         }
 
-        Which::Quote(r#type) => model::Term::Quote {
+        Which::Const(r#type) => model::Term::Const {
             r#type: model::TermId(r#type),
         },
 

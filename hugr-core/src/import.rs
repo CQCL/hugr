@@ -512,6 +512,10 @@ impl<'a> Context<'a> {
 
             model::Operation::DeclareConstructor { .. } => Ok(None),
             model::Operation::DeclareOperation { .. } => Ok(None),
+
+            model::Operation::Const { value } => {
+                todo!()
+            }
         }
     }
 
@@ -901,7 +905,7 @@ impl<'a> Context<'a> {
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
 
-            model::Term::Quote { .. } => Err(error_unsupported!("`(quote ...)` as `TypeParam`")),
+            model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
             model::Term::ListType { item_type } => {
@@ -963,7 +967,7 @@ impl<'a> Context<'a> {
                 arg: value.to_string(),
             }),
 
-            model::Term::Quote { .. } => Ok(TypeArg::Type {
+            model::Term::Const { .. } => Ok(TypeArg::Type {
                 ty: self.import_type(term_id)?,
             }),
             model::Term::Nat(value) => Ok(TypeArg::BoundedNat { n: *value }),
@@ -1094,7 +1098,7 @@ impl<'a> Context<'a> {
             | model::Term::StaticType
             | model::Term::Type
             | model::Term::Constraint
-            | model::Term::Quote { .. }
+            | model::Term::Const { .. }
             | model::Term::Str(_)
             | model::Term::ExtSet { .. }
             | model::Term::List { .. }

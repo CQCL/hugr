@@ -77,7 +77,7 @@ term = {
   | term_static
   | term_constraint
   | term_var
-  | term_quote
+  | term_const
   | term_list
   | term_list_type
   | term_str
@@ -102,7 +102,7 @@ term_constraint   = { "constraint" }
 term_var          = { "?" ~ identifier }
 term_apply_full   = { ("(" ~ "@" ~ symbol ~ term* ~ ")") }
 term_apply        = { symbol | ("(" ~ symbol ~ term* ~ ")") }
-term_quote        = { "(" ~ "quote" ~ term ~ ")" }
+term_const        = { "(" ~ "const" ~ term ~ ")" }
 term_list         = { "[" ~ (spliced_term | term)* ~ "]" }
 term_list_type    = { "(" ~ "list" ~ term ~ ")" }
 term_str          = { string }

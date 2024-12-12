@@ -375,6 +375,12 @@ pub enum Operation<'a> {
         /// The name of the symbol to be imported.
         name: &'a str,
     },
+
+    /// Construct a constant runtime value.
+    Const {
+        /// The value of the constant.
+        value: TermId,
+    },
 }
 
 impl<'a> Operation<'a> {
@@ -559,11 +565,11 @@ pub enum Term<'a> {
         args: &'a [TermId],
     },
 
-    /// Quote a runtime type as a static type.
+    /// Static type of runtime constants.
     ///
-    /// `(quote T) : static` where `T : type`.
-    Quote {
-        /// The runtime type to be quoted.
+    /// `(const T) : static` where `T : type`.
+    Const {
+        /// The runtime type.
         ///
         /// **Type:** `type`
         r#type: TermId,

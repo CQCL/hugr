@@ -370,6 +370,12 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text(*name);
                 this.print_meta(node_data.meta)
             }
+
+            Operation::Const { value } => {
+                this.print_text("const");
+                this.print_term(*value)?;
+                this.print_meta(node_data.meta)
+            }
         })
     }
 
@@ -520,8 +526,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }),
-            Term::Quote { r#type } => self.print_parens(|this| {
-                this.print_text("quote");
+            Term::Const { r#type } => self.print_parens(|this| {
+                this.print_text("const");
                 this.print_term(*r#type)
             }),
             Term::List { .. } => self.print_brackets(|this| this.print_list_parts(term_id)),
