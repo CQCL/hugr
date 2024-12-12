@@ -710,7 +710,14 @@ pub trait Dataflow: Container {
         Ok(op_id)
     }
 
-    /// TODO docs
+    /// Add a [`ops::CallIndirect`] node, calling `function` with signature
+    /// `signature`, with inputs specified by `input_wires`. Returns a handle to
+    /// the corresponding Call node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the
+    /// CallIndirect node.
     fn call_indirect(
         &mut self,
         signature: Signature,
