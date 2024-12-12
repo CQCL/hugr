@@ -290,6 +290,9 @@ fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
 mod test {
     use std::collections::HashMap;
 
+    use hugr_core::extension::simple_op::MakeRegisteredOp as _;
+    use hugr_core::std_extensions::collections::array::{self, array_type_parametric, ArrayOpDef};
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::types::type_param::TypeParam;
     use itertools::Itertools;
 
@@ -297,12 +300,12 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, PRELUDE_ID};
+    use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, PRELUDE_ID, UnwrapBuilder, };
     use hugr_core::extension::ExtensionSet;
     use hugr_core::ops::handle::{FuncID, NodeHandle};
-    use hugr_core::ops::{FuncDefn, Tag};
+    use hugr_core::ops::{DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
-    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeRow};
+    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeRow,         SumType, TypeEnum, };
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
@@ -331,7 +334,7 @@ mod test {
     }
 
     #[test]
-    fn test_module() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_recursion_module() -> Result<(), Box<dyn std::error::Error>> {
         let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
         let mut mb = ModuleBuilder::new();
         let db = {
@@ -424,20 +427,34 @@ mod test {
     }
 
     #[test]
-    fn test_flattening() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_flattening_multiargs_nats() -> Result<(), Box<dyn std::error::Error>> {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
-        let tv0 = || Type::new_var_use(0, TypeBound::Any);
-        let ity = || INT_TYPES[3].clone();
+        let tv = |i| Type::new_var_use(i, TypeBound::Copyable);
+        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
+        let sa = |n| TypeArg::BoundedNat { n };
 
-        let pf_any = |ins, outs| PolyFuncType::new([TypeBound::Any.into()], prelusig(ins, outs));
+        let n: u64 = 5;
+        let mut outer = FunctionBuilder::new(
+            "mainish",
+            prelusig(
+                array_type_parametric(sa(n), array_type_parametric(sa(2), usize_t()).unwrap()).unwrap(),
+                vec![usize_t(); 2],
+            ),
+        )?;
 
-        let mut outer = FunctionBuilder::new("mainish", prelusig(ity(), usize_t()))?;
+        let arr2u = || array_type_parametric(sa(2), usize_t()).unwrap();
+        let pf1t = PolyFuncType::new(
+            [TypeParam::max_nat()],
+            prelusig(array_type_parametric(sv(0), arr2u()).unwrap(), usize_t()),
+        );
+        let mut pf1 = outer.define_function("pf1", pf1t)?;
 
-        let pfty = pf_any(vec![tv0()], vec![tv0(), usize_t(), usize_t()]);
-        let mut pf1 = outer.define_function("pf1", pfty)?;
-
-        let mut pf2 = pf1.define_function("pf2", pf_any(vec![tv0()], vec![tv0(), usize_t()]))?;
+        let pf2t = PolyFuncType::new(
+            [TypeParam::max_nat(), TypeBound::Copyable.into()],
+            prelusig(vec![array_type_parametric(sv(0), tv(1)).unwrap()], tv(1)),
+        );
+        let mut pf2 = pf1.define_function("pf2", pf2t)?;
 
         let mono_func = {
             let mut fb = pf2.define_function("get_usz", prelusig(vec![], usize_t()))?;
@@ -446,25 +463,43 @@ mod test {
         };
         let pf2 = {
             let [inw] = pf2.input_wires_arr();
-            let [usz] = pf2.call(mono_func.handle(), &[], [])?.outputs_arr();
-            pf2.finish_with_outputs([inw, usz])?
+            let [idx] = pf2.call(mono_func.handle(), &[], [])?.outputs_arr();
+            let op_def = array::EXTENSION.get_op("get").unwrap();
+            let op =
+                hugr_core::ops::ExtensionOp::new(op_def.clone(), vec![sv(0), tv(1).into()], &STD_REG)?;
+            let [get] = pf2.add_dataflow_op(op, [inw, idx])?.outputs_arr();
+            let [got] = pf2.build_unwrap_sum(&STD_REG, 1, SumType::new([vec![], vec![tv(1)]]), get)?;
+            pf2.finish_with_outputs([got])?
         };
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
-        let [a, u] = pf1
-            .call(pf2.handle(), &[tv0().into()], pf1.input_wires())?
-            .outputs_arr();
-        let [u1, u2] = pf1
-            .call(pf2.handle(), &[usize_t().into()], [u])?
-            .outputs_arr();
-        let pf1 = pf1.finish_with_outputs([a, u1, u2])?;
+        let inner = pf1.call(
+            pf2.handle(),
+            &[sv(0), arr2u().into()],
+            pf1.input_wires(),
+        )?;
+        let elem = pf1.call(
+            pf2.handle(),
+            &[TypeArg::BoundedNat { n: 2 }, usize_t().into()],
+            inner.outputs(),
+        )?;
+        let pf1 = pf1.finish_with_outputs(elem.outputs())?;
         // Outer: two calls to pf1 with different TypeArgs
-        let [_, u, _] = outer
-            .call(pf1.handle(), &[ity().into()], outer.input_wires())?
+        let [e1] = outer
+            .call(pf1.handle(), &[sa(n)], outer.input_wires())?
             .outputs_arr();
-        let [_, u, _] = outer
-            .call(pf1.handle(), &[usize_t().into()], [u])?
+        let popleft = ArrayOpDef::pop_left.to_concrete(arr2u(), n);
+        let ar2 = outer.add_dataflow_op(popleft.clone(), outer.input_wires())?;
+        let sig = popleft.to_extension_op().unwrap().signature().into_owned();
+        let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
+            panic!()
+        };
+        let [_, ar2_unwrapped] = outer
+            .build_unwrap_sum(&STD_REG, 1, st.clone(), ar2.out_wire(0))
+            .unwrap();
+        let [e2] = outer
+            .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])?
             .outputs_arr();
-        let hugr = outer.finish_hugr_with_outputs([u])?;
+        let hugr = outer.finish_hugr_with_outputs([e1, e2])?;
 
         let mono_hugr = monomorphize(hugr);
         mono_hugr.validate()?;
@@ -473,10 +508,11 @@ mod test {
         assert_eq!(
             funcs.keys().copied().sorted().collect_vec(),
             vec![
-                &mangle_name("pf1", &[ity().into()]),
-                &mangle_name("pf1", &[usize_t().into()]),
-                &mangle_name(&pf2_name, &[ity().into()]), // from pf1<int>
-                &mangle_name(&pf2_name, &[usize_t().into()]), // from pf1<int> and (2*)pf1<usize_t>
+                &mangle_name("pf1", &[TypeArg::BoundedNat { n: 5 }]),
+                &mangle_name("pf1", &[TypeArg::BoundedNat { n: 4 }]),
+                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 5 }, arr2u().into()]), // from pf1<5>
+                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 4 }, arr2u().into()]), // from pf1<4>
+                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 2 }, usize_t().into()]), // from both pf1<4> and <5>
                 &mangle_inner_func(&pf2_name, "get_usz"),
                 "mainish"
             ]
