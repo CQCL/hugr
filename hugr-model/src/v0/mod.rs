@@ -249,8 +249,6 @@ pub struct Node<'a> {
     pub outputs: &'a [LinkIndex],
     /// The parameters of the node.
     pub params: &'a [TermId],
-    /// The regions of the node.
-    pub regions: &'a [RegionId],
     /// The meta information attached to the node.
     pub meta: &'a [MetaItem<'a>],
     /// The signature of the node.
@@ -269,15 +267,17 @@ pub enum Operation<'a> {
     #[default]
     Invalid,
     /// Data flow graphs.
-    Dfg,
+    Dfg { body: RegionId },
     /// Control flow graphs.
-    Cfg,
+    Cfg { body: RegionId },
     /// Basic blocks.
-    Block,
+    Block { body: RegionId },
     /// Function definitions.
     DefineFunc {
         /// The declaration of the function to be defined.
         decl: &'a FuncDecl<'a>,
+        /// The body of the function.
+        body: RegionId,
     },
     /// Function declarations.
     DeclareFunc {
@@ -338,7 +338,10 @@ pub enum Operation<'a> {
     /// - **Outputs**: `outputs` + `rest`
     /// - **Sources**: `inputs` + `rest`
     /// - **Targets**: `(adt [inputs outputs])` + `rest`
-    TailLoop,
+    TailLoop {
+        /// The body of the loop.
+        body: RegionId,
+    },
 
     /// Conditional operation.
     ///
@@ -346,7 +349,10 @@ pub enum Operation<'a> {
     ///
     /// - **Inputs**: `[(adt inputs)]` + `context`
     /// - **Outputs**: `outputs`
-    Conditional,
+    Conditional {
+        /// The branches of the loop.
+        branches: &'a [RegionId],
+    },
 
     /// Create an ADT value from a sequence of inputs.
     Tag {
@@ -387,7 +393,7 @@ impl<'a> Operation<'a> {
     /// Returns the symbol introduced by the operation, if any.
     pub fn symbol(&self) -> Option<&'a str> {
         match self {
-            Operation::DefineFunc { decl } => Some(decl.name),
+            Operation::DefineFunc { decl, .. } => Some(decl.name),
             Operation::DeclareFunc { decl } => Some(decl.name),
             Operation::DefineAlias { decl, .. } => Some(decl.name),
             Operation::DeclareAlias { decl } => Some(decl.name),

@@ -15,8 +15,8 @@ pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<model::Mo
 
 /// Read a list of structs from a reader into a slice allocated through the bump allocator.
 macro_rules! read_list {
-    ($bump:expr, $reader:expr, $get:ident, $read:expr) => {{
-        let mut __list_reader = $reader.$get()?;
+    ($bump:expr, $reader:expr, $read:expr) => {{
+        let mut __list_reader = $reader;
         let mut __list = BumpVec::with_capacity_in(__list_reader.len() as _, $bump);
         for __item_reader in __list_reader.iter() {
             __list.push($read($bump, __item_reader)?);
@@ -27,8 +27,8 @@ macro_rules! read_list {
 
 /// Read a list of scalars from a reader into a slice allocated through the bump allocator.
 macro_rules! read_scalar_list {
-    ($bump:expr, $reader:expr, $get:ident, $wrap:path) => {{
-        let mut __list_reader = $reader.$get()?;
+    ($bump:expr, $reader:expr, $wrap:path) => {{
+        let mut __list_reader = $reader;
         let mut __list = BumpVec::with_capacity_in(__list_reader.len() as _, $bump);
         for __item in __list_reader.iter() {
             __list.push($wrap(__item));
@@ -71,11 +71,10 @@ fn read_module<'a>(
 
 fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult<model::Node<'a>> {
     let operation = read_operation(bump, reader.get_operation()?)?;
-    let inputs = read_scalar_list!(bump, reader, get_inputs, model::LinkIndex);
-    let outputs = read_scalar_list!(bump, reader, get_outputs, model::LinkIndex);
-    let params = read_scalar_list!(bump, reader, get_params, model::TermId);
-    let regions = read_scalar_list!(bump, reader, get_regions, model::RegionId);
-    let meta = read_list!(bump, reader, get_meta, read_meta_item);
+    let inputs = read_scalar_list!(bump, reader.get_inputs()?, model::LinkIndex);
+    let outputs = read_scalar_list!(bump, reader.get_outputs()?, model::LinkIndex);
+    let params = read_scalar_list!(bump, reader.get_params()?, model::TermId);
+    let meta = read_list!(bump, reader.get_meta()?, read_meta_item);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
     Ok(model::Node {
@@ -83,7 +82,6 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
         inputs,
         outputs,
         params,
-        regions,
         meta,
         signature,
     })
@@ -96,28 +94,35 @@ fn read_operation<'a>(
     use hugr_capnp::operation::Which;
     Ok(match reader.which()? {
         Which::Invalid(()) => model::Operation::Invalid,
-        Which::Dfg(()) => model::Operation::Dfg,
-        Which::Cfg(()) => model::Operation::Cfg,
-        Which::Block(()) => model::Operation::Block,
+        Which::Dfg(body) => model::Operation::Dfg {
+            body: model::RegionId(body),
+        },
+        Which::Cfg(body) => model::Operation::Cfg {
+            body: model::RegionId(body),
+        },
+        Which::Block(body) => model::Operation::Block {
+            body: model::RegionId(body),
+        },
         Which::FuncDefn(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
+            let params = read_list!(bump, reader.get_params()?, read_param);
+            let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
             let signature = model::TermId(reader.get_signature());
+            let body = model::RegionId(reader.get_body());
             let decl = bump.alloc(model::FuncDecl {
                 name,
                 params,
                 constraints,
                 signature,
             });
-            model::Operation::DefineFunc { decl }
+            model::Operation::DefineFunc { decl, body }
         }
         Which::FuncDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
+            let params = read_list!(bump, reader.get_params()?, read_param);
+            let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
             let signature = model::TermId(reader.get_signature());
             let decl = bump.alloc(model::FuncDecl {
                 name,
@@ -130,7 +135,7 @@ fn read_operation<'a>(
         Which::AliasDefn(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
+            let params = read_list!(bump, reader.get_params()?, read_param);
             let r#type = model::TermId(reader.get_type());
             let value = model::TermId(reader.get_value());
             let decl = bump.alloc(model::AliasDecl {
@@ -143,7 +148,7 @@ fn read_operation<'a>(
         Which::AliasDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
+            let params = read_list!(bump, reader.get_params()?, read_param);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::AliasDecl {
                 name,
@@ -155,8 +160,8 @@ fn read_operation<'a>(
         Which::ConstructorDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
+            let params = read_list!(bump, reader.get_params()?, read_param);
+            let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::ConstructorDecl {
                 name,
@@ -169,8 +174,8 @@ fn read_operation<'a>(
         Which::OperationDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
+            let params = read_list!(bump, reader.get_params()?, read_param);
+            let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::OperationDecl {
                 name,
@@ -187,8 +192,13 @@ fn read_operation<'a>(
             operation: model::NodeId(operation),
         },
         Which::Tag(tag) => model::Operation::Tag { tag },
-        Which::TailLoop(()) => model::Operation::TailLoop,
-        Which::Conditional(()) => model::Operation::Conditional,
+        Which::TailLoop(body) => model::Operation::TailLoop {
+            body: model::RegionId(body),
+        },
+        Which::Conditional(branches) => {
+            let branches = read_scalar_list!(bump, branches?, model::RegionId);
+            model::Operation::Conditional { branches }
+        }
         Which::CallFunc(func) => model::Operation::CallFunc {
             func: model::TermId(func),
         },
@@ -214,10 +224,10 @@ fn read_region<'a>(
         hugr_capnp::RegionKind::Module => model::RegionKind::Module,
     };
 
-    let sources = read_scalar_list!(bump, reader, get_sources, model::LinkIndex);
-    let targets = read_scalar_list!(bump, reader, get_targets, model::LinkIndex);
-    let children = read_scalar_list!(bump, reader, get_children, model::NodeId);
-    let meta = read_list!(bump, reader, get_meta, read_meta_item);
+    let sources = read_scalar_list!(bump, reader.get_sources()?, model::LinkIndex);
+    let targets = read_scalar_list!(bump, reader.get_targets()?, model::LinkIndex);
+    let children = read_scalar_list!(bump, reader.get_children()?, model::NodeId);
+    let meta = read_list!(bump, reader.get_meta()?, read_meta_item);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
     let scope = if reader.has_scope() {
@@ -266,14 +276,14 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::Apply(reader) => {
             let reader = reader?;
             let symbol = model::NodeId(reader.get_symbol());
-            let args = read_scalar_list!(bump, reader, get_args, model::TermId);
+            let args = read_scalar_list!(bump, reader.get_args()?, model::TermId);
             model::Term::Apply { symbol, args }
         }
 
         Which::ApplyFull(reader) => {
             let reader = reader?;
             let symbol = model::NodeId(reader.get_symbol());
-            let args = read_scalar_list!(bump, reader, get_args, model::TermId);
+            let args = read_scalar_list!(bump, reader.get_args()?, model::TermId);
             model::Term::ApplyFull { symbol, args }
         }
 
@@ -283,7 +293,7 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
 
         Which::List(reader) => {
             let reader = reader?;
-            let parts = read_list!(bump, reader, get_items, read_list_part);
+            let parts = read_list!(bump, reader.get_items()?, read_list_part);
             model::Term::List { parts }
         }
 
@@ -293,7 +303,7 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
 
         Which::ExtSet(reader) => {
             let reader = reader?;
-            let parts = read_list!(bump, reader, get_items, read_ext_set_part);
+            let parts = read_list!(bump, reader.get_items()?, read_ext_set_part);
             model::Term::ExtSet { parts }
         }
 

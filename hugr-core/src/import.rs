@@ -268,7 +268,7 @@ impl<'a> Context<'a> {
         func_node: model::NodeId,
     ) -> Result<PolyFuncType, ImportError> {
         let decl = match self.get_node(func_node)?.operation {
-            model::Operation::DefineFunc { decl } => decl,
+            model::Operation::DefineFunc { decl, .. } => decl,
             model::Operation::DeclareFunc { decl } => decl,
             _ => return Err(model::ModelError::UnexpectedOperation(func_node).into()),
         };
@@ -297,38 +297,28 @@ impl<'a> Context<'a> {
 
         match node_data.operation {
             model::Operation::Invalid => Err(model::ModelError::InvalidOperation(node_id).into()),
-            model::Operation::Dfg => {
+            model::Operation::Dfg { body } => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::DFG(DFG { signature });
                 let node = self.make_node(node_id, optype, parent)?;
-
-                let [region] = node_data.regions else {
-                    return Err(model::ModelError::InvalidRegions(node_id).into());
-                };
-
-                self.import_dfg_region(node_id, *region, node)?;
+                self.import_dfg_region(node_id, body, node)?;
                 Ok(Some(node))
             }
 
-            model::Operation::Cfg => {
+            model::Operation::Cfg { body } => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::CFG(CFG { signature });
                 let node = self.make_node(node_id, optype, parent)?;
-
-                let [region] = node_data.regions else {
-                    return Err(model::ModelError::InvalidRegions(node_id).into());
-                };
-
-                self.import_cfg_region(node_id, *region, node)?;
+                self.import_cfg_region(node_id, body, node)?;
                 Ok(Some(node))
             }
 
-            model::Operation::Block => {
+            model::Operation::Block { .. } => {
                 let node = self.import_cfg_block(node_id, parent)?;
                 Ok(Some(node))
             }
 
-            model::Operation::DefineFunc { decl } => {
+            model::Operation::DefineFunc { decl, body } => {
                 self.import_poly_func_type(node_id, *decl, |ctx, signature| {
                     let optype = OpType::FuncDefn(FuncDefn {
                         name: decl.name.to_string(),
@@ -337,11 +327,7 @@ impl<'a> Context<'a> {
 
                     let node = ctx.make_node(node_id, optype, parent)?;
 
-                    let [region] = node_data.regions else {
-                        return Err(model::ModelError::InvalidRegions(node_id).into());
-                    };
-
-                    ctx.import_dfg_region(node_id, *region, node)?;
+                    ctx.import_dfg_region(node_id, body, node)?;
 
                     Ok(Some(node))
                 })
@@ -403,11 +389,11 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::TailLoop => {
+            model::Operation::TailLoop { .. } => {
                 let node = self.import_tail_loop(node_id, parent)?;
                 Ok(Some(node))
             }
-            model::Operation::Conditional => {
+            model::Operation::Conditional { .. } => {
                 let node = self.import_conditional(node_id, parent)?;
                 Ok(Some(node))
             }
@@ -445,12 +431,6 @@ impl<'a> Context<'a> {
                 ));
 
                 let node = self.make_node(node_id, optype, parent)?;
-
-                match node_data.regions {
-                    [] => {}
-                    [region] => self.import_dfg_region(node_id, *region, node)?,
-                    _ => return Err(error_unsupported!("multiple regions in custom operation")),
-                }
 
                 Ok(Some(node))
             }
@@ -603,15 +583,15 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
-        debug_assert_eq!(node_data.operation, model::Operation::TailLoop);
 
-        let [region] = node_data.regions else {
-            return Err(model::ModelError::InvalidRegions(node_id).into());
+        let model::Operation::TailLoop { body } = node_data.operation else {
+            unreachable!();
         };
-        let region_data = self.get_region(*region)?;
+
+        let body_data = self.get_region(body)?;
 
         let (_, region_outputs, _) = self.get_func_type(
-            region_data
+            body_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
@@ -640,7 +620,7 @@ impl<'a> Context<'a> {
 
         let node = self.make_node(node_id, optype, parent)?;
 
-        self.import_dfg_region(node_id, *region, node)?;
+        self.import_dfg_region(node_id, body, node)?;
         Ok(node)
     }
 
@@ -650,7 +630,11 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
-        debug_assert_eq!(node_data.operation, model::Operation::Conditional);
+
+        let model::Operation::Conditional { branches } = node_data.operation else {
+            unreachable!();
+        };
+
         let (inputs, outputs, _) = self.get_func_type(
             node_data
                 .signature
@@ -668,10 +652,10 @@ impl<'a> Context<'a> {
 
         let node = self.make_node(node_id, optype, parent)?;
 
-        for region in node_data.regions {
-            let region_data = self.get_region(*region)?;
+        for branch in branches {
+            let branch_data = self.get_region(*branch)?;
             let signature = self.import_func_type(
-                region_data
+                branch_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
             )?;
@@ -680,7 +664,7 @@ impl<'a> Context<'a> {
                 .hugr
                 .add_node_with_parent(node, OpType::Case(Case { signature }));
 
-            self.import_dfg_region(node_id, *region, case_node)?;
+            self.import_dfg_region(node_id, *branch, case_node)?;
         }
 
         Ok(node)
@@ -820,14 +804,14 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
-        debug_assert_eq!(node_data.operation, model::Operation::Block);
 
-        let [region] = node_data.regions else {
-            return Err(model::ModelError::InvalidRegions(node_id).into());
+        let model::Operation::Block { body } = node_data.operation else {
+            unreachable!();
         };
-        let region_data = self.get_region(*region)?;
+
+        let body_data = self.get_region(body)?;
         let (inputs, outputs, extensions) = self.get_func_type(
-            region_data
+            body_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
@@ -843,7 +827,7 @@ impl<'a> Context<'a> {
         });
         let node = self.make_node(node_id, optype, parent)?;
 
-        self.import_dfg_region(node_id, *region, node)?;
+        self.import_dfg_region(node_id, body, node)?;
         Ok(node)
     }
 

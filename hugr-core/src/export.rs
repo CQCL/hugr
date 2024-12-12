@@ -245,7 +245,6 @@ impl<'a> Context<'a> {
         // the node id. This is necessary to establish the correct node id for the
         // local scope introduced by some operations. We will overwrite this node later.
         let mut params: &[_] = &[];
-        let mut regions: &[_] = &[];
 
         let optype = self.hugr.get_optype(node);
 
@@ -262,15 +261,13 @@ impl<'a> Context<'a> {
 
             OpType::DFG(dfg) => {
                 let extensions = self.export_ext_set(&dfg.signature.extension_reqs);
-                regions = self
-                    .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
-                model::Operation::Dfg
+                let body = self.export_dfg(node, extensions, false);
+                model::Operation::Dfg { body }
             }
 
             OpType::CFG(_) => {
-                regions = self.bump.alloc_slice_copy(&[self.export_cfg(node, false)]);
-                model::Operation::Cfg
+                let body = self.export_cfg(node, false);
+                model::Operation::Cfg { body }
             }
 
             OpType::ExitBlock(_) => {
@@ -283,10 +280,8 @@ impl<'a> Context<'a> {
 
             OpType::DataflowBlock(block) => {
                 let extensions = self.export_ext_set(&block.extension_delta);
-                regions = self
-                    .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
-                model::Operation::Block
+                let body = self.export_dfg(node, extensions, false);
+                model::Operation::Block { body }
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
@@ -299,10 +294,8 @@ impl<'a> Context<'a> {
                     signature,
                 });
                 let extensions = this.export_ext_set(&func.signature.body().extension_reqs);
-                regions = this
-                    .bump
-                    .alloc_slice_copy(&[this.export_dfg(node, extensions, true)]);
-                model::Operation::DefineFunc { decl }
+                let body = this.export_dfg(node, extensions, true);
+                model::Operation::DefineFunc { decl, body }
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
@@ -376,15 +369,13 @@ impl<'a> Context<'a> {
 
             OpType::TailLoop(tail_loop) => {
                 let extensions = self.export_ext_set(&tail_loop.extension_delta);
-                regions = self
-                    .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, extensions, false)]);
-                model::Operation::TailLoop
+                let body = self.export_dfg(node, extensions, false);
+                model::Operation::TailLoop { body }
             }
 
             OpType::Conditional(_) => {
-                regions = self.export_conditional_regions(node);
-                model::Operation::Conditional
+                let branches = self.export_conditional_regions(node);
+                model::Operation::Conditional { branches }
             }
 
             // Opaque/extension operations should in the future support having multiple different
@@ -397,16 +388,6 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                // PERFORMANCE: Currently the API does not appear to allow to get the extension
-                // set without copying it.
-                // NOTE: We assume here that the extension set of the dfg region must be the same
-                // as that of the node. This might change in the future.
-                let extensions = self.export_ext_set(&op.extension_delta());
-
-                if let Some(region) = self.export_dfg_if_present(node, extensions, true) {
-                    regions = self.bump.alloc_slice_copy(&[region]);
-                }
-
                 model::Operation::CustomFull { operation }
             }
 
@@ -416,16 +397,6 @@ impl<'a> Context<'a> {
                 params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
-
-                // PERFORMANCE: Currently the API does not appear to allow to get the extension
-                // set without copying it.
-                // NOTE: We assume here that the extension set of the dfg region must be the same
-                // as that of the node. This might change in the future.
-                let extensions = self.export_ext_set(&op.extension_delta());
-
-                if let Some(region) = self.export_dfg_if_present(node, extensions, true) {
-                    regions = self.bump.alloc_slice_copy(&[region]);
-                }
 
                 model::Operation::CustomFull { operation }
             }
@@ -464,7 +435,6 @@ impl<'a> Context<'a> {
             inputs,
             outputs,
             params,
-            regions,
             meta,
             signature,
         };
@@ -496,7 +466,6 @@ impl<'a> Context<'a> {
                     inputs: &[],
                     outputs: &[],
                     params: &[],
-                    regions: &[],
                     meta: &[],
                     signature: None,
                 }))

@@ -316,13 +316,12 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner, false)?;
+                let body = self.parse_region(&mut inner, false)?;
                 Node {
-                    operation: Operation::Dfg,
+                    operation: Operation::Dfg { body },
                     inputs,
                     outputs,
                     params: &[],
-                    regions,
                     meta,
                     signature,
                 }
@@ -333,13 +332,12 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner, false)?;
+                let body = self.parse_region(&mut inner, false)?;
                 Node {
-                    operation: Operation::Cfg,
+                    operation: Operation::Cfg { body },
                     inputs,
                     outputs,
                     params: &[],
-                    regions,
                     meta,
                     signature,
                 }
@@ -350,13 +348,12 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner, false)?;
+                let body = self.parse_region(&mut inner, false)?;
                 Node {
-                    operation: Operation::Block,
+                    operation: Operation::Block { body },
                     inputs,
                     outputs,
                     params: &[],
-                    regions,
                     meta,
                     signature,
                 }
@@ -366,14 +363,13 @@ impl<'a> ParseContext<'a> {
                 self.vars.enter(node);
                 let decl = self.parse_func_header(inner.next().unwrap())?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner, true)?;
+                let body = self.parse_region(&mut inner, true)?;
                 self.vars.exit();
                 Node {
-                    operation: Operation::DefineFunc { decl },
+                    operation: Operation::DefineFunc { decl, body },
                     inputs: &[],
                     outputs: &[],
                     params: &[],
-                    regions,
                     meta,
                     signature: None,
                 }
@@ -389,7 +385,6 @@ impl<'a> ParseContext<'a> {
                     inputs: &[],
                     outputs: &[],
                     params: &[],
-                    regions: &[],
                     meta,
                     signature: None,
                 }
@@ -406,7 +401,6 @@ impl<'a> ParseContext<'a> {
                     inputs,
                     outputs,
                     params: &[],
-                    regions: &[],
                     meta,
                     signature,
                 }
@@ -423,7 +417,6 @@ impl<'a> ParseContext<'a> {
                     inputs,
                     outputs,
                     params: &[],
-                    regions: &[],
                     meta,
                     signature,
                 }
@@ -440,7 +433,6 @@ impl<'a> ParseContext<'a> {
                     inputs: &[],
                     outputs: &[],
                     params: &[],
-                    regions: &[],
                     meta,
                     signature: None,
                 }
@@ -456,7 +448,6 @@ impl<'a> ParseContext<'a> {
                     inputs: &[],
                     outputs: &[],
                     params: &[],
-                    regions: &[],
                     meta,
                     signature: None,
                 }
@@ -489,13 +480,11 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner, true)?;
                 Node {
                     operation,
                     inputs,
                     outputs,
                     params: self.bump.alloc_slice_copy(&params),
-                    regions,
                     meta,
                     signature,
                 }
@@ -506,13 +495,12 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner, true)?;
+                let body = self.parse_region(&mut inner, true)?;
                 Node {
-                    operation: Operation::TailLoop,
+                    operation: Operation::TailLoop { body },
                     inputs,
                     outputs,
                     params: &[],
-                    regions,
                     meta,
                     signature,
                 }
@@ -523,13 +511,12 @@ impl<'a> ParseContext<'a> {
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
-                let regions = self.parse_regions(&mut inner, false)?;
+                let branches = self.parse_regions(&mut inner, false)?;
                 Node {
-                    operation: Operation::Conditional,
+                    operation: Operation::Conditional { branches },
                     inputs,
                     outputs,
                     params: &[],
-                    regions,
                     meta,
                     signature,
                 }
@@ -546,7 +533,6 @@ impl<'a> ParseContext<'a> {
                     inputs,
                     outputs,
                     params: &[],
-                    regions: &[],
                     meta,
                     signature,
                 }
@@ -562,7 +548,6 @@ impl<'a> ParseContext<'a> {
                     inputs: &[],
                     outputs: &[],
                     params: &[],
-                    regions: &[],
                     meta,
                     signature: None,
                 }
@@ -578,7 +563,6 @@ impl<'a> ParseContext<'a> {
                     inputs: &[],
                     outputs: &[],
                     params: &[],
-                    regions: &[],
                     meta,
                     signature: None,
                 }
@@ -596,13 +580,20 @@ impl<'a> ParseContext<'a> {
         closed: bool,
     ) -> ParseResult<&'a [RegionId]> {
         let mut regions = Vec::new();
-        for pair in filter_rule(pairs, Rule::region) {
-            regions.push(self.parse_region(pair, closed)?);
+
+        while let Some(pair) = pairs.peek() {
+            if pair.as_rule() != Rule::region {
+                break;
+            }
+
+            regions.push(self.parse_region(pairs, closed)?);
         }
+
         Ok(self.bump.alloc_slice_copy(&regions))
     }
 
-    fn parse_region(&mut self, pair: Pair<'a, Rule>, closed: bool) -> ParseResult<RegionId> {
+    fn parse_region(&mut self, pairs: &mut Pairs<'a, Rule>, closed: bool) -> ParseResult<RegionId> {
+        let pair = pairs.next().unwrap();
         debug_assert_eq!(pair.as_rule(), Rule::region);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();

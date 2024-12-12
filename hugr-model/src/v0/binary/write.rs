@@ -35,17 +35,18 @@ fn write_node(mut builder: hugr_capnp::node::Builder, node: &model::Node) {
     let _ = builder.set_outputs(model::LinkIndex::unwrap_slice(node.outputs));
     write_list!(builder, init_meta, write_meta_item, node.meta);
     let _ = builder.set_params(model::TermId::unwrap_slice(node.params));
-    let _ = builder.set_regions(model::RegionId::unwrap_slice(node.regions));
     builder.set_signature(node.signature.map_or(0, |t| t.0 + 1));
 }
 
 fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &model::Operation) {
     match operation {
-        model::Operation::Dfg => builder.set_dfg(()),
-        model::Operation::Cfg => builder.set_cfg(()),
-        model::Operation::Block => builder.set_block(()),
-        model::Operation::TailLoop => builder.set_tail_loop(()),
-        model::Operation::Conditional => builder.set_conditional(()),
+        model::Operation::Dfg { body } => builder.set_dfg(body.0),
+        model::Operation::Cfg { body } => builder.set_cfg(body.0),
+        model::Operation::Block { body } => builder.set_block(body.0),
+        model::Operation::TailLoop { body } => builder.set_tail_loop(body.0),
+        model::Operation::Conditional { branches } => {
+            let _ = builder.set_conditional(model::RegionId::unwrap_slice(branches));
+        }
         model::Operation::Tag { tag } => builder.set_tag(*tag),
         model::Operation::Custom { operation } => builder.set_custom(operation.0),
         model::Operation::CustomFull { operation } => {
@@ -54,12 +55,13 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
         model::Operation::CallFunc { func } => builder.set_call_func(func.0),
         model::Operation::LoadFunc { func } => builder.set_load_func(func.0),
 
-        model::Operation::DefineFunc { decl } => {
+        model::Operation::DefineFunc { decl, body } => {
             let mut builder = builder.init_func_defn();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
             let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_signature(decl.signature.0);
+            builder.set_body(body.0);
         }
         model::Operation::DeclareFunc { decl } => {
             let mut builder = builder.init_func_decl();

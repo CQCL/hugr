@@ -30,26 +30,25 @@ struct Node {
     inputs @1 :List(LinkIndex);
     outputs @2 :List(LinkIndex);
     params @3 :List(TermId);
-    regions @4 :List(RegionId);
-    meta @5 :List(MetaItem);
-    signature @6 :OptionalTermId;
+    meta @4 :List(MetaItem);
+    signature @5 :OptionalTermId;
 }
 
 struct Operation {
     union {
         invalid @0 :Void;
-        dfg @1 :Void;
-        cfg @2 :Void;
-        block @3 :Void;
-        funcDefn @4 :FuncDecl;
+        dfg @1 :RegionId;
+        cfg @2 :RegionId;
+        block @3 :RegionId;
+        funcDefn @4 :FuncDefn;
         funcDecl @5 :FuncDecl;
         aliasDefn @6 :AliasDefn;
         aliasDecl @7 :AliasDecl;
         custom @8 :NodeId;
         customFull @9 :NodeId;
         tag @10 :UInt16;
-        tailLoop @11 :Void;
-        conditional @12 :Void;
+        tailLoop @11 :RegionId;
+        conditional @12 :List(RegionId);
         callFunc @13 :TermId;
         loadFunc @14 :TermId;
         constructorDecl @15 :ConstructorDecl;
@@ -63,6 +62,7 @@ struct Operation {
         params @1 :List(Param);
         constraints @2 :List(TermId);
         signature @3 :TermId;
+        body @4 :RegionId;
     }
 
     struct FuncDecl {
