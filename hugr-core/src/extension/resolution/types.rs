@@ -225,7 +225,7 @@ fn collect_typearg_exts(
 ///
 /// # Attributes
 ///
-/// - `arg`: The type argument to collect the extensions from.
+/// - `value`: The value to collect the extensions from.
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
