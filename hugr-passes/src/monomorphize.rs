@@ -137,7 +137,6 @@ fn mono_scan(
                 )
             }
             OpType::LoadFunction(lf) => {
-                eprintln!("{lf:?}");
                 let mono_sig = lf.instantiation.clone();
                 (
                     &lf.type_args,
