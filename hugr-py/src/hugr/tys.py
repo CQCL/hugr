@@ -443,7 +443,7 @@ class FunctionType(Type):
 
     input: TypeRow
     output: TypeRow
-    extension_reqs: ExtensionSet = field(default_factory=ExtensionSet)
+    runtime_reqs: ExtensionSet = field(default_factory=ExtensionSet)
 
     def type_bound(self) -> TypeBound:
         return TypeBound.Copyable
@@ -452,7 +452,7 @@ class FunctionType(Type):
         return stys.FunctionType(
             input=ser_it(self.input),
             output=ser_it(self.output),
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
         )
 
     @classmethod
@@ -467,7 +467,7 @@ class FunctionType(Type):
 
     @classmethod
     def endo(
-        cls, tys: TypeRow, extension_reqs: ExtensionSet | None = None
+        cls, tys: TypeRow, runtime_reqs: ExtensionSet | None = None
     ) -> FunctionType:
         """Function type with the same input and output types.
 
@@ -475,9 +475,7 @@ class FunctionType(Type):
             >>> FunctionType.endo([Qubit])
             FunctionType([Qubit], [Qubit])
         """
-        return cls(
-            input=tys, output=tys, extension_reqs=extension_reqs or ExtensionSet()
-        )
+        return cls(input=tys, output=tys, runtime_reqs=runtime_reqs or ExtensionSet())
 
     def flip(self) -> FunctionType:
         """Return a new function type with input and output types swapped.
@@ -496,15 +494,15 @@ class FunctionType(Type):
         return FunctionType(
             input=[ty.resolve(registry) for ty in self.input],
             output=[ty.resolve(registry) for ty in self.output],
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
         )
 
-    def with_extension_reqs(self, extension_reqs: ExtensionSet) -> FunctionType:
+    def with_runtime_reqs(self, runtime_reqs: ExtensionSet) -> FunctionType:
         """Adds a list of extension requirements to the function type, and
         returns the new signature.
         """
-        exts = set(self.extension_reqs)
-        exts = exts.union(extension_reqs)
+        exts = set(self.runtime_reqs)
+        exts = exts.union(runtime_reqs)
         return FunctionType(self.input, self.output, [*exts])
 
     def __str__(self) -> str:
@@ -536,13 +534,13 @@ class PolyFuncType(Type):
             body=self.body.resolve(registry),
         )
 
-    def with_extension_reqs(self, extension_reqs: ExtensionSet) -> PolyFuncType:
+    def with_runtime_reqs(self, runtime_reqs: ExtensionSet) -> PolyFuncType:
         """Adds a list of extension requirements to the function type, and
         returns the new signature.
         """
         return PolyFuncType(
             params=self.params,
-            body=self.body.with_extension_reqs(extension_reqs),
+            body=self.body.with_runtime_reqs(runtime_reqs),
         )
 
     def __str__(self) -> str:

@@ -308,17 +308,17 @@ class FunctionType(BaseType):
     input: TypeRow  # Value inputs of the function.
     output: TypeRow  # Value outputs of the function.
     # The extension requirements which are added by the operation
-    extension_reqs: ExtensionSet = Field(default_factory=ExtensionSet)
+    runtime_reqs: ExtensionSet = Field(default_factory=ExtensionSet)
 
     @classmethod
     def empty(cls) -> FunctionType:
-        return FunctionType(input=[], output=[], extension_reqs=[])
+        return FunctionType(input=[], output=[], runtime_reqs=[])
 
     def deserialize(self) -> tys.FunctionType:
         return tys.FunctionType(
             input=deser_it(self.input),
             output=deser_it(self.output),
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
         )
 
     model_config = ConfigDict(

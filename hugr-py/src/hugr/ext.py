@@ -267,8 +267,8 @@ class Extension:
     name: ExtensionId
     #: The version of the extension.
     version: Version
-    #: Extensions required by this extension, identified by name.
-    extension_reqs: set[ExtensionId] = field(default_factory=set)
+    #: Extensions required by this extension at runtime, identified by name.
+    runtime_reqs: set[ExtensionId] = field(default_factory=set)
     #: Type definitions in the extension.
     types: dict[str, TypeDef] = field(default_factory=dict)
     #: Values defined in the extension.
@@ -286,7 +286,7 @@ class Extension:
         return ext_s.Extension(
             name=self.name,
             version=self.version,  # type: ignore[arg-type]
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
             types={k: v._to_serial() for k, v in self.types.items()},
             values={k: v._to_serial() for k, v in self.values.items()},
             operations={k: v._to_serial() for k, v in self.operations.items()},
@@ -319,7 +319,7 @@ class Extension:
         """
         if op_def.signature.poly_func is not None:
             # Ensure the op def signature has the extension as a requirement
-            op_def.signature.poly_func = op_def.signature.poly_func.with_extension_reqs(
+            op_def.signature.poly_func = op_def.signature.poly_func.with_runtime_reqs(
                 [self.name]
             )
 
