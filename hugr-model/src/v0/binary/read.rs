@@ -102,7 +102,6 @@ fn read_operation<'a>(
             body: model::RegionId(body),
         },
         Which::FuncDefn(reader) => {
-            let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
@@ -117,7 +116,6 @@ fn read_operation<'a>(
             model::Operation::DefineFunc { decl, body }
         }
         Which::FuncDecl(reader) => {
-            let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
@@ -131,7 +129,6 @@ fn read_operation<'a>(
             model::Operation::DeclareFunc { decl }
         }
         Which::AliasDefn(reader) => {
-            let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let r#type = model::TermId(reader.get_type());
@@ -144,7 +141,6 @@ fn read_operation<'a>(
             model::Operation::DefineAlias { decl, value }
         }
         Which::AliasDecl(reader) => {
-            let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let r#type = model::TermId(reader.get_type());
@@ -156,7 +152,6 @@ fn read_operation<'a>(
             model::Operation::DeclareAlias { decl }
         }
         Which::ConstructorDecl(reader) => {
-            let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
@@ -170,7 +165,6 @@ fn read_operation<'a>(
             model::Operation::DeclareConstructor { decl }
         }
         Which::OperationDecl(reader) => {
-            let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader.get_constraints()?, model::TermId);
@@ -184,13 +178,11 @@ fn read_operation<'a>(
             model::Operation::DeclareOperation { decl }
         }
         Which::Custom(reader) => {
-            let reader = reader?;
             let operation = model::NodeId(reader.get_operation());
             let params = read_scalar_list!(bump, reader.get_params()?, model::TermId);
             model::Operation::Custom { operation, params }
         }
         Which::CustomFull(reader) => {
-            let reader = reader?;
             let operation = model::NodeId(reader.get_operation());
             let params = read_scalar_list!(bump, reader.get_params()?, model::TermId);
             model::Operation::CustomFull { operation, params }
@@ -278,14 +270,12 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         }
 
         Which::Apply(reader) => {
-            let reader = reader?;
             let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader.get_args()?, model::TermId);
             model::Term::Apply { symbol, args }
         }
 
         Which::ApplyFull(reader) => {
-            let reader = reader?;
             let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader.get_args()?, model::TermId);
             model::Term::ApplyFull { symbol, args }
@@ -295,9 +285,8 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             r#type: model::TermId(r#type),
         },
 
-        Which::List(reader) => {
-            let reader = reader?;
-            let parts = read_list!(bump, reader.get_items()?, read_list_part);
+        Which::List(items) => {
+            let parts = read_list!(bump, items?, read_list_part);
             model::Term::List { parts }
         }
 
@@ -305,9 +294,8 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             item_type: model::TermId(item_type),
         },
 
-        Which::ExtSet(reader) => {
-            let reader = reader?;
-            let parts = read_list!(bump, reader.get_items()?, read_ext_set_part);
+        Which::ExtSet(items) => {
+            let parts = read_list!(bump, items?, read_ext_set_part);
             model::Term::ExtSet { parts }
         }
 
@@ -316,7 +304,6 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         },
 
         Which::FuncType(reader) => {
-            let reader = reader?;
             let inputs = model::TermId(reader.get_inputs());
             let outputs = model::TermId(reader.get_outputs());
             let extensions = model::TermId(reader.get_extensions());

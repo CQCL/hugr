@@ -39,68 +39,66 @@ struct Operation {
         dfg @1 :RegionId;
         cfg @2 :RegionId;
         block @3 :RegionId;
-        funcDefn @4 :FuncDefn;
-        funcDecl @5 :FuncDecl;
-        aliasDefn @6 :AliasDefn;
-        aliasDecl @7 :AliasDecl;
-        custom @8 :Custom;
-        customFull @9 :Custom;
-        tag @10 :UInt16;
-        tailLoop @11 :RegionId;
-        conditional @12 :List(RegionId);
-        callFunc @13 :TermId;
-        loadFunc @14 :TermId;
-        constructorDecl @15 :ConstructorDecl;
-        operationDecl @16 :OperationDecl;
-        import @17 :Text;
-        const @18 :TermId;
-    }
 
-    struct FuncDefn {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        signature @3 :TermId;
-        body @4 :RegionId;
-    }
+        funcDefn :group {
+            name @4 :Text;
+            params @5 :List(Param);
+            constraints @6 :List(TermId);
+            signature @7 :TermId;
+            body @8 :RegionId;
+        }
 
-    struct FuncDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        signature @3 :TermId;
-    }
+        funcDecl :group {
+            name @9 :Text;
+            params @10 :List(Param);
+            constraints @11 :List(TermId);
+            signature @12 :TermId;
+        }
 
-    struct AliasDefn {
-        name @0 :Text;
-        params @1 :List(Param);
-        type @2 :TermId;
-        value @3 :TermId;
-    }
+        aliasDefn :group {
+            name @13 :Text;
+            params @14 :List(Param);
+            type @15 :TermId;
+            value @16 :TermId;
+        }
 
-    struct AliasDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        type @2 :TermId;
-    }
+        aliasDecl :group {
+            name @17 :Text;
+            params @18 :List(Param);
+            type @19 :TermId;
+        }
 
-    struct ConstructorDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        type @3 :TermId;
-    }
+        custom :group {
+            operation @20 :NodeId;
+            params @21 :List(TermId);
+        }
 
-    struct OperationDecl {
-        name @0 :Text;
-        params @1 :List(Param);
-        constraints @2 :List(TermId);
-        type @3 :TermId;
-    }
+        customFull :group {
+            operation @22 :NodeId;
+            params @23 :List(TermId);
+        }
 
-    struct Custom {
-        operation @0 :NodeId;
-        params @1 :List(TermId);
+        constructorDecl :group {
+            name @24 :Text;
+            params @25 :List(Param);
+            constraints @26 :List(TermId);
+            type @27 :TermId;
+        }
+
+        operationDecl :group {
+            name @28 :Text;
+            params @29 :List(Param);
+            constraints @30 :List(TermId);
+            type @31 :TermId;
+        }
+
+        tag @32 :UInt16;
+        tailLoop @33 :RegionId;
+        conditional @34 :List(RegionId);
+        callFunc @35 :TermId;
+        loadFunc @36 :TermId;
+        import @37 :Text;
+        const @38 :TermId;
     }
 }
 
@@ -141,39 +139,35 @@ struct Term {
         constraint @3 :Void;
         variable :group {
             variableNode @4 :NodeId;
-            variableIndex @21 :UInt16;
+            variableIndex @5 :UInt16;
         }
-        apply @5 :Apply;
-        applyFull @6 :ApplyFull;
-        const @7 :TermId;
-        list @8 :ListTerm;
-        listType @9 :TermId;
-        string @10 :Text;
-        stringType @11 :Void;
-        nat @12 :UInt64;
-        natType @13 :Void;
-        extSet @14 :ExtSet;
-        extSetType @15 :Void;
-        adt @16 :TermId;
-        funcType @17 :FuncType;
-        control @18 :TermId;
-        controlType @19 :Void;
-        nonLinearConstraint @20 :TermId;
-        constFunc @22 :RegionId;
-    }
-
-    struct Apply {
-        symbol @0 :NodeId;
-        args @1 :List(TermId);
-    }
-
-    struct ApplyFull {
-        symbol @0 :NodeId;
-        args @1 :List(TermId);
-    }
-
-    struct ListTerm {
-        items @0 :List(ListPart);
+        apply :group {
+            symbol @6 :NodeId;
+            args @7 :List(TermId);
+        }
+        applyFull :group {
+            symbol @8 :NodeId;
+            args @9 :List(TermId);
+        }
+        const @10 :TermId;
+        list @11 :List(ListPart);
+        listType @12 :TermId;
+        string @13 :Text;
+        stringType @14 :Void;
+        nat @15 :UInt64;
+        natType @16 :Void;
+        extSet @17 :List(ExtSetPart);
+        extSetType @18 :Void;
+        adt @19 :TermId;
+        funcType :group {
+            inputs @20 :TermId;
+            outputs @21 :TermId;
+            extensions @22 :TermId;
+        }
+        control @23 :TermId;
+        controlType @24 :Void;
+        nonLinearConstraint @25 :TermId;
+        constFunc @26 :RegionId;
     }
 
     struct ListPart {
@@ -183,21 +177,11 @@ struct Term {
         }
     }
 
-    struct ExtSet {
-        items @0 :List(ExtSetPart);
-    }
-
     struct ExtSetPart {
         union {
             extension @0 :Text;
             splice @1 :TermId;
         }
-    }
-
-    struct FuncType {
-        inputs @0 :TermId;
-        outputs @1 :TermId;
-        extensions @2 :TermId;
     }
 }
 

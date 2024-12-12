@@ -192,13 +192,11 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         }
 
         model::Term::List { parts } => {
-            let mut builder = builder.init_list();
-            write_list!(builder, init_items, write_list_item, parts);
+            write_list!(builder, init_list, write_list_part, parts);
         }
 
         model::Term::ExtSet { parts } => {
-            let mut builder = builder.init_ext_set();
-            write_list!(builder, init_items, write_ext_set_item, parts);
+            write_list!(builder, init_ext_set, write_ext_set_part, parts);
         }
 
         model::Term::FuncType {
@@ -222,14 +220,14 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
     }
 }
 
-fn write_list_item(mut builder: hugr_capnp::term::list_part::Builder, item: &model::ListPart) {
+fn write_list_part(mut builder: hugr_capnp::term::list_part::Builder, item: &model::ListPart) {
     match item {
         model::ListPart::Item(term_id) => builder.set_item(term_id.0),
         model::ListPart::Splice(term_id) => builder.set_splice(term_id.0),
     }
 }
 
-fn write_ext_set_item(
+fn write_ext_set_part(
     mut builder: hugr_capnp::term::ext_set_part::Builder,
     item: &model::ExtSetPart,
 ) {
