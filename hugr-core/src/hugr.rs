@@ -134,12 +134,12 @@ impl Hugr {
     pub fn infer_extensions(&mut self, remove: bool) -> Result<(), ExtensionError> {
         fn delta_mut(optype: &mut OpType) -> Option<&mut ExtensionSet> {
             match optype {
-                OpType::DFG(dfg) => Some(&mut dfg.signature.extension_reqs),
+                OpType::DFG(dfg) => Some(&mut dfg.signature.runtime_reqs),
                 OpType::DataflowBlock(dfb) => Some(&mut dfb.extension_delta),
                 OpType::TailLoop(tl) => Some(&mut tl.extension_delta),
-                OpType::CFG(cfg) => Some(&mut cfg.signature.extension_reqs),
+                OpType::CFG(cfg) => Some(&mut cfg.signature.runtime_reqs),
                 OpType::Conditional(c) => Some(&mut c.extension_delta),
-                OpType::Case(c) => Some(&mut c.signature.extension_reqs),
+                OpType::Case(c) => Some(&mut c.signature.runtime_reqs),
                 //OpType::Lift(_) // Not ATM: only a single element, and we expect Lift to be removed
                 //OpType::FuncDefn(_) // Not at present due to the possibility of recursion
                 _ => None,

@@ -615,7 +615,7 @@ mod test {
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder_exts(op_sig.output.clone(), 1, op_sig.extension_reqs.clone())?
+            h.simple_entry_builder_exts(op_sig.output.clone(), 1, op_sig.runtime_reqs.clone())?
         } else {
             h.simple_block_builder(op_sig.into_owned(), 1)?
         };

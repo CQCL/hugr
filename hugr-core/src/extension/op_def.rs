@@ -245,7 +245,7 @@ impl SignatureFunc {
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
         let mut res = pf.instantiate(args, exts)?;
-        res.extension_reqs.insert(def.extension.clone());
+        res.runtime_reqs.insert(def.extension.clone());
 
         // If there are any row variables left, this will fail with an error:
         res.try_into()

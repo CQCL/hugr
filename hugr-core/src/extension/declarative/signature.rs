@@ -53,7 +53,7 @@ impl SignatureDeclaration {
         let body = FuncValueType {
             input: make_type_row(&self.inputs)?,
             output: make_type_row(&self.outputs)?,
-            extension_reqs: self.extensions.clone(),
+            runtime_reqs: self.extensions.clone(),
         };
 
         let poly_func = PolyFuncTypeRV::new(op_params, body);

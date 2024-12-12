@@ -483,11 +483,8 @@ pub struct Extension {
     pub version: Version,
     /// Unique identifier for the extension.
     pub name: ExtensionId,
-    /// Other extensions defining types used by this extension.
-    /// That is, an upper-bound on the types that can be returned by
-    /// computing the signature of any operation in this extension,
-    /// for any possible [TypeArg].
-    pub extension_reqs: ExtensionSet,
+    /// Runtime dependencies this extension has on other extensions.
+    pub runtime_reqs: ExtensionSet,
     /// Types defined by this extension.
     types: BTreeMap<TypeName, TypeDef>,
     /// Static values defined by this extension.
@@ -513,7 +510,7 @@ impl Extension {
         Self {
             name,
             version,
-            extension_reqs: Default::default(),
+            runtime_reqs: Default::default(),
             types: Default::default(),
             values: Default::default(),
             operations: Default::default(),
@@ -571,10 +568,10 @@ impl Extension {
         }
     }
 
-    /// Extend the requirements of this extension with another set of extensions.
-    pub fn add_requirements(&mut self, extension_reqs: impl Into<ExtensionSet>) {
-        let reqs = mem::take(&mut self.extension_reqs);
-        self.extension_reqs = reqs.union(extension_reqs.into());
+    /// Extend the runtime requirements of this extension with another set of extensions.
+    pub fn add_requirements(&mut self, runtime_reqs: impl Into<ExtensionSet>) {
+        let reqs = mem::take(&mut self.runtime_reqs);
+        self.runtime_reqs = reqs.union(runtime_reqs.into());
     }
 
     /// Allows read-only access to the operations in this Extension
