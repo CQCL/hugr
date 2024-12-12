@@ -167,16 +167,16 @@ impl DataflowOpTrait for ExtensionOp {
         Cow::Borrowed(&self.signature)
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
         let args = self
             .args
             .iter()
-            .map(|ta| ta.substitute(subst, reg))
+            .map(|ta| ta.substitute(subst))
             .collect::<Vec<_>>();
-        let signature = self.signature.substitute(subst, reg);
+        let signature = self.signature.substitute(subst);
         debug_assert_eq!(
             self.def
-                .compute_signature(&args, reg)
+                .compute_signature(&args, subst.extension_registry())
                 .as_ref(),
             Ok(&signature)
         );
@@ -280,10 +280,10 @@ impl DataflowOpTrait for OpaqueOp {
         Cow::Borrowed(&self.signature)
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
         Self {
-            args: self.args.iter().map(|ta| ta.substitute(subst, reg)).collect(),
-            signature: self.signature.substitute(subst, reg),
+            args: self.args.iter().map(|ta| ta.substitute(subst)).collect(),
+            signature: self.signature.substitute(subst),
             ..self.clone()
         }
     }

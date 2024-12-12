@@ -54,7 +54,7 @@ pub trait DataflowOpTrait: Sized {
 
     /// Apply a type-level substitution to this OpType, i.e. replace
     /// [type variables](TypeArg::new_var_use) with new types.
-    fn substitute(&self, subst: &Substitution, reg: &ExtensionRegistry) -> Self;
+    fn substitute(&self, _subst: &Substitution) -> Self;
 }
 
 /// Helpers to construct input and output nodes
@@ -116,9 +116,9 @@ impl DataflowOpTrait for Input {
         Cow::Owned(Signature::new(TypeRow::new(), self.types.clone()))
     }
 
-    fn substitute(&self, subst: &Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &Substitution) -> Self {
         Self {
-            types: self.types.substitute(subst, reg),
+            types: self.types.substitute(subst),
         }
     }
 }
@@ -140,9 +140,9 @@ impl DataflowOpTrait for Output {
         None
     }
 
-    fn substitute(&self, subst: &Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &Substitution) -> Self {
         Self {
-            types: self.types.substitute(subst, reg),
+            types: self.types.substitute(subst),
         }
     }
 }
@@ -172,8 +172,8 @@ impl<T: DataflowOpTrait + Clone> OpTrait for T {
         DataflowOpTrait::static_input(self)
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution, reg: &ExtensionRegistry) -> Self {
-        DataflowOpTrait::substitute(self, subst, reg)
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        DataflowOpTrait::substitute(self, subst)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -212,16 +212,16 @@ impl DataflowOpTrait for Call {
         Some(EdgeKind::Function(self.called_function_type().clone()))
     }
 
-    fn substitute(&self, subst: &Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &Substitution) -> Self {
         let type_args = self
             .type_args
             .iter()
-            .map(|ta| ta.substitute(subst, reg))
+            .map(|ta| ta.substitute(subst))
             .collect::<Vec<_>>();
-        let instantiation = self.instantiation.substitute(subst, reg);
+        let instantiation = self.instantiation.substitute(subst);
         debug_assert_eq!(
             self.func_sig
-                .instantiate(&type_args, reg)
+                .instantiate(&type_args, subst.extension_registry())
                 .as_ref(),
             Ok(&instantiation)
         );
@@ -325,9 +325,9 @@ impl DataflowOpTrait for CallIndirect {
         Cow::Owned(s)
     }
 
-    fn substitute(&self, subst: &Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &Substitution) -> Self {
         Self {
-            signature: self.signature.substitute(subst, reg),
+            signature: self.signature.substitute(subst),
         }
     }
 }
@@ -356,7 +356,7 @@ impl DataflowOpTrait for LoadConstant {
         Some(EdgeKind::Const(self.constant_type().clone()))
     }
 
-    fn substitute(&self, _subst: &Substitution, _reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, _subst: &Substitution) -> Self {
         // Constants cannot refer to TypeArgs, so neither can loading them
         self.clone()
     }
@@ -420,16 +420,16 @@ impl DataflowOpTrait for LoadFunction {
         Some(EdgeKind::Function(self.func_sig.clone()))
     }
 
-    fn substitute(&self, subst: &Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &Substitution) -> Self {
         let type_args = self
             .type_args
             .iter()
-            .map(|ta| ta.substitute(subst, reg))
+            .map(|ta| ta.substitute(subst))
             .collect::<Vec<_>>();
-        let instantiation = self.instantiation.substitute(subst, reg);
+        let instantiation = self.instantiation.substitute(subst);
         debug_assert_eq!(
             self.func_sig
-                .instantiate(&type_args, reg)
+                .instantiate(&type_args, subst.extension_registry())
                 .as_ref(),
             Ok(&instantiation)
         );
@@ -528,9 +528,9 @@ impl DataflowOpTrait for DFG {
         self.inner_signature()
     }
 
-    fn substitute(&self, subst: &Substitution, reg: &ExtensionRegistry) -> Self {
+    fn substitute(&self, subst: &Substitution) -> Self {
         Self {
-            signature: self.signature.substitute(subst, reg),
+            signature: self.signature.substitute(subst),
         }
     }
 }

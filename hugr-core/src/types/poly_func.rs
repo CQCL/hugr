@@ -125,7 +125,7 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
-        Ok(self.body.substitute(&Substitution(args), ext_reg))
+        Ok(self.body.substitute(&Substitution(args, ext_reg)))
     }
 
     /// Validates this instance, checking that the types in the body are
