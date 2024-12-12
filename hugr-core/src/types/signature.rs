@@ -113,13 +113,9 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         (&self.input, &self.output)
     }
 
-    pub(super) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
-        self.input.validate(extension_registry, var_decls)?;
-        self.output.validate(extension_registry, var_decls)?;
+    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.input.validate(var_decls)?;
+        self.output.validate(var_decls)?;
         self.runtime_reqs.validate(var_decls)
     }
 

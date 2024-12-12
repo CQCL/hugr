@@ -437,7 +437,7 @@ pub trait Dataflow: Container {
         };
 
         let load_n = self.add_dataflow_op(
-            ops::LoadFunction::try_new(func_sig, type_args, self.hugr().extensions())?,
+            ops::LoadFunction::try_new(func_sig, type_args)?,
             // Static wire from the function node
             vec![Wire::new(func_node, func_op.static_output_port().unwrap())],
         )?;
@@ -699,8 +699,7 @@ pub trait Dataflow: Container {
                 })
             }
         };
-        let op: OpType =
-            ops::Call::try_new(type_scheme, type_args, self.hugr().extensions())?.into();
+        let op: OpType = ops::Call::try_new(type_scheme, type_args)?.into();
         let const_in_port = op.static_input_port().unwrap();
         let op_id = self.add_dataflow_op(op, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;

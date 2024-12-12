@@ -375,7 +375,7 @@ mod test {
     use crate::{
         extension::{
             prelude::{qb_t, usize_t, PRELUDE_ID},
-            ExtensionSet, PRELUDE_REGISTRY,
+            ExtensionSet,
         },
         ops::{Conditional, DataflowOpTrait, DataflowParent},
         types::{Signature, Substitution, Type, TypeArg, TypeBound, TypeRV},
@@ -393,15 +393,12 @@ mod test {
             sum_rows: vec![usize_t().into(), vec![qb_t(), tv0.clone()].into()],
             extension_delta: ExtensionSet::type_var(1),
         };
-        let dfb2 = dfb.substitute(&Substitution::new(
-            &[
-                qb_t().into(),
-                TypeArg::Extensions {
-                    es: PRELUDE_ID.into(),
-                },
-            ],
-            &PRELUDE_REGISTRY,
-        ));
+        let dfb2 = dfb.substitute(&Substitution::new(&[
+            qb_t().into(),
+            TypeArg::Extensions {
+                es: PRELUDE_ID.into(),
+            },
+        ]));
         let st = Type::new_sum(vec![vec![usize_t()], vec![qb_t(); 2]]);
         assert_eq!(
             dfb2.inner_signature(),
@@ -419,15 +416,12 @@ mod test {
             outputs: vec![usize_t(), tv1].into(),
             extension_delta: ExtensionSet::new(),
         };
-        let cond2 = cond.substitute(&Substitution::new(
-            &[
-                TypeArg::Sequence {
-                    elems: vec![usize_t().into(); 3],
-                },
-                qb_t().into(),
-            ],
-            &PRELUDE_REGISTRY,
-        ));
+        let cond2 = cond.substitute(&Substitution::new(&[
+            TypeArg::Sequence {
+                elems: vec![usize_t().into(); 3],
+            },
+            qb_t().into(),
+        ]));
         let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants
         assert_eq!(
             cond2.signature(),
@@ -447,15 +441,12 @@ mod test {
             rest: vec![tv0.clone()].into(),
             extension_delta: ExtensionSet::type_var(1),
         };
-        let tail2 = tail_loop.substitute(&Substitution::new(
-            &[
-                usize_t().into(),
-                TypeArg::Extensions {
-                    es: PRELUDE_ID.into(),
-                },
-            ],
-            &PRELUDE_REGISTRY,
-        ));
+        let tail2 = tail_loop.substitute(&Substitution::new(&[
+            usize_t().into(),
+            TypeArg::Extensions {
+                es: PRELUDE_ID.into(),
+            },
+        ]));
         assert_eq!(
             tail2.signature(),
             Signature::new(

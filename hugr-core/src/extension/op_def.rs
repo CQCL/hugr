@@ -249,7 +249,7 @@ impl SignatureFunc {
             // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
-        let mut res = pf.instantiate(args, exts)?;
+        let mut res = pf.instantiate(args)?;
         res.runtime_reqs.insert(def.extension.clone());
 
         // If there are any row variables left, this will fail with an error:
@@ -348,9 +348,7 @@ impl OpDef {
             SignatureFunc::CustomFunc(custom) => {
                 let (static_args, other_args) =
                     args.split_at(min(custom.static_params().len(), args.len()));
-                static_args
-                    .iter()
-                    .try_for_each(|ta| ta.validate(exts, &[]))?;
+                static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
                 check_type_args(static_args, custom.static_params())?;
                 temp = custom.compute_signature(static_args, self, exts)?;
                 (&temp, other_args)
@@ -360,8 +358,7 @@ impl OpDef {
                 return Err(SignatureError::MissingValidateFunc)
             }
         };
-        args.iter()
-            .try_for_each(|ta| ta.validate(exts, var_decls))?;
+        args.iter().try_for_each(|ta| ta.validate(var_decls))?;
         check_type_args(args, pf.params())?;
         Ok(())
     }
@@ -427,14 +424,14 @@ impl OpDef {
         self.signature_func.static_params()
     }
 
-    pub(super) fn validate(&self, exts: &ExtensionRegistry) -> Result<(), SignatureError> {
+    pub(super) fn validate(&self) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
         if let SignatureFunc::CustomValidator(ts) = &self.signature_func {
             // The type scheme may contain row variables so be of variable length;
             // these will have to be substituted to fixed-length concrete types when
             // the OpDef is instantiated into an actual OpType.
-            ts.poly_func.validate(exts)?;
+            ts.poly_func.validate()?;
         }
         Ok(())
     }

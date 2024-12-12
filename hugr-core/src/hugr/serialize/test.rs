@@ -9,7 +9,7 @@ use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::ExtensionRegistry;
-use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG};
+use crate::extension::{test::SimpleOpDef, ExtensionSet};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
@@ -499,7 +499,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, tv1));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
-    res.validate(&EMPTY_REG).unwrap();
+    res.validate().unwrap();
     res
 }
 
@@ -541,7 +541,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
-#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(PRELUDE_ID)} ], &EMPTY_REG).unwrap())]
+#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(PRELUDE_ID)} ]).unwrap())]
 #[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {

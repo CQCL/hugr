@@ -300,11 +300,11 @@ impl<'a> ValidationContext<'a> {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match &port_kind {
-            EdgeKind::Value(ty) => ty.validate(self.hugr.extensions(), var_decls),
+            EdgeKind::Value(ty) => ty.validate(var_decls),
             // Static edges must *not* refer to type variables declared by enclosing FuncDefns
             // as these are only types at runtime.
-            EdgeKind::Const(ty) => ty.validate(self.hugr.extensions(), &[]),
-            EdgeKind::Function(pf) => pf.validate(self.hugr.extensions()),
+            EdgeKind::Const(ty) => ty.validate(&[]),
+            EdgeKind::Function(pf) => pf.validate(),
             _ => Ok(()),
         }
     }
@@ -592,22 +592,20 @@ impl<'a> ValidationContext<'a> {
                 ))?;
             }
             OpType::Call(c) => {
-                c.validate(self.hugr.extensions()).map_err(|cause| {
-                    ValidationError::SignatureError {
+                c.validate()
+                    .map_err(|cause| ValidationError::SignatureError {
                         node,
                         op: op_type.name(),
                         cause,
-                    }
-                })?;
+                    })?;
             }
             OpType::LoadFunction(c) => {
-                c.validate(self.hugr.extensions()).map_err(|cause| {
-                    ValidationError::SignatureError {
+                c.validate()
+                    .map_err(|cause| ValidationError::SignatureError {
                         node,
                         op: op_type.name(),
                         cause,
-                    }
-                })?;
+                    })?;
             }
             _ => (),
         }

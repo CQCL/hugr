@@ -11,7 +11,6 @@ use thiserror::Error;
 
 use super::row_var::MaybeRV;
 use super::{check_typevar_decl, NoRV, RowVariable, Substitution, Type, TypeBase, TypeBound};
-use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
@@ -294,17 +293,11 @@ impl TypeArg {
 
     /// Much as [Type::validate], also checks that the type of any [TypeArg::Opaque]
     /// is valid and closed.
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
+            TypeArg::Type { ty } => ty.validate(var_decls),
             TypeArg::BoundedNat { .. } | TypeArg::String { .. } => Ok(()),
-            TypeArg::Sequence { elems } => elems
-                .iter()
-                .try_for_each(|a| a.validate(extension_registry, var_decls)),
+            TypeArg::Sequence { elems } => elems.iter().try_for_each(|a| a.validate(var_decls)),
             TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
@@ -478,7 +471,7 @@ mod test {
     use itertools::Itertools;
 
     use super::{check_type_arg, Substitution, TypeArg, TypeParam};
-    use crate::extension::prelude::{bool_t, usize_t, PRELUDE_REGISTRY};
+    use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::{type_param::TypeArgError, TypeBound, TypeRV};
 
     #[test]
@@ -576,7 +569,7 @@ mod test {
         };
         check_type_arg(&outer_arg, &outer_param).unwrap();
 
-        let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg], &PRELUDE_REGISTRY));
+        let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
         assert_eq!(
             outer_arg2,
             vec![bool_t().into(), TypeArg::UNIT, usize_t().into()].into()
@@ -618,8 +611,7 @@ mod test {
         // Now substitute a list of two types for that row-variable
         let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
         check_type_arg(&row_var_arg, &row_var_decl).unwrap();
-        let subst_arg =
-            good_arg.substitute(&Substitution(&[row_var_arg.clone()], &PRELUDE_REGISTRY));
+        let subst_arg = good_arg.substitute(&Substitution(&[row_var_arg.clone()]));
         check_type_arg(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,

@@ -28,7 +28,6 @@ use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
-use crate::utils::test_quantum_extension;
 use crate::{
     const_extension_ids, test_file, type_row, Direction, IncomingPort, Node, OutgoingPort,
 };
@@ -362,14 +361,6 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
     let output = b.add_node_with_parent(def, ops::Output::new(row));
     b.connect(input, 0, output, 0);
     (b, def)
-}
-#[test]
-fn unregistered_extension() {
-    let (mut h, _def) = identity_hugr_with_type(usize_t());
-    assert!(h.validate().is_err(),);
-    h.resolve_extension_defs(&test_quantum_extension::REG)
-        .unwrap();
-    h.validate().unwrap();
 }
 
 const_extension_ids! {

@@ -5,7 +5,6 @@ use std::{
 };
 
 use hugr_core::{
-    extension::ExtensionRegistry,
     ops::{Call, FuncDefn, LoadFunction, OpTrait},
     types::{Signature, Substitution, TypeArg},
     Node,
@@ -35,15 +34,13 @@ pub fn monomorphize(mut h: Hugr) -> Hugr {
     // We clone the extension registry because we will need a reference to
     // create our mutable substitutions. This is cannot cause a problem because
     // we will not be adding any new types or extension ops to the HUGR.
-    let reg = h.extensions().to_owned();
-
     #[cfg(debug_assertions)]
     validate(&h);
 
     let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
-        mono_scan(&mut h, root, None, &mut HashMap::new(), &reg);
+        mono_scan(&mut h, root, None, &mut HashMap::new());
         if !h.get_optype(root).is_module() {
             return remove_polyfuncs(h);
         }
@@ -100,7 +97,6 @@ fn mono_scan(
     parent: Node,
     mut subst_into: Option<&mut Instantiating>,
     cache: &mut Instantiations,
-    reg: &ExtensionRegistry,
 ) {
     for old_ch in h.children(parent).collect_vec() {
         let ch_op = h.get_optype(old_ch);
@@ -118,10 +114,10 @@ fn mono_scan(
                 node_map: inst.node_map,
                 ..**inst
             };
-            mono_scan(h, old_ch, Some(&mut inst), cache, reg);
+            mono_scan(h, old_ch, Some(&mut inst), cache);
             new_ch
         } else {
-            mono_scan(h, old_ch, None, cache, reg);
+            mono_scan(h, old_ch, None, cache);
             old_ch
         };
 
@@ -133,7 +129,7 @@ fn mono_scan(
                 (
                     &c.type_args,
                     mono_sig.clone(),
-                    OpType::from(Call::try_new(mono_sig.into(), [], reg).unwrap()),
+                    OpType::from(Call::try_new(mono_sig.into(), []).unwrap()),
                 )
             }
             OpType::LoadFunction(lf) => {
@@ -141,9 +137,7 @@ fn mono_scan(
                 (
                     &lf.type_args,
                     mono_sig.clone(),
-                    LoadFunction::try_new(mono_sig.into(), [], reg)
-                        .unwrap()
-                        .into(),
+                    LoadFunction::try_new(mono_sig.into(), []).unwrap().into(),
                 )
             }
             _ => continue,
@@ -153,7 +147,7 @@ fn mono_scan(
         };
         let fn_inp = ch_op.static_input_port().unwrap();
         let tgt = h.static_source(old_ch).unwrap(); // Use old_ch as edges not copied yet
-        let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache, reg);
+        let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache);
         let fn_out = {
             let func = h.get_optype(new_tgt).as_func_defn().unwrap();
             debug_assert_eq!(func.signature, mono_sig.into());
@@ -172,7 +166,6 @@ fn instantiate(
     type_args: Vec<TypeArg>,
     mono_sig: Signature,
     cache: &mut Instantiations,
-    reg: &ExtensionRegistry,
 ) -> Node {
     let for_func = cache.entry(poly_func).or_insert_with(|| {
         // First time we've instantiated poly_func. Lift any nested FuncDefn's out to the same level.
@@ -214,11 +207,11 @@ fn instantiate(
     // Now make the instantiation
     let mut node_map = HashMap::new();
     let mut inst = Instantiating {
-        subst: &Substitution::new(&type_args, reg),
+        subst: &Substitution::new(&type_args),
         target_container: mono_tgt,
         node_map: &mut node_map,
     };
-    mono_scan(h, poly_func, Some(&mut inst), cache, reg);
+    mono_scan(h, poly_func, Some(&mut inst), cache);
     // Copy edges...we have built a node_map for every node in the function.
     // Note we could avoid building the "large" map (smaller than the Hugr we've just created)
     // by doing this during recursion, but we'd need to be careful with nonlocal edges -

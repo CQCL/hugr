@@ -4,7 +4,7 @@ use std::sync::{Arc, Weak};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-use crate::extension::prelude::{either_type, option_type, usize_custom_t};
+use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -93,7 +93,7 @@ impl ArrayOpDef {
     fn signature_from_def(
         &self,
         array_def: &TypeDef,
-        extension_ref: &Weak<Extension>,
+        _extension_ref: &Weak<Extension>,
     ) -> SignatureFunc {
         use ArrayOpDef::*;
         if let new_array | pop_left | pop_right = self {
@@ -107,11 +107,9 @@ impl ArrayOpDef {
                 .expect("Array type instantiation failed");
             let standard_params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
 
-            // Construct the usize type using the passed extension reference.
-            //
-            // If we tried to use `usize_t()` directly it would try to access
-            // the `PRELUDE` lazy static recursively, causing a deadlock.
-            let usize_t: Type = usize_custom_t(extension_ref).into();
+            // We can assume that the prelude has ben loaded at this point,
+            // since it doesn't depend on the array extension.
+            let usize_t: Type = usize_t();
 
             match self {
                 get => {
@@ -288,8 +286,6 @@ impl HasConcrete for ArrayOpDef {
 
 #[cfg(test)]
 mod tests {
-    use std::arch::aarch64::float32x2_t;
-
     use strum::IntoEnumIterator;
 
     use crate::extension::prelude::usize_t;
