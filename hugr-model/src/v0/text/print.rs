@@ -586,6 +586,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("nonlinear");
                 this.print_term(*term)
             }),
+            Term::ConstFunc { region } => self.print_parens(|this| {
+                this.print_text("fn");
+                this.print_region(*region)
+            }),
         }
     }
 

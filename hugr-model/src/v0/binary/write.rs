@@ -205,6 +205,10 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::NonLinearConstraint { term } => {
             builder.set_non_linear_constraint(term.0);
         }
+
+        model::Term::ConstFunc { region } => {
+            builder.set_const_func(region.0);
+        }
     }
 }
 

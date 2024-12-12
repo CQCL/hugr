@@ -155,6 +155,7 @@ struct Term {
         control @18 :TermId;
         controlType @19 :Void;
         nonLinearConstraint @20 :TermId;
+        constFunc @22 :RegionId;
     }
 
     struct Apply {

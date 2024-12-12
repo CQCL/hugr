@@ -926,6 +926,7 @@ impl<'a> Context<'a> {
             | model::Term::ExtSet { .. }
             | model::Term::Adt { .. }
             | model::Term::Control { .. }
+            | model::Term::ConstFunc { .. }
             | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }
@@ -984,6 +985,7 @@ impl<'a> Context<'a> {
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeArg`")),
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
+            model::Term::ConstFunc { .. } => Err(error_unsupported!("`fn` as `TypeArg`")),
 
             model::Term::FuncType { .. }
             | model::Term::Adt { .. }
@@ -1105,6 +1107,7 @@ impl<'a> Context<'a> {
             | model::Term::Control { .. }
             | model::Term::ControlType
             | model::Term::Nat(_)
+            | model::Term::ConstFunc { .. }
             | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }

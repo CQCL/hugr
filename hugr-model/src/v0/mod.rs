@@ -668,6 +668,12 @@ pub enum Term<'a> {
         /// The runtime type that must be copyable and discardable.
         term: TermId,
     },
+
+    /// A constant function.
+    ConstFunc {
+        /// The region that defines the body of the function.
+        region: RegionId,
+    },
 }
 
 /// A part of a list term.

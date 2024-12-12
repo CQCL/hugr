@@ -93,6 +93,7 @@ term = {
   | term_apply_full
   | term_apply
   | term_non_linear
+  | term_const_func
 }
 
 term_wildcard     = { "_" }
@@ -116,5 +117,6 @@ term_func_type    = { "(" ~ "fn" ~ term ~ term ~ term ~ ")" }
 term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
 term_ctrl_type    = { "ctrl" }
 term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }
+term_const_func   = { "(" ~ "fn" ~ region ~ ")" }
 
 spliced_term = { term ~ "..." }

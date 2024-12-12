@@ -320,6 +320,10 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::NonLinearConstraint(term) => model::Term::NonLinearConstraint {
             term: model::TermId(term),
         },
+
+        Which::ConstFunc(region) => model::Term::ConstFunc {
+            region: model::RegionId(region),
+        },
     })
 }
 
