@@ -240,7 +240,7 @@ fn instantiate(
 
 struct TypeArgsList<'a>(&'a [TypeArg]);
 
-impl<'a> std::fmt::Display for TypeArgsList<'a> {
+impl std::fmt::Display for TypeArgsList<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for arg in self.0 {
             f.write_str("$")?;
