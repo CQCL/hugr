@@ -305,6 +305,7 @@ fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+    use std::iter;
 
     use hugr_core::extension::simple_op::MakeRegisteredOp as _;
     use hugr_core::std_extensions::collections::array::{array_type_parametric, ArrayOpDef};
@@ -321,7 +322,7 @@ mod test {
     };
     use hugr_core::extension::ExtensionSet;
     use hugr_core::ops::handle::{FuncID, NodeHandle};
-    use hugr_core::ops::{DataflowOpTrait as _, FuncDefn, Tag};
+    use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
     use hugr_core::types::{
         PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
@@ -640,14 +641,17 @@ mod test {
                 let func_ptr = builder
                     .load_func(foo.handle(), &[Type::UNIT.into()])
                     .unwrap();
-                let [r] = builder
-                    .call_indirect(
-                        Signature::new_endo(Type::UNIT),
-                        func_ptr,
-                        builder.input_wires(),
-                    )
-                    .unwrap()
-                    .outputs_arr();
+                let [r] = {
+                    let signature = Signature::new_endo(Type::UNIT);
+                    builder
+                        .add_dataflow_op(
+                            CallIndirect { signature },
+                            iter::once(func_ptr).chain(builder.input_wires()),
+                        )
+                        .unwrap()
+                        .outputs_arr()
+                };
+
                 builder.finish_with_outputs([r]).unwrap()
             };
             module_builder.finish_hugr().unwrap()

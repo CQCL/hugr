@@ -2,7 +2,7 @@ use crate::extension::prelude::MakeTuple;
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
-use crate::ops::{self, CallIndirect, OpTag, OpTrait, OpType, Tag, TailLoop};
+use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
 use crate::utils::collect_array;
 use crate::{Extension, IncomingPort, Node, OutgoingPort};
 
@@ -708,26 +708,6 @@ pub trait Dataflow: Container {
         self.hugr_mut()
             .connect(function.node(), src_port, op_id.node(), const_in_port);
         Ok(op_id)
-    }
-
-    /// Add a [`ops::CallIndirect`] node, calling `function` with signature
-    /// `signature`, with inputs specified by `input_wires`. Returns a handle to
-    /// the corresponding Call node.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error adding the
-    /// CallIndirect node.
-    fn call_indirect(
-        &mut self,
-        signature: Signature,
-        function: Wire,
-        input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_op(
-            CallIndirect { signature },
-            iter::once(function).chain(input_wires),
-        )
     }
 
     /// For the vector of `wires`, produce a `CircuitBuilder` where ops can be
