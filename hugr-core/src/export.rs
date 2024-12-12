@@ -218,7 +218,7 @@ impl<'a> Context<'a> {
             }
 
             OpType::DFG(dfg) => {
-                let extensions = self.export_ext_set(&dfg.signature.extension_reqs);
+                let extensions = self.export_ext_set(&dfg.signature.runtime_reqs);
                 regions = self
                     .bump
                     .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
@@ -255,7 +255,7 @@ impl<'a> Context<'a> {
                     constraints,
                     signature,
                 });
-                let extensions = this.export_ext_set(&func.signature.body().extension_reqs);
+                let extensions = this.export_ext_set(&func.signature.body().runtime_reqs);
                 regions = this
                     .bump
                     .alloc_slice_copy(&[this.export_dfg(node, extensions)]);
@@ -659,7 +659,7 @@ impl<'a> Context<'a> {
                 panic!("expected a `Case` node as a child of a `Conditional` node");
             };
 
-            let extensions = self.export_ext_set(&case_op.signature.extension_reqs);
+            let extensions = self.export_ext_set(&case_op.signature.runtime_reqs);
             regions.push(self.export_dfg(child, extensions));
         }
 
@@ -723,7 +723,7 @@ impl<'a> Context<'a> {
     pub fn export_func_type<RV: MaybeRV>(&mut self, t: &FuncTypeBase<RV>) -> model::TermId {
         let inputs = self.export_type_row(t.input());
         let outputs = self.export_type_row(t.output());
-        let extensions = self.export_ext_set(&t.extension_reqs);
+        let extensions = self.export_ext_set(&t.runtime_reqs);
         self.make_term(model::Term::FuncType {
             inputs,
             outputs,

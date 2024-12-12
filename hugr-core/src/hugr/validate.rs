@@ -61,7 +61,7 @@ impl Hugr {
                 return Err(ValidationError::ExtensionsNotInferred { node: parent });
             }
             let parent_extensions = match parent_op.inner_function_type() {
-                Some(s) => s.extension_reqs.clone(),
+                Some(s) => s.runtime_reqs.clone(),
                 None => match parent_op.tag() {
                     OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
                     // ModuleRoot holds but does not execute its children, so allow any extensions

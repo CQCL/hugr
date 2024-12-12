@@ -102,7 +102,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
 
     def deserialize(self, extension: ext.Extension) -> ext.OpDef:
         signature = ext.OpDefSig(
-            self.signature.deserialize().with_extension_reqs([extension.name])
+            self.signature.deserialize().with_runtime_reqs([extension.name])
             if self.signature
             else None,
             self.binary,
@@ -122,7 +122,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
 class Extension(ConfiguredBaseModel):
     version: SemanticVersion
     name: ExtensionId
-    extension_reqs: set[ExtensionId]
+    runtime_reqs: set[ExtensionId]
     types: dict[str, TypeDef]
     values: dict[str, ExtensionValue]
     operations: dict[str, OpDef]
@@ -135,7 +135,7 @@ class Extension(ConfiguredBaseModel):
         e = ext.Extension(
             version=self.version,  # type: ignore[arg-type]
             name=self.name,
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
         )
 
         for k, t in self.types.items():

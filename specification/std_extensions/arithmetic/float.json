@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "name": "arithmetic.float",
-  "extension_reqs": [
+  "runtime_reqs": [
     "arithmetic.int.types"
   ],
   "types": {},
@@ -32,7 +32,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -69,7 +69,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -99,7 +99,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -136,7 +136,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -171,7 +171,7 @@
               "size": 2
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -201,7 +201,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -236,7 +236,7 @@
               "size": 2
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -271,7 +271,7 @@
               "size": 2
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -306,7 +306,7 @@
               "size": 2
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -341,7 +341,7 @@
               "size": 2
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -378,7 +378,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -415,7 +415,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -452,7 +452,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -487,7 +487,7 @@
               "size": 2
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -517,7 +517,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -554,7 +554,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -584,7 +584,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -621,7 +621,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -651,7 +651,7 @@
               "bound": "C"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
