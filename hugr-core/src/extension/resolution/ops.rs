@@ -7,7 +7,8 @@
 
 use std::sync::Arc;
 
-use super::{Extension, ExtensionCollectionError, ExtensionRegistry, ExtensionResolutionError};
+use super::{Extension, ExtensionCollectionError, ExtensionResolutionError};
+use crate::extension::ExtensionRegistry;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpType};
 use crate::Node;

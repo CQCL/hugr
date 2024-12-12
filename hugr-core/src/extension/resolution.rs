@@ -22,6 +22,9 @@
 mod ops;
 mod types;
 mod types_mut;
+mod weak_registry;
+
+pub use weak_registry::WeakExtensionRegistry;
 
 pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
 pub(crate) use types::{collect_op_types_extensions, collect_signature_exts};
@@ -42,36 +45,36 @@ use crate::Node;
 /// Update all weak Extension pointers inside a type.
 pub fn resolve_type_extensions<RV: MaybeRV>(
     typ: &mut TypeBase<RV>,
-    extensions: &ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = ExtensionRegistry::default();
+    let mut used_extensions = WeakExtensionRegistry::default();
     resolve_type_exts(None, typ, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers in a custom type.
 pub fn resolve_custom_type_extensions(
     typ: &mut CustomType,
-    extensions: &ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = ExtensionRegistry::default();
+    let mut used_extensions = WeakExtensionRegistry::default();
     resolve_custom_type_exts(None, typ, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers inside a type argument.
 pub fn resolve_typearg_extensions(
     arg: &mut TypeArg,
-    extensions: &ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = ExtensionRegistry::default();
+    let mut used_extensions = WeakExtensionRegistry::default();
     resolve_typearg_exts(None, arg, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers inside a constant value.
 pub fn resolve_value_extensions(
     value: &mut Value,
-    extensions: &ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = ExtensionRegistry::default();
+    let mut used_extensions = WeakExtensionRegistry::default();
     resolve_value_exts(None, value, extensions, &mut used_extensions)
 }
 
@@ -146,7 +149,7 @@ impl ExtensionResolutionError {
         node: Option<Node>,
         ty: &TypeName,
         missing_extension: &ExtensionId,
-        extensions: &ExtensionRegistry,
+        extensions: &WeakExtensionRegistry,
     ) -> Self {
         Self::MissingTypeExtension {
             node,

@@ -6,7 +6,7 @@
 //! See [`super::resolve_op_types_extensions`] for a mutating version that
 //! updates the weak links to point to the correct extensions.
 
-use super::ExtensionCollectionError;
+use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
@@ -32,7 +32,7 @@ pub(crate) fn collect_op_types_extensions(
     node: Option<Node>,
     op: &OpType,
 ) -> Result<ExtensionRegistry, ExtensionCollectionError> {
-    let mut used = ExtensionRegistry::default();
+    let mut used = WeakExtensionRegistry::default();
     let mut missing = ExtensionSet::new();
 
     match op {
@@ -101,12 +101,15 @@ pub(crate) fn collect_op_types_extensions(
         OpType::Module(_) | OpType::AliasDecl(_) | OpType::AliasDefn(_) => {}
     };
 
-    missing
-        .is_empty()
-        .then_some(used)
-        .ok_or(ExtensionCollectionError::dropped_op_extension(
+    match missing.is_empty() {
+        true => {
+            // We know there are no missing extensions, so this should not fail.
+            Ok(used.try_into().expect("All extensions are valid"))
+        }
+        false => Err(ExtensionCollectionError::dropped_op_extension(
             node, op, missing,
-        ))
+        )),
+    }
 }
 
 /// Collect the Extension pointers in the [`CustomType`]s inside a signature.
@@ -119,7 +122,7 @@ pub(crate) fn collect_op_types_extensions(
 ///   `Weak<Extension>` pointer has been invalidated.
 pub(crate) fn collect_signature_exts<RV: MaybeRV>(
     signature: &FuncTypeBase<RV>,
-    used_extensions: &mut ExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
     // Note that we do not include the signature's `runtime_reqs` here, as those refer
@@ -138,7 +141,7 @@ pub(crate) fn collect_signature_exts<RV: MaybeRV>(
 ///   `Weak<Extension>` pointer has been invalidated.
 fn collect_type_row_exts<RV: MaybeRV>(
     row: &TypeRowBase<RV>,
-    used_extensions: &mut ExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
     for ty in row.iter() {
@@ -156,7 +159,7 @@ fn collect_type_row_exts<RV: MaybeRV>(
 ///   `Weak<Extension>` pointer has been invalidated.
 pub(super) fn collect_type_exts<RV: MaybeRV>(
     typ: &TypeBase<RV>,
-    used_extensions: &mut ExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
     match typ.as_type_enum() {
@@ -164,9 +167,11 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
             for arg in custom.args() {
                 collect_typearg_exts(arg, used_extensions, missing_extensions);
             }
-            match custom.extension_ref().upgrade() {
+            let ext_ref = custom.extension_ref();
+            // Check if the extension reference is still valid.
+            match ext_ref.upgrade() {
                 Some(ext) => {
-                    used_extensions.register_updated(ext);
+                    used_extensions.register(ext.name().clone(), ext_ref);
                 }
                 None => {
                     missing_extensions.insert(custom.extension().clone());
@@ -200,7 +205,7 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
 ///   `Weak<Extension>` pointer has been invalidated.
 fn collect_typearg_exts(
     arg: &TypeArg,
-    used_extensions: &mut ExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
     match arg {
@@ -226,7 +231,7 @@ fn collect_typearg_exts(
 ///   `Weak<Extension>` pointer has been invalidated.
 fn collect_value_exts(
     value: &Value,
-    used_extensions: &mut ExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
     match value {

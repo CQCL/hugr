@@ -15,6 +15,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::resolution::{
     resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
+    WeakExtensionRegistry,
 };
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc, PRELUDE};
@@ -132,7 +133,7 @@ impl CustomConst for ListValue {
 
     fn update_extensions(
         &mut self,
-        extensions: &ExtensionRegistry,
+        extensions: &WeakExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
         for val in &mut self.0 {
             resolve_value_extensions(val, extensions)?;
