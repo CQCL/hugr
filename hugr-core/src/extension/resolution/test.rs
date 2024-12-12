@@ -10,11 +10,13 @@ use rstest::rstest;
 use crate::builder::{
     Container, Dataflow, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
 };
-use crate::extension::prelude::{bool_t, ConstUsize};
+use crate::extension::prelude::{bool_t, usize_custom_t, ConstUsize};
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
 };
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE};
+use crate::ops::constant::test::CustomTestValue;
+use crate::ops::constant::CustomConst;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
 use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
 use crate::std_extensions::arithmetic::int_ops;
@@ -80,6 +82,44 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
     (ext, op.into())
 }
 
+/// Check that the extensions added during building coincide with read-only collected extensions
+/// and that they survive a serialization roundtrip.
+fn check_extension_resolution(mut hugr: Hugr) {
+    let build_extensions = hugr.extensions().clone();
+
+    // Check that the read-only methods collect the same extensions.
+    let collected_exts = ExtensionRegistry::new(hugr.nodes().flat_map(|node| {
+        hugr.get_optype(node)
+            .used_extensions()
+            .unwrap_or_default()
+            .into_iter()
+    }));
+    assert_eq!(
+        collected_exts, build_extensions,
+        "{collected_exts} != {build_extensions}"
+    );
+
+    // Check that the mutable methods collect the same extensions.
+    hugr.resolve_extension_defs(&build_extensions).unwrap();
+    assert_eq!(
+        hugr.extensions(),
+        &build_extensions,
+        "{} != {build_extensions}",
+        hugr.extensions()
+    );
+
+    // Roundtrip serialize so all weak references are dropped.
+    let ser = serde_json::to_string(&hugr).unwrap();
+    let deser_hugr = Hugr::load_json(ser.as_bytes(), &build_extensions).unwrap();
+
+    assert_eq!(
+        deser_hugr.extensions(),
+        &build_extensions,
+        "{} != {build_extensions}",
+        deser_hugr.extensions()
+    );
+}
+
 /// Build a hugr with all possible op nodes and resolve the extensions.
 #[rstest]
 fn resolve_hugr_extensions() {
@@ -90,15 +130,6 @@ fn resolve_hugr_extensions() {
     let (ext_e, op_e) = make_extension("dummy.e", "op_e");
 
     let mut module = ModuleBuilder::new();
-
-    // A constant op using the prelude extension.
-    module.add_constant(Value::extension(ConstUsize::new(42)));
-
-    // A constant op using lists of non-prelude types.
-    module.add_constant(Value::extension(ListValue::new(
-        float64_type(),
-        [ConstF64::new(f64::consts::PI).into()],
-    )));
 
     // A function declaration using the floats extension in its signature.
     let decl = module
@@ -196,7 +227,7 @@ fn resolve_hugr_extensions() {
 
     // Finally, finish the hugr and ensure it's using the right extensions.
     func.finish_with_outputs(vec![]).unwrap();
-    let mut hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
+    let hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
 
     let build_extensions = hugr.extensions().clone();
     assert!(build_extensions.contains(ext_a.name()));
@@ -204,36 +235,25 @@ fn resolve_hugr_extensions() {
     assert!(build_extensions.contains(ext_c.name()));
     assert!(build_extensions.contains(ext_d.name()));
 
-    // Check that the read-only methods collect the same extensions.
-    let mut collected_exts = ExtensionRegistry::default();
-    for node in hugr.nodes() {
-        let op = hugr.get_optype(node);
-        collected_exts.extend(op.used_extensions().unwrap());
-    }
-    assert_eq!(
-        collected_exts, build_extensions,
-        "{collected_exts} != {build_extensions}"
-    );
+    check_extension_resolution(hugr);
+}
 
-    // Check that the mutable methods collect the same extensions.
-    hugr.resolve_extension_defs(&build_extensions).unwrap();
-    assert_eq!(
-        hugr.extensions(),
-        &build_extensions,
-        "{} != {build_extensions}",
-        hugr.extensions()
-    );
+/// Test resolution of a custom constants.
+#[rstest]
+#[case::usize(ConstUsize::new(42))]
+#[case::list(ListValue::new(
+        float64_type(),
+        [ConstF64::new(f64::consts::PI).into()],
+))]
+#[case::custom(CustomTestValue(usize_custom_t(
+        &Arc::downgrade(&PRELUDE),
+)))]
+fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
+    let mut module = ModuleBuilder::new();
+    module.add_constant(Value::extension(custom_const));
+    let hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
 
-    // Rountrip serialize so all weak references are dropped.
-    let ser = serde_json::to_string(&hugr).unwrap();
-    let deser_hugr = Hugr::load_json(ser.as_bytes(), &build_extensions).unwrap();
-
-    assert_eq!(
-        deser_hugr.extensions(),
-        &build_extensions,
-        "{} != {build_extensions}",
-        deser_hugr.extensions()
-    );
+    check_extension_resolution(hugr);
 }
 
 /// Fail when collecting extensions but the weak pointers are not resolved.

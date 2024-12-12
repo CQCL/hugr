@@ -569,7 +569,7 @@ pub type ValueName = SmolStr;
 pub type ValueNameRef = str;
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use std::collections::HashSet;
     use std::sync::{Arc, Weak};
 
@@ -577,7 +577,9 @@ mod test {
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
     use crate::extension::prelude::{bool_t, usize_custom_t};
-    use crate::extension::resolution::{resolve_typearg_extensions, ExtensionResolutionError};
+    use crate::extension::resolution::{
+        resolve_custom_type_extensions, resolve_typearg_extensions, ExtensionResolutionError,
+    };
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
@@ -614,6 +616,9 @@ mod test {
             &mut self,
             extensions: &ExtensionRegistry,
         ) -> Result<(), ExtensionResolutionError> {
+            resolve_custom_type_extensions(&mut self.0, extensions)?;
+            // This loop is redundant, but we use it to test the public
+            // function.
             for arg in self.0.args_mut() {
                 resolve_typearg_extensions(arg, extensions)?;
             }

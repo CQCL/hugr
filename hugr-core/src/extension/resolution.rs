@@ -26,7 +26,9 @@ mod types_mut;
 pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
 pub(crate) use types::{collect_op_types_extensions, collect_signature_exts};
 pub(crate) use types_mut::resolve_op_types_extensions;
-use types_mut::{resolve_type_exts, resolve_typearg_exts, resolve_value_exts};
+use types_mut::{
+    resolve_custom_type_exts, resolve_type_exts, resolve_typearg_exts, resolve_value_exts,
+};
 
 use derive_more::{Display, Error, From};
 
@@ -34,7 +36,7 @@ use super::{Extension, ExtensionId, ExtensionRegistry, ExtensionSet};
 use crate::ops::constant::ValueName;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{NamedOp, OpName, OpType, Value};
-use crate::types::{FuncTypeBase, MaybeRV, TypeArg, TypeBase, TypeName};
+use crate::types::{CustomType, FuncTypeBase, MaybeRV, TypeArg, TypeBase, TypeName};
 use crate::Node;
 
 /// Update all weak Extension pointers inside a type.
@@ -47,6 +49,18 @@ pub fn resolve_type_extensions<RV: MaybeRV>(
     let node: Node = portgraph::NodeIndex::new(0).into();
     let mut used_extensions = ExtensionRegistry::default();
     resolve_type_exts(node, typ, extensions, &mut used_extensions)
+}
+
+/// Update all weak Extension pointers in a custom type.
+pub fn resolve_custom_type_extensions(
+    typ: &mut CustomType,
+    extensions: &ExtensionRegistry,
+) -> Result<(), ExtensionResolutionError> {
+    // This public export is used for implementing `CustomConst::update_extensions`, so we don't need the full internal API here.
+    // TODO: Make `node` optional in `ExtensionResolutionError`
+    let node: Node = portgraph::NodeIndex::new(0).into();
+    let mut used_extensions = ExtensionRegistry::default();
+    resolve_custom_type_exts(node, typ, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers inside a type argument.
