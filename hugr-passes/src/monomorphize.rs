@@ -92,7 +92,7 @@ struct Instantiating<'a> {
 type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 
 /// Scans a subtree for polymorphic calls and monomorphizes them by instantiating the
-/// called functions (if instantations not already in `cache`).
+/// called functions (if instantiations not already in `cache`).
 /// Optionally copies the subtree into a new location whilst applying a substitution.
 /// The subtree should be monomorphic after the substitution (if provided) has been applied.
 fn mono_scan(
