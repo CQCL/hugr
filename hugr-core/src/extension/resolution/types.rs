@@ -44,9 +44,7 @@ pub(crate) fn collect_op_types_extensions(
         }
         OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
         OpType::FuncDecl(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
-        OpType::Const(c) => {
-            collect_value_exts(&c.value, &mut used, &mut missing);
-        }
+        OpType::Const(c) => collect_value_exts(&c.value, &mut used, &mut missing),
         OpType::Input(inp) => collect_type_row_exts(&inp.types, &mut used, &mut missing),
         OpType::Output(out) => collect_type_row_exts(&out.types, &mut used, &mut missing),
         OpType::Call(c) => {
