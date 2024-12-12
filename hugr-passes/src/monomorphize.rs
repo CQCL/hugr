@@ -1,5 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    fmt::Write,
     ops::Deref,
 };
 
@@ -22,9 +23,18 @@ use itertools::Itertools as _;
 /// * else, the originals are removed (they are invisible from outside the Hugr).
 ///
 /// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
-/// signature then the hugr is untouched.
+/// signature then the HUGR will not be modified.
+///
+/// Monomorphic copies of polymorphic functions will be added to the HUGR as
+/// children of the root node.  We make best effort to ensure that names(derived
+/// from parent function names concrete type args) of new functions are unique
+/// whenever the names of their parents are unique, but this is not guaranteed.
 pub fn monomorphize(mut h: Hugr) -> Hugr {
     let validate = |h: &Hugr| h.validate().unwrap_or_else(|e| panic!("{e}"));
+
+    // We clone the extension registry because we will need a reference to
+    // create our mutable substitutions. This is cannot cause a problem because
+    // we will not be adding any new types or extension ops to the HUGR.
     let reg = h.extensions().to_owned();
 
     #[cfg(debug_assertions)]
@@ -243,46 +253,48 @@ struct TypeArgsList<'a>(&'a [TypeArg]);
 impl std::fmt::Display for TypeArgsList<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for arg in self.0 {
-            f.write_str("$")?;
+            f.write_char('$')?;
             write_type_arg_str(arg, f)?;
         }
         Ok(())
     }
 }
 
+fn escape_dollar(str: impl AsRef<str>) -> String {
+    str.as_ref().replace("$", "\\$")
+}
+
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
-        TypeArg::Type { ty } => f.write_str(&ty.to_string().replace("$", "\\$")),
+        TypeArg::Type { ty } => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
         TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
-        TypeArg::String { arg } => f.write_fmt(format_args!("s({})", arg.replace("$", "\\$"))),
-        TypeArg::Sequence { elems } => {
-            f.write_str("seq(")?;
-            let mut first = true;
-            for arg in elems.iter() {
-                if first {
-                    first = false;
-                } else {
-                    f.write_str(",")?;
-                }
-                write_type_arg_str(arg, f)?;
-            }
-            f.write_str(")")?;
-            Ok(())
-        }
+        TypeArg::String { arg } => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
+        TypeArg::Sequence { elems } => f.write_fmt(format_args!("seq({})", TypeArgsList(elems))),
         TypeArg::Extensions { es } => f.write_fmt(format_args!(
             "es({})",
             es.iter().map(|x| x.deref()).join(",")
         )),
+        // We are monomorphizing. We will never monomorphize to a signature
+        // containing a variable.
         TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
         _ => panic!("unknown type arg: {arg}"),
     }
 }
 
-/// We do our best to generate unique names.
+/// We do our best to generate unique names. Our strategy is to pick out '$' as
+/// a special character.
 ///
-/// We depend on the [Display] impl of [TypeArg].
-///
+/// We:
+///  - construct a new name of the form `{func_name}$$arg0$arg1$arg2` etc
+///  - replace any existing `$` in the function name or type args string
+///    representation with `r"\$"`
+///  - We depend on the `Display` impl of `Type` to generate the string
+///    representation of a `TypeArg::Type`. For other constructors we do the
+///    simple obvious thing.
+///  - For all TypeArg Constructors we choose a short prefix (e.g. `t` for type)
+///    and use "t({arg})" as the string representation of that arg.
 fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
+    let name = escape_dollar(name);
     format!("${name}${}", TypeArgsList(type_args.as_ref()))
 }
 
@@ -649,10 +661,11 @@ mod test {
 
     #[rstest]
     #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
-    #[case::type_(vec![Type::UNIT.into()], "$foo$$Unit")]
+    #[case::type_unit(vec![Type::UNIT.into()], "$foo$$t(Unit)")]
+    #[case::type_int(vec![INT_TYPES[2].to_owned().into()], "$foo$$t(int([BoundedNat { n: 2 }]))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
-    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq(n(0),Unit)")]
+    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq($n(0)$t(Unit))")]
     #[case::extensionset(vec![ExtensionSet::from_iter([PRELUDE_ID,int_types::EXTENSION_ID]).into()],
                          "$foo$$es(arithmetic.int.types,prelude)")] // alphabetic ordering of extension names
     #[should_panic]
