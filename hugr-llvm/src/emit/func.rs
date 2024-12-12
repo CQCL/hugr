@@ -33,7 +33,7 @@ pub use mailbox::{RowMailBox, RowPromise};
 /// One of the primary interfaces for implementing codegen extensions.
 /// We have methods for:
 ///   * Converting from hugr [Type]s to LLVM [Type](BasicTypeEnum)s;
-///   * Maintaing [MailBox](RowMailBox) for each [Wire] in the [FuncDefn];
+///   * Maintaining [MailBox](RowMailBox) for each [Wire] in the [FuncDefn];
 ///   * Accessing the [CodegenExtsMap];
 ///   * Accessing an in internal [Builder].
 ///
@@ -231,7 +231,7 @@ impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
         r
     }
 
-    /// Returns a [RowMailBox] mapped to thie input wires of `node`. When emitting a node
+    /// Returns a [RowMailBox] mapped to the input wires of `node`. When emitting a node
     /// input values are from this mailbox.
     pub fn node_ins_rmb<'hugr, OT: 'hugr>(
         &mut self,
@@ -252,7 +252,7 @@ impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
         Ok(r)
     }
 
-    /// Returns a [RowMailBox] mapped to thie ouput wires of `node`. When emitting a node
+    /// Returns a [RowMailBox] mapped to the output wires of `node`. When emitting a node
     /// output values are written to this mailbox.
     pub fn node_outs_rmb<'hugr, OT: 'hugr>(
         &mut self,

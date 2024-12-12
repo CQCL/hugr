@@ -555,27 +555,27 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::std_extensions::collections;
+    use crate::std_extensions::collections::list;
     const BOUND: TypeParam = TypeParam::Type {
         b: TypeBound::Copyable,
     };
     let list_of_var = Type::new_extension(
-        collections::EXTENSION
-            .get_type(&collections::LIST_TYPENAME)
+        list::EXTENSION
+            .get_type(&list::LIST_TYPENAME)
             .unwrap()
             .instantiate(vec![TypeArg::new_var_use(0, BOUND)])?,
     );
-    let reg = ExtensionRegistry::new([collections::EXTENSION.to_owned()]);
+    let reg = ExtensionRegistry::new([list::EXTENSION.to_owned()]);
     reg.validate()?;
     let mut def = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
             [BOUND],
             Signature::new(vec![], vec![list_of_var.clone()])
-                .with_extension_delta(collections::EXTENSION_ID),
+                .with_extension_delta(list::EXTENSION_ID),
         ),
     )?;
-    let empty_list = Value::extension(collections::ListValue::new_empty(Type::new_var_use(
+    let empty_list = Value::extension(list::ListValue::new_empty(Type::new_var_use(
         0,
         TypeBound::Copyable,
     )));

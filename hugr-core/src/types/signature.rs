@@ -2,6 +2,7 @@
 
 use itertools::Either;
 
+use std::borrow::Cow;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
@@ -14,7 +15,7 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[cfg(test)]
-use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
+use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arbitrary};
 
 #[derive(Clone, Debug, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
@@ -316,6 +317,18 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<R
         self.input == other.input
             && self.output == other.output
             && self.extension_reqs == other.extension_reqs
+    }
+}
+
+impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<Cow<'_, FuncTypeBase<RV1>>> for FuncTypeBase<RV2> {
+    fn eq(&self, other: &Cow<'_, FuncTypeBase<RV1>>) -> bool {
+        self.eq(other.as_ref())
+    }
+}
+
+impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTypeBase<RV2>> {
+    fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
+        self.as_ref().eq(other)
     }
 }
 

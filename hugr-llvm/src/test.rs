@@ -76,7 +76,7 @@ impl<
 type MakeCodegenExtsMapBox = Box<dyn MakeCodegenExtsMapFn>;
 // We would like to just stor a CodegenExtsMap, but we can't because it's
 // lifetime parameter would need to be the lifetime of TestContext, which is
-// prohibitted. Instead, we store a factory function as below.
+// prohibited. Instead, we store a factory function as below.
 pub struct TestContext {
     context: Context,
     mk_exts: MakeCodegenExtsMapBox,

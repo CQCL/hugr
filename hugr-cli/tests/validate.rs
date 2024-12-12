@@ -169,7 +169,7 @@ fn test_no_std(test_hugr_string: String, mut val_cmd: Command) {
     val_cmd.write_stdin(test_hugr_string);
     val_cmd.arg("-");
     val_cmd.arg("--no-std");
-    // test hugr doesn't have any standard extensions, so this should succceed
+    // test hugr doesn't have any standard extensions, so this should succeed
 
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }

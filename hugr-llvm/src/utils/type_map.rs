@@ -34,7 +34,7 @@ impl<'a, TM: TypeMapping, F: for<'c> TypeMapFnHelper<'c, TM> + 'a> TypeMappingFn
 
 /// Defines a mapping from [HugrType] to `OutV`;
 pub trait TypeMapping {
-    /// Auxilliary data provided when mapping from a [HugrType].
+    /// Auxiliary data provided when mapping from a [HugrType].
     type InV<'c>: Clone;
     /// The target type of the mapping.
     type OutV<'c>;
@@ -45,7 +45,7 @@ pub trait TypeMapping {
     /// convertible to `OutV` via `func_into_out`.
     type FuncOutV<'c>;
 
-    /// Returns the result of the mapping on `sum_type`, with auxilliary data
+    /// Returns the result of the mapping on `sum_type`, with auxiliary data
     /// `inv`, and when the result of mapping all fields of all variants is
     /// given by `variants`.
     fn map_sum_type<'c>(
@@ -55,7 +55,7 @@ pub trait TypeMapping {
         variants: impl IntoIterator<Item = Vec<Self::OutV<'c>>>,
     ) -> Result<Self::SumOutV<'c>>;
 
-    /// Returns the result of the mapping on `function_type`, with auxilliary data
+    /// Returns the result of the mapping on `function_type`, with auxiliary data
     /// `inv`, and when the result of mapping all inputs is given by `inputs`
     /// and the result of mapping all outputs is given by `outputs`.
     fn map_function_type<'c>(
@@ -113,7 +113,7 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
     }
 
     /// Map `hugr_type` using the [TypeMapping] `TM`, the registered callbacks,
-    /// and the auxilliary data `inv`.
+    /// and the auxiliary data `inv`.
     pub fn map_type<'c>(&self, hugr_type: &HugrType, inv: TM::InV<'c>) -> Result<TM::OutV<'c>> {
         match hugr_type.as_type_enum() {
             TypeEnum::Extension(custom_type) => {

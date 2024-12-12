@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use hugr_core::ops::{
     constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
-    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, Value, CFG,
+    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, CFG,
 };
 use hugr_core::{
     hugr::views::SiblingGraph,
@@ -45,7 +45,7 @@ where
         }
     }
 
-    /// safe because we are guarenteed only one input or output node
+    /// safe because we are guaranteed only one input or output node
     fn take_input(&mut self) -> Result<Vec<BasicValueEnum<'c>>> {
         self.inputs
             .take()
@@ -58,7 +58,7 @@ where
             .ok_or(anyhow!("DataflowParentEmitter: Output taken twice"))
     }
 
-    pub fn emit_children(mut self, context: &mut EmitFuncContext<'c, '_, H>) -> Result<()> {
+    pub fn emit_children(&mut self, context: &mut EmitFuncContext<'c, '_, H>) -> Result<()> {
         use petgraph::visit::Topo;
         let node = self.node;
         if !OpTag::DataflowParent.is_superset(node.tag()) {
@@ -306,6 +306,59 @@ fn emit_cfg<'c, H: HugrView>(
     cfg::CfgEmitter::new(context, args)?.emit_children(context)
 }
 
+fn emit_tail_loop<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, '_, H>,
+    args: EmitOpArgs<'c, '_, TailLoop, H>,
+) -> Result<()> {
+    let node = args.node();
+
+    // Make a block to jump to when we `Break`
+    let out_bb = context.new_basic_block("loop_out", None);
+    // A block for the body of the loop
+    let body_bb = context.new_basic_block("loop_body", Some(out_bb));
+
+    let (body_i_node, body_o_node) = node.get_io().unwrap();
+    let body_i_rmb = context.node_outs_rmb(body_i_node)?;
+    let body_o_rmb = context.node_ins_rmb(body_o_node)?;
+
+    body_i_rmb.write(context.builder(), args.inputs)?;
+    context.builder().build_unconditional_branch(body_bb)?;
+
+    let control_llvm_sum_type = {
+        let sum_ty = SumType::new([node.just_inputs.clone(), node.just_outputs.clone()]);
+        context.llvm_sum_type(sum_ty)?
+    };
+
+    context.build_positioned(body_bb, move |context| {
+        let inputs = body_i_rmb.read_vec(context.builder(), [])?;
+        emit_dataflow_parent(
+            context,
+            EmitOpArgs {
+                node,
+                inputs,
+                outputs: body_o_rmb.promise(),
+            },
+        )?;
+        let dataflow_outputs = body_o_rmb.read_vec(context.builder(), [])?;
+        let control_val = LLVMSumValue::try_new(dataflow_outputs[0], control_llvm_sum_type)?;
+        let mut outputs = Some(args.outputs);
+
+        control_val.build_destructure(context.builder(), |builder, tag, mut values| {
+            values.extend(dataflow_outputs[1..].iter().copied());
+            if tag == 0 {
+                body_i_rmb.write(builder, values)?;
+                builder.build_unconditional_branch(body_bb)?;
+            } else {
+                outputs.take().unwrap().finish(builder, values)?;
+                builder.build_unconditional_branch(out_bb)?;
+            }
+            Ok(())
+        })
+    })?;
+    context.builder().position_at_end(out_bb);
+    Ok(())
+}
+
 fn emit_optype<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, OpType, H>,
@@ -330,7 +383,7 @@ fn emit_optype<'c, H: HugrView>(
             context.push_todo_func(node.into_ot(fd));
             Ok(())
         }
-
+        OpType::TailLoop(x) => emit_tail_loop(context, args.into_ot(x)),
         _ => Err(anyhow!("Invalid child for Dataflow Parent: {node}")),
     }
 }
