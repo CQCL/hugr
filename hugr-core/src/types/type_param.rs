@@ -212,9 +212,10 @@ impl From<String> for TypeArg {
 
 impl From<&str> for TypeArg {
     fn from(arg: &str) -> Self {
-        TypeArg::String { arg: arg.to_string() }
+        TypeArg::String {
+            arg: arg.to_string(),
+        }
     }
-
 }
 
 impl From<Vec<TypeArg>> for TypeArg {

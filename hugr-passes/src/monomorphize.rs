@@ -1,4 +1,7 @@
-use std::{collections::{hash_map::Entry, HashMap}, ops::Deref};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    ops::Deref,
+};
 
 use hugr_core::{
     extension::ExtensionRegistry,
@@ -235,7 +238,7 @@ fn instantiate(
     mono_tgt
 }
 
-struct TypeArgsList<'a>(&'a[TypeArg]);
+struct TypeArgsList<'a>(&'a [TypeArg]);
 
 impl<'a> std::fmt::Display for TypeArgsList<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -249,9 +252,7 @@ impl<'a> std::fmt::Display for TypeArgsList<'a> {
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
-        TypeArg::Type { ty } => {
-            f.write_str(&ty.to_string().replace("$", "\\$"))
-        },
+        TypeArg::Type { ty } => f.write_str(&ty.to_string().replace("$", "\\$")),
         TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
         TypeArg::String { arg } => f.write_fmt(format_args!("s({})", arg.replace("$", "\\$"))),
         TypeArg::Sequence { elems } => {
@@ -268,7 +269,10 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
             f.write_str(")")?;
             Ok(())
         }
-        TypeArg::Extensions { es } => f.write_fmt(format_args!("es({})", es.iter().map(|x| x.deref()).join(","))),
+        TypeArg::Extensions { es } => f.write_fmt(format_args!(
+            "es({})",
+            es.iter().map(|x| x.deref()).join(",")
+        )),
         TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
         _ => panic!("unknown type arg: {arg}"),
     }
@@ -300,12 +304,16 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, PRELUDE_ID, UnwrapBuilder, };
+    use hugr_core::extension::prelude::{
+        usize_t, ConstUsize, UnpackTuple, UnwrapBuilder, PRELUDE_ID,
+    };
     use hugr_core::extension::ExtensionSet;
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
-    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeRow,         SumType, TypeEnum, };
+    use hugr_core::types::{
+        PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
+    };
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
@@ -381,9 +389,7 @@ mod test {
                 .outputs_arr();
             let pair = fb.call(db.handle(), &[usize_t().into()], [elem])?;
             let pty = pair_type(usize_t()).into();
-            let [res2] = fb
-                .call(tr.handle(), &[pty], pair.outputs())?
-                .outputs_arr();
+            let [res2] = fb.call(tr.handle(), &[pty], pair.outputs())?.outputs_arr();
             fb.finish_with_outputs([res1, res2])?;
         }
         let hugr = mb.finish_hugr()?;
@@ -438,7 +444,8 @@ mod test {
         let mut outer = FunctionBuilder::new(
             "mainish",
             prelusig(
-                array_type_parametric(sa(n), array_type_parametric(sa(2), usize_t()).unwrap()).unwrap(),
+                array_type_parametric(sa(n), array_type_parametric(sa(2), usize_t()).unwrap())
+                    .unwrap(),
                 vec![usize_t(); 2],
             ),
         )?;
@@ -465,18 +472,18 @@ mod test {
             let [inw] = pf2.input_wires_arr();
             let [idx] = pf2.call(mono_func.handle(), &[], [])?.outputs_arr();
             let op_def = array::EXTENSION.get_op("get").unwrap();
-            let op =
-                hugr_core::ops::ExtensionOp::new(op_def.clone(), vec![sv(0), tv(1).into()], &STD_REG)?;
+            let op = hugr_core::ops::ExtensionOp::new(
+                op_def.clone(),
+                vec![sv(0), tv(1).into()],
+                &STD_REG,
+            )?;
             let [get] = pf2.add_dataflow_op(op, [inw, idx])?.outputs_arr();
-            let [got] = pf2.build_unwrap_sum(&STD_REG, 1, SumType::new([vec![], vec![tv(1)]]), get)?;
+            let [got] =
+                pf2.build_unwrap_sum(&STD_REG, 1, SumType::new([vec![], vec![tv(1)]]), get)?;
             pf2.finish_with_outputs([got])?
         };
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
-        let inner = pf1.call(
-            pf2.handle(),
-            &[sv(0), arr2u().into()],
-            pf1.input_wires(),
-        )?;
+        let inner = pf1.call(pf2.handle(), &[sv(0), arr2u().into()], pf1.input_wires())?;
         let elem = pf1.call(
             pf2.handle(),
             &[TypeArg::BoundedNat { n: 2 }, usize_t().into()],
@@ -552,9 +559,7 @@ mod test {
         let [a] = mono
             .call(pf.handle(), &[usize_t().into()], [a])?
             .outputs_arr();
-        let [b] = mono
-            .call(pf.handle(), &[ity().into()], [b])?
-            .outputs_arr();
+        let [b] = mono.call(pf.handle(), &[ity().into()], [b])?.outputs_arr();
         let mono = mono.finish_with_outputs([a, b])?;
         let c = dfg.call(mono.handle(), &[], dfg.input_wires())?;
         let hugr = dfg.finish_hugr_with_outputs(c.outputs())?;
@@ -626,7 +631,7 @@ mod test {
     #[case::extensionset(vec![ExtensionSet::from_iter([PRELUDE_ID,int_types::EXTENSION_ID]).into()],
                          "$foo$$es(arithmetic.int.types,prelude)")] // alphabetic ordering of extension names
     #[should_panic]
-    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String).into()],
+    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String)],
                             "$foo$$v(1)")]
     #[case::multiple(vec![0.into(), "arg".into()], "$foo$$n(0)$s(arg)")]
     fn test_mangle_name(#[case] args: Vec<TypeArg>, #[case] expected: String) {

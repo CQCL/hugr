@@ -15,8 +15,8 @@ use crate::extension::resolution::{
 use std::borrow::Cow;
 
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::types::{EdgeKind, Signature, Substitution};
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
+use crate::types::{EdgeKind, Signature, Substitution};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use derive_more::Display;
