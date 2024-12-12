@@ -288,9 +288,12 @@ impl HasConcrete for ArrayOpDef {
 
 #[cfg(test)]
 mod tests {
+    use std::arch::aarch64::float32x2_t;
+
     use strum::IntoEnumIterator;
 
     use crate::extension::prelude::usize_t;
+    use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::std_extensions::collections::array::new_array_op;
     use crate::{
         builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
@@ -433,6 +436,26 @@ mod tests {
             (
                 &vec![array_type(size, element_ty.clone())].into(),
                 &type_row![]
+            )
+        );
+    }
+
+    #[test]
+    /// Initialize an array operation where the element type is not from the prelude.
+    fn test_non_prelude_op() {
+        let size = 2;
+        let element_ty = float64_type();
+        let op = ArrayOpDef::get.to_concrete(element_ty.clone(), size);
+
+        let optype: OpType = op.into();
+
+        let sig = optype.dataflow_signature().unwrap();
+
+        assert_eq!(
+            sig.io(),
+            (
+                &vec![array_type(size, element_ty.clone()), usize_t()].into(),
+                &vec![option_type(element_ty.clone()).into()].into()
             )
         );
     }
