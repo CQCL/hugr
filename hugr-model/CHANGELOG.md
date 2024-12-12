@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.14.0...hugr-model-v0.15.0) - 2024-12-12
+
+### Bug Fixes
+
+- Ignare lint warnings in capnproto generated code (#1728)
+
+### New Features
+
+- Export/import of JSON metadata (#1622)
+- Emulate `TypeBound`s on parameters via constraints. (#1624)
+- Lists and extension sets with splicing (#1657)
+- [**breaking**] Have `CustomType`s reference their `Extension` definition (#1723)
+
+### Performance
+
+- Faster singleton SiblingSubgraph construction (#1654)
+
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.13.2...hugr-model-v0.14.0) - 2024-11-06
 
 ### New Features
