@@ -26,7 +26,7 @@ use itertools::Itertools as _;
 /// signature then the HUGR will not be modified.
 ///
 /// Monomorphic copies of polymorphic functions will be added to the HUGR as
-/// children of the root node.  We make best effort to ensure that names(derived
+/// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
 pub fn monomorphize(mut h: Hugr) -> Hugr {
