@@ -7,6 +7,7 @@
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr::builder::{DFGBuilder, DataflowSubContainer, ModuleBuilder};
+use hugr::package::Package;
 use hugr::types::Type;
 use hugr::{
     builder::{Container, Dataflow},
@@ -15,7 +16,7 @@ use hugr::{
     types::Signature,
     Hugr,
 };
-use hugr_cli::{validate::VALID_PRINT, Package};
+use hugr_cli::validate::VALID_PRINT;
 use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
 
