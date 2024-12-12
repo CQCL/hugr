@@ -130,8 +130,6 @@ fn resolve_signature_exts(
 ) -> Result<(), ExtensionResolutionError> {
     // Note that we do not include the signature's `runtime_reqs` here, as those refer
     // to _runtime_ requirements that may not be currently present.
-    // See https://github.com/CQCL/hugr/issues/1734
-    // TODO: Update comment once that issue gets implemented.
     resolve_type_row_exts(node, &mut signature.input, extensions, used_extensions)?;
     resolve_type_row_exts(node, &mut signature.output, extensions, used_extensions)?;
     Ok(())
