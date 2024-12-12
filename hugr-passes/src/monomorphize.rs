@@ -58,7 +58,7 @@ pub fn monomorphize(mut h: Hugr) -> Hugr {
 /// first).
 ///
 /// TODO replace this with a more general remove-unused-functions pass
-/// https://github.com/CQCL/hugr/issues/1753
+/// <https://github.com/CQCL/hugr/issues/1753>
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
