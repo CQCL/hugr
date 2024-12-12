@@ -10,7 +10,7 @@ use super::{ExtensionRegistry, ExtensionResolutionError};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
 use crate::types::type_row::TypeRowBase;
-use crate::types::{MaybeRV, Signature, SumType, TypeArg, TypeBase, TypeEnum};
+use crate::types::{CustomType, MaybeRV, Signature, SumType, TypeArg, TypeBase, TypeEnum};
 use crate::Node;
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside an
@@ -143,7 +143,7 @@ fn resolve_type_row_exts<RV: MaybeRV>(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a type.
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-fn resolve_type_exts<RV: MaybeRV>(
+pub(super) fn resolve_type_exts<RV: MaybeRV>(
     node: Node,
     typ: &mut TypeBase<RV>,
     extensions: &ExtensionRegistry,
@@ -151,24 +151,7 @@ fn resolve_type_exts<RV: MaybeRV>(
 ) -> Result<(), ExtensionResolutionError> {
     match typ.as_type_enum_mut() {
         TypeEnum::Extension(custom) => {
-            for arg in custom.args_mut() {
-                resolve_typearg_exts(node, arg, extensions, used_extensions)?;
-            }
-
-            let ext_id = custom.extension();
-            let ext = extensions.get(ext_id).ok_or_else(|| {
-                ExtensionResolutionError::missing_type_extension(
-                    node,
-                    custom.name(),
-                    ext_id,
-                    extensions,
-                )
-            })?;
-
-            // Add the extension to the used extensions registry,
-            // and update the CustomType with the valid pointer.
-            used_extensions.register_updated_ref(ext);
-            custom.update_extension(Arc::downgrade(ext));
+            resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
         }
         TypeEnum::Function(f) => {
             resolve_type_row_exts(node, &mut f.input, extensions, used_extensions)?;
@@ -188,10 +171,36 @@ fn resolve_type_exts<RV: MaybeRV>(
     Ok(())
 }
 
+/// Update all weak Extension pointers in a [`CustomType`].
+///
+/// Adds the extensions used in the type to the `used_extensions` registry.
+pub(super) fn resolve_custom_type_exts(
+    node: Node,
+    custom: &mut CustomType,
+    extensions: &ExtensionRegistry,
+    used_extensions: &mut ExtensionRegistry,
+) -> Result<(), ExtensionResolutionError> {
+    for arg in custom.args_mut() {
+        resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+    }
+
+    let ext_id = custom.extension();
+    let ext = extensions.get(ext_id).ok_or_else(|| {
+        ExtensionResolutionError::missing_type_extension(node, custom.name(), ext_id, extensions)
+    })?;
+
+    // Add the extension to the used extensions registry,
+    // and update the CustomType with the valid pointer.
+    used_extensions.register_updated_ref(ext);
+    custom.update_extension(Arc::downgrade(ext));
+
+    Ok(())
+}
+
 /// Update all weak Extension pointers in the [`CustomType`]s inside a type arg.
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-fn resolve_typearg_exts(
+pub(super) fn resolve_typearg_exts(
     node: Node,
     arg: &mut TypeArg,
     extensions: &ExtensionRegistry,
@@ -212,7 +221,7 @@ fn resolve_typearg_exts(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a [`Value`].
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
-fn resolve_value_exts(
+pub(super) fn resolve_value_exts(
     node: Node,
     value: &mut Value,
     extensions: &ExtensionRegistry,
@@ -220,9 +229,10 @@ fn resolve_value_exts(
 ) -> Result<(), ExtensionResolutionError> {
     match value {
         Value::Extension { e } => {
-            // We expect that the `CustomConst::get_type` binary calls always
-            // return types with valid extensions.
-            // So here we just collect the used extensions.
+            e.value_mut().update_extensions(extensions)?;
+
+            // We expect that the `CustomConst::get_type` binary calls
+            // return types with valid extensions after we call `update_extensions`.
             let typ = e.get_type();
             let mut missing = ExtensionSet::new();
             collect_type_exts(&typ, used_extensions, &mut missing);
