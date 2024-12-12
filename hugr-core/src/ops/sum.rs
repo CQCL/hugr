@@ -55,4 +55,11 @@ impl DataflowOpTrait for Tag {
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
     }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            variants: self.variants.iter().map(|r| r.substitute(subst)).collect(),
+            tag: self.tag,
+        }
+    }
 }

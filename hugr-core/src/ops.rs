@@ -16,7 +16,7 @@ use std::borrow::Cow;
 
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
-use crate::types::{EdgeKind, Signature};
+use crate::types::{EdgeKind, Signature, Substitution};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use derive_more::Display;
@@ -369,7 +369,7 @@ pub trait StaticTag {
 
 #[enum_dispatch]
 /// Trait implemented by all OpType variants.
-pub trait OpTrait {
+pub trait OpTrait: Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
 
@@ -432,6 +432,12 @@ pub trait OpTrait {
             Direction::Outgoing => self.other_output(),
         }
         .is_some() as usize
+    }
+
+    /// Apply a type-level substitution to this OpType, i.e. replace
+    /// [type variables](crate::types::TypeArg::new_var_use) with new types.
+    fn substitute(&self, _subst: &Substitution) -> Self {
+        self.clone()
     }
 }
 

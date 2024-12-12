@@ -41,6 +41,15 @@ impl DataflowOpTrait for TailLoop {
             Signature::new(inputs, outputs).with_extension_delta(self.extension_delta.clone()),
         )
     }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            just_inputs: self.just_inputs.substitute(subst),
+            just_outputs: self.just_outputs.substitute(subst),
+            rest: self.rest.substitute(subst),
+            extension_delta: self.extension_delta.substitute(subst),
+        }
+    }
 }
 
 impl TailLoop {
@@ -111,6 +120,15 @@ impl DataflowOpTrait for Conditional {
                 .with_extension_delta(self.extension_delta.clone()),
         )
     }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst)).collect(),
+            other_inputs: self.other_inputs.substitute(subst),
+            outputs: self.outputs.substitute(subst),
+            extension_delta: self.extension_delta.substitute(subst),
+        }
+    }
 }
 
 impl Conditional {
@@ -139,6 +157,12 @@ impl DataflowOpTrait for CFG {
 
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Borrowed(&self.signature)
+    }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
     }
 }
 
@@ -223,6 +247,15 @@ impl OpTrait for DataflowBlock {
             Direction::Outgoing => self.sum_rows.len(),
         }
     }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            inputs: self.inputs.substitute(subst),
+            other_outputs: self.other_outputs.substitute(subst),
+            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst)).collect(),
+            extension_delta: self.extension_delta.substitute(subst),
+        }
+    }
 }
 
 impl OpTrait for ExitBlock {
@@ -246,6 +279,12 @@ impl OpTrait for ExitBlock {
         match dir {
             Direction::Incoming => 1,
             Direction::Outgoing => 0,
+        }
+    }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            cfg_outputs: self.cfg_outputs.substitute(subst),
         }
     }
 }
@@ -311,6 +350,12 @@ impl OpTrait for Case {
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
+    }
 }
 
 impl Case {
@@ -322,5 +367,102 @@ impl Case {
     /// The output signature of the contained dataflow graph.
     pub fn dataflow_output(&self) -> &TypeRow {
         &self.signature.output
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        extension::{
+            prelude::{qb_t, usize_t, PRELUDE_ID},
+            ExtensionSet, PRELUDE_REGISTRY,
+        },
+        ops::{Conditional, DataflowOpTrait, DataflowParent},
+        types::{Signature, Substitution, Type, TypeArg, TypeBound, TypeRV},
+    };
+
+    use super::{DataflowBlock, TailLoop};
+
+    #[test]
+    fn test_subst_dataflow_block() {
+        use crate::ops::OpTrait;
+        let tv0 = Type::new_var_use(0, TypeBound::Any);
+        let dfb = DataflowBlock {
+            inputs: vec![usize_t(), tv0.clone()].into(),
+            other_outputs: vec![tv0.clone()].into(),
+            sum_rows: vec![usize_t().into(), vec![qb_t(), tv0.clone()].into()],
+            extension_delta: ExtensionSet::type_var(1),
+        };
+        let dfb2 = dfb.substitute(&Substitution::new(
+            &[
+                qb_t().into(),
+                TypeArg::Extensions {
+                    es: PRELUDE_ID.into(),
+                },
+            ],
+            &PRELUDE_REGISTRY,
+        ));
+        let st = Type::new_sum(vec![vec![usize_t()], vec![qb_t(); 2]]);
+        assert_eq!(
+            dfb2.inner_signature(),
+            Signature::new(vec![usize_t(), qb_t()], vec![st, qb_t()])
+                .with_extension_delta(PRELUDE_ID)
+        );
+    }
+
+    #[test]
+    fn test_subst_conditional() {
+        let tv1 = Type::new_var_use(1, TypeBound::Any);
+        let cond = Conditional {
+            sum_rows: vec![usize_t().into(), tv1.clone().into()],
+            other_inputs: vec![Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any))].into(),
+            outputs: vec![usize_t(), tv1].into(),
+            extension_delta: ExtensionSet::new(),
+        };
+        let cond2 = cond.substitute(&Substitution::new(
+            &[
+                TypeArg::Sequence {
+                    elems: vec![usize_t().into(); 3],
+                },
+                qb_t().into(),
+            ],
+            &PRELUDE_REGISTRY,
+        ));
+        let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants
+        assert_eq!(
+            cond2.signature(),
+            Signature::new(
+                vec![st, Type::new_tuple(vec![usize_t(); 3])],
+                vec![usize_t(), qb_t()]
+            )
+        );
+    }
+
+    #[test]
+    fn test_tail_loop() {
+        let tv0 = Type::new_var_use(0, TypeBound::Copyable);
+        let tail_loop = TailLoop {
+            just_inputs: vec![qb_t(), tv0.clone()].into(),
+            just_outputs: vec![tv0.clone(), qb_t()].into(),
+            rest: vec![tv0.clone()].into(),
+            extension_delta: ExtensionSet::type_var(1),
+        };
+        let tail2 = tail_loop.substitute(&Substitution::new(
+            &[
+                usize_t().into(),
+                TypeArg::Extensions {
+                    es: PRELUDE_ID.into(),
+                },
+            ],
+            &PRELUDE_REGISTRY,
+        ));
+        assert_eq!(
+            tail2.signature(),
+            Signature::new(
+                vec![qb_t(), usize_t(), usize_t()],
+                vec![usize_t(), qb_t(), usize_t()]
+            )
+            .with_extension_delta(PRELUDE_ID)
+        );
     }
 }

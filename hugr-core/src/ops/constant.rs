@@ -92,6 +92,8 @@ impl OpTrait for Const {
     fn static_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Const(self.get_type()))
     }
+
+    // Constants cannot refer to TypeArgs of the enclosing Hugr, so no substitute().
 }
 
 impl From<Const> for Value {
