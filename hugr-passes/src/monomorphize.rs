@@ -26,8 +26,8 @@ use itertools::Itertools as _;
 /// signature then the HUGR will not be modified.
 ///
 /// Monomorphic copies of polymorphic functions will be added to the HUGR as
-/// children of the root node.  We make best effort to ensure that names(derived
-/// from parent function names concrete type args) of new functions are unique
+/// children of the root node.  We make best effort to ensure that names (derived
+/// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
 pub fn monomorphize(mut h: Hugr) -> Hugr {
     let validate = |h: &Hugr| h.validate().unwrap_or_else(|e| panic!("{e}"));
@@ -92,7 +92,7 @@ struct Instantiating<'a> {
 type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 
 /// Scans a subtree for polymorphic calls and monomorphizes them by instantiating the
-/// called functions (if instantations not already in `cache`).
+/// called functions (if instantiations not already in `cache`).
 /// Optionally copies the subtree into a new location whilst applying a substitution.
 /// The subtree should be monomorphic after the substitution (if provided) has been applied.
 fn mono_scan(
@@ -137,7 +137,6 @@ fn mono_scan(
                 )
             }
             OpType::LoadFunction(lf) => {
-                eprintln!("{lf:?}");
                 let mono_sig = lf.instantiation.clone();
                 (
                     &lf.type_args,
