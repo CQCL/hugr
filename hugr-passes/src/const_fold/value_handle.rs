@@ -176,7 +176,7 @@ mod test {
                 float_types::{float64_type, ConstF64},
                 int_types::{ConstInt, INT_TYPES},
             },
-            collections::ListValue,
+            collections::list::ListValue,
         },
     };
 

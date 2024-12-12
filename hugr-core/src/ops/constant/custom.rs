@@ -61,7 +61,7 @@ pub trait CustomConst:
     /// The extension(s) defining the custom constant
     /// (a set to allow, say, a [List] of [USize])
     ///
-    /// [List]: crate::std_extensions::collections::LIST_TYPENAME
+    /// [List]: crate::std_extensions::collections::list::LIST_TYPENAME
     /// [USize]: crate::extension::prelude::usize_t
     fn extension_reqs(&self) -> ExtensionSet;
 
@@ -362,7 +362,7 @@ mod test {
     use crate::{
         extension::prelude::{usize_t, ConstUsize},
         ops::{constant::custom::serialize_custom_const, Value},
-        std_extensions::collections::ListValue,
+        std_extensions::collections::list::ListValue,
     };
 
     use super::{super::OpaqueValue, CustomConst, CustomConstBoxClone, CustomSerialized};

@@ -456,7 +456,7 @@ mod test {
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
-    use crate::std_extensions::collections::{self, list_type, ListOp};
+    use crate::std_extensions::collections::list;
     use crate::types::{Signature, Type, TypeRow};
     use crate::utils::{depth, test_quantum_extension};
     use crate::{type_row, Direction, Extension, Hugr, HugrView, OutgoingPort};
@@ -466,14 +466,14 @@ mod test {
     #[test]
     #[ignore] // FIXME: This needs a rewrite now that `pop` returns an optional value -.-'
     fn cfg() -> Result<(), Box<dyn std::error::Error>> {
-        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()]);
+        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), list::EXTENSION.to_owned()]);
         reg.validate()?;
-        let listy = list_type(usize_t());
-        let pop: ExtensionOp = ListOp::pop
+        let listy = list::list_type(usize_t());
+        let pop: ExtensionOp = list::ListOp::pop
             .with_type(usize_t())
             .to_extension_op(&reg)
             .unwrap();
-        let push: ExtensionOp = ListOp::push
+        let push: ExtensionOp = list::ListOp::push
             .with_type(usize_t())
             .to_extension_op(&reg)
             .unwrap();
@@ -518,21 +518,21 @@ mod test {
                 inputs: vec![listy.clone()].into(),
                 sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
-                extension_delta: collections::EXTENSION_ID.into(),
+                extension_delta: list::EXTENSION_ID.into(),
             },
         );
         let r_df1 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: Signature::new(vec![listy.clone()], simple_unary_plus(intermed.clone()))
-                    .with_extension_delta(collections::EXTENSION_ID),
+                    .with_extension_delta(list::EXTENSION_ID),
             },
         );
         let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: Signature::new(intermed, simple_unary_plus(just_list.clone()))
-                    .with_extension_delta(collections::EXTENSION_ID),
+                    .with_extension_delta(list::EXTENSION_ID),
             },
         );
         [0, 1]

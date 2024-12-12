@@ -61,7 +61,7 @@ impl ConstantFoldPass {
     }
 
     /// Specifies any number of external inputs to provide to the Hugr (on root-node
-    /// in-ports). Each supercedes any previous value on the same in-port.
+    /// in-ports). Each supersedes any previous value on the same in-port.
     pub fn with_inputs(
         mut self,
         inputs: impl IntoIterator<Item = (impl Into<IncomingPort>, Value)>,
@@ -120,15 +120,15 @@ impl ConstantFoldPass {
             })
             .collect::<Vec<_>>();
 
-        for (n, inport, v) in wires_to_break {
+        for (n, import, v) in wires_to_break {
             let parent = hugr.get_parent(n).unwrap();
             let datatype = v.get_type();
             // We could try hash-consing identical Consts, but not ATM
             let cst = hugr.add_node_with_parent(parent, Const::new(v));
             let lcst = hugr.add_node_with_parent(parent, LoadConstant { datatype });
             hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
-            hugr.disconnect(n, inport);
-            hugr.connect(lcst, OutgoingPort::from(0), n, inport);
+            hugr.disconnect(n, import);
+            hugr.connect(lcst, OutgoingPort::from(0), n, import);
         }
         for n in remove_nodes {
             hugr.remove_node(n);

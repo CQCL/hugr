@@ -19,6 +19,7 @@ ExtensionSet = stys.ExtensionSet
 TypeBound = stys.TypeBound
 
 
+@runtime_checkable
 class TypeParam(Protocol):
     """A HUGR type parameter."""
 
@@ -30,6 +31,7 @@ class TypeParam(Protocol):
         return stys.TypeParam(root=self._to_serial())  # type: ignore[arg-type]
 
 
+@runtime_checkable
 class TypeArg(Protocol):
     """A HUGR type argument, which can be bound to a :class:TypeParam."""
 
@@ -106,7 +108,7 @@ class TypeTypeParam(TypeParam):
 class BoundedNatParam(TypeParam):
     """A type parameter indicating a natural number with an optional upper bound."""
 
-    upper_bound: int | None
+    upper_bound: int | None = None
 
     def _to_serial(self) -> stys.BoundedNatParam:
         return stys.BoundedNatParam(bound=self.upper_bound)
@@ -258,23 +260,6 @@ class VariableArg(TypeArg):
 # ----------------------------------------------
 # --------------- Type -------------------------
 # ----------------------------------------------
-
-
-@dataclass(frozen=True)
-class Array(Type):
-    """Prelude fixed `size` array of `ty` elements."""
-
-    ty: Type
-    size: int
-
-    def _to_serial(self) -> stys.Array:
-        return stys.Array(inner=self.ty._to_serial_root(), len=self.size)
-
-    def type_bound(self) -> TypeBound:
-        return self.ty.type_bound()
-
-    def __repr__(self) -> str:
-        return f"Array<{self.ty}, {self.size}>"
 
 
 @dataclass()
@@ -610,6 +595,12 @@ class ExtType(Type):
 
     def __str__(self) -> str:
         return _type_str(self.type_def.name, self.args)
+
+    def __eq__(self, value):
+        # Ignore extra attributes on subclasses
+        if isinstance(value, ExtType):
+            return self.type_def == value.type_def and self.args == value.args
+        return super().__eq__(value)
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:

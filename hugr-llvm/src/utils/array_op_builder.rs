@@ -1,9 +1,7 @@
+use hugr_core::std_extensions::collections::array::{new_array_op, ArrayOpDef};
 use hugr_core::{
     builder::{BuildError, Dataflow},
-    extension::{
-        prelude::{new_array_op, ArrayOpDef},
-        simple_op::HasConcrete as _,
-    },
+    extension::simple_op::HasConcrete as _,
     types::Type,
     Wire,
 };
@@ -115,12 +113,13 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 pub mod test {
+    use hugr_core::extension::prelude::PRELUDE_ID;
+    use hugr_core::extension::ExtensionSet;
+    use hugr_core::std_extensions::collections::array::{self, array_type};
     use hugr_core::{
         builder::{DFGBuilder, HugrBuilder},
         extension::{
-            prelude::{
-                array_type, either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _,
-            },
+            prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
             PRELUDE_REGISTRY,
         },
         types::Signature,
@@ -133,7 +132,11 @@ pub mod test {
     #[rstest::fixture]
     #[default(DFGBuilder<Hugr>)]
     pub fn all_array_ops<B: Dataflow>(
-        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW).with_prelude()).unwrap())]
+        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)
+            .with_extension_delta(ExtensionSet::from_iter([
+                PRELUDE_ID,
+                array::EXTENSION_ID
+        ]))).unwrap())]
         mut builder: B,
     ) -> B {
         let us0 = builder.add_load_value(ConstUsize::new(0));

@@ -76,6 +76,46 @@ impl EdgeKind {
     pub fn is_static(&self) -> bool {
         matches!(self, EdgeKind::Const(_) | EdgeKind::Function(_))
     }
+
+    /// Returns `true` if the edge kind is [`ControlFlow`].
+    ///
+    /// [`ControlFlow`]: EdgeKind::ControlFlow
+    #[must_use]
+    pub fn is_control_flow(&self) -> bool {
+        matches!(self, Self::ControlFlow)
+    }
+
+    /// Returns `true` if the edge kind is [`Value`].
+    ///
+    /// [`Value`]: EdgeKind::Value
+    #[must_use]
+    pub fn is_value(&self) -> bool {
+        matches!(self, Self::Value(..))
+    }
+
+    /// Returns `true` if the edge kind is [`Const`].
+    ///
+    /// [`Const`]: EdgeKind::Const
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        matches!(self, Self::Const(..))
+    }
+
+    /// Returns `true` if the edge kind is [`Function`].
+    ///
+    /// [`Function`]: EdgeKind::Function
+    #[must_use]
+    pub fn is_function(&self) -> bool {
+        matches!(self, Self::Function(..))
+    }
+
+    /// Returns `true` if the edge kind is [`StateOrder`].
+    ///
+    /// [`StateOrder`]: EdgeKind::StateOrder
+    #[must_use]
+    pub fn is_state_order(&self) -> bool {
+        matches!(self, Self::StateOrder)
+    }
 }
 
 #[derive(
