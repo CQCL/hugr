@@ -200,6 +200,29 @@
       },
       "binary": false
     },
+    "load_nat": {
+      "extension": "prelude",
+      "name": "load_nat",
+      "description": "Loads a generic bounded nat parameter into a usize runtime value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          }
+        ],
+        "body": {
+          "input": [],
+          "output": [
+            {
+              "t": "I"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
     "panic": {
       "extension": "prelude",
       "name": "panic",

@@ -31,6 +31,9 @@ mod unwrap_builder;
 
 pub use unwrap_builder::UnwrapBuilder;
 
+/// Operation to load generic bounded nat parameter.
+pub mod generic;
+
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
@@ -109,6 +112,7 @@ lazy_static! {
             TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
             NoopDef.add_to_extension(prelude, extension_ref).unwrap();
             LiftDef.add_to_extension(prelude, extension_ref).unwrap();
+            generic::LoadNatDef.add_to_extension(prelude, extension_ref).unwrap();
         })
     };
 
