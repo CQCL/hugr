@@ -297,6 +297,9 @@ def test_invalid_recursive_function() -> None:
         f_recursive.set_outputs(f_recursive.input_node[0])
 
 
+@pytest.mark.skip(
+    "Temporarily disabled until https://github.com/CQCL/hugr/issues/1774 gets fixed"
+)
 def test_higher_order() -> None:
     noop_fn = Dfg(tys.Qubit)
     noop_fn.set_outputs(noop_fn.add(ops.Noop()(noop_fn.input_node[0])))
