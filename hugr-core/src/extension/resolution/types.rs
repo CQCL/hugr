@@ -8,7 +8,7 @@
 
 use super::ExtensionCollectionError;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
-use crate::ops::{DataflowOpTrait, OpType};
+use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
 use crate::Node;
@@ -44,10 +44,7 @@ pub(crate) fn collect_op_types_extensions(
         }
         OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
         OpType::FuncDecl(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
-        OpType::Const(c) => {
-            let typ = c.get_type();
-            collect_type_exts(&typ, &mut used, &mut missing);
-        }
+        OpType::Const(c) => collect_value_exts(&c.value, &mut used, &mut missing),
         OpType::Input(inp) => collect_type_row_exts(&inp.types, &mut used, &mut missing),
         OpType::Output(out) => collect_type_row_exts(&out.types, &mut used, &mut missing),
         OpType::Call(c) => {
@@ -216,5 +213,39 @@ fn collect_typearg_exts(
         // We ignore the `TypeArg::Extension` case, as it is not required to
         // **define** the hugr.
         _ => {}
+    }
+}
+
+/// Collect the Extension pointers in the [`CustomType`]s inside a value.
+///
+/// # Attributes
+///
+/// - `value`: The value to collect the extensions from.
+/// - `used_extensions`: A The registry where to store the used extensions.
+/// - `missing_extensions`: A set of `ExtensionId`s of which the
+///   `Weak<Extension>` pointer has been invalidated.
+fn collect_value_exts(
+    value: &Value,
+    used_extensions: &mut ExtensionRegistry,
+    missing_extensions: &mut ExtensionSet,
+) {
+    match value {
+        Value::Extension { e } => {
+            let typ = e.get_type();
+            collect_type_exts(&typ, used_extensions, missing_extensions);
+        }
+        Value::Function { hugr: _ } => {
+            // The extensions used by nested hugrs do not need to be counted for the root hugr.
+        }
+        Value::Sum(s) => {
+            if let SumType::General { rows } = &s.sum_type {
+                for row in rows.iter() {
+                    collect_type_row_exts(row, used_extensions, missing_extensions);
+                }
+            }
+            s.values
+                .iter()
+                .for_each(|v| collect_value_exts(v, used_extensions, missing_extensions));
+        }
     }
 }

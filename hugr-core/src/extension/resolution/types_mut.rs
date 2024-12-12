@@ -8,7 +8,7 @@ use std::sync::Arc;
 use super::types::collect_type_exts;
 use super::{ExtensionRegistry, ExtensionResolutionError};
 use crate::extension::ExtensionSet;
-use crate::ops::OpType;
+use crate::ops::{OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{MaybeRV, Signature, SumType, TypeArg, TypeBase, TypeEnum};
 use crate::Node;
@@ -40,17 +40,7 @@ pub fn resolve_op_types_extensions(
         OpType::FuncDecl(f) => {
             resolve_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?
         }
-        OpType::Const(c) => {
-            let typ = c.get_type();
-            let mut missing = ExtensionSet::new();
-            collect_type_exts(&typ, used_extensions, &mut missing);
-            // We expect that the `CustomConst::get_type` binary calls always return valid extensions.
-            // As we cannot update the `CustomConst` type, we ignore the result.
-            //
-            // Some exotic consts may need https://github.com/CQCL/hugr/issues/1742 to be implemented
-            // to pass this test.
-            //assert!(missing.is_empty());
-        }
+        OpType::Const(c) => resolve_value_exts(node, &mut c.value, extensions, used_extensions)?,
         OpType::Input(inp) => {
             resolve_type_row_exts(node, &mut inp.types, extensions, used_extensions)?
         }
@@ -215,6 +205,49 @@ fn resolve_typearg_exts(
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+/// Update all weak Extension pointers in the [`CustomType`]s inside a [`Value`].
+///
+/// Adds the extensions used in the row to the `used_extensions` registry.
+fn resolve_value_exts(
+    node: Node,
+    value: &mut Value,
+    extensions: &ExtensionRegistry,
+    used_extensions: &mut ExtensionRegistry,
+) -> Result<(), ExtensionResolutionError> {
+    match value {
+        Value::Extension { e } => {
+            // We expect that the `CustomConst::get_type` binary calls always
+            // return types with valid extensions.
+            // So here we just collect the used extensions.
+            let typ = e.get_type();
+            let mut missing = ExtensionSet::new();
+            collect_type_exts(&typ, used_extensions, &mut missing);
+            if !missing.is_empty() {
+                return Err(ExtensionResolutionError::InvalidConstTypes {
+                    value: e.name(),
+                    missing_extensions: missing,
+                });
+            }
+        }
+        Value::Function { hugr } => {
+            // We don't need to add the nested hugr's extensions to the main one here,
+            // but we run resolution on it independently.
+            hugr.resolve_extension_defs(extensions)?;
+        }
+        Value::Sum(s) => {
+            if let SumType::General { rows } = &mut s.sum_type {
+                for row in rows.iter_mut() {
+                    resolve_type_row_exts(node, row, extensions, used_extensions)?;
+                }
+            }
+            s.values
+                .iter_mut()
+                .try_for_each(|v| resolve_value_exts(node, v, extensions, used_extensions))?;
+        }
     }
     Ok(())
 }

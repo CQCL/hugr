@@ -29,7 +29,8 @@ pub(crate) use types_mut::resolve_op_types_extensions;
 
 use derive_more::{Display, Error, From};
 
-use super::{Extension, ExtensionId, ExtensionRegistry};
+use super::{Extension, ExtensionId, ExtensionRegistry, ExtensionSet};
+use crate::ops::constant::ValueName;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{NamedOp, OpName, OpType};
 use crate::types::{FuncTypeBase, MaybeRV, TypeName};
@@ -72,6 +73,14 @@ pub enum ExtensionResolutionError {
         missing_extension: ExtensionId,
         /// A list of available extensions.
         available_extensions: Vec<ExtensionId>,
+    },
+    /// The type of an `OpaqueValue` has types which do not reference their defining extensions.
+    #[display("The type of the opaque value '{value}' requires extensions {missing_extensions}, but does not reference their definition.")]
+    InvalidConstTypes {
+        /// The value that has invalid types.
+        value: ValueName,
+        /// The missing extension.
+        missing_extensions: ExtensionSet,
     },
 }
 
