@@ -447,24 +447,34 @@ mod test {
                 array_type_parametric(sa(n), array_type_parametric(sa(2), usize_t()).unwrap())
                     .unwrap(),
                 vec![usize_t(); 2],
-            ).with_extension_delta(collections::array::EXTENSION_ID),
-        ).unwrap();
+            )
+            .with_extension_delta(collections::array::EXTENSION_ID),
+        )
+        .unwrap();
 
         let arr2u = || array_type_parametric(sa(2), usize_t()).unwrap();
         let pf1t = PolyFuncType::new(
             [TypeParam::max_nat()],
-            prelusig(array_type_parametric(sv(0), arr2u()).unwrap(), usize_t()).with_extension_delta(collections::array::EXTENSION_ID),
+            prelusig(array_type_parametric(sv(0), arr2u()).unwrap(), usize_t())
+                .with_extension_delta(collections::array::EXTENSION_ID),
         );
         let mut pf1 = outer.define_function("pf1", pf1t).unwrap();
 
         let pf2t = PolyFuncType::new(
             [TypeParam::max_nat(), TypeBound::Copyable.into()],
-            prelusig(vec![array_type_parametric(sv(0), tv(1)).unwrap()], tv(1)).with_extension_delta(collections::array::EXTENSION_ID),
+            prelusig(vec![array_type_parametric(sv(0), tv(1)).unwrap()], tv(1))
+                .with_extension_delta(collections::array::EXTENSION_ID),
         );
         let mut pf2 = pf1.define_function("pf2", pf2t).unwrap();
 
         let mono_func = {
-            let mut fb = pf2.define_function("get_usz", prelusig(vec![], usize_t()).with_extension_delta(collections::array::EXTENSION_ID)).unwrap();
+            let mut fb = pf2
+                .define_function(
+                    "get_usz",
+                    prelusig(vec![], usize_t())
+                        .with_extension_delta(collections::array::EXTENSION_ID),
+                )
+                .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
         };
@@ -476,26 +486,35 @@ mod test {
                 op_def.clone(),
                 vec![sv(0), tv(1).into()],
                 &STD_REG,
-            ).unwrap();
+            )
+            .unwrap();
             let [get] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
-            let [got] =
-                pf2.build_unwrap_sum(&STD_REG, 1, SumType::new([vec![], vec![tv(1)]]), get).unwrap();
+            let [got] = pf2
+                .build_unwrap_sum(&STD_REG, 1, SumType::new([vec![], vec![tv(1)]]), get)
+                .unwrap();
             pf2.finish_with_outputs([got]).unwrap()
         };
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
-        let inner = pf1.call(pf2.handle(), &[sv(0), arr2u().into()], pf1.input_wires()).unwrap();
-        let elem = pf1.call(
-            pf2.handle(),
-            &[TypeArg::BoundedNat { n: 2 }, usize_t().into()],
-            inner.outputs(),
-        ).unwrap();
+        let inner = pf1
+            .call(pf2.handle(), &[sv(0), arr2u().into()], pf1.input_wires())
+            .unwrap();
+        let elem = pf1
+            .call(
+                pf2.handle(),
+                &[TypeArg::BoundedNat { n: 2 }, usize_t().into()],
+                inner.outputs(),
+            )
+            .unwrap();
         let pf1 = pf1.finish_with_outputs(elem.outputs()).unwrap();
         // Outer: two calls to pf1 with different TypeArgs
         let [e1] = outer
-            .call(pf1.handle(), &[sa(n)], outer.input_wires()).unwrap()
+            .call(pf1.handle(), &[sa(n)], outer.input_wires())
+            .unwrap()
             .outputs_arr();
         let popleft = ArrayOpDef::pop_left.to_concrete(arr2u(), n);
-        let ar2 = outer.add_dataflow_op(popleft.clone(), outer.input_wires()).unwrap();
+        let ar2 = outer
+            .add_dataflow_op(popleft.clone(), outer.input_wires())
+            .unwrap();
         let sig = popleft.to_extension_op().unwrap().signature().into_owned();
         let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
             panic!()
@@ -504,7 +523,8 @@ mod test {
             .build_unwrap_sum(&STD_REG, 1, st.clone(), ar2.out_wire(0))
             .unwrap();
         let [e2] = outer
-            .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped]).unwrap()
+            .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
+            .unwrap()
             .outputs_arr();
         let hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
 
@@ -545,20 +565,26 @@ mod test {
         let sig = Signature::new_endo(vec![usize_t(), ity()]);
         let mut dfg = DFGBuilder::new(sig.clone()).unwrap();
         let mut mono = dfg.define_function("id2", sig).unwrap();
-        let pf = mono.define_function(
-            "id",
-            PolyFuncType::new(
-                [TypeBound::Any.into()],
-                Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
-            ),
-        ).unwrap();
+        let pf = mono
+            .define_function(
+                "id",
+                PolyFuncType::new(
+                    [TypeBound::Any.into()],
+                    Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
+                ),
+            )
+            .unwrap();
         let outs = pf.input_wires();
         let pf = pf.finish_with_outputs(outs).unwrap();
         let [a, b] = mono.input_wires_arr();
         let [a] = mono
-            .call(pf.handle(), &[usize_t().into()], [a]).unwrap()
+            .call(pf.handle(), &[usize_t().into()], [a])
+            .unwrap()
             .outputs_arr();
-        let [b] = mono.call(pf.handle(), &[ity().into()], [b]).unwrap().outputs_arr();
+        let [b] = mono
+            .call(pf.handle(), &[ity().into()], [b])
+            .unwrap()
+            .outputs_arr();
         let mono = mono.finish_with_outputs([a, b]).unwrap();
         let c = dfg.call(mono.handle(), &[], dfg.input_wires()).unwrap();
         let hugr = dfg.finish_hugr_with_outputs(c.outputs()).unwrap();
