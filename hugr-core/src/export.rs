@@ -2,7 +2,7 @@
 use crate::{
     extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
     hugr::{IdentList, NodeMetadataMap},
-    ops::{DataflowBlock, OpName, OpTrait, OpType},
+    ops::{DataflowBlock, OpName, OpTrait, OpType, Value},
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
@@ -357,7 +357,16 @@ impl<'a> Context<'a> {
             }
 
             OpType::Const(_) => todo!("Export const nodes?"),
-            OpType::LoadConstant(_) => todo!("Export load constant?"),
+            OpType::LoadConstant(_) => {
+                let const_node = self.hugr.static_source(node).unwrap();
+
+                let OpType::Const(const_data) = self.hugr.get_optype(const_node) else {
+                    panic!("expected a `Const` node as the source of a `LoadConstant` node");
+                };
+
+                let value = self.export_value(const_data.value());
+                model::Operation::Const { value }
+            }
 
             OpType::CallIndirect(_) => model::Operation::CustomFull {
                 operation: self.resolve_symbol(OP_FUNC_CALL_INDIRECT),
@@ -539,22 +548,6 @@ impl<'a> Context<'a> {
             outputs,
             extensions,
         })
-    }
-
-    /// Create a region from the given node's children, if it has any.
-    ///
-    /// See [`Self::export_dfg`].
-    pub fn export_dfg_if_present(
-        &mut self,
-        node: Node,
-        extensions: model::TermId,
-        link_scope_closed: bool,
-    ) -> Option<model::RegionId> {
-        if self.hugr.children(node).next().is_none() {
-            None
-        } else {
-            Some(self.export_dfg(node, extensions, link_scope_closed))
-        }
     }
 
     /// Creates a data flow region from the given node's children.
@@ -1005,6 +998,14 @@ impl<'a> Context<'a> {
                     ..model::Node::default()
                 })
             }),
+        }
+    }
+
+    fn export_value(&self, value: &Value) -> model::TermId {
+        match value {
+            Value::Extension { e } => todo!(),
+            Value::Function { hugr } => todo!(),
+            Value::Sum(_) => todo!(),
         }
     }
 }

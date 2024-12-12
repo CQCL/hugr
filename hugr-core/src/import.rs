@@ -12,7 +12,7 @@ use crate::{
     ops::{
         AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, DataflowBlock, ExitBlock,
         FuncDecl, FuncDefn, Input, LoadFunction, Module, OpType, OpaqueOp, Output, Tag, TailLoop,
-        CFG, DFG,
+        Value, CFG, DFG,
     },
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
@@ -1256,6 +1256,10 @@ impl<'a> Context<'a> {
             serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
 
         Ok(json_value)
+    }
+
+    fn import_value(&mut self, term_id: model::TermId) -> Result<Value, ImportError> {
+        todo!()
     }
 }
 
