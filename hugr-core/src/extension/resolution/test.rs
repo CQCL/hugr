@@ -11,6 +11,7 @@ use crate::builder::{
     Container, Dataflow, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::{bool_t, usize_custom_t, ConstUsize};
+use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
 };
@@ -52,9 +53,12 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
 
     let dummy_node = portgraph::NodeIndex::new(0).into();
 
-    let mut used_exts = ExtensionRegistry::default();
     resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
-    resolve_op_types_extensions(dummy_node, &mut deser_op, &extensions, &mut used_exts).unwrap();
+
+    let weak_extensions: WeakExtensionRegistry = (&extensions).into();
+    resolve_op_types_extensions(Some(dummy_node), &mut deser_op, &weak_extensions)
+        .unwrap()
+        .for_each(|_| ());
 
     let deser_extensions = deser_op.used_extensions().unwrap();
 

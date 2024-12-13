@@ -25,7 +25,7 @@ use crate::{type_row, Extension};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-use super::resolution::{resolve_type_extensions, ExtensionResolutionError};
+use super::resolution::{resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry};
 use super::ExtensionRegistry;
 
 mod unwrap_builder;
@@ -507,7 +507,7 @@ impl CustomConst for ConstExternalSymbol {
 
     fn update_extensions(
         &mut self,
-        extensions: &ExtensionRegistry,
+        extensions: &WeakExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
         resolve_type_extensions(&mut self.typ, extensions)
     }

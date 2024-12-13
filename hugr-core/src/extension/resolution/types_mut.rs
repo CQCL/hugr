@@ -3,30 +3,30 @@
 //!
 //! For a non-mutating option see [`super::collect_op_types_extensions`].
 
-use std::sync::Arc;
+use std::sync::Weak;
 
 use super::types::collect_type_exts;
-use super::{ExtensionRegistry, ExtensionResolutionError};
+use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{CustomType, MaybeRV, Signature, SumType, TypeArg, TypeBase, TypeEnum};
-use crate::Node;
+use crate::{Extension, Node};
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside an
 /// optype with a valid pointer to the extension in the `extensions`
 /// registry.
 ///
-/// When a pointer is replaced, the extension is added to the
-/// `used_extensions` registry.
+/// Returns an iterator over the used extensions.
 ///
 /// This is a helper function used right after deserializing a Hugr.
 pub fn resolve_op_types_extensions(
-    node: Node,
+    node: Option<Node>,
     op: &mut OpType,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
-) -> Result<(), ExtensionResolutionError> {
+    extensions: &WeakExtensionRegistry,
+) -> Result<impl Iterator<Item = Weak<Extension>>, ExtensionResolutionError> {
+    let mut used = WeakExtensionRegistry::default();
+    let used_extensions = &mut used;
     match op {
         OpType::ExtensionOp(ext) => {
             for arg in ext.args_mut() {
@@ -106,17 +106,17 @@ pub fn resolve_op_types_extensions(
         // Ignore optypes that do not store a signature.
         OpType::Module(_) | OpType::AliasDecl(_) | OpType::AliasDefn(_) => {}
     }
-    Ok(())
+    Ok(used.into_iter())
 }
 
 /// Update all weak Extension pointers in the [`CustomType`]s inside a signature.
 ///
 /// Adds the extensions used in the signature to the `used_extensions` registry.
 fn resolve_signature_exts(
-    node: Node,
+    node: Option<Node>,
     signature: &mut Signature,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     // Note that we do not include the signature's `runtime_reqs` here, as those refer
     // to _runtime_ requirements that may not be currently present.
@@ -129,10 +129,10 @@ fn resolve_signature_exts(
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
 fn resolve_type_row_exts<RV: MaybeRV>(
-    node: Node,
+    node: Option<Node>,
     row: &mut TypeRowBase<RV>,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     for ty in row.iter_mut() {
         resolve_type_exts(node, ty, extensions, used_extensions)?;
@@ -144,10 +144,10 @@ fn resolve_type_row_exts<RV: MaybeRV>(
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_type_exts<RV: MaybeRV>(
-    node: Node,
+    node: Option<Node>,
     typ: &mut TypeBase<RV>,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match typ.as_type_enum_mut() {
         TypeEnum::Extension(custom) => {
@@ -175,10 +175,10 @@ pub(super) fn resolve_type_exts<RV: MaybeRV>(
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_custom_type_exts(
-    node: Node,
+    node: Option<Node>,
     custom: &mut CustomType,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     for arg in custom.args_mut() {
         resolve_typearg_exts(node, arg, extensions, used_extensions)?;
@@ -191,8 +191,8 @@ pub(super) fn resolve_custom_type_exts(
 
     // Add the extension to the used extensions registry,
     // and update the CustomType with the valid pointer.
-    used_extensions.register_updated_ref(ext);
-    custom.update_extension(Arc::downgrade(ext));
+    used_extensions.register(ext_id.clone(), ext.clone());
+    custom.update_extension(ext.clone());
 
     Ok(())
 }
@@ -201,10 +201,10 @@ pub(super) fn resolve_custom_type_exts(
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_typearg_exts(
-    node: Node,
+    node: Option<Node>,
     arg: &mut TypeArg,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match arg {
         TypeArg::Type { ty } => resolve_type_exts(node, ty, extensions, used_extensions)?,
@@ -222,10 +222,10 @@ pub(super) fn resolve_typearg_exts(
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
 pub(super) fn resolve_value_exts(
-    node: Node,
+    node: Option<Node>,
     value: &mut Value,
-    extensions: &ExtensionRegistry,
-    used_extensions: &mut ExtensionRegistry,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match value {
         Value::Extension { e } => {
@@ -246,7 +246,9 @@ pub(super) fn resolve_value_exts(
         Value::Function { hugr } => {
             // We don't need to add the nested hugr's extensions to the main one here,
             // but we run resolution on it independently.
-            hugr.resolve_extension_defs(extensions)?;
+            if let Ok(exts) = extensions.try_into() {
+                hugr.resolve_extension_defs(&exts)?;
+            }
         }
         Value::Sum(s) => {
             if let SumType::General { rows } = &mut s.sum_type {

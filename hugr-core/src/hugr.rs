@@ -27,6 +27,7 @@ pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
+    WeakExtensionRegistry,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{OpTag, OpTrait};
@@ -231,6 +232,7 @@ impl Hugr {
         // Since we don't have a non-borrowing iterator over all the possible
         // NodeIds, we have to simulate it by iterating over all possible
         // indices and checking if the node exists.
+        let weak_extensions: WeakExtensionRegistry = extensions.into();
         for n in 0..self.graph.node_capacity() {
             let pg_node = portgraph::NodeIndex::new(n);
             let node: Node = pg_node.into();
@@ -243,7 +245,12 @@ impl Hugr {
             if let Some(extension) = resolve_op_extensions(node, op, extensions)? {
                 used_extensions.register_updated_ref(extension);
             }
-            resolve_op_types_extensions(node, op, extensions, &mut used_extensions)?;
+            used_extensions.extend(
+                resolve_op_types_extensions(Some(node), op, &weak_extensions)?.map(|weak| {
+                    weak.upgrade()
+                        .expect("Extension comes from a valid registry")
+                }),
+            );
         }
 
         self.extensions = used_extensions;

@@ -7,7 +7,8 @@
 
 use std::sync::Arc;
 
-use super::{Extension, ExtensionCollectionError, ExtensionRegistry, ExtensionResolutionError};
+use super::{Extension, ExtensionCollectionError, ExtensionResolutionError};
+use crate::extension::ExtensionRegistry;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpType};
 use crate::Node;
@@ -124,7 +125,10 @@ fn operation_extension<'e>(
     match extensions.get(ext) {
         Some(e) => Ok(Some(e)),
         None => Err(ExtensionResolutionError::missing_op_extension(
-            node, op, ext, extensions,
+            Some(node),
+            op,
+            ext,
+            extensions,
         )),
     }
 }

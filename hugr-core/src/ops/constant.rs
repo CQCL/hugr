@@ -579,8 +579,9 @@ pub(crate) mod test {
     use crate::extension::prelude::{bool_t, usize_custom_t};
     use crate::extension::resolution::{
         resolve_custom_type_extensions, resolve_typearg_extensions, ExtensionResolutionError,
+        WeakExtensionRegistry,
     };
-    use crate::extension::{ExtensionRegistry, PRELUDE};
+    use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
@@ -614,7 +615,7 @@ pub(crate) mod test {
 
         fn update_extensions(
             &mut self,
-            extensions: &ExtensionRegistry,
+            extensions: &WeakExtensionRegistry,
         ) -> Result<(), ExtensionResolutionError> {
             resolve_custom_type_extensions(&mut self.0, extensions)?;
             // This loop is redundant, but we use it to test the public
