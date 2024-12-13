@@ -17,10 +17,7 @@ use crate::{Extension, Node};
 /// optype with a valid pointer to the extension in the `extensions`
 /// registry.
 ///
-/// When a pointer is replaced, the extension is added to the
-/// `used_extensions` registry.
-///
-/// Returns
+/// Returns an iterator over the used extensions.
 ///
 /// This is a helper function used right after deserializing a Hugr.
 pub fn resolve_op_types_extensions(

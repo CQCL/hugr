@@ -8,10 +8,12 @@ use derive_more::Display;
 use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::Extension;
 
-/// The equivalent to an [`ExtensionRegistry`] that only contains weak references.
+/// The equivalent to an [`ExtensionRegistry`] that only contains weak
+/// references.
 ///
-/// This is used to resolve extensions pointers while
-#[derive(Debug, Display, Default)]
+/// This is used to resolve extensions pointers while the extensions themselves
+/// (and the [`Arc`] that contains them) are being initialized.
+#[derive(Debug, Display, Default, Clone)]
 #[display("WeakExtensionRegistry[{}]", exts.keys().join(", "))]
 pub struct WeakExtensionRegistry {
     /// The extensions in the registry.
@@ -41,7 +43,7 @@ impl WeakExtensionRegistry {
         self.exts.values()
     }
 
-    /// Returns an iterator over the extensions ids in the registry.
+    /// Returns an iterator over the extension ids in the registry.
     pub fn ids(&self) -> impl Iterator<Item = &ExtensionId> {
         self.exts.keys()
     }
