@@ -312,8 +312,8 @@ impl MakeRegisteredOp for ListOp {
         EXTENSION_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &LIST_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 }
 
@@ -420,7 +420,6 @@ mod test {
     fn test_extension() {
         assert_eq!(&ListOp::push.extension_id(), EXTENSION.name());
         assert_eq!(&ListOp::push.extension(), EXTENSION.name());
-        assert!(ListOp::pop.registry().contains(EXTENSION.name()));
         for (_, op_def) in EXTENSION.operations() {
             assert_eq!(op_def.extension_id(), &EXTENSION_ID);
         }

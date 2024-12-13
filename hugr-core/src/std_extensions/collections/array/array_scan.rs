@@ -14,7 +14,7 @@ use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
 use crate::Extension;
 
-use super::{array_type_def, instantiate_array, ARRAY_REGISTRY, ARRAY_TYPENAME};
+use super::{array_type_def, instantiate_array, ARRAY_TYPENAME};
 
 /// Name of the operation for the combined map/fold operation
 pub const ARRAY_SCAN_OP_ID: OpName = OpName::new_inline("scan");
@@ -203,8 +203,8 @@ impl MakeRegisteredOp for ArrayScan {
         super::EXTENSION_ID
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &ARRAY_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&super::EXTENSION)
     }
 }
 

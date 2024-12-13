@@ -261,8 +261,8 @@ impl MakeRegisteredOp for ArrayOp {
         super::EXTENSION_ID
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &super::ARRAY_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&super::EXTENSION)
     }
 }
 

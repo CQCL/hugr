@@ -650,8 +650,8 @@ impl MakeRegisteredOp for MakeTuple {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
@@ -712,8 +712,8 @@ impl MakeRegisteredOp for UnpackTuple {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
@@ -821,8 +821,8 @@ impl MakeRegisteredOp for Noop {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
@@ -947,8 +947,8 @@ impl MakeRegisteredOp for Lift {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
