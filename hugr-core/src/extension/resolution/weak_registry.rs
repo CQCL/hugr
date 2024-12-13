@@ -21,7 +21,7 @@ pub struct WeakExtensionRegistry {
 }
 
 impl WeakExtensionRegistry {
-    /// Create a new empty extension registry.
+    /// Create a new weak registry from a list of extensions and their ids.
     pub fn new(extensions: impl IntoIterator<Item = (ExtensionId, Weak<Extension>)>) -> Self {
         let mut res = Self::default();
         for (id, ext) in extensions.into_iter() {
