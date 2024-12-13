@@ -157,7 +157,8 @@ impl TypeDef {
         &self.params
     }
 
-    fn name(&self) -> &TypeName {
+    /// The type name of the definition.
+    pub fn name(&self) -> &TypeName {
         &self.name
     }
 
@@ -169,6 +170,11 @@ impl TypeDef {
     /// Returns a weak reference to the extension defining this type.
     pub fn extension(&self) -> Weak<Extension> {
         self.extension_ref.clone()
+    }
+
+    /// Returns a mutable reference to the weak extension pointer in the type def.
+    pub(super) fn extension_mut(&mut self) -> &mut Weak<Extension> {
+        &mut self.extension_ref
     }
 }
 
