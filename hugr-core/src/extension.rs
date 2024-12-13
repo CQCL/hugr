@@ -998,6 +998,7 @@ pub mod test {
         assert!(reg.remove_extension(&ext_1_id).unwrap().version() == &Version::new(1, 1, 0));
         assert_eq!(reg.len(), 1);
     }
+
     mod proptest {
 
         use ::proptest::{collection::hash_set, prelude::*};

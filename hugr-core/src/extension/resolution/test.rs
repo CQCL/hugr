@@ -15,7 +15,7 @@ use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
 };
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE};
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE};
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::constant::CustomConst;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
@@ -84,6 +84,33 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
     let op_def = ext.get_op(op_name).unwrap();
     let op = ExtensionOp::new(op_def.clone(), vec![], &ExtensionRegistry::default()).unwrap();
     (ext, op.into())
+}
+
+/// Create a new test extension with a type and an op using that type
+///
+/// Returns an instance of the defined op.
+fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -> Arc<Extension> {
+    let ext = Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
+        let type_def = ext
+            .add_type(
+                type_name.into(),
+                vec![],
+                "".to_string(),
+                TypeDefBound::any(),
+                extension_ref,
+            )
+            .unwrap();
+        let typ = type_def.instantiate([]).unwrap();
+
+        ext.add_op(
+            op_name.into(),
+            "".to_string(),
+            Signature::new_endo(vec![typ.into()]),
+            extension_ref,
+        )
+        .unwrap();
+    });
+    ext
 }
 
 /// Check that the extensions added during building coincide with read-only collected extensions
@@ -302,4 +329,21 @@ fn dropped_weak_extensions() {
         op_collection,
         Err(ExtensionCollectionError::DroppedSignatureExtensions { .. })
     );
+}
+
+/// Test the [`ExtensionRegistry::new_cyclic`] and [`ExtensionRegistry::new_with_extension_resolution`] methods.
+#[test]
+fn register_new_cyclic() {
+    let ext_id = ExtensionId::new("ext").unwrap();
+    let ext = make_extension_self_referencing(&ext_id, "my_op", "my_type");
+
+    let reg = ExtensionRegistry::new([ext]);
+
+    // Roundtrip serialization drops all the weak pointers,
+    // and causes both initialization methods to be called.
+    let ser = serde_json::to_string(&reg).unwrap();
+    let new_reg: ExtensionRegistry = serde_json::from_str(&ser).unwrap();
+
+    assert!(new_reg.contains(&ext_id));
+    new_reg.validate().unwrap();
 }
