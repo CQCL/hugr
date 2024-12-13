@@ -90,7 +90,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
 
 /// Create a new test extension with a type and an op using that type
 ///
-/// Returns an instance of the defined op.
+/// Returns the defined extension.
 fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -> Arc<Extension> {
     let ext = Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
         let type_def = ext

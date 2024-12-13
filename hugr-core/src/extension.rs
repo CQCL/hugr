@@ -257,15 +257,16 @@ impl ExtensionRegistry {
     {
         let extensions = extensions.into_iter().collect_vec();
 
-        // Unsafe internally-mutable wrapper around an extension.
-        // Important: The layout is identical to A
+        // Unsafe internally-mutable wrapper around an extension. Important:
+        // `repr(transparent)` ensures the layout is identical to `Extension`,
+        // so it can be safely transmuted.
         #[repr(transparent)]
         struct ExtensionCell {
             ext: UnsafeCell<Extension>,
         }
 
         // Create the arcs with internal mutability, and collect weak references
-        // over non-mutable references.
+        // over immutable references.
         //
         // This is safe as long as the cell mutation happens when we can guarantee
         // that the weak references are not used.
@@ -778,10 +779,10 @@ pub enum ExtensionRegistryError {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ExtensionRegistryLoadError {
-    /// Extension already defined.
+    /// Deserialization error.
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
-    /// A registered extension has invalid signatures.
+    /// Error when resolving internal extension references.
     #[error(transparent)]
     ExtensionResolutionError(#[from] ExtensionResolutionError),
 }
