@@ -26,10 +26,15 @@ impl ExtensionRegistry {
     ///   registry.
     pub fn new_with_extension_resolution(
         extensions: impl IntoIterator<Item = Extension>,
+        other_extensions: &WeakExtensionRegistry,
     ) -> Result<ExtensionRegistry, ExtensionResolutionError> {
         Self::new_cyclic(extensions, |mut exts, weak_registry| {
+            let mut weak_registry = weak_registry.clone();
+            for (other_id, other) in other_extensions.iter() {
+                weak_registry.register(other_id.clone(), other.clone());
+            }
             for ext in &mut exts {
-                ext.resolve_references(weak_registry)?;
+                ext.resolve_references(&weak_registry)?;
             }
             Ok(exts)
         })

@@ -4,16 +4,16 @@
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
 use itertools::Itertools;
-use resolution::WeakExtensionRegistry;
+use resolution::{ExtensionResolutionError, WeakExtensionRegistry};
 pub use semver::Version;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::UnsafeCell;
 use std::collections::btree_map;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
-use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
+use std::{io, mem};
 
 use derive_more::Display;
 use thiserror::Error;
@@ -83,6 +83,24 @@ impl ExtensionRegistry {
             res.register_updated(ext);
         }
         res
+    }
+
+    /// Load an ExtensionRegistry serialized as json.
+    ///
+    /// After deserialization, updates all the internal `Weak<Extension>`
+    /// references to point to the newly created [`Arc`]s in the registry,
+    /// or extensions in the `additional_extensions` parameter.
+    pub fn load_json(
+        reader: impl io::Read,
+        other_extensions: &ExtensionRegistry,
+    ) -> Result<Self, ExtensionRegistryLoadError> {
+        let extensions: Vec<Extension> = serde_json::from_reader(reader)?;
+        // After deserialization, we need to update all the internal
+        // `Weak<Extension>` references.
+        Ok(ExtensionRegistry::new_with_extension_resolution(
+            extensions,
+            &other_extensions.into(),
+        )?)
     }
 
     /// Gets the Extension with the given name
@@ -332,18 +350,17 @@ impl Extend<Arc<Extension>> for ExtensionRegistry {
     }
 }
 
-// Encode/decode ExtensionRegistry as a list of extensions.
-// We can get the map key from the extension itself.
+/// Encode/decode ExtensionRegistry as a list of extensions.
+///
+/// Any `Weak<Extension>` references inside the registry will be left unresolved.
+/// Prefer using [`ExtensionRegistry::load_json`] when deserializing.
 impl<'de> Deserialize<'de> for ExtensionRegistry {
     fn deserialize<D>(deserializer: D) -> Result<ExtensionRegistry, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let extensions: Vec<Extension> = Vec::deserialize(deserializer)?;
-        // After deserialization, we need to update all the internal
-        // `Weak<Extension>` references.
-        ExtensionRegistry::new_with_extension_resolution(extensions)
-            .map_err(|e| serde::de::Error::custom(format!("Error resolving extensions: {e}")))
+        let extensions: Vec<Arc<Extension>> = Vec::deserialize(deserializer)?;
+        Ok(ExtensionRegistry::new(extensions))
     }
 }
 
@@ -747,6 +764,7 @@ impl PartialEq for Extension {
 
 /// An error that can occur in defining an extension registry.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ExtensionRegistryError {
     /// Extension already defined.
     #[error("The registry already contains an extension with id {0} and version {1}. New extension has version {2}.")]
@@ -756,8 +774,21 @@ pub enum ExtensionRegistryError {
     InvalidSignature(ExtensionId, #[source] SignatureError),
 }
 
+/// An error that can occur while loading an extension registry.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum ExtensionRegistryLoadError {
+    /// Extension already defined.
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
+    /// A registered extension has invalid signatures.
+    #[error(transparent)]
+    ExtensionResolutionError(#[from] ExtensionResolutionError),
+}
+
 /// An error that can occur in building a new extension.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ExtensionBuildError {
     /// Existing [`OpDef`]
     #[error("Extension already has an op called {0}.")]

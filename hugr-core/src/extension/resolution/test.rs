@@ -10,12 +10,14 @@ use rstest::rstest;
 use crate::builder::{
     Container, Dataflow, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
 };
-use crate::extension::prelude::{bool_t, usize_custom_t, ConstUsize};
+use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize};
 use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
 };
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE};
+use crate::extension::{
+    ExtensionId, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
+};
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::constant::CustomConst;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
@@ -105,7 +107,7 @@ fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -
         ext.add_op(
             op_name.into(),
             "".to_string(),
-            Signature::new_endo(vec![typ.into()]),
+            Signature::new(vec![typ.into()], vec![usize_t()]),
             extension_ref,
         )
         .unwrap();
@@ -342,7 +344,7 @@ fn register_new_cyclic() {
     // Roundtrip serialization drops all the weak pointers,
     // and causes both initialization methods to be called.
     let ser = serde_json::to_string(&reg).unwrap();
-    let new_reg: ExtensionRegistry = serde_json::from_str(&ser).unwrap();
+    let new_reg = ExtensionRegistry::load_json(ser.as_bytes(), &PRELUDE_REGISTRY).unwrap();
 
     assert!(new_reg.contains(&ext_id));
     new_reg.validate().unwrap();
