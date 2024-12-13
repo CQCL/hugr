@@ -12,9 +12,7 @@ use crate::builder::{
 };
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
-use crate::extension::{
-    Extension, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
-};
+use crate::extension::{Extension, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
@@ -628,16 +626,14 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         vec![usize_t(); 4], // outputs (*2^2, three calls)
     ))?;
     let [func, int] = dfb.input_wires_arr();
-    let eval = e.instantiate_extension_op("eval", [uint_seq(1), uint_seq(2)], &PRELUDE_REGISTRY)?;
+    let eval = e.instantiate_extension_op("eval", [uint_seq(1), uint_seq(2)])?;
     let [a, b] = dfb.add_dataflow_op(eval, [func, int])?.outputs_arr();
     let par = e.instantiate_extension_op(
         "parallel",
         [uint_seq(1), uint_seq(1), uint_seq(2), uint_seq(2)],
-        &PRELUDE_REGISTRY,
     )?;
     let [par_func] = dfb.add_dataflow_op(par, [func, func])?.outputs_arr();
-    let eval2 =
-        e.instantiate_extension_op("eval", [uint_seq(2), uint_seq(4)], &PRELUDE_REGISTRY)?;
+    let eval2 = e.instantiate_extension_op("eval", [uint_seq(2), uint_seq(4)])?;
     let eval2 = dfb.add_dataflow_op(eval2, [par_func, a, b])?;
     dfb.finish_hugr_with_outputs(eval2.outputs())?;
     Ok(())
@@ -673,7 +669,6 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let par = e.instantiate_extension_op(
         "parallel",
         [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(seq1ty),
-        &PRELUDE_REGISTRY,
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(par_func.outputs())?;
@@ -752,7 +747,6 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
                 TypeArg::Extensions { es },
                 usize_t().into(),
             ],
-            &PRELUDE_REGISTRY,
         )?;
         let [f1] = cc.add_dataflow_op(op.clone(), [func, i1])?.outputs_arr();
         let [f2] = cc.add_dataflow_op(op, [func, i2])?.outputs_arr();

@@ -575,7 +575,7 @@ impl<'a> ValidationContext<'a> {
             // Check TypeArgs are valid, and if we can, fit the declared TypeParams
             ext_op
                 .def()
-                .validate_args(ext_op.args(), self.hugr.extensions(), var_decls)
+                .validate_args(ext_op.args(), var_decls)
                 .map_err(|cause| ValidationError::SignatureError {
                     node,
                     op: op_type.name(),

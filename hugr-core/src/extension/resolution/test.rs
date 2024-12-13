@@ -85,7 +85,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
         .unwrap();
     });
     let op_def = ext.get_op(op_name).unwrap();
-    let op = ExtensionOp::new(op_def.clone(), vec![], &ExtensionRegistry::default()).unwrap();
+    let op = ExtensionOp::new(op_def.clone(), vec![]).unwrap();
     (ext, op.into())
 }
 

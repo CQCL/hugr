@@ -245,7 +245,7 @@ mod test {
 
     use crate::builder::{Container, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::{qb_t, usize_t};
-    use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionId, ExtensionSet};
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::utils::test_quantum_extension::{
         self, cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
@@ -305,9 +305,7 @@ mod test {
             )
             .unwrap();
         });
-        let my_custom_op = my_ext
-            .instantiate_extension_op("MyOp", [], &PRELUDE_REGISTRY)
-            .unwrap();
+        let my_custom_op = my_ext.instantiate_extension_op("MyOp", []).unwrap();
 
         let mut module_builder = ModuleBuilder::new();
         let mut f_build = module_builder

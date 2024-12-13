@@ -414,11 +414,11 @@ mod test_fns {
         let hugr = SimpleHugrConfig::new()
             .with_outs(v1.get_type())
             .with_extensions(INT_OPS_REGISTRY.to_owned())
-            .finish_with_exts(|mut builder: DFGW, ext_reg| {
+            .finish(|mut builder: DFGW| {
                 let k1 = builder.add_load_value(v1);
                 let k2 = builder.add_load_value(v2);
                 let ext_op = int_ops::EXTENSION
-                    .instantiate_extension_op("iadd", [4.into()], ext_reg)
+                    .instantiate_extension_op("iadd", [4.into()])
                     .unwrap();
                 let add = builder.add_dataflow_op(ext_op, [k1, k2]).unwrap();
                 builder.finish_with_outputs(add.outputs()).unwrap()

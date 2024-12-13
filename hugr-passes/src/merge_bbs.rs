@@ -165,7 +165,6 @@ mod test {
 
     use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
     use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize};
-    use hugr_core::extension::PRELUDE_REGISTRY;
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
@@ -230,7 +229,7 @@ mod test {
         let loop_variants: TypeRow = vec![qb_t()].into();
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
-        let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
+        let tst_op = e.instantiate_extension_op("Test", [])?;
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
         let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
@@ -317,9 +316,7 @@ mod test {
         // CFG Normalization would move everything outside the CFG and elide the CFG altogether,
         // but this is an easy-to-construct test of merge-basic-blocks only (no CFG normalization).
         let e = extension();
-        let tst_op: OpType = e
-            .instantiate_extension_op("Test", &[], &PRELUDE_REGISTRY)?
-            .into();
+        let tst_op: OpType = e.instantiate_extension_op("Test", &[])?.into();
         let [res_t] = tst_op
             .dataflow_signature()
             .unwrap()

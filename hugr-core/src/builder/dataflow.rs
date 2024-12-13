@@ -316,7 +316,7 @@ pub(crate) mod test {
     };
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::extension::prelude::{Lift, Noop};
-    use crate::extension::{ExtensionId, SignatureError, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionId, SignatureError};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, OpTag};
     use crate::ops::{OpTrait, Value};
@@ -656,7 +656,6 @@ pub(crate) mod test {
         let ev = e.instantiate_extension_op(
             "eval",
             [vec![usize_t().into()].into(), vec![tv.into()].into()],
-            &PRELUDE_REGISTRY,
         );
         assert_eq!(
             ev,

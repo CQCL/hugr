@@ -278,11 +278,7 @@ mod test {
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = EXTENSION
-                    .instantiate_extension_op(
-                        name.as_ref(),
-                        [(int_width as u64).into()],
-                        &CONVERT_OPS_REGISTRY,
-                    )
+                    .instantiate_extension_op(name.as_ref(), [(int_width as u64).into()])
                     .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, [in1])
@@ -353,9 +349,7 @@ mod test {
             .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
-                let ext_op = EXTENSION
-                    .instantiate_extension_op(op_name, [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let ext_op = EXTENSION.instantiate_extension_op(op_name, []).unwrap();
                 let [out1] = hugr_builder
                     .add_dataflow_op(ext_op, [in1])
                     .unwrap()
@@ -576,9 +570,7 @@ mod test {
             .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(0, i).unwrap());
-                let ext_op = EXTENSION
-                    .instantiate_extension_op("itobool", [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let ext_op = EXTENSION.instantiate_extension_op("itobool", []).unwrap();
                 let [b] = builder.add_dataflow_op(ext_op, [i]).unwrap().outputs_arr();
                 let mut cond = builder
                     .conditional_builder(
@@ -612,13 +604,9 @@ mod test {
             .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(0, i).unwrap());
-                let i2b = EXTENSION
-                    .instantiate_extension_op("itobool", [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let i2b = EXTENSION.instantiate_extension_op("itobool", []).unwrap();
                 let [b] = builder.add_dataflow_op(i2b, [i]).unwrap().outputs_arr();
-                let b2i = EXTENSION
-                    .instantiate_extension_op("ifrombool", [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let b2i = EXTENSION.instantiate_extension_op("ifrombool", []).unwrap();
                 let [i] = builder.add_dataflow_op(b2i, [b]).unwrap().outputs_arr();
                 builder.finish_with_outputs([i]).unwrap()
             });

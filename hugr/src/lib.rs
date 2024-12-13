@@ -81,11 +81,10 @@
 //!     lazy_static! {
 //!         /// Quantum extension definition.
 //!         pub static ref EXTENSION: Arc<Extension> = extension();
-//!         pub static ref REG: ExtensionRegistry = ExtensionRegistry::new([EXTENSION.clone(), PRELUDE.clone()]);
 //!     }
 //!     fn get_gate(gate_name: impl Into<OpName>) -> ExtensionOp {
 //!         EXTENSION
-//!             .instantiate_extension_op(&gate_name.into(), [], &REG)
+//!             .instantiate_extension_op(&gate_name.into(), [])
 //!             .unwrap()
 //!             .into()
 //!     }

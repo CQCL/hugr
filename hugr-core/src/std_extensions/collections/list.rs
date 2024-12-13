@@ -391,7 +391,6 @@ impl ListOpInst {
         ExtensionOp::new(
             registry.get(&EXTENSION_ID)?.get_op(&self.name())?.clone(),
             self.type_args(),
-            &registry,
         )
         .ok()
     }

@@ -12,7 +12,7 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
+use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
 use crate::types::{type_param::TypeArg, Signature};
 use crate::{ops, IncomingPort, Node};
 
@@ -41,13 +41,9 @@ pub struct ExtensionOp {
 
 impl ExtensionOp {
     /// Create a new ExtensionOp given the type arguments and specified input extensions
-    pub fn new(
-        def: Arc<OpDef>,
-        args: impl Into<Vec<TypeArg>>,
-        exts: &ExtensionRegistry,
-    ) -> Result<Self, SignatureError> {
+    pub fn new(def: Arc<OpDef>, args: impl Into<Vec<TypeArg>>) -> Result<Self, SignatureError> {
         let args: Vec<TypeArg> = args.into();
-        let signature = def.compute_signature(&args, exts)?;
+        let signature = def.compute_signature(&args)?;
         Ok(Self {
             def,
             args,
@@ -60,12 +56,11 @@ impl ExtensionOp {
         def: Arc<OpDef>,
         args: impl IntoIterator<Item = TypeArg>,
         opaque: &OpaqueOp,
-        exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let args: Vec<TypeArg> = args.into_iter().collect();
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
-        let signature = match def.compute_signature(&args, exts) {
+        let signature = match def.compute_signature(&args) {
             Ok(sig) => sig,
             Err(SignatureError::MissingComputeFunc) => {
                 // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
@@ -335,6 +330,7 @@ mod test {
     use ops::OpType;
 
     use crate::extension::resolution::resolve_op_extensions;
+    use crate::extension::ExtensionRegistry;
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{

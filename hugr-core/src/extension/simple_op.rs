@@ -251,7 +251,6 @@ impl<T: MakeExtensionOp> RegisteredOp<'_, T> {
                 .get_op(&self.name())?
                 .clone(),
             self.type_args(),
-            self.registry,
         )
         .ok()
     }

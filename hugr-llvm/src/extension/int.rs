@@ -202,11 +202,7 @@ mod test {
             .finish(|mut hugr_builder| {
                 let [in1, in2] = hugr_builder.input_wires_arr();
                 let ext_op = int_ops::EXTENSION
-                    .instantiate_extension_op(
-                        name.as_ref(),
-                        [(log_width as u64).into()],
-                        &int_ops::INT_OPS_REGISTRY,
-                    )
+                    .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
                     .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, [in1, in2])
@@ -225,11 +221,7 @@ mod test {
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = int_ops::EXTENSION
-                    .instantiate_extension_op(
-                        name.as_ref(),
-                        [(log_width as u64).into()],
-                        &int_ops::INT_OPS_REGISTRY,
-                    )
+                    .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
                     .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, [in1])

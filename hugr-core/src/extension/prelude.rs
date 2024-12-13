@@ -1088,11 +1088,7 @@ mod test {
 
         const TYPE_ARG_NONE: TypeArg = TypeArg::Sequence { elems: vec![] };
         let op = PRELUDE
-            .instantiate_extension_op(
-                &PANIC_OP_ID,
-                [TYPE_ARG_NONE, TYPE_ARG_NONE],
-                &PRELUDE_REGISTRY,
-            )
+            .instantiate_extension_op(&PANIC_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
@@ -1109,11 +1105,7 @@ mod test {
             elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE
-            .instantiate_extension_op(
-                &PANIC_OP_ID,
-                [type_arg_2q.clone(), type_arg_2q.clone()],
-                &PRELUDE_REGISTRY,
-            )
+            .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
         let mut b = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()])).unwrap();
@@ -1157,9 +1149,7 @@ mod test {
         let mut b: DFGBuilder<Hugr> = DFGBuilder::new(endo_sig(vec![])).unwrap();
         let greeting: ConstString = ConstString::new("Hello, world!".into());
         let greeting_out: Wire = b.add_load_value(greeting);
-        let print_op = PRELUDE
-            .instantiate_extension_op(&PRINT_OP_ID, [], &PRELUDE_REGISTRY)
-            .unwrap();
+        let print_op = PRELUDE.instantiate_extension_op(&PRINT_OP_ID, []).unwrap();
         b.add_dataflow_op(print_op, [greeting_out]).unwrap();
         b.finish_hugr_with_outputs([]).unwrap();
     }

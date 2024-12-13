@@ -728,10 +728,9 @@ impl Extension {
         &self,
         name: &OpNameRef,
         args: impl Into<Vec<TypeArg>>,
-        ext_reg: &ExtensionRegistry,
     ) -> Result<ExtensionOp, SignatureError> {
         let op_def = self.get_op(name).expect("Op not found.");
-        ExtensionOp::new(op_def.clone(), args, ext_reg)
+        ExtensionOp::new(op_def.clone(), args)
     }
 
     /// Validates the operation definitions in the register.

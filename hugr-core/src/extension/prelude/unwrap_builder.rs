@@ -34,7 +34,7 @@ pub trait UnwrapBuilder: Dataflow {
             .collect_vec()
             .into();
         let prelude = reg.get(&PRELUDE_ID).unwrap();
-        let op = prelude.instantiate_extension_op(&PANIC_OP_ID, [input_arg, output_arg], reg)?;
+        let op = prelude.instantiate_extension_op(&PANIC_OP_ID, [input_arg, output_arg])?;
         let err = self.add_load_value(err);
         self.add_dataflow_op(op, iter::once(err).chain(input_wires))
     }
