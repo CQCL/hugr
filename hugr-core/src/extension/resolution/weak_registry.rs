@@ -21,6 +21,15 @@ pub struct WeakExtensionRegistry {
 }
 
 impl WeakExtensionRegistry {
+    /// Create a new empty extension registry.
+    pub fn new(extensions: impl IntoIterator<Item = (ExtensionId, Weak<Extension>)>) -> Self {
+        let mut res = Self::default();
+        for (id, ext) in extensions.into_iter() {
+            res.register(id, ext);
+        }
+        res
+    }
+
     /// Gets the Extension with the given name
     pub fn get(&self, name: &str) -> Option<&Weak<Extension>> {
         self.exts.get(name)
@@ -38,8 +47,13 @@ impl WeakExtensionRegistry {
         self.exts.insert(id, ext.into()).is_none()
     }
 
+    /// Returns an iterator over the weak references in the registry and their ids.
+    pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Weak<Extension>)> {
+        self.exts.iter()
+    }
+
     /// Returns an iterator over the weak references in the registry.
-    pub fn iter(&self) -> impl Iterator<Item = &Weak<Extension>> {
+    pub fn extensions(&self) -> impl Iterator<Item = &Weak<Extension>> {
         self.exts.values()
     }
 
@@ -62,7 +76,10 @@ impl<'a> TryFrom<&'a WeakExtensionRegistry> for ExtensionRegistry {
     type Error = ();
 
     fn try_from(weak: &'a WeakExtensionRegistry) -> Result<Self, Self::Error> {
-        let exts: Vec<Arc<Extension>> = weak.iter().map(|w| w.upgrade().ok_or(())).try_collect()?;
+        let exts: Vec<Arc<Extension>> = weak
+            .extensions()
+            .map(|w| w.upgrade().ok_or(()))
+            .try_collect()?;
         Ok(ExtensionRegistry::new(exts))
     }
 }
