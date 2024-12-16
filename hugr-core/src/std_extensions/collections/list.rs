@@ -18,7 +18,7 @@ use crate::extension::resolution::{
     WeakExtensionRegistry,
 };
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc, PRELUDE};
+use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc};
 use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
 use crate::ops::{OpName, Value};
 use crate::types::{TypeName, TypeRowRV};
@@ -299,12 +299,6 @@ lazy_static! {
             ListOp::load_all_ops(extension, extension_ref).unwrap();
         })
     };
-
-    /// Registry of extensions required to validate list operations.
-    pub static ref LIST_REGISTRY: ExtensionRegistry  = ExtensionRegistry::new([
-        PRELUDE.clone(),
-        EXTENSION.clone(),
-    ]);
 }
 
 impl MakeRegisteredOp for ListOp {
@@ -312,8 +306,8 @@ impl MakeRegisteredOp for ListOp {
         EXTENSION_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &LIST_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 }
 
@@ -391,7 +385,6 @@ impl ListOpInst {
         ExtensionOp::new(
             registry.get(&EXTENSION_ID)?.get_op(&self.name())?.clone(),
             self.type_args(),
-            &registry,
         )
         .ok()
     }
@@ -405,6 +398,7 @@ mod test {
         const_fail_tuple, const_none, const_ok_tuple, const_some_tuple,
     };
     use crate::ops::OpTrait;
+    use crate::std_extensions::STD_REG;
     use crate::PortIndex;
     use crate::{
         extension::{
@@ -421,7 +415,6 @@ mod test {
     fn test_extension() {
         assert_eq!(&ListOp::push.extension_id(), EXTENSION.name());
         assert_eq!(&ListOp::push.extension(), EXTENSION.name());
-        assert!(ListOp::pop.registry().contains(EXTENSION.name()));
         for (_, op_def) in EXTENSION.operations() {
             assert_eq!(op_def.extension_id(), &EXTENSION_ID);
         }
@@ -538,7 +531,7 @@ mod test {
 
         let res = op
             .with_type(usize_t())
-            .to_extension_op(&LIST_REGISTRY)
+            .to_extension_op(&STD_REG)
             .unwrap()
             .constant_fold(&consts)
             .unwrap();

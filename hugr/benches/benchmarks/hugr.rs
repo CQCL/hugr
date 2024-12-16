@@ -4,7 +4,7 @@ pub mod examples;
 
 use criterion::{black_box, criterion_group, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
 #[allow(unused)]
-use hugr::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
+use hugr::std_extensions::STD_REG;
 use hugr::Hugr;
 
 pub use examples::{circuit, simple_cfg_hugr, simple_dfg_hugr};
@@ -38,7 +38,7 @@ impl Serializer for CapnpSer {
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
         let bump = bumpalo::Bump::new();
         let module = hugr_model::v0::binary::read_from_slice(bytes, &bump).unwrap();
-        hugr_core::import::import_hugr(&module, &FLOAT_OPS_REGISTRY).unwrap()
+        hugr_core::import::import_hugr(&module, &STD_REG).unwrap()
     }
 }
 

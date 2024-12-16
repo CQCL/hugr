@@ -205,9 +205,7 @@ pub(crate) mod test_quantum_extension {
     }
 
     fn get_gate(gate_name: &OpNameRef) -> ExtensionOp {
-        EXTENSION
-            .instantiate_extension_op(gate_name, [], &REG)
-            .unwrap()
+        EXTENSION.instantiate_extension_op(gate_name, []).unwrap()
     }
     pub(crate) fn h_gate() -> ExtensionOp {
         get_gate("H")

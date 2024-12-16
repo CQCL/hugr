@@ -132,15 +132,13 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 mod test {
     use hugr_core::extension::simple_op::MakeOpDef;
     use hugr_core::extension::SignatureFunc;
-    use hugr_core::std_extensions::arithmetic::float_ops::{self, FloatOps};
+    use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::types::TypeRow;
     use hugr_core::Hugr;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
-        std_extensions::arithmetic::{
-            float_ops::FLOAT_OPS_REGISTRY,
-            float_types::{float64_type, ConstF64},
-        },
+        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
     };
     use rstest::rstest;
 
@@ -162,7 +160,7 @@ mod test {
         SimpleHugrConfig::new()
             .with_ins(inp)
             .with_outs(out)
-            .with_extensions(float_ops::FLOAT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let outputs = builder
                     .add_dataflow_op(op, builder.input_wires())
@@ -177,7 +175,7 @@ mod test {
         llvm_ctx.add_extensions(add_float_extensions);
         let hugr = SimpleHugrConfig::new()
             .with_outs(float64_type())
-            .with_extensions(FLOAT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let c = builder.add_load_value(ConstF64::new(3.12));
                 builder.finish_with_outputs([c]).unwrap()

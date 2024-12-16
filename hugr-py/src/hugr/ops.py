@@ -1273,6 +1273,9 @@ class Noop(AsExtOp, _PartialOp):
 
         return std.PRELUDE.get_op("Noop")
 
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.TypeTypeArg(self.type_)]
+
     def cached_signature(self) -> tys.FunctionType | None:
         return tys.FunctionType.endo(
             [self.type_],

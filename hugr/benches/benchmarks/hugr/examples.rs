@@ -7,7 +7,6 @@ use hugr::builder::{
     HugrBuilder, ModuleBuilder,
 };
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};
-use hugr::extension::PRELUDE_REGISTRY;
 use hugr::ops::OpName;
 use hugr::std_extensions::arithmetic::float_types::float64_type;
 use hugr::types::Signature;
@@ -94,14 +93,10 @@ pub struct CircuitLayer {
 
 /// Construct a quantum circuit with two qubits and `layers` layers applying `H q0; CX q0, q1; CX q1, q0`.
 pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
-    let h_gate = QUANTUM_EXT
-        .instantiate_extension_op("H", [], &PRELUDE_REGISTRY)
-        .unwrap();
-    let cx_gate = QUANTUM_EXT
-        .instantiate_extension_op("CX", [], &PRELUDE_REGISTRY)
-        .unwrap();
+    let h_gate = QUANTUM_EXT.instantiate_extension_op("H", []).unwrap();
+    let cx_gate = QUANTUM_EXT.instantiate_extension_op("CX", []).unwrap();
     // let rz = QUANTUM_EXT
-    //     .instantiate_extension_op("Rz", [], &FLOAT_OPS_REGISTRY)
+    //     .instantiate_extension_op("Rz", [])
     //     .unwrap();
     let signature =
         Signature::new_endo(vec![qb_t(), qb_t()]).with_extension_delta(QUANTUM_EXT.name().clone());

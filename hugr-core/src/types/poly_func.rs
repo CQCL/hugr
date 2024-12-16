@@ -2,7 +2,7 @@
 
 use itertools::Itertools;
 
-use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::extension::SignatureError;
 #[cfg(test)]
 use {
     crate::proptest::RecursionDepth,
@@ -117,22 +117,17 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     /// # Errors
     /// If there is not exactly one [TypeArg] for each binder ([Self::params]),
     /// or an arg does not fit into its corresponding [TypeParam]
-    pub(crate) fn instantiate(
-        &self,
-        args: &[TypeArg],
-        ext_reg: &ExtensionRegistry,
-    ) -> Result<FuncTypeBase<RV>, SignatureError> {
+    pub(crate) fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<RV>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
-        Ok(self.body.substitute(&Substitution(args, ext_reg)))
+        Ok(self.body.substitute(&Substitution(args)))
     }
 
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and the type variables declared.
-    pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
-        // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
-        self.body.validate(reg, &self.params)
+    pub fn validate(&self) -> Result<(), SignatureError> {
+        self.body.validate(&self.params)
     }
 
     /// Helper function for the Display implementation
@@ -161,10 +156,7 @@ pub(crate) mod test {
     use lazy_static::lazy_static;
 
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::extension::{
-        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, EMPTY_REG, PRELUDE,
-        PRELUDE_REGISTRY,
-    };
+    use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE};
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
@@ -185,10 +177,9 @@ pub(crate) mod test {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FuncTypeBase<RV>,
-            extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
-            res.validate(extension_registry)?;
+            res.validate()?;
             Ok(res)
         }
     }
@@ -201,10 +192,9 @@ pub(crate) mod test {
         let list_len = PolyFuncTypeBase::new_validated(
             [TypeBound::Any.into()],
             Signature::new(vec![list_of_var], vec![usize_t()]),
-            &REGISTRY,
         )?;
 
-        let t = list_len.instantiate(&[TypeArg::Type { ty: usize_t() }], &REGISTRY)?;
+        let t = list_len.instantiate(&[TypeArg::Type { ty: usize_t() }])?;
         assert_eq!(
             t,
             Signature::new(
@@ -228,28 +218,19 @@ pub(crate) mod test {
 
         // Valid schema...
         let good_array = array_type_parametric(size_var.clone(), ty_var.clone())?;
-        let good_ts = PolyFuncTypeBase::new_validated(
-            type_params.clone(),
-            Signature::new_endo(good_array),
-            &array::ARRAY_REGISTRY,
-        )?;
+        let good_ts =
+            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo(good_array))?;
 
         // Sanity check (good args)
-        good_ts.instantiate(
-            &[
-                TypeArg::BoundedNat { n: 5 },
-                TypeArg::Type { ty: usize_t() },
-            ],
-            &array::ARRAY_REGISTRY,
-        )?;
+        good_ts.instantiate(&[
+            TypeArg::BoundedNat { n: 5 },
+            TypeArg::Type { ty: usize_t() },
+        ])?;
 
-        let wrong_args = good_ts.instantiate(
-            &[
-                TypeArg::Type { ty: usize_t() },
-                TypeArg::BoundedNat { n: 5 },
-            ],
-            &array::ARRAY_REGISTRY,
-        );
+        let wrong_args = good_ts.instantiate(&[
+            TypeArg::Type { ty: usize_t() },
+            TypeArg::BoundedNat { n: 5 },
+        ]);
         assert_eq!(
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
@@ -277,11 +258,8 @@ pub(crate) mod test {
             TypeBound::Any,
             &Arc::downgrade(&array::EXTENSION),
         ));
-        let bad_ts = PolyFuncTypeBase::new_validated(
-            type_params.clone(),
-            Signature::new_endo(bad_array),
-            &array::ARRAY_REGISTRY,
-        );
+        let bad_ts =
+            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo(bad_array));
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
@@ -303,8 +281,7 @@ pub(crate) mod test {
                 params: vec![TypeBound::Any.into(), TypeParam::max_nat()],
             },
         ] {
-            let invalid_ts =
-                PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone(), &REGISTRY);
+            let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
@@ -314,7 +291,7 @@ pub(crate) mod test {
             );
         }
         // Variable not declared at all
-        let invalid_ts = PolyFuncTypeBase::new_validated([], body_type, &REGISTRY);
+        let invalid_ts = PolyFuncTypeBase::new_validated([], body_type);
         assert_eq!(
             invalid_ts.err(),
             Some(SignatureError::FreeTypeVar {
@@ -358,7 +335,6 @@ pub(crate) mod test {
                     TypeBound::Any,
                     &Arc::downgrade(&ext),
                 ))),
-                &reg,
             )
         };
         for decl in accepted {
@@ -421,7 +397,6 @@ pub(crate) mod test {
                 vec![usize_t()],
                 vec![TypeRV::new_row_var_use(0, TypeBound::Copyable)],
             ),
-            &PRELUDE_REGISTRY,
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
@@ -432,7 +407,6 @@ pub(crate) mod test {
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
             Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
-            &EMPTY_REG,
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
@@ -450,25 +424,21 @@ pub(crate) mod test {
                 vec![usize_t().into(), rty.clone()],
                 vec![TypeRV::new_tuple(rty)],
             ),
-            &PRELUDE_REGISTRY,
         )
         .unwrap();
 
         fn seq2() -> Vec<TypeArg> {
             vec![usize_t().into(), bool_t().into()]
         }
-        pf.instantiate(&[TypeArg::Type { ty: usize_t() }], &PRELUDE_REGISTRY)
+        pf.instantiate(&[TypeArg::Type { ty: usize_t() }])
             .unwrap_err();
-        pf.instantiate(
-            &[TypeArg::Sequence {
-                elems: vec![usize_t().into(), TypeArg::Sequence { elems: seq2() }],
-            }],
-            &PRELUDE_REGISTRY,
-        )
+        pf.instantiate(&[TypeArg::Sequence {
+            elems: vec![usize_t().into(), TypeArg::Sequence { elems: seq2() }],
+        }])
         .unwrap_err();
 
         let t2 = pf
-            .instantiate(&[TypeArg::Sequence { elems: seq2() }], &PRELUDE_REGISTRY)
+            .instantiate(&[TypeArg::Sequence { elems: seq2() }])
             .unwrap();
         assert_eq!(
             t2,
@@ -492,18 +462,14 @@ pub(crate) mod test {
                 }),
             }],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
-            &PRELUDE_REGISTRY,
         )
         .unwrap();
 
         let inner3 = Type::new_function(Signature::new_endo(vec![usize_t(), bool_t(), usize_t()]));
         let t3 = pf
-            .instantiate(
-                &[TypeArg::Sequence {
-                    elems: vec![usize_t().into(), bool_t().into(), usize_t().into()],
-                }],
-                &PRELUDE_REGISTRY,
-            )
+            .instantiate(&[TypeArg::Sequence {
+                elems: vec![usize_t().into(), bool_t().into(), usize_t().into()],
+            }])
             .unwrap();
         assert_eq!(
             t3,

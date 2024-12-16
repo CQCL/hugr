@@ -9,9 +9,7 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use crate::extension::{
-    ExtensionId, ExtensionRegistry, SignatureError, TypeDef, TypeDefBound, PRELUDE,
-};
+use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{Type, TypeBound, TypeName};
@@ -46,12 +44,6 @@ lazy_static! {
             array_scan::ArrayScanDef.add_to_extension(extension, extension_ref).unwrap();
         })
     };
-
-    /// Registry of extensions required to validate list operations.
-    pub static ref ARRAY_REGISTRY: ExtensionRegistry  = ExtensionRegistry::new([
-        PRELUDE.clone(),
-        EXTENSION.clone(),
-    ]);
 }
 
 fn array_type_def() -> &'static TypeDef {

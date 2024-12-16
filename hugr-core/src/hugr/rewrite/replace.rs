@@ -448,7 +448,7 @@ mod test {
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, Rewrite};
@@ -643,15 +643,9 @@ mod test {
                 .unwrap();
         });
         let ext_name = ext.name().clone();
-        let foo = ext
-            .instantiate_extension_op("foo", [], &PRELUDE_REGISTRY)
-            .unwrap();
-        let bar = ext
-            .instantiate_extension_op("bar", [], &PRELUDE_REGISTRY)
-            .unwrap();
-        let baz = ext
-            .instantiate_extension_op("baz", [], &PRELUDE_REGISTRY)
-            .unwrap();
+        let foo = ext.instantiate_extension_op("foo", []).unwrap();
+        let bar = ext.instantiate_extension_op("bar", []).unwrap();
+        let baz = ext.instantiate_extension_op("baz", []).unwrap();
         let mut registry = test_quantum_extension::REG.clone();
         registry.register(ext).unwrap();
 

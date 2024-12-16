@@ -390,7 +390,7 @@ mod test {
     #[case::length(ListOp::length)]
     fn test_list_emission(mut llvm_ctx: TestContext, #[case] op: ListOp) {
         let ext_op = list::EXTENSION
-            .instantiate_extension_op(op.name().as_ref(), [qb_t().into()], &list::LIST_REGISTRY)
+            .instantiate_extension_op(op.name().as_ref(), [qb_t().into()])
             .unwrap();
         let es = ExtensionRegistry::new([list::EXTENSION.to_owned(), prelude::PRELUDE.to_owned()]);
         es.validate().unwrap();

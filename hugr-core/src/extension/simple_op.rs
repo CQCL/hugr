@@ -11,10 +11,7 @@ use crate::{
     Extension,
 };
 
-use super::{
-    op_def::SignatureFunc, ExtensionBuildError, ExtensionId, ExtensionRegistry, OpDef,
-    SignatureError,
-};
+use super::{op_def::SignatureFunc, ExtensionBuildError, ExtensionId, OpDef, SignatureError};
 use delegate::delegate;
 use thiserror::Error;
 
@@ -176,14 +173,14 @@ pub trait MakeExtensionOp: NamedOp {
     fn to_registered(
         self,
         extension_id: ExtensionId,
-        registry: &ExtensionRegistry,
-    ) -> RegisteredOp<'_, Self>
+        extension: Weak<Extension>,
+    ) -> RegisteredOp<Self>
     where
         Self: Sized,
     {
         RegisteredOp {
             extension_id,
-            registry,
+            extension,
             op: self,
         }
     }
@@ -226,32 +223,28 @@ where
 /// Wrap an [MakeExtensionOp] with an extension registry to allow type computation.
 /// Generate from [MakeExtensionOp::to_registered]
 #[derive(Clone, Debug)]
-pub struct RegisteredOp<'r, T> {
+pub struct RegisteredOp<T> {
     /// The name of the extension these ops belong to.
-    extension_id: ExtensionId,
+    pub extension_id: ExtensionId,
     /// A registry of all extensions, used for type computation.
-    registry: &'r ExtensionRegistry,
+    extension: Weak<Extension>,
     /// The inner [MakeExtensionOp]
     op: T,
 }
 
-impl<T> RegisteredOp<'_, T> {
+impl<T> RegisteredOp<T> {
     /// Extract the inner wrapped value
     pub fn to_inner(self) -> T {
         self.op
     }
 }
 
-impl<T: MakeExtensionOp> RegisteredOp<'_, T> {
+impl<T: MakeExtensionOp> RegisteredOp<T> {
     /// Generate an [OpType].
     pub fn to_extension_op(&self) -> Option<ExtensionOp> {
         ExtensionOp::new(
-            self.registry
-                .get(&self.extension_id)?
-                .get_op(&self.name())?
-                .clone(),
+            self.extension.upgrade()?.get_op(&self.name())?.clone(),
             self.type_args(),
-            self.registry,
         )
         .ok()
     }
@@ -272,9 +265,8 @@ impl<T: MakeExtensionOp> RegisteredOp<'_, T> {
 pub trait MakeRegisteredOp: MakeExtensionOp {
     /// The ID of the extension this op belongs to.
     fn extension_id(&self) -> ExtensionId;
-    /// A reference to an [ExtensionRegistry] which is sufficient to generate
-    /// the signature of this op.
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry;
+    /// A reference to the [Extension] which defines this operation.
+    fn extension_ref(&self) -> Weak<Extension>;
 
     /// Convert this operation in to an [ExtensionOp]. Returns None if the type
     /// cannot be computed.
@@ -287,11 +279,11 @@ pub trait MakeRegisteredOp: MakeExtensionOp {
     }
 }
 
-impl<T: MakeRegisteredOp> From<T> for RegisteredOp<'_, T> {
+impl<T: MakeRegisteredOp> From<T> for RegisteredOp<T> {
     fn from(ext_op: T) -> Self {
         let extension_id = ext_op.extension_id();
-        let registry = ext_op.registry();
-        ext_op.to_registered(extension_id, registry)
+        let extension = ext_op.extension_ref();
+        ext_op.to_registered(extension_id, extension)
     }
 }
 
@@ -358,15 +350,14 @@ mod test {
                     .unwrap();
             })
         };
-        static ref DUMMY_REG: ExtensionRegistry = ExtensionRegistry::new([EXT.clone()]);
     }
     impl MakeRegisteredOp for DummyEnum {
         fn extension_id(&self) -> ExtensionId {
             EXT_ID.to_owned()
         }
 
-        fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-            &DUMMY_REG
+        fn extension_ref(&self) -> Weak<Extension> {
+            Arc::downgrade(&EXT)
         }
     }
 

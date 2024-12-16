@@ -57,8 +57,8 @@ mod test {
     use super::*;
     use crate::{
         extension::{
-            prelude::usize_t, CustomSignatureFunc, CustomValidator, ExtensionRegistry, OpDef,
-            SignatureError, ValidateTypeArgs,
+            prelude::usize_t, CustomSignatureFunc, CustomValidator, OpDef, SignatureError,
+            ValidateTypeArgs,
         },
         types::{FuncValueType, Signature, TypeArg},
     };
@@ -96,7 +96,6 @@ mod test {
             &'a self,
             _arg_values: &[TypeArg],
             _def: &'o crate::extension::op_def::OpDef,
-            _extension_registry: &crate::extension::ExtensionRegistry,
         ) -> Result<crate::types::PolyFuncTypeRV, crate::extension::SignatureError> {
             Ok(Default::default())
         }
@@ -112,7 +111,6 @@ mod test {
             &self,
             _arg_values: &[TypeArg],
             _def: &'o OpDef,
-            _extension_registry: &ExtensionRegistry,
         ) -> Result<(), SignatureError> {
             Ok(())
         }

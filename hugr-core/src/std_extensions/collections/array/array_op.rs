@@ -4,7 +4,7 @@ use std::sync::{Arc, Weak};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-use crate::extension::prelude::{either_type, option_type, usize_custom_t};
+use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -93,7 +93,7 @@ impl ArrayOpDef {
     fn signature_from_def(
         &self,
         array_def: &TypeDef,
-        extension_ref: &Weak<Extension>,
+        _extension_ref: &Weak<Extension>,
     ) -> SignatureFunc {
         use ArrayOpDef::*;
         if let new_array | pop_left | pop_right = self {
@@ -107,11 +107,9 @@ impl ArrayOpDef {
                 .expect("Array type instantiation failed");
             let standard_params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
 
-            // Construct the usize type using the passed extension reference.
-            //
-            // If we tried to use `usize_t()` directly it would try to access
-            // the `PRELUDE` lazy static recursively, causing a deadlock.
-            let usize_t: Type = usize_custom_t(extension_ref).into();
+            // We can assume that the prelude has ben loaded at this point,
+            // since it doesn't depend on the array extension.
+            let usize_t: Type = usize_t();
 
             match self {
                 get => {
@@ -263,8 +261,8 @@ impl MakeRegisteredOp for ArrayOp {
         super::EXTENSION_ID
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &super::ARRAY_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&super::EXTENSION)
     }
 }
 
@@ -291,6 +289,7 @@ mod tests {
     use strum::IntoEnumIterator;
 
     use crate::extension::prelude::usize_t;
+    use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::std_extensions::collections::array::new_array_op;
     use crate::{
         builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
@@ -433,6 +432,26 @@ mod tests {
             (
                 &vec![array_type(size, element_ty.clone())].into(),
                 &type_row![]
+            )
+        );
+    }
+
+    #[test]
+    /// Initialize an array operation where the element type is not from the prelude.
+    fn test_non_prelude_op() {
+        let size = 2;
+        let element_ty = float64_type();
+        let op = ArrayOpDef::get.to_concrete(element_ty.clone(), size);
+
+        let optype: OpType = op.into();
+
+        let sig = optype.dataflow_signature().unwrap();
+
+        assert_eq!(
+            sig.io(),
+            (
+                &vec![array_type(size, element_ty.clone()), usize_t()].into(),
+                &vec![option_type(element_ty.clone()).into()].into()
             )
         );
     }

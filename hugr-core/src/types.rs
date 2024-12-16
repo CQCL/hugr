@@ -32,7 +32,7 @@ use itertools::{repeat_n, Itertools};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::extension::SignatureError;
 use crate::ops::AliasDecl;
 
 use self::type_param::TypeParam;
@@ -460,23 +460,19 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// [RowVariable]: TypeEnum::RowVariable
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Sum(SumType::General { rows }) => rows
-                .iter()
-                .try_for_each(|row| row.validate(extension_registry, var_decls)),
+            TypeEnum::Sum(SumType::General { rows }) => {
+                rows.iter().try_for_each(|row| row.validate(var_decls))
+            }
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
-            TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
+            TypeEnum::Extension(custy) => custy.validate(var_decls),
             // Function values may be passed around without knowing their arity
             // (i.e. with row vars) as long as they are not called:
-            TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
+            TypeEnum::Function(ft) => ft.validate(var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
             TypeEnum::RowVar(rv) => rv.validate(var_decls),
         }
@@ -588,7 +584,7 @@ impl From<Type> for TypeRV {
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
-pub struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+pub struct Substitution<'a>(&'a [TypeArg]);
 
 impl<'a> Substitution<'a> {
     /// Create a new Substitution given the replacement values (indexed
@@ -597,8 +593,8 @@ impl<'a> Substitution<'a> {
     /// containing a type-variable.
     ///
     /// [TypeDef]: crate::extension::TypeDef
-    pub fn new(items: &'a [TypeArg], exts: &'a ExtensionRegistry) -> Self {
-        Self(items, exts)
+    pub fn new(items: &'a [TypeArg]) -> Self {
+        Self(items)
     }
 
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
@@ -638,10 +634,6 @@ impl<'a> Substitution<'a> {
             }
             _ => panic!("Not a type or list of types - call validate() ?"),
         }
-    }
-
-    pub(crate) fn extension_registry(&self) -> &ExtensionRegistry {
-        self.1
     }
 }
 

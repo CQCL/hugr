@@ -8,9 +8,10 @@ use itertools::Itertools;
 use rstest::rstest;
 
 use crate::builder::{
-    Container, Dataflow, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+    HugrBuilder, ModuleBuilder,
 };
-use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize};
+use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize, PRELUDE_ID};
 use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
@@ -26,7 +27,7 @@ use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
 use crate::types::{Signature, Type};
-use crate::{type_row, Extension, Hugr, HugrView};
+use crate::{std_extensions, type_row, Extension, Hugr, HugrView};
 
 #[rstest]
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
@@ -84,7 +85,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
         .unwrap();
     });
     let op_def = ext.get_op(op_name).unwrap();
-    let op = ExtensionOp::new(op_def.clone(), vec![], &ExtensionRegistry::default()).unwrap();
+    let op = ExtensionOp::new(op_def.clone(), vec![]).unwrap();
     (ext, op.into())
 }
 
@@ -150,6 +151,62 @@ fn check_extension_resolution(mut hugr: Hugr) {
         &build_extensions,
         "{} != {build_extensions}",
         deser_hugr.extensions()
+    );
+}
+
+/// Build a small hugr using the float types extension and check that the extensions are resolved.
+#[rstest]
+fn resolve_hugr_extensions_simple() {
+    let mut build = DFGBuilder::new(
+        Signature::new(vec![], vec![float64_type()]).with_extension_delta(
+            [
+                PRELUDE_ID.to_owned(),
+                std_extensions::arithmetic::float_types::EXTENSION_ID.to_owned(),
+            ]
+            .into_iter()
+            .collect::<ExtensionSet>(),
+        ),
+    )
+    .unwrap();
+
+    // A constant op using a non-prelude extension.
+    let f_const = build.add_load_const(Value::extension(ConstF64::new(f64::consts::PI)));
+
+    let mut hugr = build
+        .finish_hugr_with_outputs([f_const])
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    let build_extensions = hugr.extensions().clone();
+
+    // Check that the read-only methods collect the same extensions.
+    let mut collected_exts = ExtensionRegistry::default();
+    for node in hugr.nodes() {
+        let op = hugr.get_optype(node);
+        collected_exts.extend(op.used_extensions().unwrap());
+    }
+    assert_eq!(
+        collected_exts, build_extensions,
+        "{collected_exts} != {build_extensions}"
+    );
+
+    // Check that the mutable methods collect the same extensions.
+    hugr.resolve_extension_defs(&build_extensions).unwrap();
+    assert_eq!(
+        hugr.extensions(),
+        &build_extensions,
+        "{} != {build_extensions}",
+        hugr.extensions()
+    );
+
+    // Serialization roundtrip to drop the weak pointers.
+    let ser = serde_json::to_string(&hugr).unwrap();
+    let deser_hugr = Hugr::load_json(ser.as_bytes(), &build_extensions).unwrap();
+
+    assert_eq!(
+        deser_hugr.extensions(),
+        &build_extensions,
+        "{} != {build_extensions}",
+        hugr.extensions()
     );
 }
 

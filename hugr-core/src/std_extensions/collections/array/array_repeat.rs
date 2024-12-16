@@ -6,9 +6,7 @@ use std::sync::{Arc, Weak};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{
-    ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef,
-};
+use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
@@ -157,8 +155,8 @@ impl MakeRegisteredOp for ArrayRepeat {
         super::EXTENSION_ID
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &super::ARRAY_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&super::EXTENSION)
     }
 }
 

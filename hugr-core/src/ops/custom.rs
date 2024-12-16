@@ -12,7 +12,7 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
+use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
 use crate::types::{type_param::TypeArg, Signature};
 use crate::{ops, IncomingPort, Node};
 
@@ -41,13 +41,9 @@ pub struct ExtensionOp {
 
 impl ExtensionOp {
     /// Create a new ExtensionOp given the type arguments and specified input extensions
-    pub fn new(
-        def: Arc<OpDef>,
-        args: impl Into<Vec<TypeArg>>,
-        exts: &ExtensionRegistry,
-    ) -> Result<Self, SignatureError> {
+    pub fn new(def: Arc<OpDef>, args: impl Into<Vec<TypeArg>>) -> Result<Self, SignatureError> {
         let args: Vec<TypeArg> = args.into();
-        let signature = def.compute_signature(&args, exts)?;
+        let signature = def.compute_signature(&args)?;
         Ok(Self {
             def,
             args,
@@ -60,12 +56,11 @@ impl ExtensionOp {
         def: Arc<OpDef>,
         args: impl IntoIterator<Item = TypeArg>,
         opaque: &OpaqueOp,
-        exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let args: Vec<TypeArg> = args.into_iter().collect();
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
-        let signature = match def.compute_signature(&args, exts) {
+        let signature = match def.compute_signature(&args) {
             Ok(sig) => sig,
             Err(SignatureError::MissingComputeFunc) => {
                 // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
@@ -174,12 +169,6 @@ impl DataflowOpTrait for ExtensionOp {
             .map(|ta| ta.substitute(subst))
             .collect::<Vec<_>>();
         let signature = self.signature.substitute(subst);
-        debug_assert_eq!(
-            self.def
-                .compute_signature(&args, subst.extension_registry())
-                .as_ref(),
-            Ok(&signature)
-        );
         Self {
             def: self.def.clone(),
             args,
@@ -341,7 +330,9 @@ mod test {
     use ops::OpType;
 
     use crate::extension::resolution::resolve_op_extensions;
-    use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
+    use crate::extension::ExtensionRegistry;
+    use crate::std_extensions::arithmetic::conversions::{self};
+    use crate::std_extensions::STD_REG;
     use crate::{
         extension::{
             prelude::{bool_t, qb_t, usize_t},
@@ -380,7 +371,7 @@ mod test {
 
     #[test]
     fn resolve_opaque_op() {
-        let registry = &CONVERT_OPS_REGISTRY;
+        let registry = &STD_REG;
         let i0 = &INT_TYPES[0];
         let opaque = OpaqueOp::new(
             conversions::EXTENSION_ID,

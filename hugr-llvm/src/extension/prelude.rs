@@ -295,7 +295,7 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
-    use hugr_core::extension::{PRELUDE, PRELUDE_REGISTRY};
+    use hugr_core::extension::PRELUDE;
     use hugr_core::types::{Type, TypeArg};
     use hugr_core::{type_row, Hugr};
     use prelude::{bool_t, qb_t, usize_t, PANIC_OP_ID, PRINT_OP_ID};
@@ -435,11 +435,7 @@ mod test {
             elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE
-            .instantiate_extension_op(
-                &PANIC_OP_ID,
-                [type_arg_2q.clone(), type_arg_2q.clone()],
-                &PRELUDE_REGISTRY,
-            )
+            .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
         let hugr = SimpleHugrConfig::new()
@@ -462,9 +458,7 @@ mod test {
     #[rstest]
     fn prelude_print(prelude_llvm_ctx: TestContext) {
         let greeting: ConstString = ConstString::new("Hello, world!".into());
-        let print_op = PRELUDE
-            .instantiate_extension_op(&PRINT_OP_ID, [], &PRELUDE_REGISTRY)
-            .unwrap();
+        let print_op = PRELUDE.instantiate_extension_op(&PRINT_OP_ID, []).unwrap();
 
         let hugr = SimpleHugrConfig::new()
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())

@@ -9,7 +9,7 @@ use crate::{
     extension::{
         prelude::{bool_t, string_type},
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
-        ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, PRELUDE,
+        ExtensionId, ExtensionSet, OpDef, SignatureFunc,
     },
     types::Signature,
     Extension,
@@ -115,13 +115,6 @@ lazy_static! {
             FloatOps::load_all_ops(extension, extension_ref).unwrap();
         })
     };
-
-    /// Registry of extensions required to validate float operations.
-    pub static ref FLOAT_OPS_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([
-        PRELUDE.clone(),
-        super::float_types::EXTENSION.clone(),
-        EXTENSION.clone(),
-    ]);
 }
 
 impl MakeRegisteredOp for FloatOps {
@@ -129,8 +122,8 @@ impl MakeRegisteredOp for FloatOps {
         EXTENSION_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &FLOAT_OPS_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 }
 

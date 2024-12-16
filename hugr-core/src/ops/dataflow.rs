@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use super::{impl_op_name, OpTag, OpTrait};
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
 use crate::{type_row, IncomingPort};
@@ -220,9 +220,7 @@ impl DataflowOpTrait for Call {
             .collect::<Vec<_>>();
         let instantiation = self.instantiation.substitute(subst);
         debug_assert_eq!(
-            self.func_sig
-                .instantiate(&type_args, subst.extension_registry())
-                .as_ref(),
+            self.func_sig.instantiate(&type_args).as_ref(),
             Ok(&instantiation)
         );
         Self {
@@ -240,10 +238,9 @@ impl Call {
     pub fn try_new(
         func_sig: PolyFuncType,
         type_args: impl Into<Vec<TypeArg>>,
-        exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let type_args: Vec<_> = type_args.into();
-        let instantiation = func_sig.instantiate(&type_args, exts)?;
+        let instantiation = func_sig.instantiate(&type_args)?;
         Ok(Self {
             func_sig,
             type_args,
@@ -268,7 +265,7 @@ impl Call {
     /// # use hugr::extension::prelude::qb_t;
     /// # use hugr::extension::PRELUDE_REGISTRY;
     /// let signature = Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()]);
-    /// let call = Call::try_new(signature.into(), &[], &PRELUDE_REGISTRY).unwrap();
+    /// let call = Call::try_new(signature.into(), &[]).unwrap();
     /// let op = OpType::Call(call.clone());
     /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));
     /// ```
@@ -279,15 +276,8 @@ impl Call {
         self.instantiation.input_count().into()
     }
 
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(), SignatureError> {
-        let other = Self::try_new(
-            self.func_sig.clone(),
-            self.type_args.clone(),
-            extension_registry,
-        )?;
+    pub(crate) fn validate(&self) -> Result<(), SignatureError> {
+        let other = Self::try_new(self.func_sig.clone(), self.type_args.clone())?;
         if other.instantiation == self.instantiation {
             Ok(())
         } else {
@@ -428,9 +418,7 @@ impl DataflowOpTrait for LoadFunction {
             .collect::<Vec<_>>();
         let instantiation = self.instantiation.substitute(subst);
         debug_assert_eq!(
-            self.func_sig
-                .instantiate(&type_args, subst.extension_registry())
-                .as_ref(),
+            self.func_sig.instantiate(&type_args).as_ref(),
             Ok(&instantiation)
         );
         Self {
@@ -448,10 +436,9 @@ impl LoadFunction {
     pub fn try_new(
         func_sig: PolyFuncType,
         type_args: impl Into<Vec<TypeArg>>,
-        exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let type_args: Vec<_> = type_args.into();
-        let instantiation = func_sig.instantiate(&type_args, exts)?;
+        let instantiation = func_sig.instantiate(&type_args)?;
         Ok(Self {
             func_sig,
             type_args,
@@ -475,15 +462,8 @@ impl LoadFunction {
         0.into()
     }
 
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(), SignatureError> {
-        let other = Self::try_new(
-            self.func_sig.clone(),
-            self.type_args.clone(),
-            extension_registry,
-        )?;
+    pub(crate) fn validate(&self) -> Result<(), SignatureError> {
+        let other = Self::try_new(self.func_sig.clone(), self.type_args.clone())?;
         if other.instantiation == self.instantiation {
             Ok(())
         } else {

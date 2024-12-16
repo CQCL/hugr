@@ -113,20 +113,13 @@ impl ExtensionRegistry {
         self.exts.contains_key(name)
     }
 
-    /// Validate the set of extensions, ensuring that each extension requirements are also in the registry.
-    ///
-    /// Note this potentially asks extensions to validate themselves against other extensions that
-    /// may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
-    /// or at least to validate the types first - which we don't do at all yet:
-    //
-    // TODO https://github.com/CQCL/hugr/issues/624. However, parametrized types could be
-    // cyclically dependent, so there is no perfect solution, and this is at least simple.
+    /// Validate the set of extensions.
     pub fn validate(&self) -> Result<(), ExtensionRegistryError> {
         if self.valid.load(Ordering::Relaxed) {
             return Ok(());
         }
         for ext in self.exts.values() {
-            ext.validate(self)
+            ext.validate()
                 .map_err(|e| ExtensionRegistryError::InvalidSignature(ext.name().clone(), e))?;
         }
         self.valid.store(true, Ordering::Relaxed);
@@ -398,14 +391,9 @@ pub enum SignatureError {
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
-    /// The Extension Registry did not contain an Extension referenced by the Signature
-    #[error("Extension '{missing}' is not part of the declared HUGR extensions [{}]",
-        available.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ")
-    )]
-    ExtensionNotFound {
-        missing: ExtensionId,
-        available: Vec<ExtensionId>,
-    },
+    /// The weak [`Extension`] reference for a custom type has been dropped.
+    #[error("Type '{typ}' is defined in extension '{missing}', but the extension reference has been dropped.")]
+    MissingTypeExtension { typ: TypeName, missing: ExtensionId },
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
@@ -740,18 +728,16 @@ impl Extension {
         &self,
         name: &OpNameRef,
         args: impl Into<Vec<TypeArg>>,
-        ext_reg: &ExtensionRegistry,
     ) -> Result<ExtensionOp, SignatureError> {
         let op_def = self.get_op(name).expect("Op not found.");
-        ExtensionOp::new(op_def.clone(), args, ext_reg)
+        ExtensionOp::new(op_def.clone(), args)
     }
 
-    /// Validates against a registry, which we can assume includes this extension itself.
-    // (TODO deal with the registry itself containing invalid extensions!)
-    fn validate(&self, all_exts: &ExtensionRegistry) -> Result<(), SignatureError> {
+    /// Validates the operation definitions in the register.
+    fn validate(&self) -> Result<(), SignatureError> {
         // We should validate TypeParams of TypeDefs too - https://github.com/CQCL/hugr/issues/624
         for op_def in self.operations.values() {
-            op_def.validate(all_exts)?;
+            op_def.validate()?;
         }
         Ok(())
     }

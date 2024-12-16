@@ -23,8 +23,8 @@ use crate::types::PolyFuncTypeRV;
 use crate::types::type_param::TypeArg;
 use crate::Extension;
 
+use super::PRELUDE;
 use super::{ConstUsize, PRELUDE_ID};
-use super::{PRELUDE, PRELUDE_REGISTRY};
 use crate::types::type_param::TypeParam;
 
 /// Name of the operation for loading generic BoundedNat parameters.
@@ -139,8 +139,8 @@ impl MakeRegisteredOp for LoadNat {
         PRELUDE_ID
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
