@@ -675,6 +675,7 @@ mod test {
     use hugr_core::extension::ExtensionSet;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::collections::array::{self, array_type, ArrayRepeat, ArrayScan};
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::types::Type;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer, SubContainer},
@@ -706,7 +707,7 @@ mod test {
     #[rstest]
     fn emit_all_ops(mut llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 array_op_builder::test::all_array_ops(builder.dfg_builder_endo([]).unwrap())
                     .finish_sub_container()
@@ -723,7 +724,7 @@ mod test {
     #[rstest]
     fn emit_get(mut llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_extensions(array::ARRAY_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let us2 = builder.add_load_value(ConstUsize::new(2));

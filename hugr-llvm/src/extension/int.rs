@@ -165,6 +165,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 
 #[cfg(test)]
 mod test {
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::bool_t,
@@ -198,7 +199,7 @@ mod test {
         SimpleHugrConfig::new()
             .with_ins(vec![ty.clone(), ty.clone()])
             .with_outs(output_types.into())
-            .with_extensions(int_ops::INT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut hugr_builder| {
                 let [in1, in2] = hugr_builder.input_wires_arr();
                 let ext_op = int_ops::EXTENSION
@@ -217,7 +218,7 @@ mod test {
         SimpleHugrConfig::new()
             .with_ins(vec![ty.clone()])
             .with_outs(vec![ty.clone()])
-            .with_extensions(int_ops::INT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = int_ops::EXTENSION

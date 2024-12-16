@@ -1,6 +1,7 @@
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 
+use hugr_core::std_extensions::STD_REG;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
@@ -29,7 +30,6 @@ use hugr_core::types::{Signature, SumType, Type, TypeRow, TypeRowRV};
 use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 
 use crate::dataflow::{partial_from_const, DFContext, PartialValue};
-use crate::test::TEST_REG;
 
 use super::{constant_fold_pass, ConstFoldContext, ConstantFoldPass, ValueHandle};
 
@@ -186,7 +186,7 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(
             ListOp::pop
                 .with_type(bool_t())
-                .to_extension_op(&TEST_REG)
+                .to_extension_op(&STD_REG)
                 .unwrap(),
             [list],
         )?
@@ -199,7 +199,7 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         .add_dataflow_op(
             ListOp::push
                 .with_type(bool_t())
-                .to_extension_op(&TEST_REG)
+                .to_extension_op(&STD_REG)
                 .unwrap(),
             [list, elem],
         )?

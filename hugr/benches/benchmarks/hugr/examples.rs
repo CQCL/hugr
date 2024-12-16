@@ -96,7 +96,7 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     let h_gate = QUANTUM_EXT.instantiate_extension_op("H", []).unwrap();
     let cx_gate = QUANTUM_EXT.instantiate_extension_op("CX", []).unwrap();
     // let rz = QUANTUM_EXT
-    //     .instantiate_extension_op("Rz", [], &FLOAT_OPS_REGISTRY)
+    //     .instantiate_extension_op("Rz", [])
     //     .unwrap();
     let signature =
         Signature::new_endo(vec![qb_t(), qb_t()]).with_extension_delta(QUANTUM_EXT.name().clone());

@@ -331,7 +331,8 @@ mod test {
 
     use crate::extension::resolution::resolve_op_extensions;
     use crate::extension::ExtensionRegistry;
-    use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
+    use crate::std_extensions::arithmetic::conversions::{self};
+    use crate::std_extensions::STD_REG;
     use crate::{
         extension::{
             prelude::{bool_t, qb_t, usize_t},
@@ -370,7 +371,7 @@ mod test {
 
     #[test]
     fn resolve_opaque_op() {
-        let registry = &CONVERT_OPS_REGISTRY;
+        let registry = &STD_REG;
         let i0 = &INT_TYPES[0];
         let opaque = OpaqueOp::new(
             conversions::EXTENSION_ID,

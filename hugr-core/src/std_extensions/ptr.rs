@@ -14,7 +14,7 @@ use crate::{
         simple_op::{
             HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
         },
-        ExtensionId, ExtensionRegistry, OpDef, SignatureError, SignatureFunc,
+        ExtensionId, OpDef, SignatureError, SignatureFunc,
     },
     ops::{custom::ExtensionOp, NamedOp},
     type_row,
@@ -109,8 +109,6 @@ fn extension() -> Arc<Extension> {
 lazy_static! {
     /// Reference to the pointer Extension.
     pub static ref EXTENSION: Arc<Extension> = extension();
-    /// Registry required to validate pointer extension.
-    pub static ref PTR_REG: ExtensionRegistry = ExtensionRegistry::new([EXTENSION.clone()]);
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).  Depending on

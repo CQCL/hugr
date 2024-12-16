@@ -252,11 +252,12 @@ mod test {
     use crate::test::{exec_ctx, llvm_ctx, TestContext};
     use hugr_core::builder::SubContainer;
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::{usize_t, ConstUsize, PRELUDE_REGISTRY},
         std_extensions::arithmetic::{
-            conversions::{ConvertOpDef, CONVERT_OPS_REGISTRY, EXTENSION},
+            conversions::{ConvertOpDef, EXTENSION},
             float_types::float64_type,
             int_types::INT_TYPES,
         },
@@ -274,7 +275,7 @@ mod test {
         SimpleHugrConfig::new()
             .with_ins(vec![in_type.clone()])
             .with_outs(vec![out_type.clone()])
-            .with_extensions(CONVERT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = EXTENSION
@@ -346,7 +347,7 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![in_t])
             .with_outs(vec![out_t])
-            .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = EXTENSION.instantiate_extension_op(op_name, []).unwrap();
@@ -379,7 +380,7 @@ mod test {
     fn usize_roundtrip(mut exec_ctx: TestContext, #[case] val: u64) -> () {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
-            .with_extensions(CONVERT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut builder: DFGW| {
                 let k = builder.add_load_value(ConstUsize::new(val));
                 let [int] = builder
@@ -405,7 +406,7 @@ mod test {
         let int64 = INT_TYPES[6].clone();
         SimpleHugrConfig::new()
             .with_outs(usize_t())
-            .with_extensions(CONVERT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(val));
                 let [int] = builder
@@ -567,7 +568,7 @@ mod test {
 
         let hugr = SimpleHugrConfig::new()
             .with_outs(vec![usize_t()])
-            .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(0, i).unwrap());
                 let ext_op = EXTENSION.instantiate_extension_op("itobool", []).unwrap();
@@ -601,7 +602,7 @@ mod test {
     fn itobool_roundtrip(mut exec_ctx: TestContext, #[values(0, 1)] i: u64) {
         let hugr = SimpleHugrConfig::new()
             .with_outs(vec![INT_TYPES[0].clone()])
-            .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(0, i).unwrap());
                 let i2b = EXTENSION.instantiate_extension_op("itobool", []).unwrap();

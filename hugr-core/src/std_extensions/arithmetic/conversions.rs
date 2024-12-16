@@ -8,9 +8,7 @@ use crate::extension::prelude::sum_with_error;
 use crate::extension::prelude::{bool_t, string_type, usize_t};
 use crate::extension::simple_op::{HasConcrete, HasDef};
 use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
-use crate::extension::{
-    ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc, PRELUDE,
-};
+use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc};
 use crate::ops::OpName;
 use crate::ops::{custom::ExtensionOp, NamedOp};
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
@@ -168,14 +166,6 @@ lazy_static! {
             ConvertOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
-
-    /// Registry of extensions required to validate integer operations.
-    pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::new([
-        PRELUDE.clone(),
-        super::int_types::EXTENSION.clone(),
-        super::float_types::EXTENSION.clone(),
-        EXTENSION.clone(),
-    ]);
 }
 
 impl MakeRegisteredOp for ConvertOpType {

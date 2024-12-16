@@ -256,8 +256,9 @@ mod test_fns {
     use hugr_core::ops::constant::CustomConst;
 
     use hugr_core::ops::{CallIndirect, Tag, Value};
-    use hugr_core::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
+    use hugr_core::std_extensions::arithmetic::int_ops::{self};
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{type_row, Hugr};
 
@@ -356,7 +357,7 @@ mod test_fns {
 
         let hugr = SimpleHugrConfig::new()
             .with_outs(v.get_type())
-            .with_extensions(INT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(v);
                 builder.finish_with_outputs([konst]).unwrap()
@@ -413,7 +414,7 @@ mod test_fns {
 
         let hugr = SimpleHugrConfig::new()
             .with_outs(v1.get_type())
-            .with_extensions(INT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder: DFGW| {
                 let k1 = builder.add_load_value(v1);
                 let k2 = builder.add_load_value(v2);

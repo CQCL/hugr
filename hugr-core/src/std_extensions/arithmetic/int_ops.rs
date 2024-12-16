@@ -7,9 +7,7 @@ use crate::extension::prelude::{bool_t, sum_with_error};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{
-    CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs, PRELUDE,
-};
+use crate::extension::{CustomValidator, OpDef, SignatureFunc, ValidateJustArgs};
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
@@ -258,13 +256,6 @@ lazy_static! {
             IntOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
-
-    /// Registry of extensions required to validate integer operations.
-    pub static ref INT_OPS_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([
-        PRELUDE.clone(),
-        super::int_types::EXTENSION.clone(),
-        EXTENSION.clone(),
-    ]);
 }
 
 impl HasConcrete for IntOpDef {
