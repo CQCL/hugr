@@ -287,7 +287,7 @@ impl ExtensionRegistry {
                 let weak_arc: Weak<Extension> = unsafe { mem::transmute(Arc::downgrade(&arc)) };
                 (arc, weak_arc)
             })
-            .collect();
+            .unzip();
 
         let mut weak_registry = WeakExtensionRegistry::default();
         for (ext, weak) in extensions.iter().zip(weaks) {
