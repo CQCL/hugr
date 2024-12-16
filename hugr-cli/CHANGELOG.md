@@ -1,6 +1,25 @@
 # Changelog
 
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.13.3...hugr-cli-v0.14.0) - 2024-12-16
+
+### New Features
+
+- [**breaking**] Share `Extension`s under `Arc`s (#1647)
+- [**breaking**] OpDefs and TypeDefs keep a reference to their extension (#1719)
+- [**breaking**] Have `CustomType`s reference their `Extension` definition (#1723)
+- [**breaking**] Resolve OpaqueOps and CustomType extensions  (#1735)
+- [**breaking**] Hugrs now keep a `ExtensionRegistry` with their requirements (#1738)
+- [**breaking**] Move arrays from prelude into new extension (#1770)
+
+### Performance
+
+- Faster singleton SiblingSubgraph construction (#1654)
+
+### Refactor
+
+- *(cli)* [**breaking**] remove deprecations (#1777)
+
 ## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.13.1...hugr-cli-v0.13.2) - 2024-10-22
 
 ### New Features
