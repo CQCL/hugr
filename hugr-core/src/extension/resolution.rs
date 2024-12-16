@@ -10,7 +10,7 @@
 //! required across the HUGR.
 //!
 //! This is distinct from _runtime_ extension requirements, which are defined
-//! more granularly in each function signature by the `required_extensions`
+//! more granularly in each function signature by the `runtime_reqs`
 //! field. See the `extension_inference` feature and related modules for that.
 //!
 //! Note: These procedures are only temporary until `hugr-model` is stabilized.

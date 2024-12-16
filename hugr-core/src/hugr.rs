@@ -197,7 +197,7 @@ impl Hugr {
     ///
     /// This is distinct from _runtime_ extension requirements computed in
     /// [`Hugr::infer_extensions`], which are computed more granularly in each
-    /// function signature by the `required_extensions` field and define the set
+    /// function signature by the `runtime_reqs` field and define the set
     /// of capabilities required by the runtime to execute each function.
     ///
     /// Updates the internal extension registry with the extensions used in the
