@@ -471,11 +471,11 @@ mod test {
         let listy = list::list_type(usize_t());
         let pop: ExtensionOp = list::ListOp::pop
             .with_type(usize_t())
-            .to_extension_op(&reg)
+            .to_extension_op()
             .unwrap();
         let push: ExtensionOp = list::ListOp::push
             .with_type(usize_t())
-            .to_extension_op(&reg)
+            .to_extension_op()
             .unwrap();
         let just_list = TypeRow::from(vec![listy.clone()]);
         let intermed = TypeRow::from(vec![listy.clone(), usize_t()]);

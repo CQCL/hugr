@@ -118,10 +118,7 @@ pub mod test {
     use hugr_core::std_extensions::collections::array::{self, array_type};
     use hugr_core::{
         builder::{DFGBuilder, HugrBuilder},
-        extension::{
-            prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
-            PRELUDE_REGISTRY,
-        },
+        extension::prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
         types::Signature,
         Hugr,
     };
@@ -149,15 +146,13 @@ pub mod test {
                 let array_type = array_type(2, usize_t());
                 either_type(array_type.clone(), array_type)
             };
-            builder
-                .build_unwrap_sum(&PRELUDE_REGISTRY, 1, res_sum_ty, r)
-                .unwrap()
+            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
         };
 
         let [elem_0] = {
             let r = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
             builder
-                .build_unwrap_sum(&PRELUDE_REGISTRY, 1, option_type(usize_t()), r)
+                .build_unwrap_sum(1, option_type(usize_t()), r)
                 .unwrap()
         };
 
@@ -169,31 +164,19 @@ pub mod test {
                 let row = vec![usize_t(), array_type(2, usize_t())];
                 either_type(row.clone(), row)
             };
-            builder
-                .build_unwrap_sum(&PRELUDE_REGISTRY, 1, res_sum_ty, r)
-                .unwrap()
+            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
         };
 
         let [_elem_left, arr] = {
             let r = builder.add_array_pop_left(usize_t(), 2, arr).unwrap();
             builder
-                .build_unwrap_sum(
-                    &PRELUDE_REGISTRY,
-                    1,
-                    option_type(vec![usize_t(), array_type(1, usize_t())]),
-                    r,
-                )
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(1, usize_t())]), r)
                 .unwrap()
         };
         let [_elem_right, arr] = {
             let r = builder.add_array_pop_right(usize_t(), 1, arr).unwrap();
             builder
-                .build_unwrap_sum(
-                    &PRELUDE_REGISTRY,
-                    1,
-                    option_type(vec![usize_t(), array_type(0, usize_t())]),
-                    r,
-                )
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(0, usize_t())]), r)
                 .unwrap()
         };
 
