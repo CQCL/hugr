@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.10.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.9.0...hugr-py-v0.10.0) (2024-12-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* Removed the extension registry argument from `validate` calls. Removed the extension registry argument from operation instantiation methods. Removed most extension-specific test registries. Use `EMPTY_REG`, `PRELUDE_REGISTRY`, or `STD_REG` instead.
+* `extension_reqs` field in FunctionType and Extension renamed to `runtime_reqs`
+* Array type and operations have been moved out of `prelude` and into a new `collections.array` extension. (py) `list_type` method replaced with `List` class. Removed `Array` type variant from the serialization format.
+* `collections` extension renamed to `collections.list`
+* The `LoadFunction::signature` field is removed. Replace uses with `DataflowOpTrait::signature()`.
+* Array `scan` and `repeat` ops get an additional type parameter specifying the extension requirements of their input functions. Furthermore, `repeat` is no longer part of `ArrayOpDef` but is instead specified via a new `ArrayScan` struct.
+
+### Features
+
+* Add `LoadNat` operation to enable loading generic `BoundedNat`s into runtime values ([#1763](https://github.com/CQCL/hugr/issues/1763)) ([6f035d6](https://github.com/CQCL/hugr/commit/6f035d68bd5c0444e4f1aedd254ee518e9c705ea)), closes [#1629](https://github.com/CQCL/hugr/issues/1629)
+* Add array `repeat` and `scan` ops ([#1633](https://github.com/CQCL/hugr/issues/1633)) ([649589c](https://github.com/CQCL/hugr/commit/649589c9e3f1fbd9cfff53a2adb8e1f9649fbe87)), closes [#1627](https://github.com/CQCL/hugr/issues/1627)
+* Automatically add the custom op's extension to its 'runtime_reqs' set ([#1787](https://github.com/CQCL/hugr/issues/1787)) ([3ef5bd9](https://github.com/CQCL/hugr/commit/3ef5bd9380142b62426070a318b6dc3f300d615d))
+* Don't require explicit extension registers for validation ([#1784](https://github.com/CQCL/hugr/issues/1784)) ([b517dc3](https://github.com/CQCL/hugr/commit/b517dc3530c3f01d854579e210da51d7a63e3036))
+* Make array repeat and scan ops generic over extension reqs ([#1716](https://github.com/CQCL/hugr/issues/1716)) ([4c1c6ee](https://github.com/CQCL/hugr/commit/4c1c6ee4c7d657c4bdb6b37c2237ae3f06b8d0be))
+* Move arrays from prelude into new extension ([#1770](https://github.com/CQCL/hugr/issues/1770)) ([187ea8f](https://github.com/CQCL/hugr/commit/187ea8f59ee307c0ed5afe2b0faad7c6e90051f0))
+* Rename `collections` extension to `collections.list` ([#1764](https://github.com/CQCL/hugr/issues/1764)) ([eef239f](https://github.com/CQCL/hugr/commit/eef239fa02019180f398444de4b9a45a1f2f3a3e))
+* rename `extension_reqs` to `runtime_reqs` ([#1776](https://github.com/CQCL/hugr/issues/1776)) ([5f5bce4](https://github.com/CQCL/hugr/commit/5f5bce4805897d5b0fa70af69fddc039f7a8d8ab))
+
+
+### Bug Fixes
+
+* hugr-py not adding extension-reqs on custom ops ([#1759](https://github.com/CQCL/hugr/issues/1759)) ([97ba7f4](https://github.com/CQCL/hugr/commit/97ba7f4b26773598affb4dd8ac119e9e1d1444e2))
+* **py:** allow conditional cases to be defined out of order ([#1599](https://github.com/CQCL/hugr/issues/1599)) ([583d21d](https://github.com/CQCL/hugr/commit/583d21d371320851f8608daa295ef8b723d31326))
+* Replace `LoadFunction::signature` with `LoadFunction::instantiation` ([#1756](https://github.com/CQCL/hugr/issues/1756)) ([5b50d1d](https://github.com/CQCL/hugr/commit/5b50d1d3d6d4b2b2db977d03d4f704face529c74))
+* Resolve types in `Value`s and custom consts ([#1779](https://github.com/CQCL/hugr/issues/1779)) ([080eaae](https://github.com/CQCL/hugr/commit/080eaaeb8dcc7585f2e502e2c512caf802be2bba))
+* Update number of ports for PartialOps, and sanitize orderd edges ([#1635](https://github.com/CQCL/hugr/issues/1635)) ([81a1385](https://github.com/CQCL/hugr/commit/81a1385fd56a9a12b84153756b4c0bb046808c50)), closes [#1625](https://github.com/CQCL/hugr/issues/1625)
+
 ## [0.9.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.1...hugr-py-v0.9.0) (2024-10-14)
 
 
