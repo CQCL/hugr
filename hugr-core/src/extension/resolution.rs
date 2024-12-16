@@ -19,6 +19,7 @@
 //! (will) automatically resolve extensions as the operations are created,
 //! we will no longer require this post-facto resolution step.
 
+mod extension;
 mod ops;
 mod types;
 mod types_mut;
@@ -102,12 +103,12 @@ pub enum ExtensionResolutionError {
         /// A list of available extensions.
         available_extensions: Vec<ExtensionId>,
     },
+    /// A type references an extension that is not in the given registry.
     #[display(
         "Type {ty}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
         node.map(|n| format!(" in {}", n)).unwrap_or_default(),
         available_extensions.join(", ")
     )]
-    /// A type references an extension that is not in the given registry.
     MissingTypeExtension {
         /// The node that requires the extension.
         node: Option<Node>,
@@ -117,6 +118,30 @@ pub enum ExtensionResolutionError {
         missing_extension: ExtensionId,
         /// A list of available extensions.
         available_extensions: Vec<ExtensionId>,
+    },
+    /// A type definition's `extension_id` does not match the extension it is in.
+    #[display(
+        "Type definition {def} in extension {extension} declares it was defined in {wrong_extension} instead."
+    )]
+    WrongTypeDefExtension {
+        /// The extension that defines the type.
+        extension: ExtensionId,
+        /// The type definition name.
+        def: TypeName,
+        /// The extension declared in the type definition's `extension_id`.
+        wrong_extension: ExtensionId,
+    },
+    /// An operation definition's `extension_id` does not match the extension it is in.
+    #[display(
+        "Operation definition {def} in extension {extension} declares it was defined in {wrong_extension} instead."
+    )]
+    WrongOpDefExtension {
+        /// The extension that defines the op.
+        extension: ExtensionId,
+        /// The op definition name.
+        def: OpName,
+        /// The extension declared in the op definition's `extension_id`.
+        wrong_extension: ExtensionId,
     },
     /// The type of an `OpaqueValue` has types which do not reference their defining extensions.
     #[display("The type of the opaque value '{value}' requires extensions {missing_extensions}, but does not reference their definition.")]

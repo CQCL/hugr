@@ -10,7 +10,7 @@ use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
 use crate::types::type_row::TypeRowBase;
-use crate::types::{CustomType, MaybeRV, Signature, SumType, TypeArg, TypeBase, TypeEnum};
+use crate::types::{CustomType, FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
 use crate::{Extension, Node};
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside an
@@ -112,9 +112,9 @@ pub fn resolve_op_types_extensions(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a signature.
 ///
 /// Adds the extensions used in the signature to the `used_extensions` registry.
-fn resolve_signature_exts(
+pub(super) fn resolve_signature_exts<RV: MaybeRV>(
     node: Option<Node>,
-    signature: &mut Signature,
+    signature: &mut FuncTypeBase<RV>,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
@@ -128,7 +128,7 @@ fn resolve_signature_exts(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a type row.
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
-fn resolve_type_row_exts<RV: MaybeRV>(
+pub(super) fn resolve_type_row_exts<RV: MaybeRV>(
     node: Option<Node>,
     row: &mut TypeRowBase<RV>,
     extensions: &WeakExtensionRegistry,

@@ -4,14 +4,16 @@
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
 use itertools::Itertools;
+use resolution::{ExtensionResolutionError, WeakExtensionRegistry};
 pub use semver::Version;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::cell::UnsafeCell;
 use std::collections::btree_map;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
-use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
+use std::{io, mem};
 
 use derive_more::Display;
 use thiserror::Error;
@@ -81,6 +83,24 @@ impl ExtensionRegistry {
             res.register_updated(ext);
         }
         res
+    }
+
+    /// Load an ExtensionRegistry serialized as json.
+    ///
+    /// After deserialization, updates all the internal `Weak<Extension>`
+    /// references to point to the newly created [`Arc`]s in the registry,
+    /// or extensions in the `additional_extensions` parameter.
+    pub fn load_json(
+        reader: impl io::Read,
+        other_extensions: &ExtensionRegistry,
+    ) -> Result<Self, ExtensionRegistryLoadError> {
+        let extensions: Vec<Extension> = serde_json::from_reader(reader)?;
+        // After deserialization, we need to update all the internal
+        // `Weak<Extension>` references.
+        Ok(ExtensionRegistry::new_with_extension_resolution(
+            extensions,
+            &other_extensions.into(),
+        )?)
     }
 
     /// Gets the Extension with the given name
@@ -213,6 +233,86 @@ impl ExtensionRegistry {
 
         self.exts.remove(name)
     }
+
+    /// Constructs a new ExtensionRegistry from a list of [`Extension`]s while
+    /// giving you a [`WeakExtensionRegistry`] to the allocation. This allows
+    /// you to add [`Weak`] self-references to the [`Extension`]s while
+    /// constructing them, before wrapping them in [`Arc`]s.
+    ///
+    /// This is similar to [`Arc::new_cyclic`], but for ExtensionRegistries.
+    ///
+    /// Calling [`Weak::upgrade`] on a weak reference in the
+    /// [`WeakExtensionRegistry`] inside your closure will return an extension
+    /// with no internal (op / type / value) definitions.
+    //
+    // It may be possible to implement this safely using `Arc::new_cyclic`
+    // directly, but the callback type does not allow for returning extra
+    // data so it seems unlikely.
+    pub fn new_cyclic<F, E>(
+        extensions: impl IntoIterator<Item = Extension>,
+        init: F,
+    ) -> Result<Self, E>
+    where
+        F: FnOnce(Vec<Extension>, &WeakExtensionRegistry) -> Result<Vec<Extension>, E>,
+    {
+        let extensions = extensions.into_iter().collect_vec();
+
+        // Unsafe internally-mutable wrapper around an extension. Important:
+        // `repr(transparent)` ensures the layout is identical to `Extension`,
+        // so it can be safely transmuted.
+        #[repr(transparent)]
+        struct ExtensionCell {
+            ext: UnsafeCell<Extension>,
+        }
+
+        // Create the arcs with internal mutability, and collect weak references
+        // over immutable references.
+        //
+        // This is safe as long as the cell mutation happens when we can guarantee
+        // that the weak references are not used.
+        let (arcs, weaks): (Vec<Arc<ExtensionCell>>, Vec<Weak<Extension>>) = extensions
+            .iter()
+            .map(|ext| {
+                // Create a new arc with an empty extension sharing the name and version of the original,
+                // but with no internal definitions.
+                //
+                // `UnsafeCell` is not sync, but we are not writing to it while the weak references are
+                // being used.
+                #[allow(clippy::arc_with_non_send_sync)]
+                let arc = Arc::new(ExtensionCell {
+                    ext: UnsafeCell::new(Extension::new(ext.name().clone(), ext.version().clone())),
+                });
+
+                // SAFETY: `ExtensionCell` is `repr(transparent)`, so it has the same layout as `Extension`.
+                let weak_arc: Weak<Extension> = unsafe { mem::transmute(Arc::downgrade(&arc)) };
+                (arc, weak_arc)
+            })
+            .unzip();
+
+        let mut weak_registry = WeakExtensionRegistry::default();
+        for (ext, weak) in extensions.iter().zip(weaks) {
+            weak_registry.register(ext.name().clone(), weak);
+        }
+
+        // Actual initialization here
+        // Upgrading the weak references at any point here will access the empty extensions in the arcs.
+        let extensions = init(extensions, &weak_registry)?;
+
+        // We're done.
+        let arcs: Vec<Arc<Extension>> = arcs
+            .into_iter()
+            .zip(extensions)
+            .map(|(arc, ext)| {
+                // Replace the dummy extensions with the updated ones.
+                // SAFETY: The cell is only mutated when the weak references are not used.
+                unsafe { *arc.ext.get() = ext };
+                // Pretend the UnsafeCells never existed.
+                // SAFETY: `ExtensionCell` is `repr(transparent)`, so it has the same layout as `Extension`.
+                unsafe { mem::transmute::<Arc<ExtensionCell>, Arc<Extension>>(arc) }
+            })
+            .collect();
+        Ok(ExtensionRegistry::new(arcs))
+    }
 }
 
 impl IntoIterator for ExtensionRegistry {
@@ -251,8 +351,10 @@ impl Extend<Arc<Extension>> for ExtensionRegistry {
     }
 }
 
-// Encode/decode ExtensionRegistry as a list of extensions.
-// We can get the map key from the extension itself.
+/// Encode/decode ExtensionRegistry as a list of extensions.
+///
+/// Any `Weak<Extension>` references inside the registry will be left unresolved.
+/// Prefer using [`ExtensionRegistry::load_json`] when deserializing.
 impl<'de> Deserialize<'de> for ExtensionRegistry {
     fn deserialize<D>(deserializer: D) -> Result<ExtensionRegistry, D::Error>
     where
@@ -419,6 +521,11 @@ impl ExtensionValue {
     /// Returns a reference to the typed value of this [`ExtensionValue`].
     pub fn typed_value(&self) -> &ops::Value {
         &self.typed_value
+    }
+
+    /// Returns a mutable reference to the typed value of this [`ExtensionValue`].
+    pub(super) fn typed_value_mut(&mut self) -> &mut ops::Value {
+        &mut self.typed_value
     }
 
     /// Returns a reference to the name of this [`ExtensionValue`].
@@ -658,6 +765,7 @@ impl PartialEq for Extension {
 
 /// An error that can occur in defining an extension registry.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ExtensionRegistryError {
     /// Extension already defined.
     #[error("The registry already contains an extension with id {0} and version {1}. New extension has version {2}.")]
@@ -667,8 +775,21 @@ pub enum ExtensionRegistryError {
     InvalidSignature(ExtensionId, #[source] SignatureError),
 }
 
+/// An error that can occur while loading an extension registry.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum ExtensionRegistryLoadError {
+    /// Deserialization error.
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
+    /// Error when resolving internal extension references.
+    #[error(transparent)]
+    ExtensionResolutionError(#[from] ExtensionResolutionError),
+}
+
 /// An error that can occur in building a new extension.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ExtensionBuildError {
     /// Existing [`OpDef`]
     #[error("Extension already has an op called {0}.")]
@@ -909,6 +1030,7 @@ pub mod test {
         assert!(reg.remove_extension(&ext_1_id).unwrap().version() == &Version::new(1, 1, 0));
         assert_eq!(reg.len(), 1);
     }
+
     mod proptest {
 
         use ::proptest::{collection::hash_set, prelude::*};

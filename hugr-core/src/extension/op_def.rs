@@ -136,6 +136,11 @@ impl CustomValidator {
             validate: Box::new(validate),
         }
     }
+
+    /// Return a mutable reference to the PolyFuncType.
+    pub(super) fn poly_func_mut(&mut self) -> &mut PolyFuncTypeRV {
+        &mut self.poly_func
+    }
 }
 
 /// The ways in which an OpDef may compute the Signature of each operation node.
@@ -407,6 +412,11 @@ impl OpDef {
         self.extension_ref.clone()
     }
 
+    /// Returns a mutable reference to the weak extension pointer in the operation definition.
+    pub(super) fn extension_mut(&mut self) -> &mut Weak<Extension> {
+        &mut self.extension_ref
+    }
+
     /// Returns a reference to the description of this [`OpDef`].
     pub fn description(&self) -> &str {
         self.description.as_ref()
@@ -468,6 +478,11 @@ impl OpDef {
     /// Returns a reference to the signature function of this [`OpDef`].
     pub fn signature_func(&self) -> &SignatureFunc {
         &self.signature_func
+    }
+
+    /// Returns a mutable reference to the signature function of this [`OpDef`].
+    pub(super) fn signature_func_mut(&mut self) -> &mut SignatureFunc {
+        &mut self.signature_func
     }
 }
 

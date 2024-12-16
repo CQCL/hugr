@@ -11,7 +11,7 @@ use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{ExtensionError, HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
-use crate::Hugr;
+use crate::{Extension, Hugr};
 
 #[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Package of module HUGRs.
@@ -130,19 +130,39 @@ impl Package {
         extension_registry: &ExtensionRegistry,
     ) -> Result<Self, PackageEncodingError> {
         let val: serde_json::Value = serde_json::from_reader(reader)?;
-        let loaded_pkg = serde_json::from_value::<Package>(val.clone());
 
-        if let Ok(mut pkg) = loaded_pkg {
+        // Try to load a package json.
+        // Defers the extension registry loading so we can call [`ExtensionRegistry::load_json_value`] directly.
+        #[derive(Debug, serde::Deserialize)]
+        struct PackageDeser {
+            pub modules: Vec<Hugr>,
+            pub extensions: Vec<Extension>,
+        }
+        let loaded_pkg = serde_json::from_value::<PackageDeser>(val.clone());
+
+        if let Ok(PackageDeser {
+            mut modules,
+            extensions: pkg_extensions,
+        }) = loaded_pkg
+        {
+            let mut pkg_extensions = ExtensionRegistry::new_with_extension_resolution(
+                pkg_extensions,
+                &extension_registry.into(),
+            )?;
+
             // Resolve the operations in the modules using the defined registries.
             let mut combined_registry = extension_registry.clone();
-            combined_registry.extend(&pkg.extensions);
+            combined_registry.extend(&pkg_extensions);
 
-            for module in &mut pkg.modules {
+            for module in &mut modules {
                 module.resolve_extension_defs(&combined_registry)?;
-                pkg.extensions.extend(module.extensions());
+                pkg_extensions.extend(module.extensions());
             }
 
-            return Ok(pkg);
+            return Ok(Package {
+                modules,
+                extensions: pkg_extensions,
+            });
         };
         let pkg_load_err = loaded_pkg.unwrap_err();
 
