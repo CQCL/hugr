@@ -1,5 +1,64 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-v0.13.3...hugr-v0.14.0) - 2024-12-16
+
+### Bug Fixes
+
+- hierarchical simple replacement using insert_hugr (#1718)
+- hugr-py not adding extension-reqs on custom ops (#1759)
+- [**breaking**] Replace `LoadFunction::signature` with `LoadFunction::instantiation` (#1756)
+- Resolve types in `Value`s and custom consts (#1779)
+- allow disconnected outputs in SiblingSubgraph::from_node (#1769)
+
+### Documentation
+
+- Fix comment for scan op (#1751)
+
+### New Features
+
+- Dataflow analysis framework (#1476)
+- *(hugr-passes)* [**breaking**] Rewrite constant_fold_pass using dataflow framework (#1603)
+- Export/import of JSON metadata (#1622)
+- Add `SiblingSubgraph::from_node` (#1655)
+- [**breaking**] Replace GATs with `impl Iterator` returns (RPITIT) on `HugrView` (#1660)
+- Emulate `TypeBound`s on parameters via constraints. (#1624)
+- Add array `repeat` and `scan` ops (#1633)
+- move unwrap builder to hugr core (#1674)
+- Lists and extension sets with splicing (#1657)
+- add HugrView::first_child and HugrMut::remove_subtree (#1721)
+- Lower collections extension (#1720)
+- [**breaking**] impl HugrView for any &(mut) to a HugrView (#1678)
+- [**breaking**] Make array repeat and scan ops generic over extension reqs (#1716)
+- Print []+[] as Bool and [] as Unit in user-facing messages (#1745)
+- Add `PartialEq` impls for `FuncTypeBase` and `Cow<FuncTypeBase>` (#1762)
+- [**breaking**] Rename `collections` extension to `collections.list` (#1764)
+- add `is_` variant methods to `EdgeKind` (#1768)
+- [**breaking**] Move arrays from prelude into new extension (#1770)
+- Add `LoadNat` operation to enable loading generic `BoundedNat`s into runtime values (#1763)
+- [**breaking**] Add `monomorphization` pass (#1733)
+- Update extension pointers in customConsts (#1780)
+- [**breaking**] Use registries of `Weak<Extension>`s when doing resolution  (#1781)
+- [**breaking**] Resolve extension references inside the extension themselves (#1783)
+- export llvm test utilities under llvm-test feature (#1677)
+- [**breaking**] Share `Extension`s under `Arc`s (#1647)
+- [**breaking**] OpDefs and TypeDefs keep a reference to their extension (#1719)
+- [**breaking**] Have `CustomType`s reference their `Extension` definition (#1723)
+- [**breaking**] Resolve OpaqueOps and CustomType extensions  (#1735)
+- [**breaking**] `used_extensions` calls for both ops and signatures (#1739)
+- [**breaking**] Hugrs now keep a `ExtensionRegistry` with their requirements (#1738)
+- [**breaking**] rename `extension_reqs` to `runtime_reqs` (#1776)
+- [**breaking**] Don't require explicit extension registers for validation (#1784)
+
+### Performance
+
+- Return `Cow<Signature>` where possible (#1743)
+- Faster singleton SiblingSubgraph construction (#1654)
+
+### Refactor
+
+- avoid hugr clone in simple replace (#1724)
+- [trivial] replace.rs: use HugrView::first_child  (#1737)
+
 ## [0.13.3](https://github.com/CQCL/hugr/compare/hugr-v0.13.2...hugr-v0.13.3) - 2024-11-06
 
 ### Bug Fixes
