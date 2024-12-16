@@ -154,7 +154,7 @@ fn check_extension_resolution(mut hugr: Hugr) {
     );
 }
 
-/// Build a hugr with all possible op nodes and resolve the extensions.
+/// Build a small hugr using the float types extension and check that the extensions are resolved.
 #[rstest]
 fn resolve_hugr_extensions_simple() {
     let mut build = DFGBuilder::new(
@@ -201,8 +201,6 @@ fn resolve_hugr_extensions_simple() {
     // Serialization roundtrip to drop the weak pointers.
     let ser = serde_json::to_string(&hugr).unwrap();
     let deser_hugr = Hugr::load_json(ser.as_bytes(), &build_extensions).unwrap();
-
-    println!("deser_hugr: {}", ser);
 
     assert_eq!(
         deser_hugr.extensions(),
