@@ -93,7 +93,7 @@ pub(crate) fn resolve_op_extensions<'e>(
             cause: e,
         })?;
 
-    if opaque.signature() != ext_op.signature() {
+    if opaque.signature().io() != ext_op.signature().io() {
         return Err(OpaqueOpError::SignatureMismatch {
             node,
             extension: opaque.extension().clone(),
