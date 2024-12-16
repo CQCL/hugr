@@ -236,6 +236,13 @@ class OpDef(ExtensionObject):
             concrete_signature: Concrete function type of the operation, only required
             if the operation is polymorphic.
         """
+        # Add the extension where the operation is defined as a runtime requirement.
+        # We don't store this in the json definition as it is redundant information.
+        if concrete_signature is not None:
+            concrete_signature = concrete_signature.with_runtime_reqs(
+                [self.get_extension().name]
+            )
+
         return ops.ExtOp(self, concrete_signature, list(args or []))
 
 
