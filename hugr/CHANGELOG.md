@@ -2,6 +2,53 @@
 
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-v0.13.3...hugr-v0.14.0) - 2024-12-16
 
+This release includes a long list of breaking changes that simplify the API, specially around
+extensions and extension registry management.
+
+Extension definitions are now tracked by each operation and type inside the hugr, so there is no
+need to pass around extension registries any more.
+
+### ⚠ BREAKING CHANGES
+
+#### Core
+
+- The `LoadFunction::signature` field has been removed. Replaced with `DataflowOpTrait::signature()`.
+- Types which implement `AsRef` - both library ones such as `Rc` and custom ones - no longer get a blanket impl of `HugrView`. Workaround by manually calling `as_ref()` and using the `&Hugr` yourself.
+- Removed `Array` type variant from the serialization format.
+- `Optrait` now requires `Sized` and `Clone` and is no longer object safe.
+- `DataflowOptrait` now requires `Sized` and has an additional required method `substitute`.
+- `::extension::resolve` operations now use `WeakExtensionRegistry`es.
+- `ExtensionRegistry` and `Package` now wrap Extensions in `Arc`s.
+- Renamed `OpDef::extension` and `TypeDef::extension` to `extension_id`. extension now returns weak references to the Extension defining them.
+- `Extension::with_reqs` moved to `set_reqs`, which takes `&mut self` instead of `self`.
+- `Extension::add_type` and `Extension::add_op` now take an extra parameter. See docs for example usage.
+- `ExtensionRegistry::register_updated` and `register_updated_ref` are no longer fallible.
+- Removed `CustomType::new_simple`. Custom types can no longer be const-constructed.
+- Added `init_signature` and `extension_ref` methods to the `MakeOpDef` trait.
+- Redefined the const types in the prelude to generator functions.
+- Removed `resolve_opaque_op` and `resolve_extension_ops`. Use `Hugr::resolve_extension_defs` instead.
+- Removed `ExtensionRegistry::try_new`. Use `new` instead, and call `ExtensionRegistry::validate` to validate.
+- `ExtensionSet::insert` and `singleton` take extension ids by value instead of cloning internally.
+- Removed `update_validate`. The hugr extensions should be resolved at load time, so we can use validate instead.
+- The builder `finish_hugr` function family no longer takes a registry as parameter, and the `_prelude` variants have been removed.
+- `extension_reqs` field in `FunctionType` and `Extension` renamed to `runtime_reqs`.
+- Removed the extension registry argument from validate calls.
+- Removed the extension registry argument from operation instantiation methods.
+- Removed most extension-specific test registries. Use `EMPTY_REG`, `PRELUDE_REGISTRY`, or `STD_REG` instead.
+
+#### Extensions
+
+- Array scan and repeat ops get an additional type parameter specifying the extension requirements of their input functions. Furthermore, repeat is no longer part of `ArrayOpDef` but is instead specified via a new `ArrayScan` struct.
+- `collections` extension renamed to `collections.list`
+- Array type and operations have been moved out of prelude and into a new `collections.array` extension.
+
+#### Passes
+
+- `ConstantFoldPass` is no longer `UnwindSafe`, `RefUnwindSafe`, nor `Copy`.
+- `fold_leaf_op` and `find_consts` have been removed.
+- `ConstantFoldPass::new` function removed. Instead use `ConstantFoldPass::default`.
+- Variant `ConstFoldError::SimpleReplacementError` was removed.
+
 ### Bug Fixes
 
 - hierarchical simple replacement using insert_hugr (#1718)

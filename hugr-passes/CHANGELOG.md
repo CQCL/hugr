@@ -3,6 +3,15 @@
 
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.13.3...hugr-passes-v0.14.0) - 2024-12-16
 
+### ⚠ BREAKING CHANGES
+
+- Updated to `hugr 0.14`, which includes breaking changes to the serialization format.
+
+- `ConstantFoldPass` is no longer `UnwindSafe`, `RefUnwindSafe`, nor `Copy`.
+- `fold_leaf_op` and `find_consts` have been removed.
+- `ConstantFoldPass::new` function removed. Instead use `ConstantFoldPass::default`.
+- Variant `ConstFoldError::SimpleReplacementError` was removed.
+
 ### Bug Fixes
 
 - allow disconnected outputs in SiblingSubgraph::from_node (#1769)
