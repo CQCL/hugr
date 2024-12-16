@@ -1,5 +1,102 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.3...hugr-core-v0.14.0) - 2024-12-16
+
+This release includes a long list of breaking changes that simplify the API, specially around
+extensions and extension registry management.
+
+Extension definitions are now tracked by each operation and type inside the hugr, so there is no
+need to pass around extension registries any more.
+
+### ⚠ BREAKING CHANGES
+
+#### Core
+
+- The `LoadFunction::signature` field has been removed. Replaced with `DataflowOpTrait::signature()`.
+- Types which implement `AsRef` - both library ones such as `Rc` and custom ones - no longer get a blanket impl of `HugrView`. Workaround by manually calling `as_ref()` and using the `&Hugr` yourself.
+- Removed `Array` type variant from the serialization format.
+- `Optrait` now requires `Sized` and `Clone` and is no longer object safe.
+- `DataflowOptrait` now requires `Sized` and has an additional required method `substitute`.
+- `::extension::resolve` operations now use `WeakExtensionRegistry`es.
+- `ExtensionRegistry` and `Package` now wrap Extensions in `Arc`s.
+- Renamed `OpDef::extension` and `TypeDef::extension` to `extension_id`. extension now returns weak references to the Extension defining them.
+- `Extension::with_reqs` moved to `set_reqs`, which takes `&mut self` instead of `self`.
+- `Extension::add_type` and `Extension::add_op` now take an extra parameter. See docs for example usage.
+- `ExtensionRegistry::register_updated` and `register_updated_ref` are no longer fallible.
+- Removed `CustomType::new_simple`. Custom types can no longer be const-constructed.
+- Added `init_signature` and `extension_ref` methods to the `MakeOpDef` trait.
+- Redefined the const types in the prelude to generator functions.
+- Removed `resolve_opaque_op` and `resolve_extension_ops`. Use `Hugr::resolve_extension_defs` instead.
+- Removed `ExtensionRegistry::try_new`. Use `new` instead, and call `ExtensionRegistry::validate` to validate.
+- `ExtensionSet::insert` and `singleton` take extension ids by value instead of cloning internally.
+- Removed `update_validate`. The hugr extensions should be resolved at load time, so we can use validate instead.
+- The builder `finish_hugr` function family no longer takes a registry as parameter, and the `_prelude` variants have been removed.
+- `extension_reqs` field in `FunctionType` and `Extension` renamed to `runtime_reqs`.
+- Removed the extension registry argument from validate calls.
+- Removed the extension registry argument from operation instantiation methods.
+- Removed most extension-specific test registries. Use `EMPTY_REG`, `PRELUDE_REGISTRY`, or `STD_REG` instead.
+
+#### Extensions
+
+- Array scan and repeat ops get an additional type parameter specifying the extension requirements of their input functions. Furthermore, repeat is no longer part of `ArrayOpDef` but is instead specified via a new `ArrayScan` struct.
+- `collections` extension renamed to `collections.list`
+- Array type and operations have been moved out of prelude and into a new `collections.array` extension.
+
+### Bug Fixes
+
+- hierarchical simple replacement using insert_hugr (#1718)
+- hugr-py not adding extension-reqs on custom ops (#1759)
+- [**breaking**] Replace `LoadFunction::signature` with `LoadFunction::instantiation` (#1756)
+- allow disconnected outputs in SiblingSubgraph::from_node (#1769)
+- Resolve types in `Value`s and custom consts (#1779)
+
+### Documentation
+
+- Fix comment for scan op (#1751)
+
+### New Features
+
+- Export/import of JSON metadata (#1622)
+- Add `SiblingSubgraph::from_node` (#1655)
+- [**breaking**] Replace GATs with `impl Iterator` returns (RPITIT) on `HugrView` (#1660)
+- Emulate `TypeBound`s on parameters via constraints. (#1624)
+- Add array `repeat` and `scan` ops (#1633)
+- move unwrap builder to hugr core (#1674)
+- [**breaking**] Share `Extension`s under `Arc`s (#1647)
+- Lists and extension sets with splicing (#1657)
+- [**breaking**] OpDefs and TypeDefs keep a reference to their extension (#1719)
+- add HugrView::first_child and HugrMut::remove_subtree (#1721)
+- Lower collections extension (#1720)
+- [**breaking**] Have `CustomType`s reference their `Extension` definition (#1723)
+- [**breaking**] Resolve OpaqueOps and CustomType extensions  (#1735)
+- [**breaking**] impl HugrView for any &(mut) to a HugrView (#1678)
+- [**breaking**] Make array repeat and scan ops generic over extension reqs (#1716)
+- Print []+[] as Bool and [] as Unit in user-facing messages (#1745)
+- [**breaking**] `used_extensions` calls for both ops and signatures (#1739)
+- [**breaking**] Hugrs now keep a `ExtensionRegistry` with their requirements (#1738)
+- Add `PartialEq` impls for `FuncTypeBase` and `Cow<FuncTypeBase>` (#1762)
+- [**breaking**] Rename `collections` extension to `collections.list` (#1764)
+- add `is_` variant methods to `EdgeKind` (#1768)
+- [**breaking**] Move arrays from prelude into new extension (#1770)
+- Add `LoadNat` operation to enable loading generic `BoundedNat`s into runtime values (#1763)
+- [**breaking**] Add `monomorphization` pass (#1733)
+- [**breaking**] rename `extension_reqs` to `runtime_reqs` (#1776)
+- Update extension pointers in customConsts (#1780)
+- [**breaking**] Use registries of `Weak<Extension>`s when doing resolution  (#1781)
+- [**breaking**] Resolve extension references inside the extension themselves (#1783)
+- [**breaking**] Don't require explicit extension registers for validation (#1784)
+- [**breaking**] Remove ExtensionRegistry args in UnwrapBuilder and ListOp (#1785)
+
+### Performance
+
+- Faster singleton SiblingSubgraph construction (#1654)
+- Return `Cow<Signature>` where possible (#1743)
+
+### Refactor
+
+- avoid hugr clone in simple replace (#1724)
+- [trivial] replace.rs: use HugrView::first_child  (#1737)
+
 ## [0.13.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.2...hugr-core-v0.13.3) - 2024-11-06
 
 ### Bug Fixes
