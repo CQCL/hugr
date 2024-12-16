@@ -300,8 +300,8 @@ mod test {
     use std::iter;
 
     use hugr_core::extension::simple_op::MakeRegisteredOp as _;
+    use hugr_core::std_extensions::collections;
     use hugr_core::std_extensions::collections::array::{array_type_parametric, ArrayOpDef};
-    use hugr_core::std_extensions::{collections, STD_REG};
     use hugr_core::types::type_param::TypeParam;
     use itertools::Itertools;
 
@@ -491,7 +491,7 @@ mod test {
                 .unwrap();
             let [get] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
             let [got] = pf2
-                .build_unwrap_sum(&STD_REG, 1, SumType::new([vec![], vec![tv(1)]]), get)
+                .build_unwrap_sum(1, SumType::new([vec![], vec![tv(1)]]), get)
                 .unwrap();
             pf2.finish_with_outputs([got]).unwrap()
         };
@@ -521,7 +521,7 @@ mod test {
             panic!()
         };
         let [_, ar2_unwrapped] = outer
-            .build_unwrap_sum(&STD_REG, 1, st.clone(), ar2.out_wire(0))
+            .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
             .unwrap();
         let [e2] = outer
             .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])

@@ -1,7 +1,6 @@
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 
-use hugr_core::std_extensions::STD_REG;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
@@ -184,10 +183,7 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     let [list, maybe_elem] = build
         .add_dataflow_op(
-            ListOp::pop
-                .with_type(bool_t())
-                .to_extension_op(&STD_REG)
-                .unwrap(),
+            ListOp::pop.with_type(bool_t()).to_extension_op().unwrap(),
             [list],
         )?
         .outputs_arr();
@@ -197,10 +193,7 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     let [list] = build
         .add_dataflow_op(
-            ListOp::push
-                .with_type(bool_t())
-                .to_extension_op(&STD_REG)
-                .unwrap(),
+            ListOp::push.with_type(bool_t()).to_extension_op().unwrap(),
             [list, elem],
         )?
         .outputs_arr();

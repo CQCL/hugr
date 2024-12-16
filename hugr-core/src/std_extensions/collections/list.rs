@@ -25,7 +25,7 @@ use crate::types::{TypeName, TypeRowRV};
 use crate::{
     extension::{
         simple_op::{MakeExtensionOp, OpLoadError},
-        ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, TypeDef, TypeDefBound,
+        ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound,
     },
     ops::constant::CustomConst,
     ops::{custom::ExtensionOp, NamedOp},
@@ -373,20 +373,8 @@ impl MakeExtensionOp for ListOpInst {
 impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
     /// registry to validate the element type against.
-    pub fn to_extension_op(self, elem_type_registry: &ExtensionRegistry) -> Option<ExtensionOp> {
-        let registry = ExtensionRegistry::new(
-            elem_type_registry
-                .clone()
-                .into_iter()
-                // ignore self if already in registry
-                .filter(|ext| ext.name() != EXTENSION.name())
-                .chain(std::iter::once(EXTENSION.to_owned())),
-        );
-        ExtensionOp::new(
-            registry.get(&EXTENSION_ID)?.get_op(&self.name())?.clone(),
-            self.type_args(),
-        )
-        .ok()
+    pub fn to_extension_op(self) -> Option<ExtensionOp> {
+        ExtensionOp::new(EXTENSION.get_op(&self.name())?.clone(), self.type_args()).ok()
     }
 }
 
@@ -398,14 +386,10 @@ mod test {
         const_fail_tuple, const_none, const_ok_tuple, const_some_tuple,
     };
     use crate::ops::OpTrait;
-    use crate::std_extensions::STD_REG;
     use crate::PortIndex;
     use crate::{
-        extension::{
-            prelude::{qb_t, usize_t, ConstUsize},
-            PRELUDE,
-        },
-        std_extensions::arithmetic::float_types::{self, float64_type, ConstF64},
+        extension::prelude::{qb_t, usize_t, ConstUsize},
+        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
         types::TypeRow,
     };
 
@@ -443,9 +427,8 @@ mod test {
 
     #[test]
     fn test_list_ops() {
-        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]);
         let pop_op = ListOp::pop.with_type(qb_t());
-        let pop_ext = pop_op.clone().to_extension_op(&reg).unwrap();
+        let pop_ext = pop_op.clone().to_extension_op().unwrap();
         assert_eq!(ListOpInst::from_extension_op(&pop_ext).unwrap(), pop_op);
         let pop_sig = pop_ext.dataflow_signature().unwrap();
 
@@ -457,7 +440,7 @@ mod test {
         assert_eq!(pop_sig.output(), &both_row);
 
         let push_op = ListOp::push.with_type(float64_type());
-        let push_ext = push_op.clone().to_extension_op(&reg).unwrap();
+        let push_ext = push_op.clone().to_extension_op().unwrap();
         assert_eq!(ListOpInst::from_extension_op(&push_ext).unwrap(), push_op);
         let push_sig = push_ext.dataflow_signature().unwrap();
 
@@ -531,7 +514,7 @@ mod test {
 
         let res = op
             .with_type(usize_t())
-            .to_extension_op(&STD_REG)
+            .to_extension_op()
             .unwrap()
             .constant_fold(&consts)
             .unwrap();
