@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import hugr.tys as tys
+from hugr import tys, val
 from hugr.std import _load_extension
+from hugr.utils import comma_sep_str
 
 EXTENSION = _load_extension("collections.array")
 
@@ -14,7 +15,7 @@ EXTENSION = _load_extension("collections.array")
 class Array(tys.ExtType):
     """Fixed `size` array of `ty` elements."""
 
-    def __init__(self, ty: tys.Type, size: int | tys.BoundedNatArg) -> None:
+    def __init__(self, ty: tys.Type, size: int | tys.TypeArg) -> None:
         if isinstance(size, int):
             size = tys.BoundedNatArg(size)
 
@@ -52,3 +53,25 @@ class Array(tys.ExtType):
 
     def type_bound(self) -> tys.TypeBound:
         return self.ty.type_bound()
+
+
+@dataclass
+class ArrayVal(val.ExtensionValue):
+    """Constant value for a statically sized array of elements."""
+
+    v: list[val.Value]
+    ty: tys.Type
+
+    def __init__(self, v: list[val.Value], elem_ty: tys.Type) -> None:
+        self.v = v
+        self.ty = Array(elem_ty, len(v))
+
+    def to_value(self) -> val.Extension:
+        name = "ArrayValue"
+        # The value list must be serialized at this point, otherwise the
+        # `Extension` value would not be serializable.
+        vs = [v._to_serial_root() for v in self.v]
+        return val.Extension(name, typ=self.ty, val=vs, extensions=[EXTENSION.name])
+
+    def __str__(self) -> str:
+        return f"array({comma_sep_str(self.v)})"

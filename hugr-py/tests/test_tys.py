@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from hugr import val
-from hugr.std.collections.array import Array
+from hugr.std.collections.array import Array, ArrayVal
 from hugr.std.collections.list import List, ListVal
 from hugr.std.float import FLOAT_T
 from hugr.std.int import INT_T, _int_tv
@@ -170,3 +170,7 @@ def test_array():
     ls = Array(ty_var, len_var)
     assert ls.ty == ty_var
     assert ls.size is None
+
+    ar_val = ArrayVal([val.TRUE, val.FALSE], Bool)
+    assert ar_val.v == [val.TRUE, val.FALSE]
+    assert ar_val.ty == Array(Bool, 2)
