@@ -60,8 +60,6 @@ bumpalo = { workspace = true, features = ["collections"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
-webbrowser = { workspace = true }
-urlencoding = { workspace = true }
 cool_asserts = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 jsonschema = { workspace = true }

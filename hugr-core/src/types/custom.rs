@@ -155,11 +155,13 @@ impl CustomType {
 
 impl Display for CustomType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.args.is_empty() {
-            write!(f, "{}", self.id)
-        } else {
-            write!(f, "{}({:?})", self.id, self.args)
+        write!(f, "{}", self.id)?;
+        if !self.args.is_empty() {
+            write!(f, "(")?;
+            crate::utils::display_list(&self.args, f)?;
+            write!(f, ")")?;
         }
+        Ok(())
     }
 }
 

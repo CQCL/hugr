@@ -663,7 +663,7 @@ mod test {
     #[rstest]
     #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
     #[case::type_unit(vec![Type::UNIT.into()], "$foo$$t(Unit)")]
-    #[case::type_int(vec![INT_TYPES[2].to_owned().into()], "$foo$$t(int([BoundedNat { n: 2 }]))")]
+    #[case::type_int(vec![INT_TYPES[2].to_owned().into()], "$foo$$t(int(2))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq($n(0)$t(Unit))")]

@@ -1,9 +1,11 @@
 use anyhow::{anyhow, bail, ensure, Ok, Result};
+use hugr_core::extension::prelude::generic::LoadNat;
 use hugr_core::extension::prelude::{
-    self, error_type, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple,
+    self, error_type, generic, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple,
     TupleOpDef, UnpackTuple,
 };
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
+use hugr_core::types::TypeArg;
 use hugr_core::{
     extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst, types::SumType,
     HugrView,
@@ -290,6 +292,19 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             args.outputs.finish(context.builder(), returns)
         }
     })
+    .extension_op(prelude::PRELUDE_ID, generic::LOAD_NAT_OP_ID, {
+        let pcg = pcg.clone();
+        move |context, args| {
+            let load_nat = LoadNat::from_extension_op(args.node().as_ref())?;
+            let v = match load_nat.get_nat() {
+                TypeArg::BoundedNat { n } => pcg
+                    .usize_type(&context.typing_session())
+                    .const_int(n, false),
+                arg => bail!("Unexpected type arg for LoadNat: {}", arg),
+            };
+            args.outputs.finish(context.builder(), vec![v.into()])
+        }
+    })
 }
 
 #[cfg(test)]
@@ -468,6 +483,21 @@ mod test {
                 builder.finish_with_outputs([]).unwrap()
             });
 
+        check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[rstest]
+    fn prelude_load_nat(prelude_llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(usize_t())
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let v = builder
+                    .add_dataflow_op(LoadNat::new(TypeArg::BoundedNat { n: 42 }), vec![])
+                    .unwrap()
+                    .out_wire(0);
+                builder.finish_with_outputs([v]).unwrap()
+            });
         check_emission!(hugr, prelude_llvm_ctx);
     }
 }

@@ -109,8 +109,14 @@ pub struct LoadNat {
 }
 
 impl LoadNat {
-    fn new(nat: TypeArg) -> Self {
+    /// Creates a new [LoadNat] operation.
+    pub fn new(nat: TypeArg) -> Self {
         LoadNat { nat }
+    }
+
+    /// Returns the nat type argument that should be loaded.
+    pub fn get_nat(self) -> TypeArg {
+        self.nat
     }
 }
 
