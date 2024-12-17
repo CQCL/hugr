@@ -6,13 +6,27 @@ use hugr_core::{
     ops::{OpTag, OpTrait, OpType},
     HugrView, Node,
 };
+use itertools::Itertools;
 use petgraph::{graph::NodeIndex, visit::Bfs, Graph};
 
-enum CallGraphEdge {
+/// Weight for an edge in a [CallGraph]
+pub enum CallGraphEdge {
+    /// Edge corresponds to a [Call](OpType::Call) node (specified) in the Hugr
     Call(Node),
+    /// Edge corresponds to a [LoadFunction](OpType::LoadFunction) node (specified) in the Hugr
     LoadFunction(Node),
 }
 
+/// Details the [Call]s and [LoadFunction]s in a Hugr.
+/// Each node in the `CallGraph` corresponds to a [FuncDefn] in the Hugr; each edge corresponds
+/// to a [Call]/[LoadFunction] of the edge's target, contained in the edge's source.
+///
+/// For Hugrs whose root is neither a [Module](OpType::Module) nor a [FuncDefn], the call graph
+/// will have an additional node corresponding to the Hugr's root, with no incoming edges.
+///
+/// [Call]: OpType::Call
+/// [FuncDefn]: OpType::FuncDefn
+/// [LoadFunction]: OpType::LoadFunction
 pub struct CallGraph {
     g: Graph<Node, CallGraphEdge>,
     node_to_g: HashMap<Node, NodeIndex<u32>>,
@@ -61,28 +75,31 @@ impl CallGraph {
     fn reachable_funcs(
         &self,
         h: &impl HugrView,
-        roots: Option<impl IntoIterator<Item = Node>>,
+        roots: impl IntoIterator<Item = Node>,
     ) -> impl Iterator<Item = Node> + '_ {
+        let mut entry_points = roots.into_iter().collect_vec();
         let mut b = if h.get_optype(h.root()).is_module() {
-            let mut entry_points = match roots {
-                Some(i) => i.into_iter().collect(),
-                None => h
-                    .children(h.root())
-                    .filter(|n| {
-                        h.get_optype(*n)
-                            .as_func_defn()
-                            .is_some_and(|fd| fd.name == "main")
-                    })
-                    .collect::<Vec<_>>(),
+            if entry_points.is_empty() {
+                entry_points.push(
+                    h.children(h.root())
+                        .filter(|n| {
+                            h.get_optype(*n)
+                                .as_func_defn()
+                                .is_some_and(|fd| fd.name == "main")
+                        })
+                        .exactly_one()
+                        .ok()
+                        .expect("No entry_points provided, Module must contain `main`"),
+                );
             }
-            .into_iter()
-            .map(|i| self.node_to_g.get(&i).unwrap());
+            let mut entry_points = entry_points
+                .into_iter()
+                .map(|i| self.node_to_g.get(&i).unwrap());
             let mut b = Bfs::new(&self.g, *entry_points.next().unwrap());
-            while let Some(e) = entry_points.next() {
-                b.stack.push_back(*e);
-            }
+            b.stack.extend(entry_points);
             b
         } else {
+            assert!(entry_points.is_empty());
             Bfs::new(&self.g, *self.node_to_g.get(&h.root()).unwrap())
         };
         std::iter::from_fn(move || b.next(&self.g)).map(|i| *self.g.node_weight(i).unwrap())
@@ -94,12 +111,19 @@ impl CallGraph {
 ///
 /// For [Module](OpType::Module)-rooted Hugrs, `roots` may provide a list of entry points;
 /// these are expected to be children of the root although this is not enforced. If `roots`
-/// is absent, then the function called `main` (must be present and) is used as sole entry point.
+/// is empty, then the root must have exactly one child being a function called `main`,
+/// which is used as sole entry point.
 ///
+/// For non-Module-rooted Hugrs, `entry_points` must be empty; the root node is used.
 ///
-pub fn remove_dead_funcs(h: &mut impl HugrMut, roots: Option<impl IntoIterator<Item = Node>>) {
+/// # Panics
+/// * If the Hugr is non-Module-rooted and `entry_points` is non-empty
+/// * If the Hugr is Module-rooted, but does not declare `main`, and `entry_points` is empty
+/// * If the Hugr is Module-rooted, and `entry_points` is non-empty but contains nodes that
+///      are not [FuncDefn](OpType::FuncDefn)s
+pub fn remove_dead_funcs(h: &mut impl HugrMut, entry_points: impl IntoIterator<Item = Node>) {
     let cg = CallGraph::new(h);
-    let reachable = cg.reachable_funcs(h, roots).collect::<HashSet<_>>();
+    let reachable = cg.reachable_funcs(h, entry_points).collect::<HashSet<_>>();
     let unreachable = h
         .nodes()
         .filter(|n| h.get_optype(*n).is_func_defn() && !reachable.contains(n))
