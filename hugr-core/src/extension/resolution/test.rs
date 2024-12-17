@@ -22,11 +22,12 @@ use crate::extension::{
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::constant::CustomConst;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
-use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+use crate::std_extensions::arithmetic::float_types::{self, float64_type, ConstF64};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
-use crate::types::{Signature, Type};
+use crate::types::type_param::TypeParam;
+use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
 use crate::{std_extensions, type_row, Extension, Hugr, HugrView};
 
 #[rstest]
@@ -342,6 +343,36 @@ fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
     let mut module = ModuleBuilder::new();
     module.add_constant(Value::extension(custom_const));
     let hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
+
+    check_extension_resolution(hugr);
+}
+
+/// Test resolution of function call with type arguments.
+#[rstest]
+fn resolve_call() {
+    let dummy_fn_sig = PolyFuncType::new(
+        vec![TypeParam::Type { b: TypeBound::Any }],
+        Signature::new(vec![], vec![bool_t()]),
+    );
+
+    let generic_type = TypeArg::Type { ty: float64_type() };
+    let expected_ext = float_types::EXTENSION_ID.to_owned();
+
+    let mut module = ModuleBuilder::new();
+    let dummy_fn = module.declare("called_fn", dummy_fn_sig).unwrap();
+    let mut func = module
+        .define_function(
+            "caller_fn",
+            Signature::new(vec![], vec![bool_t()])
+                .with_extension_delta(ExtensionSet::from_iter([expected_ext.clone()])),
+        )
+        .unwrap();
+    let call = func.call(&dummy_fn, &[generic_type], vec![]).unwrap();
+    func.finish_with_outputs(call.outputs()).unwrap();
+
+    let hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
+
+    assert!(hugr.extensions().contains(&expected_ext));
 
     check_extension_resolution(hugr);
 }

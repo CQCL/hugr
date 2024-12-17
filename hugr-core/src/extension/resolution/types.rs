@@ -50,12 +50,18 @@ pub(crate) fn collect_op_types_extensions(
         OpType::Call(c) => {
             collect_signature_exts(c.func_sig.body(), &mut used, &mut missing);
             collect_signature_exts(&c.instantiation, &mut used, &mut missing);
+            for arg in &c.type_args {
+                collect_typearg_exts(arg, &mut used, &mut missing);
+            }
         }
         OpType::CallIndirect(c) => collect_signature_exts(&c.signature, &mut used, &mut missing),
         OpType::LoadConstant(lc) => collect_type_exts(&lc.datatype, &mut used, &mut missing),
         OpType::LoadFunction(lf) => {
             collect_signature_exts(lf.func_sig.body(), &mut used, &mut missing);
             collect_signature_exts(&lf.instantiation, &mut used, &mut missing);
+            for arg in &lf.type_args {
+                collect_typearg_exts(arg, &mut used, &mut missing);
+            }
         }
         OpType::DFG(dfg) => collect_signature_exts(&dfg.signature, &mut used, &mut missing),
         OpType::OpaqueOp(op) => {
@@ -203,7 +209,7 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-fn collect_typearg_exts(
+pub(super) fn collect_typearg_exts(
     arg: &TypeArg,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,

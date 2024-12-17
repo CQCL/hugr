@@ -587,6 +587,8 @@ impl From<Type> for TypeRV {
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
+#[derive(Clone, Debug, derive_more::Display)]
+#[display("[{}]", _0.iter().map(|ta| ta.to_string()).join(", "))]
 pub struct Substitution<'a>(&'a [TypeArg]);
 
 impl<'a> Substitution<'a> {
