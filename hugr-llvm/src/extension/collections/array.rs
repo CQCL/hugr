@@ -18,6 +18,7 @@ use inkwell::values::{
 use inkwell::IntPredicate;
 use itertools::Itertools;
 
+use crate::emit::emit_value;
 use crate::{
     emit::{deaggregate_call_result, EmitFuncContext, RowPromise},
     sum::LLVMSumType,
@@ -50,6 +51,15 @@ pub trait ArrayCodegen: Clone {
         size: u64,
     ) -> impl BasicType<'c> {
         elem_ty.array_type(size as u32)
+    }
+
+    /// Emit a [hugr_core::std_extensions::collections::array::ArrayValue].
+    fn emit_array_value<'c, H: HugrView>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        value: &array::ArrayValue,
+    ) -> Result<BasicValueEnum<'c>> {
+        emit_array_value(self, ctx, value)
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayOp].
@@ -128,6 +138,10 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
                     let elem_ty = ts.llvm_type(ty)?;
                     Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
                 }
+            })
+            .custom_const::<array::ArrayValue>({
+                let ccg = self.0.clone();
+                move |context, k| ccg.emit_array_value(context, k)
             })
             .simple_extension_op::<ArrayOpDef>({
                 let ccg = self.0.clone();
@@ -242,6 +256,31 @@ fn build_loop<'c, T, H: HugrView>(
     builder.build_unconditional_branch(head_block)?;
     ctx.builder().position_at_end(exit_block);
     Ok(val)
+}
+
+pub fn emit_array_value<'c, H: HugrView>(
+    ccg: &impl ArrayCodegen,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    value: &array::ArrayValue,
+) -> Result<BasicValueEnum<'c>> {
+    let ts = ctx.typing_session();
+    let llvm_array_ty = ccg
+        .array_type(
+            &ts,
+            ts.llvm_type(value.get_element_type())?,
+            value.get_contents().len() as u64,
+        )
+        .as_basic_type_enum()
+        .into_array_type();
+    let mut array_v = llvm_array_ty.get_undef();
+    for (i, v) in value.get_contents().iter().enumerate() {
+        let llvm_v = emit_value(ctx, v)?;
+        array_v = ctx
+            .builder()
+            .build_insert_value(array_v, llvm_v, i as u32, "")?
+            .into_array_value();
+    }
+    Ok(array_v.into())
 }
 
 pub fn emit_array_op<'c, H: HugrView>(
@@ -731,6 +770,23 @@ mod test {
                 let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
                 builder.add_array_get(usize_t(), 2, arr, us1).unwrap();
                 builder.finish_with_outputs([]).unwrap()
+            });
+        llvm_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+        });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn emit_array_value(mut llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(STD_REG.to_owned())
+            .with_outs(vec![array_type(2, usize_t())])
+            .finish(|mut builder| {
+                let vs = vec![ConstUsize::new(1).into(), ConstUsize::new(2).into()];
+                let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), vs));
+                builder.finish_with_outputs([arr]).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
