@@ -133,3 +133,72 @@ pub fn remove_dead_funcs(h: &mut impl HugrMut, entry_points: impl IntoIterator<I
         h.remove_subtree(n);
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use itertools::Itertools;
+    use rstest::rstest;
+
+    use hugr_core::builder::{
+        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    };
+    use hugr_core::{extension::prelude::usize_t, types::Signature, HugrView};
+
+    use super::remove_dead_funcs;
+
+    #[rstest]
+    #[case([], vec!["from_main", "main"])]
+    #[case(["main"], vec!["from_main", "main"])]
+    #[case(["from_main"], vec!["from_main"])]
+    #[case(["other1"], vec!["other1", "other2"])]
+    #[case(["other2"], vec!["other2"])]
+    #[case(["other1", "other2"], vec!["other1", "other2"])]
+    fn remove_dead_funcs_entry_points(
+        #[case] entry_points: impl IntoIterator<Item = &'static str>,
+        #[case] retained_funcs: Vec<&'static str>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut hb = ModuleBuilder::new();
+        let o2 = hb.define_function("other2", Signature::new_endo(usize_t()))?;
+        let o2inp = o2.input_wires();
+        let o2 = o2.finish_with_outputs(o2inp)?;
+        let mut o1 = hb.define_function("other1", Signature::new_endo(usize_t()))?;
+
+        let o1c = o1.call(o2.handle(), &[], o1.input_wires())?;
+        o1.finish_with_outputs(o1c.outputs())?;
+
+        let fm = hb.define_function("from_main", Signature::new_endo(usize_t()))?;
+        let f_inp = fm.input_wires();
+        let fm = fm.finish_with_outputs(f_inp)?;
+        let mut m = hb.define_function("main", Signature::new_endo(usize_t()))?;
+        let mc = m.call(fm.handle(), &[], m.input_wires())?;
+        m.finish_with_outputs(mc.outputs())?;
+
+        let mut hugr = hb.finish_hugr()?;
+
+        let avail_funcs = hugr
+            .nodes()
+            .filter_map(|n| {
+                hugr.get_optype(n)
+                    .as_func_defn()
+                    .map(|fd| (fd.name.clone(), n))
+            })
+            .collect::<HashMap<_, _>>();
+
+        remove_dead_funcs(
+            &mut hugr,
+            entry_points
+                .into_iter()
+                .map(|name| *avail_funcs.get(name).unwrap())
+                .collect::<Vec<_>>(),
+        );
+        let remaining_funcs = hugr
+            .nodes()
+            .filter_map(|n| hugr.get_optype(n).as_func_defn().map(|fd| fd.name.as_str()))
+            .sorted()
+            .collect_vec();
+        assert_eq!(remaining_funcs, retained_funcs);
+        Ok(())
+    }
+}
