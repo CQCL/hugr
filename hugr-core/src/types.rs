@@ -265,24 +265,27 @@ impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
 #[derive(Clone, Debug, Eq, Hash, derive_more::Display)]
 /// Core types
 pub enum TypeEnum<RV: MaybeRV> {
-    // TODO optimise with Box<CustomType> ?
+    /// An extension type.
+    //
+    // TODO optimise with `Box<CustomType>`?
     // or some static version of this?
-    #[allow(missing_docs)]
     Extension(CustomType),
-    #[allow(missing_docs)]
+    /// An alias of a type.
     #[display("Alias({})", _0.name())]
     Alias(AliasDecl),
-    #[allow(missing_docs)]
-    #[display("Function({_0})")]
+    /// A function type.
+    #[display("{_0}")]
     Function(Box<FuncValueType>),
-    // Index into TypeParams, and cache of TypeBound (checked in validation)
-    #[allow(missing_docs)]
-    #[display("Variable({_0})")]
+    /// A type variable, defined by an index into a list of type parameters.
+    //
+    // We cache the TypeBound here (checked in validation)
+    #[display("#{_0}")]
     Variable(usize, TypeBound),
     /// RowVariable. Of course, this requires that `RV` has instances, [NoRV] doesn't.
     #[display("RowVar({_0})")]
     RowVar(RV),
-    #[allow(missing_docs)]
+    /// Sum of types.
+    #[display("{_0}")]
     Sum(SumType),
 }
 
@@ -688,7 +691,7 @@ pub(crate) mod test {
         ]);
         assert_eq!(
             &t.to_string(),
-            "[usize, Function([[]][]), my_custom, Alias(my_alias)]"
+            "[usize, [] -> [], my_custom, Alias(my_alias)]"
         );
     }
 

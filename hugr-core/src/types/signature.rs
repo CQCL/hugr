@@ -3,7 +3,7 @@
 use itertools::Either;
 
 use std::borrow::Cow;
-use std::fmt::{self, Display, Write};
+use std::fmt::{self, Display};
 
 use super::type_param::TypeParam;
 use super::type_row::TypeRowBase;
@@ -279,13 +279,11 @@ impl Signature {
 
 impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if !self.input.is_empty() {
-            self.input.fmt(f)?;
-            f.write_str(" -> ")?;
+        self.input.fmt(f)?;
+        f.write_str(" -> ")?;
+        if !self.runtime_reqs.is_empty() {
+            self.runtime_reqs.fmt(f)?;
         }
-        f.write_char('[')?;
-        self.runtime_reqs.fmt(f)?;
-        f.write_char(']')?;
         self.output.fmt(f)
     }
 }

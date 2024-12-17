@@ -1,5 +1,7 @@
 //! Polymorphic Function Types
 
+use std::borrow::Cow;
+
 use itertools::Itertools;
 
 use crate::extension::SignatureError;
@@ -131,14 +133,17 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     }
 
     /// Helper function for the Display implementation
-    fn display_params(&self) -> String {
+    fn display_params(&self) -> Cow<'static, str> {
         if self.params.is_empty() {
-            return String::new();
+            return Cow::Borrowed("");
         }
-        format!(
-            "forall {}. ",
-            self.params.iter().map(ToString::to_string).join(" ")
-        )
+        let params_list = self
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, param)| format!("(#{i} : {param})"))
+            .join(" ");
+        Cow::Owned(format!("∀ {params_list}. ",))
     }
 
     /// Returns a mutable reference to the body of the function type.
