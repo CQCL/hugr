@@ -4,6 +4,7 @@
 //!
 //! [`TypeDef`]: crate::extension::TypeDef
 
+use itertools::Itertools;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use std::num::NonZeroU64;
@@ -19,7 +20,7 @@ use crate::extension::SignatureError;
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
-#[display("{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
+#[display("{}", _0.map(|i|i.to_string()).unwrap_or("-".to_string()))]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct UpperBound(Option<NonZeroU64>);
 impl UpperBound {
@@ -56,11 +57,19 @@ impl UpperBound {
 #[serde(tag = "tp")]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
+    #[display("Type{}", match b {
+        TypeBound::Any => "".to_string(),
+        _ => format!("[{b}]")
+    })]
     Type {
         /// Bound for the type parameter.
         b: TypeBound,
     },
     /// Argument is a [TypeArg::BoundedNat] that is less than the upper bound.
+    #[display("{}", match bound.value() {
+        Some(v) => format!("BoundedNat[{v}]"),
+        None => "Nat".to_string()
+    })]
     BoundedNat {
         /// Upper bound for the Nat parameter.
         bound: UpperBound,
@@ -69,12 +78,13 @@ pub enum TypeParam {
     String,
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing
     /// parameters all of the (same) specified element type.
+    #[display("List[{param}]")]
     List {
         /// The [TypeParam] describing each element of the list.
         param: Box<TypeParam>,
     },
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
-    #[display("Tuple({})", "params.iter().map(|t|t.to_string()).join(\", \")")]
+    #[display("Tuple[{}]", params.iter().map(|t|t.to_string()).join(", "))]
     Tuple {
         /// The [TypeParam]s contained in the tuple.
         params: Vec<TypeParam>,
@@ -144,29 +154,31 @@ impl From<UpperBound> for TypeParam {
 #[serde(tag = "tya")]
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
+    #[display("Type({ty})")]
     Type {
-        #[allow(missing_docs)]
+        /// The concrete type for the parameter.
         ty: Type,
     },
     /// Instance of [TypeParam::BoundedNat]. 64-bit unsigned integer.
+    #[display("{n}")]
     BoundedNat {
-        #[allow(missing_docs)]
+        /// The integer value for the parameter.
         n: u64,
     },
     ///Instance of [TypeParam::String]. UTF-8 encoded string argument.
     #[display("\"{arg}\"")]
     String {
-        #[allow(missing_docs)]
+        /// The string value for the parameter.
         arg: String,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of elements.
-    #[display("Sequence({})", {
+    #[display("({})", {
         use itertools::Itertools as _;
         elems.iter().map(|t|t.to_string()).join(",")
     })]
     Sequence {
-        #[allow(missing_docs)]
+        /// List of element types
         elems: Vec<TypeArg>,
     },
     /// Instance of [TypeParam::Extensions], providing the extension ids.
@@ -181,6 +193,7 @@ pub enum TypeArg {
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [TypeArg::Type] (not even a row variable i.e. [TypeParam::List] of type)
     /// nor [TypeArg::Extensions] - see [TypeArg::new_var_use]
+    #[display("{}", v)]
     Variable {
         #[allow(missing_docs)]
         #[serde(flatten)]
@@ -235,7 +248,7 @@ impl From<ExtensionSet> for TypeArg {
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
 )]
-#[display("TypeArgVariable({idx})")]
+#[display("var#{idx}")]
 pub struct TypeArgVariable {
     idx: usize,
     cached_decl: TypeParam,
