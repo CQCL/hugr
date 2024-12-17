@@ -52,6 +52,31 @@ pub fn monomorphize(mut h: Hugr) -> Hugr {
     h
 }
 
+/// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
+/// calls from *monomorphic* code, this will make the Hugr invalid (call [monomorphize]
+/// first).
+///
+/// Deprecated: use [remove_dead_funcs] instead.
+#[deprecated(
+    since = "0.14.1",
+    note = "Use hugr_passes::call_graph::remove_dead_funcs instead"
+)]
+pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
+    let mut pfs_to_delete = Vec::new();
+    let mut to_scan = Vec::from_iter(h.children(h.root()));
+    while let Some(n) = to_scan.pop() {
+        if is_polymorphic_funcdefn(h.get_optype(n)) {
+            pfs_to_delete.push(n)
+        } else {
+            to_scan.extend(h.children(n));
+        }
+    }
+    for n in pfs_to_delete {
+        h.remove_subtree(n);
+    }
+    h
+}
+
 fn is_polymorphic(fd: &FuncDefn) -> bool {
     !fd.signature.params().is_empty()
 }

@@ -9,6 +9,8 @@ pub mod lower;
 pub mod merge_bbs;
 mod monomorphize;
 pub use monomorphize::monomorphize;
+#[allow(deprecated)]
+pub use monomorphize::remove_polyfuncs;
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod validation;
