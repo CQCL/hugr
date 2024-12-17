@@ -91,6 +91,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 pub mod binary;
+pub mod scope;
 pub mod text;
 
 macro_rules! define_index {
@@ -132,7 +133,7 @@ macro_rules! define_index {
 }
 
 define_index! {
-    /// Index of a node in a hugr graph.
+    /// Id of a node in a hugr graph.
     #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct NodeId(pub u32);
 }
@@ -140,20 +141,30 @@ define_index! {
 define_index! {
     /// Index of a link in a hugr graph.
     #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-    pub struct LinkId(pub u32);
+    pub struct LinkIndex(pub u32);
 }
 
 define_index! {
-    /// Index of a region in a hugr graph.
+    /// Id of a region in a hugr graph.
     #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct RegionId(pub u32);
 }
 
 define_index! {
-    /// Index of a term in a hugr graph.
+    /// Id of a term in a hugr graph.
     #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct TermId(pub u32);
 }
+
+/// The id of a link consisting of its region and the link index.
+#[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[display("{_0}#{_1}")]
+pub struct LinkId(pub RegionId, pub LinkIndex);
+
+/// The id of a variable consisting of its node and the variable index.
+#[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[display("{_0}#{_1}")]
+pub struct VarId(pub NodeId, pub VarIndex);
 
 /// A module consisting of a hugr graph together with terms.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
@@ -233,9 +244,9 @@ pub struct Node<'a> {
     /// The operation that the node performs.
     pub operation: Operation<'a>,
     /// The input ports of the node.
-    pub inputs: &'a [LinkRef<'a>],
+    pub inputs: &'a [LinkIndex],
     /// The output ports of the node.
-    pub outputs: &'a [LinkRef<'a>],
+    pub outputs: &'a [LinkIndex],
     /// The parameters of the node.
     pub params: &'a [TermId],
     /// The regions of the node.
@@ -290,8 +301,8 @@ pub enum Operation<'a> {
     /// becomes known by resolving the reference, the node can be transformed into a [`Operation::CustomFull`]
     /// by inferring terms for the implicit parameters or at least filling them in with a wildcard term.
     Custom {
-        /// The name of the custom operation.
-        operation: GlobalRef<'a>,
+        /// The symbol of the custom operation.
+        operation: NodeId,
     },
     /// Custom operation with full parameters.
     ///
@@ -299,8 +310,8 @@ pub enum Operation<'a> {
     /// Since this can be tedious to write, the [`Operation::Custom`] variant can be used to indicate that
     /// the implicit parameters should be inferred.
     CustomFull {
-        /// The name of the custom operation.
-        operation: GlobalRef<'a>,
+        /// The symbol of the custom operation.
+        operation: NodeId,
     },
     /// Alias definitions.
     DefineAlias {
@@ -358,17 +369,39 @@ pub enum Operation<'a> {
         /// The declaration of the operation.
         decl: &'a OperationDecl<'a>,
     },
+
+    /// Import a symbol.
+    Import {
+        /// The name of the symbol to be imported.
+        name: &'a str,
+    },
+}
+
+impl<'a> Operation<'a> {
+    /// Returns the symbol introduced by the operation, if any.
+    pub fn symbol(&self) -> Option<&'a str> {
+        match self {
+            Operation::DefineFunc { decl } => Some(decl.name),
+            Operation::DeclareFunc { decl } => Some(decl.name),
+            Operation::DefineAlias { decl, .. } => Some(decl.name),
+            Operation::DeclareAlias { decl } => Some(decl.name),
+            Operation::DeclareConstructor { decl } => Some(decl.name),
+            Operation::DeclareOperation { decl } => Some(decl.name),
+            Operation::Import { name } => Some(name),
+            _ => None,
+        }
+    }
 }
 
 /// A region in the hugr.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Region<'a> {
     /// The kind of the region. See [`RegionKind`] for details.
     pub kind: RegionKind,
     /// The source ports of the region.
-    pub sources: &'a [LinkRef<'a>],
+    pub sources: &'a [LinkIndex],
     /// The target ports of the region.
-    pub targets: &'a [LinkRef<'a>],
+    pub targets: &'a [LinkIndex],
     /// The nodes in the region. The order of the nodes is not significant.
     pub children: &'a [NodeId],
     /// The metadata attached to the region.
@@ -377,12 +410,34 @@ pub struct Region<'a> {
     ///
     /// Can be `None` to indicate that the region signature should be inferred.
     pub signature: Option<TermId>,
+    /// Information about the scope defined by this region, if the region is closed.
+    pub scope: Option<RegionScope>,
+}
+
+/// Information about the scope defined by a closed region.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RegionScope {
+    /// The number of links in the scope.
+    pub links: u32,
+    /// The number of ports in the scope.
+    pub ports: u32,
+}
+
+/// Type to indicate whether scopes are open or closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum ScopeClosure {
+    /// A scope that is open and therefore not isolated from its parent scope.
+    #[default]
+    Open,
+    /// A scope that is closed and therefore isolated from its parent scope.
+    Closed,
 }
 
 /// The kind of a region.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum RegionKind {
     /// Data flow region.
+    #[default]
     DataFlow = 0,
     /// Control flow region.
     ControlFlow = 1,
@@ -449,63 +504,8 @@ pub struct MetaItem<'a> {
     pub value: TermId,
 }
 
-/// A reference to a global variable.
-///
-/// Global variables are defined in nodes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum GlobalRef<'a> {
-    /// Reference to the global that is defined by the given node.
-    Direct(NodeId),
-    /// Reference to the global with the given name.
-    Named(&'a str),
-}
-
-impl std::fmt::Display for GlobalRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GlobalRef::Direct(id) => write!(f, ":{}", id.index()),
-            GlobalRef::Named(name) => write!(f, "{}", name),
-        }
-    }
-}
-
-/// A reference to a local variable.
-///
-/// Local variables are defined as parameters to nodes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LocalRef<'a> {
-    /// Reference to the local variable by its parameter index and its defining node.
-    Index(NodeId, u16),
-    /// Reference to the local variable by its name.
-    Named(&'a str),
-}
-
-impl std::fmt::Display for LocalRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LocalRef::Index(node, index) => write!(f, "?:{}:{}", node.index(), index),
-            LocalRef::Named(name) => write!(f, "?{}", name),
-        }
-    }
-}
-
-/// A reference to a link.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LinkRef<'a> {
-    /// Reference to the link by its id.
-    Id(LinkId),
-    /// Reference to the link by its name.
-    Named(&'a str),
-}
-
-impl std::fmt::Display for LinkRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LinkRef::Id(id) => write!(f, "%:{})", id.index()),
-            LinkRef::Named(name) => write!(f, "%{}", name),
-        }
-    }
-}
+/// An index of a variable within a node's parameter list.
+pub type VarIndex = u16;
 
 /// A term in the compile time meta language.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -530,7 +530,7 @@ pub enum Term<'a> {
     Constraint,
 
     /// A local variable.
-    Var(LocalRef<'a>),
+    Var(VarId),
 
     /// A symbolic function application.
     ///
@@ -540,8 +540,8 @@ pub enum Term<'a> {
     ///
     /// `(GLOBAL ARG-0 ... ARG-n)`
     Apply {
-        /// Reference to the global declaration to apply.
-        global: GlobalRef<'a>,
+        /// Reference to the symbol to apply.
+        symbol: NodeId,
         /// Arguments to the function, covering only the explicit parameters.
         args: &'a [TermId],
     },
@@ -553,8 +553,8 @@ pub enum Term<'a> {
     ///
     /// `(@GLOBAL ARG-0 ... ARG-n)`
     ApplyFull {
-        /// Reference to the global declaration to apply.
-        global: GlobalRef<'a>,
+        /// Reference to the symbol to apply.
+        symbol: NodeId,
         /// Arguments to the function, covering both implicit and explicit parameters.
         args: &'a [TermId],
     },
@@ -718,13 +718,12 @@ pub enum ModelError {
     /// There is a reference to a region that does not exist.
     #[error("region not found: {0}")]
     RegionNotFound(RegionId),
-    /// There is a local reference that does not resolve.
-    #[error("local variable invalid: {0}")]
-    InvalidLocal(String),
-    /// There is a global reference that does not resolve to a node
-    /// that defines a global variable.
-    #[error("global variable invalid: {0}")]
-    InvalidGlobal(String),
+    /// Invalid variable reference.
+    #[error("variable {0} invalid")]
+    InvalidVar(VarId),
+    /// Invalid symbol reference.
+    #[error("symbol reference {0} invalid")]
+    InvalidSymbol(NodeId),
     /// The model contains an operation in a place where it is not allowed.
     #[error("unexpected operation on node: {0}")]
     UnexpectedOperation(NodeId),

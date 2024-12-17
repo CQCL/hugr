@@ -22,15 +22,12 @@ use crate::{
     Direction, Hugr, HugrView, Node, Port,
 };
 use fxhash::FxHashMap;
-use hugr_model::v0::{self as model, GlobalRef};
-use indexmap::IndexMap;
+use hugr_model::v0::{self as model};
 use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
 const TERM_JSON: &str = "prelude.json";
-
-type FxIndexMap<K, V> = IndexMap<K, V, fxhash::FxBuildHasher>;
 
 /// Error during import.
 #[derive(Debug, Clone, Error)]
@@ -76,22 +73,18 @@ pub fn import_hugr(
     module: &model::Module,
     extensions: &ExtensionRegistry,
 ) -> Result<Hugr, ImportError> {
-    let names = Names::new(module)?;
-
     // TODO: Module should know about the number of edges, so that we can use a vector here.
     // For now we use a hashmap, which will be slower.
-    let edge_ports = FxHashMap::default();
-
     let mut ctx = Context {
         module,
-        names,
         hugr: Hugr::new(OpType::Module(Module {})),
-        link_ports: edge_ports,
+        link_ports: FxHashMap::default(),
         static_edges: Vec::new(),
         extensions,
         nodes: FxHashMap::default(),
-        local_variables: IndexMap::default(),
+        local_vars: FxHashMap::default(),
         custom_name_cache: FxHashMap::default(),
+        region_scope: model::RegionId::default(),
     };
 
     ctx.import_root()?;
@@ -105,31 +98,28 @@ struct Context<'a> {
     /// The module being imported.
     module: &'a model::Module<'a>,
 
-    names: Names<'a>,
-
     /// The HUGR graph being constructed.
     hugr: Hugr,
 
     /// The ports that are part of each link. This is used to connect the ports at the end of the
     /// import process.
-    link_ports: FxHashMap<model::LinkRef<'a>, Vec<(Node, Port)>>,
+    link_ports: FxHashMap<(model::RegionId, model::LinkIndex), Vec<(Node, Port)>>,
 
     /// Pairs of nodes that should be connected by a static edge.
     /// These are collected during the import process and connected at the end.
     static_edges: Vec<(model::NodeId, model::NodeId)>,
 
-    // /// The `(Node, Port)` pairs for each `PortId` in the module.
-    // imported_ports: Vec<Option<(Node, Port)>>,
     /// The ambient extension registry to use for importing.
     extensions: &'a ExtensionRegistry,
 
     /// A map from `NodeId` to the imported `Node`.
     nodes: FxHashMap<model::NodeId, Node>,
 
-    /// The local variables that are currently in scope.
-    local_variables: FxIndexMap<&'a str, LocalVar>,
+    local_vars: FxHashMap<model::VarId, LocalVar>,
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
+
+    region_scope: model::RegionId,
 }
 
 impl<'a> Context<'a> {
@@ -166,25 +156,6 @@ impl<'a> Context<'a> {
             .ok_or_else(|| model::ModelError::RegionNotFound(region_id).into())
     }
 
-    /// Looks up a [`LocalRef`] within the current scope.
-    fn resolve_local_ref(
-        &self,
-        local_ref: &model::LocalRef,
-    ) -> Result<(usize, LocalVar), ImportError> {
-        let term = match local_ref {
-            model::LocalRef::Index(_, index) => self
-                .local_variables
-                .get_index(*index as usize)
-                .map(|(_, v)| (*index as usize, *v)),
-            model::LocalRef::Named(name) => self
-                .local_variables
-                .get_full(name)
-                .map(|(index, _, v)| (index, *v)),
-        };
-
-        term.ok_or_else(|| model::ModelError::InvalidLocal(local_ref.to_string()).into())
-    }
-
     fn make_node(
         &mut self,
         node_id: model::NodeId,
@@ -209,13 +180,16 @@ impl<'a> Context<'a> {
     }
 
     /// Associate links with the ports of the given node in the given direction.
-    fn record_links(&mut self, node: Node, direction: Direction, links: &'a [model::LinkRef<'a>]) {
+    fn record_links(&mut self, node: Node, direction: Direction, links: &'a [model::LinkIndex]) {
         let optype = self.hugr.get_optype(node);
         // NOTE: `OpType::port_count` copies the signature, which significantly slows down the import.
         debug_assert!(links.len() <= optype.port_count(direction));
 
         for (link, port) in links.iter().zip(self.hugr.node_ports(node, direction)) {
-            self.link_ports.entry(*link).or_default().push((node, port));
+            self.link_ports
+                .entry((self.region_scope, *link))
+                .or_default()
+                .push((node, port));
         }
     }
 
@@ -242,8 +216,9 @@ impl<'a> Context<'a> {
 
             if inputs.is_empty() || outputs.is_empty() {
                 return Err(error_unsupported!(
-                    "link {} is missing either an input or an output port",
-                    link_id
+                    "link {}#{} is missing either an input or an output port",
+                    link_id.0,
+                    link_id.1
                 ));
             }
 
@@ -279,60 +254,13 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    fn with_local_socpe<T>(
-        &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ImportError>,
-    ) -> Result<T, ImportError> {
-        let previous = std::mem::take(&mut self.local_variables);
-        let result = f(self);
-        self.local_variables = previous;
-        result
-    }
-
-    fn resolve_global_ref(
-        &self,
-        global_ref: &model::GlobalRef,
-    ) -> Result<model::NodeId, ImportError> {
-        match global_ref {
-            model::GlobalRef::Direct(node_id) => Ok(*node_id),
-            model::GlobalRef::Named(name) => {
-                let item = self
-                    .names
-                    .items
-                    .get(name)
-                    .ok_or_else(|| model::ModelError::InvalidGlobal(global_ref.to_string()))?;
-
-                match item {
-                    NamedItem::FuncDecl(node) => Ok(*node),
-                    NamedItem::FuncDefn(node) => Ok(*node),
-                    NamedItem::CtrDecl(node) => Ok(*node),
-                    NamedItem::OperationDecl(node) => Ok(*node),
-                }
-            }
-        }
-    }
-
-    fn get_global_name(&self, global_ref: model::GlobalRef<'a>) -> Result<&'a str, ImportError> {
-        match global_ref {
-            model::GlobalRef::Direct(node_id) => {
-                let node_data = self.get_node(node_id)?;
-
-                let name = match node_data.operation {
-                    model::Operation::DefineFunc { decl } => decl.name,
-                    model::Operation::DeclareFunc { decl } => decl.name,
-                    model::Operation::DefineAlias { decl, .. } => decl.name,
-                    model::Operation::DeclareAlias { decl } => decl.name,
-                    model::Operation::DeclareConstructor { decl } => decl.name,
-                    model::Operation::DeclareOperation { decl } => decl.name,
-                    _ => {
-                        return Err(model::ModelError::InvalidGlobal(global_ref.to_string()).into());
-                    }
-                };
-
-                Ok(name)
-            }
-            model::GlobalRef::Named(name) => Ok(name),
-        }
+    fn get_symbol_name(&self, node_id: model::NodeId) -> Result<&'a str, ImportError> {
+        let node_data = self.get_node(node_id)?;
+        let name = node_data
+            .operation
+            .symbol()
+            .ok_or(model::ModelError::InvalidSymbol(node_id))?;
+        Ok(name)
     }
 
     fn get_func_signature(
@@ -345,11 +273,12 @@ impl<'a> Context<'a> {
             _ => return Err(model::ModelError::UnexpectedOperation(func_node).into()),
         };
 
-        self.import_poly_func_type(*decl, |_, signature| Ok(signature))
+        self.import_poly_func_type(func_node, *decl, |_, signature| Ok(signature))
     }
 
     /// Import the root region of the module.
     fn import_root(&mut self) -> Result<(), ImportError> {
+        self.region_scope = self.module.root;
         let region_data = self.get_region(self.module.root)?;
 
         for node in region_data.children {
@@ -400,7 +329,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::DefineFunc { decl } => {
-                self.import_poly_func_type(*decl, |ctx, signature| {
+                self.import_poly_func_type(node_id, *decl, |ctx, signature| {
                     let optype = OpType::FuncDefn(FuncDefn {
                         name: decl.name.to_string(),
                         signature,
@@ -419,7 +348,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::DeclareFunc { decl } => {
-                self.import_poly_func_type(*decl, |ctx, signature| {
+                self.import_poly_func_type(node_id, *decl, |ctx, signature| {
                     let optype = OpType::FuncDecl(FuncDecl {
                         name: decl.name.to_string(),
                         signature,
@@ -432,19 +361,18 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::CallFunc { func } => {
-                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
-                let func_node = self.resolve_global_ref(name)?;
-                let func_sig = self.get_func_signature(func_node)?;
+                let func_sig = self.get_func_signature(*symbol)?;
 
                 let type_args = args
                     .iter()
                     .map(|term| self.import_type_arg(*term))
                     .collect::<Result<Vec<TypeArg>, _>>()?;
 
-                self.static_edges.push((func_node, node_id));
+                self.static_edges.push((*symbol, node_id));
                 let optype = OpType::Call(Call::try_new(func_sig, type_args)?);
 
                 let node = self.make_node(node_id, optype, parent)?;
@@ -452,19 +380,18 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::LoadFunc { func } => {
-                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
-                let func_node = self.resolve_global_ref(name)?;
-                let func_sig = self.get_func_signature(func_node)?;
+                let func_sig = self.get_func_signature(*symbol)?;
 
                 let type_args = args
                     .iter()
                     .map(|term| self.import_type_arg(*term))
                     .collect::<Result<Vec<TypeArg>, _>>()?;
 
-                self.static_edges.push((func_node, node_id));
+                self.static_edges.push((*symbol, node_id));
 
                 let optype = OpType::LoadFunction(LoadFunction::try_new(func_sig, type_args)?);
 
@@ -481,16 +408,16 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::CustomFull {
-                operation: GlobalRef::Named(name),
-            } if name == OP_FUNC_CALL_INDIRECT => {
-                let signature = self.get_node_signature(node_id)?;
-                let optype = OpType::CallIndirect(CallIndirect { signature });
-                let node = self.make_node(node_id, optype, parent)?;
-                Ok(Some(node))
-            }
-
             model::Operation::CustomFull { operation } => {
+                let name = self.get_symbol_name(operation)?;
+
+                if name == OP_FUNC_CALL_INDIRECT {
+                    let signature = self.get_node_signature(node_id)?;
+                    let optype = OpType::CallIndirect(CallIndirect { signature });
+                    let node = self.make_node(node_id, optype, parent)?;
+                    return Ok(Some(node));
+                }
+
                 let signature = self.get_node_signature(node_id)?;
                 let args = node_data
                     .params
@@ -498,7 +425,6 @@ impl<'a> Context<'a> {
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = self.get_global_name(operation)?;
                 let (extension, name) = self.import_custom_name(name)?;
 
                 // TODO: Currently we do not have the description or any other metadata for
@@ -529,7 +455,7 @@ impl<'a> Context<'a> {
                 "custom operation with implicit parameters"
             )),
 
-            model::Operation::DefineAlias { decl, value } => self.with_local_socpe(|ctx| {
+            model::Operation::DefineAlias { decl, value } => {
                 if !decl.params.is_empty() {
                     return Err(error_unsupported!(
                         "parameters or constraints in alias definition"
@@ -538,14 +464,14 @@ impl<'a> Context<'a> {
 
                 let optype = OpType::AliasDefn(AliasDefn {
                     name: decl.name.to_smolstr(),
-                    definition: ctx.import_type(value)?,
+                    definition: self.import_type(value)?,
                 });
 
-                let node = ctx.make_node(node_id, optype, parent)?;
+                let node = self.make_node(node_id, optype, parent)?;
                 Ok(Some(node))
-            }),
+            }
 
-            model::Operation::DeclareAlias { decl } => self.with_local_socpe(|ctx| {
+            model::Operation::DeclareAlias { decl } => {
                 if !decl.params.is_empty() {
                     return Err(error_unsupported!(
                         "parameters or constraints in alias declaration"
@@ -557,9 +483,9 @@ impl<'a> Context<'a> {
                     bound: TypeBound::Copyable,
                 });
 
-                let node = ctx.make_node(node_id, optype, parent)?;
+                let node = self.make_node(node_id, optype, parent)?;
                 Ok(Some(node))
-            }),
+            }
 
             model::Operation::Tag { tag } => {
                 let signature = node_data
@@ -578,6 +504,8 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
+            model::Operation::Import { .. } => Ok(None),
+
             model::Operation::DeclareConstructor { .. } => Ok(None),
             model::Operation::DeclareOperation { .. } => Ok(None),
         }
@@ -590,6 +518,11 @@ impl<'a> Context<'a> {
         node: Node,
     ) -> Result<(), ImportError> {
         let region_data = self.get_region(region)?;
+
+        let prev_region = self.region_scope;
+        if region_data.scope.is_some() {
+            self.region_scope = region;
+        }
 
         if region_data.kind != model::RegionKind::DataFlow {
             return Err(model::ModelError::InvalidRegions(node_id).into());
@@ -622,6 +555,8 @@ impl<'a> Context<'a> {
         for child in region_data.children {
             self.import_node(*child, node)?;
         }
+
+        self.region_scope = prev_region;
 
         Ok(())
     }
@@ -755,6 +690,11 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
+        let prev_region = self.region_scope;
+        if region_data.scope.is_some() {
+            self.region_scope = region;
+        }
+
         let (region_source, region_targets, _) = self.get_func_type(
             region_data
                 .signature
@@ -861,6 +801,8 @@ impl<'a> Context<'a> {
             self.record_links(exit, Direction::Incoming, region_data.targets);
         }
 
+        self.region_scope = prev_region;
+
         Ok(())
     }
 
@@ -899,43 +841,43 @@ impl<'a> Context<'a> {
 
     fn import_poly_func_type<RV: MaybeRV, T>(
         &mut self,
+        node: model::NodeId,
         decl: model::FuncDecl<'a>,
         in_scope: impl FnOnce(&mut Self, PolyFuncTypeBase<RV>) -> Result<T, ImportError>,
     ) -> Result<T, ImportError> {
-        self.with_local_socpe(|ctx| {
-            let mut imported_params = Vec::with_capacity(decl.params.len());
+        let mut imported_params = Vec::with_capacity(decl.params.len());
 
-            ctx.local_variables.extend(
-                decl.params
-                    .iter()
-                    .map(|param| (param.name, LocalVar::new(param.r#type))),
-            );
+        for (index, param) in decl.params.iter().enumerate() {
+            self.local_vars
+                .insert(model::VarId(node, index as _), LocalVar::new(param.r#type));
+        }
 
-            for constraint in decl.constraints {
-                match ctx.get_term(*constraint)? {
-                    model::Term::NonLinearConstraint { term } => {
-                        let model::Term::Var(var) = ctx.get_term(*term)? else {
-                            return Err(error_unsupported!(
-                                "constraint on term that is not a variable"
-                            ));
-                        };
+        for constraint in decl.constraints {
+            match self.get_term(*constraint)? {
+                model::Term::NonLinearConstraint { term } => {
+                    let model::Term::Var(var) = self.get_term(*term)? else {
+                        return Err(error_unsupported!(
+                            "constraint on term that is not a variable"
+                        ));
+                    };
 
-                        let var = ctx.resolve_local_ref(var)?.0;
-                        ctx.local_variables[var].bound = TypeBound::Copyable;
-                    }
-                    _ => return Err(error_unsupported!("constraint other than copy or discard")),
+                    self.local_vars
+                        .get_mut(var)
+                        .ok_or(model::ModelError::InvalidVar(*var))?
+                        .bound = TypeBound::Copyable;
                 }
+                _ => return Err(error_unsupported!("constraint other than copy or discard")),
             }
+        }
 
-            for (index, param) in decl.params.iter().enumerate() {
-                // NOTE: `PolyFuncType` only has explicit type parameters at present.
-                let bound = ctx.local_variables[index].bound;
-                imported_params.push(ctx.import_type_param(param.r#type, bound)?);
-            }
+        for (index, param) in decl.params.iter().enumerate() {
+            // NOTE: `PolyFuncType` only has explicit type parameters at present.
+            let bound = self.local_vars[&model::VarId(node, index as _)].bound;
+            imported_params.push(self.import_type_param(param.r#type, bound)?);
+        }
 
-            let body = ctx.import_func_type::<RV>(decl.signature)?;
-            in_scope(ctx, PolyFuncTypeBase::new(imported_params, body))
-        })
+        let body = self.import_func_type::<RV>(decl.signature)?;
+        in_scope(self, PolyFuncTypeBase::new(imported_params, body))
     }
 
     /// Import a [`TypeParam`] from a term that represents a static type.
@@ -951,7 +893,7 @@ impl<'a> Context<'a> {
 
             model::Term::StaticType => Err(error_unsupported!("`type` as `TypeParam`")),
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeParam`")),
-            model::Term::Var(_) => Err(error_unsupported!("type variable as `TypeParam`")),
+            model::Term::Var { .. } => Err(error_unsupported!("type variable as `TypeParam`")),
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
 
@@ -995,9 +937,12 @@ impl<'a> Context<'a> {
             }
 
             model::Term::Var(var) => {
-                let (index, var) = self.resolve_local_ref(var)?;
-                let decl = self.import_type_param(var.r#type, var.bound)?;
-                Ok(TypeArg::new_var_use(index, decl))
+                let var_info = self
+                    .local_vars
+                    .get(var)
+                    .ok_or(model::ModelError::InvalidVar(*var))?;
+                let decl = self.import_type_param(var_info.r#type, var_info.bound)?;
+                Ok(TypeArg::new_var_use(var.1 as _, decl))
             }
 
             model::Term::List { .. } => {
@@ -1052,9 +997,8 @@ impl<'a> Context<'a> {
             match self.get_term(term_id)? {
                 model::Term::Wildcard => return Err(error_uninferred!("wildcard")),
 
-                model::Term::Var(var) => {
-                    let (index, _) = self.resolve_local_ref(var)?;
-                    es.insert_type_var(index);
+                model::Term::Var(model::VarId(_, index)) => {
+                    es.insert_type_var(*index as _);
                 }
 
                 model::Term::ExtSet { parts } => {
@@ -1091,13 +1035,13 @@ impl<'a> Context<'a> {
                 Err(error_uninferred!("application with implicit parameters"))
             }
 
-            model::Term::ApplyFull { global: name, args } => {
+            model::Term::ApplyFull { symbol, args } => {
                 let args = args
                     .iter()
                     .map(|arg| self.import_type_arg(*arg))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = self.get_global_name(*name)?;
+                let name = self.get_symbol_name(*symbol)?;
                 let (extension, id) = self.import_custom_name(name)?;
 
                 let extension_ref =
@@ -1119,10 +1063,8 @@ impl<'a> Context<'a> {
                 )))
             }
 
-            model::Term::Var(var) => {
-                // We pretend that all `TypeBound`s are copyable.
-                let (index, _) = self.resolve_local_ref(var)?;
-                Ok(TypeBase::new_var_use(index, TypeBound::Copyable))
+            model::Term::Var(model::VarId(_, index)) => {
+                Ok(TypeBase::new_var_use(*index as _, TypeBound::Copyable))
             }
 
             model::Term::FuncType { .. } => {
@@ -1255,9 +1197,8 @@ impl<'a> Context<'a> {
                         }
                     }
                 }
-                model::Term::Var(var) => {
-                    let (index, _) = ctx.resolve_local_ref(var)?;
-                    let var = RV::try_from_rv(RowVariable(index, TypeBound::Any))
+                model::Term::Var(model::VarId(_, index)) => {
+                    let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Any))
                         .map_err(|_| model::ModelError::TypeError(term_id))?;
                     types.push(TypeBase::new(TypeEnum::RowVar(var)));
                 }
@@ -1298,13 +1239,14 @@ impl<'a> Context<'a> {
         term_id: model::TermId,
     ) -> Result<serde_json::Value, ImportError> {
         let (global, args) = match self.get_term(term_id)? {
-            model::Term::Apply { global, args } | model::Term::ApplyFull { global, args } => {
-                (global, args)
+            model::Term::Apply { symbol, args } | model::Term::ApplyFull { symbol, args } => {
+                (symbol, args)
             }
             _ => return Err(model::ModelError::TypeError(term_id).into()),
         };
 
-        if global != &GlobalRef::Named(TERM_JSON) {
+        let global = self.get_symbol_name(*global)?;
+        if global != TERM_JSON {
             return Err(model::ModelError::TypeError(term_id).into());
         }
 
@@ -1320,51 +1262,6 @@ impl<'a> Context<'a> {
             serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
 
         Ok(json_value)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum NamedItem {
-    FuncDecl(model::NodeId),
-    FuncDefn(model::NodeId),
-    CtrDecl(model::NodeId),
-    OperationDecl(model::NodeId),
-}
-
-struct Names<'a> {
-    items: FxHashMap<&'a str, NamedItem>,
-}
-
-impl<'a> Names<'a> {
-    pub fn new(module: &model::Module<'a>) -> Result<Self, ImportError> {
-        let mut items = FxHashMap::default();
-
-        for (node_id, node_data) in module.nodes.iter().enumerate() {
-            let node_id = model::NodeId(node_id as _);
-
-            let item = match node_data.operation {
-                model::Operation::DefineFunc { decl } => {
-                    Some((decl.name, NamedItem::FuncDecl(node_id)))
-                }
-                model::Operation::DeclareFunc { decl } => {
-                    Some((decl.name, NamedItem::FuncDefn(node_id)))
-                }
-                model::Operation::DeclareConstructor { decl } => {
-                    Some((decl.name, NamedItem::CtrDecl(node_id)))
-                }
-                model::Operation::DeclareOperation { decl } => {
-                    Some((decl.name, NamedItem::OperationDecl(node_id)))
-                }
-                _ => None,
-            };
-
-            if let Some((name, item)) = item {
-                // TODO: Deal with duplicates
-                items.insert(name, item);
-            }
-        }
-
-        Ok(Self { items })
     }
 }
 
