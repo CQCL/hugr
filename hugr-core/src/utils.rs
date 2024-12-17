@@ -266,22 +266,6 @@ pub(crate) mod test {
         Hugr,
     };
 
-    /// Open a browser page to render a dot string graph.
-    ///
-    /// This can be used directly on the output of `Hugr::dot_string`
-    #[cfg(not(ci_run))]
-    pub(crate) fn viz_dotstr(dotstr: impl AsRef<str>) {
-        let mut base: String = "https://dreampuf.github.io/GraphvizOnline/#".into();
-        base.push_str(&urlencoding::encode(dotstr.as_ref()));
-        webbrowser::open(&base).unwrap();
-    }
-
-    /// Open a browser page to render a HugrView's dot string graph.
-    #[cfg(not(ci_run))]
-    pub(crate) fn viz_hugr(hugr: &impl HugrView) {
-        viz_dotstr(hugr.dot_string());
-    }
-
     /// Check that a hugr just loads and returns a single expected constant.
     pub(crate) fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
         assert_fully_folded_with(h, |v| v == expected_value)
