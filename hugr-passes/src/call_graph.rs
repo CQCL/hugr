@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Data structure for call graphs of a Hugr, and some transformations using them.
 use std::collections::{HashMap, HashSet};
 
@@ -37,10 +38,10 @@ impl CallGraph {
     /// Calls to functions outside the view will be dropped.
     pub fn new(hugr: &impl HugrView) -> Self {
         let mut g = Graph::default();
+        // For non-Module-rooted Hugrs, make sure we include the root
         let root = (!hugr.get_optype(hugr.root()).is_module()).then_some(hugr.root());
         let node_to_g = hugr
             .nodes()
-            // For non-Module-rooted Hugrs, make sure we include the root
             .filter(|&n| Some(n) == root || OpTag::Function.is_superset(hugr.get_optype(n).tag()))
             .map(|n| (n, g.add_node(n)))
             .collect::<HashMap<_, _>>();
