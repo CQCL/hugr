@@ -37,7 +37,13 @@ type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 /// ```
 #[derive(Debug, Clone)]
 pub struct LinkTable<K> {
+    /// The set of links in the currently active region and all parent regions.
+    ///
+    /// The order in this index set is the order in which links were added to the table.
+    /// This is used to efficiently remove all links from the current region when exiting a scope.
     links: FxIndexSet<(RegionId, K)>,
+
+    /// The stack of scopes that are currently open.
     scopes: Vec<LinkScope>,
 }
 

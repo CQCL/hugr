@@ -38,7 +38,12 @@ type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct VarTable<'a> {
+    /// The set of variables in the currently active node and all its parent nodes.
+    ///
+    /// The order in this index set is the order in which variables were added to the table.
+    /// This is used to efficiently remove all variables from the current node when exiting a scope.
     vars: FxIndexSet<(NodeId, &'a str)>,
+    /// The stack of scopes that are currently open.
     scopes: Vec<VarScope>,
 }
 
