@@ -90,7 +90,7 @@ impl ConstantFoldPass {
         let results = Machine::new(&hugr).run(ConstFoldContext(hugr), inputs);
         let mut keep_nodes = HashSet::new();
         self.find_needed_nodes(&results, &mut keep_nodes);
-        let [root_inp, _] = hugr.get_io(hugr.root()).unwrap();
+        let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
         let remove_nodes = hugr
             .nodes()
@@ -110,7 +110,7 @@ impl ConstantFoldPass {
                 // Avoid breaking edges from existing LoadConstant (we'd only add another)
                 // or from root input node (any "external inputs" provided will show up here
                 //   - potentially also in other places which this won't catch)
-                (!hugr.get_optype(src).is_load_constant() && src != root_inp).then_some((
+                (!hugr.get_optype(src).is_load_constant() && Some(src) != mb_root_inp).then_some((
                     n,
                     ip,
                     results
