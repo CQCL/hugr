@@ -1,6 +1,6 @@
 //! Standard command line tools, used by the hugr binary.
 
-use clap::Parser;
+use clap::{crate_version, Parser};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use clio::Input;
 use derive_more::{Display, Error, From};
@@ -18,7 +18,7 @@ use hugr::package::Package;
 
 /// CLI arguments.
 #[derive(Parser, Debug)]
-#[clap(version = "1.0", long_about = None)]
+#[clap(version = crate_version!(), long_about = None)]
 #[clap(about = "HUGR CLI tools.")]
 #[group(id = "hugr")]
 #[non_exhaustive]
