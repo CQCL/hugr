@@ -16,7 +16,7 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [features]
-test-utils = ["insta", "rstest", "pathsearch"]
+test-utils = ["insta", "rstest", "pathsearch", "portgraph"]
 
 default = ["llvm14-0"]
 llvm14-0 = ["inkwell/llvm14-0"]
@@ -34,6 +34,7 @@ strum.workspace = true
 
 insta = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
+portgraph = { workspace = true, optional = true }
 pathsearch = { workspace = true, optional = true }
 
 [dev-dependencies]
