@@ -61,8 +61,6 @@ strum = "0.26.1"
 strum_macros = "0.26.1"
 thiserror = "2.0.6"
 typetag = "0.2.7"
-urlencoding = "2.1.2"
-webbrowser = "1.0.0"
 clap = { version = "4.5.4" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.1"
