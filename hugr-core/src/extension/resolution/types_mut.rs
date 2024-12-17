@@ -50,6 +50,9 @@ pub fn resolve_op_types_extensions(
         OpType::Call(c) => {
             resolve_signature_exts(node, c.func_sig.body_mut(), extensions, used_extensions)?;
             resolve_signature_exts(node, &mut c.instantiation, extensions, used_extensions)?;
+            for arg in &mut c.type_args {
+                resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+            }
         }
         OpType::CallIndirect(c) => {
             resolve_signature_exts(node, &mut c.signature, extensions, used_extensions)?
@@ -60,6 +63,9 @@ pub fn resolve_op_types_extensions(
         OpType::LoadFunction(lf) => {
             resolve_signature_exts(node, lf.func_sig.body_mut(), extensions, used_extensions)?;
             resolve_signature_exts(node, &mut lf.instantiation, extensions, used_extensions)?;
+            for arg in &mut lf.type_args {
+                resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+            }
         }
         OpType::DFG(dfg) => {
             resolve_signature_exts(node, &mut dfg.signature, extensions, used_extensions)?
