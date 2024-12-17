@@ -16,7 +16,7 @@ categories = ["compilers"]
 bench = false
 
 [dependencies]
-clap = { workspace = true, features = ["derive"] }
+clap = { workspace = true, features = ["derive", "cargo"] }
 clap-verbosity-flag.workspace = true
 derive_more = { workspace = true, features = ["display", "error", "from"] }
 hugr = { path = "../hugr", version = "0.14.0" }
