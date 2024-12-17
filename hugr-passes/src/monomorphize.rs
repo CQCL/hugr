@@ -10,7 +10,7 @@ use hugr_core::{
     Node,
 };
 
-use hugr_core::hugr::{hugrmut::HugrMut, internal::HugrMutInternals, Hugr, HugrView, OpType};
+use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
 use itertools::Itertools as _;
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
@@ -31,23 +31,25 @@ use itertools::Itertools as _;
 pub fn monomorphize(mut h: Hugr) -> Hugr {
     let validate = |h: &Hugr| h.validate().unwrap_or_else(|e| panic!("{e}"));
 
-    // We clone the extension registry because we will need a reference to
-    // create our mutable substitutions. This is cannot cause a problem because
-    // we will not be adding any new types or extension ops to the HUGR.
     #[cfg(debug_assertions)]
     validate(&h);
 
-    let root = h.root();
-    // If the root is a polymorphic function, then there are no external calls, so nothing to do
-    if !is_polymorphic_funcdefn(h.get_optype(root)) {
-        mono_scan(&mut h, root, None, &mut HashMap::new());
-        if !h.get_optype(root).is_module() {
-            return remove_polyfuncs(h);
-        }
-    }
+    monomorphize_ref(&mut h);
+
     #[cfg(debug_assertions)]
     validate(&h);
     h
+}
+
+fn monomorphize_ref(h: &mut impl HugrMut) {
+    let root = h.root();
+    // If the root is a polymorphic function, then there are no external calls, so nothing to do
+    if !is_polymorphic_funcdefn(h.get_optype(root)) {
+        mono_scan(h, root, None, &mut HashMap::new());
+        if !h.get_optype(root).is_module() {
+            remove_polyfuncs_ref(h);
+        }
+    }
 }
 
 /// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
@@ -72,6 +74,21 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     h
 }
 
+fn remove_polyfuncs_ref(h: &mut impl HugrMut) {
+    let mut pfs_to_delete = Vec::new();
+    let mut to_scan = Vec::from_iter(h.children(h.root()));
+    while let Some(n) = to_scan.pop() {
+        if is_polymorphic_funcdefn(h.get_optype(n)) {
+            pfs_to_delete.push(n)
+        } else {
+            to_scan.extend(h.children(n));
+        }
+    }
+    for n in pfs_to_delete {
+        h.remove_subtree(n);
+    }
+}
+
 fn is_polymorphic(fd: &FuncDefn) -> bool {
     !fd.signature.params().is_empty()
 }
@@ -93,7 +110,7 @@ type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 /// Optionally copies the subtree into a new location whilst applying a substitution.
 /// The subtree should be monomorphic after the substitution (if provided) has been applied.
 fn mono_scan(
-    h: &mut Hugr,
+    h: &mut impl HugrMut,
     parent: Node,
     mut subst_into: Option<&mut Instantiating>,
     cache: &mut Instantiations,
@@ -161,7 +178,7 @@ fn mono_scan(
 }
 
 fn instantiate(
-    h: &mut Hugr,
+    h: &mut impl HugrMut,
     poly_func: Node,
     type_args: Vec<TypeArg>,
     mono_sig: Signature,
