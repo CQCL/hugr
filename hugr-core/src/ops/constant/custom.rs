@@ -10,6 +10,9 @@ use std::hash::{Hash, Hasher};
 use downcast_rs::{impl_downcast, Downcast};
 use thiserror::Error;
 
+use crate::extension::resolution::{
+    resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry,
+};
 use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFailure, Type};
@@ -41,7 +44,7 @@ use super::{Value, ValueName};
 /// #[typetag::serde]
 /// impl CustomConst for CC {
 ///   fn name(&self) -> ValueName { "CC".into() }
-///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(&int_types::EXTENSION_ID) }
+///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(int_types::EXTENSION_ID) }
 ///   fn get_type(&self) -> Type { int_types::INT_TYPES[5].clone() }
 /// }
 ///
@@ -61,7 +64,7 @@ pub trait CustomConst:
     /// The extension(s) defining the custom constant
     /// (a set to allow, say, a [List] of [USize])
     ///
-    /// [List]: crate::std_extensions::collections::LIST_TYPENAME
+    /// [List]: crate::std_extensions::collections::list::LIST_TYPENAME
     /// [USize]: crate::extension::prelude::usize_t
     fn extension_reqs(&self) -> ExtensionSet;
 
@@ -82,6 +85,19 @@ pub trait CustomConst:
     fn equal_consts(&self, _other: &dyn CustomConst) -> bool {
         // false unless overridden
         false
+    }
+
+    /// Update the extensions associated with the internal values.
+    ///
+    /// This is used to ensure that any extension reference [`CustomConst::get_type`] remains
+    /// valid when serializing and deserializing the constant.
+    ///
+    /// See the helper methods in [`crate::extension::resolution`].
+    fn update_extensions(
+        &mut self,
+        _extensions: &WeakExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        Ok(())
     }
 
     /// Report the type.
@@ -300,6 +316,12 @@ impl CustomConst for CustomSerialized {
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
     }
+    fn update_extensions(
+        &mut self,
+        extensions: &WeakExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        resolve_type_extensions(&mut self.typ, extensions)
+    }
     fn get_type(&self) -> Type {
         self.typ.clone()
     }
@@ -362,7 +384,7 @@ mod test {
     use crate::{
         extension::prelude::{usize_t, ConstUsize},
         ops::{constant::custom::serialize_custom_const, Value},
-        std_extensions::collections::ListValue,
+        std_extensions::collections::list::ListValue,
     };
 
     use super::{super::OpaqueValue, CustomConst, CustomConstBoxClone, CustomSerialized};

@@ -19,6 +19,7 @@ ExtensionSet = stys.ExtensionSet
 TypeBound = stys.TypeBound
 
 
+@runtime_checkable
 class TypeParam(Protocol):
     """A HUGR type parameter."""
 
@@ -30,6 +31,7 @@ class TypeParam(Protocol):
         return stys.TypeParam(root=self._to_serial())  # type: ignore[arg-type]
 
 
+@runtime_checkable
 class TypeArg(Protocol):
     """A HUGR type argument, which can be bound to a :class:TypeParam."""
 
@@ -106,7 +108,7 @@ class TypeTypeParam(TypeParam):
 class BoundedNatParam(TypeParam):
     """A type parameter indicating a natural number with an optional upper bound."""
 
-    upper_bound: int | None
+    upper_bound: int | None = None
 
     def _to_serial(self) -> stys.BoundedNatParam:
         return stys.BoundedNatParam(bound=self.upper_bound)
@@ -258,23 +260,6 @@ class VariableArg(TypeArg):
 # ----------------------------------------------
 # --------------- Type -------------------------
 # ----------------------------------------------
-
-
-@dataclass(frozen=True)
-class Array(Type):
-    """Prelude fixed `size` array of `ty` elements."""
-
-    ty: Type
-    size: int
-
-    def _to_serial(self) -> stys.Array:
-        return stys.Array(inner=self.ty._to_serial_root(), len=self.size)
-
-    def type_bound(self) -> TypeBound:
-        return self.ty.type_bound()
-
-    def __repr__(self) -> str:
-        return f"Array<{self.ty}, {self.size}>"
 
 
 @dataclass()
@@ -458,7 +443,7 @@ class FunctionType(Type):
 
     input: TypeRow
     output: TypeRow
-    extension_reqs: ExtensionSet = field(default_factory=ExtensionSet)
+    runtime_reqs: ExtensionSet = field(default_factory=ExtensionSet)
 
     def type_bound(self) -> TypeBound:
         return TypeBound.Copyable
@@ -467,7 +452,7 @@ class FunctionType(Type):
         return stys.FunctionType(
             input=ser_it(self.input),
             output=ser_it(self.output),
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
         )
 
     @classmethod
@@ -482,7 +467,7 @@ class FunctionType(Type):
 
     @classmethod
     def endo(
-        cls, tys: TypeRow, extension_reqs: ExtensionSet | None = None
+        cls, tys: TypeRow, runtime_reqs: ExtensionSet | None = None
     ) -> FunctionType:
         """Function type with the same input and output types.
 
@@ -490,9 +475,7 @@ class FunctionType(Type):
             >>> FunctionType.endo([Qubit])
             FunctionType([Qubit], [Qubit])
         """
-        return cls(
-            input=tys, output=tys, extension_reqs=extension_reqs or ExtensionSet()
-        )
+        return cls(input=tys, output=tys, runtime_reqs=runtime_reqs or ExtensionSet())
 
     def flip(self) -> FunctionType:
         """Return a new function type with input and output types swapped.
@@ -511,8 +494,16 @@ class FunctionType(Type):
         return FunctionType(
             input=[ty.resolve(registry) for ty in self.input],
             output=[ty.resolve(registry) for ty in self.output],
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
         )
+
+    def with_runtime_reqs(self, runtime_reqs: ExtensionSet) -> FunctionType:
+        """Adds a list of extension requirements to the function type, and
+        returns the new signature.
+        """
+        exts = set(self.runtime_reqs)
+        exts = exts.union(runtime_reqs)
+        return FunctionType(self.input, self.output, [*exts])
 
     def __str__(self) -> str:
         return f"{comma_sep_str(self.input)} -> {comma_sep_str(self.output)}"
@@ -541,6 +532,15 @@ class PolyFuncType(Type):
         return PolyFuncType(
             params=self.params,
             body=self.body.resolve(registry),
+        )
+
+    def with_runtime_reqs(self, runtime_reqs: ExtensionSet) -> PolyFuncType:
+        """Adds a list of extension requirements to the function type, and
+        returns the new signature.
+        """
+        return PolyFuncType(
+            params=self.params,
+            body=self.body.with_runtime_reqs(runtime_reqs),
         )
 
     def __str__(self) -> str:
@@ -593,6 +593,12 @@ class ExtType(Type):
 
     def __str__(self) -> str:
         return _type_str(self.type_def.name, self.args)
+
+    def __eq__(self, value):
+        # Ignore extra attributes on subclasses
+        if isinstance(value, ExtType):
+            return self.type_def == value.type_def and self.args == value.args
+        return super().__eq__(value)
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:

@@ -194,20 +194,18 @@ pub(crate) mod test_quantum_extension {
         pub static ref EXTENSION: Arc<Extension> = extension();
 
         /// A registry with all necessary extensions to run tests internally, including the test quantum extension.
-        pub static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([
+        pub static ref REG: ExtensionRegistry = ExtensionRegistry::new([
             EXTENSION.clone(),
             PRELUDE.clone(),
             float_types::EXTENSION.clone(),
             float_ops::EXTENSION.clone(),
             logic::EXTENSION.clone()
-        ]).unwrap();
+        ]);
 
     }
 
     fn get_gate(gate_name: &OpNameRef) -> ExtensionOp {
-        EXTENSION
-            .instantiate_extension_op(gate_name, [], &REG)
-            .unwrap()
+        EXTENSION.instantiate_extension_op(gate_name, []).unwrap()
     }
     pub(crate) fn h_gate() -> ExtensionOp {
         get_gate("H")

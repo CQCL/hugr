@@ -5,8 +5,8 @@ use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Weak};
 
 use super::{
-    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry,
-    ExtensionSet, SignatureError,
+    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
+    SignatureError,
 };
 
 use crate::ops::{OpName, OpNameRef};
@@ -24,7 +24,6 @@ pub trait CustomSignatureFunc: Send + Sync {
         &'a self,
         arg_values: &[TypeArg],
         def: &'o OpDef,
-        extension_registry: &ExtensionRegistry,
     ) -> Result<PolyFuncTypeRV, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
@@ -47,7 +46,6 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
         &'a self,
         arg_values: &[TypeArg],
         _def: &'o OpDef,
-        _extension_registry: &ExtensionRegistry,
     ) -> Result<PolyFuncTypeRV, SignatureError> {
         SignatureFromArgs::compute_signature(self, arg_values)
     }
@@ -68,7 +66,6 @@ pub trait ValidateTypeArgs: Send + Sync {
         &self,
         arg_values: &[TypeArg],
         def: &'o OpDef,
-        extension_registry: &ExtensionRegistry,
     ) -> Result<(), SignatureError>;
 }
 
@@ -86,7 +83,6 @@ impl<T: ValidateJustArgs> ValidateTypeArgs for T {
         &self,
         arg_values: &[TypeArg],
         _def: &'o OpDef,
-        _extension_registry: &ExtensionRegistry,
     ) -> Result<(), SignatureError> {
         ValidateJustArgs::validate(self, arg_values)
     }
@@ -135,6 +131,11 @@ impl CustomValidator {
             poly_func: poly_func.into(),
             validate: Box::new(validate),
         }
+    }
+
+    /// Return a mutable reference to the PolyFuncType.
+    pub(super) fn poly_func_mut(&mut self) -> &mut PolyFuncTypeRV {
+        &mut self.poly_func
     }
 }
 
@@ -223,12 +224,11 @@ impl SignatureFunc {
         &self,
         def: &OpDef,
         args: &[TypeArg],
-        exts: &ExtensionRegistry,
     ) -> Result<Signature, SignatureError> {
         let temp: PolyFuncTypeRV; // to keep alive
         let (pf, args) = match &self {
             SignatureFunc::CustomValidator(custom) => {
-                custom.validate.validate(args, def, exts)?;
+                custom.validate.validate(args, def)?;
                 (&custom.poly_func, args)
             }
             SignatureFunc::PolyFuncType(ts) => (ts, args),
@@ -237,15 +237,18 @@ impl SignatureFunc {
                 let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
 
                 check_type_args(static_args, static_params)?;
-                temp = func.compute_signature(static_args, def, exts)?;
+                temp = func.compute_signature(static_args, def)?;
                 (&temp, other_args)
             }
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
             // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
-        let mut res = pf.instantiate(args, exts)?;
-        res.extension_reqs.insert(&def.extension);
+        let mut res = pf.instantiate(args)?;
+
+        // Automatically add the extensions where the operation is defined to
+        // the runtime requirements of the op.
+        res.runtime_reqs.insert(def.extension.clone());
 
         // If there are any row variables left, this will fail with an error:
         res.try_into()
@@ -327,13 +330,12 @@ pub struct OpDef {
 }
 
 impl OpDef {
-    /// Check provided type arguments are valid against [ExtensionRegistry],
+    /// Check provided type arguments are valid against their extensions,
     /// against parameters, and that no type variables are used as static arguments
     /// (to [compute_signature][CustomSignatureFunc::compute_signature])
     pub fn validate_args(
         &self,
         args: &[TypeArg],
-        exts: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         let temp: PolyFuncTypeRV; // to keep alive
@@ -343,11 +345,9 @@ impl OpDef {
             SignatureFunc::CustomFunc(custom) => {
                 let (static_args, other_args) =
                     args.split_at(min(custom.static_params().len(), args.len()));
-                static_args
-                    .iter()
-                    .try_for_each(|ta| ta.validate(exts, &[]))?;
+                static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
                 check_type_args(static_args, custom.static_params())?;
-                temp = custom.compute_signature(static_args, self, exts)?;
+                temp = custom.compute_signature(static_args, self)?;
                 (&temp, other_args)
             }
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
@@ -355,20 +355,15 @@ impl OpDef {
                 return Err(SignatureError::MissingValidateFunc)
             }
         };
-        args.iter()
-            .try_for_each(|ta| ta.validate(exts, var_decls))?;
+        args.iter().try_for_each(|ta| ta.validate(var_decls))?;
         check_type_args(args, pf.params())?;
         Ok(())
     }
 
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
-    pub fn compute_signature(
-        &self,
-        args: &[TypeArg],
-        exts: &ExtensionRegistry,
-    ) -> Result<Signature, SignatureError> {
-        self.signature_func.compute_signature(self, args, exts)
+    pub fn compute_signature(&self, args: &[TypeArg]) -> Result<Signature, SignatureError> {
+        self.signature_func.compute_signature(self, args)
     }
 
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
@@ -407,6 +402,11 @@ impl OpDef {
         self.extension_ref.clone()
     }
 
+    /// Returns a mutable reference to the weak extension pointer in the operation definition.
+    pub(super) fn extension_mut(&mut self) -> &mut Weak<Extension> {
+        &mut self.extension_ref
+    }
+
     /// Returns a reference to the description of this [`OpDef`].
     pub fn description(&self) -> &str {
         self.description.as_ref()
@@ -417,14 +417,14 @@ impl OpDef {
         self.signature_func.static_params()
     }
 
-    pub(super) fn validate(&self, exts: &ExtensionRegistry) -> Result<(), SignatureError> {
+    pub(super) fn validate(&self) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
         if let SignatureFunc::CustomValidator(ts) = &self.signature_func {
             // The type scheme may contain row variables so be of variable length;
             // these will have to be substituted to fixed-length concrete types when
             // the OpDef is instantiated into an actual OpType.
-            ts.poly_func.validate(exts)?;
+            ts.poly_func.validate()?;
         }
         Ok(())
     }
@@ -468,6 +468,11 @@ impl OpDef {
     /// Returns a reference to the signature function of this [`OpDef`].
     pub fn signature_func(&self) -> &SignatureFunc {
         &self.signature_func
+    }
+
+    /// Returns a mutable reference to the signature function of this [`OpDef`].
+    pub(super) fn signature_func_mut(&mut self) -> &mut SignatureFunc {
+        &mut self.signature_func
     }
 }
 
@@ -536,10 +541,10 @@ pub(super) mod test {
     use crate::builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::usize_t;
+    use crate::extension::SignatureError;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
-    use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::OpName;
-    use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::std_extensions::collections::list;
     use crate::types::type_param::{TypeArgError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
     use crate::{const_extension_ids, Extension};
@@ -636,7 +641,7 @@ pub(super) mod test {
 
     #[test]
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
-        let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
@@ -658,18 +663,19 @@ pub(super) mod test {
             Ok(())
         })?;
 
-        let reg = ExtensionRegistry::try_new([PRELUDE.clone(), EXTENSION.clone(), ext]).unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), list::EXTENSION.clone(), ext]);
+        reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: usize_t() }])?);
         let mut dfg = DFGBuilder::new(endo_sig(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: usize_t() }], &reg)
+            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: usize_t() }])
                 .unwrap(),
             dfg.input_wires(),
         )?;
-        dfg.finish_hugr_with_outputs(rev.outputs(), &reg)?;
+        dfg.finish_hugr_with_outputs(rev.outputs())?;
 
         Ok(())
     }
@@ -712,32 +718,32 @@ pub(super) mod test {
             // Base case, no type variables:
             let args = [TypeArg::BoundedNat { n: 3 }, usize_t().into()];
             assert_eq!(
-                def.compute_signature(&args, &PRELUDE_REGISTRY),
+                def.compute_signature(&args),
                 Ok(Signature::new(
                     vec![usize_t(); 3],
                     vec![Type::new_tuple(vec![usize_t(); 3])]
                 )
                 .with_extension_delta(EXT_ID))
             );
-            assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
+            assert_eq!(def.validate_args(&args, &[]), Ok(()));
 
             // Second arg may be a variable (substitutable)
             let tyvar = Type::new_var_use(0, TypeBound::Copyable);
             let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
             let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
             assert_eq!(
-                def.compute_signature(&args, &PRELUDE_REGISTRY),
+                def.compute_signature(&args),
                 Ok(
                     Signature::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
                         .with_extension_delta(EXT_ID)
                 )
             );
-            def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Copyable.into()])
+            def.validate_args(&args, &[TypeBound::Copyable.into()])
                 .unwrap();
 
             // quick sanity check that we are validating the args - note changed bound:
             assert_eq!(
-                def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Any.into()]),
+                def.validate_args(&args, &[TypeBound::Any.into()]),
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
                     actual: TypeBound::Any.into(),
                     cached: TypeBound::Copyable.into()
@@ -749,12 +755,12 @@ pub(super) mod test {
             let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
             // We can't prevent this from getting into our compute_signature implementation:
             assert_eq!(
-                def.compute_signature(&args, &PRELUDE_REGISTRY),
+                def.compute_signature(&args),
                 Err(SignatureError::InvalidTypeArgs)
             );
             // But validation rules it out, even when the variable is declared:
             assert_eq!(
-                def.validate_args(&args, &PRELUDE_REGISTRY, &[kind]),
+                def.validate_args(&args, &[kind]),
                 Err(SignatureError::FreeTypeVar {
                     idx: 0,
                     num_decls: 0
@@ -784,15 +790,15 @@ pub(super) mod test {
             let tv = Type::new_var_use(1, TypeBound::Copyable);
             let args = [TypeArg::Type { ty: tv.clone() }];
             let decls = [TypeParam::Extensions, TypeBound::Copyable.into()];
-            def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
+            def.validate_args(&args, &decls).unwrap();
             assert_eq!(
-                def.compute_signature(&args, &EMPTY_REG),
+                def.compute_signature(&args),
                 Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID))
             );
             // But not with an external row variable
             let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
             assert_eq!(
-                def.compute_signature(&[arg.clone()], &EMPTY_REG),
+                def.compute_signature(&[arg.clone()]),
                 Err(SignatureError::TypeArgMismatch(
                     TypeArgError::TypeMismatch {
                         param: TypeBound::Any.into(),
@@ -807,7 +813,7 @@ pub(super) mod test {
 
     #[test]
     fn instantiate_extension_delta() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::extension::prelude::{bool_t, PRELUDE_REGISTRY};
+        use crate::extension::prelude::bool_t;
 
         let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
             let params: Vec<TypeParam> = vec![TypeParam::Extensions];
@@ -822,16 +828,12 @@ pub(super) mod test {
             )?;
 
             // Concrete extension set
-            let es = ExtensionSet::singleton(&EXT_ID);
+            let es = ExtensionSet::singleton(EXT_ID);
             let exp_fun_ty = Signature::new_endo(bool_t()).with_extension_delta(es.clone());
             let args = [TypeArg::Extensions { es }];
 
-            def.validate_args(&args, &PRELUDE_REGISTRY, &params)
-                .unwrap();
-            assert_eq!(
-                def.compute_signature(&args, &PRELUDE_REGISTRY),
-                Ok(exp_fun_ty)
-            );
+            def.validate_args(&args, &params).unwrap();
+            assert_eq!(def.compute_signature(&args), Ok(exp_fun_ty));
 
             Ok(())
         })?;

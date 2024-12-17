@@ -1,5 +1,7 @@
 //! Definition of dataflow operations with no children.
 
+use std::borrow::Cow;
+
 use super::dataflow::DataflowOpTrait;
 use super::{impl_op_name, OpTag};
 use crate::types::{EdgeKind, Signature, Type, TypeRow};
@@ -35,14 +37,15 @@ impl DataflowOpTrait for Tag {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
-        Signature::new(
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(Signature::new(
             self.variants
                 .get(self.tag)
                 .expect("Not a valid tag")
                 .clone(),
             vec![Type::new_sum(self.variants.clone())],
-        )
+        ))
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -51,5 +54,12 @@ impl DataflowOpTrait for Tag {
 
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
+    }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            variants: self.variants.iter().map(|r| r.substitute(subst)).collect(),
+            tag: self.tag,
+        }
     }
 }

@@ -2,9 +2,9 @@
 //!
 //! [`Type`]: super::Type
 use std::fmt::{self, Display};
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
-use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
+use crate::extension::{ExtensionId, SignatureError, TypeDef};
 use crate::Extension;
 
 use super::{
@@ -77,35 +77,29 @@ impl CustomType {
         self.bound
     }
 
-    pub(super) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
+    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         // Check the args are individually ok
-        self.args
-            .iter()
-            .try_for_each(|a| a.validate(extension_registry, var_decls))?;
+        self.args.iter().try_for_each(|a| a.validate(var_decls))?;
         // And check they fit into the TypeParams declared by the TypeDef
-        let def = self.get_type_def(extension_registry)?;
+        let ext = self.get_extension()?;
+        let def = self.get_type_def(&ext)?;
         def.check_custom(self)
     }
 
-    fn get_type_def<'a>(
-        &self,
-        extension_registry: &'a ExtensionRegistry,
-    ) -> Result<&'a TypeDef, SignatureError> {
-        let ex = extension_registry.get(&self.extension);
-        // Even if OpDef's (+binaries) are not available, the part of the Extension definition
-        // describing the TypeDefs can easily be passed around (serialized), so should be available.
-        let ex = ex.ok_or(SignatureError::ExtensionNotFound {
-            missing: self.extension.clone(),
-            available: extension_registry.ids().cloned().collect(),
-        })?;
-        ex.get_type(&self.id)
+    fn get_type_def<'a>(&self, ext: &'a Arc<Extension>) -> Result<&'a TypeDef, SignatureError> {
+        ext.get_type(&self.id)
             .ok_or(SignatureError::ExtensionTypeNotFound {
                 exn: self.extension.clone(),
                 typ: self.id.clone(),
+            })
+    }
+
+    fn get_extension(&self) -> Result<Arc<Extension>, SignatureError> {
+        self.extension_ref
+            .upgrade()
+            .ok_or(SignatureError::MissingTypeExtension {
+                missing: self.extension.clone(),
+                typ: self.name().clone(),
             })
     }
 
@@ -115,8 +109,9 @@ impl CustomType {
             .iter()
             .map(|arg| arg.substitute(tr))
             .collect::<Vec<_>>();
+        let ext = self.get_extension().unwrap_or_else(|e| panic!("{}", e));
         let bound = self
-            .get_type_def(tr.extension_registry())
+            .get_type_def(&ext)
             .expect("validate should rule this out")
             .bound(&args);
         debug_assert!(self.bound.contains(bound));
@@ -135,6 +130,11 @@ impl CustomType {
     /// Type arguments.
     pub fn args(&self) -> &[TypeArg] {
         &self.args
+    }
+
+    /// Returns a mutable reference to the type arguments.
+    pub(crate) fn args_mut(&mut self) -> &mut Vec<TypeArg> {
+        &mut self.args
     }
 
     /// Parent extension.

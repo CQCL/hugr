@@ -445,7 +445,7 @@ impl<'a> Context<'a> {
                     .collect::<Result<Vec<TypeArg>, _>>()?;
 
                 self.static_edges.push((func_node, node_id));
-                let optype = OpType::Call(Call::try_new(func_sig, type_args, self.extensions)?);
+                let optype = OpType::Call(Call::try_new(func_sig, type_args)?);
 
                 let node = self.make_node(node_id, optype, parent)?;
                 Ok(Some(node))
@@ -466,11 +466,7 @@ impl<'a> Context<'a> {
 
                 self.static_edges.push((func_node, node_id));
 
-                let optype = OpType::LoadFunction(LoadFunction::try_new(
-                    func_sig,
-                    type_args,
-                    self.extensions,
-                )?);
+                let optype = OpType::LoadFunction(LoadFunction::try_new(func_sig, type_args)?);
 
                 let node = self.make_node(node_id, optype, parent)?;
                 Ok(Some(node))
@@ -1068,7 +1064,7 @@ impl<'a> Context<'a> {
                                 let ext_ident = IdentList::new(*ext).map_err(|_| {
                                     model::ModelError::MalformedName(ext.to_smolstr())
                                 })?;
-                                es.insert(&ext_ident);
+                                es.insert(ext_ident);
                             }
                             model::ExtSetPart::Splice(term_id) => {
                                 // The order in an extension set does not matter.

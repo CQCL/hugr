@@ -7,9 +7,7 @@ use crate::extension::prelude::{bool_t, sum_with_error};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{
-    CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs, PRELUDE,
-};
+use crate::extension::{CustomValidator, OpDef, SignatureFunc, ValidateJustArgs};
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
@@ -254,18 +252,10 @@ lazy_static! {
     /// Extension for basic integer operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(ExtensionSet::singleton(&super::int_types::EXTENSION_ID));
+            extension.add_requirements(ExtensionSet::singleton(super::int_types::EXTENSION_ID));
             IntOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
-
-    /// Registry of extensions required to validate integer operations.
-    pub static ref INT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
-        PRELUDE.clone(),
-        super::int_types::EXTENSION.clone(),
-        EXTENSION.clone(),
-    ])
-    .unwrap();
 }
 
 impl HasConcrete for IntOpDef {
@@ -322,8 +312,8 @@ impl MakeRegisteredOp for ConcreteIntOp {
         EXTENSION_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &INT_OPS_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 }
 
@@ -385,24 +375,27 @@ mod test {
                 .with_two_log_widths(3, 4)
                 .to_extension_op()
                 .unwrap()
-                .signature(),
-            Signature::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
+                .signature()
+                .as_ref(),
+            &Signature::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
         );
         assert_eq!(
             IntOpDef::iwiden_s
                 .with_two_log_widths(3, 3)
                 .to_extension_op()
                 .unwrap()
-                .signature(),
-            Signature::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
+                .signature()
+                .as_ref(),
+            &Signature::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
         );
         assert_eq!(
             IntOpDef::inarrow_s
                 .with_two_log_widths(3, 3)
                 .to_extension_op()
                 .unwrap()
-                .signature(),
-            Signature::new(int_type(3), sum_ty_with_err(int_type(3)))
+                .signature()
+                .as_ref(),
+            &Signature::new(int_type(3), sum_ty_with_err(int_type(3)))
                 .with_extension_delta(EXTENSION_ID)
         );
         assert!(
@@ -418,8 +411,9 @@ mod test {
                 .with_two_log_widths(2, 1)
                 .to_extension_op()
                 .unwrap()
-                .signature(),
-            Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
+                .signature()
+                .as_ref(),
+            &Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
                 .with_extension_delta(EXTENSION_ID)
         );
 

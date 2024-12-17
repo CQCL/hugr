@@ -5,18 +5,16 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 use clio::Input;
 use derive_more::{Display, Error, From};
 use hugr::extension::ExtensionRegistry;
-use hugr::package::PackageValidationError;
+use hugr::package::{PackageEncodingError, PackageValidationError};
 use hugr::Hugr;
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::{ffi::OsString, path::PathBuf};
 
 pub mod extensions;
 pub mod mermaid;
 pub mod validate;
 
-// TODO: Deprecated re-export. Remove on a breaking release.
-#[doc(inline)]
-#[deprecated(since = "0.13.2", note = "Use `hugr::package::Package` instead.")]
-pub use hugr::package::Package;
+use hugr::package::Package;
 
 /// CLI arguments.
 #[derive(Parser, Debug)]
@@ -46,6 +44,9 @@ pub enum CliError {
     /// Error parsing input.
     #[display("Error parsing package: {_0}")]
     Parse(serde_json::Error),
+    /// Hugr load error.
+    #[display("Error parsing package: {_0}")]
+    HUGRLoad(PackageEncodingError),
     #[display("Error validating HUGR: {_0}")]
     /// Errors produced by the `validate` subcommand.
     Validate(PackageValidationError),
@@ -96,15 +97,10 @@ impl PackageOrHugr {
     }
 
     /// Validates the package or hugr.
-    ///
-    /// Updates the extension registry with any new extensions defined in the package.
-    pub fn update_validate(
-        &mut self,
-        reg: &mut ExtensionRegistry,
-    ) -> Result<(), PackageValidationError> {
+    pub fn validate(&self) -> Result<(), PackageValidationError> {
         match self {
-            PackageOrHugr::Package(pkg) => pkg.update_validate(reg),
-            PackageOrHugr::Hugr(hugr) => hugr.update_validate(reg).map_err(Into::into),
+            PackageOrHugr::Package(pkg) => pkg.validate(),
+            PackageOrHugr::Hugr(hugr) => Ok(hugr.validate()?),
         }
     }
 }
@@ -120,25 +116,35 @@ impl AsRef<[Hugr]> for PackageOrHugr {
 
 impl HugrArgs {
     /// Read either a package or a single hugr from the input.
-    pub fn get_package_or_hugr(&mut self) -> Result<PackageOrHugr, CliError> {
-        let val: serde_json::Value = serde_json::from_reader(&mut self.input)?;
-        if let Ok(hugr) = serde_json::from_value::<Hugr>(val.clone()) {
-            return Ok(PackageOrHugr::Hugr(hugr));
+    pub fn get_package_or_hugr(
+        &mut self,
+        extensions: &ExtensionRegistry,
+    ) -> Result<PackageOrHugr, CliError> {
+        // We need to read the input twice; once to try to load it as a HUGR, and if that fails, as a package.
+        // If `input` is a file, we can reuse the reader by seeking back to the start.
+        // Else, we need to read the file into a buffer.
+        match self.input.can_seek() {
+            true => get_package_or_hugr_seek(&mut self.input, extensions),
+            false => {
+                let mut buffer = Vec::new();
+                self.input.read_to_end(&mut buffer)?;
+                get_package_or_hugr_seek(Cursor::new(buffer), extensions)
+            }
         }
-        let pkg = serde_json::from_value::<Package>(val.clone())?;
-        Ok(PackageOrHugr::Package(pkg))
     }
+}
 
-    /// Read either a package from the input.
-    ///
-    /// deprecated: use [HugrArgs::get_package_or_hugr] instead.
-    #[deprecated(
-        since = "0.13.2",
-        note = "Use `HugrArgs::get_package_or_hugr` instead."
-    )]
-    pub fn get_package(&mut self) -> Result<Package, CliError> {
-        let val: serde_json::Value = serde_json::from_reader(&mut self.input)?;
-        let pkg = serde_json::from_value::<Package>(val.clone())?;
-        Ok(pkg)
+/// Load a package or hugr from a seekable input.
+fn get_package_or_hugr_seek<I: Seek + Read>(
+    mut input: I,
+    extensions: &ExtensionRegistry,
+) -> Result<PackageOrHugr, CliError> {
+    match Hugr::load_json(&mut input, extensions) {
+        Ok(hugr) => Ok(PackageOrHugr::Hugr(hugr)),
+        Err(_) => {
+            input.seek(SeekFrom::Start(0))?;
+            let pkg = Package::from_json_reader(input, extensions)?;
+            Ok(PackageOrHugr::Package(pkg))
+        }
     }
 }

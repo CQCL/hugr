@@ -1,19 +1,15 @@
 use anyhow::{anyhow, bail, ensure, Ok, Result};
+use hugr_core::extension::prelude::{
+    self, error_type, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple,
+    TupleOpDef, UnpackTuple,
+};
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
 use hugr_core::{
-    extension::{
-        prelude::{
-            self, error_type, ArrayOp, ArrayOpDef, ConstError, ConstExternalSymbol, ConstString,
-            ConstUsize, MakeTuple, TupleOpDef, UnpackTuple, ARRAY_TYPE_NAME,
-        },
-        simple_op::MakeExtensionOp as _,
-    },
-    ops::constant::CustomConst,
-    types::{SumType, TypeArg},
+    extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst, types::SumType,
     HugrView,
 };
 use inkwell::{
-    types::{BasicType, BasicTypeEnum, IntType, PointerType},
+    types::{BasicType, IntType, PointerType},
     values::{BasicValue as _, BasicValueEnum, StructValue},
     AddressSpace,
 };
@@ -24,13 +20,10 @@ use crate::{
     emit::{
         func::EmitFuncContext,
         libc::{emit_libc_abort, emit_libc_printf},
-        RowPromise,
     },
     sum::LLVMSumValue,
     types::TypingSession,
 };
-
-pub mod array;
 
 /// A helper trait for customising the lowering [hugr_core::extension::prelude]
 /// types, [CustomConst]s, and ops.
@@ -66,27 +59,6 @@ pub trait PreludeCodegen: Clone {
             ],
             false,
         ))
-    }
-
-    /// Return the llvm type of [hugr_core::extension::prelude::array_type].
-    fn array_type<'c>(
-        &self,
-        _session: &TypingSession<'c, '_>,
-        elem_ty: BasicTypeEnum<'c>,
-        size: u64,
-    ) -> impl BasicType<'c> {
-        elem_ty.array_type(size as u32)
-    }
-
-    /// Emit a [hugr_core::extension::prelude::ArrayOp].
-    fn emit_array_op<'c, H: HugrView>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayOp,
-        inputs: Vec<BasicValueEnum<'c>>,
-        outputs: RowPromise<'c>,
-    ) -> Result<()> {
-        array::emit_array_op(self, ctx, op, inputs, outputs)
     }
 
     /// Emit a [hugr_core::extension::prelude::PRINT_OP_ID] node.
@@ -134,7 +106,7 @@ pub trait PreludeCodegen: Clone {
     /// The default implementation emits calls to libc's `printf` and `abort`.
     ///
     /// Note that implementations of `emit_panic` must not emit `unreachable`
-    /// terminators, that, if appropriate, is the responsibilitiy of the caller.
+    /// terminators, that, if appropriate, is the responsibility of the caller.
     fn emit_panic<H: HugrView>(
         &self,
         ctx: &mut EmitFuncContext<H>,
@@ -236,16 +208,6 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.error_type(&ts)?.as_basic_type_enum())
     })
-    .custom_type((prelude::PRELUDE_ID, ARRAY_TYPE_NAME.into()), {
-        let pcg = pcg.clone();
-        move |ts, hugr_type| {
-            let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = hugr_type.args() else {
-                return Err(anyhow!("Invalid type args for array type"));
-            };
-            let elem_ty = ts.llvm_type(ty)?;
-            Ok(pcg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
-        }
-    })
     .custom_const::<ConstUsize>(|context, k| {
         let ty: IntType = context
             .llvm_type(&k.get_type())?
@@ -301,17 +263,6 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         }
         _ => Err(anyhow!("Unsupported TupleOpDef")),
     })
-    .simple_extension_op::<ArrayOpDef>({
-        let pcg = pcg.clone();
-        move |context, args, _| {
-            pcg.emit_array_op(
-                context,
-                ArrayOp::from_extension_op(args.node().as_ref())?,
-                args.inputs,
-                args.outputs,
-            )
-        }
-    })
     .extension_op(prelude::PRELUDE_ID, prelude::PRINT_OP_ID, {
         let pcg = pcg.clone();
         move |context, args| {
@@ -344,7 +295,7 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
-    use hugr_core::extension::{PRELUDE, PRELUDE_REGISTRY};
+    use hugr_core::extension::PRELUDE;
     use hugr_core::types::{Type, TypeArg};
     use hugr_core::{type_row, Hugr};
     use prelude::{bool_t, qb_t, usize_t, PANIC_OP_ID, PRINT_OP_ID};
@@ -484,11 +435,7 @@ mod test {
             elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE
-            .instantiate_extension_op(
-                &PANIC_OP_ID,
-                [type_arg_2q.clone(), type_arg_2q.clone()],
-                &PRELUDE_REGISTRY,
-            )
+            .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
         let hugr = SimpleHugrConfig::new()
@@ -511,9 +458,7 @@ mod test {
     #[rstest]
     fn prelude_print(prelude_llvm_ctx: TestContext) {
         let greeting: ConstString = ConstString::new("Hello, world!".into());
-        let print_op = PRELUDE
-            .instantiate_extension_op(&PRINT_OP_ID, [], &PRELUDE_REGISTRY)
-            .unwrap();
+        let print_op = PRELUDE.instantiate_extension_op(&PRINT_OP_ID, []).unwrap();
 
         let hugr = SimpleHugrConfig::new()
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())

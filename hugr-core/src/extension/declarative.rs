@@ -17,7 +17,7 @@
 //! # const DECLARATIVE_YAML: &str = include_str!("../../examples/extension/declarative.yaml");
 //! # use hugr::extension::declarative::load_extensions;
 //! // Required extensions must already be present in the registry.
-//! let mut reg = hugr::std_extensions::logic::LOGIC_REG.clone();
+//! let mut reg = hugr::std_extensions::STD_REG.clone();
 //! load_extensions(DECLARATIVE_YAML, &mut reg).unwrap();
 //! ```
 //!
@@ -127,7 +127,7 @@ impl ExtensionSetDeclaration {
             registry.register(PRELUDE.clone())?;
         }
         if !scope.contains(&PRELUDE_ID) {
-            scope.insert(&PRELUDE_ID);
+            scope.insert(PRELUDE_ID);
         }
 
         // Registers extensions sequentially, adding them to the current scope.
@@ -137,7 +137,7 @@ impl ExtensionSetDeclaration {
                 registry,
             };
             let ext = decl.make_extension(&self.imports, ctx)?;
-            scope.insert(ext.name());
+            scope.insert(ext.name().clone());
             registry.register(ext)?;
         }
 
@@ -364,7 +364,7 @@ extensions:
 
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[rstest]
-    #[case(EXAMPLE_YAML_FILE, 1, 1, 3, &std_extensions::logic::LOGIC_REG)]
+    #[case(EXAMPLE_YAML_FILE, 1, 1, 3, &std_extensions::STD_REG)]
     fn test_decode_file(
         #[case] yaml_file: &str,
         #[case] num_declarations: usize,

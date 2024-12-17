@@ -1,29 +1,8 @@
 {
   "version": "0.1.0",
   "name": "prelude",
-  "extension_reqs": [],
+  "runtime_reqs": [],
   "types": {
-    "array": {
-      "extension": "prelude",
-      "name": "array",
-      "params": [
-        {
-          "tp": "BoundedNat",
-          "bound": null
-        },
-        {
-          "tp": "Type",
-          "b": "A"
-        }
-      ],
-      "description": "array",
-      "bound": {
-        "b": "FromParams",
-        "indices": [
-          1
-        ]
-      }
-    },
     "error": {
       "extension": "prelude",
       "name": "error",
@@ -99,7 +78,7 @@
               "b": "A"
             }
           ],
-          "extension_reqs": [
+          "runtime_reqs": [
             "0"
           ]
         }
@@ -143,7 +122,7 @@
               ]
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -174,7 +153,7 @@
               "b": "A"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
@@ -216,123 +195,33 @@
               "b": "A"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
     },
-    "discard_empty": {
+    "load_nat": {
       "extension": "prelude",
-      "name": "discard_empty",
-      "description": "Discard an empty array",
-      "signature": {
-        "params": [
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "BoundedNat",
-                  "n": 0
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 0,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ],
-          "output": [],
-          "extension_reqs": []
-        }
-      },
-      "binary": false
-    },
-    "get": {
-      "extension": "prelude",
-      "name": "get",
-      "description": "Get an element from an array",
+      "name": "load_nat",
+      "description": "Loads a generic bounded nat parameter into a usize runtime value.",
       "signature": {
         "params": [
           {
             "tp": "BoundedNat",
             "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "C"
           }
         ],
         "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "C"
-                  }
-                }
-              ],
-              "bound": "C"
-            },
+          "input": [],
+          "output": [
             {
               "t": "I"
             }
           ],
-          "output": [
-            {
-              "t": "Sum",
-              "s": "General",
-              "rows": [
-                [],
-                [
-                  {
-                    "t": "V",
-                    "i": 1,
-                    "b": "C"
-                  }
-                ]
-              ]
-            }
-          ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
-    },
-    "new_array": {
-      "extension": "prelude",
-      "name": "new_array",
-      "description": "Create a new array from elements",
-      "signature": null,
-      "binary": true
     },
     "panic": {
       "extension": "prelude",
@@ -377,24 +266,10 @@
               "b": "A"
             }
           ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false
-    },
-    "pop_left": {
-      "extension": "prelude",
-      "name": "pop_left",
-      "description": "Pop an element from the left of an array",
-      "signature": null,
-      "binary": true
-    },
-    "pop_right": {
-      "extension": "prelude",
-      "name": "pop_right",
-      "description": "Pop an element from the right of an array",
-      "signature": null,
-      "binary": true
     },
     "print": {
       "extension": "prelude",
@@ -413,428 +288,7 @@
             }
           ],
           "output": [],
-          "extension_reqs": []
-        }
-      },
-      "binary": false
-    },
-    "repeat": {
-      "extension": "prelude",
-      "name": "repeat",
-      "description": "Creates a new array whose elements are initialised by calling the given function n times",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "G",
-              "input": [],
-              "output": [
-                {
-                  "t": "V",
-                  "i": 1,
-                  "b": "A"
-                }
-              ],
-              "extension_reqs": []
-            }
-          ],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ],
-          "extension_reqs": []
-        }
-      },
-      "binary": false
-    },
-    "scan": {
-      "extension": "prelude",
-      "name": "scan",
-      "description": "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          },
-          {
-            "tp": "List",
-            "param": {
-              "tp": "Type",
-              "b": "A"
-            }
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            },
-            {
-              "t": "G",
-              "input": [
-                {
-                  "t": "V",
-                  "i": 1,
-                  "b": "A"
-                },
-                {
-                  "t": "R",
-                  "i": 3,
-                  "b": "A"
-                }
-              ],
-              "output": [
-                {
-                  "t": "V",
-                  "i": 2,
-                  "b": "A"
-                },
-                {
-                  "t": "R",
-                  "i": 3,
-                  "b": "A"
-                }
-              ],
-              "extension_reqs": []
-            },
-            {
-              "t": "R",
-              "i": 3,
-              "b": "A"
-            }
-          ],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 2,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            },
-            {
-              "t": "R",
-              "i": 3,
-              "b": "A"
-            }
-          ],
-          "extension_reqs": []
-        }
-      },
-      "binary": false
-    },
-    "set": {
-      "extension": "prelude",
-      "name": "set",
-      "description": "Set an element in an array",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            },
-            {
-              "t": "I"
-            },
-            {
-              "t": "V",
-              "i": 1,
-              "b": "A"
-            }
-          ],
-          "output": [
-            {
-              "t": "Sum",
-              "s": "General",
-              "rows": [
-                [
-                  {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  },
-                  {
-                    "t": "Opaque",
-                    "extension": "prelude",
-                    "id": "array",
-                    "args": [
-                      {
-                        "tya": "Variable",
-                        "idx": 0,
-                        "cached_decl": {
-                          "tp": "BoundedNat",
-                          "bound": null
-                        }
-                      },
-                      {
-                        "tya": "Type",
-                        "ty": {
-                          "t": "V",
-                          "i": 1,
-                          "b": "A"
-                        }
-                      }
-                    ],
-                    "bound": "A"
-                  }
-                ],
-                [
-                  {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  },
-                  {
-                    "t": "Opaque",
-                    "extension": "prelude",
-                    "id": "array",
-                    "args": [
-                      {
-                        "tya": "Variable",
-                        "idx": 0,
-                        "cached_decl": {
-                          "tp": "BoundedNat",
-                          "bound": null
-                        }
-                      },
-                      {
-                        "tya": "Type",
-                        "ty": {
-                          "t": "V",
-                          "i": 1,
-                          "b": "A"
-                        }
-                      }
-                    ],
-                    "bound": "A"
-                  }
-                ]
-              ]
-            }
-          ],
-          "extension_reqs": []
-        }
-      },
-      "binary": false
-    },
-    "swap": {
-      "extension": "prelude",
-      "name": "swap",
-      "description": "Swap two elements in an array",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            },
-            {
-              "t": "I"
-            },
-            {
-              "t": "I"
-            }
-          ],
-          "output": [
-            {
-              "t": "Sum",
-              "s": "General",
-              "rows": [
-                [
-                  {
-                    "t": "Opaque",
-                    "extension": "prelude",
-                    "id": "array",
-                    "args": [
-                      {
-                        "tya": "Variable",
-                        "idx": 0,
-                        "cached_decl": {
-                          "tp": "BoundedNat",
-                          "bound": null
-                        }
-                      },
-                      {
-                        "tya": "Type",
-                        "ty": {
-                          "t": "V",
-                          "i": 1,
-                          "b": "A"
-                        }
-                      }
-                    ],
-                    "bound": "A"
-                  }
-                ],
-                [
-                  {
-                    "t": "Opaque",
-                    "extension": "prelude",
-                    "id": "array",
-                    "args": [
-                      {
-                        "tya": "Variable",
-                        "idx": 0,
-                        "cached_decl": {
-                          "tp": "BoundedNat",
-                          "bound": null
-                        }
-                      },
-                      {
-                        "tya": "Type",
-                        "ty": {
-                          "t": "V",
-                          "i": 1,
-                          "b": "A"
-                        }
-                      }
-                    ],
-                    "bound": "A"
-                  }
-                ]
-              ]
-            }
-          ],
-          "extension_reqs": []
+          "runtime_reqs": []
         }
       },
       "binary": false

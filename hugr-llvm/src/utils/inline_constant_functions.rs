@@ -1,5 +1,4 @@
 use hugr_core::{
-    extension::ExtensionRegistry,
     hugr::hugrmut::HugrMut,
     ops::{FuncDefn, LoadFunction, Value},
     types::PolyFuncType,
@@ -12,18 +11,12 @@ fn const_fn_name(konst_n: Node) -> String {
     format!("const_fun_{}", konst_n.index())
 }
 
-pub fn inline_constant_functions(
-    hugr: &mut impl HugrMut,
-    registry: &ExtensionRegistry,
-) -> Result<()> {
-    while inline_constant_functions_impl(hugr, registry)? {}
+pub fn inline_constant_functions(hugr: &mut impl HugrMut) -> Result<()> {
+    while inline_constant_functions_impl(hugr)? {}
     Ok(())
 }
 
-fn inline_constant_functions_impl(
-    hugr: &mut impl HugrMut,
-    registry: &ExtensionRegistry,
-) -> Result<bool> {
+fn inline_constant_functions_impl(hugr: &mut impl HugrMut) -> Result<bool> {
     let mut const_funs = vec![];
 
     for n in hugr.nodes() {
@@ -66,6 +59,7 @@ fn inline_constant_functions_impl(
                     "Constant function hugr has no inner_func_type: {}",
                     konst_n.index()
                 ))?
+                .into_owned()
                 .into();
             let func_defn = FuncDefn {
                 name: const_fn_name(konst_n),
@@ -75,10 +69,7 @@ fn inline_constant_functions_impl(
             hugr.insert_hugr(func_node, func_hugr);
 
             for lcn in load_constant_ns {
-                hugr.replace_op(
-                    lcn,
-                    LoadFunction::try_new(polysignature.clone(), [], registry)?,
-                )?;
+                hugr.replace_op(lcn, LoadFunction::try_new(polysignature.clone(), [])?)?;
             }
             any_changes = true;
         }
@@ -94,7 +85,7 @@ mod test {
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
-        extension::{prelude::qb_t, PRELUDE_REGISTRY},
+        extension::prelude::qb_t,
         ops::{CallIndirect, Const, Value},
         types::Signature,
         Hugr, HugrView, Wire,
@@ -106,9 +97,7 @@ mod test {
         Value::function({
             let mut builder = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
             let r = go(&mut builder);
-            builder
-                .finish_hugr_with_outputs([r], &PRELUDE_REGISTRY)
-                .unwrap()
+            builder.finish_hugr_with_outputs([r]).unwrap()
         })
         .unwrap()
         .into()
@@ -138,10 +127,10 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
             };
-            builder.finish_hugr(&PRELUDE_REGISTRY).unwrap()
+            builder.finish_hugr().unwrap()
         };
 
-        inline_constant_functions(&mut hugr, &PRELUDE_REGISTRY).unwrap();
+        inline_constant_functions(&mut hugr).unwrap();
 
         for n in hugr.nodes() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
@@ -187,10 +176,10 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
             };
-            builder.finish_hugr(&PRELUDE_REGISTRY).unwrap()
+            builder.finish_hugr().unwrap()
         };
 
-        inline_constant_functions(&mut hugr, &PRELUDE_REGISTRY).unwrap();
+        inline_constant_functions(&mut hugr).unwrap();
 
         for n in hugr.nodes() {
             if let Some(konst) = hugr.get_optype(n).as_const() {

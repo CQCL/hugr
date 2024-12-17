@@ -17,7 +17,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
-pub use signature::{FuncValueType, Signature};
+pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::{TypeRow, TypeRowRV};
@@ -25,8 +25,6 @@ pub use type_row::{TypeRow, TypeRowRV};
 // Unused in --no-features
 #[allow(unused_imports)]
 pub(crate) use poly_func::PolyFuncTypeBase;
-#[allow(unused_imports)]
-pub(crate) use signature::FuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
@@ -34,7 +32,7 @@ use itertools::{repeat_n, Itertools};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::extension::SignatureError;
 use crate::ops::AliasDecl;
 
 use self::type_param::TypeParam;
@@ -77,6 +75,46 @@ impl EdgeKind {
     /// - i.e. the value is statically known
     pub fn is_static(&self) -> bool {
         matches!(self, EdgeKind::Const(_) | EdgeKind::Function(_))
+    }
+
+    /// Returns `true` if the edge kind is [`ControlFlow`].
+    ///
+    /// [`ControlFlow`]: EdgeKind::ControlFlow
+    #[must_use]
+    pub fn is_control_flow(&self) -> bool {
+        matches!(self, Self::ControlFlow)
+    }
+
+    /// Returns `true` if the edge kind is [`Value`].
+    ///
+    /// [`Value`]: EdgeKind::Value
+    #[must_use]
+    pub fn is_value(&self) -> bool {
+        matches!(self, Self::Value(..))
+    }
+
+    /// Returns `true` if the edge kind is [`Const`].
+    ///
+    /// [`Const`]: EdgeKind::Const
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        matches!(self, Self::Const(..))
+    }
+
+    /// Returns `true` if the edge kind is [`Function`].
+    ///
+    /// [`Function`]: EdgeKind::Function
+    #[must_use]
+    pub fn is_function(&self) -> bool {
+        matches!(self, Self::Function(..))
+    }
+
+    /// Returns `true` if the edge kind is [`StateOrder`].
+    ///
+    /// [`StateOrder`]: EdgeKind::StateOrder
+    #[must_use]
+    pub fn is_state_order(&self) -> bool {
+        matches!(self, Self::StateOrder)
     }
 }
 
@@ -148,10 +186,16 @@ impl std::fmt::Display for SumType {
         }
 
         match self {
+            SumType::Unit { size: 1 } => write!(f, "Unit"),
+            SumType::Unit { size: 2 } => write!(f, "Bool"),
             SumType::Unit { size } => {
                 display_list_with_separator(repeat_n("[]", *size as usize), f, "+")
             }
-            SumType::General { rows } => display_list_with_separator(rows.iter(), f, "+"),
+            SumType::General { rows } => match rows.len() {
+                1 if rows[0].is_empty() => write!(f, "Unit"),
+                2 if rows[0].is_empty() && rows[1].is_empty() => write!(f, "Bool"),
+                _ => display_list_with_separator(rows.iter(), f, "+"),
+            },
         }
     }
 }
@@ -416,23 +460,19 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// [RowVariable]: TypeEnum::RowVariable
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Sum(SumType::General { rows }) => rows
-                .iter()
-                .try_for_each(|row| row.validate(extension_registry, var_decls)),
+            TypeEnum::Sum(SumType::General { rows }) => {
+                rows.iter().try_for_each(|row| row.validate(var_decls))
+            }
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
-            TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
+            TypeEnum::Extension(custy) => custy.validate(var_decls),
             // Function values may be passed around without knowing their arity
             // (i.e. with row vars) as long as they are not called:
-            TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
+            TypeEnum::Function(ft) => ft.validate(var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
             TypeEnum::RowVar(rv) => rv.validate(var_decls),
         }
@@ -544,9 +584,19 @@ impl From<Type> for TypeRV {
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
-pub(crate) struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+pub struct Substitution<'a>(&'a [TypeArg]);
 
-impl Substitution<'_> {
+impl<'a> Substitution<'a> {
+    /// Create a new Substitution given the replacement values (indexed
+    /// as the variables they replace). `exts` must contain the [TypeDef]
+    /// for every custom [Type] (to which the Substitution is applied)
+    /// containing a type-variable.
+    ///
+    /// [TypeDef]: crate::extension::TypeDef
+    pub fn new(items: &'a [TypeArg]) -> Self {
+        Self(items)
+    }
+
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
@@ -584,10 +634,6 @@ impl Substitution<'_> {
             }
             _ => panic!("Not a type or list of types - call validate() ?"),
         }
-    }
-
-    fn extension_registry(&self) -> &ExtensionRegistry {
-        self.1
     }
 }
 

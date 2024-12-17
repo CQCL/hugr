@@ -71,7 +71,7 @@ where
 
     /// Create a general `FatNode` from a specific one.
     pub fn generalise(self) -> FatNode<'hugr, OpType, H> {
-        // guaranteed to be valid becasue self is valid
+        // guaranteed to be valid because self is valid
         FatNode {
             hugr: self.hugr,
             node: self.node,

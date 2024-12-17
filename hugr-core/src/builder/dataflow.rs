@@ -14,7 +14,6 @@ use crate::{Direction, IncomingPort, OutgoingPort, Wire};
 
 use crate::types::{PolyFuncType, Signature, Type};
 
-use crate::extension::ExtensionRegistry;
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
@@ -83,11 +82,11 @@ impl DFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(
-        mut self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Hugr, ValidationError> {
-        self.base.update_validate(extension_registry)?;
+    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
+        if cfg!(feature = "extension_inference") {
+            self.base.infer_extensions(false)?;
+        }
+        self.base.validate()?;
         Ok(self.base)
     }
 }
@@ -249,7 +248,7 @@ impl FunctionBuilder<Hugr> {
             .get_optype(parent)
             .as_func_defn()
             .expect("FunctionBuilder node must be a FuncDefn");
-        let signature = old_optype.inner_signature();
+        let signature = old_optype.inner_signature().into_owned();
         let name = old_optype.name.clone();
         self.hugr_mut()
             .replace_op(
@@ -299,8 +298,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T: From<BuildHandle<DfgID>>> SubContainer for
 }
 
 impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
-    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError> {
-        self.0.finish_hugr(extension_registry)
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+        self.0.finish_hugr()
     }
 }
 
@@ -317,7 +316,7 @@ pub(crate) mod test {
     };
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::extension::prelude::{Lift, Noop};
-    use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionId, SignatureError};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, OpTag};
     use crate::ops::{OpTrait, Value};
@@ -325,7 +324,7 @@ pub(crate) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
     use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
-    use crate::utils::test_quantum_extension::{self, h_gate};
+    use crate::utils::test_quantum_extension::h_gate;
     use crate::{builder::test::n_identity, type_row, Wire};
 
     use super::super::test::simple_dfg_hugr;
@@ -342,10 +341,7 @@ pub(crate) mod test {
             let inner_builder = outer_builder.dfg_builder_endo([(usize_t(), int)])?;
             let inner_id = n_identity(inner_builder)?;
 
-            outer_builder.finish_hugr_with_outputs(
-                inner_id.outputs().chain(q_out.outputs()),
-                &test_quantum_extension::REG,
-            )
+            outer_builder.finish_hugr_with_outputs(inner_id.outputs().chain(q_out.outputs()))
         };
 
         assert_eq!(build_result.err(), None);
@@ -363,7 +359,7 @@ pub(crate) mod test {
 
             f(&mut builder)?;
 
-            builder.finish_hugr(&test_quantum_extension::REG)
+            builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -412,7 +408,7 @@ pub(crate) mod test {
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
 
-            Ok(module_builder.finish_prelude_hugr()?)
+            Ok(module_builder.finish_hugr()?)
         };
 
         assert_matches!(
@@ -446,7 +442,7 @@ pub(crate) mod test {
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
-            f_build.finish_prelude_hugr_with_outputs([nested.out_wire(0)])
+            f_build.finish_hugr_with_outputs([nested.out_wire(0)])
         };
 
         assert_matches!(builder(), Ok(_));
@@ -473,8 +469,7 @@ pub(crate) mod test {
             let i1 = f_build.add_input(qb_t());
             let noop1 = f_build.add_dataflow_op(Noop(qb_t()), [i1])?;
 
-            let hugr =
-                f_build.finish_prelude_hugr_with_outputs([noop0.out_wire(0), noop1.out_wire(0)])?;
+            let hugr = f_build.finish_hugr_with_outputs([noop0.out_wire(0), noop1.out_wire(0)])?;
             Ok((hugr, f_node))
         };
 
@@ -527,7 +522,7 @@ pub(crate) mod test {
         let mut dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.set_metadata("x", 42);
-        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1], &EMPTY_REG)?;
+        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         // Create a module, and insert the DFG into it
         let mut module_builder = ModuleBuilder::new();
@@ -543,7 +538,7 @@ pub(crate) mod test {
             (dfg.node(), f.node())
         };
 
-        let hugr = module_builder.finish_hugr(&EMPTY_REG)?;
+        let hugr = module_builder.finish_hugr()?;
         assert_eq!(hugr.node_count(), 7);
 
         assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
@@ -585,7 +580,7 @@ pub(crate) mod test {
 
         let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
-        parent.finish_hugr_with_outputs([w], &test_quantum_extension::REG)?;
+        parent.finish_hugr_with_outputs([w])?;
 
         Ok(())
     }
@@ -603,7 +598,7 @@ pub(crate) mod test {
         // CFGs
         let b_child_2_handle = b_child_2.finish_with_outputs([b_child_in_wire])?;
 
-        let res = b.finish_prelude_hugr_with_outputs([b_child_2_handle.out_wire(0)]);
+        let res = b.finish_hugr_with_outputs([b_child_2_handle.out_wire(0)]);
 
         assert_matches!(
             res,
@@ -661,7 +656,6 @@ pub(crate) mod test {
         let ev = e.instantiate_extension_op(
             "eval",
             [vec![usize_t().into()].into(), vec![tv.into()].into()],
-            &PRELUDE_REGISTRY,
         );
         assert_eq!(
             ev,
@@ -685,17 +679,13 @@ pub(crate) mod test {
                     .unwrap();
                 let load_constant = builder.add_load_value(Value::true_val());
                 let [r] = builder
-                    .call(&func, &[], [load_constant], &EMPTY_REG)
+                    .call(&func, &[], [load_constant])
                     .unwrap()
                     .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
                 (load_constant.node(), r.node())
             };
-            (
-                builder.finish_hugr(&EMPTY_REG).unwrap(),
-                load_constant,
-                call,
-            )
+            (builder.finish_hugr().unwrap(), load_constant, call)
         };
 
         let lc_optype = hugr.get_optype(load_constant);
@@ -712,6 +702,6 @@ pub(crate) mod test {
             call_optype.other_input_port().unwrap(),
         );
 
-        hugr.validate(&EMPTY_REG).unwrap();
+        hugr.validate().unwrap();
     }
 }

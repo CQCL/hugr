@@ -10,8 +10,7 @@ use std::num::NonZeroU64;
 use thiserror::Error;
 
 use super::row_var::MaybeRV;
-use super::{check_typevar_decl, RowVariable, Substitution, Type, TypeBase, TypeBound};
-use crate::extension::ExtensionRegistry;
+use super::{check_typevar_decl, NoRV, RowVariable, Substitution, Type, TypeBase, TypeBound};
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
@@ -155,18 +154,26 @@ pub enum TypeArg {
         n: u64,
     },
     ///Instance of [TypeParam::String]. UTF-8 encoded string argument.
+    #[display("\"{arg}\"")]
     String {
         #[allow(missing_docs)]
         arg: String,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of elements.
-    #[display("Sequence({})", "elems.iter().map(|t|t.to_string()).join(\", \")")]
+    #[display("Sequence({})", {
+        use itertools::Itertools as _;
+        elems.iter().map(|t|t.to_string()).join(",")
+    })]
     Sequence {
         #[allow(missing_docs)]
         elems: Vec<TypeArg>,
     },
     /// Instance of [TypeParam::Extensions], providing the extension ids.
+    #[display("Exts({})", {
+        use itertools::Itertools as _;
+        es.iter().map(|t|t.to_string()).join(",")
+    })]
     Extensions {
         #[allow(missing_docs)]
         es: ExtensionSet,
@@ -199,6 +206,14 @@ impl From<u64> for TypeArg {
 impl From<String> for TypeArg {
     fn from(arg: String) -> Self {
         TypeArg::String { arg }
+    }
+}
+
+impl From<&str> for TypeArg {
+    fn from(arg: &str) -> Self {
+        TypeArg::String {
+            arg: arg.to_string(),
+        }
     }
 }
 
@@ -252,19 +267,37 @@ impl TypeArg {
         }
     }
 
+    /// Returns an integer if the TypeArg is an instance of BoundedNat.
+    pub fn as_nat(&self) -> Option<u64> {
+        match self {
+            TypeArg::BoundedNat { n } => Some(*n),
+            _ => None,
+        }
+    }
+
+    /// Returns a type if the TypeArg is an instance of Type.
+    pub fn as_type(&self) -> Option<TypeBase<NoRV>> {
+        match self {
+            TypeArg::Type { ty } => Some(ty.clone()),
+            _ => None,
+        }
+    }
+
+    /// Returns a string if the TypeArg is an instance of String.
+    pub fn as_string(&self) -> Option<String> {
+        match self {
+            TypeArg::String { arg } => Some(arg.clone()),
+            _ => None,
+        }
+    }
+
     /// Much as [Type::validate], also checks that the type of any [TypeArg::Opaque]
     /// is valid and closed.
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
+            TypeArg::Type { ty } => ty.validate(var_decls),
             TypeArg::BoundedNat { .. } | TypeArg::String { .. } => Ok(()),
-            TypeArg::Sequence { elems } => elems
-                .iter()
-                .try_for_each(|a| a.validate(extension_registry, var_decls)),
+            TypeArg::Sequence { elems } => elems.iter().try_for_each(|a| a.validate(var_decls)),
             TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
@@ -438,7 +471,7 @@ mod test {
     use itertools::Itertools;
 
     use super::{check_type_arg, Substitution, TypeArg, TypeParam};
-    use crate::extension::prelude::{bool_t, usize_t, PRELUDE_REGISTRY};
+    use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::{type_param::TypeArgError, TypeBound, TypeRV};
 
     #[test]
@@ -536,7 +569,7 @@ mod test {
         };
         check_type_arg(&outer_arg, &outer_param).unwrap();
 
-        let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg], &PRELUDE_REGISTRY));
+        let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
         assert_eq!(
             outer_arg2,
             vec![bool_t().into(), TypeArg::UNIT, usize_t().into()].into()
@@ -578,8 +611,7 @@ mod test {
         // Now substitute a list of two types for that row-variable
         let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
         check_type_arg(&row_var_arg, &row_var_decl).unwrap();
-        let subst_arg =
-            good_arg.substitute(&Substitution(&[row_var_arg.clone()], &PRELUDE_REGISTRY));
+        let subst_arg = good_arg.substitute(&Substitution(&[row_var_arg.clone()]));
         check_type_arg(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,

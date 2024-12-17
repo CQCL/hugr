@@ -32,6 +32,8 @@ fn test_extension_dump(mut cmd: Command) {
         "arithmetic/int.json",
         "arithmetic/float.json",
         "arithmetic/conversions.json",
+        "collections/array.json",
+        "collections/list.json",
     ];
     // check all paths exist
     for path in expected_paths.iter() {

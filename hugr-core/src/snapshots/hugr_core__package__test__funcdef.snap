@@ -9,6 +9,6 @@ graph LR
             direction LR
             1["(1) Input"]
             2["(2) Output"]
-            1--"0:0<br>[]+[]"-->2
+            1--"0:0<br>Bool"-->2
         end
     end

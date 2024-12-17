@@ -1,5 +1,5 @@
 ---
-source: src/extension/conversions.rs
+source: hugr-llvm/src/extension/conversions.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'

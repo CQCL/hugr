@@ -448,7 +448,7 @@ mod test {
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, Rewrite};
@@ -456,7 +456,7 @@ mod test {
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
-    use crate::std_extensions::collections::{self, list_type, ListOp};
+    use crate::std_extensions::collections::list;
     use crate::types::{Signature, Type, TypeRow};
     use crate::utils::{depth, test_quantum_extension};
     use crate::{type_row, Direction, Extension, Hugr, HugrView, OutgoingPort};
@@ -466,17 +466,16 @@ mod test {
     #[test]
     #[ignore] // FIXME: This needs a rewrite now that `pop` returns an optional value -.-'
     fn cfg() -> Result<(), Box<dyn std::error::Error>> {
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()])
-                .unwrap();
-        let listy = list_type(usize_t());
-        let pop: ExtensionOp = ListOp::pop
+        let reg = ExtensionRegistry::new([PRELUDE.to_owned(), list::EXTENSION.to_owned()]);
+        reg.validate()?;
+        let listy = list::list_type(usize_t());
+        let pop: ExtensionOp = list::ListOp::pop
             .with_type(usize_t())
-            .to_extension_op(&reg)
+            .to_extension_op()
             .unwrap();
-        let push: ExtensionOp = ListOp::push
+        let push: ExtensionOp = list::ListOp::push
             .with_type(usize_t())
-            .to_extension_op(&reg)
+            .to_extension_op()
             .unwrap();
         let just_list = TypeRow::from(vec![listy.clone()]);
         let intermed = TypeRow::from(vec![listy.clone(), usize_t()]);
@@ -492,7 +491,7 @@ mod test {
         cfg.branch(&entry, 0, &bb2)?;
         cfg.branch(&bb2, 0, &exit)?;
 
-        let mut h = cfg.finish_hugr(&reg).unwrap();
+        let mut h = cfg.finish_hugr().unwrap();
         {
             let pop = find_node(&h, "pop");
             let push = find_node(&h, "push");
@@ -519,21 +518,21 @@ mod test {
                 inputs: vec![listy.clone()].into(),
                 sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
-                extension_delta: collections::EXTENSION_ID.into(),
+                extension_delta: list::EXTENSION_ID.into(),
             },
         );
         let r_df1 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: Signature::new(vec![listy.clone()], simple_unary_plus(intermed.clone()))
-                    .with_extension_delta(collections::EXTENSION_ID),
+                    .with_extension_delta(list::EXTENSION_ID),
             },
         );
         let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: Signature::new(intermed, simple_unary_plus(just_list.clone()))
-                    .with_extension_delta(collections::EXTENSION_ID),
+                    .with_extension_delta(list::EXTENSION_ID),
             },
         );
         [0, 1]
@@ -572,7 +571,7 @@ mod test {
             }],
             mu_new: vec![],
         })?;
-        h.update_validate(&reg)?;
+        h.validate()?;
         {
             let pop = find_node(&h, "pop");
             let push = find_node(&h, "push");
@@ -616,9 +615,9 @@ mod test {
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder_exts(op_sig.output, 1, op_sig.extension_reqs.clone())?
+            h.simple_entry_builder_exts(op_sig.output.clone(), 1, op_sig.runtime_reqs.clone())?
         } else {
-            h.simple_block_builder(op_sig, 1)?
+            h.simple_block_builder(op_sig.into_owned(), 1)?
         };
         let op: OpType = op.into();
         let op = bb.add_dataflow_op(op, bb.input_wires())?;
@@ -644,15 +643,9 @@ mod test {
                 .unwrap();
         });
         let ext_name = ext.name().clone();
-        let foo = ext
-            .instantiate_extension_op("foo", [], &PRELUDE_REGISTRY)
-            .unwrap();
-        let bar = ext
-            .instantiate_extension_op("bar", [], &PRELUDE_REGISTRY)
-            .unwrap();
-        let baz = ext
-            .instantiate_extension_op("baz", [], &PRELUDE_REGISTRY)
-            .unwrap();
+        let foo = ext.instantiate_extension_op("foo", []).unwrap();
+        let bar = ext.instantiate_extension_op("bar", []).unwrap();
+        let baz = ext.instantiate_extension_op("baz", []).unwrap();
         let mut registry = test_quantum_extension::REG.clone();
         registry.register(ext).unwrap();
 
@@ -685,9 +678,7 @@ mod test {
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs()).unwrap();
         let case2 = case2.finish_with_outputs(baz_dfg.outputs()).unwrap().node();
         let cond = cond.finish_sub_container().unwrap();
-        let h = h
-            .finish_hugr_with_outputs(cond.outputs(), &registry)
-            .unwrap();
+        let h = h.finish_hugr_with_outputs(cond.outputs()).unwrap();
 
         let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());
         let r1 = r_hugr.add_node_with_parent(

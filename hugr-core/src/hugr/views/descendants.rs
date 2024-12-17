@@ -173,10 +173,11 @@ where
 
 #[cfg(test)]
 pub(super) mod test {
+    use std::borrow::Cow;
+
     use rstest::rstest;
 
     use crate::extension::prelude::{qb_t, usize_t};
-    use crate::utils::test_quantum_extension;
     use crate::IncomingPort;
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
@@ -214,7 +215,7 @@ pub(super) mod test {
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?;
             (f_id, inner_id)
         };
-        let hugr = module_builder.finish_hugr(&test_quantum_extension::REG)?;
+        let hugr = module_builder.finish_hugr()?;
         Ok((hugr, f_id.handle().node(), inner_id.handle().node()))
     }
 
@@ -242,7 +243,7 @@ pub(super) mod test {
 
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
-            inner_region.inner_function_type(),
+            inner_region.inner_function_type().map(Cow::into_owned),
             Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
@@ -291,7 +292,7 @@ pub(super) mod test {
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
         let extracted = region.extract_hugr();
-        extracted.validate(&test_quantum_extension::REG)?;
+        extracted.validate()?;
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
 

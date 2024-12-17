@@ -4,11 +4,10 @@
 //! calling the CLI binary, which Miri doesn't support.
 #![cfg(all(test, not(miri)))]
 
-use std::sync::Arc;
-
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr::builder::{DFGBuilder, DataflowSubContainer, ModuleBuilder};
+use hugr::package::Package;
 use hugr::types::Type;
 use hugr::{
     builder::{Container, Dataflow},
@@ -17,7 +16,7 @@ use hugr::{
     types::Signature,
     Hugr,
 };
-use hugr_cli::{validate::VALID_PRINT, Package};
+use hugr_cli::validate::VALID_PRINT;
 use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
 
@@ -49,9 +48,7 @@ fn test_package(#[default(bool_t())] id_type: Type) -> Package {
     df.finish_with_outputs([i]).unwrap();
     let hugr = module.hugr().clone(); // unvalidated
 
-    let rdr = std::fs::File::open(FLOAT_EXT_FILE).unwrap();
-    let float_ext: Arc<hugr::Extension> = serde_json::from_reader(rdr).unwrap();
-    Package::new(vec![hugr], vec![float_ext]).unwrap()
+    Package::new(vec![hugr]).unwrap()
 }
 
 /// A DFG-rooted HUGR.
@@ -130,7 +127,9 @@ fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
     cmd.arg("mermaid");
     cmd.arg("--validate");
     cmd.write_stdin(bad_hugr_string);
-    cmd.assert().failure().stderr(contains("UnconnectedPort"));
+    cmd.assert()
+        .failure()
+        .stderr(contains("has an unconnected port"));
 }
 
 #[rstest]
@@ -141,7 +140,7 @@ fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error validating HUGR").and(contains("unconnected port")));
+        .stderr(contains("Node(1)").and(contains("unconnected port")));
 }
 
 #[rstest]
@@ -171,7 +170,7 @@ fn test_no_std(test_hugr_string: String, mut val_cmd: Command) {
     val_cmd.write_stdin(test_hugr_string);
     val_cmd.arg("-");
     val_cmd.arg("--no-std");
-    // test hugr doesn't have any standard extensions, so this should succceed
+    // test hugr doesn't have any standard extensions, so this should succeed
 
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }

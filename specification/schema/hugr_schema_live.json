@@ -92,34 +92,6 @@
             "title": "AliasDefn",
             "type": "object"
         },
-        "Array": {
-            "additionalProperties": true,
-            "description": "Known size array whose elements are of the same type.",
-            "properties": {
-                "t": {
-                    "const": "Array",
-                    "default": "Array",
-                    "enum": [
-                        "Array"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
-                "inner": {
-                    "$ref": "#/$defs/Type"
-                },
-                "len": {
-                    "title": "Len",
-                    "type": "integer"
-                }
-            },
-            "required": [
-                "inner",
-                "len"
-            ],
-            "title": "Array",
-            "type": "object"
-        },
         "BoundedNatArg": {
             "additionalProperties": true,
             "properties": {
@@ -577,11 +549,11 @@
                     "title": "Name",
                     "type": "string"
                 },
-                "extension_reqs": {
+                "runtime_reqs": {
                     "items": {
                         "type": "string"
                     },
-                    "title": "Extension Reqs",
+                    "title": "Runtime Reqs",
                     "type": "array",
                     "uniqueItems": true
                 },
@@ -610,7 +582,7 @@
             "required": [
                 "version",
                 "name",
-                "extension_reqs",
+                "runtime_reqs",
                 "types",
                 "values",
                 "operations"
@@ -869,11 +841,11 @@
                     "title": "Output",
                     "type": "array"
                 },
-                "extension_reqs": {
+                "runtime_reqs": {
                     "items": {
                         "type": "string"
                     },
-                    "title": "Extension Reqs",
+                    "title": "Runtime Reqs",
                     "type": "array"
                 }
             },
@@ -1054,7 +1026,7 @@
                     "title": "Type Args",
                     "type": "array"
                 },
-                "signature": {
+                "instantiation": {
                     "$ref": "#/$defs/FunctionType"
                 }
             },
@@ -1062,7 +1034,7 @@
                 "parent",
                 "func_sig",
                 "type_args",
-                "signature"
+                "instantiation"
             ],
             "title": "LoadFunction",
             "type": "object"
@@ -1794,7 +1766,6 @@
             "discriminator": {
                 "mapping": {
                     "Alias": "#/$defs/Alias",
-                    "Array": "#/$defs/Array",
                     "G": "#/$defs/FunctionType",
                     "I": "#/$defs/USize",
                     "Opaque": "#/$defs/Opaque",
@@ -1820,9 +1791,6 @@
                 },
                 {
                     "$ref": "#/$defs/FunctionType"
-                },
-                {
-                    "$ref": "#/$defs/Array"
                 },
                 {
                     "$ref": "#/$defs/SumType"

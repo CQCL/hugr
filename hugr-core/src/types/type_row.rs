@@ -8,10 +8,7 @@ use std::{
 };
 
 use super::{type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Type, TypeBase};
-use crate::{
-    extension::{ExtensionRegistry, SignatureError},
-    utils::display_list,
-};
+use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
 use itertools::Itertools;
 
@@ -71,7 +68,7 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
     /// Applies a substitution to the row.
     /// For `TypeRowRV`, note this may change the length of the row.
     /// For `TypeRow`, guaranteed not to change the length of the row.
-    pub(super) fn substitute(&self, s: &Substitution) -> Self {
+    pub(crate) fn substitute(&self, s: &Substitution) -> Self {
         self.iter()
             .flat_map(|ty| ty.substitute(s))
             .collect::<Vec<_>>()
@@ -94,12 +91,8 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
         }
     }
 
-    pub(super) fn validate(
-        &self,
-        exts: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
-        self.iter().try_for_each(|t| t.validate(exts, var_decls))
+    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.iter().try_for_each(|t| t.validate(var_decls))
     }
 }
 

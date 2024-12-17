@@ -101,15 +101,19 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
     lower_funcs: list[FixedHugr] = pd.Field(default_factory=list)
 
     def deserialize(self, extension: ext.Extension) -> ext.OpDef:
+        signature = ext.OpDefSig(
+            self.signature.deserialize().with_runtime_reqs([extension.name])
+            if self.signature
+            else None,
+            self.binary,
+        )
+
         return extension.add_op_def(
             ext.OpDef(
                 name=self.name,
                 description=self.description,
                 misc=self.misc or {},
-                signature=ext.OpDefSig(
-                    self.signature.deserialize() if self.signature else None,
-                    self.binary,
-                ),
+                signature=signature,
                 lower_funcs=[f.deserialize() for f in self.lower_funcs],
             )
         )
@@ -118,7 +122,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
 class Extension(ConfiguredBaseModel):
     version: SemanticVersion
     name: ExtensionId
-    extension_reqs: set[ExtensionId]
+    runtime_reqs: set[ExtensionId]
     types: dict[str, TypeDef]
     values: dict[str, ExtensionValue]
     operations: dict[str, OpDef]
@@ -131,7 +135,7 @@ class Extension(ConfiguredBaseModel):
         e = ext.Extension(
             version=self.version,  # type: ignore[arg-type]
             name=self.name,
-            extension_reqs=self.extension_reqs,
+            runtime_reqs=self.runtime_reqs,
         )
 
         for k, t in self.types.items():

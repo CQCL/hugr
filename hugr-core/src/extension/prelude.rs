@@ -25,15 +25,15 @@ use crate::{type_row, Extension};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use super::resolution::{resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry};
 use super::ExtensionRegistry;
 
 mod unwrap_builder;
 
 pub use unwrap_builder::UnwrapBuilder;
 
-/// Array type and operations.
-pub mod array;
-pub use array::{array_type, new_array_op, ArrayOp, ArrayOpDef, ARRAY_TYPE_NAME, NEW_ARRAY_OP_ID};
+/// Operation to load generic bounded nat parameter.
+pub mod generic;
 
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
@@ -77,14 +77,6 @@ lazy_static! {
                     extension_ref,
                 )
                 .unwrap();
-            prelude.add_type(
-                    TypeName::new_inline(ARRAY_TYPE_NAME),
-                    vec![ TypeParam::max_nat(), TypeBound::Any.into()],
-                    "array".into(),
-                    TypeDefBound::from_params(vec![1] ),
-                    extension_ref,
-                )
-                .unwrap();
             prelude
                 .add_type(
                     TypeName::new_inline("qubit"),
@@ -121,14 +113,12 @@ lazy_static! {
             TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
             NoopDef.add_to_extension(prelude, extension_ref).unwrap();
             LiftDef.add_to_extension(prelude, extension_ref).unwrap();
-            array::ArrayOpDef::load_all_ops(prelude, extension_ref).unwrap();
-            array::ArrayScanDef.add_to_extension(prelude, extension_ref).unwrap();
+            generic::LoadNatDef.add_to_extension(prelude, extension_ref).unwrap();
         })
     };
 
     /// An extension registry containing only the prelude
-    pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
-        ExtensionRegistry::try_new([PRELUDE.clone()]).unwrap();
+    pub static ref PRELUDE_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([PRELUDE.clone()]);
 }
 
 pub(crate) fn usize_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
@@ -224,7 +214,7 @@ impl CustomConst for ConstString {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
 
     fn get_type(&self) -> Type {
@@ -417,7 +407,7 @@ impl CustomConst for ConstUsize {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
 
     fn get_type(&self) -> Type {
@@ -463,7 +453,7 @@ impl CustomConst for ConstError {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
     fn get_type(&self) -> Type {
         error_type()
@@ -509,10 +499,17 @@ impl CustomConst for ConstExternalSymbol {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
+        ExtensionSet::singleton(PRELUDE_ID)
     }
     fn get_type(&self) -> Type {
         self.typ.clone()
+    }
+
+    fn update_extensions(
+        &mut self,
+        extensions: &WeakExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        resolve_type_extensions(&mut self.typ, extensions)
     }
 
     fn validate(&self) -> Result<(), CustomCheckFailure> {
@@ -653,8 +650,8 @@ impl MakeRegisteredOp for MakeTuple {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
@@ -715,8 +712,8 @@ impl MakeRegisteredOp for UnpackTuple {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
@@ -824,8 +821,8 @@ impl MakeRegisteredOp for Noop {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
@@ -950,17 +947,15 @@ impl MakeRegisteredOp for Lift {
         PRELUDE_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
-        &PRELUDE_REGISTRY
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&PRELUDE)
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::builder::inout_sig;
-    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
-    use crate::utils::test_quantum_extension;
     use crate::{
         builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
@@ -1021,35 +1016,17 @@ mod test {
     #[test]
     fn test_lift() {
         const XA: ExtensionId = ExtensionId::new_unchecked("xa");
-        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(&XA));
+        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(XA));
         let optype: OpType = op.clone().into();
         assert_eq!(
-            optype.dataflow_signature().unwrap(),
-            Signature::new_endo(type_row![Type::UNIT])
+            optype.dataflow_signature().unwrap().as_ref(),
+            &Signature::new_endo(type_row![Type::UNIT])
                 .with_extension_delta(XA)
                 .with_prelude()
         );
 
         let new_op = Lift::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
         assert_eq!(new_op, op);
-    }
-
-    #[test]
-    /// Test building a HUGR involving a new_array operation.
-    fn test_new_array() {
-        let mut b = DFGBuilder::new(inout_sig(
-            vec![qb_t(), qb_t()],
-            array_type(TypeArg::BoundedNat { n: 2 }, qb_t()),
-        ))
-        .unwrap();
-
-        let [q1, q2] = b.input_wires_arr();
-
-        let op = new_array_op(qb_t(), 2);
-
-        let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
-
-        b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
     }
 
     #[test]
@@ -1063,7 +1040,7 @@ mod test {
         let some = b.add_load_value(const_val1);
         let none = b.add_load_value(const_val2);
 
-        b.finish_prelude_hugr_with_outputs([some, none]).unwrap();
+        b.finish_hugr_with_outputs([some, none]).unwrap();
     }
 
     #[test]
@@ -1077,8 +1054,7 @@ mod test {
         let bool = b.add_load_value(const_bool);
         let float = b.add_load_value(const_float);
 
-        b.finish_hugr_with_outputs([bool, float], &FLOAT_OPS_REGISTRY)
-            .unwrap();
+        b.finish_hugr_with_outputs([bool, float]).unwrap();
     }
 
     #[test]
@@ -1101,7 +1077,7 @@ mod test {
 
         assert_eq!(
             error_val.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
@@ -1112,16 +1088,12 @@ mod test {
 
         const TYPE_ARG_NONE: TypeArg = TypeArg::Sequence { elems: vec![] };
         let op = PRELUDE
-            .instantiate_extension_op(
-                &PANIC_OP_ID,
-                [TYPE_ARG_NONE, TYPE_ARG_NONE],
-                &PRELUDE_REGISTRY,
-            )
+            .instantiate_extension_op(&PANIC_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
 
-        b.finish_prelude_hugr_with_outputs([]).unwrap();
+        b.finish_hugr_with_outputs([]).unwrap();
     }
 
     #[test]
@@ -1133,11 +1105,7 @@ mod test {
             elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE
-            .instantiate_extension_op(
-                &PANIC_OP_ID,
-                [type_arg_2q.clone(), type_arg_2q.clone()],
-                &PRELUDE_REGISTRY,
-            )
+            .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
         let mut b = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()])).unwrap();
@@ -1151,8 +1119,7 @@ mod test {
             .add_dataflow_op(panic_op, [err, q0, q1])
             .unwrap()
             .outputs_arr();
-        b.finish_hugr_with_outputs([q0, q1], &test_quantum_extension::REG)
-            .unwrap();
+        b.finish_hugr_with_outputs([q0, q1]).unwrap();
     }
 
     #[test]
@@ -1170,7 +1137,7 @@ mod test {
         assert!(string_const.validate().is_ok());
         assert_eq!(
             string_const.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(string_const.equal_consts(&ConstString::new("Lorem ipsum".into())));
         assert!(!string_const.equal_consts(&ConstString::new("Lorem ispum".into())));
@@ -1182,11 +1149,9 @@ mod test {
         let mut b: DFGBuilder<Hugr> = DFGBuilder::new(endo_sig(vec![])).unwrap();
         let greeting: ConstString = ConstString::new("Hello, world!".into());
         let greeting_out: Wire = b.add_load_value(greeting);
-        let print_op = PRELUDE
-            .instantiate_extension_op(&PRINT_OP_ID, [], &PRELUDE_REGISTRY)
-            .unwrap();
+        let print_op = PRELUDE.instantiate_extension_op(&PRINT_OP_ID, []).unwrap();
         b.add_dataflow_op(print_op, [greeting_out]).unwrap();
-        b.finish_prelude_hugr_with_outputs([]).unwrap();
+        b.finish_hugr_with_outputs([]).unwrap();
     }
 
     #[test]
@@ -1197,7 +1162,7 @@ mod test {
         assert!(subject.validate().is_ok());
         assert_eq!(
             subject.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
+            ExtensionSet::singleton(PRELUDE_ID)
         );
         assert!(subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("bar", Type::UNIT, false)));

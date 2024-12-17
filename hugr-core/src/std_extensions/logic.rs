@@ -12,7 +12,7 @@ use crate::{
     extension::{
         prelude::bool_t,
         simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp, OpLoadError},
-        ExtensionId, ExtensionRegistry, OpDef, SignatureFunc,
+        ExtensionId, OpDef, SignatureFunc,
     },
     ops,
     types::type_param::TypeArg,
@@ -129,9 +129,6 @@ fn extension() -> Arc<Extension> {
 lazy_static! {
     /// Reference to the logic Extension.
     pub static ref EXTENSION: Arc<Extension> = extension();
-    /// Registry required to validate logic extension.
-    pub static ref LOGIC_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
 }
 
 impl MakeRegisteredOp for LogicOp {
@@ -139,8 +136,8 @@ impl MakeRegisteredOp for LogicOp {
         EXTENSION_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &LOGIC_REG
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 }
 

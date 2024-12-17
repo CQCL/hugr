@@ -7,9 +7,7 @@ use hugr::builder::{
     HugrBuilder, ModuleBuilder,
 };
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};
-use hugr::extension::PRELUDE_REGISTRY;
 use hugr::ops::OpName;
-use hugr::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use hugr::std_extensions::arithmetic::float_types::float64_type;
 use hugr::types::Signature;
 use hugr::{type_row, Extension, Hugr, Node};
@@ -18,7 +16,7 @@ use lazy_static::lazy_static;
 pub fn simple_dfg_hugr() -> Hugr {
     let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
     let [i1] = dfg_builder.input_wires_arr();
-    dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
+    dfg_builder.finish_hugr_with_outputs([i1]).unwrap()
 }
 
 pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
@@ -50,7 +48,7 @@ pub fn simple_cfg_hugr() -> Hugr {
     let mut cfg_builder =
         CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
     simple_cfg_builder(&mut cfg_builder).unwrap();
-    cfg_builder.finish_prelude_hugr().unwrap()
+    cfg_builder.finish_hugr().unwrap()
 }
 
 lazy_static! {
@@ -95,14 +93,10 @@ pub struct CircuitLayer {
 
 /// Construct a quantum circuit with two qubits and `layers` layers applying `H q0; CX q0, q1; CX q1, q0`.
 pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
-    let h_gate = QUANTUM_EXT
-        .instantiate_extension_op("H", [], &PRELUDE_REGISTRY)
-        .unwrap();
-    let cx_gate = QUANTUM_EXT
-        .instantiate_extension_op("CX", [], &PRELUDE_REGISTRY)
-        .unwrap();
+    let h_gate = QUANTUM_EXT.instantiate_extension_op("H", []).unwrap();
+    let cx_gate = QUANTUM_EXT.instantiate_extension_op("CX", []).unwrap();
     // let rz = QUANTUM_EXT
-    //     .instantiate_extension_op("Rz", [], &FLOAT_OPS_REGISTRY)
+    //     .instantiate_extension_op("Rz", [])
     //     .unwrap();
     let signature =
         Signature::new_endo(vec![qb_t(), qb_t()]).with_extension_delta(QUANTUM_EXT.name().clone());
@@ -137,8 +131,5 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     let outs = linear.finish();
     f_build.finish_with_outputs(outs).unwrap();
 
-    (
-        module_builder.finish_hugr(&FLOAT_OPS_REGISTRY).unwrap(),
-        layer_ids,
-    )
+    (module_builder.finish_hugr().unwrap(), layer_ids)
 }

@@ -252,11 +252,12 @@ mod test {
     use crate::test::{exec_ctx, llvm_ctx, TestContext};
     use hugr_core::builder::SubContainer;
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::{usize_t, ConstUsize, PRELUDE_REGISTRY},
         std_extensions::arithmetic::{
-            conversions::{ConvertOpDef, CONVERT_OPS_REGISTRY, EXTENSION},
+            conversions::{ConvertOpDef, EXTENSION},
             float_types::float64_type,
             int_types::INT_TYPES,
         },
@@ -274,15 +275,11 @@ mod test {
         SimpleHugrConfig::new()
             .with_ins(vec![in_type.clone()])
             .with_outs(vec![out_type.clone()])
-            .with_extensions(CONVERT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = EXTENSION
-                    .instantiate_extension_op(
-                        name.as_ref(),
-                        [(int_width as u64).into()],
-                        &CONVERT_OPS_REGISTRY,
-                    )
+                    .instantiate_extension_op(name.as_ref(), [(int_width as u64).into()])
                     .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, [in1])
@@ -350,12 +347,10 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![in_t])
             .with_outs(vec![out_t])
-            .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
-                let ext_op = EXTENSION
-                    .instantiate_extension_op(op_name, [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let ext_op = EXTENSION.instantiate_extension_op(op_name, []).unwrap();
                 let [out1] = hugr_builder
                     .add_dataflow_op(ext_op, [in1])
                     .unwrap()
@@ -385,7 +380,7 @@ mod test {
     fn usize_roundtrip(mut exec_ctx: TestContext, #[case] val: u64) -> () {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
-            .with_extensions(CONVERT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut builder: DFGW| {
                 let k = builder.add_load_value(ConstUsize::new(val));
                 let [int] = builder
@@ -411,7 +406,7 @@ mod test {
         let int64 = INT_TYPES[6].clone();
         SimpleHugrConfig::new()
             .with_outs(usize_t())
-            .with_extensions(CONVERT_OPS_REGISTRY.clone())
+            .with_extensions(STD_REG.clone())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(val));
                 let [int] = builder
@@ -573,12 +568,10 @@ mod test {
 
         let hugr = SimpleHugrConfig::new()
             .with_outs(vec![usize_t()])
-            .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(0, i).unwrap());
-                let ext_op = EXTENSION
-                    .instantiate_extension_op("itobool", [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let ext_op = EXTENSION.instantiate_extension_op("itobool", []).unwrap();
                 let [b] = builder.add_dataflow_op(ext_op, [i]).unwrap().outputs_arr();
                 let mut cond = builder
                     .conditional_builder(
@@ -609,16 +602,12 @@ mod test {
     fn itobool_roundtrip(mut exec_ctx: TestContext, #[values(0, 1)] i: u64) {
         let hugr = SimpleHugrConfig::new()
             .with_outs(vec![INT_TYPES[0].clone()])
-            .with_extensions(CONVERT_OPS_REGISTRY.to_owned())
+            .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(0, i).unwrap());
-                let i2b = EXTENSION
-                    .instantiate_extension_op("itobool", [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let i2b = EXTENSION.instantiate_extension_op("itobool", []).unwrap();
                 let [b] = builder.add_dataflow_op(i2b, [i]).unwrap().outputs_arr();
-                let b2i = EXTENSION
-                    .instantiate_extension_op("ifrombool", [], &CONVERT_OPS_REGISTRY)
-                    .unwrap();
+                let b2i = EXTENSION.instantiate_extension_op("ifrombool", []).unwrap();
                 let [i] = builder.add_dataflow_op(b2i, [b]).unwrap().outputs_arr();
                 builder.finish_with_outputs([i]).unwrap()
             });

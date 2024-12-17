@@ -1,17 +1,19 @@
 //! Dataflow operations.
 
+use std::borrow::Cow;
+
 use super::{impl_op_name, OpTag, OpTrait};
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeArg, TypeRow};
-use crate::IncomingPort;
+use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
+use crate::{type_row, IncomingPort};
 
 #[cfg(test)]
-use ::proptest_derive::Arbitrary;
+use proptest_derive::Arbitrary;
 
 /// Trait implemented by all dataflow operations.
-pub trait DataflowOpTrait {
+pub trait DataflowOpTrait: Sized {
     /// Tag identifying the operation.
     const TAG: OpTag;
 
@@ -19,7 +21,7 @@ pub trait DataflowOpTrait {
     fn description(&self) -> &str;
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature;
+    fn signature(&self) -> Cow<'_, Signature>;
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -49,6 +51,10 @@ pub trait DataflowOpTrait {
     fn static_input(&self) -> Option<EdgeKind> {
         None
     }
+
+    /// Apply a type-level substitution to this OpType, i.e. replace
+    /// [type variables](TypeArg::new_var_use) with new types.
+    fn substitute(&self, _subst: &Substitution) -> Self;
 }
 
 /// Helpers to construct input and output nodes
@@ -105,8 +111,15 @@ impl DataflowOpTrait for Input {
         None
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(TypeRow::new(), self.types.clone())
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(Signature::new(TypeRow::new(), self.types.clone()))
+    }
+
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            types: self.types.substitute(subst),
+        }
     }
 }
 impl DataflowOpTrait for Output {
@@ -118,27 +131,34 @@ impl DataflowOpTrait for Output {
 
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
-    fn signature(&self) -> Signature {
-        Signature::new(self.types.clone(), TypeRow::new())
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(Signature::new(self.types.clone(), TypeRow::new()))
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
         None
     }
+
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            types: self.types.substitute(subst),
+        }
+    }
 }
 
-impl<T: DataflowOpTrait> OpTrait for T {
+impl<T: DataflowOpTrait + Clone> OpTrait for T {
     fn description(&self) -> &str {
         DataflowOpTrait::description(self)
     }
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn dataflow_signature(&self) -> Option<Signature> {
+    fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         Some(DataflowOpTrait::signature(self))
     }
     fn extension_delta(&self) -> ExtensionSet {
-        DataflowOpTrait::signature(self).extension_reqs.clone()
+        DataflowOpTrait::signature(self).runtime_reqs.clone()
     }
     fn other_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_input(self)
@@ -150,6 +170,10 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn static_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::static_input(self)
+    }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        DataflowOpTrait::substitute(self, subst)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -180,12 +204,30 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
-    fn signature(&self) -> Signature {
-        self.instantiation.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.instantiation)
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Function(self.called_function_type().clone()))
+    }
+
+    fn substitute(&self, subst: &Substitution) -> Self {
+        let type_args = self
+            .type_args
+            .iter()
+            .map(|ta| ta.substitute(subst))
+            .collect::<Vec<_>>();
+        let instantiation = self.instantiation.substitute(subst);
+        debug_assert_eq!(
+            self.func_sig.instantiate(&type_args).as_ref(),
+            Ok(&instantiation)
+        );
+        Self {
+            type_args,
+            instantiation,
+            func_sig: self.func_sig.clone(),
+        }
     }
 }
 impl Call {
@@ -196,10 +238,9 @@ impl Call {
     pub fn try_new(
         func_sig: PolyFuncType,
         type_args: impl Into<Vec<TypeArg>>,
-        exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let type_args = type_args.into();
-        let instantiation = func_sig.instantiate(&type_args, exts)?;
+        let type_args: Vec<_> = type_args.into();
+        let instantiation = func_sig.instantiate(&type_args)?;
         Ok(Self {
             func_sig,
             type_args,
@@ -224,7 +265,7 @@ impl Call {
     /// # use hugr::extension::prelude::qb_t;
     /// # use hugr::extension::PRELUDE_REGISTRY;
     /// let signature = Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()]);
-    /// let call = Call::try_new(signature.into(), &[], &PRELUDE_REGISTRY).unwrap();
+    /// let call = Call::try_new(signature.into(), &[]).unwrap();
     /// let op = OpType::Call(call.clone());
     /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));
     /// ```
@@ -235,15 +276,8 @@ impl Call {
         self.instantiation.input_count().into()
     }
 
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(), SignatureError> {
-        let other = Self::try_new(
-            self.func_sig.clone(),
-            self.type_args.clone(),
-            extension_registry,
-        )?;
+    pub(crate) fn validate(&self) -> Result<(), SignatureError> {
+        let other = Self::try_new(self.func_sig.clone(), self.type_args.clone())?;
         if other.instantiation == self.instantiation {
             Ok(())
         } else {
@@ -272,12 +306,19 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
         let mut s = self.signature.clone();
         s.input
             .to_mut()
             .insert(0, Type::new_function(self.signature.clone()));
-        s
+        Cow::Owned(s)
+    }
+
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
     }
 }
 
@@ -296,14 +337,21 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(TypeRow::new(), vec![self.datatype.clone()])
+    fn signature(&self) -> Cow<'_, Signature> {
+        // TODO: Store a cached signature
+        Cow::Owned(Signature::new(TypeRow::new(), vec![self.datatype.clone()]))
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Const(self.constant_type().clone()))
     }
+
+    fn substitute(&self, _subst: &Substitution) -> Self {
+        // Constants cannot refer to TypeArgs, so neither can loading them
+        self.clone()
+    }
 }
+
 impl LoadConstant {
     #[inline]
     /// The type of the constant loaded by this op.
@@ -341,7 +389,7 @@ pub struct LoadFunction {
     /// The type arguments that instantiate `func_sig`.
     pub type_args: Vec<TypeArg>,
     /// The instantiation of `func_sig`.
-    pub signature: Signature, // Cache, so we can fail in try_new() not in signature()
+    pub instantiation: Signature, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(LoadFunction);
 impl DataflowOpTrait for LoadFunction {
@@ -351,12 +399,33 @@ impl DataflowOpTrait for LoadFunction {
         "Load a static function in to the local dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
-        self.signature.clone()
+    fn signature(&self) -> Cow<'_, Signature> {
+        Cow::Owned(Signature::new(
+            type_row![],
+            Type::new_function(self.instantiation.clone()),
+        ))
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Function(self.func_sig.clone()))
+    }
+
+    fn substitute(&self, subst: &Substitution) -> Self {
+        let type_args = self
+            .type_args
+            .iter()
+            .map(|ta| ta.substitute(subst))
+            .collect::<Vec<_>>();
+        let instantiation = self.instantiation.substitute(subst);
+        debug_assert_eq!(
+            self.func_sig.instantiate(&type_args).as_ref(),
+            Ok(&instantiation)
+        );
+        Self {
+            func_sig: self.func_sig.clone(),
+            type_args,
+            instantiation,
+        }
     }
 }
 impl LoadFunction {
@@ -367,15 +436,13 @@ impl LoadFunction {
     pub fn try_new(
         func_sig: PolyFuncType,
         type_args: impl Into<Vec<TypeArg>>,
-        exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let type_args = type_args.into();
-        let instantiation = func_sig.instantiate(&type_args, exts)?;
-        let signature = Signature::new(TypeRow::new(), vec![Type::new_function(instantiation)]);
+        let type_args: Vec<_> = type_args.into();
+        let instantiation = func_sig.instantiate(&type_args)?;
         Ok(Self {
             func_sig,
             type_args,
-            signature,
+            instantiation,
         })
     }
 
@@ -395,21 +462,14 @@ impl LoadFunction {
         0.into()
     }
 
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(), SignatureError> {
-        let other = Self::try_new(
-            self.func_sig.clone(),
-            self.type_args.clone(),
-            extension_registry,
-        )?;
-        if other.signature == self.signature {
+    pub(crate) fn validate(&self) -> Result<(), SignatureError> {
+        let other = Self::try_new(self.func_sig.clone(), self.type_args.clone())?;
+        if other.instantiation == self.instantiation {
             Ok(())
         } else {
             Err(SignatureError::LoadFunctionIncorrectlyAppliesType {
-                cached: self.signature.clone(),
-                expected: other.signature.clone(),
+                cached: self.instantiation.clone(),
+                expected: other.instantiation.clone(),
             })
         }
     }
@@ -418,7 +478,7 @@ impl LoadFunction {
 /// Operations that is the parent of a dataflow graph.
 pub trait DataflowParent {
     /// Signature of the inner dataflow graph.
-    fn inner_signature(&self) -> Signature;
+    fn inner_signature(&self) -> Cow<'_, Signature>;
 }
 
 /// A simply nested dataflow graph.
@@ -432,8 +492,8 @@ pub struct DFG {
 impl_op_name!(DFG);
 
 impl DataflowParent for DFG {
-    fn inner_signature(&self) -> Signature {
-        self.signature.clone()
+    fn inner_signature(&self) -> Cow<'_, Signature> {
+        Cow::Borrowed(&self.signature)
     }
 }
 
@@ -444,7 +504,13 @@ impl DataflowOpTrait for DFG {
         "A simply nested dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> Cow<'_, Signature> {
         self.inner_signature()
+    }
+
+    fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
     }
 }

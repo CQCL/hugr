@@ -14,7 +14,7 @@ use crate::{
         simple_op::{
             HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
         },
-        ExtensionId, ExtensionRegistry, OpDef, SignatureError, SignatureFunc,
+        ExtensionId, OpDef, SignatureError, SignatureFunc,
     },
     ops::{custom::ExtensionOp, NamedOp},
     type_row,
@@ -109,9 +109,6 @@ fn extension() -> Arc<Extension> {
 lazy_static! {
     /// Reference to the pointer Extension.
     pub static ref EXTENSION: Arc<Extension> = extension();
-    /// Registry required to validate pointer extension.
-    pub static ref PTR_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).  Depending on
@@ -170,8 +167,8 @@ impl MakeRegisteredOp for PtrOp {
         EXTENSION_ID.to_owned()
     }
 
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &PTR_REG
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
     }
 }
 
@@ -236,9 +233,7 @@ pub(crate) mod test {
     use strum::IntoEnumIterator;
 
     use super::*;
-    use crate::std_extensions::arithmetic::float_types::{
-        float64_type, EXTENSION as FLOAT_EXTENSION,
-    };
+    use crate::std_extensions::arithmetic::float_types::float64_type;
     fn get_opdef(op: impl NamedOp) -> Option<&'static Arc<OpDef>> {
         EXTENSION.get_op(&op.name())
     }
@@ -272,8 +267,6 @@ pub(crate) mod test {
     fn test_build() {
         let in_row = vec![bool_t(), float64_type()];
 
-        let reg =
-            ExtensionRegistry::try_new([EXTENSION.to_owned(), FLOAT_EXTENSION.to_owned()]).unwrap();
         let hugr = {
             let mut builder = DFGBuilder::new(
                 Signature::new(in_row.clone(), type_row![]).with_extension_delta(EXTENSION_ID),
@@ -287,8 +280,8 @@ pub(crate) mod test {
                 builder.add_write_ptr(new_ptr, read).unwrap();
             }
 
-            builder.finish_hugr_with_outputs([], &reg).unwrap()
+            builder.finish_hugr_with_outputs([]).unwrap()
         };
-        assert_matches!(hugr.validate(&reg), Ok(_));
+        assert_matches!(hugr.validate(), Ok(_));
     }
 }

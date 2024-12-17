@@ -367,18 +367,12 @@ class LoadFunction(DataflowOp):
     op: Literal["LoadFunction"] = "LoadFunction"
     func_sig: PolyFuncType
     type_args: list[stys.TypeArg]
-    signature: FunctionType
+    instantiation: FunctionType
 
     def deserialize(self) -> ops.LoadFunc:
-        signature = self.signature.deserialize()
-        assert len(signature.input) == 0
-        (f_ty,) = signature.output
-        assert isinstance(
-            f_ty, tys.FunctionType
-        ), "Expected single function type output"
         return ops.LoadFunc(
             self.func_sig.deserialize(),
-            f_ty,
+            self.instantiation.deserialize(),
             deser_it(self.type_args),
         )
 
@@ -391,12 +385,12 @@ class DFG(DataflowOp):
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.signature = FunctionType(
-            input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
+            input=list(inputs), output=list(outputs), runtime_reqs=ExtensionSet([])
         )
 
     def deserialize(self) -> ops.DFG:
         sig = self.signature.deserialize()
-        return ops.DFG(sig.input, sig.output, sig.extension_reqs)
+        return ops.DFG(sig.input, sig.output, sig.runtime_reqs)
 
 
 # ------------------------------------------------
@@ -449,7 +443,7 @@ class Case(BaseOp):
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.signature = stys.FunctionType(
-            input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
+            input=list(inputs), output=list(outputs), runtime_reqs=ExtensionSet([])
         )
 
     def deserialize(self) -> ops.Case:
@@ -490,7 +484,7 @@ class CFG(DataflowOp):
 
     def insert_port_types(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.signature = FunctionType(
-            input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
+            input=list(inputs), output=list(outputs), runtime_reqs=ExtensionSet([])
         )
 
     def deserialize(self) -> ops.CFG:

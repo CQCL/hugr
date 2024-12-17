@@ -1,9 +1,7 @@
+use hugr_core::std_extensions::collections::array::{new_array_op, ArrayOpDef};
 use hugr_core::{
     builder::{BuildError, Dataflow},
-    extension::{
-        prelude::{new_array_op, ArrayOpDef},
-        simple_op::HasConcrete as _,
-    },
+    extension::simple_op::HasConcrete as _,
     types::Type,
     Wire,
 };
@@ -115,14 +113,12 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 pub mod test {
+    use hugr_core::extension::prelude::PRELUDE_ID;
+    use hugr_core::extension::ExtensionSet;
+    use hugr_core::std_extensions::collections::array::{self, array_type};
     use hugr_core::{
         builder::{DFGBuilder, HugrBuilder},
-        extension::{
-            prelude::{
-                array_type, either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _,
-            },
-            PRELUDE_REGISTRY,
-        },
+        extension::prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
         types::Signature,
         Hugr,
     };
@@ -133,7 +129,11 @@ pub mod test {
     #[rstest::fixture]
     #[default(DFGBuilder<Hugr>)]
     pub fn all_array_ops<B: Dataflow>(
-        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW).with_prelude()).unwrap())]
+        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)
+            .with_extension_delta(ExtensionSet::from_iter([
+                PRELUDE_ID,
+                array::EXTENSION_ID
+        ]))).unwrap())]
         mut builder: B,
     ) -> B {
         let us0 = builder.add_load_value(ConstUsize::new(0));
@@ -146,15 +146,13 @@ pub mod test {
                 let array_type = array_type(2, usize_t());
                 either_type(array_type.clone(), array_type)
             };
-            builder
-                .build_unwrap_sum(&PRELUDE_REGISTRY, 1, res_sum_ty, r)
-                .unwrap()
+            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
         };
 
         let [elem_0] = {
             let r = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
             builder
-                .build_unwrap_sum(&PRELUDE_REGISTRY, 1, option_type(usize_t()), r)
+                .build_unwrap_sum(1, option_type(usize_t()), r)
                 .unwrap()
         };
 
@@ -166,31 +164,19 @@ pub mod test {
                 let row = vec![usize_t(), array_type(2, usize_t())];
                 either_type(row.clone(), row)
             };
-            builder
-                .build_unwrap_sum(&PRELUDE_REGISTRY, 1, res_sum_ty, r)
-                .unwrap()
+            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
         };
 
         let [_elem_left, arr] = {
             let r = builder.add_array_pop_left(usize_t(), 2, arr).unwrap();
             builder
-                .build_unwrap_sum(
-                    &PRELUDE_REGISTRY,
-                    1,
-                    option_type(vec![usize_t(), array_type(1, usize_t())]),
-                    r,
-                )
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(1, usize_t())]), r)
                 .unwrap()
         };
         let [_elem_right, arr] = {
             let r = builder.add_array_pop_right(usize_t(), 1, arr).unwrap();
             builder
-                .build_unwrap_sum(
-                    &PRELUDE_REGISTRY,
-                    1,
-                    option_type(vec![usize_t(), array_type(0, usize_t())]),
-                    r,
-                )
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(0, usize_t())]), r)
                 .unwrap()
         };
 
@@ -200,6 +186,6 @@ pub mod test {
 
     #[rstest]
     fn build_all_ops(all_array_ops: DFGBuilder<Hugr>) {
-        all_array_ops.finish_hugr(&PRELUDE_REGISTRY).unwrap();
+        all_array_ops.finish_hugr().unwrap();
     }
 }
