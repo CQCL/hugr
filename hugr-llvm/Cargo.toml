@@ -16,15 +16,7 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [features]
-test-utils = [
-    "insta",
-    "rstest",
-    "portgraph",
-    "pathsearch",
-    "serde_json",
-    "serde",
-    "typetag",
-]
+test-utils = ["insta", "rstest", "pathsearch"]
 
 default = ["llvm14-0"]
 llvm14-0 = ["inkwell/llvm14-0"]
@@ -38,16 +30,11 @@ itertools.workspace = true
 delegate.workspace = true
 petgraph.workspace = true
 lazy_static.workspace = true
-downcast-rs.workspace = true
 strum.workspace = true
 
 insta = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
-portgraph = { workspace = true, optional = true }
 pathsearch = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
-typetag = { workspace = true, optional = true }
 
 [dev-dependencies]
-hugr-llvm = {"path" = ".", features = ["test-utils"]}
+hugr-llvm = { "path" = ".", features = ["test-utils"] }
