@@ -6,13 +6,21 @@ mod array_scan;
 
 use std::sync::Arc;
 
+use itertools::Itertools as _;
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use std::hash::{Hash, Hasher};
 
+use crate::extension::resolution::{
+    resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
+    WeakExtensionRegistry,
+};
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
-use crate::ops::{ExtensionOp, OpName};
+use crate::extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound};
+use crate::ops::constant::{maybe_hash_values, CustomConst, TryHash, ValueName};
+use crate::ops::{ExtensionOp, OpName, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{Type, TypeBound, TypeName};
+use crate::types::{CustomCheckFailure, CustomType, Type, TypeBound, TypeName};
 use crate::Extension;
 
 pub use array_op::{ArrayOp, ArrayOpDef, ArrayOpDefIter};
@@ -26,8 +34,115 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.ar
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// Statically sized array of values, all of the same type.
+pub struct ArrayValue(Vec<Value>, Type);
+
+impl ArrayValue {
+    /// Create a new [CustomConst] for an array of values of type `typ`.
+    /// That all values are of type `typ` is not checked here.
+    pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
+        Self(contents.into_iter().collect_vec(), typ)
+    }
+
+    /// Create a new [CustomConst] for an empty array of values of type `typ`.
+    pub fn new_empty(typ: Type) -> Self {
+        Self(vec![], typ)
+    }
+
+    /// Returns the type of the `[ArrayValue]` as a `[CustomType]`.`
+    pub fn custom_type(&self) -> CustomType {
+        array_custom_type(self.0.len() as u64, self.1.clone())
+    }
+
+    /// Returns the type of values inside the `[ArrayValue]`.
+    pub fn get_element_type(&self) -> &Type {
+        &self.1
+    }
+
+    /// Returns the values contained inside the `[ArrayValue]`.
+    pub fn get_contents(&self) -> &[Value] {
+        &self.0
+    }
+}
+
+impl TryHash for ArrayValue {
+    fn try_hash(&self, mut st: &mut dyn Hasher) -> bool {
+        maybe_hash_values(&self.0, &mut st) && {
+            self.1.hash(&mut st);
+            true
+        }
+    }
+}
+
+#[typetag::serde]
+impl CustomConst for ArrayValue {
+    fn name(&self) -> ValueName {
+        ValueName::new_inline("array")
+    }
+
+    fn get_type(&self) -> Type {
+        self.custom_type().into()
+    }
+
+    fn validate(&self) -> Result<(), CustomCheckFailure> {
+        let typ = self.custom_type();
+
+        EXTENSION
+            .get_type(&ARRAY_TYPENAME)
+            .unwrap()
+            .check_custom(&typ)
+            .map_err(|_| {
+                CustomCheckFailure::Message(format!(
+                    "Custom typ {typ} is not a valid instantiation of array."
+                ))
+            })?;
+
+        // constant can only hold classic type.
+        let ty = match typ.args() {
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] if *n as usize == self.0.len() => ty,
+            _ => {
+                return Err(CustomCheckFailure::Message(format!(
+                    "Invalid array type arguments: {:?}",
+                    typ.args()
+                )))
+            }
+        };
+
+        // check all values are instances of the element type
+        for v in &self.0 {
+            if v.get_type() != *ty {
+                return Err(CustomCheckFailure::Message(format!(
+                    "Array element {v:?} is not of expected type {ty}"
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        crate::ops::constant::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
+            .union(EXTENSION_ID.into())
+    }
+
+    fn update_extensions(
+        &mut self,
+        extensions: &WeakExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        for val in &mut self.0 {
+            resolve_value_extensions(val, extensions)?;
+        }
+        resolve_type_extensions(&mut self.1, extensions)
+    }
+}
+
 lazy_static! {
-    /// Extension for list operations.
+    /// Extension for array operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
@@ -55,7 +170,7 @@ fn array_type_def() -> &'static TypeDef {
 /// This method is equivalent to [`array_type_parametric`], but uses concrete
 /// arguments types to ensure no errors are possible.
 pub fn array_type(size: u64, element_ty: Type) -> Type {
-    instantiate_array(array_type_def(), size, element_ty).expect("array parameters are valid")
+    array_custom_type(size, element_ty).into()
 }
 
 /// Instantiate a new array type given the size and element type parameters.
@@ -68,14 +183,25 @@ pub fn array_type_parametric(
     instantiate_array(array_type_def(), size, element_ty)
 }
 
+fn array_custom_type(size: impl Into<TypeArg>, element_ty: impl Into<TypeArg>) -> CustomType {
+    instantiate_array_custom(array_type_def(), size, element_ty)
+        .expect("array parameters are valid")
+}
+
+fn instantiate_array_custom(
+    array_def: &TypeDef,
+    size: impl Into<TypeArg>,
+    element_ty: impl Into<TypeArg>,
+) -> Result<CustomType, SignatureError> {
+    array_def.instantiate(vec![size.into(), element_ty.into()])
+}
+
 fn instantiate_array(
     array_def: &TypeDef,
     size: impl Into<TypeArg>,
     element_ty: impl Into<TypeArg>,
 ) -> Result<Type, SignatureError> {
-    array_def
-        .instantiate(vec![size.into(), element_ty.into()])
-        .map(Into::into)
+    instantiate_array_custom(array_def, size, element_ty).map(Into::into)
 }
 
 /// Name of the operation in the prelude for creating new arrays.
@@ -90,9 +216,11 @@ pub fn new_array_op(element_ty: Type, size: u64) -> ExtensionOp {
 #[cfg(test)]
 mod test {
     use crate::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::prelude::qb_t;
+    use crate::extension::prelude::{qb_t, usize_t, ConstUsize};
+    use crate::ops::constant::CustomConst;
+    use crate::std_extensions::arithmetic::float_types::ConstF64;
 
-    use super::{array_type, new_array_op};
+    use super::{array_type, new_array_op, ArrayValue};
 
     #[test]
     /// Test building a HUGR involving a new_array operation.
@@ -107,5 +235,15 @@ mod test {
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
         b.finish_hugr_with_outputs(out.outputs()).unwrap();
+    }
+
+    #[test]
+    fn test_array_value() {
+        let array_value = ArrayValue(vec![ConstUsize::new(3).into()], usize_t());
+
+        array_value.validate().unwrap();
+
+        let wrong_array_value = ArrayValue(vec![ConstF64::new(1.2).into()], usize_t());
+        assert!(wrong_array_value.validate().is_err());
     }
 }

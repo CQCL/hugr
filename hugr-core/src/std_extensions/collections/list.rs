@@ -49,7 +49,7 @@ pub struct ListValue(Vec<Value>, Type);
 
 impl ListValue {
     /// Create a new [CustomConst] for a list of values of type `typ`.
-    /// That all values ore of type `typ` is not checked here.
+    /// That all values are of type `typ` is not checked here.
     pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
         Self(contents.into_iter().collect_vec(), typ)
     }
