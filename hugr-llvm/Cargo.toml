@@ -16,7 +16,15 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [features]
-test-utils = ["insta", "rstest", "pathsearch", "portgraph"]
+test-utils = [
+    "insta",
+    "rstest",
+    "portgraph",
+    "pathsearch",
+    "serde_json",
+    "serde",
+    "typetag",
+]
 
 default = ["llvm14-0"]
 llvm14-0 = ["inkwell/llvm14-0"]
@@ -36,6 +44,9 @@ insta = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 portgraph = { workspace = true, optional = true }
 pathsearch = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+typetag = { workspace = true, optional = true }
 
 [dev-dependencies]
 hugr-llvm = { "path" = ".", features = ["test-utils"] }
