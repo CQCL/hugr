@@ -355,24 +355,34 @@ fn resolve_call() {
         Signature::new(vec![], vec![bool_t()]),
     );
 
-    let generic_type = TypeArg::Type { ty: float64_type() };
-    let expected_ext = float_types::EXTENSION_ID.to_owned();
+    let generic_type_1 = TypeArg::Type { ty: float64_type() };
+    let generic_type_2 = TypeArg::Type { ty: int_type(6) };
+    let expected_exts = [
+        float_types::EXTENSION_ID.to_owned(),
+        int_types::EXTENSION_ID.to_owned(),
+    ]
+    .into_iter()
+    .collect::<ExtensionSet>();
 
     let mut module = ModuleBuilder::new();
     let dummy_fn = module.declare("called_fn", dummy_fn_sig).unwrap();
+
     let mut func = module
         .define_function(
             "caller_fn",
             Signature::new(vec![], vec![bool_t()])
-                .with_extension_delta(ExtensionSet::from_iter([expected_ext.clone()])),
+                .with_extension_delta(ExtensionSet::from_iter(expected_exts.clone())),
         )
         .unwrap();
-    let call = func.call(&dummy_fn, &[generic_type], vec![]).unwrap();
+    let _load_func = func.load_func(&dummy_fn, &[generic_type_1]).unwrap();
+    let call = func.call(&dummy_fn, &[generic_type_2], vec![]).unwrap();
     func.finish_with_outputs(call.outputs()).unwrap();
 
-    let hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
+    let hugr = module.finish_hugr().unwrap();
 
-    assert!(hugr.extensions().contains(&expected_ext));
+    for ext in expected_exts {
+        assert!(hugr.extensions().contains(&ext));
+    }
 
     check_extension_resolution(hugr);
 }
