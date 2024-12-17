@@ -154,7 +154,7 @@ impl From<UpperBound> for TypeParam {
 #[serde(tag = "tya")]
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
-    #[display("Type({ty})")]
+    #[display("{ty}")]
     Type {
         /// The concrete type for the parameter.
         ty: Type,
@@ -193,7 +193,7 @@ pub enum TypeArg {
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [TypeArg::Type] (not even a row variable i.e. [TypeParam::List] of type)
     /// nor [TypeArg::Extensions] - see [TypeArg::new_var_use]
-    #[display("{}", v)]
+    #[display("{v}")]
     Variable {
         #[allow(missing_docs)]
         #[serde(flatten)]
@@ -248,7 +248,7 @@ impl From<ExtensionSet> for TypeArg {
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
 )]
-#[display("var#{idx}")]
+#[display("#{idx}")]
 pub struct TypeArgVariable {
     idx: usize,
     cached_decl: TypeParam,

@@ -279,7 +279,7 @@ pub enum TypeEnum<RV: MaybeRV> {
     /// A type variable, defined by an index into a list of type parameters.
     //
     // We cache the TypeBound here (checked in validation)
-    #[display("var#{_0}")]
+    #[display("#{_0}")]
     Variable(usize, TypeBound),
     /// RowVariable. Of course, this requires that `RV` has instances, [NoRV] doesn't.
     #[display("RowVar({_0})")]

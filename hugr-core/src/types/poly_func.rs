@@ -141,7 +141,7 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
             .params
             .iter()
             .enumerate()
-            .map(|(i, param)| format!("(var#{i} : {param})"))
+            .map(|(i, param)| format!("(#{i} : {param})"))
             .join(" ");
         Cow::Owned(format!("∀ {params_list}. ",))
     }
