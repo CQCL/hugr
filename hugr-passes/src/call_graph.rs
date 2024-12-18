@@ -173,7 +173,7 @@ mod test {
     };
     use hugr_core::{extension::prelude::usize_t, types::Signature, HugrView};
 
-    use super::remove_dead_funcs;
+    use super::RemoveDeadFuncsPass;
 
     #[rstest]
     #[case([], vec!["from_main", "main"])]
@@ -213,13 +213,16 @@ mod test {
             })
             .collect::<HashMap<_, _>>();
 
-        remove_dead_funcs(
-            &mut hugr,
-            entry_points
-                .into_iter()
-                .map(|name| *avail_funcs.get(name).unwrap())
-                .collect::<Vec<_>>(),
-        );
+        RemoveDeadFuncsPass::default()
+            .with_module_entry_points(
+                entry_points
+                    .into_iter()
+                    .map(|name| *avail_funcs.get(name).unwrap())
+                    .collect::<Vec<_>>(),
+            )
+            .run(&mut hugr)
+            .unwrap();
+
         let remaining_funcs = hugr
             .nodes()
             .filter_map(|n| hugr.get_optype(n).as_func_defn().map(|fd| fd.name.as_str()))
