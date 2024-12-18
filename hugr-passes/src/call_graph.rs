@@ -48,12 +48,12 @@ impl CallGraph {
             .map(|n| (n, g.add_node(n)))
             .collect::<HashMap<_, _>>();
         for (func, cg_node) in node_to_g.iter() {
-            traverse(hugr, *func, *cg_node, &mut g, &node_to_g)
+            traverse(hugr, *cg_node, *func, &mut g, &node_to_g)
         }
         fn traverse(
             h: &impl HugrView,
-            node: Node,
-            enclosing: NodeIndex<u32>,
+            enclosing_func: NodeIndex<u32>,
+            node: Node, // Nonstrict-descendant of `enclosing_func``
             g: &mut Graph<Node, CallGraphEdge>,
             node_to_g: &HashMap<Node, NodeIndex<u32>>,
         ) {
@@ -61,14 +61,14 @@ impl CallGraph {
                 if h.get_optype(ch).is_func_defn() {
                     continue;
                 };
-                traverse(h, ch, enclosing, g, node_to_g);
+                traverse(h, enclosing_func, ch, g, node_to_g);
                 let weight = match h.get_optype(ch) {
                     OpType::Call(_) => CallGraphEdge::Call(ch),
                     OpType::LoadFunction(_) => CallGraphEdge::LoadFunction(ch),
                     _ => continue,
                 };
                 if let Some(target) = h.static_source(ch) {
-                    g.add_edge(enclosing, *node_to_g.get(&target).unwrap(), weight);
+                    g.add_edge(enclosing_func, *node_to_g.get(&target).unwrap(), weight);
                 }
             }
         }
