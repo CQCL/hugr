@@ -56,6 +56,7 @@ fn emit_logic_op<'c, H: HugrView>(
             }
             acc
         }
+        LogicOp::Not => builder.build_not(inputs[0], "")?,
         op => {
             return Err(anyhow!("LogicOpEmitter: Unknown op: {op:?}"));
         }
@@ -138,6 +139,13 @@ mod test {
     fn eq(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
         let hugr = test_logic_op(LogicOp::Eq, 2);
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn not(mut llvm_ctx: TestContext) {
+        llvm_ctx.add_extensions(add_logic_extensions);
+        let hugr = test_logic_op(LogicOp::Not, 1);
         check_emission!(hugr, llvm_ctx);
     }
 }
