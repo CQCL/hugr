@@ -33,17 +33,9 @@ use thiserror::Error;
     since = "0.14.1",
     note = "Use `hugr::algorithms::MonomorphizePass` instead."
 )]
-// TODO: Deprecated. Remove on a breaking release.
+// TODO: Deprecated. Remove on a breaking release and rename private `monomorphize_ref` to `monomorphize`.
 pub fn monomorphize(mut h: Hugr) -> Hugr {
-    let validate = |h: &Hugr| h.validate().unwrap_or_else(|e| panic!("{e}"));
-
-    #[cfg(debug_assertions)]
-    validate(&h);
-
     monomorphize_ref(&mut h);
-
-    #[cfg(debug_assertions)]
-    validate(&h);
     h
 }
 

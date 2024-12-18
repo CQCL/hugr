@@ -14,7 +14,7 @@ mod monomorphize;
 )]
 #[allow(deprecated)]
 pub use monomorphize::monomorphize;
-pub use monomorphize::{remove_polyfuncs, MonomorphizePass};
+pub use monomorphize::{remove_polyfuncs, MonomorphizeError, MonomorphizePass};
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod validation;
