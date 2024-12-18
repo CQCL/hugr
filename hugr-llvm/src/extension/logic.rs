@@ -56,10 +56,7 @@ fn emit_logic_op<'c, H: HugrView>(
             }
             acc
         }
-        LogicOp::Not => {
-            let x = inputs[0];
-            builder.build_not(x, "")?
-        }
+        LogicOp::Not => builder.build_not(inputs[0], "")?,
         op => {
             return Err(anyhow!("LogicOpEmitter: Unknown op: {op:?}"));
         }
