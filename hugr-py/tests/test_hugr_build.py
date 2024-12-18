@@ -330,3 +330,14 @@ def test_dfg_unpack() -> None:
     dfg.set_outputs(*cond.outputs())
 
     validate(dfg.hugr)
+
+
+def test_option() -> None:
+    dfg = Dfg(tys.Bool)
+    b = dfg.inputs()[0]
+
+    dfg.add_op(ops.Some(tys.Option(tys.Bool)), b)
+
+    dfg.set_outputs(b)
+
+    validate(dfg.hugr)

@@ -8,7 +8,7 @@ from hugr.std.int import INT_T, IntVal
 
 from .conftest import QUANTUM_EXT, H, Measure, validate
 
-SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
+EITHER_T = tys.Either([tys.Qubit], [tys.Qubit, INT_T])
 
 
 def build_cond(h: Conditional) -> None:
@@ -25,7 +25,7 @@ def build_cond(h: Conditional) -> None:
 
 
 def test_cond() -> None:
-    h = Conditional(SUM_T, [tys.Bool])
+    h = Conditional(EITHER_T, [tys.Bool])
     build_cond(h)
     validate(h.hugr)
 
@@ -33,7 +33,7 @@ def test_cond() -> None:
 def test_nested_cond() -> None:
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
-    tagged_q = h.add(ops.Tag(0, SUM_T)(q))
+    tagged_q = h.add(ops.Left(EITHER_T)(q))
 
     with h.add_conditional(tagged_q, h.load(val.TRUE)) as cond:
         build_cond(cond)
@@ -42,12 +42,12 @@ def test_nested_cond() -> None:
     validate(h.hugr)
 
     # build then insert
-    con = Conditional(SUM_T, [tys.Bool])
+    con = Conditional(EITHER_T, [tys.Bool])
     build_cond(con)
 
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
-    tagged_q = h.add(ops.Tag(0, SUM_T)(q))
+    tagged_q = h.add(ops.Left(EITHER_T)(q))
     cond_n = h.insert_conditional(con, tagged_q, h.load(val.TRUE))
     h.set_outputs(*cond_n[:2])
     validate(h.hugr)
@@ -70,7 +70,7 @@ def test_if_else() -> None:
 
 def test_incomplete() -> None:
     def _build_incomplete():
-        with Conditional(SUM_T, [tys.Bool]) as c, c.add_case(0) as case0:
+        with Conditional(EITHER_T, [tys.Bool]) as c, c.add_case(0) as case0:
             q, b = case0.inputs()
             case0.set_outputs(q, b)
 
@@ -118,13 +118,13 @@ def test_complex_tail_loop() -> None:
         # if b is true, return first variant (just qubit)
         with tl.add_if(b, q) as if_:
             (q,) = if_.inputs()
-            tagged_q = if_.add(ops.Tag(0, SUM_T)(q))
+            tagged_q = if_.add(ops.Continue(EITHER_T)(q))
             if_.set_outputs(tagged_q)
 
         # else return second variant (qubit, int)
         with if_.add_else() as else_:
             (q,) = else_.inputs()
-            tagged_q_i = else_.add(ops.Tag(1, SUM_T)(q, else_.load(IntVal(1))))
+            tagged_q_i = else_.add(ops.Break(EITHER_T)(q, else_.load(IntVal(1))))
             else_.set_outputs(tagged_q_i)
 
         # finish with Sum output from if-else, and bool from inputs
