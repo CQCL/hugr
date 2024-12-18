@@ -259,7 +259,7 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 ///
 /// If the Hugr is [Module](OpType::Module)-rooted,
 /// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
-///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
+///     - call [remove_polyfuncs_ref] when no other Hugr will be linked in that might instantiate these
 /// * else, the originals are removed (they are invisible from outside the Hugr).
 ///
 /// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
