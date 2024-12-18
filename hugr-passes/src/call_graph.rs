@@ -10,6 +10,8 @@ use hugr_core::{
 use itertools::Itertools;
 use petgraph::{graph::NodeIndex, visit::Bfs, Graph};
 
+use crate::validation::{ValidatePassError, ValidationLevel};
+
 /// Weight for an edge in a [CallGraph]
 pub enum CallGraphEdge {
     /// Edge corresponds to a [Call](OpType::Call) node (specified) in the Hugr
@@ -98,6 +100,39 @@ fn reachable_funcs<'a>(
         Bfs::new(&cg.g, *cg.node_to_g.get(&h.root()).unwrap())
     };
     std::iter::from_fn(move || b.next(&cg.g)).map(|i| *cg.g.node_weight(i).unwrap())
+}
+
+#[derive(Debug, Clone, Default)]
+/// A configuration for the Dead Function Removal pass.
+pub struct RemoveDeadFuncsPass {
+    validation: ValidationLevel,
+    entry_points: Vec<Node>,
+}
+
+impl RemoveDeadFuncsPass {
+    /// Sets the validation level used before and after the pass is run
+    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
+        self.validation = level;
+        self
+    }
+
+    /// Adds new entry points for a Module-rooted Hugr,
+    /// i.e., FuncDefns that are children of the root.
+    pub fn with_module_entry_points(
+        mut self,
+        entry_points: impl IntoIterator<Item = Node>,
+    ) -> Self {
+        self.entry_points.extend(entry_points);
+        self
+    }
+
+    /// Runs the pass (see [remove_dead_funcs]) with this configuration
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ValidatePassError> {
+        self.validation.run_validated_pass(hugr, |hugr: &mut H, _| {
+            remove_dead_funcs(hugr, self.entry_points.iter().cloned());
+            Ok(())
+        })
+    }
 }
 
 /// Delete from the Hugr any functions that are not used by either [Call](OpType::Call) or
