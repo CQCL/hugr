@@ -556,6 +556,61 @@ class Tag(DataflowOp):
         return f"Tag({self.tag})"
 
 
+@dataclass
+class Some(Tag):
+    """Tag operation for the `Some` variant of an Option type.
+
+    Example:
+        # construct a Some variant holding a row of Bool and Unit types
+        >>> Some(tys.Bool, tys.Unit)
+        Some
+    """
+
+    def __init__(self, *some_tys: tys.Type) -> None:
+        super().__init__(1, tys.Option(*some_tys))
+
+    def __repr__(self) -> str:
+        return "Some"
+
+
+@dataclass
+class Right(Tag):
+    """Tag operation for the `Right` variant of an type."""
+
+    def __init__(self, either_type: tys.Either) -> None:
+        super().__init__(1, either_type)
+
+    def __repr__(self) -> str:
+        return "Right"
+
+
+@dataclass
+class Left(Tag):
+    """Tag operation for the `Left` variant of an type."""
+
+    def __init__(self, either_type: tys.Either) -> None:
+        super().__init__(0, either_type)
+
+    def __repr__(self) -> str:
+        return "Left"
+
+
+class Continue(Left):
+    """Tag operation for the `Continue` variant of a TailLoop
+    controlling Either type.
+    """
+
+    def __repr__(self) -> str:
+        return "Continue"
+
+
+class Break(Right):
+    """Tag operation for the `Break` variant of a TailLoop controlling Either type."""
+
+    def __repr__(self) -> str:
+        return "Break"
+
+
 class DfParentOp(Op, Protocol):
     """Abstract parent of dataflow graph operations. Can be queried for the
     dataflow signature of its child graph.
