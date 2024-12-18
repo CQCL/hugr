@@ -11,6 +11,7 @@ pr_draft = true
 # (This would normally only be enabled once there are multiple packages in the workspace)
 git_tag_name = "{{ package }}-v{{ version }}"
 git_release_name = "{{ package }}: v{{ version }}"
+git_release_latest = false
 pr_labels = ["release"]
 
 # Only create releases / push to crates.io after merging a release-please PR.
@@ -42,6 +43,7 @@ name = "hugr"
 changelog_include = ["hugr-core", "hugr-passes"]
 release = true
 version_group = "hugr"
+git_release_latest = true
 
 [[package]]
 name = "hugr-core"

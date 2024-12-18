@@ -8,9 +8,21 @@ mod half_node;
 pub mod lower;
 pub mod merge_bbs;
 mod monomorphize;
-pub use monomorphize::monomorphize;
+// TODO: Deprecated re-export. Remove on a breaking release.
+#[deprecated(
+    since = "0.14.1",
+    note = "Use `hugr::algorithms::MonomorphizePass` instead."
+)]
 #[allow(deprecated)]
 pub use monomorphize::remove_polyfuncs;
+// TODO: Deprecated re-export. Remove on a breaking release.
+#[deprecated(
+    since = "0.14.1",
+    note = "Use `hugr::algorithms::MonomorphizePass` instead."
+)]
+#[allow(deprecated)]
+pub use monomorphize::monomorphize;
+pub use monomorphize::{MonomorphizeError, MonomorphizePass};
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod validation;

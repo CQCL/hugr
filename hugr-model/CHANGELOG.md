@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.15.0...hugr-model-v0.16.0) - 2024-12-18
+
+### New Features
+
+- Scoping rules and utilities for symbols, links and variables (#1754)
+
 ## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.14.0...hugr-model-v0.15.0) - 2024-12-16
 
 ### Bug Fixes

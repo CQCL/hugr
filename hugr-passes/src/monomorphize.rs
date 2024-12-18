@@ -10,8 +10,9 @@ use hugr_core::{
     Node,
 };
 
-use hugr_core::hugr::{hugrmut::HugrMut, internal::HugrMutInternals, Hugr, HugrView, OpType};
+use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
 use itertools::Itertools as _;
+use thiserror::Error;
 
 use crate::call_graph::remove_dead_funcs;
 
@@ -30,26 +31,25 @@ use crate::call_graph::remove_dead_funcs;
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
+#[deprecated(
+    since = "0.14.1",
+    note = "Use `hugr::algorithms::MonomorphizePass` instead."
+)]
+// TODO: Deprecated. Remove on a breaking release and rename private `monomorphize_ref` to `monomorphize`.
 pub fn monomorphize(mut h: Hugr) -> Hugr {
-    let validate = |h: &Hugr| h.validate().unwrap_or_else(|e| panic!("{e}"));
+    monomorphize_ref(&mut h);
+    h
+}
 
-    // We clone the extension registry because we will need a reference to
-    // create our mutable substitutions. This is cannot cause a problem because
-    // we will not be adding any new types or extension ops to the HUGR.
-    #[cfg(debug_assertions)]
-    validate(&h);
-
+fn monomorphize_ref(h: &mut impl HugrMut) {
     let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
-        mono_scan(&mut h, root, None, &mut HashMap::new());
+        mono_scan(h, root, None, &mut HashMap::new());
         if !h.get_optype(root).is_module() {
-            remove_dead_funcs(&mut h, []);
+            remove_dead_funcs(h, []);
         }
     }
-    #[cfg(debug_assertions)]
-    validate(&h);
-    h
 }
 
 /// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
@@ -59,9 +59,14 @@ pub fn monomorphize(mut h: Hugr) -> Hugr {
 /// Deprecated: use [remove_dead_funcs] instead.
 #[deprecated(
     since = "0.14.1",
-    note = "Use hugr_passes::call_graph::remove_dead_funcs instead"
+    note = "Use hugr::algorithms::call_graph::RemoveDeadFuncsPass instead"
 )]
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
+    remove_polyfuncs_ref(&mut h);
+    h
+}
+
+fn remove_polyfuncs_ref(h: &mut impl HugrMut) {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
     while let Some(n) = to_scan.pop() {
@@ -74,7 +79,6 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     for n in pfs_to_delete {
         h.remove_subtree(n);
     }
-    h
 }
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
@@ -98,7 +102,7 @@ type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 /// Optionally copies the subtree into a new location whilst applying a substitution.
 /// The subtree should be monomorphic after the substitution (if provided) has been applied.
 fn mono_scan(
-    h: &mut Hugr,
+    h: &mut impl HugrMut,
     parent: Node,
     mut subst_into: Option<&mut Instantiating>,
     cache: &mut Instantiations,
@@ -166,7 +170,7 @@ fn mono_scan(
 }
 
 fn instantiate(
-    h: &mut Hugr,
+    h: &mut impl HugrMut,
     poly_func: Node,
     type_args: Vec<TypeArg>,
     mono_sig: Signature,
@@ -223,26 +227,77 @@ fn instantiate(
     // 'ext' edges by copying every node before recursing on any of them,
     // 'dom' edges would *also* require recursing in dominator-tree preorder.
     for (&old_ch, &new_ch) in node_map.iter() {
-        for inport in h.node_inputs(old_ch).collect::<Vec<_>>() {
+        for in_port in h.node_inputs(old_ch).collect::<Vec<_>>() {
             // Edges from monomorphized functions to their calls already added during mono_scan()
             // as these depend not just on the original FuncDefn but also the TypeArgs
-            if h.linked_outputs(new_ch, inport).next().is_some() {
+            if h.linked_outputs(new_ch, in_port).next().is_some() {
                 continue;
             };
-            let srcs = h.linked_outputs(old_ch, inport).collect::<Vec<_>>();
+            let srcs = h.linked_outputs(old_ch, in_port).collect::<Vec<_>>();
             for (src, outport) in srcs {
                 // Sources could be a mixture of within this polymorphic FuncDefn, and Static edges from outside
                 h.connect(
                     node_map.get(&src).copied().unwrap_or(src),
                     outport,
                     new_ch,
-                    inport,
+                    in_port,
                 );
             }
         }
     }
 
     mono_tgt
+}
+
+use crate::validation::{ValidatePassError, ValidationLevel};
+
+/// Replaces calls to polymorphic functions with calls to new monomorphic
+/// instantiations of the polymorphic ones.
+///
+/// If the Hugr is [Module](OpType::Module)-rooted,
+/// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
+///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
+/// * else, the originals are removed (they are invisible from outside the Hugr).
+///
+/// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
+/// signature then the HUGR will not be modified.
+///
+/// Monomorphic copies of polymorphic functions will be added to the HUGR as
+/// children of the root node.  We make best effort to ensure that names (derived
+/// from parent function names and concrete type args) of new functions are unique
+/// whenever the names of their parents are unique, but this is not guaranteed.
+#[derive(Debug, Clone, Default)]
+pub struct MonomorphizePass {
+    validation: ValidationLevel,
+}
+
+#[derive(Debug, Error)]
+#[non_exhaustive]
+/// Errors produced by [MonomorphizePass].
+pub enum MonomorphizeError {
+    #[error(transparent)]
+    #[allow(missing_docs)]
+    ValidationError(#[from] ValidatePassError),
+}
+
+impl MonomorphizePass {
+    /// Sets the validation level used before and after the pass is run.
+    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
+        self.validation = level;
+        self
+    }
+
+    /// Run the Monomorphization pass.
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), MonomorphizeError> {
+        monomorphize_ref(hugr);
+        Ok(())
+    }
+
+    /// Run the pass using specified configuration.
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), MonomorphizeError> {
+        self.validation
+            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
+    }
 }
 
 struct TypeArgsList<'a>(&'a [TypeArg]);
@@ -329,7 +384,7 @@ mod test {
 
     use crate::call_graph::remove_dead_funcs;
 
-    use super::{is_polymorphic, mangle_inner_func, mangle_name, monomorphize};
+    use super::{is_polymorphic, mangle_inner_func, mangle_name, MonomorphizePass};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -349,7 +404,8 @@ mod test {
             DFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1]).unwrap();
-        let hugr2 = monomorphize(hugr.clone());
+        let mut hugr2 = hugr.clone();
+        MonomorphizePass::default().run(&mut hugr2).unwrap();
         assert_eq!(hugr, hugr2);
     }
 
@@ -404,14 +460,15 @@ mod test {
             let [res2] = fb.call(tr.handle(), &[pty], pair.outputs())?.outputs_arr();
             fb.finish_with_outputs([res1, res2])?;
         }
-        let hugr = mb.finish_hugr()?;
+        let mut hugr = mb.finish_hugr()?;
         assert_eq!(
             hugr.nodes()
                 .filter(|n| hugr.get_optype(*n).is_func_defn())
                 .count(),
             3
         );
-        let mono = monomorphize(hugr);
+        MonomorphizePass::default().run(&mut hugr)?;
+        let mono = hugr;
         mono.validate()?;
 
         let mut funcs = list_funcs(&mono);
@@ -430,8 +487,10 @@ mod test {
             funcs.into_keys().sorted().collect_vec(),
             ["double", "main", "triple"]
         );
+        let mut mono2 = mono.clone();
+        MonomorphizePass::default().run(&mut mono2)?;
 
-        assert_eq!(monomorphize(mono.clone()), mono); // Idempotent
+        assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
         remove_dead_funcs(&mut nopoly, []);
@@ -535,9 +594,10 @@ mod test {
             .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
             .unwrap()
             .outputs_arr();
-        let hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
+        let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
 
-        let mono_hugr = monomorphize(hugr);
+        MonomorphizePass::default().run(&mut hugr).unwrap();
+        let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
         let pf2_name = mangle_inner_func("pf1", "pf2");
@@ -596,8 +656,9 @@ mod test {
             .outputs_arr();
         let mono = mono.finish_with_outputs([a, b]).unwrap();
         let c = dfg.call(mono.handle(), &[], dfg.input_wires()).unwrap();
-        let hugr = dfg.finish_hugr_with_outputs(c.outputs()).unwrap();
-        let mono_hugr = monomorphize(hugr);
+        let mut hugr = dfg.finish_hugr_with_outputs(c.outputs()).unwrap();
+        MonomorphizePass::default().run(&mut hugr)?;
+        let mono_hugr = hugr;
 
         let mut funcs = list_funcs(&mono_hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -614,7 +675,7 @@ mod test {
 
     #[test]
     fn load_function() {
-        let hugr = {
+        let mut hugr = {
             let mut module_builder = ModuleBuilder::new();
             let foo = {
                 let builder = module_builder
@@ -653,10 +714,10 @@ mod test {
             module_builder.finish_hugr().unwrap()
         };
 
-        let mut mono_hugr = monomorphize(hugr);
-        remove_dead_funcs(&mut mono_hugr, []);
+        MonomorphizePass::default().run(&mut hugr).unwrap();
+        remove_dead_funcs(&mut hugr, []);
 
-        let funcs = list_funcs(&mono_hugr);
+        let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
     }
 
