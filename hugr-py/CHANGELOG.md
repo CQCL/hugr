@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.0...hugr-py-v0.10.1) (2024-12-18)
+
+
+### Features
+
+* add ArrayValue to python, rust and lowering ([#1773](https://github.com/CQCL/hugr/issues/1773)) ([d429cff](https://github.com/CQCL/hugr/commit/d429cffc8a5a6a10af44b701aca772622c862eb6))
+* add wrapper for tagging Some, Left, Right, Break, Continue ([#1814](https://github.com/CQCL/hugr/issues/1814)) ([f0385a0](https://github.com/CQCL/hugr/commit/f0385a0f3edc1490b3bb2e639b00379c5a556866)), closes [#1808](https://github.com/CQCL/hugr/issues/1808)
+
 ## [0.10.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.9.0...hugr-py-v0.10.0) (2024-12-16)
 
 
