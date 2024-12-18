@@ -230,20 +230,20 @@ fn instantiate(
     // 'ext' edges by copying every node before recursing on any of them,
     // 'dom' edges would *also* require recursing in dominator-tree preorder.
     for (&old_ch, &new_ch) in node_map.iter() {
-        for inport in h.node_inputs(old_ch).collect::<Vec<_>>() {
+        for in_port in h.node_inputs(old_ch).collect::<Vec<_>>() {
             // Edges from monomorphized functions to their calls already added during mono_scan()
             // as these depend not just on the original FuncDefn but also the TypeArgs
-            if h.linked_outputs(new_ch, inport).next().is_some() {
+            if h.linked_outputs(new_ch, in_port).next().is_some() {
                 continue;
             };
-            let srcs = h.linked_outputs(old_ch, inport).collect::<Vec<_>>();
+            let srcs = h.linked_outputs(old_ch, in_port).collect::<Vec<_>>();
             for (src, outport) in srcs {
                 // Sources could be a mixture of within this polymorphic FuncDefn, and Static edges from outside
                 h.connect(
                     node_map.get(&src).copied().unwrap_or(src),
                     outport,
                     new_ch,
-                    inport,
+                    in_port,
                 );
             }
         }
