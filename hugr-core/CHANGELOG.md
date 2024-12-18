@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.0...hugr-core-v0.14.1) - 2024-12-18
+
+### Bug Fixes
+
+- `Call` ops not tracking their parameter extensions (#1805)
+
+### New Features
+
+- Lower LoadNat to LLVM (#1801)
+- Cleanup `Display` of types and arguments (#1802)
+- add ArrayValue to python, rust and lowering (#1773)
+- Scoping rules and utilities for symbols, links and variables (#1754)
+
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.3...hugr-core-v0.14.0) - 2024-12-16
 
 This release includes a long list of breaking changes that simplify the API, specially around

@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.14.0...hugr-cli-v0.14.1) - 2024-12-18
+
+### New Features
+
+- Print `hugr-cli`'s correct version when using '--version' (#1790)
+
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.13.3...hugr-cli-v0.14.0) - 2024-12-16
 
 ### ⚠ BREAKING CHANGES

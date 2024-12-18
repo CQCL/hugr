@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.0...hugr-passes-v0.14.1) - 2024-12-18
+
+### Bug Fixes
+
+- Constant folding now tolerates root nodes without input/output nodes (#1799)
+
+### New Features
+
+- Cleanup `Display` of types and arguments (#1802)
+- add MonomorphizePass and deprecate monomorphize (#1809)
+
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.13.3...hugr-passes-v0.14.0) - 2024-12-16
 
 ### ⚠ BREAKING CHANGES
