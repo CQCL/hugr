@@ -336,7 +336,7 @@ def test_option() -> None:
     dfg = Dfg(tys.Bool)
     b = dfg.inputs()[0]
 
-    dfg.add_op(ops.Some(tys.Option(tys.Bool)), b)
+    dfg.add_op(ops.Some(tys.Bool), b)
 
     dfg.set_outputs(b)
 

@@ -558,10 +558,16 @@ class Tag(DataflowOp):
 
 @dataclass
 class Some(Tag):
-    """Tag operation for the `Some` variant of an Option type."""
+    """Tag operation for the `Some` variant of an Option type.
 
-    def __init__(self, option_type: tys.Option) -> None:
-        super().__init__(1, option_type)
+    Example:
+        # construct a Some variant holding a row of Bool and Unit types
+        >>> Some(tys.Bool, tys.Unit)
+        Some
+    """
+
+    def __init__(self, *some_tys: tys.Type) -> None:
+        super().__init__(1, tys.Option(*some_tys))
 
     def __repr__(self) -> str:
         return "Some"
