@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.1...hugr-core-v0.14.2) - 2024-12-19
+
+### Testing
+
+- Add tests for constant value deserialization (#1822)
+
 ## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.0...hugr-core-v0.14.1) - 2024-12-18
 
 ### Bug Fixes
