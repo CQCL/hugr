@@ -1,5 +1,6 @@
 //! Compilation passes acting on the HUGR program representation.
 
+pub mod call_graph;
 pub mod const_fold;
 pub mod dataflow;
 pub mod force_order;
@@ -10,11 +11,18 @@ mod monomorphize;
 // TODO: Deprecated re-export. Remove on a breaking release.
 #[deprecated(
     since = "0.14.1",
+    note = "Use `hugr::algorithms::call_graph::RemoveDeadFuncsPass` instead."
+)]
+#[allow(deprecated)]
+pub use monomorphize::remove_polyfuncs;
+// TODO: Deprecated re-export. Remove on a breaking release.
+#[deprecated(
+    since = "0.14.1",
     note = "Use `hugr::algorithms::MonomorphizePass` instead."
 )]
 #[allow(deprecated)]
 pub use monomorphize::monomorphize;
-pub use monomorphize::{remove_polyfuncs, MonomorphizeError, MonomorphizePass};
+pub use monomorphize::{MonomorphizeError, MonomorphizePass};
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod validation;
