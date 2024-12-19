@@ -583,6 +583,7 @@ pub(crate) mod test {
     };
     use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
+    use crate::std_extensions::collections::array::{array_type, ArrayValue};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -734,15 +735,34 @@ pub(crate) mod test {
     }
 
     #[fixture]
+    fn const_serialized_usize() -> Value {
+        CustomSerialized::try_from_custom_const(ConstUsize::new(257))
+            .unwrap()
+            .into()
+    }
+
+    #[fixture]
     fn const_tuple() -> Value {
-        Value::tuple([ConstUsize::new(257).into(), serialized_float(5.1)])
+        Value::tuple([const_usize(), Value::true_val()])
+    }
+
+    /// Equivalent to [`const_tuple`], but uses a non-resolved opaque op for the usize element.
+    #[fixture]
+    fn const_tuple_serialized() -> Value {
+        Value::tuple([const_serialized_usize(), Value::true_val()])
+    }
+
+    #[fixture]
+    fn const_array_2_bool() -> Value {
+        ArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
     }
 
     #[rstest]
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
-    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), float64_type()]), "const:seq:{")]
+    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
+    #[case(const_array_2_bool(), array_type(2, bool_t()), "const:custom:array")]
     fn const_type(
         #[case] const_value: Value,
         #[case] expected_type: Type,
@@ -754,6 +774,19 @@ pub(crate) mod test {
             name.starts_with(name_prefix),
             "{name} does not start with {name_prefix}"
         );
+    }
+
+    #[rstest]
+    #[case(Value::unit(), Value::unit())]
+    #[case(const_usize(), const_usize())]
+    #[case(const_serialized_usize(), const_usize())]
+    #[case(const_tuple_serialized(), const_tuple())]
+    #[case(const_array_2_bool(), const_array_2_bool())]
+    fn const_serde_roundtrip(#[case] const_value: Value, #[case] expected_value: Value) {
+        let serialized = serde_json::to_string(&const_value).unwrap();
+        let deserialized: Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized, expected_value);
     }
 
     #[rstest]
