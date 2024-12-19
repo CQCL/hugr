@@ -67,7 +67,7 @@ class ArrayVal(val.ExtensionValue):
         self.ty = Array(elem_ty, len(v))
 
     def to_value(self) -> val.Extension:
-        name = "ArrayValue"
+        name = "array"
         # The value list must be serialized at this point, otherwise the
         # `Extension` value would not be serializable.
         vs = [v._to_serial_root() for v in self.v]
