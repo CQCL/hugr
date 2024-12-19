@@ -117,7 +117,7 @@ impl TypeParam {
         }
     }
 
-    fn contains(&self, other: &TypeParam) -> bool {
+    pub(super) fn contains(&self, other: &TypeParam) -> bool {
         match (self, other) {
             (TypeParam::Type { b: b1 }, TypeParam::Type { b: b2 }) => b1.contains(*b2),
             (TypeParam::BoundedNat { bound: b1 }, TypeParam::BoundedNat { bound: b2 }) => {
