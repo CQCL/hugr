@@ -1,3 +1,4 @@
+use delegate::delegate;
 use itertools::Itertools;
 
 use super::build_traits::{HugrBuilder, SubContainer};
@@ -80,7 +81,7 @@ impl DFGBuilder<Hugr> {
         DFGBuilder::create_with_io(base, root, signature)
     }
 
-    /// Add a new input to the function being constructed.
+    /// Add a new input to the DFG being constructed.
     ///
     /// Returns the new wire from the input node.
     pub fn add_input(&mut self, input_type: Type) -> Wire {
@@ -119,7 +120,7 @@ impl DFGBuilder<Hugr> {
         self.input_wires().last().unwrap()
     }
 
-    /// Add a new output to the function being constructed.
+    /// Add a new output to the DFG being constructed.
     pub fn add_output(&mut self, output_type: Type) {
         let [_, out_node] = self.io();
 
@@ -154,7 +155,7 @@ impl DFGBuilder<Hugr> {
         self.num_out_wires += 1;
     }
 
-    /// Update the function builder's parent signature.
+    /// Update the DFG builder's parent signature.
     ///
     /// Internal function used in [add_input] and [add_output].
     ///
@@ -261,6 +262,18 @@ impl FunctionBuilder<Hugr> {
 
         let db = DFGBuilder::create_with_io(base, root, body)?;
         Ok(Self::from_dfg_builder(db))
+    }
+
+    delegate! {
+        to self.0 {
+            /// Add a new input to the function being constructed.
+            ///
+            /// Returns the new wire from the input node.
+            pub fn add_input(&mut self, input_type: Type) -> Wire;
+
+            /// Add a new input to the function being constructed.
+            pub fn add_output(&mut self, output_type: Type);
+        }
     }
 }
 
@@ -465,8 +478,8 @@ pub(crate) mod test {
             f_build.set_order(&noop0.node(), &f_build.io()[1]);
 
             // Add a new input and output, and connect them with a noop in between
-            f_build.0.add_output(qb_t());
-            let i1 = f_build.0.add_input(qb_t());
+            f_build.add_output(qb_t());
+            let i1 = f_build.add_input(qb_t());
             let noop1 = f_build.add_dataflow_op(Noop(qb_t()), [i1])?;
 
             let hugr = f_build.finish_hugr_with_outputs([noop0.out_wire(0), noop1.out_wire(0)])?;
