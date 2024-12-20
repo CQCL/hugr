@@ -47,7 +47,7 @@ fn monomorphize_ref(h: &mut impl HugrMut) {
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
         mono_scan(h, root, None, &mut HashMap::new());
         if !h.get_optype(root).is_module() {
-            remove_dead_funcs(h, []);
+            remove_dead_funcs(h, []).unwrap(); // no-entry-points always succeeds
         }
     }
 }
@@ -493,7 +493,7 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly, []);
+        remove_dead_funcs(&mut nopoly, [])?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -715,7 +715,7 @@ mod test {
         };
 
         MonomorphizePass::default().run(&mut hugr).unwrap();
-        remove_dead_funcs(&mut hugr, []);
+        remove_dead_funcs(&mut hugr, []).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));

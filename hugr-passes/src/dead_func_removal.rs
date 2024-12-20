@@ -11,6 +11,15 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 
 use super::call_graph::{CallGraph, CallGraphNode};
 
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+/// Errors produced by [ConstantFoldPass].
+pub enum RemoveDeadFuncsError {
+    #[error(transparent)]
+    #[allow(missing_docs)]
+    ValidationError(#[from] ValidatePassError),
+}
+
 fn reachable_funcs<'a>(
     cg: &'a CallGraph,
     h: &'a impl HugrView,
@@ -68,10 +77,9 @@ impl RemoveDeadFuncsPass {
     }
 
     /// Runs the pass (see [remove_dead_funcs]) with this configuration
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ValidatePassError> {
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         self.validation.run_validated_pass(hugr, |hugr: &mut H, _| {
-            remove_dead_funcs(hugr, self.entry_points.iter().cloned());
-            Ok(())
+            remove_dead_funcs(hugr, self.entry_points.iter().cloned())
         })
     }
 }
@@ -96,7 +104,10 @@ impl RemoveDeadFuncsPass {
 /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
 /// [LoadFunction]: hugr_core::ops::OpType::LoadFunction
 /// [Module]: hugr_core::ops::OpType::Module
-pub fn remove_dead_funcs(h: &mut impl HugrMut, entry_points: impl IntoIterator<Item = Node>) {
+pub fn remove_dead_funcs(
+    h: &mut impl HugrMut,
+    entry_points: impl IntoIterator<Item = Node>,
+) -> Result<(), RemoveDeadFuncsError> {
     let reachable = reachable_funcs(&CallGraph::new(h), h, entry_points).collect::<HashSet<_>>();
     let unreachable = h
         .nodes()
@@ -105,6 +116,7 @@ pub fn remove_dead_funcs(h: &mut impl HugrMut, entry_points: impl IntoIterator<I
     for n in unreachable {
         h.remove_subtree(n);
     }
+    Ok(())
 }
 
 #[cfg(test)]
