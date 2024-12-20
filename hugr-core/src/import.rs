@@ -442,12 +442,6 @@ impl<'a> Context<'a> {
 
                 let node = self.make_node(node_id, optype, parent)?;
 
-                match node_data.regions {
-                    [] => {}
-                    [region] => self.import_dfg_region(node_id, *region, node)?,
-                    _ => return Err(error_unsupported!("multiple regions in custom operation")),
-                }
-
                 Ok(Some(node))
             }
 

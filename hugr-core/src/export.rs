@@ -414,18 +414,6 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                // PERFORMANCE: Currently the API does not appear to allow to get the extension
-                // set without copying it.
-                // NOTE: We assume here that the extension set of the dfg region must be the same
-                // as that of the node. This might change in the future.
-                let extensions = self.export_ext_set(&op.extension_delta());
-
-                if let Some(region) =
-                    self.export_dfg_if_present(node, extensions, model::ScopeClosure::Closed)
-                {
-                    regions = self.bump.alloc_slice_copy(&[region]);
-                }
-
                 model::Operation::CustomFull { operation }
             }
 
@@ -435,18 +423,6 @@ impl<'a> Context<'a> {
                 params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
-
-                // PERFORMANCE: Currently the API does not appear to allow to get the extension
-                // set without copying it.
-                // NOTE: We assume here that the extension set of the dfg region must be the same
-                // as that of the node. This might change in the future.
-                let extensions = self.export_ext_set(&op.extension_delta());
-
-                if let Some(region) =
-                    self.export_dfg_if_present(node, extensions, model::ScopeClosure::Closed)
-                {
-                    regions = self.bump.alloc_slice_copy(&[region]);
-                }
 
                 model::Operation::CustomFull { operation }
             }
@@ -594,22 +570,6 @@ impl<'a> Context<'a> {
             outputs,
             extensions,
         })
-    }
-
-    /// Create a region from the given node's children, if it has any.
-    ///
-    /// See [`Self::export_dfg`].
-    pub fn export_dfg_if_present(
-        &mut self,
-        node: Node,
-        extensions: model::TermId,
-        closure: model::ScopeClosure,
-    ) -> Option<model::RegionId> {
-        if self.hugr.children(node).next().is_none() {
-            None
-        } else {
-            Some(self.export_dfg(node, extensions, closure))
-        }
     }
 
     /// Creates a data flow region from the given node's children.
