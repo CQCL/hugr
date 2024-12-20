@@ -9,7 +9,7 @@ use std::hash::{Hash, Hasher};
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
-use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type};
+use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
 
 use delegate::delegate;
@@ -448,6 +448,21 @@ impl Value {
     /// Returns a constant "false" value, i.e. the first variant of Sum((), ()).
     pub fn false_val() -> Self {
         Self::unit_sum(0, 2).expect("0 < 2")
+    }
+
+    /// Returns an optional with some values. This is a Sum with two variants, the
+    /// first being empty and the second being the values.
+    pub fn some<V: Into<Value>>(values: impl IntoIterator<Item = V>) -> Self {
+        let values: Vec<Value> = values.into_iter().map(Into::into).collect_vec();
+        let value_types: Vec<Type> = values.iter().map(|v| v.get_type()).collect_vec();
+        let sum_type = SumType::new_option(value_types);
+        Self::sum(1, values, sum_type).unwrap()
+    }
+
+    /// Returns an optional with no value. This is a Sum with two variants, the
+    /// first being empty and the second being the value.
+    pub fn none(value_types: impl Into<TypeRow>) -> Self {
+        Self::sum(0, [], SumType::new_option(value_types)).unwrap()
     }
 
     /// Returns a constant `bool` value.
