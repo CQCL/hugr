@@ -2,11 +2,7 @@
 //! Data structure for call graphs of a Hugr, and some transformations using them.
 use std::collections::{HashMap, HashSet};
 
-use hugr_core::{
-    hugr::hugrmut::HugrMut,
-    ops::{OpTag, OpTrait, OpType},
-    HugrView, Node,
-};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, HugrView, Node};
 use itertools::Itertools;
 use petgraph::{graph::NodeIndex, visit::Bfs, Graph};
 
@@ -20,18 +16,30 @@ pub enum CallGraphEdge {
     LoadFunction(Node),
 }
 
+/// Weight for a petgraph-node in a [CallGraph]
+pub enum CallGraphNode {
+    /// petgraph-node corresponds to a [FuncDecl](OpType::FuncDecl) node (specified) in the Hugr
+    FuncDecl(Node),
+    /// petgraph-node corresponds to a [FuncDefn](OpType::FuncDefn) node (specified) in the Hugr
+    FuncDefn(Node),
+    /// petgraph-node corresponds to the root node of the hugr, that is not
+    /// a [FuncDefn](OpType::FuncDefn). Note that it will not be a [Module](OpType::Module)
+    /// either, as such a node could not have outgoing edges, so is not represented in the petgraph.
+    NonFuncRoot,
+}
+
 /// Details the [Call]s and [LoadFunction]s in a Hugr.
 /// Each node in the `CallGraph` corresponds to a [FuncDefn] in the Hugr; each edge corresponds
 /// to a [Call]/[LoadFunction] of the edge's target, contained in the edge's source.
 ///
 /// For Hugrs whose root is neither a [Module](OpType::Module) nor a [FuncDefn], the call graph
-/// will have an additional node corresponding to the Hugr's root, with no incoming edges.
+/// will have an additional [CallGraphNode::NonFuncRoot] corresponding to the Hugr's root, with no incoming edges.
 ///
 /// [Call]: OpType::Call
 /// [FuncDefn]: OpType::FuncDefn
 /// [LoadFunction]: OpType::LoadFunction
 pub struct CallGraph {
-    g: Graph<Node, CallGraphEdge>,
+    g: Graph<CallGraphNode, CallGraphEdge>,
     node_to_g: HashMap<Node, NodeIndex<u32>>,
 }
 
@@ -40,12 +48,17 @@ impl CallGraph {
     /// Calls to functions outside the view will be dropped.
     pub fn new(hugr: &impl HugrView) -> Self {
         let mut g = Graph::default();
-        // For non-Module-rooted Hugrs, make sure we include the root
-        let root = (!hugr.get_optype(hugr.root()).is_module()).then_some(hugr.root());
+        let non_func_root = (!hugr.get_optype(hugr.root()).is_module()).then_some(hugr.root());
         let node_to_g = hugr
             .nodes()
-            .filter(|&n| Some(n) == root || OpTag::Function.is_superset(hugr.get_optype(n).tag()))
-            .map(|n| (n, g.add_node(n)))
+            .filter_map(|n| {
+                let weight = match hugr.get_optype(n) {
+                    OpType::FuncDecl(_) => CallGraphNode::FuncDecl(n),
+                    OpType::FuncDefn(_) => CallGraphNode::FuncDefn(n),
+                    _ => (Some(n) == non_func_root).then_some(CallGraphNode::NonFuncRoot)?,
+                };
+                Some((n, g.add_node(weight)))
+            })
             .collect::<HashMap<_, _>>();
         for (func, cg_node) in node_to_g.iter() {
             traverse(hugr, *cg_node, *func, &mut g, &node_to_g)
@@ -54,7 +67,7 @@ impl CallGraph {
             h: &impl HugrView,
             enclosing_func: NodeIndex<u32>,
             node: Node, // Nonstrict-descendant of `enclosing_func``
-            g: &mut Graph<Node, CallGraphEdge>,
+            g: &mut Graph<CallGraphNode, CallGraphEdge>,
             node_to_g: &HashMap<Node, NodeIndex<u32>>,
         ) {
             for ch in h.children(node) {
@@ -74,11 +87,23 @@ impl CallGraph {
         }
         CallGraph { g, node_to_g }
     }
+
+    /// Allows access to the petgraph
+    pub fn graph(&self) -> &Graph<CallGraphNode, CallGraphEdge> {
+        &self.g
+    }
+
+    /// Convert a Hugr [Node] into a petgraph node index.
+    /// Result will be `None` if `n` is not a [FuncDefn](OpType::FuncDefn),
+    /// [FuncDecl](OpType::FuncDecl) or the hugr root.
+    pub fn node_index(&self, n: Node) -> Option<NodeIndex<u32>> {
+        self.node_to_g.get(&n).copied()
+    }
 }
 
 fn reachable_funcs<'a>(
     cg: &'a CallGraph,
-    h: &impl HugrView,
+    h: &'a impl HugrView,
     entry_points: impl IntoIterator<Item = Node>,
 ) -> impl Iterator<Item = Node> + 'a {
     let mut roots = entry_points.into_iter().collect_vec();
@@ -99,7 +124,10 @@ fn reachable_funcs<'a>(
         assert!(roots.is_empty());
         Bfs::new(&cg.g, *cg.node_to_g.get(&h.root()).unwrap())
     };
-    std::iter::from_fn(move || b.next(&cg.g)).map(|i| *cg.g.node_weight(i).unwrap())
+    std::iter::from_fn(move || b.next(&cg.g)).map(|i| match cg.g.node_weight(i).unwrap() {
+        CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
+        CallGraphNode::NonFuncRoot => h.root(),
+    })
 }
 
 #[derive(Debug, Clone, Default)]
