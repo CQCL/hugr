@@ -563,7 +563,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 outputs,
                 extensions,
             } => self.print_parens(|this| {
-                this.print_text("fn");
+                this.print_text("->");
                 this.print_term(*inputs)?;
                 this.print_term(*outputs)?;
                 this.print_term(*extensions)
@@ -579,6 +579,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Term::NonLinearConstraint { term } => self.print_parens(|this| {
                 this.print_text("nonlinear");
                 this.print_term(*term)
+            }),
+            Term::ConstFunc { region } => self.print_parens(|this| {
+                this.print_text("fn");
+                this.print_region(*region)
             }),
         }
     }

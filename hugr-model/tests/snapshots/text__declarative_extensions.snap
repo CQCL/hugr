@@ -13,6 +13,6 @@ expression: "roundtrip(include_str!(\"fixtures/model-decl-exts.edn\"))"
 (declare-operation array.Init
   (param ?t type)
   (param ?n nat)
-  (fn [?t] [(array.Array ?t ?n)] (ext array))
+  (-> [?t] [(array.Array ?t ?n)] (ext array))
   (meta docs.description
     "Initialize an array of size ?n with copies of a default value."))

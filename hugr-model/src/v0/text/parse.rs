@@ -250,6 +250,11 @@ impl<'a> ParseContext<'a> {
                     Term::NonLinearConstraint { term }
                 }
 
+                Rule::term_const_func => {
+                    let region = self.parse_region(inner.next().unwrap(), ScopeClosure::Closed)?;
+                    Term::ConstFunc { region }
+                }
+
                 r => unreachable!("term: {:?}", r),
             };
 

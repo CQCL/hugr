@@ -93,6 +93,7 @@ term = {
   | term_apply_full
   | term_apply
   | term_non_linear
+  | term_const_func
 }
 
 term_wildcard     = { "_" }
@@ -112,9 +113,10 @@ term_nat_type     = { "nat" }
 term_ext_set      = { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
 term_ext_set_type = { "ext-set" }
 term_adt          = { "(" ~ "adt" ~ term ~ ")" }
-term_func_type    = { "(" ~ "fn" ~ term ~ term ~ term ~ ")" }
+term_func_type    = { "(" ~ "->" ~ term ~ term ~ term ~ ")" }
 term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
 term_ctrl_type    = { "ctrl" }
 term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }
+term_const_func   = { "(" ~ "fn" ~ term ~ ")" }
 
 spliced_term = { term ~ "..." }

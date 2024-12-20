@@ -15,34 +15,34 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cond
   (dfg
     [%0 %1] [%2]
     (signature
-      (fn
+      (->
         [(adt [[] []]) (@ arithmetic.int.types.int)]
         [(@ arithmetic.int.types.int)]
         (ext)))
     (cond
       [%0 %1] [%2]
       (signature
-        (fn
+        (->
           [(adt [[] []]) (@ arithmetic.int.types.int)]
           [(@ arithmetic.int.types.int)]
           (ext)))
       (dfg
         [%3] [%3]
         (signature
-          (fn
+          (->
             [(@ arithmetic.int.types.int)]
             [(@ arithmetic.int.types.int)]
             (ext))))
       (dfg
         [%4] [%5]
         (signature
-          (fn
+          (->
             [(@ arithmetic.int.types.int)]
             [(@ arithmetic.int.types.int)]
             (ext)))
         ((@ arithmetic.int.ineg) [%4] [%5]
           (signature
-            (fn
+            (->
               [(@ arithmetic.int.types.int)]
               [(@ arithmetic.int.types.int)]
               (ext arithmetic.int))))))))
