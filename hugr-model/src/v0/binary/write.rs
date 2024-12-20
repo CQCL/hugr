@@ -161,7 +161,7 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::NatType => builder.set_nat_type(()),
         model::Term::ExtSetType => builder.set_ext_set_type(()),
         model::Term::Adt { variants } => builder.set_adt(variants.0),
-        model::Term::Quote { r#type } => builder.set_quote(r#type.0),
+        model::Term::Const { r#type } => builder.set_const(r#type.0),
         model::Term::Control { values } => builder.set_control(values.0),
         model::Term::ControlType => builder.set_control_type(()),
 

@@ -520,8 +520,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }),
-            Term::Quote { r#type } => self.print_parens(|this| {
-                this.print_text("quote");
+            Term::Const { r#type } => self.print_parens(|this| {
+                this.print_text("const");
                 this.print_term(*r#type)
             }),
             Term::List { .. } => self.print_brackets(|this| this.print_list_parts(term_id)),

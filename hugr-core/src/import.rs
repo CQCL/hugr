@@ -897,7 +897,7 @@ impl<'a> Context<'a> {
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
 
-            model::Term::Quote { .. } => Err(error_unsupported!("`(quote ...)` as `TypeParam`")),
+            model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
             model::Term::ListType { item_type } => {
@@ -959,9 +959,6 @@ impl<'a> Context<'a> {
                 arg: value.to_string(),
             }),
 
-            model::Term::Quote { .. } => Ok(TypeArg::Type {
-                ty: self.import_type(term_id)?,
-            }),
             model::Term::Nat(value) => Ok(TypeArg::BoundedNat { n: *value }),
             model::Term::ExtSet { .. } => Ok(TypeArg::Extensions {
                 es: self.import_extension_set(term_id)?,
@@ -976,6 +973,7 @@ impl<'a> Context<'a> {
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeArg`")),
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
+            model::Term::Const { .. } => Err(error_unsupported!("`const` as `TypeArg`")),
 
             model::Term::FuncType { .. }
             | model::Term::Adt { .. }
@@ -1090,7 +1088,7 @@ impl<'a> Context<'a> {
             | model::Term::StaticType
             | model::Term::Type
             | model::Term::Constraint
-            | model::Term::Quote { .. }
+            | model::Term::Const { .. }
             | model::Term::Str(_)
             | model::Term::ExtSet { .. }
             | model::Term::List { .. }

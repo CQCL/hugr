@@ -140,7 +140,7 @@ struct Term {
         }
         apply @5 :Apply;
         applyFull @6 :ApplyFull;
-        quote @7 :TermId;
+        const @7 :TermId;
         list @8 :ListTerm;
         listType @9 :TermId;
         string @10 :Text;

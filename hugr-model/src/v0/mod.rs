@@ -559,11 +559,11 @@ pub enum Term<'a> {
         args: &'a [TermId],
     },
 
-    /// Quote a runtime type as a static type.
+    /// Type for a constant runtime value.
     ///
-    /// `(quote T) : static` where `T : type`.
-    Quote {
-        /// The runtime type to be quoted.
+    /// `(const T) : static` where `T : type`.
+    Const {
+        /// The runtime type of the constant value.
         ///
         /// **Type:** `type`
         r#type: TermId,
