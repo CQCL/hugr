@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use hugr_core::{hugr::hugrmut::HugrMut, HugrView, Node};
 use itertools::Itertools;
-use petgraph::visit::Bfs;
+use petgraph::visit::Dfs;
 
 use crate::validation::{ValidatePassError, ValidationLevel};
 
@@ -26,7 +26,7 @@ fn reachable_funcs<'a>(
     entry_points: impl IntoIterator<Item = Node>,
 ) -> impl Iterator<Item = Node> + 'a {
     let mut roots = entry_points.into_iter().collect_vec();
-    let mut b = if h.get_optype(h.root()).is_module() {
+    let mut searcher = if h.get_optype(h.root()).is_module() {
         if roots.is_empty() {
             roots.extend(h.children(h.root()).filter(|n| {
                 h.get_optype(*n)
@@ -36,16 +36,16 @@ fn reachable_funcs<'a>(
             assert_eq!(roots.len(), 1, "No entry_points for Module and no `main`");
         }
         let mut roots = roots.into_iter().map(|i| cg.node_index(i).unwrap());
-        let mut b = Bfs::new(cg.graph(), roots.next().unwrap());
-        b.stack.extend(roots);
-        b
+        let mut d = Dfs::new(cg.graph(), roots.next().unwrap());
+        d.stack.extend(roots);
+        d
     } else {
         assert!(roots.is_empty());
-        Bfs::new(&cg.graph(), cg.node_index(h.root()).unwrap())
+        Dfs::new(&cg.graph(), cg.node_index(h.root()).unwrap())
     };
     let g = cg.graph();
     std::iter::from_fn(move || {
-        b.next(g).map(|i| match g.node_weight(i).unwrap() {
+        searcher.next(g).map(|i| match g.node_weight(i).unwrap() {
             CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
             CallGraphNode::NonFuncRoot => h.root(),
         })
