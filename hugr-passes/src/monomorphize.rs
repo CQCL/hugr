@@ -14,12 +14,14 @@ use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
 use itertools::Itertools as _;
 use thiserror::Error;
 
+use crate::remove_dead_funcs;
+
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
 /// If the Hugr is [Module](OpType::Module)-rooted,
 /// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
-///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
+///     - [remove_dead_funcs] can be used when no other Hugr will be linked in that might instantiate these
 /// * else, the originals are removed (they are invisible from outside the Hugr).
 ///
 /// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
@@ -45,7 +47,7 @@ fn monomorphize_ref(h: &mut impl HugrMut) {
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
         mono_scan(h, root, None, &mut HashMap::new());
         if !h.get_optype(root).is_module() {
-            remove_polyfuncs_ref(h);
+            remove_dead_funcs(h, []).unwrap(); // no-entry-points always succeeds
         }
     }
 }
@@ -54,8 +56,11 @@ fn monomorphize_ref(h: &mut impl HugrMut) {
 /// calls from *monomorphic* code, this will make the Hugr invalid (call [monomorphize]
 /// first).
 ///
-/// TODO replace this with a more general remove-unused-functions pass
-/// <https://github.com/CQCL/hugr/issues/1753>
+/// Deprecated: use [remove_dead_funcs] instead.
+#[deprecated(
+    since = "0.14.1",
+    note = "Use hugr::algorithms::call_graph::RemoveDeadFuncsPass instead"
+)]
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     remove_polyfuncs_ref(&mut h);
     h
@@ -377,9 +382,9 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::monomorphize::{remove_polyfuncs_ref, MonomorphizePass};
+    use crate::remove_dead_funcs;
 
-    use super::{is_polymorphic, mangle_inner_func, mangle_name, remove_polyfuncs};
+    use super::{is_polymorphic, mangle_inner_func, mangle_name, MonomorphizePass};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -443,7 +448,7 @@ mod test {
             let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem])?;
             fb.finish_with_outputs(trip.outputs())?
         };
-        {
+        let mn = {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
             let mut fb = mb.define_function("main", prelusig(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
@@ -453,8 +458,8 @@ mod test {
             let pair = fb.call(db.handle(), &[usize_t().into()], [elem])?;
             let pty = pair_type(usize_t()).into();
             let [res2] = fb.call(tr.handle(), &[pty], pair.outputs())?.outputs_arr();
-            fb.finish_with_outputs([res1, res2])?;
-        }
+            fb.finish_with_outputs([res1, res2])?
+        };
         let mut hugr = mb.finish_hugr()?;
         assert_eq!(
             hugr.nodes()
@@ -487,7 +492,8 @@ mod test {
 
         assert_eq!(mono2, mono); // Idempotent
 
-        let nopoly = remove_polyfuncs(mono);
+        let mut nopoly = mono;
+        remove_dead_funcs(&mut nopoly, [mn.node()])?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -709,7 +715,7 @@ mod test {
         };
 
         MonomorphizePass::default().run(&mut hugr).unwrap();
-        remove_polyfuncs_ref(&mut hugr);
+        remove_dead_funcs(&mut hugr, []).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
