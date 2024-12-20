@@ -768,8 +768,16 @@ pub(crate) mod test {
     }
 
     #[fixture]
-    fn const_array_2_bool() -> Value {
+    fn const_array_bool() -> Value {
         ArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
+    }
+
+    #[fixture]
+    fn const_array_options() -> Value {
+        let some_true = Value::some([Value::true_val()]);
+        let none = Value::none(vec![bool_t()]);
+        let elem_ty = SumType::new_option(vec![bool_t()]);
+        ArrayValue::new(elem_ty.into(), [some_true, none]).into()
     }
 
     #[rstest]
@@ -777,7 +785,12 @@ pub(crate) mod test {
     #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
     #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
-    #[case(const_array_2_bool(), array_type(2, bool_t()), "const:custom:array")]
+    #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
+    #[case(
+        const_array_options(),
+        array_type(2, SumType::new_option(vec![bool_t()]).into()),
+        "const:custom:array"
+    )]
     fn const_type(
         #[case] const_value: Value,
         #[case] expected_type: Type,
@@ -796,7 +809,8 @@ pub(crate) mod test {
     #[case(const_usize(), const_usize())]
     #[case(const_serialized_usize(), const_usize())]
     #[case(const_tuple_serialized(), const_tuple())]
-    #[case(const_array_2_bool(), const_array_2_bool())]
+    #[case(const_array_bool(), const_array_bool())]
+    #[case(const_array_options(), const_array_options())]
     fn const_serde_roundtrip(#[case] const_value: Value, #[case] expected_value: Value) {
         let serialized = serde_json::to_string(&const_value).unwrap();
         let deserialized: Value = serde_json::from_str(&serialized).unwrap();
