@@ -9,7 +9,7 @@ use std::hash::{Hash, Hasher};
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
-use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type};
+use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
 
 use delegate::delegate;
@@ -450,6 +450,21 @@ impl Value {
         Self::unit_sum(0, 2).expect("0 < 2")
     }
 
+    /// Returns an optional with some values. This is a Sum with two variants, the
+    /// first being empty and the second being the values.
+    pub fn some<V: Into<Value>>(values: impl IntoIterator<Item = V>) -> Self {
+        let values: Vec<Value> = values.into_iter().map(Into::into).collect_vec();
+        let value_types: Vec<Type> = values.iter().map(|v| v.get_type()).collect_vec();
+        let sum_type = SumType::new_option(value_types);
+        Self::sum(1, values, sum_type).unwrap()
+    }
+
+    /// Returns an optional with no value. This is a Sum with two variants, the
+    /// first being empty and the second being the value.
+    pub fn none(value_types: impl Into<TypeRow>) -> Self {
+        Self::sum(0, [], SumType::new_option(value_types)).unwrap()
+    }
+
     /// Returns a constant `bool` value.
     ///
     /// see [`Value::true_val`] and [`Value::false_val`].
@@ -753,8 +768,16 @@ pub(crate) mod test {
     }
 
     #[fixture]
-    fn const_array_2_bool() -> Value {
+    fn const_array_bool() -> Value {
         ArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
+    }
+
+    #[fixture]
+    fn const_array_options() -> Value {
+        let some_true = Value::some([Value::true_val()]);
+        let none = Value::none(vec![bool_t()]);
+        let elem_ty = SumType::new_option(vec![bool_t()]);
+        ArrayValue::new(elem_ty.into(), [some_true, none]).into()
     }
 
     #[rstest]
@@ -762,7 +785,12 @@ pub(crate) mod test {
     #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
     #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
-    #[case(const_array_2_bool(), array_type(2, bool_t()), "const:custom:array")]
+    #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
+    #[case(
+        const_array_options(),
+        array_type(2, SumType::new_option(vec![bool_t()]).into()),
+        "const:custom:array"
+    )]
     fn const_type(
         #[case] const_value: Value,
         #[case] expected_type: Type,
@@ -781,7 +809,8 @@ pub(crate) mod test {
     #[case(const_usize(), const_usize())]
     #[case(const_serialized_usize(), const_usize())]
     #[case(const_tuple_serialized(), const_tuple())]
-    #[case(const_array_2_bool(), const_array_2_bool())]
+    #[case(const_array_bool(), const_array_bool())]
+    #[case(const_array_options(), const_array_options())]
     fn const_serde_roundtrip(#[case] const_value: Value, #[case] expected_value: Value) {
         let serialized = serde_json::to_string(&const_value).unwrap();
         let deserialized: Value = serde_json::from_str(&serialized).unwrap();

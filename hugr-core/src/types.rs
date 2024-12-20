@@ -226,6 +226,11 @@ impl SumType {
         Self::new([types.into()])
     }
 
+    /// New option type (either an empty option, or a row of types)
+    pub fn new_option(types: impl Into<TypeRow>) -> Self {
+        Self::new([vec![].into(), types.into()])
+    }
+
     /// Report the tag'th variant, if it exists.
     pub fn get_variant(&self, tag: usize) -> Option<&TypeRowRV> {
         match self {
