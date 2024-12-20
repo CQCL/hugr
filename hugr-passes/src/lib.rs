@@ -3,6 +3,8 @@
 pub mod call_graph;
 pub mod const_fold;
 pub mod dataflow;
+mod dead_func_removal;
+pub use dead_func_removal::{remove_dead_funcs, RemoveDeadFuncsPass};
 pub mod force_order;
 mod half_node;
 pub mod lower;

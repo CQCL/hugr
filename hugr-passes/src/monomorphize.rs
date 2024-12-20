@@ -14,7 +14,7 @@ use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
 use itertools::Itertools as _;
 use thiserror::Error;
 
-use crate::call_graph::remove_dead_funcs;
+use crate::remove_dead_funcs;
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -382,7 +382,7 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::call_graph::remove_dead_funcs;
+    use crate::remove_dead_funcs;
 
     use super::{is_polymorphic, mangle_inner_func, mangle_name, MonomorphizePass};
 
