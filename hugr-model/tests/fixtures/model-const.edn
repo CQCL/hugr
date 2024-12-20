@@ -1,0 +1,23 @@
+(hugr 0)
+
+(define-func example.bools
+  []
+  [(adt [[] []]) (adt [[] []])]
+  (ext)
+  (dfg [] [%false %true]
+    (signature (-> [] [(adt [[] []]) (adt [[] []])] (ext)))
+    (const (tag 0 []) [] [%false]
+      (signature (-> [] [(adt [[] []])] (ext))))
+    (const (tag 1 []) [] [%true]
+      (signature (-> [] [(adt [[] []])] (ext))))))
+
+(define-func example.f64
+  []
+  [(@ arithmetic.float.types.float64)]
+  (ext)
+  (dfg [] [%0]
+    (signature (-> [] [(@ arithmetic.float.types.float64)] (ext)))
+    (const
+      (@ prelude.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":1.0}}" (ext))
+      [] [%0]
+      (signature (-> [] [(@ arithmetic.float.types.float64)] (ext))))))

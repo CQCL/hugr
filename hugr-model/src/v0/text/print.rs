@@ -370,6 +370,14 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text(*name);
                 this.print_meta(node_data.meta)
             }
+
+            Operation::Const { value } => {
+                this.print_text("const");
+                this.print_term(*value)?;
+                this.print_port_lists(node_data.inputs, node_data.outputs)?;
+                this.print_signature(node_data.signature)?;
+                this.print_meta(node_data.meta)
+            }
         })
     }
 
@@ -422,7 +430,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         first: &'a [LinkIndex],
         second: &'a [LinkIndex],
     ) -> PrintResult<()> {
-        if !first.is_empty() && !second.is_empty() {
+        if !first.is_empty() || !second.is_empty() {
             self.print_group(|this| {
                 this.print_port_list(first)?;
                 this.print_port_list(second)
@@ -520,9 +528,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }),
-            Term::Quote { r#type } => self.print_parens(|this| {
-                this.print_text("quote");
-                this.print_term(*r#type)
+            Term::Const { r#type, extensions } => self.print_parens(|this| {
+                this.print_text("const");
+                this.print_term(*r#type)?;
+                this.print_term(*extensions)
             }),
             Term::List { .. } => self.print_brackets(|this| this.print_list_parts(term_id)),
             Term::ListType { item_type } => self.print_parens(|this| {
@@ -563,7 +572,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 outputs,
                 extensions,
             } => self.print_parens(|this| {
-                this.print_text("fn");
+                this.print_text("->");
                 this.print_term(*inputs)?;
                 this.print_term(*outputs)?;
                 this.print_term(*extensions)
@@ -579,6 +588,15 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Term::NonLinearConstraint { term } => self.print_parens(|this| {
                 this.print_text("nonlinear");
                 this.print_term(*term)
+            }),
+            Term::ConstFunc { region } => self.print_parens(|this| {
+                this.print_text("fn");
+                this.print_region(*region)
+            }),
+            Term::ConstAdt { tag, values } => self.print_parens(|this| {
+                this.print_text("tag");
+                this.print_text(tag.to_string());
+                this.print_term(*values)
             }),
         }
     }

@@ -375,6 +375,12 @@ pub enum Operation<'a> {
         /// The name of the symbol to be imported.
         name: &'a str,
     },
+
+    /// Create a constant value.
+    Const {
+        /// The term that describes how to construct the constant value.
+        value: TermId,
+    },
 }
 
 impl<'a> Operation<'a> {
@@ -559,14 +565,18 @@ pub enum Term<'a> {
         args: &'a [TermId],
     },
 
-    /// Quote a runtime type as a static type.
+    /// Type for a constant runtime value.
     ///
-    /// `(quote T) : static` where `T : type`.
-    Quote {
-        /// The runtime type to be quoted.
+    /// `(const T) : static` where `T : type`.
+    Const {
+        /// The runtime type of the constant value.
         ///
         /// **Type:** `type`
         r#type: TermId,
+        /// The extension set required to be present in order to use the constant value.
+        ///
+        /// **Type:** `ext-set`
+        extensions: TermId,
     },
 
     /// A list. May include individual items or other lists to be spliced in.
@@ -661,6 +671,20 @@ pub enum Term<'a> {
     NonLinearConstraint {
         /// The runtime type that must be copyable and discardable.
         term: TermId,
+    },
+
+    /// A constant anonymous function.
+    ConstFunc {
+        /// The body of the constant anonymous function.
+        region: RegionId,
+    },
+
+    /// A constant value for an algebraic data type.
+    ConstAdt {
+        /// The tag of the variant.
+        tag: u16,
+        /// The values of the variant.
+        values: TermId,
     },
 }
 
