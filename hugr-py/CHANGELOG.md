@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.1...hugr-py-v0.10.2) (2024-12-20)
+
+
+### Features
+
+* Add `StringVal` to hugr-py ([#1818](https://github.com/CQCL/hugr/issues/1818)) ([b05a419](https://github.com/CQCL/hugr/commit/b05a419e08dfcccf10fa081a22fc83af0d11502b))
+
+
+### Bug Fixes
+
+* **py:** Fix array/list value serialization ([#1827](https://github.com/CQCL/hugr/issues/1827)) ([7bf85b9](https://github.com/CQCL/hugr/commit/7bf85b94dfbeebddb91c261c155e8f47a6cd14ef))
+
 ## [0.10.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.0...hugr-py-v0.10.1) (2024-12-18)
 
 
