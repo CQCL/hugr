@@ -4,7 +4,6 @@
 use std::collections::HashSet;
 
 use hugr_core::{hugr::hugrmut::HugrMut, HugrView, Node};
-use itertools::Itertools;
 use petgraph::visit::Dfs;
 
 use crate::validation::{ValidatePassError, ValidationLevel};
@@ -15,6 +14,8 @@ use super::call_graph::{CallGraph, CallGraphNode};
 #[non_exhaustive]
 /// Errors produced by [ConstantFoldPass].
 pub enum RemoveDeadFuncsError {
+    #[error("Node {0} was not a FuncDefn child of the Module root")]
+    InvalidEntryPoint(Node),
     #[error(transparent)]
     #[allow(missing_docs)]
     ValidationError(#[from] ValidatePassError),
@@ -24,32 +25,32 @@ fn reachable_funcs<'a>(
     cg: &'a CallGraph,
     h: &'a impl HugrView,
     entry_points: impl IntoIterator<Item = Node>,
-) -> impl Iterator<Item = Node> + 'a {
-    let mut roots = entry_points.into_iter().collect_vec();
+) -> Result<impl Iterator<Item = Node> + 'a, RemoveDeadFuncsError> {
+    let g = cg.graph();
+    let mut entry_points = entry_points.into_iter();
     let mut searcher = if h.get_optype(h.root()).is_module() {
-        if roots.is_empty() {
-            roots.extend(h.children(h.root()).filter(|n| {
-                h.get_optype(*n)
-                    .as_func_defn()
-                    .is_some_and(|fd| fd.name == "main")
-            }));
-            assert_eq!(roots.len(), 1, "No entry_points for Module and no `main`");
+        let mut d = Dfs::new(g, 0.into());
+        d.stack.clear();
+        for n in entry_points {
+            if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.root()) {
+                return Err(RemoveDeadFuncsError::InvalidEntryPoint(n));
+            }
+            d.stack.push(cg.node_index(n).unwrap())
         }
-        let mut roots = roots.into_iter().map(|i| cg.node_index(i).unwrap());
-        let mut d = Dfs::new(cg.graph(), roots.next().unwrap());
-        d.stack.extend(roots);
         d
     } else {
-        assert!(roots.is_empty());
-        Dfs::new(&cg.graph(), cg.node_index(h.root()).unwrap())
+        if let Some(n) = entry_points.next() {
+            // Can't be a child of the module root as there isn't a module root!
+            return Err(RemoveDeadFuncsError::InvalidEntryPoint(n));
+        }
+        Dfs::new(g, cg.node_index(h.root()).unwrap())
     };
-    let g = cg.graph();
-    std::iter::from_fn(move || {
+    Ok(std::iter::from_fn(move || {
         searcher.next(g).map(|i| match g.node_weight(i).unwrap() {
             CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
             CallGraphNode::NonFuncRoot => h.root(),
         })
-    })
+    }))
 }
 
 #[derive(Debug, Clone, Default)]
@@ -66,8 +67,11 @@ impl RemoveDeadFuncsPass {
         self
     }
 
-    /// Adds new entry points for a Module-rooted Hugr,
-    /// i.e., FuncDefns that are children of the root.
+    /// Adds new entry points - these must be [FuncDefn] nodes
+    /// that are children of the [Module] at the root of the Hugr.
+    ///
+    /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
+    /// [Module]: hugr_core::ops::OpType::Module
     pub fn with_module_entry_points(
         mut self,
         entry_points: impl IntoIterator<Item = Node>,
@@ -87,18 +91,17 @@ impl RemoveDeadFuncsPass {
 /// Delete from the Hugr any functions that are not used by either [Call] or
 /// [LoadFunction] nodes in reachable parts.
 ///
-/// For [Module]-rooted Hugrs, `roots` may provide a list of entry points;
-/// these are expected to be children of the root although this is not enforced. If `roots`
-/// is empty, then the root must have exactly one child being a function called `main`,
-/// which is used as sole entry point.
+/// For [Module]-rooted Hugrs, `entry_points` may provide a list of entry points,
+/// which must be children of the root. Note that if `entry_points` is empty, this will
+/// result in all functions in the module being removed.
 ///
-/// For non-Module-rooted Hugrs, `entry_points` must be empty; the root node is used.
+/// For non-[Module]-rooted Hugrs, `entry_points` must be empty; the root node is used.
 ///
-/// # Panics
-/// * If the Hugr is non-Module-rooted and `entry_points` is non-empty
-/// * If the Hugr is Module-rooted, but does not declare `main`, and `entry_points` is empty
-/// * If the Hugr is Module-rooted, and `entry_points` is non-empty but contains nodes that
-///      are not [FuncDefn]s
+/// # Errors
+/// * If there are any `entry_points` but the root of the hugr is not a [Module]
+/// * If any node in `entry_points` is
+///     * not a [FuncDefn], or
+///     * not a child of the root
 ///
 /// [Call]: hugr_core::ops::OpType::Call
 /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
@@ -108,7 +111,7 @@ pub fn remove_dead_funcs(
     h: &mut impl HugrMut,
     entry_points: impl IntoIterator<Item = Node>,
 ) -> Result<(), RemoveDeadFuncsError> {
-    let reachable = reachable_funcs(&CallGraph::new(h), h, entry_points).collect::<HashSet<_>>();
+    let reachable = reachable_funcs(&CallGraph::new(h), h, entry_points)?.collect::<HashSet<_>>();
     let unreachable = h
         .nodes()
         .filter(|n| h.get_optype(*n).is_func_defn() && !reachable.contains(n))
@@ -134,7 +137,7 @@ mod test {
     use super::RemoveDeadFuncsPass;
 
     #[rstest]
-    #[case([], vec!["from_main", "main"])]
+    #[case([], vec![])] // No entry_points removes everything!
     #[case(["main"], vec!["from_main", "main"])]
     #[case(["from_main"], vec!["from_main"])]
     #[case(["other1"], vec!["other1", "other2"])]

@@ -448,7 +448,7 @@ mod test {
             let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem])?;
             fb.finish_with_outputs(trip.outputs())?
         };
-        {
+        let mn = {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
             let mut fb = mb.define_function("main", prelusig(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
@@ -458,8 +458,8 @@ mod test {
             let pair = fb.call(db.handle(), &[usize_t().into()], [elem])?;
             let pty = pair_type(usize_t()).into();
             let [res2] = fb.call(tr.handle(), &[pty], pair.outputs())?.outputs_arr();
-            fb.finish_with_outputs([res1, res2])?;
-        }
+            fb.finish_with_outputs([res1, res2])?
+        };
         let mut hugr = mb.finish_hugr()?;
         assert_eq!(
             hugr.nodes()
@@ -493,7 +493,7 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly, [])?;
+        remove_dead_funcs(&mut nopoly, [mn.node()])?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
