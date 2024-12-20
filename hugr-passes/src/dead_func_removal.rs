@@ -3,7 +3,11 @@
 
 use std::collections::HashSet;
 
-use hugr_core::{hugr::hugrmut::HugrMut, HugrView, Node};
+use hugr_core::{
+    hugr::hugrmut::HugrMut,
+    ops::{OpTag, OpTrait},
+    HugrView, Node,
+};
 use petgraph::visit::Dfs;
 
 use crate::validation::{ValidatePassError, ValidationLevel};
@@ -114,7 +118,7 @@ pub fn remove_dead_funcs(
     let reachable = reachable_funcs(&CallGraph::new(h), h, entry_points)?.collect::<HashSet<_>>();
     let unreachable = h
         .nodes()
-        .filter(|n| h.get_optype(*n).is_func_defn() && !reachable.contains(n))
+        .filter(|n| OpTag::Function.is_superset(h.get_optype(*n).tag()) && !reachable.contains(n))
         .collect::<Vec<_>>();
     for n in unreachable {
         h.remove_subtree(n);
