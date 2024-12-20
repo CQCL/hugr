@@ -8,7 +8,7 @@ use hugr_core::{
     ops::{OpTag, OpTrait},
     HugrView, Node,
 };
-use petgraph::visit::Dfs;
+use petgraph::visit::{Dfs, Walker};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
 
@@ -32,7 +32,7 @@ fn reachable_funcs<'a>(
 ) -> Result<impl Iterator<Item = Node> + 'a, RemoveDeadFuncsError> {
     let g = cg.graph();
     let mut entry_points = entry_points.into_iter();
-    let mut searcher = if h.get_optype(h.root()).is_module() {
+    let searcher = if h.get_optype(h.root()).is_module() {
         let mut d = Dfs::new(g, 0.into());
         d.stack.clear();
         for n in entry_points {
@@ -49,11 +49,9 @@ fn reachable_funcs<'a>(
         }
         Dfs::new(g, cg.node_index(h.root()).unwrap())
     };
-    Ok(std::iter::from_fn(move || {
-        searcher.next(g).map(|i| match g.node_weight(i).unwrap() {
-            CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
-            CallGraphNode::NonFuncRoot => h.root(),
-        })
+    Ok(searcher.iter(g).map(|i| match g.node_weight(i).unwrap() {
+        CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
+        CallGraphNode::NonFuncRoot => h.root(),
     }))
 }
 
