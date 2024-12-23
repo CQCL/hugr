@@ -14,7 +14,6 @@ use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
 use itertools::Itertools as _;
 use thiserror::Error;
 
-use crate::remove_dead_funcs;
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -22,7 +21,8 @@ use crate::remove_dead_funcs;
 /// If the Hugr is [Module](OpType::Module)-rooted,
 /// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
 ///     - [remove_dead_funcs] can be used when no other Hugr will be linked in that might instantiate these
-/// * else, the originals are removed (they are invisible from outside the Hugr).
+/// * else, the originals are removed (they are invisible from outside the Hugr); however, note
+///     that this behaviour is expected to change in a future release to match Module-rooted Hugrs.
 ///
 /// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
 /// signature then the HUGR will not be modified.
@@ -47,7 +47,8 @@ fn monomorphize_ref(h: &mut impl HugrMut) {
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
         mono_scan(h, root, None, &mut HashMap::new());
         if !h.get_optype(root).is_module() {
-            remove_dead_funcs(h, []).unwrap(); // no-entry-points always succeeds
+            #[allow(deprecated)] // TODO remove in next breaking release
+            remove_polyfuncs_ref(h);
         }
     }
 }
