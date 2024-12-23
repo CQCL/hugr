@@ -772,28 +772,23 @@ pub(crate) mod test {
             ) -> impl Strategy<Value = (T, Vec<TypeParam>)> + Clone;
         }
 
-        struct MakeTypeVar(TypeParam);
-
-        impl VarEnvState<TypeArg> for MakeTypeVar {
-            fn with_env(
-                self,
-                vars: Vec<TypeParam>,
-                _reg: Arc<ExtensionRegistry>,
-            ) -> impl Strategy<Value = (TypeArg, Vec<TypeParam>)> + Clone {
-                let mut opts = vars
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, p)| self.0.contains(p))
-                    .map(|(i, p)| (TypeArg::new_var_use(i, p.clone()), vars.clone()))
-                    .collect_vec();
-                let mut env_with_new = vars.clone();
-                env_with_new.push(self.0.clone());
-                opts.push((
-                    TypeArg::new_var_use(vars.len(), self.0.clone()),
-                    env_with_new,
-                ));
-                select(opts)
-            }
+        fn make_type_var(
+            kind: TypeParam,
+            vars: Vec<TypeParam>,
+        ) -> impl Strategy<Value = (TypeArg, Vec<TypeParam>)> + Clone {
+            let mut opts = vars
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| kind.contains(p))
+                .map(|(i, p)| (TypeArg::new_var_use(i, p.clone()), vars.clone()))
+                .collect_vec();
+            let mut env_with_new = vars;
+            env_with_new.push(kind.clone());
+            opts.push((
+                TypeArg::new_var_use(env_with_new.len() - 1, kind),
+                env_with_new,
+            ));
+            select(opts)
         }
 
         #[derive(Debug, Clone)]
@@ -809,12 +804,10 @@ pub(crate) mod test {
                     // no Alias
                     MakeCustomType.with_env(vars.clone(), reg.clone()),
                     MakeFuncType.with_env(vars.clone(), reg.clone()),
-                    MakeTypeVar(self.0.into())
-                        .with_env(vars.clone(), reg.clone())
-                        .prop_map(|(ta, vars)| match ta {
-                            TypeArg::Type { ty } => (ty, vars),
-                            _ => panic!("Passed in a TypeBound, expected a Type"),
-                        }),
+                    make_type_var(self.0.into(), vars.clone()).prop_map(|(ta, vars)| match ta {
+                        TypeArg::Type { ty } => (ty, vars),
+                        _ => panic!("Passed in a TypeBound, expected a Type"),
+                    }),
                     // Type has no row_variable; consider joining with TypeRV
                     MakeSumType(self.0).with_env(vars, reg)
                 ]
@@ -860,7 +853,7 @@ pub(crate) mod test {
                                 None => proptest::num::u64::ANY.sboxed(),
                             }
                             .prop_map(move |n| (TypeArg::BoundedNat { n }, vars.clone())),
-                            MakeTypeVar(self.0).with_env(vars2, reg)
+                            make_type_var(self.0, vars2)
                         ]
                         .sboxed()
                     }
@@ -870,7 +863,7 @@ pub(crate) mod test {
                             string_regex("[a-z]+")
                                 .unwrap()
                                 .prop_map(move |arg| (TypeArg::String { arg }, vars.clone())),
-                            MakeTypeVar(self.0).with_env(vars2, reg)
+                            make_type_var(self.0, vars2)
                         ]
                         .sboxed()
                     }
@@ -939,15 +932,17 @@ pub(crate) mod test {
             let vars2 = vars.clone();
             prop_oneof![
                 es.clone().prop_map(move |es| (es, vars2.clone())),
-                es.prop_flat_map(move |es2| MakeTypeVar(TypeParam::Extensions)
-                    .with_env(vars.clone(), reg.clone())
-                    .prop_map(move |(ta, vars)| (
-                        match ta {
-                            TypeArg::Extensions { es } => es2.clone().union(es),
-                            _ => panic!("Asked for TypeParam::Extensions"),
-                        },
-                        vars
-                    )))
+                es.prop_flat_map(
+                    move |es2| make_type_var(TypeParam::Extensions, vars.clone()).prop_map(
+                        move |(ta, vars)| (
+                            match ta {
+                                TypeArg::Extensions { es } => es2.clone().union(es),
+                                _ => panic!("Asked for TypeParam::Extensions"),
+                            },
+                            vars
+                        )
+                    )
+                )
             ]
         }
 
