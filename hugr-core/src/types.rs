@@ -1087,6 +1087,7 @@ pub(crate) mod test {
             }
         }
 
+        #[allow(unused)]
         struct MakePair<S, T>(S, T);
 
         impl<A, B, S: VarEnvState<A>, T: VarEnvState<B> + Clone> VarEnvState<(A, B)> for MakePair<S, T>
