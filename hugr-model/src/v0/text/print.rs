@@ -584,6 +584,11 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("fn");
                 this.print_region(*region)
             }),
+            Term::ConstAdt { tag, values } => self.print_parens(|this| {
+                this.print_text("tag");
+                this.print_text(tag.to_string());
+                this.print_term(*values)
+            }),
         }
     }
 

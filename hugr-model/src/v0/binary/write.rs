@@ -205,6 +205,12 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::ConstFunc { region } => {
             builder.set_const_func(region.0);
         }
+
+        model::Term::ConstAdt { tag, values } => {
+            let mut builder = builder.init_const_adt();
+            builder.set_tag(*tag);
+            builder.set_values(values.0);
+        }
     }
 }
 

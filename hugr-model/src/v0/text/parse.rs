@@ -255,6 +255,12 @@ impl<'a> ParseContext<'a> {
                     Term::ConstFunc { region }
                 }
 
+                Rule::term_const_adt => {
+                    let tag = inner.next().unwrap().as_str().parse().unwrap();
+                    let values = self.parse_term(inner.next().unwrap())?;
+                    Term::ConstAdt { tag, values }
+                }
+
                 r => unreachable!("term: {:?}", r),
             };
 

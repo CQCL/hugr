@@ -155,6 +155,7 @@ struct Term {
         controlType @19 :Void;
         nonLinearConstraint @20 :TermId;
         constFunc @22 :RegionId;
+        constAdt @23 :ConstAdt;
     }
 
     struct Apply {
@@ -187,6 +188,11 @@ struct Term {
             extension @0 :Text;
             splice @1 :TermId;
         }
+    }
+
+    struct ConstAdt {
+        tag @0 :UInt16;
+        values @1 :TermId;
     }
 
     struct FuncType {

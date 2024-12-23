@@ -94,6 +94,7 @@ term = {
   | term_apply
   | term_non_linear
   | term_const_func
+  | term_const_adt
 }
 
 term_wildcard     = { "_" }
@@ -118,5 +119,6 @@ term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
 term_ctrl_type    = { "ctrl" }
 term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }
 term_const_func   = { "(" ~ "fn" ~ term ~ ")" }
+term_const_adt    = { "(" ~ "tag" ~ tag ~ term* ~ ")" }
 
 spliced_term = { term ~ "..." }

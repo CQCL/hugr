@@ -668,6 +668,14 @@ pub enum Term<'a> {
         /// The body of the constant anonymous function.
         region: RegionId,
     },
+
+    /// A constant value for an algebraic data type.
+    ConstAdt {
+        /// The tag of the variant.
+        tag: u16,
+        /// The values of the variant.
+        values: TermId,
+    },
 }
 
 /// A part of a list term.

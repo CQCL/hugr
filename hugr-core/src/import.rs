@@ -913,7 +913,8 @@ impl<'a> Context<'a> {
             | model::Term::Adt { .. }
             | model::Term::Control { .. }
             | model::Term::NonLinearConstraint { .. }
-            | model::Term::ConstFunc { .. } => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::ConstFunc { .. }
+            | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ControlType => {
                 Err(error_unsupported!("type of control types as `TypeParam`"))
@@ -967,6 +968,7 @@ impl<'a> Context<'a> {
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
             model::Term::Const { .. } => Err(error_unsupported!("`const` as `TypeArg`")),
+            model::Term::ConstAdt { .. } => Err(error_unsupported!("adt constant as `TypeArg`")),
             model::Term::ConstFunc { .. } => {
                 Err(error_unsupported!("function constant as `TypeArg`"))
             }
@@ -1092,7 +1094,8 @@ impl<'a> Context<'a> {
             | model::Term::ControlType
             | model::Term::Nat(_)
             | model::Term::NonLinearConstraint { .. }
-            | model::Term::ConstFunc { .. } => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::ConstFunc { .. }
+            | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
         }
     }
 

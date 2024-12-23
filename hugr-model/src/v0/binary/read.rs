@@ -321,6 +321,13 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::ConstFunc(region) => model::Term::ConstFunc {
             region: model::RegionId(region),
         },
+
+        Which::ConstAdt(reader) => {
+            let reader = reader?;
+            let tag = reader.get_tag();
+            let values = model::TermId(reader.get_values());
+            model::Term::ConstAdt { tag, values }
+        }
     })
 }
 
