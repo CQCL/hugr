@@ -753,6 +753,7 @@ pub(crate) mod test {
         use crate::extension::{ExtensionRegistry, ExtensionSet};
         use crate::proptest::RecursionDepth;
         use crate::std_extensions::std_reg;
+        use crate::types::Substitution;
         use crate::types::{
             type_param::TypeParam, FuncValueType, Type, TypeArg, TypeBound, TypeRow,
         };
@@ -1112,13 +1113,42 @@ pub(crate) mod test {
             }
         }
 
+        /// Given a VarEnvState that builds a T with an environment,
+        /// Builds (a T, the environment for that T, and a TypeArg for each TypeParam in that environment)
+        ///    with the environment making the TypeArgs valid
+        fn with_substitution<T: std::fmt::Debug + Clone + 'static>(
+            content: impl VarEnvState<T>,
+            content_depth: RecursionDepth,
+            subst_depth: RecursionDepth,
+            reg: Arc<ExtensionRegistry>,
+        ) -> impl Strategy<Value = ((T, Vec<TypeParam>), Vec<TypeArg>, Vec<TypeParam>)> {
+            content
+                .with_env(vec![], content_depth, reg.clone())
+                .prop_flat_map(move |(val, val_env)| {
+                    MakeVec(val_env.iter().cloned().map(MakeTypeArg).collect())
+                        .with_env(vec![], subst_depth, reg.clone())
+                        .prop_map(move |(subst, subst_env)| {
+                            ((val.clone(), val_env.clone()), subst, subst_env)
+                        })
+                })
+        }
+
         proptest! {
             #[test]
             // We override the RecursionDepth from default 4 down to 3 because otherwise we overflow the stack.
             // It doesn't seem to be an infinite loop, I infer that the folding etc. in the VarEnvState methods
             // just use a lot more stack than the simpler, original, proptests.
-            fn test_type_valid((t,env) in MakeType(TypeBound::Any).with_env(vec![], 3.into(), Arc::new(std_reg()))) {
-                prop_assert!(t.validate(&env).is_ok());
+            fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
+                    MakeType(TypeBound::Any),
+                    2.into(),
+                    2.into(),
+                    Arc::new(std_reg()))) {
+                prop_assert!(t.validate(&t_env).is_ok());
+                for s1 in s.iter() {
+                    prop_assert!(s1.validate(&s_env).is_ok());
+                }
+                let ts = t.substitute1(&Substitution::new(&s));
+                prop_assert!(ts.validate(&s_env).is_ok());
             }
         }
     }
