@@ -117,7 +117,7 @@ jobs:
       - name: Build with no features
         run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose  --no-default-features
+        run: RUST_MIN_STACK=10485760 cargo test --verbose  --no-default-features
 
   # Run tests on Rust stable
   tests-stable-all-features:
@@ -140,7 +140,7 @@ jobs:
       - name: Build with all features
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose  --all-features
+        run: RUST_MIN_STACK=10485760 cargo test --verbose  --all-features
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -175,11 +175,11 @@ jobs:
       - name: Build with no features
         run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose  --no-default-features
+        run: RUST_MIN_STACK=10485760 cargo test --verbose  --no-default-features
       - name: Build with all features
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose  --all-features
+        run: RUST_MIN_STACK=10485760 cargo test --verbose  --all-features
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -277,7 +277,7 @@ jobs:
       - name: Build
         run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
       - name: Tests with no features
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --exclude test_type_substitution
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.

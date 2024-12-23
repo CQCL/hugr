@@ -1140,8 +1140,8 @@ pub(crate) mod test {
             // just use a lot more stack than the simpler, original, proptests.
             fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
                     MakeType(TypeBound::Any),
-                    2.into(),
-                    2.into(),
+                    3.into(),
+                    3.into(),
                     Arc::new(std_reg()))) {
                 prop_assert!(t.validate(&t_env).is_ok());
                 for s1 in s.iter() {
