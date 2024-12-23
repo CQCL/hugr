@@ -802,7 +802,11 @@ pub(crate) mod test {
             ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
                 prop_oneof![
                     // no Alias
-                    MakeCustomType.with_env(vars.clone(), reg.clone()),
+                    MakeCustomType
+                        .with_env(vars.clone(), reg.clone())
+                        .prop_filter("Must fit TypeBound", move |(ct, _)| self
+                            .0
+                            .contains(ct.least_upper_bound())),
                     MakeFuncType.with_env(vars.clone(), reg.clone()),
                     make_type_var(self.0.into(), vars.clone()).prop_map(|(ta, vars)| match ta {
                         TypeArg::Type { ty } => (ty, vars),
