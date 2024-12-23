@@ -751,17 +751,17 @@ pub(crate) mod test {
         use std::{iter::once, sync::Arc};
 
         use crate::extension::{ExtensionRegistry, ExtensionSet};
+        use crate::std_extensions::std_reg;
         use crate::types::{
             type_param::TypeParam, FuncValueType, Type, TypeArg, TypeBound, TypeRow,
         };
         use itertools::Itertools;
-        use proptest::sample::Index;
-        use proptest::string::string_regex;
         use proptest::{
             collection::vec,
             prelude::{any, Just, Strategy},
-            prop_oneof,
-            sample::select,
+            prop_assert, prop_oneof, proptest,
+            sample::{select, Index},
+            string::string_regex,
         };
 
         trait VarEnvState<T>: Send + Sync {
@@ -1066,6 +1066,14 @@ pub(crate) mod test {
                             .with_env(env, reg.clone())
                             .prop_map(move |(v2, env)| ((v1.clone(), v2), env))
                     })
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn test_type_valid(t_with_env in MakeType(TypeBound::Any).with_env(vec![], Arc::new(std_reg()))) {
+                let (t,env) = t_with_env;
+                prop_assert!(t.validate(&env).is_ok());
             }
         }
     }
