@@ -19,7 +19,7 @@ use thiserror::Error;
 ///
 /// If the Hugr is [Module](OpType::Module)-rooted,
 /// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
-///     - [remove_dead_funcs] can be used when no other Hugr will be linked in that might instantiate these
+///     - [crate::remove_dead_funcs] can be used when no other Hugr will be linked in that might instantiate these
 /// * else, the originals are removed (they are invisible from outside the Hugr); however, note
 ///     that this behaviour is expected to change in a future release to match Module-rooted Hugrs.
 ///
@@ -46,7 +46,7 @@ fn monomorphize_ref(h: &mut impl HugrMut) {
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
         mono_scan(h, root, None, &mut HashMap::new());
         if !h.get_optype(root).is_module() {
-            #[allow(deprecated)] // TODO remove in next breaking release
+            #[allow(deprecated)] // TODO remove in next breaking release and update docs
             remove_polyfuncs_ref(h);
         }
     }
@@ -56,16 +56,21 @@ fn monomorphize_ref(h: &mut impl HugrMut) {
 /// calls from *monomorphic* code, this will make the Hugr invalid (call [monomorphize]
 /// first).
 ///
-/// Deprecated: use [remove_dead_funcs] instead.
+/// Deprecated: use [crate::remove_dead_funcs] instead.
 #[deprecated(
     since = "0.14.1",
-    note = "Use hugr::algorithms::call_graph::RemoveDeadFuncsPass instead"
+    note = "Use hugr::algorithms::dead_funcs::RemoveDeadFuncsPass instead"
 )]
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
+    #[allow(deprecated)] // we are in a deprecated function, so remove both at same time
     remove_polyfuncs_ref(&mut h);
     h
 }
 
+#[deprecated(
+    since = "0.14.1",
+    note = "Use hugr::algorithms::dead_funcs::RemoveDeadFuncsPass instead"
+)]
 fn remove_polyfuncs_ref(h: &mut impl HugrMut) {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
