@@ -930,7 +930,7 @@ pub(crate) mod test {
             let es = vec(
                 select(
                     reg.iter()
-                        .map(|e| ExtensionSet::singleton(e.name()))
+                        .map(|e| ExtensionSet::singleton(e.name().clone()))
                         .collect_vec(),
                 ),
                 0..2,
