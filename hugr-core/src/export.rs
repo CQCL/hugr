@@ -2,7 +2,7 @@
 use crate::{
     extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
     hugr::{IdentList, NodeMetadataMap},
-    ops::{DataflowBlock, OpName, OpTrait, OpType},
+    ops::{DataflowBlock, OpName, OpTrait, OpType, Value},
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
@@ -987,6 +987,28 @@ impl<'a> Context<'a> {
         self.make_term(model::Term::ExtSet {
             parts: parts.into_bump_slice(),
         })
+    }
+
+    fn export_value(&mut self, value: &Value) -> model::TermId {
+        match value {
+            Value::Extension { e } => todo!("export extension value"),
+            Value::Function { hugr } => todo!("export function value"),
+
+            Value::Sum(sum) => {
+                let tag = sum.tag as _;
+                let mut values = BumpVec::with_capacity_in(sum.values.len(), self.bump);
+
+                for value in &sum.values {
+                    values.push(model::ListPart::Item(self.export_value(value)));
+                }
+
+                let values = self.make_term(model::Term::List {
+                    parts: values.into_bump_slice(),
+                });
+
+                self.make_term(model::Term::ConstAdt { tag, values })
+            }
+        }
     }
 
     pub fn export_node_metadata(
