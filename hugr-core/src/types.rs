@@ -756,4 +756,385 @@ pub(crate) mod test {
             }
         }
     }
+
+    mod proptest2 {
+        use std::{iter::once, sync::Arc};
+
+        use crate::extension::{ExtensionRegistry, ExtensionSet};
+        use crate::proptest::RecursionDepth;
+        use crate::std_extensions::std_reg;
+        use crate::types::Substitution;
+        use crate::types::{
+            type_param::TypeParam, FuncValueType, Type, TypeArg, TypeBound, TypeRow,
+        };
+        use itertools::Itertools;
+        use proptest::{
+            collection::vec,
+            prelude::{any, Just, Strategy},
+            prop_assert, prop_oneof, proptest,
+            sample::{select, Index},
+            string::string_regex,
+        };
+
+        trait VarEnvState<T>: Send + Sync {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (T, Vec<TypeParam>)> + Clone;
+        }
+
+        fn make_type_var(
+            kind: TypeParam,
+            vars: Vec<TypeParam>,
+        ) -> impl Strategy<Value = (TypeArg, Vec<TypeParam>)> + Clone {
+            let mut opts = vars
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| kind.contains(p))
+                .map(|(i, p)| (TypeArg::new_var_use(i, p.clone()), vars.clone()))
+                .collect_vec();
+            let mut env_with_new = vars;
+            env_with_new.push(kind.clone());
+            opts.push((
+                TypeArg::new_var_use(env_with_new.len() - 1, kind),
+                env_with_new,
+            ));
+            select(opts)
+        }
+
+        #[derive(Debug, Clone)]
+        struct MakeType(TypeBound);
+
+        impl VarEnvState<Type> for MakeType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                let non_leaf = (!depth.leaf()) as u32;
+                let depth = depth.descend();
+                prop_oneof![
+                    // no Alias
+                    1 => MakeCustomType
+                        .with_env(vars.clone(), depth, reg.clone())
+                        .prop_filter("Must fit TypeBound", move |(ct, _)| self
+                            .0
+                            .contains(ct.least_upper_bound())),
+                    non_leaf => MakeFuncType.with_env(vars.clone(), depth, reg.clone()),
+                    1 => make_type_var(self.0.into(), vars.clone()).prop_map(|(ta, vars)| match ta {
+                        TypeArg::Type { ty } => (ty, vars),
+                        _ => panic!("Passed in a TypeBound, expected a Type"),
+                    }),
+                    // Type has no row_variable; consider joining with TypeRV
+                    1 => MakeSumType(self.0).with_env(vars, depth, reg)
+                ]
+            }
+        }
+
+        struct MakeSumType(TypeBound);
+        const MAX_NUM_VARIANTS: u8 = 5;
+        impl VarEnvState<Type> for MakeSumType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                let b = self.0;
+                if depth.leaf() {
+                    (1..MAX_NUM_VARIANTS)
+                        .prop_map(move |nv| (Type::new_unit_sum(nv), vars.clone()))
+                        .sboxed()
+                } else {
+                    (1..MAX_NUM_VARIANTS)
+                        .prop_flat_map(move |nv| {
+                            MakeVec(vec![MakeTypeRow(b); nv as usize]).with_env(
+                                vars.clone(),
+                                depth,
+                                reg.clone(),
+                            )
+                        })
+                        .prop_map(|(rows, vars)| (Type::new_sum(rows), vars))
+                        .sboxed()
+                }
+            }
+        }
+
+        #[derive(Clone, Debug)]
+        struct MakeTypeArg(TypeParam);
+        const MAX_LIST_LEN: usize = 4;
+        impl VarEnvState<TypeArg> for MakeTypeArg {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (TypeArg, Vec<TypeParam>)> + Clone {
+                match &self.0 {
+                    TypeParam::Type { b } => MakeType(*b)
+                        .with_env(vars, depth, reg)
+                        .prop_map(|(ty, vars)| (TypeArg::Type { ty }, vars))
+                        .sboxed(),
+                    TypeParam::BoundedNat { bound } => {
+                        let vars2 = vars.clone();
+                        prop_oneof![
+                            match bound.value() {
+                                Some(max) => (0..max.get()).sboxed(),
+                                None => proptest::num::u64::ANY.sboxed(),
+                            }
+                            .prop_map(move |n| (TypeArg::BoundedNat { n }, vars.clone())),
+                            make_type_var(self.0, vars2)
+                        ]
+                        .sboxed()
+                    }
+                    TypeParam::String => {
+                        let vars2 = vars.clone();
+                        prop_oneof![
+                            string_regex("[a-z]+")
+                                .unwrap()
+                                .prop_map(move |arg| (TypeArg::String { arg }, vars.clone())),
+                            make_type_var(self.0, vars2)
+                        ]
+                        .sboxed()
+                    }
+                    TypeParam::List { param } => {
+                        if depth.leaf() {
+                            Just((TypeArg::Sequence { elems: vec![] }, vars)).sboxed()
+                        } else {
+                            fold_n(
+                                MakeTypeArg((**param).clone()),
+                                0..MAX_LIST_LEN,
+                                vars,
+                                depth.descend(),
+                                reg,
+                            )
+                            .prop_map(|(elems, vars)| (TypeArg::Sequence { elems }, vars))
+                            .sboxed()
+                        }
+                    }
+                    TypeParam::Tuple { params } => {
+                        MakeVec(params.iter().cloned().map(MakeTypeArg).collect())
+                            .with_env(vars, depth, reg)
+                            .prop_map(|(elems, vars)| (TypeArg::Sequence { elems }, vars))
+                            .sboxed()
+                    }
+                    TypeParam::Extensions => make_extensions(vars, reg)
+                        .prop_map(|(es, vars)| (TypeArg::Extensions { es }, vars))
+                        .sboxed(),
+                }
+            }
+        }
+
+        struct MakeFuncType;
+        const MAX_TYPE_ROW_LEN: usize = 5;
+        impl VarEnvState<Type> for MakeFuncType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                MakeTypeRow(TypeBound::Any)
+                    .with_env(vars, depth, reg.clone())
+                    .prop_flat_map(move |(inputs, vars)| {
+                        let reg2 = reg.clone();
+                        MakeTypeRow(TypeBound::Any)
+                            .with_env(vars, depth, reg.clone())
+                            .prop_flat_map(move |(outputs, vars)| {
+                                let inputs = inputs.clone();
+                                make_extensions(vars, reg2.clone()).prop_map(move |(exts, vars)| {
+                                    (
+                                        Type::new_function(
+                                            FuncValueType::new(inputs.clone(), outputs.clone())
+                                                .with_extension_delta(exts),
+                                        ),
+                                        vars,
+                                    )
+                                })
+                            })
+                    })
+            }
+        }
+
+        fn make_extensions(
+            vars: Vec<TypeParam>,
+            reg: Arc<ExtensionRegistry>,
+        ) -> impl Strategy<Value = (ExtensionSet, Vec<TypeParam>)> {
+            // Some number of extensions from the registry
+            let es = vec(
+                select(
+                    reg.iter()
+                        .map(|e| ExtensionSet::singleton(e.name().clone()))
+                        .collect_vec(),
+                ),
+                0..2,
+            )
+            .prop_map(ExtensionSet::union_over);
+            let vars2 = vars.clone();
+            prop_oneof![
+                es.clone().prop_map(move |es| (es, vars2.clone())),
+                es.prop_flat_map(
+                    move |es2| make_type_var(TypeParam::Extensions, vars.clone()).prop_map(
+                        move |(ta, vars)| (
+                            match ta {
+                                TypeArg::Extensions { es } => es2.clone().union(es),
+                                _ => panic!("Asked for TypeParam::Extensions"),
+                            },
+                            vars
+                        )
+                    )
+                )
+            ]
+        }
+
+        struct MakeCustomType;
+
+        impl VarEnvState<Type> for MakeCustomType {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Type, Vec<TypeParam>)> + Clone {
+                any::<Index>().prop_flat_map(move |idx| {
+                    let (ext, typ) = *idx.get(
+                        &reg.iter()
+                            .flat_map(|e| {
+                                e.types()
+                                    .filter(|t| !depth.leaf() || t.1.params().is_empty())
+                                    .map(|(name, _)| (e.name(), name))
+                            })
+                            .collect_vec(),
+                    );
+                    let typedef = reg.get(ext).unwrap().get_type(typ).unwrap();
+                    // Make unborrowed things that inner closure can take ownership op:
+                    let (ext, typ, reg) = (ext.clone(), typ.clone(), reg.clone());
+                    MakeVec(typedef.params().iter().cloned().map(MakeTypeArg).collect())
+                        .with_env(vars.clone(), depth, reg.clone())
+                        .prop_map(move |(v, vars)| {
+                            (
+                                Type::new_extension(
+                                    reg.get(&ext)
+                                        .unwrap()
+                                        .get_type(&typ)
+                                        .unwrap()
+                                        .instantiate(v)
+                                        .unwrap(),
+                                ),
+                                vars,
+                            )
+                        })
+                })
+            }
+        }
+
+        #[derive(Clone)]
+        struct MakeTypeRow(TypeBound);
+
+        impl VarEnvState<TypeRow> for MakeTypeRow {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (TypeRow, Vec<TypeParam>)> + Clone {
+                (0..MAX_TYPE_ROW_LEN)
+                    .prop_flat_map(move |sz| {
+                        MakeVec(vec![MakeType(self.0); sz]).with_env(
+                            vars.clone(),
+                            depth,
+                            reg.clone(),
+                        )
+                    })
+                    .prop_map(|(vec, vars)| (TypeRow::from(vec), vars))
+            }
+        }
+
+        fn fold_n<
+            E: Clone + std::fmt::Debug + 'static + Send + Sync,
+            T: VarEnvState<E> + Clone + Send + Sync + 'static,
+        >(
+            elem_strat: T,
+            size_strat: impl Strategy<Value = usize>,
+            params: Vec<TypeParam>,
+            depth: RecursionDepth,
+            reg: Arc<ExtensionRegistry>,
+        ) -> impl Strategy<Value = (Vec<E>, Vec<TypeParam>)> {
+            size_strat.prop_flat_map(move |sz| {
+                MakeVec(vec![elem_strat.clone(); sz]).with_env(params.clone(), depth, reg.clone())
+            })
+        }
+
+        struct MakeVec<T>(Vec<T>);
+
+        impl<E, T: VarEnvState<E>> VarEnvState<Vec<E>> for MakeVec<T>
+        where
+            E: Clone + std::fmt::Debug + 'static + Send + Sync,
+            T: VarEnvState<E> + Clone + Send + Sync + 'static,
+        {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (Vec<E>, Vec<TypeParam>)> + Clone {
+                let mut s = Just((Vec::<E>::new(), vars)).sboxed();
+                for strat in self.0 {
+                    let reg2 = reg.clone();
+                    s = s
+                        .prop_flat_map(move |(v, vars)| {
+                            strat.clone().with_env(vars, depth, reg2.clone()).prop_map(
+                                move |(elem, vars)| {
+                                    (v.iter().cloned().chain(once(elem)).collect(), vars)
+                                },
+                            )
+                        })
+                        .sboxed();
+                }
+                s
+            }
+        }
+
+        /// Given a VarEnvState that builds a T with an environment,
+        /// Builds (a T, the environment for that T, and a TypeArg for each TypeParam in that environment)
+        ///    with the environment making the TypeArgs valid
+        fn with_substitution<T: std::fmt::Debug + Clone + 'static>(
+            content: impl VarEnvState<T>,
+            content_depth: RecursionDepth,
+            subst_depth: RecursionDepth,
+            reg: Arc<ExtensionRegistry>,
+        ) -> impl Strategy<Value = ((T, Vec<TypeParam>), Vec<TypeArg>, Vec<TypeParam>)> {
+            content
+                .with_env(vec![], content_depth, reg.clone())
+                .prop_flat_map(move |(val, val_env)| {
+                    MakeVec(val_env.iter().cloned().map(MakeTypeArg).collect())
+                        .with_env(vec![], subst_depth, reg.clone())
+                        .prop_map(move |(subst, subst_env)| {
+                            ((val.clone(), val_env.clone()), subst, subst_env)
+                        })
+                })
+        }
+
+        proptest! {
+            #[test]
+            // We override the RecursionDepth from default 4 down to 3 because otherwise we overflow the stack.
+            // It doesn't seem to be an infinite loop, I infer that the folding etc. in the VarEnvState methods
+            // just use a lot more stack than the simpler, original, proptests.
+            fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
+                    MakeType(TypeBound::Any),
+                    3.into(),
+                    3.into(),
+                    Arc::new(std_reg()))) {
+                prop_assert!(t.validate(&t_env).is_ok());
+                for s1 in s.iter() {
+                    prop_assert!(s1.validate(&s_env).is_ok());
+                }
+                let ts = t.substitute1(&Substitution::new(&s));
+                prop_assert!(ts.validate(&s_env).is_ok());
+            }
+        }
+    }
 }
