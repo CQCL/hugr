@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-v0.14.1...hugr-v0.14.2) - 2024-12-24
+
+### New Features
+
+- Add CallGraph struct, and dead-function-removal pass (#1796)
+- `Value::some`, `::none`, and `SumType::new_option` helpers (#1828)
+
+### Testing
+
+- Add tests for constant value deserialization (#1822)
+
 ## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-v0.14.0...hugr-v0.14.1) - 2024-12-18
 
 ### Bug Fixes
