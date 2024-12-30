@@ -14,7 +14,7 @@ use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
-use hugr_core::{Hugr, HugrView};
+use hugr_core::{Hugr, HugrView, Node};
 
 use super::const_fold::constant_fold_pass;
 
@@ -28,69 +28,8 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
             for n in h.children(h.root()).collect::<Vec<_>>() {
                 match h.get_optype(n) {
                     OpType::Conditional(_) => {
-                        let (pred, _) = h.single_linked_output(n, 0).unwrap();
-                        if h.get_optype(pred).is_load_constant() {
-                            let cst_node = h.static_source(pred).unwrap();
-                            let Some(Value::Sum(Sum { tag, values, .. })) =
-                                h.get_optype(cst_node).as_const().map(Const::value)
-                            else {
-                                panic!("Conditional input was not a Sum")
-                            };
-                            let case_node = h.children(n).nth(*tag).unwrap();
-                            let signature =
-                                h.get_optype(case_node).as_case().unwrap().signature.clone();
-
-                            let mut replacement = Hugr::new(h.get_optype(h.root()).clone());
-                            let dfg = replacement
-                                .add_node_with_parent(replacement.root(), DFG { signature });
-                            for (i, v) in values.iter().enumerate() {
-                                let cst = replacement.add_node_with_parent(
-                                    replacement.root(),
-                                    Const::new(v.clone()),
-                                );
-                                replacement.connect(cst, 0, dfg, i);
-                            }
-                            let mut removal = vec![n];
-                            if h.static_targets(cst_node).map_or(0, Iterator::count) == 1 {
-                                // Also remove the original (Sum) constant - we could leave this for later DCE?
-                                removal.push(cst_node);
-                            }
-                            h.apply_rewrite(Replacement {
-                                removal,
-                                replacement,
-                                adoptions: HashMap::from([(dfg, case_node)]),
-                                mu_inp: h
-                                    .all_linked_outputs(n)
-                                    .skip(1)
-                                    .enumerate()
-                                    .map(|(i, (src, src_pos))| NewEdgeSpec {
-                                        src,
-                                        tgt: dfg,
-                                        kind: NewEdgeKind::Value {
-                                            src_pos,
-                                            tgt_pos: (i + values.len()).into(),
-                                        },
-                                    })
-                                    .collect(),
-                                mu_new: vec![],
-                                mu_out: h
-                                    .node_outputs(n)
-                                    .flat_map(|src_pos| {
-                                        h.linked_inputs(n, src_pos).map(move |(tgt, tgt_pos)| {
-                                            NewEdgeSpec {
-                                                src: dfg,
-                                                tgt,
-                                                kind: NewEdgeKind::Value { src_pos, tgt_pos },
-                                            }
-                                        })
-                                    })
-                                    .collect(),
-                            })
-                            .unwrap();
-                            // TODO: replace conditional with DFG containing that case,
-                            // and constant with element constants.
-                            need_scan = true; // will inline on next iter. PERF: inline it now
-                        }
+                        need_scan |= conditional_to_dfg(&mut h, n).is_some();
+                        // will inline on next iter. PERF: inline it now
                     }
                     OpType::DFG(_) => {
                         h.apply_rewrite(InlineDFG(n.into())).unwrap();
@@ -187,4 +126,61 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
             Some(cst.value().clone())
         })
         .collect()
+}
+
+fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
+    let (pred, _) = h.single_linked_output(cond, 0).unwrap();
+    h.get_optype(pred).as_load_constant()?;
+    let cst_node = h.static_source(pred).unwrap();
+    let Some(Value::Sum(Sum { tag, values, .. })) =
+        h.get_optype(cst_node).as_const().map(Const::value)
+    else {
+        panic!("Conditional input was not a Sum")
+    };
+    let case_node = h.children(cond).nth(*tag).unwrap();
+    let signature = h.get_optype(case_node).as_case().unwrap().signature.clone();
+
+    let mut replacement = Hugr::new(h.get_optype(h.root()).clone());
+    let dfg = replacement.add_node_with_parent(replacement.root(), DFG { signature });
+    for (i, v) in values.iter().enumerate() {
+        let cst = replacement.add_node_with_parent(replacement.root(), Const::new(v.clone()));
+        replacement.connect(cst, 0, dfg, i);
+    }
+    let mut removal = vec![cond];
+    if h.static_targets(cst_node).map_or(0, Iterator::count) == 1 {
+        // Also remove the original (Sum) constant - we could leave this for later DCE?
+        removal.push(cst_node);
+    }
+    h.apply_rewrite(Replacement {
+        removal,
+        replacement,
+        adoptions: HashMap::from([(dfg, case_node)]),
+        mu_inp: h
+            .all_linked_outputs(cond)
+            .skip(1)
+            .enumerate()
+            .map(|(i, (src, src_pos))| NewEdgeSpec {
+                src,
+                tgt: dfg,
+                kind: NewEdgeKind::Value {
+                    src_pos,
+                    tgt_pos: (i + values.len()).into(),
+                },
+            })
+            .collect(),
+        mu_new: vec![],
+        mu_out: h
+            .node_outputs(cond)
+            .flat_map(|src_pos| {
+                h.linked_inputs(cond, src_pos)
+                    .map(move |(tgt, tgt_pos)| NewEdgeSpec {
+                        src: dfg,
+                        tgt,
+                        kind: NewEdgeKind::Value { src_pos, tgt_pos },
+                    })
+            })
+            .collect(),
+    })
+    .unwrap();
+    Some(())
 }
