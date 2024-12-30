@@ -176,20 +176,16 @@ impl ConstantFoldPass {
             }
             // Also follow dataflow demand
             for (src, op) in h.all_linked_outputs(n) {
-                let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
-                    EdgeKind::Value(_) => {
-                        h.get_optype(src).is_load_constant()
-                            || results
-                                .try_read_wire_concrete::<Value, _, _>(Wire::new(src, op))
-                                .is_err()
-                    }
-                    EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
-                    EdgeKind::ControlFlow => false, // we always include all children of a CFG above
-                    _ => true, // needed as EdgeKind non-exhaustive; not knowing what it is, assume the worst
-                };
-                if needs_predecessor {
-                    q.push_back(src);
+                if matches!(h.get_optype(src).port_kind(op).unwrap(), EdgeKind::Value(_))
+                    && results
+                        .try_read_wire_concrete::<Value, _, _>(Wire::new(src, op))
+                        .is_ok()
+                    && !h.get_optype(src).is_load_constant()
+                {
+                    continue;
                 }
+                // All other edge types --> we need the predecessors (even if included already e.g. ControlFlow)
+                q.push_back(src);
             }
         }
     }
