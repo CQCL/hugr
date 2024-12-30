@@ -7,10 +7,13 @@
 use std::collections::HashMap;
 
 use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::internal::HugrMutInternals;
 use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
 use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
+use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
-use hugr_core::ops::{Const, OpType, Value, DFG};
+use hugr_core::ops::handle::FuncID;
+use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
 use hugr_core::{Hugr, HugrView};
 
 use super::const_fold::constant_fold_pass;
@@ -117,10 +120,43 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                         }
                     }
                     OpType::Call(_) => {
+                        // If it's a FuncDefn (could be a FuncDecl), inline.
                         // Even if no inputs are constants (e.g. they are partial sums with multiple tags),
                         // this *could* (maybe) be beneficial.
                         // Note we are only doing this at the top level of the Hugr!
-                        // TODO: Copy body of called-function into DFG, wire in remaining inputs (unchanged).
+                        let Ok(function) = DescendantsGraph::<FuncID<true>>::try_new(
+                            &h,
+                            h.static_source(n).unwrap(),
+                        ) else {
+                            break;
+                        };
+                        // Ideally we'd like the following to preserve uses from within "function" of Consts outside
+                        // the function, but (see https://github.com/CQCL/hugr/discussions/1642) this probably won't happen at the moment - TODO XXX FIXME
+                        let mut func = function.extract_hugr();
+                        let func_sig = func.root_type().as_func_defn().unwrap().inner_signature();
+                        func.replace_op(
+                            func.root(),
+                            DFG {
+                                signature: func_sig.into_owned(),
+                            },
+                        )
+                        .unwrap();
+                        let func_copy = h.insert_hugr(h.get_parent(n).unwrap(), func).new_root;
+                        let new_connections = h
+                            .all_linked_outputs(n)
+                            .enumerate()
+                            .map(|(tgt_port, (src, src_port))| {
+                                (src, src_port, func_copy, tgt_port.into())
+                            })
+                            .chain(h.node_outputs(n).flat_map(|src_port| {
+                                h.linked_inputs(n, src_port)
+                                    .map(move |(tgt, tgt_port)| (n, src_port, tgt, tgt_port))
+                            }))
+                            .collect::<Vec<_>>();
+                        h.remove_node(n);
+                        for (src_node, src_port, tgt_node, tgt_port) in new_connections {
+                            h.connect(src_node, src_port, tgt_node, tgt_port);
+                        }
                         precision_improved = true;
                     }
                     OpType::CFG(_) => {
