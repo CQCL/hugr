@@ -63,40 +63,7 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                         // Even if no inputs are constants (e.g. they are partial sums with multiple tags),
                         // this *could* (maybe) be beneficial.
                         // Note we are only doing this at the top level of the Hugr!
-                        let Ok(function) = DescendantsGraph::<FuncID<true>>::try_new(
-                            &h,
-                            h.static_source(n).unwrap(),
-                        ) else {
-                            break;
-                        };
-                        // Ideally we'd like the following to preserve uses from within "function" of Consts outside
-                        // the function, but (see https://github.com/CQCL/hugr/discussions/1642) this probably won't happen at the moment - TODO XXX FIXME
-                        let mut func = function.extract_hugr();
-                        let func_sig = func.root_type().as_func_defn().unwrap().inner_signature();
-                        func.replace_op(
-                            func.root(),
-                            DFG {
-                                signature: func_sig.into_owned(),
-                            },
-                        )
-                        .unwrap();
-                        let func_copy = h.insert_hugr(h.get_parent(n).unwrap(), func).new_root;
-                        let new_connections = h
-                            .all_linked_outputs(n)
-                            .enumerate()
-                            .map(|(tgt_port, (src, src_port))| {
-                                (src, src_port, func_copy, tgt_port.into())
-                            })
-                            .chain(h.node_outputs(n).flat_map(|src_port| {
-                                h.linked_inputs(n, src_port)
-                                    .map(move |(tgt, tgt_port)| (n, src_port, tgt, tgt_port))
-                            }))
-                            .collect::<Vec<_>>();
-                        h.remove_node(n);
-                        for (src_node, src_port, tgt_node, tgt_port) in new_connections {
-                            h.connect(src_node, src_port, tgt_node, tgt_port);
-                        }
-                        precision_improved = true;
+                        precision_improved |= inline_call(&mut h, n).is_some();
                     }
                     OpType::CFG(_) => {
                         // TODO: if entry node has in-edges (i.e. from other blocks) -> peel, set precision_improved=True
@@ -182,5 +149,46 @@ fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
             .collect(),
     })
     .unwrap();
+    Some(())
+}
+
+fn inline_call(h: &mut impl HugrMut, call: Node) -> Option<()> {
+    let orig_func = h.static_source(call).unwrap();
+    let function = DescendantsGraph::<FuncID<true>>::try_new(&h, orig_func).ok()?;
+    // Ideally we'd like the following to preserve uses from within "function" of Consts outside
+    // the function, but (see https://github.com/CQCL/hugr/discussions/1642) this probably won't happen at the moment - TODO XXX FIXME
+    let mut func = function.extract_hugr();
+    let recursive_calls = func
+        .static_targets(func.root())
+        .unwrap()
+        .collect::<Vec<_>>();
+    let func_sig = func.root_type().as_func_defn().unwrap().inner_signature();
+    func.replace_op(
+        func.root(),
+        DFG {
+            signature: func_sig.into_owned(),
+        },
+    )
+    .unwrap();
+    let func_copy = h.insert_hugr(h.get_parent(call).unwrap(), func);
+    for (rc, p) in recursive_calls.into_iter() {
+        let call_node = func_copy.node_map.get(&rc).unwrap();
+        h.disconnect(*call_node, p);
+        h.connect(orig_func, 0, *call_node, p);
+    }
+    let func_copy = func_copy.new_root;
+    let new_connections = h
+        .all_linked_outputs(call)
+        .enumerate()
+        .map(|(tgt_port, (src, src_port))| (src, src_port, func_copy, tgt_port.into()))
+        .chain(h.node_outputs(call).flat_map(|src_port| {
+            h.linked_inputs(call, src_port)
+                .map(move |(tgt, tgt_port)| (func_copy, src_port, tgt, tgt_port))
+        }))
+        .collect::<Vec<_>>();
+    h.remove_node(call);
+    for (src_node, src_port, tgt_node, tgt_port) in new_connections {
+        h.connect(src_node, src_port, tgt_node, tgt_port);
+    }
     Some(())
 }
