@@ -4,9 +4,13 @@
 //! but the API is useful, and it seems likely that some of the transforms
 //! will not be worth performing if a single-[Value] is not wanted and/or achievable.
 
+use std::collections::HashMap;
+
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
-use hugr_core::ops::{OpType, Value};
+use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
+use hugr_core::ops::constant::Sum;
+use hugr_core::ops::{Const, OpType, Value, DFG};
 use hugr_core::{Hugr, HugrView};
 
 use super::const_fold::constant_fold_pass;
@@ -23,6 +27,63 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                     OpType::Conditional(_) => {
                         let (pred, _) = h.single_linked_output(n, 0).unwrap();
                         if h.get_optype(pred).is_load_constant() {
+                            let cst_node = h.static_source(pred).unwrap();
+                            let Some(Value::Sum(Sum { tag, values, .. })) =
+                                h.get_optype(cst_node).as_const().map(Const::value)
+                            else {
+                                panic!("Conditional input was not a Sum")
+                            };
+                            let case_node = h.children(n).nth(*tag).unwrap();
+                            let signature =
+                                h.get_optype(case_node).as_case().unwrap().signature.clone();
+
+                            let mut replacement = Hugr::new(h.get_optype(h.root()).clone());
+                            let dfg = replacement
+                                .add_node_with_parent(replacement.root(), DFG { signature });
+                            for (i, v) in values.iter().enumerate() {
+                                let cst = replacement.add_node_with_parent(
+                                    replacement.root(),
+                                    Const::new(v.clone()),
+                                );
+                                replacement.connect(cst, 0, dfg, i);
+                            }
+                            let mut removal = vec![n];
+                            if h.static_targets(cst_node).map_or(0, Iterator::count) == 1 {
+                                // Also remove the original (Sum) constant - we could leave this for later DCE?
+                                removal.push(cst_node);
+                            }
+                            h.apply_rewrite(Replacement {
+                                removal,
+                                replacement,
+                                adoptions: HashMap::from([(dfg, case_node)]),
+                                mu_inp: h
+                                    .all_linked_outputs(n)
+                                    .skip(1)
+                                    .enumerate()
+                                    .map(|(i, (src, src_pos))| NewEdgeSpec {
+                                        src,
+                                        tgt: dfg,
+                                        kind: NewEdgeKind::Value {
+                                            src_pos,
+                                            tgt_pos: (i + values.len()).into(),
+                                        },
+                                    })
+                                    .collect(),
+                                mu_new: vec![],
+                                mu_out: h
+                                    .node_outputs(n)
+                                    .flat_map(|src_pos| {
+                                        h.linked_inputs(n, src_pos).map(move |(tgt, tgt_pos)| {
+                                            NewEdgeSpec {
+                                                src: dfg,
+                                                tgt,
+                                                kind: NewEdgeKind::Value { src_pos, tgt_pos },
+                                            }
+                                        })
+                                    })
+                                    .collect(),
+                            })
+                            .unwrap();
                             // TODO: replace conditional with DFG containing that case,
                             // and constant with element constants.
                             need_scan = true; // will inline on next iter. PERF: inline it now
