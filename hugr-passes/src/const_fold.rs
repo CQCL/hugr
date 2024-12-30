@@ -155,7 +155,7 @@ impl ConstantFoldPass {
                 continue;
             };
 
-            if h.get_optype(n).is_cfg() {
+            if h.get_optype(n).is_cfg() || h.get_optype(n).is_conditional() {
                 for bb in h.children(n) {
                     //if results.bb_reachable(bb).unwrap() { // no, we'd need to patch up predicates
                     q.push_back(bb);
