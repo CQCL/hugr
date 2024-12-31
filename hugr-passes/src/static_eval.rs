@@ -97,24 +97,26 @@ fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
     let (pred, _) = h.single_linked_output(cond, 0).unwrap();
     h.get_optype(pred).as_load_constant()?;
     let cst_node = h.static_source(pred).unwrap();
-    let Some(Value::Sum(Sum { tag, values, .. })) =
-        h.get_optype(cst_node).as_const().map(Const::value)
+    let Value::Sum(Sum { tag, values, .. }) = h.get_optype(cst_node).as_const().unwrap().value()
     else {
         panic!("Conditional input was not a Sum")
     };
     let case_node = h.children(cond).nth(*tag).unwrap();
     let signature = h.get_optype(case_node).as_case().unwrap().signature.clone();
 
-    let mut replacement = Hugr::new(h.get_optype(h.root()).clone());
+    let mut replacement = Hugr::new(h.get_optype(h.get_parent(cond).unwrap()).clone());
     let dfg = replacement.add_node_with_parent(replacement.root(), DFG { signature });
     for (i, v) in values.iter().enumerate() {
         let cst = replacement.add_node_with_parent(replacement.root(), Const::new(v.clone()));
         replacement.connect(cst, 0, dfg, i);
     }
     let mut removal = vec![cond];
-    if h.static_targets(cst_node).map_or(0, Iterator::count) == 1 {
+    if h.static_targets(pred).map_or(0, Iterator::count) == 1 {
         // Also remove the original (Sum) constant - we could leave this for later DCE?
-        removal.push(cst_node);
+        removal.push(pred);
+        if h.static_targets(cst_node).map_or(0, Iterator::count) == 1 {
+            removal.push(cst_node);
+        }
     }
     h.apply_rewrite(Replacement {
         removal,
