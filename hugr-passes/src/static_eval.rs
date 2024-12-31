@@ -14,7 +14,7 @@ use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
-use hugr_core::{Hugr, HugrView, Node};
+use hugr_core::{Direction, Hugr, HugrView, Node};
 
 use crate::const_fold::ConstantFoldPass;
 
@@ -160,14 +160,20 @@ fn inline_call(h: &mut impl HugrMut, call: Node) -> Option<()> {
         .static_targets(func.root())
         .unwrap()
         .collect::<Vec<_>>();
-    let func_sig = func.root_type().as_func_defn().unwrap().inner_signature();
-    func.replace_op(
-        func.root(),
-        DFG {
-            signature: func_sig.into_owned(),
-        },
-    )
-    .unwrap();
+    let new_op = OpType::from(DFG {
+        signature: func
+            .root_type()
+            .as_func_defn()
+            .unwrap()
+            .inner_signature()
+            .into_owned(),
+    });
+    let (in_ports, out_ports) = (
+        new_op.port_count(Direction::Incoming),
+        new_op.port_count(Direction::Outgoing),
+    );
+    func.replace_op(func.root(), new_op).unwrap();
+    func.set_num_ports(func.root(), in_ports as _, out_ports as _);
     let func_copy = h.insert_hugr(h.get_parent(call).unwrap(), func);
     for (rc, p) in recursive_calls.into_iter() {
         let call_node = func_copy.node_map.get(&rc).unwrap();
@@ -177,6 +183,7 @@ fn inline_call(h: &mut impl HugrMut, call: Node) -> Option<()> {
     let func_copy = func_copy.new_root;
     let new_connections = h
         .all_linked_outputs(call)
+        .filter(|(n, _)| *n != orig_func)
         .enumerate()
         .map(|(tgt_port, (src, src_port))| (src, src_port, func_copy, tgt_port.into()))
         .chain(h.node_outputs(call).flat_map(|src_port| {
