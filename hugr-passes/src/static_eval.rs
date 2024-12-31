@@ -20,10 +20,10 @@ use super::const_fold::constant_fold_pass;
 
 pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
     // TODO: allow inputs to be specified
-    loop {
+    'reanalyse: loop {
         constant_fold_pass(&mut h);
-        let mut need_reanalyse = false;
         loop {
+            let mut need_reanalyse = false;
             let mut need_scan = false;
             for n in h.children(h.root()).collect::<Vec<_>>() {
                 match h.get_optype(n) {
@@ -36,13 +36,7 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                         need_scan = true;
                     }
                     OpType::TailLoop(_) => {
-                        let (pred, _) = h.single_linked_output(n, 0).unwrap();
-                        if h.get_optype(pred).is_load_constant() {
-                            // TODO: copy body of loop into DFG (dup loop, change container type, output Sum)
-                            // TODO: change constant into elements
-                            // TODO: nest existing loop inside conditional testing output of DFG.
-                            need_reanalyse = true;
-                        }
+                        need_reanalyse |= peel_tailloop(&mut h, n).is_some();
                     }
                     OpType::CallIndirect(_) => {
                         let (called, _) = h.single_linked_output(n, 0).unwrap();
@@ -59,9 +53,8 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                         }
                     }
                     OpType::Call(_) => {
-                        // If it's a FuncDefn (could be a FuncDecl), inline.
                         // Even if no inputs are constants (e.g. they are partial sums with multiple tags),
-                        // this *could* (maybe) be beneficial.
+                        // inlining *could* (maybe) be beneficial.
                         // Note we are only doing this at the top level of the Hugr!
                         need_reanalyse |= inline_call(&mut h, n).is_some();
                     }
@@ -73,13 +66,13 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                     _ => (),
                 }
             }
-            if need_reanalyse || !need_scan {
+            if need_reanalyse {
                 break;
             };
+            if !need_scan {
+                break 'reanalyse; // done
+            };
         }
-        if !need_reanalyse {
-            break;
-        };
     }
 
     let [_, out] = h.get_io(h.root()).unwrap();
@@ -191,4 +184,14 @@ fn inline_call(h: &mut impl HugrMut, call: Node) -> Option<()> {
         h.connect(src_node, src_port, tgt_node, tgt_port);
     }
     Some(())
+}
+
+fn peel_tailloop(h: &mut impl HugrMut, tl: Node) -> Option<()> {
+    let (pred, _) = h.single_linked_output(tl, 0).unwrap();
+    h.get_optype(pred).as_load_constant()?;
+    // TODO: copy body of loop into DFG (dup loop, change container type, output Sum)
+    // TODO: change constant into elements
+    // TODO: nest existing loop inside conditional testing output of DFG.
+    // Some(())
+    None
 }
