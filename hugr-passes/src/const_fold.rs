@@ -32,6 +32,7 @@ pub struct ConstantFoldPass {
     validation: ValidationLevel,
     allow_increase_termination: bool,
     inputs: HashMap<IncomingPort, Value>,
+    entry_point: Option<Node>,
 }
 
 #[derive(Debug, Error)]
@@ -71,6 +72,17 @@ impl ConstantFoldPass {
         self
     }
 
+    /// Sets the entry point for a [Module]-rooted Hugr, i.e. at which [FuncDefn]
+    /// child of the root the Hugr starts executing. If unspecified, for
+    /// [Module]-rooted Hugrs, the entire contents will be removed.
+    ///
+    /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
+    /// [Module]: hugr_core::ops::OpType::Module
+    pub fn with_module_entry_point(mut self, node: Node) -> Self {
+        self.entry_point = Some(node);
+        self
+    }
+
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
@@ -88,8 +100,7 @@ impl ConstantFoldPass {
         });
 
         let results = Machine::new(&hugr).run(ConstFoldContext(hugr), inputs);
-        let mut keep_nodes = HashSet::new();
-        self.find_needed_nodes(&results, &mut keep_nodes);
+        let keep_nodes = self.find_needed_nodes(&results);
         let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
         let remove_nodes = hugr
@@ -145,11 +156,17 @@ impl ConstantFoldPass {
     fn find_needed_nodes<H: HugrView>(
         &self,
         results: &AnalysisResults<ValueHandle, H>,
-        needed: &mut HashSet<Node>,
-    ) {
-        let mut q = VecDeque::new();
+    ) -> HashSet<Node> {
         let h = results.hugr();
-        q.push_back(h.root());
+        let mut needed = HashSet::new();
+        let mut q = VecDeque::from_iter([h.root()]);
+        if let Some(entry) = self.entry_point {
+            assert!(h.get_parent(entry) == Some(h.root()));
+            assert!(h.get_optype(entry).is_func_defn());
+            assert!(h.get_optype(h.root()).is_module());
+            q.push_back(entry);
+        }
+
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
@@ -188,6 +205,7 @@ impl ConstantFoldPass {
                 q.push_back(src);
             }
         }
+        needed
     }
 }
 
