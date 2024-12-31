@@ -16,16 +16,21 @@ use hugr_core::ops::handle::FuncID;
 use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
 use hugr_core::{Hugr, HugrView, Node};
 
-use super::const_fold::constant_fold_pass;
+use crate::const_fold::ConstantFoldPass;
 
-pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
+pub fn static_eval(mut h: Hugr, entry: Option<Node>) -> Option<Vec<Value>> {
     // TODO: allow inputs to be specified
+    let mut cp = ConstantFoldPass::default();
+    if let Some(ep) = entry {
+        cp = cp.with_module_entry_point(ep);
+    };
+    let start = entry.unwrap_or(h.root());
     'reanalyse: loop {
-        constant_fold_pass(&mut h);
+        cp.run(&mut h).unwrap();
         loop {
             let mut need_reanalyse = false;
             let mut need_scan = false;
-            for n in h.children(h.root()).collect::<Vec<_>>() {
+            for n in h.children(start).collect::<Vec<_>>() {
                 match h.get_optype(n) {
                     OpType::Conditional(_) => {
                         need_scan |= conditional_to_dfg(&mut h, n).is_some();
@@ -75,7 +80,7 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
         }
     }
 
-    let [_, out] = h.get_io(h.root()).unwrap();
+    let [_, out] = h.get_io(start).unwrap();
     h.signature(out)
         .unwrap()
         .input_ports()
@@ -201,7 +206,9 @@ mod test {
     use std::{fs::File, io::BufReader};
 
     use hugr_core::std_extensions::{arithmetic::int_types::ConstInt, STD_REG};
+    use hugr_core::HugrView;
     use hugr_core::{ops::Value, Hugr};
+    use itertools::Itertools;
 
     use super::static_eval;
 
@@ -212,8 +219,18 @@ mod test {
             &STD_REG,
         )
         .unwrap();
+        let main = h
+            .children(h.root())
+            .filter(|n| {
+                h.get_optype(*n)
+                    .as_func_defn()
+                    .is_some_and(|f| f.name == "main")
+            })
+            .exactly_one()
+            .ok()
+            .unwrap();
         assert_eq!(
-            static_eval(h),
+            static_eval(h, Some(main)),
             Some(vec![Value::extension(ConstInt::new_u(5, 8).unwrap())])
         );
     }
