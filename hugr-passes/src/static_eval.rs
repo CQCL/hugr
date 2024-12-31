@@ -14,7 +14,7 @@ use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
-use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex};
+use hugr_core::{Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
 use crate::const_fold::ConstantFoldPass;
 
@@ -27,6 +27,7 @@ pub fn static_eval(mut h: Hugr, entry: Option<Node>) -> Option<Vec<Value>> {
     let start = entry.unwrap_or(h.root());
     'reanalyse: loop {
         cp.run(&mut h).unwrap();
+        eprintln!("****Constant folding produced {}", h.mermaid_string());
         loop {
             let mut need_reanalyse = false;
             let mut need_scan = false;
@@ -71,6 +72,13 @@ pub fn static_eval(mut h: Hugr, entry: Option<Node>) -> Option<Vec<Value>> {
                     _ => (),
                 }
             }
+            eprintln!(
+                "Scan of top level ({} reanalysis, {} rescan) produced {}",
+                if need_reanalyse { "needs" } else { "no" },
+                if need_scan { "needs" } else { "no" },
+                h.mermaid_string()
+            );
+            h.validate().unwrap();
             if need_reanalyse {
                 break;
             };
@@ -118,7 +126,8 @@ fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
             removal.push(cst_node);
         }
     }
-    let other_input = h.get_optype(cond).other_input_port();
+    let ord_in = h.get_optype(cond).other_input_port();
+    let ord_out = h.get_optype(cond).other_output_port();
     h.apply_rewrite(Replacement {
         removal,
         replacement,
@@ -127,32 +136,30 @@ fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
             .node_inputs(cond)
             .skip(1) // predicate dealt with above
             .flat_map(|tgt_pos| {
-                h.linked_outputs(cond, tgt_pos).map(move |(src, src_pos)| {
-                    let kind = if Some(tgt_pos) == other_input {
-                        NewEdgeKind::Order
-                    } else {
-                        NewEdgeKind::Value {
-                            src_pos,
-                            tgt_pos: (tgt_pos.index() - 1 + values.len()).into(),
-                        }
-                    };
-                    NewEdgeSpec {
+                let tgt_port = (Some(tgt_pos) != ord_in)
+                    .then_some(IncomingPort::from(tgt_pos.index() + values.len() - 1));
+                h.linked_outputs(cond, tgt_pos)
+                    .map(move |(src, src_pos)| NewEdgeSpec {
                         src,
                         tgt: dfg,
-                        kind,
-                    }
-                })
+                        kind: tgt_port
+                            .map(|tgt_pos| NewEdgeKind::Value { src_pos, tgt_pos })
+                            .unwrap_or(NewEdgeKind::Order),
+                    })
             })
             .collect(),
         mu_new: vec![],
         mu_out: h
             .node_outputs(cond)
             .flat_map(|src_pos| {
+                let src_port = (Some(src_pos) != ord_out).then_some(src_pos);
                 h.linked_inputs(cond, src_pos)
                     .map(move |(tgt, tgt_pos)| NewEdgeSpec {
                         src: dfg,
                         tgt,
-                        kind: NewEdgeKind::Value { src_pos, tgt_pos },
+                        kind: src_port
+                            .map(|src_pos| NewEdgeKind::Value { src_pos, tgt_pos })
+                            .unwrap_or(NewEdgeKind::Order),
                     })
             })
             .collect(),
