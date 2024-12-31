@@ -22,7 +22,7 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
     // TODO: allow inputs to be specified
     loop {
         constant_fold_pass(&mut h);
-        let mut precision_improved = false;
+        let mut need_reanalyse = false;
         loop {
             let mut need_scan = false;
             for n in h.children(h.root()).collect::<Vec<_>>() {
@@ -41,7 +41,7 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                             // TODO: copy body of loop into DFG (dup loop, change container type, output Sum)
                             // TODO: change constant into elements
                             // TODO: nest existing loop inside conditional testing output of DFG.
-                            precision_improved = true;
+                            need_reanalyse = true;
                         }
                     }
                     OpType::CallIndirect(_) => {
@@ -49,11 +49,11 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                         match h.get_optype(called) {
                             OpType::LoadConstant(_) => {
                                 // TODO: Inline called Hugr into DFG
-                                precision_improved = true;
+                                need_reanalyse = true;
                             }
                             OpType::LoadFunction(_) => {
                                 // TODO: Convert to Call
-                                precision_improved = true
+                                need_reanalyse = true
                             }
                             _ => (),
                         }
@@ -63,7 +63,7 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                         // Even if no inputs are constants (e.g. they are partial sums with multiple tags),
                         // this *could* (maybe) be beneficial.
                         // Note we are only doing this at the top level of the Hugr!
-                        precision_improved |= inline_call(&mut h, n).is_some();
+                        need_reanalyse |= inline_call(&mut h, n).is_some();
                     }
                     OpType::CFG(_) => {
                         // TODO: if entry node has in-edges (i.e. from other blocks) -> peel, set precision_improved=True
@@ -73,11 +73,11 @@ pub fn static_eval(mut h: Hugr) -> Option<Vec<Value>> {
                     _ => (),
                 }
             }
-            if precision_improved || !need_scan {
+            if need_reanalyse || !need_scan {
                 break;
             };
         }
-        if !precision_improved {
+        if !need_reanalyse {
             break;
         };
     }
