@@ -14,7 +14,7 @@ use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
-use hugr_core::{Direction, Hugr, HugrView, Node};
+use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex};
 
 use crate::const_fold::ConstantFoldPass;
 
@@ -118,21 +118,30 @@ fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
             removal.push(cst_node);
         }
     }
+    let other_input = h.get_optype(cond).other_input_port();
     h.apply_rewrite(Replacement {
         removal,
         replacement,
         adoptions: HashMap::from([(dfg, case_node)]),
         mu_inp: h
-            .all_linked_outputs(cond)
-            .skip(1)
-            .enumerate()
-            .map(|(i, (src, src_pos))| NewEdgeSpec {
-                src,
-                tgt: dfg,
-                kind: NewEdgeKind::Value {
-                    src_pos,
-                    tgt_pos: (i + values.len()).into(),
-                },
+            .node_inputs(cond)
+            .skip(1) // predicate dealt with above
+            .flat_map(|tgt_pos| {
+                h.linked_outputs(cond, tgt_pos).map(move |(src, src_pos)| {
+                    let kind = if Some(tgt_pos) == other_input {
+                        NewEdgeKind::Order
+                    } else {
+                        NewEdgeKind::Value {
+                            src_pos,
+                            tgt_pos: (tgt_pos.index() - 1 + values.len()).into(),
+                        }
+                    };
+                    NewEdgeSpec {
+                        src,
+                        tgt: dfg,
+                        kind,
+                    }
+                })
             })
             .collect(),
         mu_new: vec![],
