@@ -318,6 +318,9 @@ def test_recursive_fibonacci() -> None:
 
     validate(mod.hugr)
 
+    with open("/Users/alanlawrence/fibonacci_hugr.json", "w") as f:
+        f.write(mod.hugr.to_json())
+
 
 def test_higher_order() -> None:
     noop_fn = Dfg(tys.Qubit)

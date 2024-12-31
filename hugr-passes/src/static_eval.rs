@@ -195,3 +195,26 @@ fn peel_tailloop(h: &mut impl HugrMut, tl: Node) -> Option<()> {
     // Some(())
     None
 }
+
+#[cfg(test)]
+mod test {
+    use std::{fs::File, io::BufReader};
+
+    use hugr_core::std_extensions::{arithmetic::int_types::ConstInt, STD_REG};
+    use hugr_core::{ops::Value, Hugr};
+
+    use super::static_eval;
+
+    #[test]
+    fn recursive_fibonacci() {
+        let h = Hugr::load_json(
+            BufReader::new(File::open("/Users/alanlawrence/fibonacci_hugr.json").unwrap()),
+            &STD_REG,
+        )
+        .unwrap();
+        assert_eq!(
+            static_eval(h),
+            Some(vec![Value::extension(ConstInt::new_u(5, 8).unwrap())])
+        );
+    }
+}
