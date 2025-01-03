@@ -1169,7 +1169,7 @@ pub(crate) mod test {
                 .with_env(vec![], 3.into(), Arc::new(std_reg()))
                 .prop_filter("Some variable referred to twice", |(t, env)| {
                     let mut counts = vec![0; env.len()];
-                    count_tvars(&t, &mut counts);
+                    count_tvars(t, &mut counts);
                     counts.iter().any(|i| *i>1)
                 })) {
                     // Just check some instance passes the filter
