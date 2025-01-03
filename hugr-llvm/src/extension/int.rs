@@ -300,24 +300,25 @@ mod test {
 
     fn test_binary_int_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
         let ty = &INT_TYPES[log_width as usize];
-        test_binary_int_op_with_results(name, log_width, None, vec![ty.clone()])
+        test_int_op_with_results::<2>(name, log_width, None, vec![ty.clone()])
     }
 
     fn test_binary_icmp_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
-        test_binary_int_op_with_results(name, log_width, None, vec![bool_t()])
+        test_int_op_with_results::<2>(name, log_width, None, vec![bool_t()])
     }
 
-    fn test_binary_int_op_with_results(
+    fn test_int_op_with_results<const N: usize>(
+        // N is the number of inputs to the hugr
         name: impl AsRef<str>,
         log_width: u8,
-        inputs: Option<[ConstInt; 2]>, // If inputs are provided, they'll be wired into the op, otherwise the inputs to the hugr will be wired into the op
+        inputs: Option<[ConstInt; N]>, // If inputs are provided, they'll be wired into the op, otherwise the inputs to the hugr will be wired into the op
         output_types: impl Into<TypeRow>,
     ) -> Hugr {
         let ty = &INT_TYPES[log_width as usize];
         let input_tys = if inputs.is_some() {
             vec![]
         } else {
-            vec![ty.clone(), ty.clone()]
+            itertools::repeat_n(ty.clone(), N).collect()
         };
         SimpleHugrConfig::new()
             .with_ins(input_tys)
@@ -325,7 +326,7 @@ mod test {
             .with_extensions(STD_REG.clone())
             .finish(|mut hugr_builder| {
                 let input_wires = match inputs {
-                    None => hugr_builder.input_wires_arr::<2>().to_vec(),
+                    None => hugr_builder.input_wires_arr::<N>().to_vec(),
                     Some(inputs) => {
                         let mut input_wires = Vec::new();
                         inputs.into_iter().for_each(|i| {
@@ -346,37 +347,11 @@ mod test {
             })
     }
 
-    fn test_unary_int_op(name: impl AsRef<str>, log_width: u8, input: Option<ConstInt>) -> Hugr {
-        let ty = &INT_TYPES[log_width as usize];
-        let hugr_input_tys = if input.is_some() {
-            vec![]
-        } else {
-            vec![ty.clone()]
-        };
-        SimpleHugrConfig::new()
-            .with_ins(hugr_input_tys)
-            .with_outs(vec![ty.clone()])
-            .with_extensions(STD_REG.clone())
-            .finish(|mut hugr_builder| {
-                let in_wire = match input {
-                    None => hugr_builder.input_wires_arr::<1>()[0],
-                    Some(input) => hugr_builder.add_load_value(input),
-                };
-                let ext_op = int_ops::EXTENSION
-                    .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
-                    .unwrap();
-                let outputs = hugr_builder
-                    .add_dataflow_op(ext_op, [in_wire])
-                    .unwrap()
-                    .outputs();
-                hugr_builder.finish_with_outputs(outputs).unwrap()
-            })
-    }
-
     #[rstest]
     fn test_neg_emission(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_unary_int_op("ineg", 2, None);
+        let ty = INT_TYPES[2].clone();
+        let hugr = test_int_op_with_results::<1>("ineg", 2, None, vec![ty.clone()]);
         check_emission!("ineg", hugr, llvm_ctx);
     }
 
@@ -421,7 +396,7 @@ mod test {
             ConstInt::new_u(6, lhs).unwrap(),
             ConstInt::new_u(6, rhs).unwrap(),
         ];
-        let hugr = test_binary_int_op_with_results(op, 6, Some(inputs), vec![ty.clone()]);
+        let hugr = test_int_op_with_results::<2>(op, 6, Some(inputs), vec![ty.clone()]);
         assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), result);
     }
 
@@ -451,7 +426,7 @@ mod test {
             ConstInt::new_s(6, lhs).unwrap(),
             ConstInt::new_s(6, rhs).unwrap(),
         ];
-        let hugr = test_binary_int_op_with_results(op, 6, Some(inputs), vec![ty.clone()]);
+        let hugr = test_int_op_with_results::<2>(op, 6, Some(inputs), vec![ty.clone()]);
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), result);
     }
 
@@ -466,7 +441,8 @@ mod test {
     ) {
         exec_ctx.add_extensions(add_int_extensions);
         let input = ConstInt::new_s(6, arg).unwrap();
-        let hugr = test_unary_int_op(op, 6, Some(input));
+        let ty = INT_TYPES[6].clone();
+        let hugr = test_int_op_with_results::<1>(op, 6, Some([input]), vec![ty.clone()]);
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), result);
     }
 }
