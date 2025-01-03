@@ -1139,13 +1139,10 @@ pub(crate) mod test {
 
         proptest! {
             #[test]
-            // We override the RecursionDepth from default 4 down to 3 because otherwise we overflow the stack.
-            // It doesn't seem to be an infinite loop, I infer that the folding etc. in the VarEnvState methods
-            // just use a lot more stack than the simpler, original, proptests.
             fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
                     MakeType(TypeBound::Any),
-                    3.into(),
-                    3.into(),
+                    RecursionDepth::default(), // Needs RUST_MIN_STACK e.g. 10485760
+                    RecursionDepth::default(),
                     Arc::new(std_reg()))) {
                 prop_assert!(t.validate(&t_env).is_ok());
                 for s1 in s.iter() {
@@ -1181,9 +1178,7 @@ pub(crate) mod test {
 
         fn count_tvars<RV: MaybeRV>(t: &TypeBase<RV>, vs: &mut [usize]) {
             match t.as_type_enum() {
-                TypeEnum::Extension(cust) => {
-                    cust.args().iter().for_each(|a| count_tavars(a, vs))
-                }
+                TypeEnum::Extension(cust) => cust.args().iter().for_each(|a| count_tavars(a, vs)),
                 TypeEnum::Alias(_) => (),
                 TypeEnum::Function(ft) => {
                     ft.input
