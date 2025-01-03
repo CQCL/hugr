@@ -922,7 +922,7 @@ pub(crate) mod test {
                             Just((TypeArg::Sequence { elems: vec![] }, vars)).sboxed()
                         } else {
                             fold_n(
-                                MakeTypeArg((**param).clone()),
+                                MakeTypeArg((**param).clone()), // TODO make Variables as well as elems
                                 0..MAX_LIST_LEN,
                                 vars,
                                 depth.descend(),
@@ -1169,7 +1169,7 @@ pub(crate) mod test {
         fn any_tp(tp: &TypeParam, f: &impl Fn(&TypeParam) -> bool) -> bool {
             f(tp)
                 || match tp {
-                    TypeParam::List { param } => f(&**param),
+                    TypeParam::List { param } => f(param),
                     TypeParam::Tuple { params } => params.iter().any(|p| any_tp(p, f)),
                     _ => false,
                 }
