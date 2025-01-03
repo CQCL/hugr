@@ -1156,9 +1156,9 @@ pub(crate) mod test {
             }
 
             #[test]
-            fn test_type_covers_list(_ in MakeType(TypeBound::Any)
-                    .with_env(vec![], 3.into(), Arc::new(std_reg()))
-                    .prop_filter("check there are lists", |(_t, env)| {
+            fn test_covers_list(_ in with_substitution(
+                    MakeType(TypeBound::Any), 3.into(), 3.into(), Arc::new(std_reg()))
+                    .prop_filter("check there are lists", |((_t, env), _s, _env2)| {
                 fn is_list(tp: &TypeParam) -> bool {
                     matches!(tp, TypeParam::List { .. })
                 }
