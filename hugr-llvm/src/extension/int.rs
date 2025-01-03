@@ -217,6 +217,12 @@ fn emit_int_op<'c, H: HugrView>(
                 .build_not(arg.into_int_value(), "")?
                 .as_basic_value_enum()])
         }),
+        IntOpDef::iand => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_and(lhs.into_int_value(), rhs.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
     }
 }
@@ -383,7 +389,15 @@ mod test {
     #[case::ishl("ishl", 73, 1, 146)]
     #[case::ishl("ishl", 18446744073709551615, 1, 18446744073709551614)]
     #[case::ishr("ishr", 73, 1, 36)]
-    fn test_exec_unsigned_op(
+    #[case::ior("ior", 6, 9, 15)]
+    #[case::ior("ior", 6, 15, 15)]
+    #[case::ixor("ixor", 6, 9, 15)]
+    #[case::ixor("ixor", 6, 15, 9)]
+    #[case::ixor("ixor", 15, 6, 9)]
+    #[case::iand("iand", 6, 15, 6)]
+    #[case::iand("iand", 15, 6, 6)]
+    #[case::iand("iand", 15, 15, 15)]
+    fn test_exec_unsigned_bin_op(
         mut exec_ctx: TestContext,
         #[case] op: String,
         #[case] lhs: u64,
@@ -444,5 +458,21 @@ mod test {
         let ty = INT_TYPES[6].clone();
         let hugr = test_int_op_with_results::<1>(op, 6, Some([input]), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), result);
+    }
+
+    #[rstest]
+    // LHS: Most significant bit (2^63), RHS: All the other bits combined
+    #[case::inot("inot", 9223372036854775808, 9223372036854775807)]
+    fn test_exec_unsigned_unary_op(
+        mut exec_ctx: TestContext,
+        #[case] op: String,
+        #[case] arg: u64,
+        #[case] result: u64,
+    ) {
+        exec_ctx.add_extensions(add_int_extensions);
+        let input = ConstInt::new_u(6, arg).unwrap();
+        let ty = INT_TYPES[6].clone();
+        let hugr = test_int_op_with_results::<1>(op, 6, Some([input]), ty.clone());
+        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), result);
     }
 }
