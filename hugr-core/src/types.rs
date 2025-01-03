@@ -1109,22 +1109,43 @@ pub(crate) mod test {
         }
 
         proptest! {
-            #[test]
-            // We override the RecursionDepth from default 4 down to 3 because otherwise we overflow the stack.
-            // It doesn't seem to be an infinite loop, I infer that the folding etc. in the VarEnvState methods
-            // just use a lot more stack than the simpler, original, proptests.
-            fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
-                    MakeType(TypeBound::Any),
-                    3.into(),
-                    3.into(),
-                    Arc::new(std_reg()))) {
-                prop_assert!(t.validate(&t_env).is_ok());
-                for s1 in s.iter() {
-                    prop_assert!(s1.validate(&s_env).is_ok());
+                #[test]
+                // We override the RecursionDepth from default 4 down to 3 because otherwise we overflow the stack.
+                // It doesn't seem to be an infinite loop, I infer that the folding etc. in the VarEnvState methods
+                // just use a lot more stack than the simpler, original, proptests.
+                fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
+                        MakeType(TypeBound::Any),
+                        3.into(),
+                        3.into(),
+                        Arc::new(std_reg()))) {
+                    prop_assert!(t.validate(&t_env).is_ok());
+                    for s1 in s.iter() {
+                        prop_assert!(s1.validate(&s_env).is_ok());
+                    }
+                    let ts = t.substitute1(&Substitution::new(&s));
+                    prop_assert!(ts.validate(&s_env).is_ok());
                 }
-                let ts = t.substitute1(&Substitution::new(&s));
-                prop_assert!(ts.validate(&s_env).is_ok());
+
+                #[test]
+                fn test_type_covers_list(_ in MakeType(TypeBound::Any)
+                        .with_env(vec![], 3.into(), Arc::new(std_reg()))
+                        .prop_filter("check there are lists", |(_t, env)| {
+                    fn is_list(tp: &TypeParam) -> bool {
+                        matches!(tp, TypeParam::List { .. })
+                    }
+                    env.iter().any(|tp| any_tp(tp, &is_list))
+                })) {
+                    // Will pass as long as some instances pass the filter
+                }
             }
+
+        fn any_tp(tp: &TypeParam, f: &impl Fn(&TypeParam) -> bool) -> bool {
+            f(tp)
+                || match tp {
+                    TypeParam::List { param } => f(&**param),
+                    TypeParam::Tuple { params } => params.iter().any(|p| any_tp(p, f)),
+                    _ => false,
+                }
         }
     }
 }
