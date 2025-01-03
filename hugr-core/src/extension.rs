@@ -878,14 +878,18 @@ impl ExtensionSet {
         self.0.iter()
     }
 
+    /// Iterate over the indices of all contained type variables (of kind [TypeParam::Extensions])
+    pub fn typevars(&self) -> impl Iterator<Item = usize> + '_ {
+        self.0.iter().filter_map(as_typevar)
+    }
+
     /// True if this set contains no [ExtensionId]s
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
-        self.iter()
-            .filter_map(as_typevar)
+        self.typevars()
             .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
     }
 

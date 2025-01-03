@@ -766,6 +766,8 @@ pub(crate) mod test {
             string::string_regex,
         };
 
+        use super::{MaybeRV, TypeBase, TypeEnum};
+
         trait VarEnvState<T>: Send + Sync {
             fn with_env(
                 self,
@@ -1163,6 +1165,52 @@ pub(crate) mod test {
                 env.iter().any(|tp| any_tp(tp, &is_list))
             })) {
                 // Will pass as long as some instances pass the filter
+            }
+
+            #[test]
+            fn test_tvars_multiply_referred(_ in MakeType(TypeBound::Any)
+                .with_env(vec![], 3.into(), Arc::new(std_reg()))
+                .prop_filter("Some variable referred to twice", |(t, env)| {
+                    let mut counts = vec![0; env.len()];
+                    count_tvars(&t, &mut counts);
+                    counts.iter().any(|i| *i>1)
+                })) {
+                    // Just check some instance passes the filter
+                }
+        }
+
+        fn count_tvars<RV: MaybeRV>(t: &TypeBase<RV>, vs: &mut [usize]) {
+            match t.as_type_enum() {
+                TypeEnum::Extension(cust) => {
+                    cust.args().iter().for_each(|a| count_tavars(a, vs))
+                }
+                TypeEnum::Alias(_) => (),
+                TypeEnum::Function(ft) => {
+                    ft.input
+                        .iter()
+                        .chain(ft.output.iter())
+                        .for_each(|t| count_tvars(t, vs));
+                    ft.runtime_reqs.typevars().for_each(|i| vs[i] += 1);
+                }
+                TypeEnum::Variable(idx, _) => vs[*idx] += 1,
+                TypeEnum::RowVar(rv) => vs[rv.as_rv().0] += 1,
+                TypeEnum::Sum(sum_type) => (0..sum_type.num_variants()).for_each(|tag| {
+                    sum_type
+                        .get_variant(tag)
+                        .unwrap()
+                        .iter()
+                        .for_each(|t| count_tvars(t, vs))
+                }),
+            }
+        }
+
+        fn count_tavars(ta: &TypeArg, vs: &mut [usize]) {
+            match ta {
+                TypeArg::Type { ty } => count_tvars(ty, vs),
+                TypeArg::BoundedNat { .. } | TypeArg::String { .. } => (),
+                TypeArg::Sequence { elems } => elems.iter().for_each(|ta| count_tavars(ta, vs)),
+                TypeArg::Extensions { es } => es.typevars().for_each(|i| vs[i] += 1),
+                TypeArg::Variable { v } => vs[v.index()] += 1,
             }
         }
 
