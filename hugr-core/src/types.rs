@@ -755,7 +755,7 @@ pub(crate) mod test {
         use crate::std_extensions::std_reg;
         use crate::types::Substitution;
         use crate::types::{
-            type_param::TypeParam, FuncValueType, Type, TypeArg, TypeBound, TypeRow,
+            type_param::TypeParam, FuncValueType, Type, TypeArg, TypeBound, TypeRV, TypeRowRV,
         };
         use itertools::Itertools;
         use proptest::{
@@ -820,6 +820,33 @@ pub(crate) mod test {
                     }),
                     // Type has no row_variable; consider joining with TypeRV
                     1 => MakeSumType(self.0).with_env(vars, depth, reg)
+                ]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct MakeTypeRV(TypeBound);
+
+        impl VarEnvState<TypeRV> for MakeTypeRV {
+            fn with_env(
+                self,
+                vars: Vec<TypeParam>,
+                depth: RecursionDepth,
+                reg: Arc<ExtensionRegistry>,
+            ) -> impl Strategy<Value = (TypeRV, Vec<TypeParam>)> + Clone {
+                prop_oneof![
+                    MakeType(self.0)
+                        .with_env(vars.clone(), depth, reg)
+                        .prop_map(|(t, env)| (t.into_(), env)),
+                    make_type_var(TypeParam::new_list(self.0), vars).prop_map(|(ta, env)| {
+                        let TypeArg::Variable { v } = ta else {
+                            panic!()
+                        };
+                        (
+                            TypeRV::new_row_var_use(v.index(), v.bound_if_row_var().unwrap()),
+                            env,
+                        )
+                    })
                 ]
             }
         }
@@ -1024,22 +1051,22 @@ pub(crate) mod test {
         #[derive(Clone)]
         struct MakeTypeRow(TypeBound);
 
-        impl VarEnvState<TypeRow> for MakeTypeRow {
+        impl VarEnvState<TypeRowRV> for MakeTypeRow {
             fn with_env(
                 self,
                 vars: Vec<TypeParam>,
                 depth: RecursionDepth,
                 reg: Arc<ExtensionRegistry>,
-            ) -> impl Strategy<Value = (TypeRow, Vec<TypeParam>)> + Clone {
+            ) -> impl Strategy<Value = (TypeRowRV, Vec<TypeParam>)> + Clone {
                 (0..MAX_TYPE_ROW_LEN)
                     .prop_flat_map(move |sz| {
-                        MakeVec(vec![MakeType(self.0); sz]).with_env(
+                        MakeVec(vec![MakeTypeRV(self.0); sz]).with_env(
                             vars.clone(),
                             depth,
                             reg.clone(),
                         )
                     })
-                    .prop_map(|(vec, vars)| (TypeRow::from(vec), vars))
+                    .prop_map(|(vec, vars)| (TypeRowRV::from(vec), vars))
             }
         }
 
@@ -1109,35 +1136,35 @@ pub(crate) mod test {
         }
 
         proptest! {
-                #[test]
-                // We override the RecursionDepth from default 4 down to 3 because otherwise we overflow the stack.
-                // It doesn't seem to be an infinite loop, I infer that the folding etc. in the VarEnvState methods
-                // just use a lot more stack than the simpler, original, proptests.
-                fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
-                        MakeType(TypeBound::Any),
-                        3.into(),
-                        3.into(),
-                        Arc::new(std_reg()))) {
-                    prop_assert!(t.validate(&t_env).is_ok());
-                    for s1 in s.iter() {
-                        prop_assert!(s1.validate(&s_env).is_ok());
-                    }
-                    let ts = t.substitute1(&Substitution::new(&s));
-                    prop_assert!(ts.validate(&s_env).is_ok());
+            #[test]
+            // We override the RecursionDepth from default 4 down to 3 because otherwise we overflow the stack.
+            // It doesn't seem to be an infinite loop, I infer that the folding etc. in the VarEnvState methods
+            // just use a lot more stack than the simpler, original, proptests.
+            fn test_type_substitution(((t,t_env), s, s_env) in with_substitution(
+                    MakeType(TypeBound::Any),
+                    3.into(),
+                    3.into(),
+                    Arc::new(std_reg()))) {
+                prop_assert!(t.validate(&t_env).is_ok());
+                for s1 in s.iter() {
+                    prop_assert!(s1.validate(&s_env).is_ok());
                 }
-
-                #[test]
-                fn test_type_covers_list(_ in MakeType(TypeBound::Any)
-                        .with_env(vec![], 3.into(), Arc::new(std_reg()))
-                        .prop_filter("check there are lists", |(_t, env)| {
-                    fn is_list(tp: &TypeParam) -> bool {
-                        matches!(tp, TypeParam::List { .. })
-                    }
-                    env.iter().any(|tp| any_tp(tp, &is_list))
-                })) {
-                    // Will pass as long as some instances pass the filter
-                }
+                let ts = t.substitute1(&Substitution::new(&s));
+                prop_assert!(ts.validate(&s_env).is_ok());
             }
+
+            #[test]
+            fn test_type_covers_list(_ in MakeType(TypeBound::Any)
+                    .with_env(vec![], 3.into(), Arc::new(std_reg()))
+                    .prop_filter("check there are lists", |(_t, env)| {
+                fn is_list(tp: &TypeParam) -> bool {
+                    matches!(tp, TypeParam::List { .. })
+                }
+                env.iter().any(|tp| any_tp(tp, &is_list))
+            })) {
+                // Will pass as long as some instances pass the filter
+            }
+        }
 
         fn any_tp(tp: &TypeParam, f: &impl Fn(&TypeParam) -> bool) -> bool {
             f(tp)
