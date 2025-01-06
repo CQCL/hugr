@@ -15,8 +15,12 @@ use inkwell::{
 use crate::{
     custom::CodegenExtsBuilder,
     emit::{
-        emit_value, func::EmitFuncContext, get_intrinsic, ops::emit_custom_binary_op,
-        ops::emit_custom_unary_op, EmitOpArgs,
+        emit_value,
+        func::EmitFuncContext,
+        get_intrinsic,
+        ops::emit_custom_binary_op,
+        ops::emit_custom_unary_op,
+        EmitOpArgs,
     },
     types::TypingSession,
 };
@@ -44,6 +48,63 @@ fn emit_icmp<'c, H: HugrView>(
         Ok(vec![ctx
             .builder()
             .build_select(r, true_val, false_val, "")?])
+    })
+}
+
+/// Emit an ipow operation. This isn't directly supported in llvm, so we do a
+/// loop over the exponent, performing `imul`s instead.
+/// The insertion pointer is expected to be pointing to the end of `launch_bb`.
+fn emit_ipow<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, '_, H>,
+    args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+) -> Result<()> {
+    emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+        let done_bb = ctx.new_basic_block("done", None);
+        let pow_body_bb = ctx.new_basic_block("pow_body", Some(done_bb));
+        let return_one_bb = ctx.new_basic_block("power_of_zero", Some(pow_body_bb));
+        let pow_bb = ctx.new_basic_block("pow", Some(return_one_bb));
+
+        let acc_p = ctx.builder().build_alloca(lhs.get_type(), "acc_ptr")?;
+        let exp_p = ctx.builder().build_alloca(rhs.get_type(), "exp_ptr")?;
+        ctx.builder().build_store(acc_p, lhs)?;
+        ctx.builder().build_store(exp_p, rhs)?;
+        ctx.builder().build_unconditional_branch(pow_bb)?;
+
+        let zero = rhs.get_type().into_int_type().const_int(0, false);
+        // Assumes RHS type is the same as output type (which it should be)
+        let one = rhs.get_type().into_int_type().const_int(1, false);
+
+        // Block for just returning one
+        ctx.builder().position_at_end(return_one_bb);
+        ctx.builder().build_store(acc_p, one)?;
+        ctx.builder().build_unconditional_branch(done_bb)?;
+
+        ctx.builder().position_at_end(pow_bb);
+        let acc = ctx.builder().build_load(acc_p, "acc")?;
+        let exp = ctx.builder().build_load(exp_p, "exp")?;
+
+        // Special case if the exponent is 0 or 1
+        ctx.builder().build_switch(
+            exp.into_int_value(),
+            pow_body_bb,
+            &[(one, done_bb), (zero, return_one_bb)],
+        )?;
+
+        // Block that performs one `imul` and modifies the values in the store
+        ctx.builder().position_at_end(pow_body_bb);
+        let new_acc =
+            ctx.builder()
+                .build_int_mul(acc.into_int_value(), lhs.into_int_value(), "new_acc")?;
+        let new_exp = ctx
+            .builder()
+            .build_int_sub(exp.into_int_value(), one, "new_exp")?;
+        ctx.builder().build_store(acc_p, new_acc)?;
+        ctx.builder().build_store(exp_p, new_exp)?;
+        ctx.builder().build_unconditional_branch(pow_bb)?;
+
+        ctx.builder().position_at_end(done_bb);
+        let result = ctx.builder().build_load(acc_p, "result")?;
+        Ok(vec![result.as_basic_value_enum()])
     })
 }
 
@@ -223,6 +284,7 @@ fn emit_int_op<'c, H: HugrView>(
                 .build_and(lhs.into_int_value(), rhs.into_int_value(), "")?
                 .as_basic_value_enum()])
         }),
+        IntOpDef::ipow => emit_ipow(context, args),
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
     }
 }
@@ -364,6 +426,7 @@ mod test {
     #[rstest]
     #[case::iadd("iadd", 3)]
     #[case::isub("isub", 6)]
+    #[case::ipow("ipow", 3)]
     fn test_binop_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
         let hugr = test_binary_int_op(op.clone(), width);
@@ -397,6 +460,9 @@ mod test {
     #[case::iand("iand", 6, 15, 6)]
     #[case::iand("iand", 15, 6, 6)]
     #[case::iand("iand", 15, 15, 15)]
+    #[case::ipow("ipow", 2, 3, 8)]
+    #[case::ipow("ipow", 42, 1, 42)]
+    #[case::ipow("ipow", 42, 0, 1)]
     fn test_exec_unsigned_bin_op(
         mut exec_ctx: TestContext,
         #[case] op: String,
