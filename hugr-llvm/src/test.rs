@@ -160,6 +160,13 @@ impl TestContext {
         emission.exec_u64(entry_point).unwrap()
     }
 
+    pub fn exec_hugr_i64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> i64 {
+        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+        emission.verify().unwrap();
+
+        emission.exec_i64(entry_point).unwrap()
+    }
+
     pub fn exec_hugr_f64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> f64 {
         let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
 
