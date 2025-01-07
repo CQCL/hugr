@@ -28,38 +28,39 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
   (dfg
     [%0] [%1]
     (signature
-      (fn
+      (->
         [(@ arithmetic.int.types.int)]
         [(@ arithmetic.int.types.int)]
         (ext arithmetic.int)))
     (call (@ example.callee (ext)) [%0] [%1]
       (signature
-        (fn
+        (->
           [(@ arithmetic.int.types.int)]
           [(@ arithmetic.int.types.int)]
           (ext arithmetic.int))))))
 
 (define-func example.load
   []
-  [(fn
+  [(->
      [(@ arithmetic.int.types.int)]
      [(@ arithmetic.int.types.int)]
      (ext arithmetic.int))]
   (ext)
   (dfg
+    [] [%0]
     (signature
-      (fn
+      (->
         []
-        [(fn
+        [(->
            [(@ arithmetic.int.types.int)]
            [(@ arithmetic.int.types.int)]
            (ext arithmetic.int))]
         (ext)))
-    (load-func (@ example.caller)
+    (load-func (@ example.caller) [] [%0]
       (signature
-        (fn
+        (->
           []
-          [(fn
+          [(->
              [(@ arithmetic.int.types.int)]
              [(@ arithmetic.int.types.int)]
              (ext arithmetic.int))]

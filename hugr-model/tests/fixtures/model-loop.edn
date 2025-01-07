@@ -4,10 +4,10 @@
   (forall ?a type)
   [?a] [?a] (ext)
   (dfg [%0] [%1]
-    (signature (fn [?a] [?a] (ext)))
+    (signature (-> [?a] [?a] (ext)))
     (tail-loop [%0] [%1]
-      (signature (fn [?a] [?a] (ext)))
+      (signature (-> [?a] [?a] (ext)))
       (dfg [%2] [%3]
-        (signature (fn [?a] [(adt [[?a] [?a]])] (ext)))
+        (signature (-> [?a] [(adt [[?a] [?a]])] (ext)))
         (tag 0 [%2] [%3]
-          (signature (fn [?a] [(adt [[?a] [?a]])] (ext))))))))
+          (signature (-> [?a] [(adt [[?a] [?a]])] (ext))))))))

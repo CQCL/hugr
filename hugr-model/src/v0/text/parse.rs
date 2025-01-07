@@ -165,9 +165,10 @@ impl<'a> ParseContext<'a> {
                     }
                 }
 
-                Rule::term_quote => {
+                Rule::term_const => {
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Term::Quote { r#type }
+                    let extensions = self.parse_term(inner.next().unwrap())?;
+                    Term::Const { r#type, extensions }
                 }
 
                 Rule::term_list => {
@@ -248,6 +249,17 @@ impl<'a> ParseContext<'a> {
                 Rule::term_non_linear => {
                     let term = self.parse_term(inner.next().unwrap())?;
                     Term::NonLinearConstraint { term }
+                }
+
+                Rule::term_const_func => {
+                    let region = self.parse_region(inner.next().unwrap(), ScopeClosure::Closed)?;
+                    Term::ConstFunc { region }
+                }
+
+                Rule::term_const_adt => {
+                    let tag = inner.next().unwrap().as_str().parse().unwrap();
+                    let values = self.parse_term(inner.next().unwrap())?;
+                    Term::ConstAdt { tag, values }
                 }
 
                 r => unreachable!("term: {:?}", r),
@@ -581,6 +593,23 @@ impl<'a> ParseContext<'a> {
                     regions: &[],
                     meta,
                     signature: None,
+                }
+            }
+
+            Rule::node_const => {
+                let value = self.parse_term(inner.next().unwrap())?;
+                let inputs = self.parse_port_list(&mut inner)?;
+                let outputs = self.parse_port_list(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
+                let meta = self.parse_meta(&mut inner)?;
+                Node {
+                    operation: Operation::Const { value },
+                    inputs,
+                    outputs,
+                    params: &[],
+                    regions: &[],
+                    meta,
+                    signature,
                 }
             }
 

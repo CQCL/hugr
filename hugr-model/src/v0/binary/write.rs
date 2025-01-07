@@ -103,6 +103,8 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
         }
 
         model::Operation::Invalid => builder.set_invalid(()),
+
+        model::Operation::Const { value } => builder.set_const(value.0),
     }
 }
 
@@ -161,7 +163,11 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::NatType => builder.set_nat_type(()),
         model::Term::ExtSetType => builder.set_ext_set_type(()),
         model::Term::Adt { variants } => builder.set_adt(variants.0),
-        model::Term::Quote { r#type } => builder.set_quote(r#type.0),
+        model::Term::Const { r#type, extensions } => {
+            let mut builder = builder.init_const();
+            builder.set_type(r#type.0);
+            builder.set_extensions(extensions.0);
+        }
         model::Term::Control { values } => builder.set_control(values.0),
         model::Term::ControlType => builder.set_control_type(()),
 
@@ -200,6 +206,16 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
 
         model::Term::NonLinearConstraint { term } => {
             builder.set_non_linear_constraint(term.0);
+        }
+
+        model::Term::ConstFunc { region } => {
+            builder.set_const_func(region.0);
+        }
+
+        model::Term::ConstAdt { tag, values } => {
+            let mut builder = builder.init_const_adt();
+            builder.set_tag(*tag);
+            builder.set_values(values.0);
         }
     }
 }
