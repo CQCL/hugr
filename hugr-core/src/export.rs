@@ -76,6 +76,8 @@ struct Context<'a> {
 
     /// Mapping from node ids in the [`Hugr`] to the corresponding model nodes.
     id_to_node: FxHashMap<model::NodeId, Node>,
+    // TODO: Once this module matures, we should consider adding an auxiliary structure
+    // that ensures that the `node_to_id` and `id_to_node` maps stay in sync.
 }
 
 impl<'a> Context<'a> {
