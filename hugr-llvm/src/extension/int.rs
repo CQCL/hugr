@@ -450,6 +450,7 @@ mod test {
     #[case::imin("imin_u", 2, 1, 1)]
     #[case::imin("imin_u", 2, 2, 2)]
     #[case::ishl("ishl", 73, 1, 146)]
+    // (2^64 - 1) << 1 = (2^64 - 2)
     #[case::ishl("ishl", 18446744073709551615, 1, 18446744073709551614)]
     #[case::ishr("ishr", 73, 1, 36)]
     #[case::ior("ior", 6, 9, 15)]
@@ -530,9 +531,9 @@ mod test {
     }
 
     #[rstest]
-    // LHS: Most significant bit (2^63), RHS: All the other bits combined
-    #[case::inot("inot", 9223372036854775808, 9223372036854775807)]
-    #[case::inot("inot", 1, 0)]
+    #[case::inot("inot", 9223372036854775808, !9223372036854775808u64)]
+    #[case::inot("inot", 42, !42u64)]
+    #[case::inot("inot", !0u64, 0)]
     fn test_exec_unsigned_unary_op(
         mut exec_ctx: TestContext,
         #[case] op: String,
