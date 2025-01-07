@@ -346,7 +346,7 @@ mod test {
                     .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
                     .unwrap();
                 let outputs = hugr_builder
-                    .add_dataflow_op(ext_op, input_wires.into_iter())
+                    .add_dataflow_op(ext_op, input_wires)
                     .unwrap()
                     .outputs();
                 hugr_builder.finish_with_outputs(outputs).unwrap()
