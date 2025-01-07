@@ -2,7 +2,7 @@
 use crate::{
     extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
     hugr::{IdentList, NodeMetadataMap},
-    ops::{DataflowBlock, OpName, OpTrait, OpType, Value},
+    ops::{constant::CustomSerialized, DataflowBlock, OpName, OpTrait, OpType, Value},
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
@@ -999,8 +999,12 @@ impl<'a> Context<'a> {
     fn export_value(&mut self, value: &'a Value) -> model::TermId {
         match value {
             Value::Extension { e } => {
-                let json = serde_json::to_string(e.value())
-                    .expect("extension values are always serializable");
+                let json = match e.value().downcast_ref::<CustomSerialized>() {
+                    Some(custom) => serde_json::to_string(custom.value()).unwrap(),
+                    None => serde_json::to_string(e.value())
+                        .expect("custom extension values should be serializable"),
+                };
+
                 let json = self.make_term(model::Term::Str(self.bump.alloc_str(&json)));
                 let runtime_type = self.export_type(&e.get_type());
                 let extensions = self.export_ext_set(&e.extension_reqs());

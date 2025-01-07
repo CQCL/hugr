@@ -15,9 +15,14 @@
   []
   [(@ arithmetic.float.types.float64)]
   (ext)
-  (dfg [] [%0]
-    (signature (-> [] [(@ arithmetic.float.types.float64)] (ext)))
+  (dfg [] [%0 %1]
+    (signature (-> [] [(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)] (ext)))
     (const
       (@ prelude.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":1.0}}" (ext))
       [] [%0]
+      (signature (-> [] [(@ arithmetic.float.types.float64)] (ext))))
+    ; The following const is to test that import/export can deal with unknown constants.
+    (const
+      (@ prelude.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstUnknown\",\"v\":{\"value\":1.0}}" (ext))
+      [] [%1]
       (signature (-> [] [(@ arithmetic.float.types.float64)] (ext))))))
