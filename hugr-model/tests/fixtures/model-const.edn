@@ -11,6 +11,28 @@
     (const (tag 1 []) [] [%true]
       (signature (-> [] [(adt [[] []])] (ext))))))
 
+(define-func example.make-pair
+  []
+  [(adt [[(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]])]
+  (ext)
+  (dfg [] [%pair]
+    (signature
+      (->
+        []
+        [(adt [[(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]])]
+        (ext)))
+    (const
+      (tag
+        0
+        [(@ prelude.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":2.0}}" (ext))
+         (@ prelude.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":3.0}}" (ext))])
+      [] [%pair]
+      (signature
+        (->
+          []
+          [(adt [[(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]])]
+          (ext))))))
+
 (define-func example.f64
   []
   [(@ arithmetic.float.types.float64)]
