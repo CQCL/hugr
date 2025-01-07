@@ -15,12 +15,8 @@ use inkwell::{
 use crate::{
     custom::CodegenExtsBuilder,
     emit::{
-        emit_value,
-        func::EmitFuncContext,
-        get_intrinsic,
-        ops::emit_custom_binary_op,
-        ops::emit_custom_unary_op,
-        EmitOpArgs,
+        emit_value, func::EmitFuncContext, get_intrinsic, ops::emit_custom_binary_op,
+        ops::emit_custom_unary_op, EmitOpArgs,
     },
     types::TypingSession,
 };
