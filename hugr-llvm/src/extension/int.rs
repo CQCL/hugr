@@ -463,7 +463,7 @@ mod test {
     #[rstest]
     // LHS: Most significant bit (2^63), RHS: All the other bits combined
     #[case::inot("inot", 9223372036854775808, 9223372036854775807)]
-    #[case::inot("inot", 1, 0)]
+    #[case::inot("inot", 18446744073709551615, 0)]
     fn test_exec_unsigned_unary_op(
         mut exec_ctx: TestContext,
         #[case] op: String,
