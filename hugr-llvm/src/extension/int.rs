@@ -493,6 +493,9 @@ mod test {
     #[case::imin("imin_s", -1, -2, -2)]
     #[case::imin("imin_s", -2, -1, -2)]
     #[case::imin("imin_s", -2, -2, -2)]
+    #[case::ipow("ipow", -2, 1, -2)]
+    #[case::ipow("ipow", -2, 2, 4)]
+    #[case::ipow("ipow", -2, 3, -8)]
     fn test_exec_signed_bin_op(
         mut exec_ctx: TestContext,
         #[case] op: String,
