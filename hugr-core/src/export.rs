@@ -7,7 +7,7 @@ use crate::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
         CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
-        TypeBase, TypeBound, TypeEnum,
+        TypeBase, TypeBound, TypeEnum, TypeRow,
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
@@ -728,8 +728,31 @@ impl<'a> Context<'a> {
         }
 
         // Get the signature of the control flow region.
-        // This is the same as the signature of the parent node.
-        let signature = Some(self.export_func_type(&self.hugr.signature(node).unwrap()));
+        let signature = {
+            let node_signature = self.hugr.signature(node).unwrap();
+
+            let mut wrap_ctrl = |types: &TypeRow| {
+                let types = self.export_type_row(types);
+                let types_ctrl = self.make_term(model::Term::Control { values: types });
+                self.make_term(model::Term::List {
+                    parts: self
+                        .bump
+                        .alloc_slice_copy(&[model::ListPart::Item(types_ctrl)]),
+                })
+            };
+
+            let inputs = wrap_ctrl(node_signature.input());
+            let outputs = wrap_ctrl(node_signature.output());
+            let extensions = self.export_ext_set(&node_signature.runtime_reqs);
+
+            let func_type = self.make_term(model::Term::FuncType {
+                inputs,
+                outputs,
+                extensions,
+            });
+
+            Some(func_type)
+        };
 
         let scope = match closure {
             model::ScopeClosure::Closed => {

@@ -14,7 +14,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cfg.
       (signature (-> [?0] [?0] (ext)))
       (cfg
         [%2] [%3]
-        (signature (-> [?0] [?0] (ext)))
+        (signature (-> [(ctrl [?0])] [(ctrl [?0])] (ext)))
         (block [%2] [%6]
           (signature (-> [(ctrl [?0])] [(ctrl [?0])] (ext)))
           (dfg
