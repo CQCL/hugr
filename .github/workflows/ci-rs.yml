@@ -73,9 +73,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
+        run: cargo clippy --all-targets --all-features  -- -D warnings
       - name: Build docs
-        run: cargo doc --no-deps --all-features --workspace
+        run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
@@ -248,7 +248,7 @@ jobs:
 
   tests-stable-llvm:
     needs: changes
-    if: ${{ ( needs.changes.outputs.llvm == 'true' && github.event_name == 'push' ) || needs.changes.outputs.override == 'true' }}
+    if: ${{ ( needs.changes.outputs.llvm == 'true' && github.event_name != 'push' )}}
     runs-on: ubuntu-latest
     name: tests hugr-llvm
     strategy:
@@ -261,10 +261,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.7
-      - id: toolchain
-        uses: dtolnay/rust-toolchain@master
+      - name: Install stable toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "stable"
+          components: rustfmt, clippy
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - name: Install CapnProto
@@ -274,6 +275,13 @@ jobs:
         with:
           version: ${{ matrix.llvm-version[0] }}
           env: true
+      - name: Run clippy
+        run: cargo clippy -p hugr-llvm -- -D warnings
+      - name: Build docs
+        run: cargo doc -p hugr-llvm --no-deps
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+
       - name: Build
         run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
       - name: Tests with no features
