@@ -217,6 +217,14 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
             builder.set_tag(*tag);
             builder.set_values(values.0);
         }
+
+        model::Term::Bytes { data } => {
+            builder.set_bytes(data);
+        }
+
+        model::Term::BytesType => {
+            builder.set_bytes_type(());
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use base64::{prelude::BASE64_STANDARD, Engine};
 use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
@@ -598,6 +599,15 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text(tag.to_string());
                 this.print_term(*values)
             }),
+            Term::BytesType => {
+                self.print_text("bytes");
+                Ok(())
+            }
+            Term::Bytes { data } => self.print_parens(|this| {
+                this.print_text("bytes");
+                this.print_byte_string(data);
+                Ok(())
+            }),
         }
     }
 
@@ -714,6 +724,16 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             }
         }
 
+        output.push('"');
+        self.print_text(output);
+    }
+
+    /// Print a bytes literal.
+    fn print_byte_string(&mut self, bytes: &[u8]) {
+        // every 3 bytes are encoded into 4 characters
+        let mut output = String::with_capacity(2 + bytes.len().div_ceil(3) * 4);
+        output.push('"');
+        BASE64_STANDARD.encode_string(bytes, &mut output);
         output.push('"');
         self.print_text(output);
     }

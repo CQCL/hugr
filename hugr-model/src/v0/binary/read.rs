@@ -335,6 +335,11 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             let values = model::TermId(reader.get_values());
             model::Term::ConstAdt { tag, values }
         }
+
+        Which::Bytes(bytes) => model::Term::Bytes {
+            data: bump.alloc_slice_copy(bytes?),
+        },
+        Which::BytesType(()) => model::Term::BytesType,
     })
 }
 

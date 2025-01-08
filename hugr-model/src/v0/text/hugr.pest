@@ -10,6 +10,8 @@ string_raw     = @{ (!("\\" | "\"") ~ ANY)+ }
 string_escape  = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
 string_unicode = @{ "\\u" ~ "{" ~ ASCII_HEX_DIGIT+ ~ "}" }
 
+base64_string = { "\"" ~ (ASCII_ALPHANUMERIC | "+" | "/")* ~ "="* ~ "\"" }
+
 module = { "(" ~ "hugr" ~ "0" ~ ")" ~ meta* ~ node* ~ EOI }
 
 meta = { "(" ~ "meta" ~ symbol ~ term ~ ")" }
@@ -97,6 +99,8 @@ term = {
   | term_non_linear
   | term_const_func
   | term_const_adt
+  | term_bytes_type
+  | term_bytes
 }
 
 term_wildcard     = { "_" }
@@ -122,5 +126,7 @@ term_ctrl_type    = { "ctrl" }
 term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }
 term_const_func   = { "(" ~ "fn" ~ term ~ ")" }
 term_const_adt    = { "(" ~ "tag" ~ tag ~ term* ~ ")" }
+term_bytes_type   = { "bytes" }
+term_bytes        = { "(" ~ "bytes" ~ base64_string ~ ")" }
 
 spliced_term = { term ~ "..." }

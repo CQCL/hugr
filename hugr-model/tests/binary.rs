@@ -68,3 +68,8 @@ pub fn test_lists() {
 pub fn test_const() {
     binary_roundtrip(include_str!("fixtures/model-const.edn"));
 }
+
+#[test]
+pub fn test_literals() {
+    binary_roundtrip(include_str!("fixtures/model-literals.edn"));
+}

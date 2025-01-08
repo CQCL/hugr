@@ -157,6 +157,8 @@ struct Term {
         nonLinearConstraint @20 :TermId;
         constFunc @22 :RegionId;
         constAdt @23 :ConstAdt;
+        bytes @24 :Data;
+        bytesType @25 :Void;
     }
 
     struct Apply {

@@ -686,6 +686,15 @@ pub enum Term<'a> {
         /// The values of the variant.
         values: TermId,
     },
+
+    /// A literal byte string.
+    Bytes {
+        /// The data of the byte string.
+        data: &'a [u8],
+    },
+
+    /// The type of byte strings.
+    BytesType,
 }
 
 /// A part of a list term.

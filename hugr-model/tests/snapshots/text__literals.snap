@@ -5,3 +5,5 @@ expression: "roundtrip(include_str!(\"fixtures/model-literals.edn\"))"
 (hugr 0)
 
 (define-alias mod.string str "\"\n\r\t\\👍")
+
+(define-alias mod.bytes bytes (bytes "SGVsbG8gd29ybGQg8J+Yig=="))

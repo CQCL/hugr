@@ -16,6 +16,7 @@ license.workspace = true
 bench = false
 
 [dependencies]
+base64 = { workspace = true }
 bumpalo = { workspace = true, features = ["collections"] }
 capnp = "0.20.1"
 derive_more = { version = "1.0.0", features = ["display"] }
