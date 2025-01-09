@@ -246,7 +246,7 @@ jobs:
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  tests-stable-llvm:
+  tests-check-llvm:
     needs: changes
     if: ${{ ( needs.changes.outputs.llvm == 'true' && github.event_name != 'push' )}}
     runs-on: ubuntu-latest
