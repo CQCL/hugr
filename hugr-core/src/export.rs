@@ -10,8 +10,8 @@ use crate::{
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
-        TypeBase, TypeBound, TypeEnum, TypeRow,
+        CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, Type, TypeArg,
+        TypeBase, TypeBound, TypeEnum,
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
@@ -1047,6 +1047,13 @@ impl<'a> Context<'a> {
 
                     let symbol = self.resolve_symbol("arithmetic.int.const");
                     let args = self.bump.alloc_slice_copy(&[bitwidth, literal]);
+                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                }
+
+                if let Some(v) = e.value().downcast_ref::<ConstF64>() {
+                    let literal = self.make_term(model::Term::Nat(v.to_bits()));
+                    let symbol = self.resolve_symbol("arithmetic.float.const-f64");
+                    let args = self.bump.alloc_slice_copy(&[literal]);
                     return self.make_term(model::Term::ApplyFull { symbol, args });
                 }
 
