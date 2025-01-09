@@ -612,6 +612,15 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("meta");
                 Ok(())
             }
+            Term::Float { value } => {
+                // The debug representation of a float always includes a decimal point.
+                self.print_text(format!("{:?}", value.into_inner()));
+                Ok(())
+            }
+            Term::FloatType => {
+                self.print_text("float");
+                Ok(())
+            }
         }
     }
 

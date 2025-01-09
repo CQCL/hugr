@@ -3,6 +3,10 @@ use crate::{
     extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
     hugr::{IdentList, NodeMetadataMap},
     ops::{constant::CustomSerialized, DataflowBlock, OpName, OpTrait, OpType, Value},
+    std_extensions::{
+        arithmetic::{float_types::ConstF64, int_types::ConstInt},
+        collections::array::ArrayValue,
+    },
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
@@ -1018,6 +1022,46 @@ impl<'a> Context<'a> {
     fn export_value(&mut self, value: &'a Value) -> model::TermId {
         match value {
             Value::Extension { e } => {
+                // NOTE: We have special cased arrays, integers, and floats for now.
+                // TODO: Allow arbitrary extension values to be exported as terms.
+
+                if let Some(array) = e.value().downcast_ref::<ArrayValue>() {
+                    let len = self.make_term(model::Term::Nat(array.get_contents().len() as u64));
+                    let element_type = self.export_type(array.get_element_type());
+                    let mut contents =
+                        BumpVec::with_capacity_in(array.get_contents().len(), self.bump);
+
+                    for element in array.get_contents() {
+                        contents.push(model::ListPart::Item(self.export_value(element)));
+                    }
+
+                    let contents = self.make_term(model::Term::List {
+                        parts: contents.into_bump_slice(),
+                    });
+
+                    let symbol = self.resolve_symbol(ArrayValue::CTR_NAME);
+                    let args = self.bump.alloc_slice_copy(&[len, element_type, contents]);
+                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                }
+
+                if let Some(v) = e.value().downcast_ref::<ConstInt>() {
+                    let bitwidth = self.make_term(model::Term::Nat(v.log_width() as u64));
+                    let literal = self.make_term(model::Term::Nat(v.value_u()));
+
+                    let symbol = self.resolve_symbol(ConstInt::CTR_NAME);
+                    let args = self.bump.alloc_slice_copy(&[bitwidth, literal]);
+                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                }
+
+                if let Some(v) = e.value().downcast_ref::<ConstF64>() {
+                    let literal = self.make_term(model::Term::Float {
+                        value: v.value().into(),
+                    });
+                    let symbol = self.resolve_symbol(ConstF64::CTR_NAME);
+                    let args = self.bump.alloc_slice_copy(&[literal]);
+                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                }
+
                 let json = match e.value().downcast_ref::<CustomSerialized>() {
                     Some(custom) => serde_json::to_string(custom.value()).unwrap(),
                     None => serde_json::to_string(e.value())

@@ -86,6 +86,7 @@ term = {
   | term_list_type
   | term_str
   | term_str_type
+  | term_float
   | term_nat
   | term_nat_type
   | term_ext_set
@@ -102,33 +103,37 @@ term = {
   | term_bytes_type
   | term_bytes
   | term_meta
+  | term_float
+  | term_float_type
 }
 
-term_wildcard     = { "_" }
-term_type         = { "type" }
-term_static       = { "static" }
-term_constraint   = { "constraint" }
-term_var          = { "?" ~ identifier }
-term_apply_full   = { ("(" ~ "@" ~ symbol ~ term* ~ ")") }
-term_apply        = { symbol | ("(" ~ symbol ~ term* ~ ")") }
-term_const        = { "(" ~ "const" ~ term ~ term ~ ")" }
-term_list         = { "[" ~ (spliced_term | term)* ~ "]" }
-term_list_type    = { "(" ~ "list" ~ term ~ ")" }
-term_str          = { string }
-term_str_type     = { "str" }
-term_nat          = { (ASCII_DIGIT)+ }
-term_nat_type     = { "nat" }
-term_ext_set      = { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
-term_ext_set_type = { "ext-set" }
-term_adt          = { "(" ~ "adt" ~ term ~ ")" }
-term_func_type    = { "(" ~ "->" ~ term ~ term ~ term ~ ")" }
-term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
-term_ctrl_type    = { "ctrl" }
-term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }
-term_const_func   = { "(" ~ "fn" ~ term ~ ")" }
-term_const_adt    = { "(" ~ "tag" ~ tag ~ term* ~ ")" }
-term_bytes_type   = { "bytes" }
-term_bytes        = { "(" ~ "bytes" ~ base64_string ~ ")" }
-term_meta         = { "meta" }
+term_wildcard     =  { "_" }
+term_type         =  { "type" }
+term_static       =  { "static" }
+term_constraint   =  { "constraint" }
+term_var          =  { "?" ~ identifier }
+term_apply_full   =  { ("(" ~ "@" ~ symbol ~ term* ~ ")") }
+term_apply        =  { symbol | ("(" ~ symbol ~ term* ~ ")") }
+term_const        =  { "(" ~ "const" ~ term ~ term ~ ")" }
+term_list         =  { "[" ~ (spliced_term | term)* ~ "]" }
+term_list_type    =  { "(" ~ "list" ~ term ~ ")" }
+term_str          =  { string }
+term_str_type     =  { "str" }
+term_nat          = @{ (ASCII_DIGIT)+ }
+term_nat_type     =  { "nat" }
+term_ext_set      =  { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
+term_ext_set_type =  { "ext-set" }
+term_adt          =  { "(" ~ "adt" ~ term ~ ")" }
+term_func_type    =  { "(" ~ "->" ~ term ~ term ~ term ~ ")" }
+term_ctrl         =  { "(" ~ "ctrl" ~ term ~ ")" }
+term_ctrl_type    =  { "ctrl" }
+term_non_linear   =  { "(" ~ "nonlinear" ~ term ~ ")" }
+term_const_func   =  { "(" ~ "fn" ~ term ~ ")" }
+term_const_adt    =  { "(" ~ "tag" ~ tag ~ term* ~ ")" }
+term_bytes_type   =  { "bytes" }
+term_bytes        =  { "(" ~ "bytes" ~ base64_string ~ ")" }
+term_meta         =  { "meta" }
+term_float_type   =  { "float" }
+term_float        = @{ ("+" | "-")? ~ (ASCII_DIGIT)+ ~ "." ~ (ASCII_DIGIT)+ }
 
 spliced_term = { term ~ "..." }

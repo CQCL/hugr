@@ -114,6 +114,7 @@ impl<'a> ParseContext<'a> {
         debug_assert_eq!(pair.as_rule(), Rule::term);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
+        let str_slice = pair.as_str();
         let mut inner = pair.into_inner();
 
         let term =
@@ -203,7 +204,7 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Rule::term_nat => {
-                    let value = inner.next().unwrap().as_str().parse().unwrap();
+                    let value = str_slice.trim().parse().unwrap();
                     Term::Nat(value)
                 }
 
@@ -276,6 +277,14 @@ impl<'a> ParseContext<'a> {
                     })?;
                     let data = self.bump.alloc_slice_copy(&data);
                     Term::Bytes { data }
+                }
+
+                Rule::term_float_type => Term::FloatType,
+                Rule::term_float => {
+                    let value: f64 = str_slice.trim().parse().unwrap();
+                    Term::Float {
+                        value: value.into(),
+                    }
                 }
 
                 r => unreachable!("term: {:?}", r),
