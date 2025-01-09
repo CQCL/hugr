@@ -70,7 +70,7 @@ in
     # https://devenv.sh/languages/
     # https://devenv.sh/reference/options/#languagesrustversion
     languages.rust = {
-      channel = "nixpkgs";
+      channel = "beta";
       enable = true;
       components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
     };
