@@ -124,6 +124,11 @@ jobs:
 
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Build with no features
         run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -135,6 +140,13 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     name: tests (Rust stable, all features)
+    strategy:
+      matrix:
+        llvm-version:
+          # different strings for install action and feature name
+          # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+          - ["14.0", "14-0"]
+
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.7
@@ -147,10 +159,21 @@ jobs:
 
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Build with all features
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose  --all-features
+      - name: Build hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
+      - name: Tests hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }}
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -182,6 +205,11 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Build with no features
         run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -255,40 +283,6 @@ jobs:
           name: rust
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
-
-  tests-stable-llvm:
-    needs: changes
-    if: ${{ ( needs.changes.outputs.llvm == 'true' && github.event_name != 'push' )}}
-    runs-on: ubuntu-latest
-    name: tests hugr-llvm
-    strategy:
-      matrix:
-        llvm-version:
-          # different strings for install action and feature name
-          # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-          - ["14.0", "14-0"]
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
-      - name: Install stable toolchain
-        id: toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - name: Configure default rust toolchain
-        run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ matrix.llvm-version[0] }}
-          env: true
-      - name: Build
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
-      - name: Tests with no features
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }}
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
