@@ -256,7 +256,7 @@ jobs:
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  tests-check-llvm:
+  tests-stable-llvm:
     needs: changes
     if: ${{ ( needs.changes.outputs.llvm == 'true' && github.event_name != 'push' )}}
     runs-on: ubuntu-latest
@@ -285,13 +285,6 @@ jobs:
         with:
           version: ${{ matrix.llvm-version[0] }}
           env: true
-      - name: Run clippy
-        run: cargo clippy -p hugr-llvm -- -D warnings
-      - name: Build docs
-        run: cargo doc -p hugr-llvm --no-deps
-        env:
-          RUSTDOCFLAGS: "-Dwarnings"
-
       - name: Build
         run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
       - name: Tests with no features
