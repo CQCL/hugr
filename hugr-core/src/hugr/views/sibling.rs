@@ -85,7 +85,7 @@ macro_rules! impl_base_members {
     };
 }
 
-impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
+impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
     impl_base_members! {}
 
     #[inline]
@@ -265,7 +265,7 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     }
 }
 
-impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
+impl<Root: NodeHandle> HugrView for SiblingMut<'_, Root> {
     impl_base_members! {}
 
     fn contains_node(&self, node: Node) -> bool {

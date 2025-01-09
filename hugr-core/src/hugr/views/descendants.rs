@@ -38,7 +38,7 @@ pub struct DescendantsGraph<'g, Root = Node> {
     /// The operation handle of the root node.
     _phantom: std::marker::PhantomData<Root>,
 }
-impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
+impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.pg_index())
