@@ -24,10 +24,10 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1736318091,
+        "lastModified": 1736490741,
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "9e13860d50cbfd42e79101a516e1939c7723f093",
+        "rev": "ff8cb1e6d1755aa3ace7c662f79f74882cc5022f",
         "type": "github"
       },
       "original": {
@@ -73,14 +73,15 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1736447052,
+        "lastModified": 1736320768,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "156eeac81bc295d151a080eb63e41ae4dc461064",
+        "rev": "4bc9c909d9ac828a039f288cf872d16d38185db8",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -133,10 +134,10 @@
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736331291,
+        "lastModified": 1736424758,
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "32b86a837805a4162a01b2356c65ef9dd53dbae6",
+        "rev": "cc016df54b03d8c1bbb1aae761da01dbfae5f126",
         "type": "github"
       },
       "original": {
