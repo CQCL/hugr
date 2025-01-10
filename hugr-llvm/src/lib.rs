@@ -72,7 +72,7 @@ pub mod utils;
 pub fn llvm_version() -> &'static str {
     #[cfg(feature = "llvm14-0")]
     return "llvm14";
-    panic!("No recognised llvm feature")
+    panic!("No recognised llvm feature.")
 }
 
 #[cfg(any(test, feature = "test-utils"))]
