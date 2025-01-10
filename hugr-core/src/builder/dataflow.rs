@@ -1,10 +1,8 @@
-use delegate::delegate;
-use itertools::Itertools;
-
 use super::build_traits::{HugrBuilder, SubContainer};
 use super::handle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
+use itertools::Itertools;
 use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
@@ -17,6 +15,88 @@ use crate::types::{PolyFuncType, Signature, Type};
 
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
+
+pub trait MutableIO: Dataflow {
+    fn num_in_wires_mut(&mut self) -> &mut usize;
+    fn num_out_wires_mut(&mut self) -> &mut usize;
+
+    // TODO: define a generic signature for this function
+    fn update_signature(&mut self, f: impl FnOnce(Signature) -> Signature) -> &ops::FuncDefn;
+
+    /// Add a new input to the DFG being constructed.
+    ///
+    /// Returns the new wire from the input node.
+    fn add_input(&mut self, input_type: Type) -> Wire {
+        let [inp_node, _] = self.io();
+
+        // Update the parent's root type
+        let new_optype = self.update_signature(|mut s| {
+            s.input.to_mut().push(input_type);
+            s
+        });
+
+        // Update the inner input node
+        let types = new_optype.signature.body().input.clone();
+        self.hugr_mut()
+            .replace_op(inp_node, Input { types })
+            .unwrap();
+        let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
+        let new_port = new_port.next().unwrap();
+
+        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
+        let new_value_port: OutgoingPort = (new_port - 1).into();
+        let new_order_port: OutgoingPort = new_port.into();
+        let order_edge_targets = self
+            .hugr()
+            .linked_inputs(inp_node, new_value_port)
+            .collect_vec();
+        self.hugr_mut().disconnect(inp_node, new_value_port);
+        for (tgt_node, tgt_port) in order_edge_targets {
+            self.hugr_mut()
+                .connect(inp_node, new_order_port, tgt_node, tgt_port);
+        }
+
+        // Update the builder metadata
+        *self.num_in_wires_mut() += 1;
+
+        self.input_wires().last().unwrap()
+    }
+
+    /// Add a new output to the DFG being constructed.
+    fn add_output(&mut self, output_type: Type) {
+        let [_, out_node] = self.io();
+
+        // Update the parent's root type
+        let new_optype = self.update_signature(|mut s| {
+            s.output.to_mut().push(output_type);
+            s
+        });
+
+        // Update the inner input node
+        let types = new_optype.signature.body().output.clone();
+        self.hugr_mut()
+            .replace_op(out_node, Output { types })
+            .unwrap();
+        let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
+        let new_port = new_port.next().unwrap();
+
+        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
+        let new_value_port: IncomingPort = (new_port - 1).into();
+        let new_order_port: IncomingPort = new_port.into();
+        let order_edge_sources = self
+            .hugr()
+            .linked_outputs(out_node, new_value_port)
+            .collect_vec();
+        self.hugr_mut().disconnect(out_node, new_value_port);
+        for (src_node, src_port) in order_edge_sources {
+            self.hugr_mut()
+                .connect(src_node, src_port, out_node, new_order_port);
+        }
+
+        // Update the builder metadata
+        *self.num_out_wires_mut() += 1;
+    }
+}
 
 /// Builder for a [`ops::DFG`] node.
 #[derive(Debug, Clone, PartialEq)]
@@ -80,109 +160,18 @@ impl DFGBuilder<Hugr> {
         let root = base.root();
         DFGBuilder::create_with_io(base, root, signature)
     }
+}
 
-    /// Add a new input to the DFG being constructed.
-    ///
-    /// Returns the new wire from the input node.
-    pub fn add_input(&mut self, input_type: Type) -> Wire {
-        let [inp_node, _] = self.io();
-
-        // Update the parent's root type
-        let new_optype = self.update_fn_signature(|mut s| {
-            s.input.to_mut().push(input_type);
-            s
-        });
-
-        // Update the inner input node
-        let types = new_optype.signature.body().input.clone();
-        self.hugr_mut()
-            .replace_op(inp_node, Input { types })
-            .unwrap();
-        let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
-        let new_port = new_port.next().unwrap();
-
-        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
-        let new_value_port: OutgoingPort = (new_port - 1).into();
-        let new_order_port: OutgoingPort = new_port.into();
-        let order_edge_targets = self
-            .hugr()
-            .linked_inputs(inp_node, new_value_port)
-            .collect_vec();
-        self.hugr_mut().disconnect(inp_node, new_value_port);
-        for (tgt_node, tgt_port) in order_edge_targets {
-            self.hugr_mut()
-                .connect(inp_node, new_order_port, tgt_node, tgt_port);
-        }
-
-        // Update the builder metadata
-        self.num_in_wires += 1;
-
-        self.input_wires().last().unwrap()
+impl MutableIO for DFGBuilder<Hugr> {
+    fn num_in_wires_mut(&mut self) -> &mut usize {
+        &mut self.num_in_wires
     }
 
-    /// Add a new output to the DFG being constructed.
-    pub fn add_output(&mut self, output_type: Type) {
-        let [_, out_node] = self.io();
-
-        // Update the parent's root type
-        let new_optype = self.update_fn_signature(|mut s| {
-            s.output.to_mut().push(output_type);
-            s
-        });
-
-        // Update the inner input node
-        let types = new_optype.signature.body().output.clone();
-        self.hugr_mut()
-            .replace_op(out_node, Output { types })
-            .unwrap();
-        let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
-        let new_port = new_port.next().unwrap();
-
-        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
-        let new_value_port: IncomingPort = (new_port - 1).into();
-        let new_order_port: IncomingPort = new_port.into();
-        let order_edge_sources = self
-            .hugr()
-            .linked_outputs(out_node, new_value_port)
-            .collect_vec();
-        self.hugr_mut().disconnect(out_node, new_value_port);
-        for (src_node, src_port) in order_edge_sources {
-            self.hugr_mut()
-                .connect(src_node, src_port, out_node, new_order_port);
-        }
-
-        // Update the builder metadata
-        self.num_out_wires += 1;
+    fn num_out_wires_mut(&mut self) -> &mut usize {
+        &mut self.num_out_wires
     }
 
-    /// Update the DFG builder's parent signature.
-    ///
-    /// Internal function used in [add_input] and [add_output].
-    ///
-    /// Does not update the input and output nodes.
-    ///
-    /// Returns a reference to the new optype.
-    fn update_fn_signature(&mut self, f: impl FnOnce(Signature) -> Signature) -> &ops::FuncDefn {
-        let parent = self.container_node();
-        let old_optype = self
-            .hugr()
-            .get_optype(parent)
-            .as_func_defn()
-            .expect("FunctionBuilder node must be a FuncDefn");
-        let signature = old_optype.inner_signature().into_owned();
-        let name = old_optype.name.clone();
-        self.hugr_mut()
-            .replace_op(
-                parent,
-                ops::FuncDefn {
-                    signature: f(signature).into(),
-                    name,
-                },
-            )
-            .expect("Could not replace FunctionBuilder operation");
-
-        self.hugr().get_optype(parent).as_func_defn().unwrap()
-    }
+    // fn update_signature(&mut self, f: impl FnOnce(Signature) -> Signature) -> &ops::FuncDefn {}
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
@@ -263,17 +252,43 @@ impl FunctionBuilder<Hugr> {
         let db = DFGBuilder::create_with_io(base, root, body)?;
         Ok(Self::from_dfg_builder(db))
     }
+}
 
-    delegate! {
-        to self.0 {
-            /// Add a new input to the function being constructed.
-            ///
-            /// Returns the new wire from the input node.
-            pub fn add_input(&mut self, input_type: Type) -> Wire;
+impl MutableIO for FunctionBuilder<Hugr> {
+    fn num_in_wires_mut(&mut self) -> &mut usize {
+        &mut self.0.num_in_wires
+    }
+    fn num_out_wires_mut(&mut self) -> &mut usize {
+        &mut self.0.num_out_wires
+    }
 
-            /// Add a new input to the function being constructed.
-            pub fn add_output(&mut self, output_type: Type);
-        }
+    /// Update the function builder's parent signature.
+    ///
+    /// Internal function used in [add_input] and [add_output].
+    ///
+    /// Does not update the input and output nodes.
+    ///
+    /// Returns a reference to the new optype.
+    fn update_signature(&mut self, f: impl FnOnce(Signature) -> Signature) -> &ops::FuncDefn {
+        let parent = self.container_node();
+        let old_optype = self
+            .hugr()
+            .get_optype(parent)
+            .as_func_defn()
+            .expect("FunctionBuilder node must be a FuncDefn");
+        let signature = old_optype.inner_signature().into_owned();
+        let name = old_optype.name.clone();
+        self.hugr_mut()
+            .replace_op(
+                parent,
+                ops::FuncDefn {
+                    signature: f(signature).into(),
+                    name,
+                },
+            )
+            .expect("Could not replace FunctionBuilder operation");
+
+        self.hugr().get_optype(parent).as_func_defn().unwrap()
     }
 }
 
