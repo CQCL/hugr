@@ -1022,6 +1022,20 @@ impl<'a> Context<'a> {
     fn export_value(&mut self, value: &'a Value) -> model::TermId {
         match value {
             Value::Extension { e } => {
+                if is_simple_value_type(&value.get_type()) {
+                    let mut builder =
+                        flexbuffers::Builder::new(flexbuffers::BuilderOptions::SHARE_KEYS);
+                    let mut vec_builder = builder.start_vector();
+                    export_value_flexbuffer(&mut vec_builder, value);
+                    vec_builder.end_vector();
+                    let data = self.bump.alloc_slice_copy(builder.view());
+                    let literal = self.make_term(model::Term::Bytes { data });
+                    let runtime_type = self.export_type(&value.get_type());
+                    let args = self.bump.alloc_slice_copy(&[runtime_type, literal]);
+                    let symbol = self.resolve_symbol("flexbuffer.const");
+                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                }
+
                 if let Some(array) = e.value().downcast_ref::<ArrayValue>() {
                     let len = self.make_term(model::Term::Nat(array.get_contents().len() as u64));
                     let element_type = self.export_type(array.get_element_type());
@@ -1143,6 +1157,85 @@ impl<'a> Context<'a> {
         let symbol = self.resolve_symbol(name);
         let args = self.bump.alloc_slice_copy(args);
         self.make_term(model::Term::ApplyFull { symbol, args })
+    }
+}
+
+fn is_simple_value_type<RV: MaybeRV>(ty: &TypeBase<RV>) -> bool {
+    match ty.as_type_enum() {
+        TypeEnum::Extension(ext) => {
+            if (ext.extension() as &str) == "arithmetic.int.types" && ext.name() == "int" {
+                return true;
+            }
+
+            if (ext.extension() as &str) == "arithmetic.float.types" && ext.name() == "float64" {
+                return true;
+            }
+
+            if (ext.extension() as &str) == "collections.array" && ext.name() == "array" {
+                let Some(TypeArg::Type { ty }) = ext.args().get(1) else {
+                    return false;
+                };
+
+                return is_simple_value_type(ty);
+            }
+
+            false
+        }
+        TypeEnum::Sum(SumType::Unit { .. }) => true,
+        TypeEnum::Sum(SumType::General { rows }) => {
+            rows.iter().all(|row| row.iter().all(is_simple_value_type))
+        }
+        _ => false,
+    }
+}
+
+fn export_value_flexbuffer(builder: &mut flexbuffers::VectorBuilder, value: &Value) {
+    match value {
+        Value::Extension { e } => {
+            if let Some(array) = e.value().downcast_ref::<ArrayValue>() {
+                let mut vec = builder.start_vector();
+                for element in array.get_contents() {
+                    export_value_flexbuffer(&mut vec, element);
+                }
+                vec.end_vector();
+                return;
+            }
+
+            if let Some(v) = e.value().downcast_ref::<ConstInt>() {
+                builder.push(v.value_u());
+                return;
+            }
+
+            if let Some(v) = e.value().downcast_ref::<ConstF64>() {
+                builder.push(v.to_bits());
+                return;
+            }
+
+            unreachable!("{:?}", value)
+        }
+        Value::Function { .. } => unreachable!(),
+        Value::Sum(sum) => {
+            if sum.sum_type.num_variants() == 2
+                && sum.sum_type.get_variant(0).unwrap().is_empty()
+                && sum.sum_type.get_variant(1).unwrap().len() == 1
+            {
+                if sum.tag == 0 {
+                    builder.push(());
+                } else if sum.tag == 1 {
+                    export_value_flexbuffer(builder, &sum.values[0]);
+                } else {
+                    unreachable!()
+                }
+                return;
+            }
+
+            let mut vec = builder.start_vector();
+            vec.push(sum.tag as u16);
+            for value in &sum.values {
+                export_value_flexbuffer(&mut vec, value);
+            }
+            vec.end_vector();
+        }
     }
 }
 
