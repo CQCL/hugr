@@ -9,7 +9,9 @@ resolution-markers = [
 members = [
     "hugr",
 ]
-requirements = [
+
+[manifest.dependency-groups]
+dev = [
     { name = "mypy", specifier = ">=1.9.0,<2" },
     { name = "pre-commit", specifier = ">=3.6.2,<4" },
     { name = "pytest", specifier = ">=8.1.1,<9" },

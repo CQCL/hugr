@@ -309,6 +309,12 @@ impl<CC: CustomConst> From<CC> for OpaqueValue {
     }
 }
 
+impl From<Box<dyn CustomConst>> for OpaqueValue {
+    fn from(value: Box<dyn CustomConst>) -> Self {
+        Self { v: value }
+    }
+}
+
 impl PartialEq for OpaqueValue {
     fn eq(&self, other: &Self) -> bool {
         self.value().equal_consts(other.value())

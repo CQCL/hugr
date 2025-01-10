@@ -2,7 +2,7 @@
 use crate::{
     extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
     hugr::{IdentList, NodeMetadataMap},
-    ops::{DataflowBlock, OpName, OpTrait, OpType},
+    ops::{constant::CustomSerialized, DataflowBlock, OpName, OpTrait, OpType, Value},
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
@@ -20,6 +20,7 @@ pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
 const TERM_JSON: &str = "prelude.json";
 const META_DESCRIPTION: &str = "docs.description";
+const TERM_JSON_CONST: &str = "prelude.const-json";
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
@@ -71,7 +72,12 @@ struct Context<'a> {
     implicit_imports: FxHashMap<&'a str, model::NodeId>,
 
     /// Map from node ids in the [`Hugr`] to the corresponding node ids in the model.
-    node_indices: FxHashMap<Node, model::NodeId>,
+    node_to_id: FxHashMap<Node, model::NodeId>,
+
+    /// Mapping from node ids in the [`Hugr`] to the corresponding model nodes.
+    id_to_node: FxHashMap<model::NodeId, Node>,
+    // TODO: Once this module matures, we should consider adding an auxiliary structure
+    // that ensures that the `node_to_id` and `id_to_node` maps stay in sync.
 }
 
 impl<'a> Context<'a> {
@@ -89,7 +95,8 @@ impl<'a> Context<'a> {
             local_constraints: Vec::new(),
             symbols: model::scope::SymbolTable::default(),
             implicit_imports: FxHashMap::default(),
-            node_indices: FxHashMap::default(),
+            node_to_id: FxHashMap::default(),
+            id_to_node: FxHashMap::default(),
             links: model::scope::LinkTable::default(),
         }
     }
@@ -104,11 +111,13 @@ impl<'a> Context<'a> {
         let mut children = Vec::with_capacity(hugr_children.size_hint().0);
 
         for child in hugr_children.clone() {
-            children.push(self.export_node_shallow(child));
+            if let Some(child_id) = self.export_node_shallow(child) {
+                children.push(child_id);
+            }
         }
 
-        for (child, child_node_id) in hugr_children.zip(children.iter().copied()) {
-            self.export_node_deep(child, child_node_id);
+        for child in &children {
+            self.export_node_deep(*child);
         }
 
         let mut all_children = BumpVec::with_capacity_in(
@@ -226,11 +235,25 @@ impl<'a> Context<'a> {
         result
     }
 
-    fn export_node_shallow(&mut self, node: Node) -> model::NodeId {
-        let node_id = self.module.insert_node(model::Node::default());
-        self.node_indices.insert(node, node_id);
+    fn export_node_shallow(&mut self, node: Node) -> Option<model::NodeId> {
+        let optype = self.hugr.get_optype(node);
 
-        let symbol = match self.hugr.get_optype(node) {
+        // We skip nodes that are not exported as nodes in the model.
+        if let OpType::Const(_)
+        | OpType::Input(_)
+        | OpType::Output(_)
+        | OpType::ExitBlock(_)
+        | OpType::Case(_) = optype
+        {
+            return None;
+        }
+
+        let node_id = self.module.insert_node(model::Node::default());
+        self.node_to_id.insert(node, node_id);
+        self.id_to_node.insert(node_id, node);
+
+        // We record the name of the symbol defined by the node, if any.
+        let symbol = match optype {
             OpType::FuncDefn(func_defn) => Some(func_defn.name.as_str()),
             OpType::FuncDecl(func_decl) => Some(func_decl.name.as_str()),
             OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
@@ -244,16 +267,17 @@ impl<'a> Context<'a> {
                 .expect("duplicate symbol");
         }
 
-        node_id
+        Some(node_id)
     }
 
-    fn export_node_deep(&mut self, node: Node, node_id: model::NodeId) {
+    fn export_node_deep(&mut self, node_id: model::NodeId) {
         // We insert a dummy node with the invalid operation at this point to reserve
         // the node id. This is necessary to establish the correct node id for the
         // local scope introduced by some operations. We will overwrite this node later.
         let mut params: &[_] = &[];
         let mut regions: &[_] = &[];
 
+        let node = self.id_to_node[&node_id];
         let optype = self.hugr.get_optype(node);
 
         let operation = match optype {
@@ -358,7 +382,7 @@ impl<'a> Context<'a> {
             OpType::Call(call) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let symbol = self.node_indices[&node];
+                let symbol = self.node_to_id[&node];
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
@@ -370,7 +394,7 @@ impl<'a> Context<'a> {
             OpType::LoadFunction(load) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let symbol = self.node_indices[&node];
+                let symbol = self.node_to_id[&node];
 
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
@@ -380,8 +404,24 @@ impl<'a> Context<'a> {
                 model::Operation::LoadFunc { func }
             }
 
-            OpType::Const(_) => todo!("Export const nodes?"),
-            OpType::LoadConstant(_) => todo!("Export load constant?"),
+            OpType::Const(_) => {
+                unreachable!("const nodes are filtered out by `export_node_shallow`")
+            }
+
+            OpType::LoadConstant(_) => {
+                // TODO: If the node is not connected to a constant, we should do better than panic.
+                let const_node = self.hugr.static_source(node).unwrap();
+                let const_node_op = self.hugr.get_optype(const_node);
+
+                let OpType::Const(const_node_data) = const_node_op else {
+                    panic!("expected `LoadConstant` node to be connected to a `Const` node");
+                };
+
+                // TODO: Share the constant value between all nodes that load it.
+
+                let value = self.export_value(&const_node_data.value);
+                model::Operation::Const { value }
+            }
 
             OpType::CallIndirect(_) => model::Operation::CustomFull {
                 operation: self.resolve_symbol(OP_FUNC_CALL_INDIRECT),
@@ -414,18 +454,6 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                // PERFORMANCE: Currently the API does not appear to allow to get the extension
-                // set without copying it.
-                // NOTE: We assume here that the extension set of the dfg region must be the same
-                // as that of the node. This might change in the future.
-                let extensions = self.export_ext_set(&op.extension_delta());
-
-                if let Some(region) =
-                    self.export_dfg_if_present(node, extensions, model::ScopeClosure::Closed)
-                {
-                    regions = self.bump.alloc_slice_copy(&[region]);
-                }
-
                 model::Operation::CustomFull { operation }
             }
 
@@ -435,18 +463,6 @@ impl<'a> Context<'a> {
                 params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
-
-                // PERFORMANCE: Currently the API does not appear to allow to get the extension
-                // set without copying it.
-                // NOTE: We assume here that the extension set of the dfg region must be the same
-                // as that of the node. This might change in the future.
-                let extensions = self.export_ext_set(&op.extension_delta());
-
-                if let Some(region) =
-                    self.export_dfg_if_present(node, extensions, model::ScopeClosure::Closed)
-                {
-                    regions = self.bump.alloc_slice_copy(&[region]);
-                }
 
                 model::Operation::CustomFull { operation }
             }
@@ -549,7 +565,7 @@ impl<'a> Context<'a> {
 
             for (name, value) in opdef.iter_misc() {
                 let name = self.bump.alloc_str(name);
-                let value = self.export_json(value);
+                let value = self.export_json_meta(value);
                 meta.push(model::MetaItem { name, value });
             }
 
@@ -596,22 +612,6 @@ impl<'a> Context<'a> {
         })
     }
 
-    /// Create a region from the given node's children, if it has any.
-    ///
-    /// See [`Self::export_dfg`].
-    pub fn export_dfg_if_present(
-        &mut self,
-        node: Node,
-        extensions: model::TermId,
-        closure: model::ScopeClosure,
-    ) -> Option<model::RegionId> {
-        if self.hugr.children(node).next().is_none() {
-            None
-        } else {
-            Some(self.export_dfg(node, extensions, closure))
-        }
-    }
-
     /// Creates a data flow region from the given node's children.
     ///
     /// `Input` and `Output` nodes are used to determine the source and target ports of the region.
@@ -628,44 +628,39 @@ impl<'a> Context<'a> {
             self.links.enter(region);
         }
 
-        let region_children = {
-            let children = self.hugr.children(node);
+        let mut sources: &[_] = &[];
+        let mut targets: &[_] = &[];
+        let mut input_types = None;
+        let mut output_types = None;
 
-            // We skip the first two children, which are the `Input` and `Output` nodes.
-            // These nodes are not exported as model nodes themselves, but are used to determine
-            // the region's sources and targets.
-            let mut region_children =
-                BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
-            for child in children.skip(2) {
-                region_children.push(self.export_node_shallow(child));
+        let children = self.hugr.children(node);
+        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
+
+        for child in children {
+            match self.hugr.get_optype(child) {
+                OpType::Input(input) => {
+                    sources = self.make_ports(child, Direction::Outgoing, input.types.len());
+                    input_types = Some(&input.types);
+                }
+                OpType::Output(output) => {
+                    targets = self.make_ports(child, Direction::Incoming, output.types.len());
+                    output_types = Some(&output.types);
+                }
+                _ => {
+                    if let Some(child_id) = self.export_node_shallow(child) {
+                        region_children.push(child_id);
+                    }
+                }
             }
-            region_children.into_bump_slice()
-        };
+        }
 
-        let mut children = self.hugr.children(node);
-
-        // The first child is an `Input` node, which we use to determine the region's sources.
-        let input_node = children.next().unwrap();
-        let OpType::Input(input_op) = self.hugr.get_optype(input_node) else {
-            panic!("expected an `Input` node as the first child node");
-        };
-        let sources = self.make_ports(input_node, Direction::Outgoing, input_op.types.len());
-
-        // The second child is an `Output` node, which we use to determine the region's targets.
-        let output_node = children.next().unwrap();
-        let OpType::Output(output_op) = self.hugr.get_optype(output_node) else {
-            panic!("expected an `Output` node as the second child node");
-        };
-        let targets = self.make_ports(output_node, Direction::Incoming, output_op.types.len());
-
-        // Export the remaining children of the node.
-        for (child, child_node_id) in children.zip(region_children.iter().copied()) {
-            self.export_node_deep(child, child_node_id);
+        for child_id in &region_children {
+            self.export_node_deep(*child_id);
         }
 
         let signature = {
-            let inputs = self.export_type_row(&input_op.types);
-            let outputs = self.export_type_row(&output_op.types);
+            let inputs = self.export_type_row(input_types.unwrap());
+            let outputs = self.export_type_row(output_types.unwrap());
 
             Some(self.make_term(model::Term::FuncType {
                 inputs,
@@ -687,7 +682,7 @@ impl<'a> Context<'a> {
             kind: model::RegionKind::DataFlow,
             sources,
             targets,
-            children: region_children,
+            children: region_children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
             signature,
             scope,
@@ -705,58 +700,32 @@ impl<'a> Context<'a> {
             self.links.enter(region);
         }
 
-        let region_children = {
-            let children = self.hugr.children(node);
-            let mut region_children =
-                BumpVec::with_capacity_in(children.size_hint().0 - 1, self.bump);
+        let mut source = None;
+        let mut targets: &[_] = &[];
 
-            // First export the children shallowly to allocate their IDs and register symbols.
-            for (i, child) in children.enumerate() {
-                // The second node is the exit block, which is not exported as a node itself.
-                if i == 1 {
-                    continue;
+        let children = self.hugr.children(node);
+        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 1, self.bump);
+
+        for child in children {
+            match self.hugr.get_optype(child) {
+                OpType::ExitBlock(_) => {
+                    targets = self.make_ports(child, Direction::Incoming, 1);
                 }
+                _ => {
+                    if let Some(child_id) = self.export_node_shallow(child) {
+                        region_children.push(child_id);
+                    }
 
-                region_children.push(self.export_node_shallow(child));
+                    if source.is_none() {
+                        source = Some(self.get_link_index(child, IncomingPort::from(0)));
+                    }
+                }
             }
-
-            region_children.into_bump_slice()
-        };
-
-        let mut children_iter = self.hugr.children(node);
-        let mut region_children_iter = region_children.iter().copied();
-
-        // The first child is the entry block.
-        // We create a source port on the control flow region and connect it to the
-        // first input port of the exported entry block.
-        let source = {
-            let entry_block = children_iter.next().unwrap();
-            let entry_node_id = region_children_iter.next().unwrap();
-
-            let OpType::DataflowBlock(_) = self.hugr.get_optype(entry_block) else {
-                panic!("expected a `DataflowBlock` node as the first child node");
-            };
-
-            self.export_node_deep(entry_block, entry_node_id);
-            self.get_link_index(entry_block, IncomingPort::from(0))
-        };
-
-        // The second child is the exit block.
-        // Contrary to the entry block, the exit block does not have a dataflow subgraph.
-        // We therefore do not export the block itself, but simply use its output ports
-        // as the target ports of the control flow region.
-        let exit_block = children_iter.next_back().unwrap();
-
-        let OpType::ExitBlock(_) = self.hugr.get_optype(exit_block) else {
-            panic!("expected an `ExitBlock` node as the second child node");
-        };
-
-        // Export the remaining children of the node, except for the last one.
-        for (child, child_node_id) in children_iter.zip(region_children_iter) {
-            self.export_node_deep(child, child_node_id);
         }
 
-        let targets = self.make_ports(exit_block, Direction::Incoming, 1);
+        for child_id in &region_children {
+            self.export_node_deep(*child_id);
+        }
 
         // Get the signature of the control flow region.
         // This is the same as the signature of the parent node.
@@ -773,9 +742,9 @@ impl<'a> Context<'a> {
 
         self.module.regions[region.index()] = model::Region {
             kind: model::RegionKind::ControlFlow,
-            sources: self.bump.alloc_slice_copy(&[source]),
+            sources: self.bump.alloc_slice_copy(&[source.unwrap()]),
             targets,
-            children: region_children,
+            children: region_children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
             signature,
             scope,
@@ -1029,6 +998,60 @@ impl<'a> Context<'a> {
         })
     }
 
+    fn export_value(&mut self, value: &'a Value) -> model::TermId {
+        match value {
+            Value::Extension { e } => {
+                let json = match e.value().downcast_ref::<CustomSerialized>() {
+                    Some(custom) => serde_json::to_string(custom.value()).unwrap(),
+                    None => serde_json::to_string(e.value())
+                        .expect("custom extension values should be serializable"),
+                };
+
+                let json = self.make_term(model::Term::Str(self.bump.alloc_str(&json)));
+                let runtime_type = self.export_type(&e.get_type());
+                let extensions = self.export_ext_set(&e.extension_reqs());
+                let args = self
+                    .bump
+                    .alloc_slice_copy(&[runtime_type, json, extensions]);
+                let symbol = self.resolve_symbol(TERM_JSON_CONST);
+                self.make_term(model::Term::ApplyFull { symbol, args })
+            }
+
+            Value::Function { hugr } => {
+                let outer_hugr = std::mem::replace(&mut self.hugr, hugr);
+                let outer_node_to_id = std::mem::take(&mut self.node_to_id);
+
+                let region = match hugr.root_type() {
+                    OpType::DFG(dfg) => {
+                        let extensions = self.export_ext_set(&dfg.extension_delta());
+                        self.export_dfg(hugr.root(), extensions, model::ScopeClosure::Closed)
+                    }
+                    _ => panic!("Value::Function root must be a DFG"),
+                };
+
+                self.node_to_id = outer_node_to_id;
+                self.hugr = outer_hugr;
+
+                self.make_term(model::Term::ConstFunc { region })
+            }
+
+            Value::Sum(sum) => {
+                let tag = sum.tag as _;
+                let mut values = BumpVec::with_capacity_in(sum.values.len(), self.bump);
+
+                for value in &sum.values {
+                    values.push(model::ListPart::Item(self.export_value(value)));
+                }
+
+                let values = self.make_term(model::Term::List {
+                    parts: values.into_bump_slice(),
+                });
+
+                self.make_term(model::Term::ConstAdt { tag, values })
+            }
+        }
+    }
+
     pub fn export_node_metadata(
         &mut self,
         metadata_map: &NodeMetadataMap,
@@ -1037,14 +1060,14 @@ impl<'a> Context<'a> {
 
         for (name, value) in metadata_map {
             let name = self.bump.alloc_str(name);
-            let value = self.export_json(value);
+            let value = self.export_json_meta(value);
             meta.push(model::MetaItem { name, value });
         }
 
         meta.into_bump_slice()
     }
 
-    pub fn export_json(&mut self, value: &serde_json::Value) -> model::TermId {
+    pub fn export_json_meta(&mut self, value: &serde_json::Value) -> model::TermId {
         let value = serde_json::to_string(value).expect("json values are always serializable");
         let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
         let value = self.bump.alloc_slice_copy(&[value]);

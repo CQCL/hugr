@@ -537,7 +537,7 @@ impl<'a> ValidationContext<'a> {
                 };
                 if !dominator_tree
                     .dominators(ancestor)
-                    .map_or(false, |mut ds| ds.any(|n| n == from_parent))
+                    .is_some_and(|mut ds| ds.any(|n| n == from_parent))
                 {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
                         from,

@@ -55,6 +55,7 @@ struct Operation {
         constructorDecl @15 :ConstructorDecl;
         operationDecl @16 :OperationDecl;
         import @17 :Text;
+        const @18 :TermId;
     }
 
     struct FuncDefn {
@@ -140,7 +141,7 @@ struct Term {
         }
         apply @5 :Apply;
         applyFull @6 :ApplyFull;
-        quote @7 :TermId;
+        const @7 :Const;
         list @8 :ListTerm;
         listType @9 :TermId;
         string @10 :Text;
@@ -154,6 +155,8 @@ struct Term {
         control @18 :TermId;
         controlType @19 :Void;
         nonLinearConstraint @20 :TermId;
+        constFunc @22 :RegionId;
+        constAdt @23 :ConstAdt;
     }
 
     struct Apply {
@@ -188,10 +191,20 @@ struct Term {
         }
     }
 
+    struct ConstAdt {
+        tag @0 :UInt16;
+        values @1 :TermId;
+    }
+
     struct FuncType {
         inputs @0 :TermId;
         outputs @1 :TermId;
         extensions @2 :TermId;
+    }
+
+    struct Const {
+        type @0 :TermId;
+        extensions @1 :TermId;
     }
 }
 
