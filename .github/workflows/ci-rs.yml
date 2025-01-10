@@ -20,6 +20,11 @@ env:
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   HUGR_TEST_SCHEMA: "1"
+  # different strings for install action and feature name
+  # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+  LLVM_VERSION: "14.0"
+  LLVM_FEATURE_NAME: "14-0"
+
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -75,8 +80,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
-          env: true
+          version: ${{ env.LLVM_VERSION }}
       - name: Run clippy
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
       - name: Build docs
@@ -99,8 +103,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
-          env: true
+          version: ${{ env.LLVM_VERSION }}
       - name: Build benchmarks with no features
         run: cargo bench --verbose --no-run  --no-default-features
       - name: Build benchmarks with all features
@@ -127,8 +130,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
-          env: true
+          version: ${{ env.LLVM_VERSION }}
       - name: Build with no features
         run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -140,12 +142,6 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     name: tests (Rust stable, all features)
-    strategy:
-      matrix:
-        llvm-version:
-          # different strings for install action and feature name
-          # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-          - ["14.0", "14-0"]
 
     steps:
       - uses: actions/checkout@v4
@@ -162,18 +158,17 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
-          env: true
+          version: ${{ env.LLVM_VERSION }}
       - name: Build with all features
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose  --all-features
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -208,8 +203,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
-          env: true
+          version: ${{ env.LLVM_VERSION }}
       - name: Build with no features
         run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -264,8 +258,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
-          env: true
+          version: ${{ env.LLVM_VERSION }}
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
