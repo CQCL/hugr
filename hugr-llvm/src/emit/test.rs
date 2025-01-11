@@ -313,7 +313,7 @@ mod test_fns {
     fn emit_hugr_conditional(llvm_ctx: TestContext) {
         let hugr = {
             let input_v_rows: Vec<TypeRow> =
-                (0..3).map(Type::new_unit_sum).map_into().collect_vec();
+                (1..4).map(Type::new_unit_sum).map_into().collect_vec();
             let output_v_rows = {
                 let mut r = input_v_rows.clone();
                 r.reverse();

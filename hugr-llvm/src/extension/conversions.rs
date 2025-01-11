@@ -196,7 +196,7 @@ fn emit_conversion_op<'c, H: HugrView>(
                     let sum_t = sum_ty.build_tag(ctx.builder(), 1, vec![])?;
                     ctx.builder().build_select(is1, sum_t, sum_f, "")?
                 } else {
-                    let tag_ty = sum_ty.get_tag_type();
+                    let tag_ty = sum_ty.tag_type();
                     let tag = LLVMSumValue::try_new(arg, sum_ty)?.build_get_tag(ctx.builder())?;
                     let is_true = ctx.builder().build_int_compare(
                         IntPredicate::EQ,
