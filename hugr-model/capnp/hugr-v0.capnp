@@ -31,7 +31,7 @@ struct Node {
     outputs @2 :List(LinkIndex);
     params @3 :List(TermId);
     regions @4 :List(RegionId);
-    meta @5 :List(MetaItem);
+    meta @5 :List(TermId);
     signature @6 :OptionalTermId;
 }
 
@@ -105,7 +105,7 @@ struct Region {
     sources @1 :List(LinkIndex);
     targets @2 :List(LinkIndex);
     children @3 :List(NodeId);
-    meta @4 :List(MetaItem);
+    meta @4 :List(TermId);
     signature @5 :OptionalTermId;
     scope @6 :RegionScope;
 }
@@ -122,11 +122,6 @@ enum RegionKind {
     dataFlow @0;
     controlFlow @1;
     module @2;
-}
-
-struct MetaItem {
-    name @0 :Text;
-    value @1 :UInt32;
 }
 
 struct Term {
@@ -159,6 +154,7 @@ struct Term {
         constAdt @23 :ConstAdt;
         bytes @24 :Data;
         bytesType @25 :Void;
+        meta @26 :Void;
     }
 
     struct Apply {

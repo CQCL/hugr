@@ -3,13 +3,13 @@
 (declare-func example.callee
   (forall ?ext ext-set)
   [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int ?ext ...)
-  (meta doc.title (prelude.json "\"Callee\""))
-  (meta doc.description (prelude.json "\"This is a function declaration.\"")))
+  (meta (compat.meta-json "title" "\"Callee\""))
+  (meta (compat.meta-json "description" "\"This is a function declaration.\"")))
 
 (define-func example.caller
   [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int)
-  (meta doc.title (prelude.json "\"Caller\""))
-  (meta doc.description (prelude.json "\"This defines a function that calls the function which we declared earlier.\""))
+  (meta (compat.meta-json "title" "\"Caller\""))
+  (meta (compat.meta-json "description" "\"This defines a function that calls the function which we declared earlier.\""))
   (dfg [%3] [%4]
     (signature (-> [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))
     (call (@ example.callee (ext)) [%3] [%4]

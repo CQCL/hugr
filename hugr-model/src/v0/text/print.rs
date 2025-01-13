@@ -3,8 +3,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, LinkIndex, ListPart, MetaItem, ModelError, Module, NodeId, Operation, Param,
-    ParamSort, RegionId, RegionKind, Term, TermId, VarId,
+    ExtSetPart, LinkIndex, ListPart, ModelError, Module, NodeId, Operation, Param, ParamSort,
+    RegionId, RegionKind, Term, TermId, VarId,
 };
 
 type PrintError = ModelError;
@@ -608,6 +608,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_byte_string(data);
                 Ok(())
             }),
+            Term::Meta => {
+                self.print_text("meta");
+                Ok(())
+            }
         }
     }
 
@@ -683,14 +687,11 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_meta(&mut self, meta: &'a [MetaItem<'a>]) -> PrintResult<()> {
+    fn print_meta(&mut self, meta: &'a [TermId]) -> PrintResult<()> {
         for item in meta {
             self.print_parens(|this| {
-                this.print_group(|this| {
-                    this.print_text("meta");
-                    this.print_text(item.name);
-                });
-                this.print_term(item.value)
+                this.print_text("meta");
+                this.print_term(*item)
             })?;
         }
 

@@ -28,9 +28,6 @@ use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
-const TERM_JSON: &str = "prelude.json";
-const TERM_JSON_CONST: &str = "prelude.const-json";
-
 /// Error during import.
 #[derive(Debug, Clone, Error)]
 pub enum ImportError {
@@ -174,8 +171,8 @@ impl<'a> Context<'a> {
         for meta_item in node_data.meta {
             // TODO: For now we expect all metadata to be JSON since this is how
             // it is handled in `hugr-core`.
-            let value = self.import_json_meta(meta_item.value)?;
-            self.hugr.set_metadata(node, meta_item.name, value);
+            let (name, value) = self.import_json_meta(*meta_item)?;
+            self.hugr.set_metadata(node, name, value);
         }
 
         Ok(node)
@@ -949,6 +946,7 @@ impl<'a> Context<'a> {
             | model::Term::NonLinearConstraint { .. }
             | model::Term::ConstFunc { .. }
             | model::Term::Bytes { .. }
+            | model::Term::Meta
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ControlType => {
@@ -1016,7 +1014,9 @@ impl<'a> Context<'a> {
                 Ok(TypeArg::Type { ty })
             }
 
-            model::Term::Control { .. } | model::Term::NonLinearConstraint { .. } => {
+            model::Term::Control { .. }
+            | model::Term::Meta
+            | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }
         }
@@ -1137,6 +1137,7 @@ impl<'a> Context<'a> {
             | model::Term::Bytes { .. }
             | model::Term::BytesType
             | model::Term::ConstFunc { .. }
+            | model::Term::Meta
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
         }
     }
@@ -1275,7 +1276,7 @@ impl<'a> Context<'a> {
     fn import_json_meta(
         &mut self,
         term_id: model::TermId,
-    ) -> Result<serde_json::Value, ImportError> {
+    ) -> Result<(&'a str, serde_json::Value), ImportError> {
         let (global, args) = match self.get_term(term_id)? {
             model::Term::Apply { symbol, args } | model::Term::ApplyFull { symbol, args } => {
                 (symbol, args)
@@ -1284,11 +1285,15 @@ impl<'a> Context<'a> {
         };
 
         let global = self.get_symbol_name(*global)?;
-        if global != TERM_JSON {
+        if global != model::COMPAT_META_JSON {
             return Err(model::ModelError::TypeError(term_id).into());
         }
 
-        let [json_arg] = args else {
+        let [name_arg, json_arg] = args else {
+            return Err(model::ModelError::TypeError(term_id).into());
+        };
+
+        let model::Term::Str(name) = self.get_term(*name_arg)? else {
             return Err(model::ModelError::TypeError(term_id).into());
         };
 
@@ -1299,7 +1304,7 @@ impl<'a> Context<'a> {
         let json_value =
             serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
 
-        Ok(json_value)
+        Ok((name, json_value))
     }
 
     fn import_value(
@@ -1319,7 +1324,7 @@ impl<'a> Context<'a> {
             model::Term::ApplyFull { symbol, args } => {
                 let symbol_name = self.get_symbol_name(*symbol)?;
 
-                if symbol_name == TERM_JSON_CONST {
+                if symbol_name == model::COMPAT_CONST_JSON {
                     let value = args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
 
                     let model::Term::Str(json) = self.get_term(*value)? else {
@@ -1375,6 +1380,7 @@ impl<'a> Context<'a> {
             | model::Term::Type
             | model::Term::Bytes { .. }
             | model::Term::BytesType
+            | model::Term::Meta
             | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }

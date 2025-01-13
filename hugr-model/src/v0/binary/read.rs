@@ -75,7 +75,7 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
     let outputs = read_scalar_list!(bump, reader, get_outputs, model::LinkIndex);
     let params = read_scalar_list!(bump, reader, get_params, model::TermId);
     let regions = read_scalar_list!(bump, reader, get_regions, model::RegionId);
-    let meta = read_list!(bump, reader, get_meta, read_meta_item);
+    let meta = read_scalar_list!(bump, reader, get_meta, model::TermId);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
     Ok(model::Node {
@@ -217,7 +217,7 @@ fn read_region<'a>(
     let sources = read_scalar_list!(bump, reader, get_sources, model::LinkIndex);
     let targets = read_scalar_list!(bump, reader, get_targets, model::LinkIndex);
     let children = read_scalar_list!(bump, reader, get_children, model::NodeId);
-    let meta = read_list!(bump, reader, get_meta, read_meta_item);
+    let meta = read_scalar_list!(bump, reader, get_meta, model::TermId);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
     let scope = if reader.has_scope() {
@@ -256,6 +256,7 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::NatType(()) => model::Term::NatType,
         Which::ExtSetType(()) => model::Term::ExtSetType,
         Which::ControlType(()) => model::Term::ControlType,
+        Which::Meta(()) => model::Term::Meta,
 
         Which::Variable(reader) => {
             let node = model::NodeId(reader.get_variable_node());
@@ -341,15 +342,6 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         },
         Which::BytesType(()) => model::Term::BytesType,
     })
-}
-
-fn read_meta_item<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::meta_item::Reader,
-) -> ReadResult<model::MetaItem<'a>> {
-    let name = bump.alloc_str(reader.get_name()?.to_str()?);
-    let value = model::TermId(reader.get_value());
-    Ok(model::MetaItem { name, value })
 }
 
 fn read_list_part(

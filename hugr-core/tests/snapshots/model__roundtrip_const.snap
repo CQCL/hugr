@@ -4,7 +4,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 ---
 (hugr 0)
 
-(import prelude.const-json)
+(import compat.const-json)
 
 (import arithmetic.float.types.float64)
 
@@ -34,12 +34,12 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
       (tag
         0
         [(@
-           prelude.const-json
+           compat.const-json
            (@ arithmetic.float.types.float64)
            "{\"c\":\"ConstF64\",\"v\":{\"value\":2.0}}"
            (ext arithmetic.float.types))
          (@
-           prelude.const-json
+           compat.const-json
            (@ arithmetic.float.types.float64)
            "{\"c\":\"ConstF64\",\"v\":{\"value\":3.0}}"
            (ext arithmetic.float.types))])
@@ -63,7 +63,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
         (ext)))
     (const
       (@
-        prelude.const-json
+        compat.const-json
         (@ arithmetic.float.types.float64)
         "{\"c\":\"ConstF64\",\"v\":{\"value\":1.0}}"
         (ext arithmetic.float.types))
@@ -71,7 +71,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
       (signature (-> [] [(@ arithmetic.float.types.float64)] (ext))))
     (const
       (@
-        prelude.const-json
+        compat.const-json
         (@ arithmetic.float.types.float64)
         "{\"c\":\"ConstUnknown\",\"v\":{\"value\":1.0}}"
         (ext))

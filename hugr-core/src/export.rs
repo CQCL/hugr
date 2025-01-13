@@ -18,9 +18,6 @@ use std::fmt::Write;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
-const TERM_JSON: &str = "prelude.json";
-const META_DESCRIPTION: &str = "docs.description";
-const TERM_JSON_CONST: &str = "prelude.const-json";
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
@@ -558,15 +555,12 @@ impl<'a> Context<'a> {
             let mut meta = BumpVec::with_capacity_in(meta_len, self.bump);
 
             if let Some(description) = description {
-                let name = META_DESCRIPTION;
                 let value = self.make_term(model::Term::Str(self.bump.alloc_str(description)));
-                meta.push(model::MetaItem { name, value })
+                meta.push(self.make_term_apply(model::CORE_META_DESCRIPTION, &[value]));
             }
 
             for (name, value) in opdef.iter_misc() {
-                let name = self.bump.alloc_str(name);
-                let value = self.export_json_meta(value);
-                meta.push(model::MetaItem { name, value });
+                meta.push(self.export_json_meta(name, value));
             }
 
             self.bump.alloc_slice_copy(&meta)
@@ -1036,7 +1030,7 @@ impl<'a> Context<'a> {
                 let args = self
                     .bump
                     .alloc_slice_copy(&[runtime_type, json, extensions]);
-                let symbol = self.resolve_symbol(TERM_JSON_CONST);
+                let symbol = self.resolve_symbol(model::COMPAT_CONST_JSON);
                 self.make_term(model::Term::ApplyFull { symbol, args })
             }
 
@@ -1075,30 +1069,21 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn export_node_metadata(
-        &mut self,
-        metadata_map: &NodeMetadataMap,
-    ) -> &'a [model::MetaItem<'a>] {
+    pub fn export_node_metadata(&mut self, metadata_map: &NodeMetadataMap) -> &'a [model::TermId] {
         let mut meta = BumpVec::with_capacity_in(metadata_map.len(), self.bump);
 
         for (name, value) in metadata_map {
-            let name = self.bump.alloc_str(name);
-            let value = self.export_json_meta(value);
-            meta.push(model::MetaItem { name, value });
+            meta.push(self.export_json_meta(name, value));
         }
 
         meta.into_bump_slice()
     }
 
-    pub fn export_json_meta(&mut self, value: &serde_json::Value) -> model::TermId {
+    pub fn export_json_meta(&mut self, name: &str, value: &serde_json::Value) -> model::TermId {
         let value = serde_json::to_string(value).expect("json values are always serializable");
         let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
-        let value = self.bump.alloc_slice_copy(&[value]);
-        let symbol = self.resolve_symbol(TERM_JSON);
-        self.make_term(model::Term::ApplyFull {
-            symbol,
-            args: value,
-        })
+        let name = self.make_term(model::Term::Str(self.bump.alloc_str(name)));
+        self.make_term_apply(model::COMPAT_META_JSON, &[name, value])
     }
 
     fn resolve_symbol(&mut self, name: &'a str) -> model::NodeId {
@@ -1113,6 +1098,12 @@ impl<'a> Context<'a> {
                 })
             }),
         }
+    }
+
+    fn make_term_apply(&mut self, name: &'a str, args: &[model::TermId]) -> model::TermId {
+        let symbol = self.resolve_symbol(name);
+        let args = self.bump.alloc_slice_copy(args);
+        self.make_term(model::Term::ApplyFull { symbol, args })
     }
 }
 
