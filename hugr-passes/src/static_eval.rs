@@ -14,7 +14,7 @@ use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
-use hugr_core::{Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
+use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex};
 
 use crate::const_fold::ConstantFoldPass;
 
@@ -126,46 +126,53 @@ fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
             removal.push(cst_node);
         }
     }
-    let ord_in = h.get_optype(cond).other_input_port();
-    let ord_out = h.get_optype(cond).other_output_port();
     h.apply_rewrite(Replacement {
         removal,
         replacement,
         adoptions: HashMap::from([(dfg, case_node)]),
-        mu_inp: h
-            .node_inputs(cond)
-            .skip(1) // predicate dealt with above
-            .flat_map(|tgt_pos| {
-                let tgt_port = (Some(tgt_pos) != ord_in)
-                    .then_some(IncomingPort::from(tgt_pos.index() + values.len() - 1));
-                h.linked_outputs(cond, tgt_pos)
-                    .map(move |(src, src_pos)| NewEdgeSpec {
-                        src,
-                        tgt: dfg,
-                        kind: tgt_port
-                            .map(|tgt_pos| NewEdgeKind::Value { src_pos, tgt_pos })
-                            .unwrap_or(NewEdgeKind::Order),
-                    })
+        mu_inp: make_mu(h, cond, dfg, Direction::Incoming, true) // predicate dealt with above
+            .map(|mut e| {
+                if let NewEdgeKind::Value { tgt_pos, .. } = &mut e.kind {
+                    *tgt_pos = (tgt_pos.index() + values.len() - 1).into();
+                }
+                e
             })
             .collect(),
         mu_new: vec![],
-        mu_out: h
-            .node_outputs(cond)
-            .flat_map(|src_pos| {
-                let src_port = (Some(src_pos) != ord_out).then_some(src_pos);
-                h.linked_inputs(cond, src_pos)
-                    .map(move |(tgt, tgt_pos)| NewEdgeSpec {
-                        src: dfg,
-                        tgt,
-                        kind: src_port
-                            .map(|src_pos| NewEdgeKind::Value { src_pos, tgt_pos })
-                            .unwrap_or(NewEdgeKind::Order),
-                    })
-            })
-            .collect(),
+        mu_out: make_mu(h, cond, dfg, Direction::Outgoing, false).collect(),
     })
     .unwrap();
     Some(())
+}
+
+fn make_mu(
+    h: &impl HugrView,
+    old: Node,
+    new: Node,
+    dir: Direction,
+    skip_first: bool,
+) -> impl Iterator<Item = NewEdgeSpec> + '_ {
+    let ord_port = h.get_optype(old).other_port(dir);
+    h.node_ports(old, dir)
+        .skip(skip_first as usize)
+        .flat_map(move |pos| {
+            h.linked_ports(old, pos).map(move |(node, nodp)| {
+                let (src, tgt) = if dir == Direction::Outgoing {
+                    (new, node)
+                } else {
+                    (node, new)
+                };
+                let kind = if Some(pos) == ord_port {
+                    NewEdgeKind::Order
+                } else {
+                    NewEdgeKind::Value {
+                        src_pos: pos.as_outgoing().or_else(|_| nodp.as_outgoing()).unwrap(),
+                        tgt_pos: pos.as_incoming().or_else(|_| nodp.as_incoming()).unwrap(),
+                    }
+                };
+                NewEdgeSpec { src, tgt, kind }
+            })
+        })
 }
 
 fn inline_call(h: &mut impl HugrMut, call: Node) -> Option<()> {
