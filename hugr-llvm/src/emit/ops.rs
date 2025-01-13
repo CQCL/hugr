@@ -13,7 +13,6 @@ use inkwell::values::{BasicValueEnum, CallableValue};
 use itertools::{zip_eq, Itertools};
 use petgraph::visit::Walker;
 
-use crate::types::LLVMSumType;
 use crate::{
     sum::LLVMSumValue,
     utils::fat::{FatExt as _, FatNode},
@@ -130,7 +129,7 @@ pub fn emit_value<'c, H: HugrView>(
             values,
             sum_type,
         }) => {
-            let llvm_st = LLVMSumType::try_new(&context.typing_session(), sum_type.clone())?;
+            let llvm_st = context.llvm_sum_type(sum_type.clone())?;
             let vs = values
                 .iter()
                 .map(|x| emit_value(context, x))

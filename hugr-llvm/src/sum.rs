@@ -102,17 +102,29 @@ impl<'c> LLVMSumType<'c> {
 
     /// Constructs a new [LLVMSumType] from a [HugrSumType], using `session` to
     /// determine the types of the fields.
-    pub fn try_new(session: &TypingSession<'c, '_>, sum_type: HugrSumType) -> Result<Self> {
-        Ok(Self(LLVMSumTypeEnum::try_new(session, sum_type)?))
+    ///
+    /// Returns an error if the type of any field cannot be converted by
+    /// `session`, or if `sum_type` has no variants.
+    pub fn try_from_hugr_type(session: &TypingSession<'c, '_>, sum_type: HugrSumType) -> Result<Self> {
+        let variants = (0..sum_type.num_variants())
+            .map(|i| {
+                let tr = get_variant_typerow(&sum_type, i as u32)?;
+                tr.iter()
+                    .map(|t| session.llvm_type(t))
+                    .collect::<Result<Vec<_>>>()
+            }).collect::<Result<Vec<_>>>()?;
+        Self::try_new(session.iw_context(), variants)
     }
 
     /// Constructs a new [LLVMSumType] from a `Vec` of variants.
     /// Each variant is a `Vec` of LLVM types each corresponding to a field in the sum.
-    pub fn new(
+    ///
+    /// Returns an error if `variant_types` is empty;
+    pub fn try_new(
         context: &'c Context,
         variant_types: impl Into<Vec<Vec<BasicTypeEnum<'c>>>>,
-    ) -> Self {
-        Self(LLVMSumTypeEnum::new(context, variant_types.into()))
+    ) -> Result<Self> {
+        Ok(Self(LLVMSumTypeEnum::try_new(context, variant_types.into())?))
     }
 
     /// Returns an constant `undef` value of the underlying LLVM type.
@@ -242,11 +254,9 @@ fn tag_width_for_num_variants(num_variants: usize) -> u32 {
 impl<'c> LLVMSumTypeEnum<'c> {
     /// Constructs a new [LLVMSumTypeEnum] from a `Vec` of variants.
     /// Each variant is a `Vec` of LLVM types each corresponding to a field in the sum.
-    pub fn new(context: &'c Context, variant_types: Vec<Vec<BasicTypeEnum<'c>>>) -> Self {
+    pub fn try_new(context: &'c Context, variant_types: Vec<Vec<BasicTypeEnum<'c>>>) -> Result<Self> {
         let result = match variant_types.len() {
-            0 => panic!(
-                "LLVMSumType constructed with no variants. Void is not representable in LLVM"
-            ),
+            0 => anyhow::bail!("LLVMSumType constructed with no variants. Void is not representable in LLVM"),
             1 => {
                 let variant_types = variant_types.into_iter().exactly_one().unwrap();
                 let (fields, field_indices) =
@@ -300,24 +310,7 @@ impl<'c> LLVMSumTypeEnum<'c> {
                 }
             }
         };
-        result
-    }
-
-    /// Create to create a new `LLVMSumType` from a [HugrSumType].
-    ///
-    /// Returns an error if any field cannot be converted to LLVM types.
-    pub fn try_new(session: &TypingSession<'c, '_>, sum_type: HugrSumType) -> Result<Self> {
-        assert!(sum_type.num_variants() < u32::MAX as usize);
-        let variants = (0..sum_type.num_variants())
-            .map(|i| {
-                let tr = get_variant_typerow(&sum_type, i as u32)?;
-                tr.iter()
-                    .map(|t| session.llvm_type(t))
-                    .collect::<Result<Vec<_>>>()
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(Self::new(session.iw_context(), variants))
+        Ok(result)
     }
 
     /// Emit instructions to build a value of type `LLVMSumType`, being of variant `tag`.

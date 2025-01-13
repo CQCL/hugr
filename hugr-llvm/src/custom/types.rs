@@ -53,10 +53,10 @@ impl<'a> TypeMapping for LLVMTypeMapping<'a> {
         context: TypingSession<'c, 'a>,
         variants: impl IntoIterator<Item = Vec<Self::OutV<'c>>>,
     ) -> Result<Self::SumOutV<'c>> {
-        Ok(LLVMSumType::new(
+        LLVMSumType::try_new(
             context.iw_context(),
             variants.into_iter().collect_vec(),
-        ))
+        )
     }
 
     fn map_function_type<'c>(
