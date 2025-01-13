@@ -216,24 +216,26 @@ impl<'a> Context<'a> {
                 }
             }
 
-            if inputs.is_empty() || outputs.is_empty() {
-                return Err(error_unsupported!(
-                    "link {}#{} is missing either an input or an output port",
-                    link_id.0,
-                    link_id.1
-                ));
-            }
-
-            // We connect the first output to all the inputs, and the first input to all the outputs
-            // (except the first one, which we already connected to the first input). This should
-            // result in the hugr having a (hyper)edge that connects all the ports.
-            // There should be a better way to do this.
-            for (node, port) in inputs.iter() {
-                self.hugr.connect(outputs[0].0, outputs[0].1, *node, *port);
-            }
-
-            for (node, port) in outputs.iter().skip(1) {
-                self.hugr.connect(*node, *port, inputs[0].0, inputs[0].1);
+            match (inputs.as_slice(), outputs.as_slice()) {
+                ([], []) => {
+                    unreachable!();
+                }
+                (_, [output]) => {
+                    for (node, port) in inputs.iter() {
+                        self.hugr.connect(output.0, output.1, *node, *port);
+                    }
+                }
+                ([input], _) => {
+                    for (node, port) in outputs.iter() {
+                        self.hugr.connect(*node, *port, input.0, input.1);
+                    }
+                }
+                _ => {
+                    return Err(error_unsupported!(
+                        "link {:?} would require hyperedge",
+                        link_id
+                    ));
+                }
             }
 
             inputs.clear();
@@ -996,7 +998,6 @@ impl<'a> Context<'a> {
             model::Term::ListType { .. } => Err(error_unsupported!("`(list ...)` as `TypeArg`")),
             model::Term::ExtSetType => Err(error_unsupported!("`ext-set` as `TypeArg`")),
             model::Term::Type => Err(error_unsupported!("`type` as `TypeArg`")),
-            model::Term::ApplyFull { .. } => Err(error_unsupported!("custom types as `TypeArg`")),
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeArg`")),
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
@@ -1010,8 +1011,12 @@ impl<'a> Context<'a> {
 
             model::Term::FuncType { .. }
             | model::Term::Adt { .. }
-            | model::Term::Control { .. }
-            | model::Term::NonLinearConstraint { .. } => {
+            | model::Term::ApplyFull { .. } => {
+                let ty = self.import_type(term_id)?;
+                Ok(TypeArg::Type { ty })
+            }
+
+            model::Term::Control { .. } | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }
         }

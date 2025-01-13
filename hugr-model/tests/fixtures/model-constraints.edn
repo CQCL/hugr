@@ -11,3 +11,10 @@
   (forall ?t type)
   (where (nonlinear ?t))
   [(@ prelude.Array ?t)] [(@ prelude.Array ?t) (@ prelude.Array ?t)] (ext))
+
+(define-func util.copy
+  (forall ?t type)
+  (where (nonlinear ?t))
+  [?t] [?t ?t] (ext)
+  (dfg [%0] [%0 %0]
+    (signature (-> [?t] [?t ?t] (ext)))))

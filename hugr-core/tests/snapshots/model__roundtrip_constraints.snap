@@ -16,3 +16,9 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
   (forall ?0 type)
   (where (nonlinear ?0))
   [(@ prelude.Array ?0)] [(@ prelude.Array ?0) (@ prelude.Array ?0)] (ext))
+
+(define-func util.copy
+  (forall ?0 type)
+  (where (nonlinear ?0))
+  [?0] [?0 ?0] (ext)
+  (dfg [%0] [%0 %0] (signature (-> [?0] [?0 ?0] (ext)))))
