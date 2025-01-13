@@ -9,12 +9,15 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bump = Bump::new();
     let hugr = load_qv();
     let module = export_hugr(&hugr, &bump);
-    // let imported = import_hugr(&module, &STD_REG).unwrap();
-    // println!("{}", model::text::print_to_string(&module, 120).unwrap());
-    println!(
-        "size in bytes: {}",
-        model::binary::write_to_vec(&module).len()
-    );
+    std::fs::write(
+        "qv_hugr.edn",
+        model::text::print_to_string(&module, 120).unwrap(),
+    )
+    .unwrap();
+
+    let binary = model::binary::write_to_vec(&module);
+    println!("size in bytes: {}", binary.len());
+    std::fs::write("qv_hugr.hugr", binary).unwrap();
 
     // println!("{:#?}", module);
     Ok(())

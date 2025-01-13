@@ -15,6 +15,10 @@ use crate::{
         ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
         Output, Tag, TailLoop, Value, CFG, DFG,
     },
+    std_extensions::{
+        arithmetic::{float_types::ConstF64, int_types::ConstInt},
+        collections::array::ArrayValue,
+    },
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
@@ -1354,6 +1358,60 @@ impl<'a> Context<'a> {
                         let opaque_value = OpaqueValue::new(custom_const);
                         return Ok(Value::Extension { e: opaque_value });
                     }
+                }
+
+                if symbol_name == "collections.array.const" {
+                    let element_type_term =
+                        args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                    let element_type = self.import_type(*element_type_term)?;
+
+                    let contents = {
+                        let contents = args.get(2).ok_or(model::ModelError::TypeError(term_id))?;
+                        let contents = self.import_closed_list(*contents)?;
+                        contents
+                            .iter()
+                            .map(|item| self.import_value(*item, *element_type_term))
+                            .collect::<Result<Vec<_>, _>>()?
+                    };
+
+                    return Ok(ArrayValue::new(element_type, contents).into());
+                }
+
+                if symbol_name == "arithmetic.int.const" {
+                    let bitwidth = {
+                        let bitwidth = args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Nat(bitwidth) = self.get_term(*bitwidth)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        if *bitwidth > 6 {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        }
+                        *bitwidth as u8
+                    };
+
+                    let value = {
+                        let value = args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Nat(value) = self.get_term(*value)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        *value
+                    };
+
+                    return Ok(ConstInt::new_u(bitwidth, value)
+                        .map_err(|_| model::ModelError::TypeError(term_id))?
+                        .into());
+                }
+
+                if symbol_name == "arithmetic.float.const-f64" {
+                    let value = {
+                        let value = args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Nat(value) = self.get_term(*value)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        f64::from_bits(*value)
+                    };
+
+                    return Ok(ConstF64::new(value).into());
                 }
 
                 Err(error_unsupported!("constant value that is not JSON data"))
