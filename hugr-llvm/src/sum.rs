@@ -15,6 +15,12 @@ use inkwell::{
 };
 use itertools::{izip, Itertools as _};
 
+/// An elidable type is one that holds no information, for example `{}`, the
+/// empty struct.
+///
+/// Currently the following types are elidable:
+///   * Empty structs, which may be packed, unpacked, named, or unnamed
+///   * Empty arrays of any type.
 pub fn elidable_type<'c>(ty: impl BasicType<'c>) -> bool {
     let ty = ty.as_basic_type_enum();
     match ty {
@@ -58,30 +64,31 @@ fn basic_type_poison<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
 }
 
 #[derive(Debug, Clone, derive_more::Display)]
-pub struct LLVMSumType<'c>(LLVMSumTypeEnum<'c>);
-
 /// The opaque representation of a [HugrSumType].
 ///
 /// Provides an `impl`s of `BasicType`, allowing interoperation with other
 /// inkwell tools.
 ///
 /// To obtain an [LLVMSumType] corresponding to a [HugrSumType] use
-/// [LLVMSumType::new] or [LLVMSumType::try_new].
+/// [LLVMSumType::try_new] or [LLVMSumType::try_from_hugr_type].
 ///
 /// Any such [LLVMSumType] has a fixed underlying LLVM type, which can be
-/// obtained by [BasicValue::as_basic_type_enum] or [LLVMSumType::value_type].
+/// obtained by [BasicType::as_basic_type_enum] or [LLVMSumType::value_type].
 /// Note this type is unspecified, and we go to some effort to ensure that it is
-/// minimal and efficient. In particular unit types such as empty structs(`{}`)
-/// are elided from the LLVM type where possible. See [elidable_type] for the
-/// specification of which types are elided.
+/// minimal and efficient. Users should not expect this type to remain the same
+/// across versions.
+///
+/// Unit types such as empty structs(`{}`) are elided from the LLVM type where
+/// possible. See [elidable_type] for the specification of which types are
+/// elided.
 ///
 /// Each [LLVMSumType] has an associated [IntType] tag type, which can be
 /// obtained via [LLVMSumType::tag_type].
 ///
 /// The value type [LLVMSumValue] represents values of this type. To obtain an
 /// [LLVMSumValue] use [LLVMSumType::build_tag] or [LLVMSumType::value].
-///
-///
+pub struct LLVMSumType<'c>(LLVMSumTypeEnum<'c>);
+
 impl<'c> LLVMSumType<'c> {
     delegate! {
         to self.0 {
@@ -105,14 +112,18 @@ impl<'c> LLVMSumType<'c> {
     ///
     /// Returns an error if the type of any field cannot be converted by
     /// `session`, or if `sum_type` has no variants.
-    pub fn try_from_hugr_type(session: &TypingSession<'c, '_>, sum_type: HugrSumType) -> Result<Self> {
+    pub fn try_from_hugr_type(
+        session: &TypingSession<'c, '_>,
+        sum_type: HugrSumType,
+    ) -> Result<Self> {
         let variants = (0..sum_type.num_variants())
             .map(|i| {
                 let tr = get_variant_typerow(&sum_type, i as u32)?;
                 tr.iter()
                     .map(|t| session.llvm_type(t))
                     .collect::<Result<Vec<_>>>()
-            }).collect::<Result<Vec<_>>>()?;
+            })
+            .collect::<Result<Vec<_>>>()?;
         Self::try_new(session.iw_context(), variants)
     }
 
@@ -124,7 +135,10 @@ impl<'c> LLVMSumType<'c> {
         context: &'c Context,
         variant_types: impl Into<Vec<Vec<BasicTypeEnum<'c>>>>,
     ) -> Result<Self> {
-        Ok(Self(LLVMSumTypeEnum::try_new(context, variant_types.into())?))
+        Ok(Self(LLVMSumTypeEnum::try_new(
+            context,
+            variant_types.into(),
+        )?))
     }
 
     /// Returns an constant `undef` value of the underlying LLVM type.
@@ -254,9 +268,14 @@ fn tag_width_for_num_variants(num_variants: usize) -> u32 {
 impl<'c> LLVMSumTypeEnum<'c> {
     /// Constructs a new [LLVMSumTypeEnum] from a `Vec` of variants.
     /// Each variant is a `Vec` of LLVM types each corresponding to a field in the sum.
-    pub fn try_new(context: &'c Context, variant_types: Vec<Vec<BasicTypeEnum<'c>>>) -> Result<Self> {
+    pub fn try_new(
+        context: &'c Context,
+        variant_types: Vec<Vec<BasicTypeEnum<'c>>>,
+    ) -> Result<Self> {
         let result = match variant_types.len() {
-            0 => anyhow::bail!("LLVMSumType constructed with no variants. Void is not representable in LLVM"),
+            0 => anyhow::bail!(
+                "LLVMSumType constructed with no variants. Void is not representable in LLVM"
+            ),
             1 => {
                 let variant_types = variant_types.into_iter().exactly_one().unwrap();
                 let (fields, field_indices) =
@@ -502,7 +521,7 @@ impl<'c> LLVMSumValue<'c> {
 
     /// Emit instructions to read the tag of a value of type `LLVMSumType`.
     ///
-    /// The type of the value is that returned by [LLVMSumType::get_tag_type].
+    /// The type of the value is that returned by [LLVMSumType::tag_type].
     pub fn build_get_tag(&self, builder: &Builder<'c>) -> Result<IntValue<'c>> {
         let result = match self.get_type().0 {
             LLVMSumTypeEnum::Unit { tag_type, .. }
