@@ -1360,6 +1360,9 @@ impl<'a> Context<'a> {
                     }
                 }
 
+                // NOTE: We have special cased arrays, integers, and floats for now.
+                // TODO: Allow arbitrary extension values to be imported from terms.
+
                 if symbol_name == "collections.array.const" {
                     let element_type_term =
                         args.first().ok_or(model::ModelError::TypeError(term_id))?;
@@ -1414,7 +1417,7 @@ impl<'a> Context<'a> {
                     return Ok(ConstF64::new(value).into());
                 }
 
-                Err(error_unsupported!("constant value that is not JSON data"))
+                Err(error_unsupported!("unknown custom constant value"))
                 // TODO: This should ultimately include the following cases:
                 // - function definitions
                 // - custom constructors for values

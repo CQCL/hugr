@@ -10,7 +10,7 @@ use crate::{
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, Type, TypeArg,
+        CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
         TypeBase, TypeBound, TypeEnum, TypeRow,
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
@@ -1022,6 +1022,9 @@ impl<'a> Context<'a> {
     fn export_value(&mut self, value: &'a Value) -> model::TermId {
         match value {
             Value::Extension { e } => {
+                // NOTE: We have special cased arrays, integers, and floats for now.
+                // TODO: Allow arbitrary extension values to be exported as terms.
+
                 if let Some(array) = e.value().downcast_ref::<ArrayValue>() {
                     let len = self.make_term(model::Term::Nat(array.get_contents().len() as u64));
                     let element_type = self.export_type(array.get_element_type());

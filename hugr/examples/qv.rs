@@ -1,25 +1,28 @@
 #![allow(missing_docs)]
 
 use bumpalo::Bump;
-use hugr::{package::Package, std_extensions::STD_REG, Hugr, HugrView};
+use hugr::{package::Package, std_extensions::STD_REG, Hugr};
 use hugr_core::{export::export_hugr, import::import_hugr};
 use hugr_model::v0 as model;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bump = Bump::new();
     let hugr = load_qv();
+
     let module = export_hugr(&hugr, &bump);
+    let imported = import_hugr(&module, &STD_REG).unwrap();
+    let exported_again = export_hugr(&imported, &bump);
+
     std::fs::write(
         "qv_hugr.edn",
-        model::text::print_to_string(&module, 120).unwrap(),
+        model::text::print_to_string(&exported_again, 120).unwrap(),
     )
     .unwrap();
 
-    let binary = model::binary::write_to_vec(&module);
-    println!("size in bytes: {}", binary.len());
-    std::fs::write("qv_hugr.hugr", binary).unwrap();
+    // let binary = model::binary::write_to_vec(&module);
+    // println!("size in bytes: {}", binary.len());
+    // std::fs::write("qv_hugr.hugr", binary).unwrap();
 
-    // println!("{:#?}", module);
     Ok(())
 }
 
