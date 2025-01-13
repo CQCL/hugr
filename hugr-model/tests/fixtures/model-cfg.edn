@@ -9,9 +9,9 @@
       (signature (-> [?a] [?a] (ext)))
       (cfg [%2] [%4]
         (signature (-> [(ctrl [?a])] [(ctrl [?a])] (ext)))
-        (block [%2] [%4]
-          (signature (-> [(ctrl [?a])] [(ctrl [?a])] (ext)))
+        (block [%2] [%4 %2]
+          (signature (-> [(ctrl [?a])] [(ctrl [?a]) (ctrl [?a])] (ext)))
           (dfg [%5] [%6]
-            (signature (-> [?a] [(adt [[?a]])] (ext)))
+            (signature (-> [?a] [(adt [[?a] [?a]])] (ext)))
             (tag 0 [%5] [%6]
-              (signature (-> [?a] [(adt [[?a]])] (ext))))))))))
+              (signature (-> [?a] [(adt [[?a] [?a]])] (ext))))))))))
