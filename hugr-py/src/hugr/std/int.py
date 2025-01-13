@@ -131,6 +131,30 @@ ILtU = _ILtUDef()
 
 
 @dataclass(frozen=True)
+class _IMulDef(RegisteredOp):
+    """Integer multiply."""
+
+    width: int = 5
+    const_op_def: ClassVar[ext.OpDef] = INT_OPS_EXTENSION.operations["imul"]
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.BoundedNatArg(n=self.width)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        row: list[tys.Type] = [int_t(self.width)] * 2
+        return tys.FunctionType(
+            row, [int_t(self.width)], runtime_reqs=[INT_OPS_EXTENSION.name]
+        )
+
+    def __call__(self, a: ComWire) -> Command:
+        return DataflowOp.__call__(self, a)
+
+
+#: IMul operation
+IMul = _IMulDef()
+
+
+@dataclass(frozen=True)
 class _ISubDef(RegisteredOp):
     """Integer subtract."""
 
