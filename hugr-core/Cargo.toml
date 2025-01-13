@@ -58,8 +58,6 @@ hugr-model = { version = "0.16.0", path = "../hugr-model", optional = true }
 indexmap.workspace = true
 fxhash.workspace = true
 bumpalo = { workspace = true, features = ["collections"] }
-flexbuffers = "24.12.23"
-arrow = "54.0.0"
 
 [dev-dependencies]
 rstest = { workspace = true }

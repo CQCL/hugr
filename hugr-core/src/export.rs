@@ -1,6 +1,6 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::{
-    extension::{prelude::ConstUsize, ExtensionId, ExtensionSet, OpDef, SignatureFunc},
+    extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
     hugr::{IdentList, NodeMetadataMap},
     ops::{constant::CustomSerialized, DataflowBlock, OpName, OpTrait, OpType, Value},
     std_extensions::{
@@ -11,7 +11,7 @@ use crate::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
         CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, Type, TypeArg,
-        TypeBase, TypeBound, TypeEnum,
+        TypeBase, TypeBound, TypeEnum, TypeRow,
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
