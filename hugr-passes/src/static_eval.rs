@@ -16,7 +16,7 @@ use hugr_core::ops::handle::{FuncID, TailLoopID};
 use hugr_core::ops::{
     Case, Conditional, Const, DataflowOpTrait, DataflowParent, Input, OpType, Output, Value, DFG,
 };
-use hugr_core::types::TypeEnum;
+use hugr_core::types::{Signature, TypeEnum};
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex};
 
 use crate::const_fold::ConstantFoldPass;
@@ -263,10 +263,10 @@ fn peel_tailloop(h: &mut impl HugrMut, tl: Node) {
     };
     debug_assert_eq!(cond.signature().input, signature.output);
     let cond = replacement.add_node_after(first_iter, cond);
-    replacement
-        .replace_op(first_iter, DFG { signature })
-        .unwrap();
-
+    let dfg = OpType::from(DFG { signature });
+    let (in_count, out_count) = (dfg.input_count(), dfg.output_count());
+    replacement.replace_op(first_iter, dfg).unwrap();
+    replacement.set_num_ports(first_iter, in_count, out_count);
     fn wire_all(h: &mut Hugr, from: Node, to: Node) {
         for p in h.node_outputs(from).collect::<Vec<_>>() {
             h.connect(from, p, to, p.index());
@@ -286,27 +286,27 @@ fn peel_tailloop(h: &mut impl HugrMut, tl: Node) {
             types: outer_sig.input.clone(),
         },
     );
-    let new_tl = replacement.add_node_with_parent(cont, tl_desc.clone());
-    wire_all(&mut replacement, inp, new_tl);
     let oup = replacement.add_node_with_parent(
         cont,
         Output {
             types: outer_sig.output.clone(),
         },
     );
+    let new_tl = replacement.add_node_with_parent(cont, tl_desc.clone());
+    wire_all(&mut replacement, inp, new_tl);
     wire_all(&mut replacement, new_tl, oup);
 
     // Break variant
     let brk = replacement.add_node_after(
         cont,
         Case {
-            signature: outer_sig.clone(),
+            signature: Signature::new_endo(outer_sig.output.clone()),
         },
     );
     let inp = replacement.add_node_with_parent(
         brk,
         Input {
-            types: outer_sig.input,
+            types: outer_sig.output.clone(),
         },
     );
     let oup = replacement.add_node_with_parent(
