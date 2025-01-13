@@ -361,4 +361,27 @@ mod test {
             Some(vec![Value::extension(ConstInt::new_u(5, 8).unwrap())])
         );
     }
+
+    #[test]
+    fn iterative_tailloop() {
+        let h = Hugr::load_json(
+            BufReader::new(File::open("/Users/alanlawrence/factorial_hugr.json").unwrap()),
+            &STD_REG,
+        )
+        .unwrap();
+        let main = h
+            .children(h.root())
+            .filter(|n| {
+                h.get_optype(*n)
+                    .as_func_defn()
+                    .is_some_and(|f| f.name == "main")
+            })
+            .exactly_one()
+            .ok()
+            .unwrap();
+        assert_eq!(
+            static_eval(h, Some(main)),
+            Some(vec![Value::extension(ConstInt::new_u(5, 120).unwrap())])
+        );
+    }
 }
