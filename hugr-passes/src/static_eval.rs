@@ -12,8 +12,11 @@ use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
 use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
-use hugr_core::ops::handle::FuncID;
-use hugr_core::ops::{Const, DataflowParent, OpType, Value, DFG};
+use hugr_core::ops::handle::{FuncID, TailLoopID};
+use hugr_core::ops::{
+    Case, Conditional, Const, DataflowOpTrait, DataflowParent, Input, OpType, Output, Value, DFG,
+};
+use hugr_core::types::TypeEnum;
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex};
 
 use crate::const_fold::ConstantFoldPass;
@@ -42,7 +45,11 @@ pub fn static_eval(mut h: Hugr, entry: Option<Node>) -> Option<Vec<Value>> {
                         need_scan = true;
                     }
                     OpType::TailLoop(_) => {
-                        need_reanalyse |= peel_tailloop(&mut h, n).is_some();
+                        // Even if no inputs are constants (e.g. they are partial sums with multiple tags),
+                        // peeling increases precision so could be beneficial. Note that it moves the TailLoop
+                        // inside a Conditional, and we only peel TailLoops at the top level of the Hugr.
+                        peel_tailloop(&mut h, n);
+                        need_reanalyse = true;
                     }
                     OpType::CallIndirect(_) => {
                         let (called, _) = h.single_linked_output(n, 0).unwrap();
@@ -220,14 +227,105 @@ fn inline_call(h: &mut impl HugrMut, call: Node) -> Option<()> {
     Some(())
 }
 
-fn peel_tailloop(h: &mut impl HugrMut, tl: Node) -> Option<()> {
-    let (pred, _) = h.single_linked_output(tl, 0).unwrap();
-    h.get_optype(pred).as_load_constant()?;
+fn peel_tailloop(h: &mut impl HugrMut, tl: Node) {
     // TODO: copy body of loop into DFG (dup loop, change container type, output Sum)
     // TODO: change constant into elements
     // TODO: nest existing loop inside conditional testing output of DFG.
-    // Some(())
-    None
+    let tl_desc = h.get_optype(tl).as_tail_loop().unwrap();
+    let mut replacement = Hugr::new(h.get_optype(h.get_parent(tl).unwrap()).clone());
+    let first_iter = replacement
+        .insert_from_view(
+            replacement.root(),
+            &DescendantsGraph::<TailLoopID>::try_new(h, tl).unwrap(),
+        )
+        .new_root;
+
+    let signature = tl_desc.inner_signature().into_owned();
+    let outer_sig = tl_desc.signature().into_owned();
+    let cond = {
+        // Converts the result of the first iteration, i.e. results *inside* the TailLoop,
+        // to the result of the whole TailLoop
+        let mut iter_result = signature.output.iter();
+        let TypeEnum::Sum(st) = iter_result.next().unwrap().as_type_enum() else {
+            panic!("First output of loop body was not predicate")
+        };
+        Conditional {
+            // The loop's control predicate cannot actually contain any Row Variables
+            sum_rows: st
+                .clone()
+                .into_rows()
+                .map(|trv| trv.try_into().unwrap())
+                .collect(),
+            other_inputs: iter_result.cloned().collect::<Vec<_>>().into(),
+            outputs: outer_sig.output.clone(),
+            extension_delta: signature.runtime_reqs.clone(),
+        }
+    };
+    debug_assert_eq!(cond.signature().input, signature.output);
+    let cond = replacement.add_node_after(first_iter, cond);
+    replacement
+        .replace_op(first_iter, DFG { signature })
+        .unwrap();
+
+    fn wire_all(h: &mut Hugr, from: Node, to: Node) {
+        for p in h.node_outputs(from).collect::<Vec<_>>() {
+            h.connect(from, p, to, p.index());
+        }
+    }
+    wire_all(&mut replacement, first_iter, cond);
+    // Continue variant: the original TailLoop will go in here
+    let cont = replacement.add_node_with_parent(
+        cond,
+        Case {
+            signature: outer_sig.clone(),
+        },
+    );
+    let inp = replacement.add_node_with_parent(
+        cont,
+        Input {
+            types: outer_sig.input.clone(),
+        },
+    );
+    let new_tl = replacement.add_node_with_parent(cont, tl_desc.clone());
+    wire_all(&mut replacement, inp, new_tl);
+    let oup = replacement.add_node_with_parent(
+        cont,
+        Output {
+            types: outer_sig.output.clone(),
+        },
+    );
+    wire_all(&mut replacement, new_tl, oup);
+
+    // Break variant
+    let brk = replacement.add_node_after(
+        cont,
+        Case {
+            signature: outer_sig.clone(),
+        },
+    );
+    let inp = replacement.add_node_with_parent(
+        brk,
+        Input {
+            types: outer_sig.input,
+        },
+    );
+    let oup = replacement.add_node_with_parent(
+        brk,
+        Output {
+            types: outer_sig.output,
+        },
+    );
+    wire_all(&mut replacement, inp, oup);
+
+    h.apply_rewrite(Replacement {
+        removal: vec![tl],
+        replacement,
+        adoptions: HashMap::from([(new_tl, tl)]),
+        mu_inp: make_mu(h, tl, first_iter, Direction::Incoming, false).collect(),
+        mu_out: make_mu(h, tl, cond, Direction::Outgoing, false).collect(),
+        mu_new: vec![],
+    })
+    .unwrap();
 }
 
 #[cfg(test)]
