@@ -186,10 +186,7 @@ fn inline_call(h: &mut impl HugrMut, call: Node) -> Option<()> {
             .inner_signature()
             .into_owned(),
     });
-    let (in_ports, out_ports) = (
-        new_op.port_count(Direction::Incoming),
-        new_op.port_count(Direction::Outgoing),
-    );
+    let (in_ports, out_ports) = (new_op.input_count(), new_op.output_count());
     func.replace_op(func.root(), new_op).unwrap();
     func.set_num_ports(func.root(), in_ports as _, out_ports as _);
     let func_copy = h.insert_hugr(h.get_parent(call).unwrap(), func);
