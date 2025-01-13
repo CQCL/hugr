@@ -71,6 +71,7 @@ indexmap = "2.3.0"
 fxhash = "0.2.1"
 bumpalo = { version = "3.16.0" }
 pathsearch = "0.2.0"
+base64 = "0.22.1"
 
 [profile.dev.package]
 insta.opt-level = 3

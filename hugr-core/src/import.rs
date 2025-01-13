@@ -922,7 +922,7 @@ impl<'a> Context<'a> {
             model::Term::Var { .. } => Err(error_unsupported!("type variable as `TypeParam`")),
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
-
+            model::Term::BytesType { .. } => Err(error_unsupported!("`bytes` as `TypeParam`")),
             model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
@@ -946,6 +946,7 @@ impl<'a> Context<'a> {
             | model::Term::Control { .. }
             | model::Term::NonLinearConstraint { .. }
             | model::Term::ConstFunc { .. }
+            | model::Term::Bytes { .. }
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ControlType => {
@@ -999,6 +1000,8 @@ impl<'a> Context<'a> {
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeArg`")),
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
+            model::Term::BytesType => Err(error_unsupported!("`bytes` as `TypeArg`")),
+            model::Term::Bytes { .. } => Err(error_unsupported!("`(bytes ..)` as `TypeArg`")),
             model::Term::Const { .. } => Err(error_unsupported!("`const` as `TypeArg`")),
             model::Term::ConstAdt { .. } => Err(error_unsupported!("adt constant as `TypeArg`")),
             model::Term::ConstFunc { .. } => {
@@ -1126,6 +1129,8 @@ impl<'a> Context<'a> {
             | model::Term::ControlType
             | model::Term::Nat(_)
             | model::Term::NonLinearConstraint { .. }
+            | model::Term::Bytes { .. }
+            | model::Term::BytesType
             | model::Term::ConstFunc { .. }
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
         }
@@ -1363,6 +1368,8 @@ impl<'a> Context<'a> {
             | model::Term::Control { .. }
             | model::Term::ControlType
             | model::Term::Type
+            | model::Term::Bytes { .. }
+            | model::Term::BytesType
             | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }

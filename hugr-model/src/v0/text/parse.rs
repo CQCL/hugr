@@ -1,3 +1,4 @@
+use base64::{prelude::BASE64_STANDARD, Engine};
 use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
 use pest::{
@@ -260,6 +261,20 @@ impl<'a> ParseContext<'a> {
                     let tag = inner.next().unwrap().as_str().parse().unwrap();
                     let values = self.parse_term(inner.next().unwrap())?;
                     Term::ConstAdt { tag, values }
+                }
+
+                Rule::term_bytes_type => Term::BytesType,
+
+                Rule::term_bytes => {
+                    let token = inner.next().unwrap();
+                    let slice = token.as_str();
+                    // Remove the quotes
+                    let slice = &slice[1..slice.len() - 1];
+                    let data = BASE64_STANDARD.decode(slice).map_err(|_| {
+                        ParseError::custom("invalid base64 encoding", token.as_span())
+                    })?;
+                    let data = self.bump.alloc_slice_copy(&data);
+                    Term::Bytes { data }
                 }
 
                 r => unreachable!("term: {:?}", r),
