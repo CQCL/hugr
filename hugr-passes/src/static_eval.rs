@@ -14,7 +14,8 @@ use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::constant::Sum;
 use hugr_core::ops::handle::{FuncID, TailLoopID};
 use hugr_core::ops::{
-    Case, Conditional, Const, DataflowOpTrait, DataflowParent, Input, OpType, Output, Value, DFG,
+    Case, Conditional, Const, DataflowOpTrait, DataflowParent, Input, LoadConstant, OpType, Output,
+    Value, DFG,
 };
 use hugr_core::types::{Signature, TypeEnum};
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex};
@@ -123,7 +124,10 @@ fn conditional_to_dfg(h: &mut impl HugrMut, cond: Node) -> Option<()> {
     let dfg = replacement.add_node_with_parent(replacement.root(), DFG { signature });
     for (i, v) in values.iter().enumerate() {
         let cst = replacement.add_node_with_parent(replacement.root(), Const::new(v.clone()));
-        replacement.connect(cst, 0, dfg, i);
+        let datatype = v.get_type();
+        let lcst = replacement.add_node_after(cst, LoadConstant { datatype });
+        replacement.connect(cst, 0, lcst, 0);
+        replacement.connect(lcst, 0, dfg, i);
     }
     let mut removal = vec![cond];
     if h.static_targets(pred).map_or(0, Iterator::count) == 1 {
