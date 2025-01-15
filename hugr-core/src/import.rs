@@ -1363,7 +1363,7 @@ impl<'a> Context<'a> {
                 // NOTE: We have special cased arrays, integers, and floats for now.
                 // TODO: Allow arbitrary extension values to be imported from terms.
 
-                if symbol_name == "collections.array.const" {
+                if symbol_name == ArrayValue::CTR_NAME {
                     let element_type_term =
                         args.first().ok_or(model::ModelError::TypeError(term_id))?;
                     let element_type = self.import_type(*element_type_term)?;
@@ -1380,7 +1380,7 @@ impl<'a> Context<'a> {
                     return Ok(ArrayValue::new(element_type, contents).into());
                 }
 
-                if symbol_name == "arithmetic.int.const" {
+                if symbol_name == ConstInt::CTR_NAME {
                     let bitwidth = {
                         let bitwidth = args.first().ok_or(model::ModelError::TypeError(term_id))?;
                         let model::Term::Nat(bitwidth) = self.get_term(*bitwidth)? else {
@@ -1405,7 +1405,7 @@ impl<'a> Context<'a> {
                         .into());
                 }
 
-                if symbol_name == "arithmetic.float.const-f64" {
+                if symbol_name == ConstF64::CTR_NAME {
                     let value = {
                         let value = args.first().ok_or(model::ModelError::TypeError(term_id))?;
                         let model::Term::Nat(value) = self.get_term(*value)? else {

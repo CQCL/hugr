@@ -1039,7 +1039,7 @@ impl<'a> Context<'a> {
                         parts: contents.into_bump_slice(),
                     });
 
-                    let symbol = self.resolve_symbol("collections.array.const");
+                    let symbol = self.resolve_symbol(ArrayValue::CTR_NAME);
                     let args = self.bump.alloc_slice_copy(&[element_type, len, contents]);
                     return self.make_term(model::Term::ApplyFull { symbol, args });
                 }
@@ -1048,14 +1048,14 @@ impl<'a> Context<'a> {
                     let bitwidth = self.make_term(model::Term::Nat(v.log_width() as u64));
                     let literal = self.make_term(model::Term::Nat(v.value_u()));
 
-                    let symbol = self.resolve_symbol("arithmetic.int.const");
+                    let symbol = self.resolve_symbol(ConstInt::CTR_NAME);
                     let args = self.bump.alloc_slice_copy(&[bitwidth, literal]);
                     return self.make_term(model::Term::ApplyFull { symbol, args });
                 }
 
                 if let Some(v) = e.value().downcast_ref::<ConstF64>() {
                     let literal = self.make_term(model::Term::Nat(v.to_bits()));
-                    let symbol = self.resolve_symbol("arithmetic.float.const-f64");
+                    let symbol = self.resolve_symbol(ConstF64::CTR_NAME);
                     let args = self.bump.alloc_slice_copy(&[literal]);
                     return self.make_term(model::Term::ApplyFull { symbol, args });
                 }
