@@ -1054,7 +1054,9 @@ impl<'a> Context<'a> {
                 }
 
                 if let Some(v) = e.value().downcast_ref::<ConstF64>() {
-                    let literal = self.make_term(model::Term::Nat(v.to_bits()));
+                    let literal = self.make_term(model::Term::Float {
+                        value: v.value().into(),
+                    });
                     let symbol = self.resolve_symbol(ConstF64::CTR_NAME);
                     let args = self.bump.alloc_slice_copy(&[literal]);
                     return self.make_term(model::Term::ApplyFull { symbol, args });

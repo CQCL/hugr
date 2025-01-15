@@ -24,8 +24,13 @@
     (const
       (tag
         0
+<<<<<<< HEAD
         [(@ compat.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":2.0}}" (ext))
          (@ compat.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":3.0}}" (ext))])
+=======
+        [(@ arithmetic.float.const-f64 2.0)
+         (@ arithmetic.float.const-f64 -3.0)])
+>>>>>>> 96fb63e4 (Float literals in `hugr-model`.)
       [] [%pair]
       (signature
         (->
@@ -33,7 +38,7 @@
           [(adt [[(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]])]
           (ext))))))
 
-(define-func example.f64
+(define-func example.f64-json
   []
   [(@ arithmetic.float.types.float64)]
   (ext)

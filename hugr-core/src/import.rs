@@ -926,6 +926,7 @@ impl<'a> Context<'a> {
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::BytesType { .. } => Err(error_unsupported!("`bytes` as `TypeParam`")),
+            model::Term::FloatType { .. } => Err(error_unsupported!("`float` as `TypeParam`")),
             model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
@@ -951,6 +952,7 @@ impl<'a> Context<'a> {
             | model::Term::ConstFunc { .. }
             | model::Term::Bytes { .. }
             | model::Term::Meta
+            | model::Term::Float { .. }
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ControlType => {
@@ -1004,8 +1006,10 @@ impl<'a> Context<'a> {
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
             model::Term::BytesType => Err(error_unsupported!("`bytes` as `TypeArg`")),
+            model::Term::FloatType => Err(error_unsupported!("`float` as `TypeArg`")),
             model::Term::Bytes { .. } => Err(error_unsupported!("`(bytes ..)` as `TypeArg`")),
             model::Term::Const { .. } => Err(error_unsupported!("`const` as `TypeArg`")),
+            model::Term::Float { .. } => Err(error_unsupported!("float literal as `TypeArg`")),
             model::Term::ConstAdt { .. } => Err(error_unsupported!("adt constant as `TypeArg`")),
             model::Term::ConstFunc { .. } => {
                 Err(error_unsupported!("function constant as `TypeArg`"))
@@ -1140,6 +1144,8 @@ impl<'a> Context<'a> {
             | model::Term::NonLinearConstraint { .. }
             | model::Term::Bytes { .. }
             | model::Term::BytesType
+            | model::Term::FloatType
+            | model::Term::Float { .. }
             | model::Term::ConstFunc { .. }
             | model::Term::Meta
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
@@ -1408,10 +1414,10 @@ impl<'a> Context<'a> {
                 if symbol_name == ConstF64::CTR_NAME {
                     let value = {
                         let value = args.first().ok_or(model::ModelError::TypeError(term_id))?;
-                        let model::Term::Nat(value) = self.get_term(*value)? else {
+                        let model::Term::Float { value } = self.get_term(*value)? else {
                             return Err(model::ModelError::TypeError(term_id).into());
                         };
-                        f64::from_bits(*value)
+                        value.into_inner()
                     };
 
                     return Ok(ConstF64::new(value).into());
@@ -1442,6 +1448,8 @@ impl<'a> Context<'a> {
             | model::Term::Bytes { .. }
             | model::Term::BytesType
             | model::Term::Meta
+            | model::Term::Float { .. }
+            | model::Term::FloatType
             | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }

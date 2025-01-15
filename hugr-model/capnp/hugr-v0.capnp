@@ -155,6 +155,8 @@ struct Term {
         bytes @24 :Data;
         bytesType @25 :Void;
         meta @26 :Void;
+        float @27 :Float64;
+        floatType @28 :Void;
     }
 
     struct Apply {
