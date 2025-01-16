@@ -1371,7 +1371,7 @@ impl<'a> Context<'a> {
 
                 if symbol_name == ArrayValue::CTR_NAME {
                     let element_type_term =
-                        args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
                     let element_type = self.import_type(*element_type_term)?;
 
                     let contents = {

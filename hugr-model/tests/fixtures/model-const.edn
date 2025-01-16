@@ -31,8 +31,8 @@
         0
         [(@
            collections.array.const
-           (@ arithmetic.int.types.int 6)
            5
+           (@ arithmetic.int.types.int 6)
            [(@ arithmetic.int.const 6 1)
             (@ arithmetic.int.const 6 2)
             (@ arithmetic.int.const 6 3)

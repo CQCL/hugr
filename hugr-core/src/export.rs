@@ -1040,7 +1040,7 @@ impl<'a> Context<'a> {
                     });
 
                     let symbol = self.resolve_symbol(ArrayValue::CTR_NAME);
-                    let args = self.bump.alloc_slice_copy(&[element_type, len, contents]);
+                    let args = self.bump.alloc_slice_copy(&[len, element_type, contents]);
                     return self.make_term(model::Term::ApplyFull { symbol, args });
                 }
 
