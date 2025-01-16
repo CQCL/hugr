@@ -204,7 +204,7 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Rule::term_nat => {
-                    let value = inner.next().unwrap().as_str().parse().unwrap();
+                    let value = str_slice.trim().parse().unwrap();
                     Term::Nat(value)
                 }
 
@@ -281,7 +281,7 @@ impl<'a> ParseContext<'a> {
 
                 Rule::term_float_type => Term::FloatType,
                 Rule::term_float => {
-                    let value: f64 = str_slice.parse().unwrap();
+                    let value: f64 = str_slice.trim().parse().unwrap();
                     Term::Float {
                         value: value.into(),
                     }

@@ -13,29 +13,39 @@
 
 (define-func example.make-pair
   []
-  [(adt [[(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]])]
+  [(adt
+     [[(@ collections.array.array 5 (@ arithmetic.int.types.int 6))
+       (@ arithmetic.float.types.float64)]])]
   (ext)
-  (dfg [] [%pair]
+  (dfg
+    [] [%0]
     (signature
       (->
         []
-        [(adt [[(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]])]
+        [(adt
+           [[(@ collections.array.array 5 (@ arithmetic.int.types.int 6))
+             (@ arithmetic.float.types.float64)]])]
         (ext)))
     (const
       (tag
         0
-<<<<<<< HEAD
-        [(@ compat.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":2.0}}" (ext))
-         (@ compat.const-json (@ arithmetic.float.types.float64) "{\"c\":\"ConstF64\",\"v\":{\"value\":3.0}}" (ext))])
-=======
-        [(@ arithmetic.float.const-f64 2.0)
+        [(@
+           collections.array.const
+           (@ arithmetic.int.types.int 6)
+           5
+           [(@ arithmetic.int.const 6 1)
+            (@ arithmetic.int.const 6 2)
+            (@ arithmetic.int.const 6 3)
+            (@ arithmetic.int.const 6 4)
+            (@ arithmetic.int.const 6 5)])
          (@ arithmetic.float.const-f64 -3.0)])
->>>>>>> 96fb63e4 (Float literals in `hugr-model`.)
-      [] [%pair]
+      [] [%0]
       (signature
         (->
           []
-          [(adt [[(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]])]
+          [(adt
+             [[(@ collections.array.array 5 (@ arithmetic.int.types.int 6))
+               (@ arithmetic.float.types.float64)]])]
           (ext))))))
 
 (define-func example.f64-json
