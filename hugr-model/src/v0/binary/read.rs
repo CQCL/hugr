@@ -341,6 +341,11 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             data: bump.alloc_slice_copy(bytes?),
         },
         Which::BytesType(()) => model::Term::BytesType,
+
+        Which::Float(value) => model::Term::Float {
+            value: value.into(),
+        },
+        Which::FloatType(()) => model::Term::FloatType,
     })
 }
 

@@ -15,6 +15,10 @@ use crate::{
         ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
         Output, Tag, TailLoop, Value, CFG, DFG,
     },
+    std_extensions::{
+        arithmetic::{float_types::ConstF64, int_types::ConstInt},
+        collections::array::ArrayValue,
+    },
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
@@ -922,6 +926,7 @@ impl<'a> Context<'a> {
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::BytesType { .. } => Err(error_unsupported!("`bytes` as `TypeParam`")),
+            model::Term::FloatType { .. } => Err(error_unsupported!("`float` as `TypeParam`")),
             model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
@@ -947,6 +952,7 @@ impl<'a> Context<'a> {
             | model::Term::ConstFunc { .. }
             | model::Term::Bytes { .. }
             | model::Term::Meta
+            | model::Term::Float { .. }
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ControlType => {
@@ -1000,8 +1006,10 @@ impl<'a> Context<'a> {
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
             model::Term::BytesType => Err(error_unsupported!("`bytes` as `TypeArg`")),
+            model::Term::FloatType => Err(error_unsupported!("`float` as `TypeArg`")),
             model::Term::Bytes { .. } => Err(error_unsupported!("`(bytes ..)` as `TypeArg`")),
             model::Term::Const { .. } => Err(error_unsupported!("`const` as `TypeArg`")),
+            model::Term::Float { .. } => Err(error_unsupported!("float literal as `TypeArg`")),
             model::Term::ConstAdt { .. } => Err(error_unsupported!("adt constant as `TypeArg`")),
             model::Term::ConstFunc { .. } => {
                 Err(error_unsupported!("function constant as `TypeArg`"))
@@ -1136,6 +1144,8 @@ impl<'a> Context<'a> {
             | model::Term::NonLinearConstraint { .. }
             | model::Term::Bytes { .. }
             | model::Term::BytesType
+            | model::Term::FloatType
+            | model::Term::Float { .. }
             | model::Term::ConstFunc { .. }
             | model::Term::Meta
             | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
@@ -1356,7 +1366,64 @@ impl<'a> Context<'a> {
                     }
                 }
 
-                Err(error_unsupported!("constant value that is not JSON data"))
+                // NOTE: We have special cased arrays, integers, and floats for now.
+                // TODO: Allow arbitrary extension values to be imported from terms.
+
+                if symbol_name == ArrayValue::CTR_NAME {
+                    let element_type_term =
+                        args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
+                    let element_type = self.import_type(*element_type_term)?;
+
+                    let contents = {
+                        let contents = args.get(2).ok_or(model::ModelError::TypeError(term_id))?;
+                        let contents = self.import_closed_list(*contents)?;
+                        contents
+                            .iter()
+                            .map(|item| self.import_value(*item, *element_type_term))
+                            .collect::<Result<Vec<_>, _>>()?
+                    };
+
+                    return Ok(ArrayValue::new(element_type, contents).into());
+                }
+
+                if symbol_name == ConstInt::CTR_NAME {
+                    let bitwidth = {
+                        let bitwidth = args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Nat(bitwidth) = self.get_term(*bitwidth)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        if *bitwidth > 6 {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        }
+                        *bitwidth as u8
+                    };
+
+                    let value = {
+                        let value = args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Nat(value) = self.get_term(*value)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        *value
+                    };
+
+                    return Ok(ConstInt::new_u(bitwidth, value)
+                        .map_err(|_| model::ModelError::TypeError(term_id))?
+                        .into());
+                }
+
+                if symbol_name == ConstF64::CTR_NAME {
+                    let value = {
+                        let value = args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Float { value } = self.get_term(*value)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        value.into_inner()
+                    };
+
+                    return Ok(ConstF64::new(value).into());
+                }
+
+                Err(error_unsupported!("unknown custom constant value"))
                 // TODO: This should ultimately include the following cases:
                 // - function definitions
                 // - custom constructors for values
@@ -1381,6 +1448,8 @@ impl<'a> Context<'a> {
             | model::Term::Bytes { .. }
             | model::Term::BytesType
             | model::Term::Meta
+            | model::Term::Float { .. }
+            | model::Term::FloatType
             | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }

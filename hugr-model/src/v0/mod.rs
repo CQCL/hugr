@@ -87,6 +87,7 @@
 //! [#1546]: https://github.com/CQCL/hugr/issues/1546
 //! [#1553]: https://github.com/CQCL/hugr/issues/1553
 //! [#1554]: https://github.com/CQCL/hugr/issues/1554
+use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 use thiserror::Error;
 
@@ -718,6 +719,15 @@ pub enum Term<'a> {
 
     /// The type of metadata.
     Meta,
+
+    /// A literal floating-point number.
+    Float {
+        /// The value of the floating-point number.
+        value: OrderedFloat<f64>,
+    },
+
+    /// The type of floating-point numbers.
+    FloatType,
 }
 
 /// A part of a list term.
