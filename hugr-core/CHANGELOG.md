@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.1...hugr-core-v0.14.2) - 2025-01-16
+
+### Bug Fixes
+
+- Three bugfixes in model import and export. (#1844)
+
+### New Features
+
+- `Value::some`, `::none`, and `SumType::new_option` helpers (#1828)
+- Constant values in `hugr-model` (#1838)
+- *(hugr-llvm)* Emit ipow (#1839)
+- Bytes literal in hugr-model. (#1845)
+
+### Testing
+
+- Add tests for constant value deserialization (#1822)
+
 ## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.0...hugr-core-v0.14.1) - 2024-12-18
 
 ### Bug Fixes

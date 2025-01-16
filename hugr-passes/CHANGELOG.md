@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.1...hugr-passes-v0.14.2) - 2025-01-16
+
+### New Features
+
+- Add CallGraph struct, and dead-function-removal pass (#1796)
+
 ## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.0...hugr-passes-v0.14.1) - 2024-12-18
 
 ### Bug Fixes
