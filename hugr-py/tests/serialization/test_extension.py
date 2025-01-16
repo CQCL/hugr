@@ -1,4 +1,4 @@
-from semver import Version
+from pydantic_extra_types.semantic_version import SemanticVersion
 
 from hugr._serialization.extension import (
     ExplicitBound,
@@ -96,7 +96,7 @@ def test_extension():
         lower_funcs=[],
     )
     ext = Extension(
-        version=Version(0, 1, 0),
+        version=SemanticVersion(0, 1, 0),
         name="ext",
         runtime_reqs=set(),
         types={"foo": type_def},
@@ -118,7 +118,7 @@ def test_package():
     assert serialization_version() == Package.get_version()
 
     ext = Extension(
-        version=Version(0, 1, 0),
+        version=SemanticVersion(0, 1, 0),
         name="ext",
         runtime_reqs=set(),
         types={},
