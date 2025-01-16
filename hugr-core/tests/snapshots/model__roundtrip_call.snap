@@ -4,7 +4,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 ---
 (hugr 0)
 
-(import prelude.json)
+(import compat.meta-json)
 
 (import arithmetic.int.types.int)
 
@@ -13,18 +13,20 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
   [(@ arithmetic.int.types.int)]
   [(@ arithmetic.int.types.int)]
   (ext ?0 ... arithmetic.int)
-  (meta doc.description (@ prelude.json "\"This is a function declaration.\""))
-  (meta doc.title (@ prelude.json "\"Callee\"")))
+  (meta
+    (@ compat.meta-json "description" "\"This is a function declaration.\""))
+  (meta (@ compat.meta-json "title" "\"Callee\"")))
 
 (define-func example.caller
   [(@ arithmetic.int.types.int)]
   [(@ arithmetic.int.types.int)]
   (ext arithmetic.int)
-  (meta doc.description
+  (meta
     (@
-      prelude.json
+      compat.meta-json
+      "description"
       "\"This defines a function that calls the function which we declared earlier.\""))
-  (meta doc.title (@ prelude.json "\"Caller\""))
+  (meta (@ compat.meta-json "title" "\"Caller\""))
   (dfg
     [%0] [%1]
     (signature

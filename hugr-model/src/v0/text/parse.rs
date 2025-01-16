@@ -9,8 +9,8 @@ use thiserror::Error;
 
 use crate::v0::{
     scope::{LinkTable, SymbolTable, UnknownSymbolError, VarTable},
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, MetaItem, Module, Node,
-    NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, Module, Node, NodeId,
+    Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
     ScopeClosure, Term, TermId,
 };
 
@@ -126,6 +126,7 @@ impl<'a> ParseContext<'a> {
                 Rule::term_nat_type => Term::NatType,
                 Rule::term_ctrl_type => Term::ControlType,
                 Rule::term_ext_set_type => Term::ExtSetType,
+                Rule::term_meta => Term::Meta,
 
                 Rule::term_var => {
                     let name_token = inner.next().unwrap();
@@ -880,14 +881,13 @@ impl<'a> ParseContext<'a> {
         Ok(self.links.use_link(name))
     }
 
-    fn parse_meta(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [MetaItem<'a>]> {
+    fn parse_meta(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [TermId]> {
         let mut items = Vec::new();
 
         for meta in filter_rule(pairs, Rule::meta) {
             let mut inner = meta.into_inner();
-            let name = self.parse_symbol(&mut inner)?;
             let value = self.parse_term(inner.next().unwrap())?;
-            items.push(MetaItem { name, value })
+            items.push(value)
         }
 
         Ok(self.bump.alloc_slice_copy(&items))

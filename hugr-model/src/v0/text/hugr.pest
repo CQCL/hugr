@@ -14,7 +14,7 @@ base64_string = { "\"" ~ (ASCII_ALPHANUMERIC | "+" | "/")* ~ "="* ~ "\"" }
 
 module = { "(" ~ "hugr" ~ "0" ~ ")" ~ meta* ~ node* ~ EOI }
 
-meta = { "(" ~ "meta" ~ symbol ~ term ~ ")" }
+meta = { "(" ~ "meta" ~ term ~ ")" }
 
 edge_name  = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 port       =  { edge_name }
@@ -101,6 +101,7 @@ term = {
   | term_const_adt
   | term_bytes_type
   | term_bytes
+  | term_meta
 }
 
 term_wildcard     = { "_" }
@@ -128,5 +129,6 @@ term_const_func   = { "(" ~ "fn" ~ term ~ ")" }
 term_const_adt    = { "(" ~ "tag" ~ tag ~ term* ~ ")" }
 term_bytes_type   = { "bytes" }
 term_bytes        = { "(" ~ "bytes" ~ base64_string ~ ")" }
+term_meta         = { "meta" }
 
 spliced_term = { term ~ "..." }

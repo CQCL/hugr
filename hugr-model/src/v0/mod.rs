@@ -90,6 +90,35 @@
 use smol_str::SmolStr;
 use thiserror::Error;
 
+/// Constructor for documentation metadata.
+///
+/// - **Parameter:** `?description : str`
+/// - **Result:** `meta`
+pub const CORE_META_DESCRIPTION: &str = "core.meta.description";
+
+/// Constructor for JSON encoded metadata.
+///
+/// This is included in the model to allow for compatibility with `hugr-core`.
+/// The intention is to deprecate this in the future in favor of metadata
+/// expressed with custom constructors.
+///
+/// - **Parameter:** `?name : str`
+/// - **Parameter:** `?json : str`
+/// - **Result:** `meta`
+pub const COMPAT_META_JSON: &str = "compat.meta-json";
+
+/// Constructor for JSON encoded constants.
+///
+/// This is included in the model to allow for compatibility with `hugr-core`.
+/// The intention is to deprecate this in the future in favor of constants
+/// expressed with custom constructors.
+///
+/// - **Parameter:** `?type : type`
+/// - **Parameter:** `?json : str`
+/// - **Parameter:** `?exts : ext-set`
+/// - **Result:** `(const ?type ?exts)`
+pub const COMPAT_CONST_JSON: &str = "compat.const-json";
+
 pub mod binary;
 pub mod scope;
 pub mod text;
@@ -252,7 +281,7 @@ pub struct Node<'a> {
     /// The regions of the node.
     pub regions: &'a [RegionId],
     /// The meta information attached to the node.
-    pub meta: &'a [MetaItem<'a>],
+    pub meta: &'a [TermId],
     /// The signature of the node.
     ///
     /// Can be `None` to indicate that the node's signature should be inferred,
@@ -411,7 +440,7 @@ pub struct Region<'a> {
     /// The nodes in the region. The order of the nodes is not significant.
     pub children: &'a [NodeId],
     /// The metadata attached to the region.
-    pub meta: &'a [MetaItem<'a>],
+    pub meta: &'a [TermId],
     /// The signature of the region.
     ///
     /// Can be `None` to indicate that the region signature should be inferred.
@@ -499,15 +528,6 @@ pub struct OperationDecl<'a> {
     pub constraints: &'a [TermId],
     /// The type of the operation. This must be a function type.
     pub r#type: TermId,
-}
-
-/// A metadata item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MetaItem<'a> {
-    /// Name of the metadata item.
-    pub name: &'a str,
-    /// Value of the metadata item.
-    pub value: TermId,
 }
 
 /// An index of a variable within a node's parameter list.
@@ -695,6 +715,9 @@ pub enum Term<'a> {
 
     /// The type of byte strings.
     BytesType,
+
+    /// The type of metadata.
+    Meta,
 }
 
 /// A part of a list term.

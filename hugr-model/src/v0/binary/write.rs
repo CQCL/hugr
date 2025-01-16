@@ -33,7 +33,7 @@ fn write_node(mut builder: hugr_capnp::node::Builder, node: &model::Node) {
     write_operation(builder.reborrow().init_operation(), &node.operation);
     let _ = builder.set_inputs(model::LinkIndex::unwrap_slice(node.inputs));
     let _ = builder.set_outputs(model::LinkIndex::unwrap_slice(node.outputs));
-    write_list!(builder, init_meta, write_meta_item, node.meta);
+    let _ = builder.set_meta(model::TermId::unwrap_slice(node.meta));
     let _ = builder.set_params(model::TermId::unwrap_slice(node.params));
     let _ = builder.set_regions(model::RegionId::unwrap_slice(node.regions));
     builder.set_signature(node.signature.map_or(0, |t| t.0 + 1));
@@ -117,11 +117,6 @@ fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
     });
 }
 
-fn write_meta_item(mut builder: hugr_capnp::meta_item::Builder, meta_item: &model::MetaItem) {
-    builder.set_name(meta_item.name);
-    builder.set_value(meta_item.value.0)
-}
-
 fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region) {
     builder.set_kind(match region.kind {
         model::RegionKind::DataFlow => hugr_capnp::RegionKind::DataFlow,
@@ -132,7 +127,7 @@ fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region
     let _ = builder.set_sources(model::LinkIndex::unwrap_slice(region.sources));
     let _ = builder.set_targets(model::LinkIndex::unwrap_slice(region.targets));
     let _ = builder.set_children(model::NodeId::unwrap_slice(region.children));
-    write_list!(builder, init_meta, write_meta_item, region.meta);
+    let _ = builder.set_meta(model::TermId::unwrap_slice(region.meta));
     builder.set_signature(region.signature.map_or(0, |t| t.0 + 1));
 
     if let Some(scope) = &region.scope {
@@ -224,6 +219,10 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
 
         model::Term::BytesType => {
             builder.set_bytes_type(());
+        }
+
+        model::Term::Meta => {
+            builder.set_meta(());
         }
     }
 }
