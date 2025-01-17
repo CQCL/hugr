@@ -2,9 +2,9 @@
 
 use clap::Parser;
 use clap_verbosity_flag::log::Level;
-use hugr::{extension::ExtensionRegistry, Extension, Hugr};
+use hugr::{extension::ExtensionRegistry, package::Package, Extension, Hugr};
 
-use crate::{CliError, HugrArgs};
+use crate::{CliError, HugrArgs, HugrOutputArgs};
 
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
@@ -16,6 +16,9 @@ pub struct ValArgs {
     #[command(flatten)]
     /// common arguments
     pub hugr_args: HugrArgs,
+
+    #[command(flatten)]
+    pub output_args: HugrOutputArgs,
 }
 
 /// String to print when validation is successful.
@@ -27,6 +30,11 @@ impl ValArgs {
         let result = self.hugr_args.validate()?;
         if self.verbosity(Level::Info) {
             eprintln!("{}", VALID_PRINT);
+        }
+        let output_format = self.output_args.output_format;
+        if let Some(output) = &mut self.output_args.output {
+            Package::new(result.clone()).unwrap().to_envelope_writer(output, output_format)?;
+
         }
         Ok(result)
     }

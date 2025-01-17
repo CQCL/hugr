@@ -20,6 +20,9 @@ workspace = true
 extension_inference = []
 declarative = ["serde_yaml"]
 model_unstable = ["hugr-model"]
+zstd = ["dep:zstd"]
+default = ["model_unstable", "zstd"]
+
 
 [lib]
 bench = false
@@ -54,6 +57,8 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 semver = { version = "1.0.23", features = ["serde"] }
 hugr-model = { version = "0.16.0", path = "../hugr-model", optional = true }
+zstd = { version = "0.13.2", optional = true }
+packed_struct = { version =  "0.10.1", features = ["byte_types_64"] }
 
 [dev-dependencies]
 rstest = { workspace = true }

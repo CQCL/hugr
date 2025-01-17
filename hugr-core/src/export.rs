@@ -19,6 +19,7 @@ use hugr_model::v0::{
     },
     fxhash::FxHashMap,
 };
+use itertools::Itertools as _;
 use std::fmt::Write;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
@@ -29,6 +30,15 @@ pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
     let mut ctx = Context::new(hugr, bump);
     ctx.export_root();
     ctx.module
+}
+
+pub fn export_hugr_list<'a>(hugrs: impl IntoIterator<Item=&'a Hugr>, bump: &'a Bump) -> model::ModuleList<'a> {
+    let mut modules = vec![];
+    for h in hugrs {
+        modules.push(export_hugr(h, bump));
+    }
+    model::ModuleList { modules }
+
 }
 
 /// State for converting a HUGR graph to its representation in the model.
