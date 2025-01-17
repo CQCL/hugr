@@ -370,6 +370,13 @@ pub struct Module<'a> {
     pub terms: Vec<Term<'a>>,
 }
 
+/// TODO docs
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct ModuleList<'a> {
+    /// TODO docs
+    pub modules: Vec<Module<'a>>,
+}
+
 impl<'a> Module<'a> {
     /// Return the node data for a given node id.
     #[inline]

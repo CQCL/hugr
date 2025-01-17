@@ -21,6 +21,13 @@ macro_rules! write_list {
     };
 }
 
+/// Writes a module list to an impl of [Write].
+pub fn write_module_list_to_writer(list: &model::ModuleList, writer: impl Write) -> Result<(), WriteError> {
+    let mut message = capnp::message::Builder::new_default();
+    write_module_list(message.init_root(), list);
+    Ok(capnp::serialize_packed::write_message(writer, &message)?)
+}
+
 /// Writes a module to an impl of [Write].
 pub fn write_to_writer(module: &model::Module, writer: impl Write) -> Result<(), WriteError> {
     let mut message = capnp::message::Builder::new_default();
@@ -46,6 +53,10 @@ fn write_module(mut builder: hugr_capnp::module::Builder, module: &model::Module
     write_list!(builder, init_nodes, write_node, module.nodes);
     write_list!(builder, init_regions, write_region, module.regions);
     write_list!(builder, init_terms, write_term, module.terms);
+}
+
+fn write_module_list(mut builder: hugr_capnp::module_list::Builder, list: &model::ModuleList) {
+    write_list!(builder, init_modules, write_module, list.modules);
 }
 
 fn write_node(mut builder: hugr_capnp::node::Builder, node: &model::Node) {
