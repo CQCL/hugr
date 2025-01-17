@@ -1,14 +1,30 @@
+use std::io::BufRead;
+
 use crate::hugr_v0_capnp as hugr_capnp;
 use crate::v0 as model;
 use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
 
-type ReadResult<T> = Result<T, capnp::Error>;
+/// An error encounted while deserialising a model.
+#[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
+#[non_exhaustive]
+pub enum ReadError {
+    #[from(forward)]
+    /// An error encounted while decoding a model from a `capnproto` buffer.
+    DecodingError(capnp::Error),
+}
+
+type ReadResult<T> = Result<T, ReadError>;
 
 /// Read a hugr module from a byte slice.
 pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<model::Module<'a>> {
+    read_from_reader(slice, bump)
+}
+
+/// Read a hugr module from an impl of [BufRead].
+pub fn read_from_reader(reader: impl BufRead, bump: &Bump) -> ReadResult<model::Module<'_>> {
     let reader =
-        capnp::serialize_packed::read_message(slice, capnp::message::ReaderOptions::new())?;
+        capnp::serialize_packed::read_message(reader, capnp::message::ReaderOptions::new())?;
     let root = reader.get_root::<hugr_capnp::module::Reader>()?;
     read_module(bump, root)
 }

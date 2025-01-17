@@ -19,7 +19,7 @@ bench = false
 base64 = { workspace = true }
 bumpalo = { workspace = true, features = ["collections"] }
 capnp = "0.20.1"
-derive_more = { version = "1.0.0", features = ["display"] }
+derive_more = { version = "1.0.0", features = ["display", "from", "error"] }
 fxhash.workspace = true
 indexmap.workspace = true
 pest = "2.7.12"
