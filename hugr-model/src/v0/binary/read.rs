@@ -1,3 +1,5 @@
+use std::io::BufRead;
+
 use crate::hugr_v0_capnp as hugr_capnp;
 use crate::v0 as model;
 use bumpalo::collections::Vec as BumpVec;
@@ -16,8 +18,13 @@ type ReadResult<T> = Result<T, ReadError>;
 
 /// Read a hugr module from a byte slice.
 pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<model::Module<'a>> {
+    read_from_reader(slice, bump)
+}
+
+/// Read a hugr module from an impl of [BufRead].
+pub fn read_from_reader(reader: impl BufRead, bump: &Bump) -> ReadResult<model::Module<'_>> {
     let reader =
-        capnp::serialize_packed::read_message(slice, capnp::message::ReaderOptions::new())?;
+        capnp::serialize_packed::read_message(reader, capnp::message::ReaderOptions::new())?;
     let root = reader.get_root::<hugr_capnp::module::Reader>()?;
     read_module(bump, root)
 }
