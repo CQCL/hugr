@@ -1,11 +1,12 @@
 //! Standard command line tools, used by the hugr binary.
 
+use clap::builder::TypedValueParser as _;
 use clap::{crate_version, Parser};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use clio::Input;
+use clio::{Input, Output};
 use derive_more::{Display, Error, From};
 use hugr::extension::ExtensionRegistry;
-use hugr::package::{PackageEncodingError, PackageValidationError};
+use hugr::package::{EnvelopeError, PackageEncodingError, PackageValidationError, PayloadType};
 use hugr::Hugr;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::{ffi::OsString, path::PathBuf};
@@ -50,6 +51,10 @@ pub enum CliError {
     #[display("Error validating HUGR: {_0}")]
     /// Errors produced by the `validate` subcommand.
     Validate(PackageValidationError),
+
+    #[display("Error decoding HUGR envelope: {_0}")]
+    /// Errors produced by the `validate` subcommand.
+    Envelope(EnvelopeError),
 }
 
 /// Validate and visualise a HUGR file.
@@ -58,6 +63,10 @@ pub struct HugrArgs {
     /// Input HUGR file, use '-' for stdin
     #[clap(value_parser, default_value = "-")]
     pub input: Input,
+
+    // #[command(flatten)]
+    // pub input_format: InputFormatArgs,
+
     /// Verbosity.
     #[command(flatten)]
     pub verbose: Verbosity<InfoLevel>,
@@ -74,6 +83,27 @@ pub struct HugrArgs {
         help = "Paths to serialised extensions to validate against."
     )]
     pub extensions: Vec<PathBuf>,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct HugrOutputArgs {
+    #[arg(short, long, value_parser)]
+    pub output: Option<Output>,
+
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new(["json","json-zstd","model","model-zstd"]).map(|s| PayloadType::from_str(&s).unwrap()))]
+    pub output_format: Option<PayloadType>
+}
+
+#[derive(clap::Args)]
+pub struct PayloadTypeArg {
+    pub json: bool,
+    pub zstd: bool
+}
+
+
+pub enum InputFormatArgs {
+    Auto,
+    Envelope(hugr::package::PayloadType)
 }
 
 /// A simple enum containing either a package or a single hugr.
@@ -139,12 +169,13 @@ fn get_package_or_hugr_seek<I: Seek + Read>(
     mut input: I,
     extensions: &ExtensionRegistry,
 ) -> Result<PackageOrHugr, CliError> {
-    match Hugr::load_json(&mut input, extensions) {
-        Ok(hugr) => Ok(PackageOrHugr::Hugr(hugr)),
-        Err(_) => {
-            input.seek(SeekFrom::Start(0))?;
-            let pkg = Package::from_json_reader(input, extensions)?;
-            Ok(PackageOrHugr::Package(pkg))
-        }
+    if let Ok(hugr) = Hugr::load_json(&mut input, extensions) {
+       return Ok(PackageOrHugr::Hugr(hugr));
     }
+    input.seek(SeekFrom::Start(0))?;
+    if let Ok(pkg) = Package::from_json_reader(&mut input, extensions) {
+        return Ok(PackageOrHugr::Package(pkg));
+    }
+    input.seek(SeekFrom::Start(0))?;
+    return Ok(PackageOrHugr::Package(Package::from_envelope_reader(input, extensions)?));
 }

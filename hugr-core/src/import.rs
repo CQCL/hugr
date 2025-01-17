@@ -77,6 +77,17 @@ macro_rules! error_uninferred {
     ($($e:expr),*) => { ImportError::Uninferred(format!($($e),*)) }
 }
 
+pub fn import_hugr_list(list: &model::ModuleList,
+    extensions: &ExtensionRegistry,
+) -> Result<Vec<Hugr>, ImportError> {
+    let mut hugrs = Vec::with_capacity(list.modules.len());
+    for module in &list.modules {
+        let hugr = import_hugr(module, extensions)?;
+        hugrs.push(hugr);
+    }
+    Ok(hugrs)
+}
+
 /// Import a `hugr` module from its model representation.
 pub fn import_hugr(
     module: &model::Module,
