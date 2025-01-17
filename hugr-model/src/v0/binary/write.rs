@@ -1,5 +1,15 @@
+use std::io::Write;
+
 use crate::hugr_v0_capnp as hugr_capnp;
 use crate::v0 as model;
+
+/// An error encounter while serializing a model.
+#[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
+#[non_exhaustive]
+pub enum WriteError {
+    /// An error encountered while encoding a `capnproto` buffer.
+    EncodingError(capnp::Error),
+}
 
 /// Write a list of items into a list builder.
 macro_rules! write_list {
@@ -9,6 +19,15 @@ macro_rules! write_list {
             $write(__list_builder.reborrow().get(index as _), item);
         }
     };
+}
+
+/// Writes a module to an impl of [Write].
+pub fn write_to_writer(module: &model::Module, writer: impl Write) -> Result<(), WriteError> {
+    let mut message = capnp::message::Builder::new_default();
+    let builder = message.init_root();
+    write_module(builder, module);
+
+    Ok(capnp::serialize_packed::write_message(writer, &message)?)
 }
 
 /// Writes a module to a byte vector.
