@@ -50,7 +50,7 @@ fn basic_type_undef<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
     }
 }
 
-/// Returns an `undef` value for any [BasicType].
+/// Returns an `poison` value for any [BasicType].
 fn basic_type_poison<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
     let t = t.as_basic_type_enum();
     match t {
