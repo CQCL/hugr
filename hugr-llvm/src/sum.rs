@@ -223,7 +223,7 @@ enum LLVMSumTypeEnum<'c> {
     /// A Sum type with a single variant and more than one non-elidable field.
     /// Values of this type contain information in the values of their
     /// non-elidable fields.
-    /// Represented by a struct containing each elidable field.
+    /// Represented by a struct containing each non-elidable field.
     SingleVariantMultiField {
         /// The LLVM types of the fields. One entry for each Hugr field in the
         /// single variant.
