@@ -11,7 +11,14 @@ use crate::{
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
-use hugr_model::v0::{self as model, fxhash::FxHashMap, bumpalo::{Bump, collections::{Vec as BumpVec, String as BumpString}}};
+use hugr_model::v0::{
+    self as model,
+    bumpalo::{
+        collections::{String as BumpString, Vec as BumpVec},
+        Bump,
+    },
+    fxhash::FxHashMap,
+};
 use std::fmt::Write;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";

@@ -6,12 +6,15 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
+    bumpalo::{
+        collections::{String as BumpString, Vec as BumpVec},
+        Bump,
+    },
     fxhash::FxHashMap,
-    bumpalo::{Bump, collections::{Vec as BumpVec, String as BumpString}},
     scope::{LinkTable, SymbolTable, UnknownSymbolError, VarTable},
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex,
-    ListPart, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
-    RegionKind, RegionScope, ScopeClosure, Term, TermId,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, Module, Node, NodeId,
+    Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
+    ScopeClosure, Term, TermId,
 };
 
 mod pest_parser {
