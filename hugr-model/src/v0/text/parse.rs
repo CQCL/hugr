@@ -1,6 +1,4 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
-use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
-use fxhash::FxHashMap;
 use pest::{
     iterators::{Pair, Pairs},
     Parser, RuleType,
@@ -8,6 +6,11 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
+    bumpalo::{
+        collections::{String as BumpString, Vec as BumpVec},
+        Bump,
+    },
+    fxhash::FxHashMap,
     scope::{LinkTable, SymbolTable, UnknownSymbolError, VarTable},
     AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, Module, Node, NodeId,
     Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,

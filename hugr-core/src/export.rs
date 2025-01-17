@@ -11,9 +11,14 @@ use crate::{
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
-use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
-use fxhash::FxHashMap;
-use hugr_model::v0::{self as model};
+use hugr_model::v0::{
+    self as model,
+    bumpalo::{
+        collections::{String as BumpString, Vec as BumpVec},
+        Bump,
+    },
+    fxhash::FxHashMap,
+};
 use std::fmt::Write;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
@@ -1148,7 +1153,7 @@ mod test {
     #[rstest]
     #[case(test_simple_circuit())]
     fn test_export(#[case] hugr: Hugr) {
-        use bumpalo::Bump;
+        use hugr_model::v0::bumpalo::Bump;
         let bump = Bump::new();
         let _model = super::export_hugr(&hugr, &bump);
     }
