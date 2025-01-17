@@ -22,6 +22,9 @@ pub mod std_extensions;
 pub mod types;
 pub mod utils;
 
+use package::Package;
+use std_extensions::STD_REG;
+
 pub use crate::core::{
     CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex, Wire,
 };
@@ -30,3 +33,23 @@ pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};
 
 #[cfg(test)]
 pub mod proptest;
+
+#[test]
+#[cfg(feature="model_unstable")]
+fn bounds() {
+    use export::export_hugr;
+    use import::import_hugr;
+
+    let json = include_str!("../../hugr.json");
+    let package: Package = serde_json::from_str(json.trim()).unwrap();
+
+    // Extension registry combining standard extensions with those defined in the package.
+    let mut exts = STD_REG.clone();
+    exts.extend(package.extensions);
+
+    // Export and import the first and only module in the package.
+    assert_eq!(package.modules.len(), 1);
+    let bump = bumpalo::Bump::new();
+    let exported = export_hugr(&package.modules[0], &bump);
+    import_hugr(&exported, &exts).unwrap();
+}
