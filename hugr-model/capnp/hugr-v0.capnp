@@ -216,3 +216,7 @@ enum ParamSort {
     implicit @0;
     explicit @1;
 }
+
+struct ModuleList {
+    modules @0 :List(Module);
+}

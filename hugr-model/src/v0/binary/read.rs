@@ -16,6 +16,16 @@ pub enum ReadError {
 
 type ReadResult<T> = Result<T, ReadError>;
 
+/// Read a list of hugr modules lfrom an impl of [BufRead].
+pub fn read_module_list_from_reader<'a>(
+    reader: impl BufRead,
+    bump: &'a Bump,
+) -> ReadResult<model::ModuleList<'a>> {
+    let reader =
+        capnp::serialize_packed::read_message(reader, capnp::message::ReaderOptions::new())?;
+    read_module_list(bump, reader.get_root()?)
+}
+
 /// Read a hugr module from a byte slice.
 pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<model::Module<'a>> {
     read_from_reader(slice, bump)
@@ -51,6 +61,19 @@ macro_rules! read_scalar_list {
         }
         __list.into_bump_slice()
     }};
+}
+
+fn read_module_list<'a>(
+    bump: &'a Bump,
+    reader: hugr_capnp::module_list::Reader,
+) -> ReadResult<model::ModuleList<'a>> {
+    Ok(model::ModuleList {
+        modules: reader
+            .get_modules()?
+            .iter()
+            .map(|r| read_module(bump, r))
+            .collect::<Result<Vec<_>, _>>()?,
+    })
 }
 
 fn read_module<'a>(
