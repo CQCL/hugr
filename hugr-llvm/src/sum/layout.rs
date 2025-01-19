@@ -95,7 +95,7 @@ fn layout_variants_impl<T: Ord + Clone + fmt::Debug>(
     let variants = variants.as_ref();
     assert!(!variants.is_empty());
     // * sorted_fields is a Vec<T> with enough copies of each T to represent any
-    //   one variant. It will be the firstu return value.
+    //   one variant. It will be the first return value.
     // * t_to_index_map maps types to the index of the first
     //   occurence of that type.
     let (sorted_fields, t_to_index_map) = {
