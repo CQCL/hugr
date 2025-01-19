@@ -4,7 +4,7 @@ use std::{iter, slice};
 
 use crate::types::{HugrSumType, TypingSession};
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use delegate::delegate;
 use hugr_core::types::TypeRow;
 use inkwell::{
@@ -175,6 +175,10 @@ impl<'c> LLVMSumType<'c> {
 /// This type is not public, so that it can be changed without breaking users.
 #[derive(Debug, Clone)]
 enum LLVMSumTypeEnum<'c> {
+    /// A Sum type with no variants, Represented by `{}`.
+    ///
+    /// Values of this type can only be constructed by [get_poison].
+    Void { tag_type: IntType<'c> },
     /// A Sum type with a single variant and all-elidable fields.
     /// Represented by `{}`
     /// Values of this type contain no information, so they never need to be
@@ -271,9 +275,9 @@ impl<'c> LLVMSumTypeEnum<'c> {
         variant_types: Vec<Vec<BasicTypeEnum<'c>>>,
     ) -> Result<Self> {
         let result = match variant_types.len() {
-            0 => anyhow::bail!(
-                "LLVMSumType constructed with no variants. Void is not representable in LLVM"
-            ),
+            0 => Self::Void {
+                tag_type: context.bool_type(),
+            },
             1 => {
                 let variant_types = variant_types.into_iter().exactly_one().unwrap();
                 let (fields, field_indices) =
@@ -347,6 +351,7 @@ impl<'c> LLVMSumTypeEnum<'c> {
         ensure!(vs.len() == self.num_fields_for_variant(tag));
         ensure!(iter::zip(&vs, self.fields_for_variant(tag)).all(|(x, y)| &x.get_type() == y));
         let value = match self {
+            Self::Void { .. } => bail!("Can't tag an empty sum"),
             Self::Unit { value_type, .. } => value_type.get_undef().as_basic_value_enum(),
             Self::NoFields { value_type, .. } => value_type
                 .const_int(tag as u64, false)
@@ -400,6 +405,7 @@ impl<'c> LLVMSumTypeEnum<'c> {
     /// Get the type of the value that would be returned by `build_get_tag`.
     pub fn tag_type(&self) -> IntType<'c> {
         match self {
+            Self::Void { tag_type, .. } => *tag_type,
             Self::Unit { tag_type, .. } => *tag_type,
             Self::NoFields { value_type, .. } => *value_type,
             Self::SingleVariantSingleField { tag_type, .. } => *tag_type,
@@ -414,6 +420,7 @@ impl<'c> LLVMSumTypeEnum<'c> {
     /// The underlying LLVM type.
     pub fn value_type(&self) -> BasicTypeEnum<'c> {
         match self {
+            Self::Void { tag_type, .. } => (*tag_type).into(),
             Self::Unit { value_type, .. } => (*value_type).into(),
             Self::NoFields { value_type, .. } => (*value_type).into(),
             Self::SingleVariantSingleField {
@@ -429,6 +436,7 @@ impl<'c> LLVMSumTypeEnum<'c> {
     /// The number of variants in the represented [HugrSumType].
     pub fn num_variants(&self) -> usize {
         match self {
+            Self::Void { .. } => 0,
             Self::Unit { .. }
             | Self::SingleVariantSingleField { .. }
             | Self::SingleVariantMultiField { .. } => 1,
@@ -444,14 +452,15 @@ impl<'c> LLVMSumTypeEnum<'c> {
         self.fields_for_variant(tag).len()
     }
 
-    /// The LLVM types representing the fields in the `tag` variant of the represented [HugrSumType].
-    /// Panics if `tag` is out of bounds.
+    /// The LLVM types representing the fields in the `tag` variant of the
+    /// represented [HugrSumType].  Panics if `tag` is out of bounds.
     pub(self) fn fields_for_variant(&self, tag: usize) -> &[BasicTypeEnum<'c>] {
         assert!(tag < self.num_variants());
         match self {
-            Self::SingleVariantSingleField { field_types: variant_types, .. }
-            | Self::SingleVariantMultiField { field_types: variant_types, .. }
-            | Self::Unit { field_types: variant_types, .. } => &variant_types[..],
+            Self::Void { .. } => unreachable!("Void has no valid tag"),
+            Self::SingleVariantSingleField { field_types, .. }
+            | Self::SingleVariantMultiField { field_types, .. }
+            | Self::Unit { field_types, .. } => &field_types[..],
             Self::MultiVariant { variant_types, .. } | Self::NoFields { variant_types, .. } => {
                 &variant_types[tag]
             }
@@ -506,6 +515,10 @@ impl<'c> LLVMSumValue<'c> {
     pub fn try_new(value: impl BasicValue<'c>, sum_type: LLVMSumType<'c>) -> Result<Self> {
         let value = value.as_basic_value_enum();
         ensure!(
+            !matches!(sum_type.0, LLVMSumTypeEnum::Void { .. }),
+            "Cannot construct LLVMSumValue of a Void sum"
+        );
+        ensure!(
             value.get_type() == sum_type.value_type(),
             "Cannot construct LLVMSumValue of type {sum_type} from value of type {}",
             value.get_type()
@@ -522,6 +535,7 @@ impl<'c> LLVMSumValue<'c> {
     /// The type of the value is that returned by [LLVMSumType::tag_type].
     pub fn build_get_tag(&self, builder: &Builder<'c>) -> Result<IntValue<'c>> {
         let result = match self.get_type().0 {
+            LLVMSumTypeEnum::Void { .. } => bail!("Cannot get tag of void sum"),
             LLVMSumTypeEnum::Unit { tag_type, .. }
             | LLVMSumTypeEnum::SingleVariantSingleField { tag_type, .. }
             | LLVMSumTypeEnum::SingleVariantMultiField { tag_type, .. } => {
@@ -547,15 +561,28 @@ impl<'c> LLVMSumValue<'c> {
         tag: usize,
     ) -> Result<Vec<BasicValueEnum<'c>>> {
         ensure!(tag < self.num_variants(), "Bad tag {tag} in {}", self.1);
-        let results = match self.get_type().0 {
-            LLVMSumTypeEnum::Unit { field_types: variant_types, .. } => {
-                anyhow::Ok(variant_types.into_iter().map(basic_type_undef).collect_vec())
-            }
-            LLVMSumTypeEnum::NoFields { variant_types, .. } => {
-                Ok(variant_types[tag].iter().copied().map(basic_type_undef).collect())
-            }
-            LLVMSumTypeEnum::SingleVariantSingleField { field_types: variant_types, field_index, .. } => {
-                Ok(variant_types
+        let results =
+            match self.get_type().0 {
+                LLVMSumTypeEnum::Void { .. } => bail!("Cannot untag void sum"),
+                LLVMSumTypeEnum::Unit {
+                    field_types: variant_types,
+                    ..
+                } => anyhow::Ok(
+                    variant_types
+                        .into_iter()
+                        .map(basic_type_undef)
+                        .collect_vec(),
+                ),
+                LLVMSumTypeEnum::NoFields { variant_types, .. } => Ok(variant_types[tag]
+                    .iter()
+                    .copied()
+                    .map(basic_type_undef)
+                    .collect()),
+                LLVMSumTypeEnum::SingleVariantSingleField {
+                    field_types: variant_types,
+                    field_index,
+                    ..
+                } => Ok(variant_types
                     .iter()
                     .enumerate()
                     .map(|(i, t)| {
@@ -565,34 +592,41 @@ impl<'c> LLVMSumValue<'c> {
                             basic_type_undef(*t)
                         }
                     })
-                    .collect())
-            }
-            LLVMSumTypeEnum::SingleVariantMultiField { field_types: variant_types, field_indices, .. } => {
-                itertools::zip_eq(variant_types, field_indices).map(|(t, mb_i)| {
-                    if let Some(i) = mb_i {
-                        Ok(builder.build_extract_value(self.0.into_struct_value(), i as u32, "")?)
-                    } else {
-                        Ok(basic_type_undef(t))
-                    }
-                }).collect()
-            }
-            LLVMSumTypeEnum::MultiVariant {
-                variant_types,
-                field_indices,
-                ..
-            } => {
-                let value = self.0.into_struct_value();
-                itertools::zip_eq(&variant_types[tag], &field_indices[tag])
-                    .map(|(ty, mb_i)| {
+                    .collect()),
+                LLVMSumTypeEnum::SingleVariantMultiField {
+                    field_types: variant_types,
+                    field_indices,
+                    ..
+                } => itertools::zip_eq(variant_types, field_indices)
+                    .map(|(t, mb_i)| {
                         if let Some(i) = mb_i {
-                            Ok(builder.build_extract_value(value, *i as u32 + 1, "")?)
+                            Ok(builder.build_extract_value(
+                                self.0.into_struct_value(),
+                                i as u32,
+                                "",
+                            )?)
                         } else {
-                            Ok(basic_type_undef(*ty))
+                            Ok(basic_type_undef(t))
                         }
                     })
-                    .collect()
-            }
-        }?;
+                    .collect(),
+                LLVMSumTypeEnum::MultiVariant {
+                    variant_types,
+                    field_indices,
+                    ..
+                } => {
+                    let value = self.0.into_struct_value();
+                    itertools::zip_eq(&variant_types[tag], &field_indices[tag])
+                        .map(|(ty, mb_i)| {
+                            if let Some(i) = mb_i {
+                                Ok(builder.build_extract_value(value, *i as u32 + 1, "")?)
+                            } else {
+                                Ok(basic_type_undef(*ty))
+                            }
+                        })
+                        .collect()
+                }
+            }?;
         #[cfg(debug_assertions)]
         {
             let result_types = results.iter().map(|x| x.get_type()).collect_vec();
@@ -649,7 +683,8 @@ mod test {
     use rstest::{rstest, Context};
 
     use crate::{
-        test::{llvm_ctx, TestContext}, types::HugrType
+        test::{llvm_ctx, TestContext},
+        types::HugrType,
     };
 
     use super::*;
@@ -741,7 +776,12 @@ mod test {
     #[case::one_variant_two_fields_elided_fields(HugrSumType::new([vec![bool_t(),HugrType::UNIT,bool_t()]]), 0)]
     #[case::two_variant_one_field(HugrSumType::new([vec![bool_t()],vec![]]), 1)]
     #[case::two_variant_one_field_elided_fields(HugrSumType::new([vec![bool_t()],vec![HugrType::UNIT]]), 1)]
-    fn build_untag_tag(#[context] rstest_ctx: Context, llvm_ctx: TestContext, #[case] sum: HugrSumType, #[case]tag: usize) {
+    fn build_untag_tag(
+        #[context] rstest_ctx: Context,
+        llvm_ctx: TestContext,
+        #[case] sum: HugrSumType,
+        #[case] tag: usize,
+    ) {
         let module = {
             let ts = llvm_ctx.get_typing_session();
             let iwc = llvm_ctx.iw_context();
