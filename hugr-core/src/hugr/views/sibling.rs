@@ -149,7 +149,7 @@ impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
         let hugr = hugr.base_hugr();
         Self {
             root,
-            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.pg_index()),
+            graph: FlatRegionGraph::new(&hugr.graph, &hugr.hierarchy, root.pg_index()),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -249,7 +249,7 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
         Root: 'p;
 
     fn portgraph(&self) -> Self::Portgraph<'_> {
-        FlatRegionGraph::new_flat_region(
+        FlatRegionGraph::new(
             &self.base_hugr().graph,
             &self.base_hugr().hierarchy,
             self.root.pg_index(),
