@@ -712,7 +712,7 @@ mod test {
         let i64 = iwc.i64_type().as_basic_type_enum();
 
         {
-            // no-variants -> empty_struct
+            // no-variants -> i1
             let hugr_type = HugrType::new_unit_sum(0);
             assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i1);
         }
