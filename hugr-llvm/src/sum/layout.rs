@@ -1,11 +1,10 @@
 //! The algorithm for computing the fields of the struct representing a
 //! [HugrSumType].
 //!
-use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::ops::RangeFrom;
+use std::{borrow::Cow, ops::Range};
 
 use inkwell::types::{BasicType, BasicTypeEnum};
 use itertools::Itertools as _;
@@ -84,6 +83,71 @@ impl PartialOrd for BasicTypeOrd<'_> {
     }
 }
 
+// Compute the fields required to represent and one variant of `variants`.
+// Fields of type `t` such that `elide(t)` is true will be elided from the
+// returned fields.
+//
+// Returns:
+//  * sorted_fields: Vec<T>. The fields required to represent any one variant of
+//    `variant`. Sorted via the `Ord` impl of `T`.
+//  * t_to_range: BTreeMap<T,Range<usize>.  The contiguous range of
+//    `sorted_fields` having the mapped type.
+fn layout_fields<T: Ord + Clone + fmt::Debug>(
+    variants: &[Vec<T>],
+    elide: impl Fn(&T) -> bool,
+) -> (Vec<T>, BTreeMap<T, Range<usize>>) {
+    // t_counts tracks, per-type, the maximum number of fields a variant
+    // has of that type.
+    let t_counts = {
+        let t_counts_per_variant = variants.iter().map(|variant| {
+            let mut t_counts = BTreeMap::<T, usize>::new();
+            for t in variant {
+                if !elide(t) {
+                    t_counts
+                        .entry(t.clone())
+                        .and_modify(|count| *count += 1)
+                        .or_insert(1);
+                }
+            }
+            t_counts
+        });
+        let mut t_counts = BTreeMap::<T, usize>::new();
+        for (t, count) in t_counts_per_variant.flatten() {
+            t_counts
+                .entry(t)
+                .and_modify(|x| *x = count.max(*x))
+                .or_insert(count);
+        }
+        t_counts
+    };
+    let sorted_fields = t_counts
+        .iter()
+        .flat_map(|(t, &count)| itertools::repeat_n(t.clone(), count))
+        .collect_vec();
+    // Map from each t to its first occurrence in sorted_fields
+    let t_to_range: BTreeMap<T, Range<usize>> = t_counts
+        .into_iter()
+        .scan(0, |offset, (t, count)| {
+            let t_offset = *offset;
+            *offset += count;
+            Some((t, t_offset..*offset))
+        })
+        .collect();
+
+    #[cfg(debug_assertions)]
+    {
+        assert_eq!(t_to_range.first_key_value().unwrap().1.start, 0);
+        assert_eq!(
+            t_to_range.last_key_value().unwrap().1.end,
+            sorted_fields.len()
+        );
+        for (t, range) in &t_to_range {
+            assert!(range.clone().all(|i| &sorted_fields[i] == t));
+        }
+    }
+    (sorted_fields, t_to_range)
+}
+
 /// The implemenation of the layout algorithm.
 /// We write this generically so that we can test it with simple types.
 ///
@@ -93,67 +157,22 @@ fn layout_variants_impl<T: Ord + Clone + fmt::Debug>(
     elide: impl Fn(&T) -> bool,
 ) -> (Vec<T>, Vec<Vec<Option<usize>>>) {
     let variants = variants.as_ref();
-    assert!(!variants.is_empty());
-    // * sorted_fields is a Vec<T> with enough copies of each T to represent any
-    //   one variant. It will be the first return value.
-    // * t_to_index_map maps types to the index of the first
-    //   occurence of that type.
-    let (sorted_fields, t_to_index_map) = {
-        // t_counts tracks, per-type, the maximum number of fields a variant
-        // has of that type.
-        let t_counts = {
-            let t_counts_per_variant = variants.iter().map(|variant| {
-                let mut t_counts = BTreeMap::<T, usize>::new();
-                for t in variant.iter().flat_map(|t| (!elide(t)).then_some(t)) {
-                    t_counts
-                        .entry(t.clone())
-                        .and_modify(|count| *count += 1)
-                        .or_insert(1);
-                }
-                t_counts
-            });
-            let mut t_counts = BTreeMap::<T, usize>::new();
-            for (t, count) in t_counts_per_variant.flatten() {
-                t_counts
-                    .entry(t)
-                    .and_modify(|x| *x = count.max(*x))
-                    .or_insert(count);
-            }
-            t_counts
-        };
-        let mut t_to_index_map = BTreeMap::<T, usize>::default();
-        let mut last_t = None;
-        let sorted_fields = t_counts
-            .into_iter()
-            .flat_map(|(t, count)| itertools::repeat_n(t, count))
-            .enumerate()
-            .map(|(i, t)| {
-                if last_t.as_ref() != Some(&t) {
-                    last_t = Some(t.clone());
-                    let _overwritten = t_to_index_map.insert(t.clone(), i).is_some();
-                    debug_assert!(!_overwritten);
-                }
-                t
-            })
-            .collect_vec();
-        (sorted_fields, t_to_index_map)
-    };
+
+    let (sorted_fields, t_to_range) = layout_fields(variants, &elide);
 
     // the second return value. Here we record, per-variant, which field of
     // `sorted_fields` represents each field.
     let layout = variants
         .iter()
         .map(|variant| {
-            let mut t_to_range_map = BTreeMap::<T, RangeFrom<usize>>::new();
+            let mut t_to_range_map = t_to_range.clone();
             variant
                 .iter()
                 .map(|t| {
                     (!elide(t)).then(|| {
-                        let field_index_iter = t_to_range_map
-                            .entry(t.clone())
-                            .or_insert(t_to_index_map[t]..);
-                        field_index_iter
-                            .next()
+                        t_to_range_map
+                            .get_mut(&t)
+                            .and_then(Iterator::next)
                             .expect("We have ensured that there are enough fields of type t")
                     })
                 })
@@ -187,8 +206,7 @@ mod test {
     use super::*;
 
     #[rstest]
-    #[should_panic]
-    #[case::none([], [], [])]
+    #[case::void([], [], [])]
     #[case::one_empty([vec![]], [vec![]], [])]
     #[case::multi_empty([vec![],vec![]], [vec![],vec![]], [])]
     #[case::one_nonempty([vec![5]], [vec![Some(0)]], [5])]
@@ -200,7 +218,7 @@ mod test {
     #[case::two_nonempty_no_dups_rev_order([vec![8],vec![7]], [vec![Some(1)],vec![Some(0)]], [7,8])]
     #[case::two_nonempty_all_dups([vec![9,10],vec![10,9]], [vec![Some(0),Some(1)],vec![Some(1),Some(0)]], [9,10])]
     #[case::three_nonempty_some_dups([vec![9,10],vec![9],vec![11,10,-1]], [vec![Some(1),Some(2)],vec![Some(1)],vec![Some(3),Some(2),Some(0)]], [-1,9,10,11])]
-    // #[case::two_nonempty_all_elidable([vec![0],vec![0],vec![11,10,-1]], [vec![Some(1),Some(2)],vec![Some(1)],vec![Some(3),Some(2),Some(0)]], [-1,9,10,11])]
+    #[case::two_nonempty_all_elidable(vec![vec![0];2], vec![vec![None];2], [])]
     fn layout_variants(
         #[case] variants: impl AsRef<[Vec<i32>]>,
         #[case] expected_layout: impl AsRef<[Vec<Option<usize>>]>,
