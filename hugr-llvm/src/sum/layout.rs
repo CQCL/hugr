@@ -174,7 +174,7 @@ fn layout_variants_impl<T: Ord + Clone + fmt::Debug>(
                 .map(|t| {
                     (!elide(t)).then(|| {
                         t_to_range_map
-                            .get_mut(&t)
+                            .get_mut(t)
                             .and_then(Iterator::next)
                             .expect("We have ensured that there are enough fields of type t")
                     })
