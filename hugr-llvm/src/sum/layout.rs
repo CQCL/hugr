@@ -124,7 +124,7 @@ fn layout_fields<T: Ord + Clone + fmt::Debug>(
         .iter()
         .flat_map(|(t, &count)| itertools::repeat_n(t.clone(), count))
         .collect_vec();
-    // Map from each t to its first occurrence in sorted_fields
+    // Map from each t to its index range in sorted_fields
     let t_to_range: BTreeMap<T, Range<usize>> = t_counts
         .into_iter()
         .scan(0, |offset, (t, count)| {
