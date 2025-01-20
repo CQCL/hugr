@@ -148,7 +148,7 @@ fn layout_fields<T: Ord + Clone + fmt::Debug>(
     (sorted_fields, t_to_range)
 }
 
-/// The implemenation of the layout algorithm.
+/// The implementation of the layout algorithm.
 /// We write this generically so that we can test it with simple types.
 ///
 /// Panics if `variants` is empty.
