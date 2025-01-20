@@ -106,3 +106,97 @@ class _DivModDef(RegisteredOp):
 
 #: DivMod operation.
 DivMod = _DivModDef()
+
+
+@dataclass(frozen=True)
+class _ILtUDef(RegisteredOp):
+    """Integer less than (unsigned)."""
+
+    width: int = 5
+    const_op_def: ClassVar[ext.OpDef] = INT_OPS_EXTENSION.operations["ilt_u"]
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.BoundedNatArg(n=self.width)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        row: list[tys.Type] = [int_t(self.width)] * 2
+        return tys.FunctionType(row, [tys.Bool], runtime_reqs=[INT_OPS_EXTENSION.name])
+
+    def __call__(self, a: ComWire) -> Command:
+        return DataflowOp.__call__(self, a)
+
+
+#: IntLessThan (unsigned) operation
+ILtU = _ILtUDef()
+
+
+@dataclass(frozen=True)
+class _IMulDef(RegisteredOp):
+    """Integer multiply."""
+
+    width: int = 5
+    const_op_def: ClassVar[ext.OpDef] = INT_OPS_EXTENSION.operations["imul"]
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.BoundedNatArg(n=self.width)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        row: list[tys.Type] = [int_t(self.width)] * 2
+        return tys.FunctionType(
+            row, [int_t(self.width)], runtime_reqs=[INT_OPS_EXTENSION.name]
+        )
+
+    def __call__(self, a: ComWire) -> Command:
+        return DataflowOp.__call__(self, a)
+
+
+#: IMul operation
+IMul = _IMulDef()
+
+
+@dataclass(frozen=True)
+class _ISubDef(RegisteredOp):
+    """Integer subtract."""
+
+    width: int = 5
+    const_op_def: ClassVar[ext.OpDef] = INT_OPS_EXTENSION.operations["isub"]
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.BoundedNatArg(n=self.width)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        row: list[tys.Type] = [int_t(self.width)] * 2
+        return tys.FunctionType(
+            row, [int_t(self.width)], runtime_reqs=[INT_OPS_EXTENSION.name]
+        )
+
+    def __call__(self, a: ComWire) -> Command:
+        return DataflowOp.__call__(self, a)
+
+
+#: ISub operation
+ISub = _ISubDef()
+
+
+@dataclass(frozen=True)
+class _IAddDef(RegisteredOp):
+    """Integer add."""
+
+    width: int = 5
+    const_op_def: ClassVar[ext.OpDef] = INT_OPS_EXTENSION.operations["iadd"]
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.BoundedNatArg(n=self.width)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        row: list[tys.Type] = [int_t(self.width)] * 2
+        return tys.FunctionType(
+            row, [int_t(self.width)], runtime_reqs=[INT_OPS_EXTENSION.name]
+        )
+
+    def __call__(self, a: ComWire) -> Command:
+        return DataflowOp.__call__(self, a)
+
+
+#: IAdd operation
+IAdd = _IAddDef()

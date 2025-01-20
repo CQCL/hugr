@@ -3,8 +3,9 @@ import pytest
 from hugr import ops, tys, val
 from hugr.build.cond_loop import Conditional, ConditionalError, TailLoop
 from hugr.build.dfg import Dfg
+from hugr.build.function import Module
 from hugr.package import Package
-from hugr.std.int import INT_T, IntVal
+from hugr.std.int import INT_T, ILtU, IMul, IntVal, ISub
 
 from .conftest import QUANTUM_EXT, H, Measure, validate
 
@@ -144,3 +145,28 @@ def test_conditional_bug() -> None:
     with cond.add_case(0) as case:
         case.set_outputs()
     validate(cond.hugr)
+
+
+def test_iterative_factorial() -> None:
+    mod = Module()
+
+    fac = mod.define_function("factorial", [INT_T], [INT_T])
+    loop_t = tys.Either([INT_T], [])
+    with fac.add_tail_loop(fac.inputs(), [fac.load(IntVal(1))]) as tl:
+        one = tl.load(IntVal(1))
+        with tl.add_if(tl.add_op(ILtU, tl.input_node[0], one)) as if_:
+            if_.set_outputs(if_.add(ops.Break(loop_t)()), tl.input_node[1])
+        with if_.add_else() as else_:
+            i2 = else_.add_op(ISub, tl.input_node[0], one)
+            f2 = else_.add_op(IMul, tl.input_node[0], tl.input_node[1])
+            else_.set_outputs(else_.add(ops.Continue(loop_t)(i2)), f2)
+        tl.set_loop_outputs(*else_.conditional_node.outputs())
+    fac.set_outputs(tl)
+
+    main = mod.define_function("main", [], [INT_T])
+    main.set_outputs(main.call(fac, main.load(IntVal(5))))
+
+    validate(mod.hugr)
+
+    with open("/Users/alanlawrence/factorial_hugr.json", "w") as f:
+        f.write(mod.hugr.to_json())
