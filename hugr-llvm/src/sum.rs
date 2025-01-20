@@ -175,7 +175,7 @@ impl<'c> LLVMSumType<'c> {
 /// This type is not public, so that it can be changed without breaking users.
 #[derive(Debug, Clone)]
 enum LLVMSumTypeEnum<'c> {
-    /// A Sum type with no variants, Represented by `{}`.
+    /// A Sum type with no variants. It's representation is unspecified.
     ///
     /// Values of this type can only be constructed by [get_poison].
     Void { tag_type: IntType<'c> },
@@ -712,6 +712,12 @@ mod test {
         let i64 = iwc.i64_type().as_basic_type_enum();
 
         {
+            // no-variants -> empty_struct
+            let hugr_type = HugrType::new_unit_sum(0);
+            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i1);
+        }
+
+        {
             // one-variant-no-fields -> empty_struct
             let hugr_type = HugrType::UNIT;
             assert_eq!(ts.llvm_type(&hugr_type).unwrap(), empty_struct.clone());
@@ -726,25 +732,25 @@ mod test {
         {
             // multi-variant-no-fields -> bare tag
             let hugr_type = bool_t();
-            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i1.clone());
+            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i1);
         }
 
         {
             // multi-variant-elidable-fields -> bare tag
             let hugr_type = HugrType::new_sum(vec![vec![HugrType::UNIT]; 3]);
-            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i2.clone());
+            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i2);
         }
 
         {
             // one-variant-one-field -> bare field
             let hugr_type = HugrType::new_tuple(vec![usize_t()]);
-            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i64.clone());
+            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i64);
         }
 
         {
             // one-variant-one-non-elidable-field -> bare field
             let hugr_type = HugrType::new_tuple(vec![HugrType::UNIT, usize_t()]);
-            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i64.clone());
+            assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i64);
         }
 
         {
