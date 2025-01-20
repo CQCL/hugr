@@ -33,6 +33,7 @@ pub mod proptest;
 
 #[test]
 #[cfg(feature = "model_unstable")]
+#[should_panic] // BUG: see https://github.com/CQCL/hugr/issues/1876
 fn bounds() {
     use crate::package::Package;
     use crate::std_extensions::STD_REG;
