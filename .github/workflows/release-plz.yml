@@ -30,6 +30,9 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
+          # Use a temporary directory to avoid polluting the workspace,
+          # otherwise release-plz fails due to uncommitted changes.
+          directory: ${{ runner.temp }}/llvm
 
       - name: Run release-plz
         uses: MarcoIeni/release-plz-action@v0.5
