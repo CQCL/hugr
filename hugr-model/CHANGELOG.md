@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.17.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.16.0...hugr-model-v0.17.0) - 2025-01-20
+
+### Bug Fixes
+
+- Three bugfixes in model import and export. (#1844)
+
+### New Features
+
+- Constant values in `hugr-model` (#1838)
+- Bytes literal in hugr-model. (#1845)
+- Improved representation for metadata in `hugr-model` (#1849)
+
 ## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.15.0...hugr-model-v0.16.0) - 2024-12-18
 
 ### New Features
