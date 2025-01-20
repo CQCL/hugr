@@ -13,19 +13,19 @@ alloca_block:
   %"8_0" = alloca i64, align 8
   %"9_0" = alloca i64, align 8
   %"9_1" = alloca i64, align 8
-  %"17_0" = alloca { i32, { i64 }, {} }, align 8
+  %"17_0" = alloca { i1, i64 }, align 8
   %"16_0" = alloca i64, align 8
   %"15_0" = alloca i64, align 8
   %"12_0" = alloca i64, align 8
-  %"13_0" = alloca { i32, {}, {} }, align 8
-  %"011" = alloca { i32, { i64 }, {} }, align 8
+  %"13_0" = alloca i1, align 1
+  %"011" = alloca { i1, i64 }, align 8
   %"013" = alloca i64, align 8
   %"23_0" = alloca i64, align 8
   %"20_0" = alloca i64, align 8
   %"24_0" = alloca i64, align 8
-  %"25_0" = alloca { i32, { i64 }, {} }, align 8
+  %"25_0" = alloca { i1, i64 }, align 8
   %"019" = alloca i64, align 8
-  %"29_0" = alloca { i32, { i64 }, {} }, align 8
+  %"29_0" = alloca { i1, i64 }, align 8
   %"27_0" = alloca i64, align 8
   br label %entry_block
 
@@ -38,7 +38,7 @@ entry_block:                                      ; preds = %alloca_block
   store i64 %"7_02", i64* %"9_1", align 4
   br label %loop_body
 
-loop_body:                                        ; preds = %12, %entry_block
+loop_body:                                        ; preds = %8, %entry_block
   %"9_03" = load i64, i64* %"9_0", align 4
   %"9_14" = load i64, i64* %"9_1", align 4
   store i64 2, i64* %"15_0", align 4
@@ -52,78 +52,72 @@ loop_body:                                        ; preds = %12, %entry_block
   %"9_07" = load i64, i64* %"9_0", align 4
   %"12_08" = load i64, i64* %"12_0", align 4
   %1 = icmp eq i64 %"9_07", %"12_08"
-  %2 = select i1 %1, { i32, {}, {} } { i32 1, {} poison, {} undef }, { i32, {}, {} } { i32 0, {} undef, {} poison }
-  store { i32, {}, {} } %2, { i32, {}, {} }* %"13_0", align 4
-  %"13_09" = load { i32, {}, {} }, { i32, {}, {} }* %"13_0", align 4
+  %2 = select i1 %1, i1 true, i1 false
+  store i1 %2, i1* %"13_0", align 1
+  %"13_09" = load i1, i1* %"13_0", align 1
   %"9_010" = load i64, i64* %"9_0", align 4
-  %3 = extractvalue { i32, {}, {} } %"13_09", 0
-  switch i32 %3, label %4 [
-    i32 1, label %6
+  switch i1 %"13_09", label %3 [
+    i1 true, label %4
   ]
 
-4:                                                ; preds = %loop_body
-  %5 = extractvalue { i32, {}, {} } %"13_09", 1
+3:                                                ; preds = %loop_body
   store i64 %"9_010", i64* %"013", align 4
   br label %cond_17_case_0
 
-6:                                                ; preds = %loop_body
-  %7 = extractvalue { i32, {}, {} } %"13_09", 2
+4:                                                ; preds = %loop_body
   store i64 %"9_010", i64* %"019", align 4
   br label %cond_17_case_1
 
-loop_out:                                         ; preds = %15
+loop_out:                                         ; preds = %10
   %"8_026" = load i64, i64* %"8_0", align 4
   store i64 %"8_026", i64* %"0", align 4
   %"027" = load i64, i64* %"0", align 4
   ret i64 %"027"
 
-cond_17_case_0:                                   ; preds = %4
+cond_17_case_0:                                   ; preds = %3
   %"014" = load i64, i64* %"013", align 4
   store i64 1, i64* %"23_0", align 4
   store i64 %"014", i64* %"20_0", align 4
   %"20_015" = load i64, i64* %"20_0", align 4
   %"23_016" = load i64, i64* %"23_0", align 4
-  %8 = sub i64 %"20_015", %"23_016"
-  store i64 %8, i64* %"24_0", align 4
+  %5 = sub i64 %"20_015", %"23_016"
+  store i64 %5, i64* %"24_0", align 4
   %"24_017" = load i64, i64* %"24_0", align 4
-  %9 = insertvalue { i64 } undef, i64 %"24_017", 0
-  %10 = insertvalue { i32, { i64 }, {} } { i32 0, { i64 } poison, {} poison }, { i64 } %9, 1
-  store { i32, { i64 }, {} } %10, { i32, { i64 }, {} }* %"25_0", align 4
-  %"25_018" = load { i32, { i64 }, {} }, { i32, { i64 }, {} }* %"25_0", align 4
-  store { i32, { i64 }, {} } %"25_018", { i32, { i64 }, {} }* %"011", align 4
+  %6 = insertvalue { i1, i64 } { i1 false, i64 poison }, i64 %"24_017", 1
+  store { i1, i64 } %6, { i1, i64 }* %"25_0", align 4
+  %"25_018" = load { i1, i64 }, { i1, i64 }* %"25_0", align 4
+  store { i1, i64 } %"25_018", { i1, i64 }* %"011", align 4
   br label %cond_exit_17
 
-cond_17_case_1:                                   ; preds = %6
+cond_17_case_1:                                   ; preds = %4
   %"020" = load i64, i64* %"019", align 4
-  store { i32, { i64 }, {} } { i32 1, { i64 } poison, {} undef }, { i32, { i64 }, {} }* %"29_0", align 4
-  %"29_021" = load { i32, { i64 }, {} }, { i32, { i64 }, {} }* %"29_0", align 4
-  store { i32, { i64 }, {} } %"29_021", { i32, { i64 }, {} }* %"011", align 4
+  store { i1, i64 } { i1 true, i64 poison }, { i1, i64 }* %"29_0", align 4
+  %"29_021" = load { i1, i64 }, { i1, i64 }* %"29_0", align 4
+  store { i1, i64 } %"29_021", { i1, i64 }* %"011", align 4
   store i64 %"020", i64* %"27_0", align 4
   br label %cond_exit_17
 
 cond_exit_17:                                     ; preds = %cond_17_case_1, %cond_17_case_0
-  %"012" = load { i32, { i64 }, {} }, { i32, { i64 }, {} }* %"011", align 4
-  store { i32, { i64 }, {} } %"012", { i32, { i64 }, {} }* %"17_0", align 4
-  %"17_022" = load { i32, { i64 }, {} }, { i32, { i64 }, {} }* %"17_0", align 4
+  %"012" = load { i1, i64 }, { i1, i64 }* %"011", align 4
+  store { i1, i64 } %"012", { i1, i64 }* %"17_0", align 4
+  %"17_022" = load { i1, i64 }, { i1, i64 }* %"17_0", align 4
   %"16_023" = load i64, i64* %"16_0", align 4
-  store { i32, { i64 }, {} } %"17_022", { i32, { i64 }, {} }* %"17_0", align 4
+  store { i1, i64 } %"17_022", { i1, i64 }* %"17_0", align 4
   store i64 %"16_023", i64* %"16_0", align 4
-  %"17_024" = load { i32, { i64 }, {} }, { i32, { i64 }, {} }* %"17_0", align 4
+  %"17_024" = load { i1, i64 }, { i1, i64 }* %"17_0", align 4
   %"16_025" = load i64, i64* %"16_0", align 4
-  %11 = extractvalue { i32, { i64 }, {} } %"17_024", 0
-  switch i32 %11, label %12 [
-    i32 1, label %15
+  %7 = extractvalue { i1, i64 } %"17_024", 0
+  switch i1 %7, label %8 [
+    i1 true, label %10
   ]
 
-12:                                               ; preds = %cond_exit_17
-  %13 = extractvalue { i32, { i64 }, {} } %"17_024", 1
-  %14 = extractvalue { i64 } %13, 0
-  store i64 %14, i64* %"9_0", align 4
+8:                                                ; preds = %cond_exit_17
+  %9 = extractvalue { i1, i64 } %"17_024", 1
+  store i64 %9, i64* %"9_0", align 4
   store i64 %"16_025", i64* %"9_1", align 4
   br label %loop_body
 
-15:                                               ; preds = %cond_exit_17
-  %16 = extractvalue { i32, { i64 }, {} } %"17_024", 2
+10:                                               ; preds = %cond_exit_17
   store i64 %"16_025", i64* %"8_0", align 4
   br label %loop_out
 }

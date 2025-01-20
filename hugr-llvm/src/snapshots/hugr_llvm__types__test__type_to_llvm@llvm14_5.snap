@@ -1,5 +1,5 @@
 ---
-source: src/types.rs
-expression: "[int([BoundedNat { n: 2 }])]"
+source: hugr-llvm/src/types.rs
+expression: "[int(2)]"
 ---
-"{ { i8 } }"
+"i8"

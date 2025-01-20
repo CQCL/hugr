@@ -1,11 +1,11 @@
 ---
-source: src/emit/ops/cfg.rs
-expression: module.to_string()
+source: hugr-llvm/src/emit/ops/cfg.rs
+expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define { i32, {}, {} } @_hl.main.1({ i32, {}, {}, {} } %0, { i32, {}, {} } %1) {
+define i1 @_hl.main.1(i2 %0, i1 %1) {
 alloca_block:
   br label %entry_block
 
@@ -13,83 +13,71 @@ entry_block:                                      ; preds = %alloca_block
   br label %2
 
 2:                                                ; preds = %entry_block
-  br label %10
+  br label %8
 
-3:                                                ; preds = %29
-  switch i32 0, label %4 [
+3:                                                ; preds = %19
+  switch i1 false, label %4 [
   ]
 
 4:                                                ; preds = %3
-  %5 = extractvalue { {} } undef, 0
-  br label %9
+  br label %7
 
-6:                                                ; preds = %31
-  switch i32 0, label %7 [
+5:                                                ; preds = %20
+  switch i1 false, label %6 [
   ]
 
-7:                                                ; preds = %6
-  %8 = extractvalue { {} } undef, 0
-  br label %9
+6:                                                ; preds = %5
+  br label %7
 
-9:                                                ; preds = %7, %4
-  %"03.0" = phi { i32, {}, {} } [ { i32 1, {} poison, {} undef }, %4 ], [ { i32 0, {} undef, {} poison }, %7 ]
-  ret { i32, {}, {} } %"03.0"
+7:                                                ; preds = %6, %4
+  %"03.0" = phi i1 [ true, %4 ], [ false, %6 ]
+  ret i1 %"03.0"
 
-10:                                               ; preds = %2
-  %11 = extractvalue { i32, {}, {}, {} } %0, 0
-  switch i32 %11, label %12 [
-    i32 1, label %14
-    i32 2, label %16
+8:                                                ; preds = %2
+  switch i2 %0, label %9 [
+    i2 1, label %10
+    i2 -2, label %11
   ]
 
-12:                                               ; preds = %10
-  %13 = extractvalue { i32, {}, {}, {} } %0, 1
+9:                                                ; preds = %8
+  br label %12
+
+10:                                               ; preds = %8
+  br label %14
+
+11:                                               ; preds = %8
+  br label %16
+
+12:                                               ; preds = %9
+  switch i1 false, label %13 [
+  ]
+
+13:                                               ; preds = %12
   br label %18
 
 14:                                               ; preds = %10
-  %15 = extractvalue { i32, {}, {}, {} } %0, 2
-  br label %21
+  switch i1 false, label %15 [
+  ]
 
-16:                                               ; preds = %10
-  %17 = extractvalue { i32, {}, {}, {} } %0, 3
-  br label %24
+15:                                               ; preds = %14
+  br label %18
 
-18:                                               ; preds = %12
-  switch i32 0, label %19 [
+16:                                               ; preds = %11
+  switch i1 false, label %17 [
+  ]
+
+17:                                               ; preds = %16
+  br label %18
+
+18:                                               ; preds = %17, %15, %13
+  %"06.0" = phi i1 [ true, %13 ], [ %1, %17 ], [ false, %15 ]
+  switch i1 %"06.0", label %19 [
+    i1 true, label %20
   ]
 
 19:                                               ; preds = %18
-  %20 = extractvalue { {} } undef, 0
-  br label %27
-
-21:                                               ; preds = %14
-  switch i32 0, label %22 [
-  ]
-
-22:                                               ; preds = %21
-  %23 = extractvalue { {} } undef, 0
-  br label %27
-
-24:                                               ; preds = %16
-  switch i32 0, label %25 [
-  ]
-
-25:                                               ; preds = %24
-  %26 = extractvalue { {} } undef, 0
-  br label %27
-
-27:                                               ; preds = %25, %22, %19
-  %"06.0" = phi { i32, {}, {} } [ { i32 1, {} poison, {} undef }, %19 ], [ %1, %25 ], [ { i32 0, {} undef, {} poison }, %22 ]
-  %28 = extractvalue { i32, {}, {} } %"06.0", 0
-  switch i32 %28, label %29 [
-    i32 1, label %31
-  ]
-
-29:                                               ; preds = %27
-  %30 = extractvalue { i32, {}, {} } %"06.0", 1
   br label %3
 
-31:                                               ; preds = %27
-  %32 = extractvalue { i32, {}, {} } %"06.0", 2
-  br label %6
+20:                                               ; preds = %18
+  br label %5
 }

@@ -1,0 +1,7 @@
+---
+source: hugr-llvm/src/sum.rs
+expression: module.to_string()
+---
+define i2 @untag_tag(i2 %0) {
+  ret i2 -2
+}

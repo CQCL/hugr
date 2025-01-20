@@ -47,6 +47,7 @@ pathsearch = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 typetag = { workspace = true, optional = true }
+derive_more = { workspace = true, features = ["debug"] }
 
 [dev-dependencies]
 hugr-llvm = { "path" = ".", features = ["test-utils"] }

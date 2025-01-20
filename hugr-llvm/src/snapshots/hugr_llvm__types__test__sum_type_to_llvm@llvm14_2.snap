@@ -1,5 +1,5 @@
 ---
-source: src/types.rs
-expression: "[⊥, []]+[[]+[], []+[]+[]]"
+source: hugr-llvm/src/types.rs
+expression: "[[]+[]+[]+[], Unit]+[Bool, []+[]+[]]"
 ---
-"{ i32, { {}, { {} } }, { { i32, {}, {} }, { i32, {}, {}, {} } } }"
+"{ i1, i2, i1 }"
