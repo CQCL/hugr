@@ -22,8 +22,6 @@ pub mod std_extensions;
 pub mod types;
 pub mod utils;
 
-use package::Package;
-use std_extensions::STD_REG;
 
 pub use crate::core::{
     CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex, Wire,
@@ -35,10 +33,12 @@ pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};
 pub mod proptest;
 
 #[test]
-#[cfg(feature="model_unstable")]
+#[cfg(feature = "model_unstable")]
 fn bounds() {
     use export::export_hugr;
     use import::import_hugr;
+    use crate::package::Package;
+    use crate::std_extensions::STD_REG;
 
     let json = include_str!("../../hugr.json");
     let package: Package = serde_json::from_str(json.trim()).unwrap();

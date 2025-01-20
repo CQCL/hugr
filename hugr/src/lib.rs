@@ -127,8 +127,6 @@
 //! println!("{}", serialized);
 //! ```
 
-use hugr_core::package::Package;
-use hugr_core::std_extensions::STD_REG;
 // These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
 // The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate.
 pub use hugr_core::{builder, core, extension, ops, package, std_extensions, types, utils};
