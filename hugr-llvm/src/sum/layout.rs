@@ -136,11 +136,14 @@ fn layout_fields<T: Ord + Clone + fmt::Debug>(
 
     #[cfg(debug_assertions)]
     {
-        assert_eq!(t_to_range.first_key_value().unwrap().1.start, 0);
-        assert_eq!(
-            t_to_range.last_key_value().unwrap().1.end,
-            sorted_fields.len()
-        );
+        if !t_to_range.is_empty() {
+            assert_eq!(t_to_range.first_key_value().unwrap().1.start, 0);
+            assert_eq!(
+                t_to_range.last_key_value().unwrap().1.end,
+                sorted_fields.len()
+            );
+        }
+
         for (t, range) in &t_to_range {
             assert!(range.clone().all(|i| &sorted_fields[i] == t));
         }
