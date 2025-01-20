@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.2...hugr-core-v0.15.0) - 2025-01-20
+
+### Documentation
+
+- Explain why `ConstF64` is not PartialEq (#1829)
+
 ## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.1...hugr-core-v0.14.2) - 2025-01-20
 
 ### Bug Fixes
