@@ -15,6 +15,7 @@ use std::mem;
 
 use itertools::Itertools;
 use portgraph::algorithms::ConvexChecker;
+use portgraph::boundary::Boundary;
 use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
@@ -179,14 +180,8 @@ impl SiblingSubgraph {
     ) -> Result<Self, InvalidSubgraph> {
         let pg = hugr.portgraph();
 
-        let to_pg = |(n, p): (Node, Port)| {
-            pg.port_index(n.pg_index(), p.pg_offset())
-                .expect("invalid port")
-        };
-
         // Ordering of the edges here is preserved and becomes ordering of the signature.
-        let subpg =
-            Subgraph::new_subgraph(pg.clone(), combine_in_out(&inputs, &outputs).map(to_pg));
+        let subpg = Subgraph::new_subgraph(pg.clone(), make_boundary(hugr, &inputs, &outputs));
         let nodes = subpg.nodes_iter().map_into().collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 
@@ -414,7 +409,7 @@ impl SiblingSubgraph {
                 .is_some_and(|s| s.port_type(p).is_some())
         });
 
-        if combine_in_out(&vec![out_order_ports], &in_order_ports)
+        if iter_io(&vec![out_order_ports], &in_order_ports)
             .any(|(n, p)| is_order_edge(&replacement, n, p))
         {
             unimplemented!("Found state order edges in replacement graph");
@@ -485,15 +480,40 @@ impl SiblingSubgraph {
     }
 }
 
-fn combine_in_out<'a>(
+/// Returns an iterator over the input ports.
+fn iter_incoming(inputs: &IncomingPorts) -> impl Iterator<Item = (Node, IncomingPort)> + '_ {
+    inputs.iter().flat_map(|part| part.iter().copied())
+}
+
+/// Returns an iterator over the output ports.
+fn iter_outgoing(outputs: &OutgoingPorts) -> impl Iterator<Item = (Node, OutgoingPort)> + '_ {
+    outputs.iter().copied()
+}
+
+/// Returns an iterator over both incoming and outgoing ports.
+fn iter_io<'a>(
     inputs: &'a IncomingPorts,
     outputs: &'a OutgoingPorts,
 ) -> impl Iterator<Item = (Node, Port)> + 'a {
-    inputs
-        .iter()
-        .flatten()
-        .map(|(n, p)| (*n, (*p).into()))
-        .chain(outputs.iter().map(|(n, p)| (*n, (*p).into())))
+    iter_incoming(inputs)
+        .map(|(n, p)| (n, Port::from(p)))
+        .chain(iter_outgoing(outputs).map(|(n, p)| (n, Port::from(p))))
+}
+
+fn make_boundary<'a>(
+    hugr: &impl HugrView,
+    inputs: &'a IncomingPorts,
+    outputs: &'a OutgoingPorts,
+) -> Boundary {
+    let to_pg_index = |n: Node, p: Port| {
+        hugr.portgraph()
+            .port_index(n.pg_index(), p.pg_offset())
+            .unwrap()
+    };
+    Boundary::new(
+        iter_incoming(inputs).map(|(n, p)| to_pg_index(n, p.into())),
+        iter_outgoing(outputs).map(|(n, p)| to_pg_index(n, p.into())),
+    )
 }
 
 /// Precompute convexity information for a HUGR.
@@ -591,11 +611,11 @@ fn validate_subgraph<H: HugrView>(
     }
 
     // Check there are no linked "other" ports
-    if combine_in_out(inputs, outputs).any(|(n, p)| is_order_edge(hugr, n, p)) {
+    if iter_io(inputs, outputs).any(|(n, p)| is_order_edge(hugr, n, p)) {
         unimplemented!("Connected order edges not supported at the boundary")
     }
 
-    let boundary_ports = combine_in_out(inputs, outputs).collect_vec();
+    let boundary_ports = iter_io(inputs, outputs).collect_vec();
     // Check that the boundary ports are all in the subgraph.
     if let Some(&(n, p)) = boundary_ports.iter().find(|(n, _)| !node_set.contains(n)) {
         Err(InvalidSubgraphBoundary::PortNodeNotInSet(n, p))?;
