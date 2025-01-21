@@ -64,6 +64,9 @@ impl std::ops::Deref for ConstF64 {
 }
 
 impl ConstF64 {
+    /// Name of the constructor for creating constant 64bit floats.
+    pub(crate) const CTR_NAME: &'static str = "arithmetic.float.const-f64";
+
     /// Create a new [`ConstF64`]
     pub fn new(value: f64) -> Self {
         // This function can't be `const` because `is_finite()` is not yet stable as a const function.

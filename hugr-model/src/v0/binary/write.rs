@@ -224,6 +224,8 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::Meta => {
             builder.set_meta(());
         }
+        model::Term::Float { value } => builder.set_float(value.into_inner()),
+        model::Term::FloatType => builder.set_float_type(()),
     }
 }
 
