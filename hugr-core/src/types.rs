@@ -256,6 +256,15 @@ impl SumType {
             _ => None,
         }
     }
+
+    /// Convert the SumType into its constituent rows (one per variant)
+    pub fn into_rows(self) -> impl Iterator<Item = TypeRowRV> {
+        match self {
+            SumType::Unit { size } => vec![TypeRowRV::new(); size as usize],
+            SumType::General { rows } => rows,
+        }
+        .into_iter()
+    }
 }
 
 impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {

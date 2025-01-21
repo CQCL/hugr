@@ -10,7 +10,7 @@ from hugr.build.function import Module
 from hugr.hugr import Hugr
 from hugr.hugr.node_port import Node, _SubPort
 from hugr.ops import NoConcreteFunc
-from hugr.std.int import INT_T, DivMod, IntVal
+from hugr.std.int import INT_T, DivMod, IAdd, ILtU, IntVal, ISub
 from hugr.std.logic import Not
 
 from .conftest import validate
@@ -295,6 +295,31 @@ def test_invalid_recursive_function() -> None:
 
     with pytest.raises(ValueError, match="The function has fixed output type"):
         f_recursive.set_outputs(f_recursive.input_node[0])
+
+
+def test_recursive_fibonacci() -> None:
+    mod = Module()
+
+    fib = mod.define_function("fibonacci", [INT_T], [INT_T])
+    one = fib.load(IntVal(1))
+    two = fib.load(IntVal(2))
+    pred = fib.add_op(ILtU, fib.input_node[0], two)
+    cond = fib.add_conditional(pred)
+    with cond.add_case(0) as f:
+        r1 = f.call(fib, f.add_op(ISub, fib.input_node[0], one))
+        r2 = f.call(fib, f.add_op(ISub, fib.input_node[0], two))
+        f.set_outputs(f.add_op(IAdd, r1, r2))
+    with cond.add_case(1) as t:
+        t.set_outputs(t.load(IntVal(1)))
+    fib.set_outputs(*cond.outputs())
+
+    main = mod.define_function("main", [], [INT_T])
+    main.set_outputs(main.call(fib, main.load(IntVal(5))))
+
+    validate(mod.hugr)
+
+    with open("/Users/alanlawrence/fibonacci_hugr.json", "w") as f:
+        f.write(mod.hugr.to_json())
 
 
 def test_higher_order() -> None:

@@ -61,7 +61,7 @@ pub struct Replacement {
     /// and there would be no possible [Self::mu_inp], [Self::mu_out] or [Self::adoptions].
     pub removal: Vec<Node>,
     /// A hugr (not necessarily valid, as it may be missing edges and/or nodes), whose root
-    /// is the same type as the root of [Self::replacement].  "G" in the spec.
+    /// is the same type as the common parent of all the nodes in [Self::removal].  "G" in the spec.
     pub replacement: Hugr,
     /// Describes how parts of the Hugr that would otherwise be removed should instead be preserved but
     /// with new parents amongst the newly-inserted nodes.  This is a Map from container nodes in
