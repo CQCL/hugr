@@ -22,7 +22,7 @@ use crate::{
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
-        TypeEnum, TypeRow,
+        TypeEnum, TypeName, TypeRow,
     },
     Direction, Hugr, HugrView, Node, Port,
 };
@@ -55,6 +55,14 @@ pub enum ImportError {
         missing_ext: ExtensionId,
         /// The available extensions in the registry.
         available: Vec<ExtensionId>,
+    },
+    /// An extension type is missing.
+    #[error("Importing the hugr requires extension {ext} to have a type named {name}, but it was not found.")]
+    ExtensionType {
+        /// The extension that is missing the type.
+        ext: ExtensionId,
+        /// The name of the missing type.
+        name: TypeName,
     },
     /// The model is not well-formed.
     #[error("validate error: {0}")]
@@ -1096,13 +1104,21 @@ impl<'a> Context<'a> {
                             available: self.extensions.ids().cloned().collect(),
                         })?;
 
+                let ext_type =
+                    extension_ref
+                        .get_type(&id)
+                        .ok_or_else(|| ImportError::ExtensionType {
+                            ext: extension.clone(),
+                            name: id.clone(),
+                        })?;
+
+                let bound = ext_type.bound(&args);
+
                 Ok(TypeBase::new_extension(CustomType::new(
                     id,
                     args,
                     extension,
-                    // As part of the migration from `TypeBound`s to constraints, we pretend that all
-                    // `TypeBound`s are copyable.
-                    TypeBound::Copyable,
+                    bound,
                     &Arc::downgrade(extension_ref),
                 )))
             }
