@@ -3,8 +3,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, LinkIndex, ListPart, ModelError, Module, NodeId, Operation, Param, ParamSort,
-    RegionId, RegionKind, Term, TermId, VarId,
+    ExtSetPart, LinkIndex, ListPart, ModelError, Module, NodeId, Operation, Param, RegionId,
+    RegionKind, Term, TermId, VarId,
 };
 
 type PrintError = ModelError;
@@ -268,26 +268,6 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_regions(node_data.regions)
             }
 
-            Operation::CustomFull { operation } => {
-                this.print_group(|this| {
-                    this.print_parens(|this| {
-                        this.print_text("@");
-                        this.print_symbol(*operation)?;
-
-                        for param in node_data.params {
-                            this.print_term(*param)?;
-                        }
-
-                        Ok(())
-                    })?;
-
-                    this.print_port_lists(node_data.inputs, node_data.outputs)
-                })?;
-                this.print_signature(node_data.signature)?;
-                this.print_meta(node_data.meta)?;
-                this.print_regions(node_data.regions)
-            }
-
             Operation::DefineAlias { decl, value } => this.with_local_scope(decl.params, |this| {
                 this.print_group(|this| {
                     this.print_text("define-alias");
@@ -460,11 +440,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
     fn print_param(&mut self, param: Param<'a>) -> PrintResult<()> {
         self.print_parens(|this| {
-            match param.sort {
-                ParamSort::Implicit => this.print_text("forall"),
-                ParamSort::Explicit => this.print_text("param"),
-            };
-
+            this.print_text("param");
             this.print_text(format!("?{}", param.name));
             this.print_term(param.r#type)
         })
@@ -520,15 +496,6 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }
-            Term::ApplyFull { symbol, args } => self.print_parens(|this| {
-                this.print_text("@");
-                this.print_symbol(*symbol)?;
-                for arg in args.iter() {
-                    this.print_term(*arg)?;
-                }
-
-                Ok(())
-            }),
             Term::Const { r#type, extensions } => self.print_parens(|this| {
                 this.print_text("const");
                 this.print_term(*r#type)?;

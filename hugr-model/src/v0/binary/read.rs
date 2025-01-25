@@ -183,9 +183,6 @@ fn read_operation<'a>(
         Which::Custom(operation) => model::Operation::Custom {
             operation: model::NodeId(operation),
         },
-        Which::CustomFull(operation) => model::Operation::CustomFull {
-            operation: model::NodeId(operation),
-        },
         Which::Tag(tag) => model::Operation::Tag { tag },
         Which::TailLoop(()) => model::Operation::TailLoop,
         Which::Conditional(()) => model::Operation::Conditional,
@@ -269,13 +266,6 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
             model::Term::Apply { symbol, args }
-        }
-
-        Which::ApplyFull(reader) => {
-            let reader = reader?;
-            let symbol = model::NodeId(reader.get_symbol());
-            let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::ApplyFull { symbol, args }
         }
 
         Which::Const(reader) => {
@@ -377,11 +367,5 @@ fn read_param<'a>(
 ) -> ReadResult<model::Param<'a>> {
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
     let r#type = model::TermId(reader.get_type());
-
-    let sort = match reader.get_sort()? {
-        hugr_capnp::ParamSort::Implicit => model::ParamSort::Implicit,
-        hugr_capnp::ParamSort::Explicit => model::ParamSort::Explicit,
-    };
-
-    Ok(model::Param { name, r#type, sort })
+    Ok(model::Param { name, r#type })
 }

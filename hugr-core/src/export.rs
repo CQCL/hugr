@@ -388,7 +388,7 @@ impl<'a> Context<'a> {
                 args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { symbol, args });
+                let func = self.make_term(model::Term::Apply { symbol, args });
                 model::Operation::CallFunc { func }
             }
 
@@ -401,7 +401,7 @@ impl<'a> Context<'a> {
                 args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { symbol, args });
+                let func = self.make_term(model::Term::Apply { symbol, args });
                 model::Operation::LoadFunc { func }
             }
 
@@ -424,7 +424,7 @@ impl<'a> Context<'a> {
                 model::Operation::Const { value }
             }
 
-            OpType::CallIndirect(_) => model::Operation::CustomFull {
+            OpType::CallIndirect(_) => model::Operation::Custom {
                 operation: self.resolve_symbol(OP_FUNC_CALL_INDIRECT),
             },
 
@@ -455,7 +455,7 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                model::Operation::CustomFull { operation }
+                model::Operation::Custom { operation }
             }
 
             OpType::OpaqueOp(op) => {
@@ -465,7 +465,7 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                model::Operation::CustomFull { operation }
+                model::Operation::Custom { operation }
             }
         };
 
@@ -809,11 +809,7 @@ impl<'a> Context<'a> {
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
             let r#type = self.export_type_param(param, Some((scope, i as _)));
-            let param = model::Param {
-                name,
-                r#type,
-                sort: model::ParamSort::Implicit,
-            };
+            let param = model::Param { name, r#type };
             params.push(param)
         }
 
@@ -833,7 +829,7 @@ impl<'a> Context<'a> {
             TypeEnum::Alias(alias) => {
                 let global = self.resolve_symbol(self.bump.alloc_str(alias.name()));
                 let args = &[];
-                self.make_term(model::Term::ApplyFull {
+                self.make_term(model::Term::Apply {
                     symbol: global,
                     args,
                 })
@@ -865,7 +861,7 @@ impl<'a> Context<'a> {
         let args = self
             .bump
             .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_type_arg(p)));
-        let term = model::Term::ApplyFull { symbol, args };
+        let term = model::Term::Apply { symbol, args };
         self.make_term(term)
     }
 
@@ -986,7 +982,7 @@ impl<'a> Context<'a> {
                 );
                 let types = self.make_term(model::Term::List { parts });
                 let symbol = self.resolve_symbol(TERM_PARAM_TUPLE);
-                self.make_term(model::Term::ApplyFull {
+                self.make_term(model::Term::Apply {
                     symbol,
                     args: self.bump.alloc_slice_copy(&[types]),
                 })
@@ -1041,7 +1037,7 @@ impl<'a> Context<'a> {
 
                     let symbol = self.resolve_symbol(ArrayValue::CTR_NAME);
                     let args = self.bump.alloc_slice_copy(&[len, element_type, contents]);
-                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                    return self.make_term(model::Term::Apply { symbol, args });
                 }
 
                 if let Some(v) = e.value().downcast_ref::<ConstInt>() {
@@ -1050,7 +1046,7 @@ impl<'a> Context<'a> {
 
                     let symbol = self.resolve_symbol(ConstInt::CTR_NAME);
                     let args = self.bump.alloc_slice_copy(&[bitwidth, literal]);
-                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                    return self.make_term(model::Term::Apply { symbol, args });
                 }
 
                 if let Some(v) = e.value().downcast_ref::<ConstF64>() {
@@ -1059,7 +1055,7 @@ impl<'a> Context<'a> {
                     });
                     let symbol = self.resolve_symbol(ConstF64::CTR_NAME);
                     let args = self.bump.alloc_slice_copy(&[literal]);
-                    return self.make_term(model::Term::ApplyFull { symbol, args });
+                    return self.make_term(model::Term::Apply { symbol, args });
                 }
 
                 let json = match e.value().downcast_ref::<CustomSerialized>() {
@@ -1075,7 +1071,7 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_copy(&[runtime_type, json, extensions]);
                 let symbol = self.resolve_symbol(model::COMPAT_CONST_JSON);
-                self.make_term(model::Term::ApplyFull { symbol, args })
+                self.make_term(model::Term::Apply { symbol, args })
             }
 
             Value::Function { hugr } => {
@@ -1147,7 +1143,7 @@ impl<'a> Context<'a> {
     fn make_term_apply(&mut self, name: &'a str, args: &[model::TermId]) -> model::TermId {
         let symbol = self.resolve_symbol(name);
         let args = self.bump.alloc_slice_copy(args);
-        self.make_term(model::Term::ApplyFull { symbol, args })
+        self.make_term(model::Term::Apply { symbol, args })
     }
 }
 

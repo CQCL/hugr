@@ -57,7 +57,7 @@ node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ reg
 node_tag               = { "(" ~ "tag" ~ tag ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_import            = { "(" ~ "import" ~ symbol ~ meta* ~ ")" }
 node_const             = { "(" ~ "const" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
-node_custom            = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_custom            = { "(" ~ term_apply ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
 signature        = { "(" ~ "signature" ~ term ~ ")" }
 func_header      = { symbol ~ param* ~ where_clause* ~ term ~ term ~ term }
@@ -65,11 +65,8 @@ alias_header     = { symbol ~ param* ~ term }
 ctr_header       = { symbol ~ param* ~ where_clause* ~ term }
 operation_header = { symbol ~ param* ~ where_clause* ~ term }
 
-param = { param_implicit | param_explicit }
-
-param_implicit = { "(" ~ "forall" ~ term_var ~ term ~ ")" }
-param_explicit = { "(" ~ "param" ~ term_var ~ term ~ ")" }
-where_clause   = { "(" ~ "where" ~ term ~ ")" }
+param        = { "(" ~ "param" ~ term_var ~ term ~ ")" }
+where_clause = { "(" ~ "where" ~ term ~ ")" }
 
 region     = { region_dfg | region_cfg }
 region_dfg = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ node* ~ ")" }
@@ -95,7 +92,6 @@ term = {
   | term_func_type
   | term_ctrl
   | term_ctrl_type
-  | term_apply_full
   | term_apply
   | term_non_linear
   | term_const_func
@@ -112,7 +108,6 @@ term_type         =  { "type" }
 term_static       =  { "static" }
 term_constraint   =  { "constraint" }
 term_var          =  { "?" ~ identifier }
-term_apply_full   =  { ("(" ~ "@" ~ symbol ~ term* ~ ")") }
 term_apply        =  { symbol | ("(" ~ symbol ~ term* ~ ")") }
 term_const        =  { "(" ~ "const" ~ term ~ term ~ ")" }
 term_list         =  { "[" ~ (spliced_term | term)* ~ "]" }

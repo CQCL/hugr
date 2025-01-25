@@ -325,21 +325,7 @@ pub enum Operation<'a> {
         func: TermId,
     },
     /// Custom operation.
-    ///
-    /// The node's parameters correspond to the explicit parameter of the custom operation,
-    /// leaving out the implicit parameters. Once the declaration of the custom operation
-    /// becomes known by resolving the reference, the node can be transformed into a [`Operation::CustomFull`]
-    /// by inferring terms for the implicit parameters or at least filling them in with a wildcard term.
     Custom {
-        /// The symbol of the custom operation.
-        operation: NodeId,
-    },
-    /// Custom operation with full parameters.
-    ///
-    /// The node's parameters correspond to both the explicit and implicit parameters of the custom operation.
-    /// Since this can be tedious to write, the [`Operation::Custom`] variant can be used to indicate that
-    /// the implicit parameters should be inferred.
-    CustomFull {
         /// The symbol of the custom operation.
         operation: NodeId,
     },
@@ -561,28 +547,11 @@ pub enum Term<'a> {
 
     /// A symbolic function application.
     ///
-    /// The arguments of this application cover only the explicit parameters of the referenced declaration,
-    /// leaving out the implicit parameters. Once the type of the declaration is known, the implicit parameters
-    /// can be inferred and the term replaced with [`Term::ApplyFull`].
-    ///
     /// `(GLOBAL ARG-0 ... ARG-n)`
     Apply {
         /// Reference to the symbol to apply.
         symbol: NodeId,
-        /// Arguments to the function, covering only the explicit parameters.
-        args: &'a [TermId],
-    },
-
-    /// A symbolic function application with all arguments applied.
-    ///
-    /// The arguments to this application cover both the implicit and explicit parameters of the referenced declaration.
-    /// Since this can be tedious to write out, only the explicit parameters can be provided via [`Term::Apply`].
-    ///
-    /// `(@GLOBAL ARG-0 ... ARG-n)`
-    ApplyFull {
-        /// Reference to the symbol to apply.
-        symbol: NodeId,
-        /// Arguments to the function, covering both implicit and explicit parameters.
+        /// Arguments to the function.
         args: &'a [TermId],
     },
 
@@ -751,25 +720,12 @@ pub enum ExtSetPart<'a> {
 /// A parameter to a function or alias.
 ///
 /// Parameter names must be unique within a parameter list.
-/// Implicit and explicit parameters share a namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Param<'a> {
     /// The name of the parameter.
     pub name: &'a str,
     /// The type of the parameter.
     pub r#type: TermId,
-    /// The sort of the parameter (implicit or explicit).
-    pub sort: ParamSort,
-}
-
-/// The sort of a parameter (implicit or explicit).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ParamSort {
-    /// The parameter is implicit and should be inferred, unless a full application form is used
-    /// (see [`Term::ApplyFull`] and [`Operation::CustomFull`]).
-    Implicit,
-    /// The parameter is explicit and should always be provided.
-    Explicit,
 }
 
 /// Errors that can occur when traversing and interpreting the model.

@@ -1,13 +1,12 @@
 (hugr 0)
 
 (define-func example.add
-  [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)]
-  [(@ arithmetic.int.types.int)]
+  [arithmetic.int.types.int arithmetic.int.types.int]
+  [arithmetic.int.types.int]
   (ext)
   (dfg
     [%0 %1]
     [%2]
-    (signature (-> [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))
-    ((@ arithmetic.int.iadd) [%0 %1] [%2]
-      (signature (-> [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))
-      )))
+    (signature (-> [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
+    (arithmetic.int.iadd [%0 %1] [%2]
+      (signature (-> [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int] (ext))))))

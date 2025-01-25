@@ -2,8 +2,8 @@
 
 (define-func example.swap
   ; The types of the values to be swapped are passed as implicit parameters.
-  (forall ?a type)
-  (forall ?b type)
+  (param ?a type)
+  (param ?b type)
   [?a ?b] [?b ?a] (ext)
   (dfg [%a %b] [%b %a]
     (signature (-> [?a ?b] [?b ?a] (ext)))))

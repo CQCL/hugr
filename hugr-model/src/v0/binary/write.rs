@@ -48,9 +48,6 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
         model::Operation::Conditional => builder.set_conditional(()),
         model::Operation::Tag { tag } => builder.set_tag(*tag),
         model::Operation::Custom { operation } => builder.set_custom(operation.0),
-        model::Operation::CustomFull { operation } => {
-            builder.set_custom_full(operation.0);
-        }
         model::Operation::CallFunc { func } => builder.set_call_func(func.0),
         model::Operation::LoadFunc { func } => builder.set_load_func(func.0),
 
@@ -111,10 +108,6 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
 fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
     builder.set_name(param.name);
     builder.set_type(param.r#type.0);
-    builder.set_sort(match param.sort {
-        model::ParamSort::Implicit => hugr_capnp::ParamSort::Implicit,
-        model::ParamSort::Explicit => hugr_capnp::ParamSort::Explicit,
-    });
 }
 
 fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region) {
@@ -168,12 +161,6 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
 
         model::Term::Apply { symbol, args } => {
             let mut builder = builder.init_apply();
-            builder.set_symbol(symbol.0);
-            let _ = builder.set_args(model::TermId::unwrap_slice(args));
-        }
-
-        model::Term::ApplyFull { symbol, args } => {
-            let mut builder = builder.init_apply_full();
             builder.set_symbol(symbol.0);
             let _ = builder.set_args(model::TermId::unwrap_slice(args));
         }

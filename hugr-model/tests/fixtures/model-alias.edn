@@ -2,6 +2,6 @@
 
 (declare-alias local.float type)
 
-(define-alias local.int type (@ arithmetic.int.types.int))
+(define-alias local.int type arithmetic.int.types.int)
 
 (define-alias local.endo type (-> [] [] (ext)))

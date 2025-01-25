@@ -374,7 +374,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::CallFunc { func } => {
-                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
+                let model::Term::Apply { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
@@ -393,7 +393,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::LoadFunc { func } => {
-                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
+                let model::Term::Apply { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
@@ -421,7 +421,7 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::CustomFull { operation } => {
+            model::Operation::Custom { operation } => {
                 let name = self.get_symbol_name(operation)?;
 
                 if name == OP_FUNC_CALL_INDIRECT {
@@ -457,10 +457,6 @@ impl<'a> Context<'a> {
 
                 Ok(Some(node))
             }
-
-            model::Operation::Custom { .. } => Err(error_unsupported!(
-                "custom operation with implicit parameters"
-            )),
 
             model::Operation::DefineAlias { decl, value } => {
                 if !decl.params.is_empty() {
@@ -932,7 +928,6 @@ impl<'a> Context<'a> {
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeParam`")),
             model::Term::Var { .. } => Err(error_unsupported!("type variable as `TypeParam`")),
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
-            model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::BytesType { .. } => Err(error_unsupported!("`bytes` as `TypeParam`")),
             model::Term::FloatType { .. } => Err(error_unsupported!("`float` as `TypeParam`")),
             model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
@@ -973,9 +968,6 @@ impl<'a> Context<'a> {
     fn import_type_arg(&mut self, term_id: model::TermId) -> Result<TypeArg, ImportError> {
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
-            model::Term::Apply { .. } => {
-                Err(error_uninferred!("application with implicit parameters"))
-            }
 
             model::Term::Var(var) => {
                 let var_info = self
@@ -1023,9 +1015,7 @@ impl<'a> Context<'a> {
                 Err(error_unsupported!("function constant as `TypeArg`"))
             }
 
-            model::Term::FuncType { .. }
-            | model::Term::Adt { .. }
-            | model::Term::ApplyFull { .. } => {
+            model::Term::FuncType { .. } | model::Term::Adt { .. } | model::Term::Apply { .. } => {
                 let ty = self.import_type(term_id)?;
                 Ok(TypeArg::Type { ty })
             }
@@ -1083,11 +1073,8 @@ impl<'a> Context<'a> {
     ) -> Result<TypeBase<RV>, ImportError> {
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
-            model::Term::Apply { .. } => {
-                Err(error_uninferred!("application with implicit parameters"))
-            }
 
-            model::Term::ApplyFull { symbol, args } => {
+            model::Term::Apply { symbol, args } => {
                 let args = args
                     .iter()
                     .map(|arg| self.import_type_arg(*arg))
@@ -1303,15 +1290,12 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: model::TermId,
     ) -> Result<(&'a str, serde_json::Value), ImportError> {
-        let (global, args) = match self.get_term(term_id)? {
-            model::Term::Apply { symbol, args } | model::Term::ApplyFull { symbol, args } => {
-                (symbol, args)
-            }
-            _ => return Err(model::ModelError::TypeError(term_id).into()),
+        let model::Term::Apply { symbol, args } = self.get_term(term_id)? else {
+            return Err(model::ModelError::TypeError(term_id).into());
         };
 
-        let global = self.get_symbol_name(*global)?;
-        if global != model::COMPAT_META_JSON {
+        let symbol = self.get_symbol_name(*symbol)?;
+        if symbol != model::COMPAT_META_JSON {
             return Err(model::ModelError::TypeError(term_id).into());
         }
 
@@ -1342,12 +1326,9 @@ impl<'a> Context<'a> {
 
         match term_data {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
-            model::Term::Apply { .. } => {
-                Err(error_uninferred!("application with implicit parameters"))
-            }
             model::Term::Var(_) => Err(error_unsupported!("constant value containing a variable")),
 
-            model::Term::ApplyFull { symbol, args } => {
+            model::Term::Apply { symbol, args } => {
                 let symbol_name = self.get_symbol_name(*symbol)?;
 
                 if symbol_name == model::COMPAT_CONST_JSON {

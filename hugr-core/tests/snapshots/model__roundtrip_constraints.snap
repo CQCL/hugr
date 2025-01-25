@@ -7,21 +7,21 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 (import collections.array.array)
 
 (declare-func array.replicate
-  (forall ?0 nat)
-  (forall ?1 type)
+  (param ?0 nat)
+  (param ?1 type)
   (where (nonlinear ?1))
-  [?1] [(@ collections.array.array ?0 ?1)] (ext))
+  [?1] [(collections.array.array ?0 ?1)] (ext))
 
 (declare-func array.copy
-  (forall ?0 nat)
-  (forall ?1 type)
+  (param ?0 nat)
+  (param ?1 type)
   (where (nonlinear ?1))
-  [(@ collections.array.array ?0 ?1)]
-  [(@ collections.array.array ?0 ?1) (@ collections.array.array ?0 ?1)]
+  [(collections.array.array ?0 ?1)]
+  [(collections.array.array ?0 ?1) (collections.array.array ?0 ?1)]
   (ext))
 
 (define-func util.copy
-  (forall ?0 type)
+  (param ?0 type)
   (where (nonlinear ?0))
   [?0] [?0 ?0] (ext)
   (dfg [%0] [%0 %0] (signature (-> [?0] [?0 ?0] (ext)))))

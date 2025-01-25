@@ -1,7 +1,7 @@
 (hugr 0)
 
 (define-func example.cfg
-  (forall ?a type)
+  (param ?a type)
   [?a] [?a] (ext)
   (dfg [%0] [%1]
     (signature (-> [?a] [?a] (ext)))

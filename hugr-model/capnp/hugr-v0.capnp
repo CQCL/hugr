@@ -46,16 +46,15 @@ struct Operation {
         aliasDefn @6 :AliasDefn;
         aliasDecl @7 :AliasDecl;
         custom @8 :NodeId;
-        customFull @9 :NodeId;
-        tag @10 :UInt16;
-        tailLoop @11 :Void;
-        conditional @12 :Void;
-        callFunc @13 :TermId;
-        loadFunc @14 :TermId;
-        constructorDecl @15 :ConstructorDecl;
-        operationDecl @16 :OperationDecl;
-        import @17 :Text;
-        const @18 :TermId;
+        tag @9 :UInt16;
+        tailLoop @10 :Void;
+        conditional @11 :Void;
+        callFunc @12 :TermId;
+        loadFunc @13 :TermId;
+        constructorDecl @14 :ConstructorDecl;
+        operationDecl @15 :OperationDecl;
+        import @16 :Text;
+        const @17 :TermId;
     }
 
     struct FuncDefn {
@@ -132,31 +131,30 @@ struct Term {
         constraint @3 :Void;
         variable :group {
             variableNode @4 :NodeId;
-            variableIndex @21 :UInt16;
+            variableIndex @20 :UInt16;
         }
         apply @5 :Apply;
-        applyFull @6 :ApplyFull;
-        const @7 :Const;
-        list @8 :ListTerm;
-        listType @9 :TermId;
-        string @10 :Text;
-        stringType @11 :Void;
-        nat @12 :UInt64;
-        natType @13 :Void;
-        extSet @14 :ExtSet;
-        extSetType @15 :Void;
-        adt @16 :TermId;
-        funcType @17 :FuncType;
-        control @18 :TermId;
-        controlType @19 :Void;
-        nonLinearConstraint @20 :TermId;
-        constFunc @22 :RegionId;
-        constAdt @23 :ConstAdt;
-        bytes @24 :Data;
-        bytesType @25 :Void;
-        meta @26 :Void;
-        float @27 :Float64;
-        floatType @28 :Void;
+        const @6 :Const;
+        list @7 :ListTerm;
+        listType @8 :TermId;
+        string @9 :Text;
+        stringType @10 :Void;
+        nat @11 :UInt64;
+        natType @12 :Void;
+        extSet @13 :ExtSet;
+        extSetType @14 :Void;
+        adt @15 :TermId;
+        funcType @16 :FuncType;
+        control @17 :TermId;
+        controlType @18 :Void;
+        nonLinearConstraint @19 :TermId;
+        constFunc @21 :RegionId;
+        constAdt @22 :ConstAdt;
+        bytes @23 :Data;
+        bytesType @24 :Void;
+        meta @25 :Void;
+        float @26 :Float64;
+        floatType @27 :Void;
     }
 
     struct Apply {
@@ -211,10 +209,4 @@ struct Term {
 struct Param {
     name @0 :Text;
     type @1 :TermId;
-    sort @2 :ParamSort;
-}
-
-enum ParamSort {
-    implicit @0;
-    explicit @1;
 }

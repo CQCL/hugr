@@ -10,8 +10,8 @@ use thiserror::Error;
 use crate::v0::{
     scope::{LinkTable, SymbolTable, UnknownSymbolError, VarTable},
     AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, Module, Node, NodeId,
-    Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
-    ScopeClosure, Term, TermId,
+    Operation, OperationDecl, Param, Region, RegionId, RegionKind, RegionScope, ScopeClosure, Term,
+    TermId,
 };
 
 mod pest_parser {
@@ -149,20 +149,6 @@ impl<'a> ParseContext<'a> {
                     }
 
                     Term::Apply {
-                        symbol,
-                        args: self.bump.alloc_slice_copy(&args),
-                    }
-                }
-
-                Rule::term_apply_full => {
-                    let symbol = self.parse_symbol_use(&mut inner)?;
-                    let mut args = Vec::new();
-
-                    for token in inner {
-                        args.push(self.parse_term(token)?);
-                    }
-
-                    Term::ApplyFull {
                         symbol,
                         args: self.bump.alloc_slice_copy(&args),
                     }
@@ -501,11 +487,7 @@ impl<'a> ParseContext<'a> {
 
             Rule::node_custom => {
                 let op = inner.next().unwrap();
-                debug_assert!(matches!(
-                    op.as_rule(),
-                    Rule::term_apply | Rule::term_apply_full
-                ));
-                let op_rule = op.as_rule();
+                debug_assert!(matches!(op.as_rule(), Rule::term_apply));
                 let mut op_inner = op.into_inner();
 
                 let operation = self.parse_symbol_use(&mut op_inner)?;
@@ -516,12 +498,7 @@ impl<'a> ParseContext<'a> {
                     params.push(self.parse_term(token)?);
                 }
 
-                let operation = match op_rule {
-                    Rule::term_apply_full => Operation::CustomFull { operation },
-                    Rule::term_apply => Operation::Custom { operation },
-                    _ => unreachable!(),
-                };
-
+                let operation = Operation::Custom { operation };
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
                 let signature = self.parse_signature(&mut inner)?;
@@ -809,32 +786,11 @@ impl<'a> ParseContext<'a> {
         let mut params = Vec::new();
 
         for pair in filter_rule(pairs, Rule::param) {
-            let param = pair.into_inner().next().unwrap();
-            let param_span = param.as_span();
-
-            let param = match param.as_rule() {
-                Rule::param_implicit => {
-                    let mut inner = param.into_inner();
-                    let name = &inner.next().unwrap().as_str()[1..];
-                    let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param {
-                        name,
-                        r#type,
-                        sort: ParamSort::Implicit,
-                    }
-                }
-                Rule::param_explicit => {
-                    let mut inner = param.into_inner();
-                    let name = &inner.next().unwrap().as_str()[1..];
-                    let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param {
-                        name,
-                        r#type,
-                        sort: ParamSort::Explicit,
-                    }
-                }
-                _ => unreachable!(),
-            };
+            let param_span = pair.as_span();
+            let mut inner = pair.into_inner();
+            let name = &inner.next().unwrap().as_str()[1..];
+            let r#type = self.parse_term(inner.next().unwrap())?;
+            let param = Param { name, r#type };
 
             self.vars
                 .insert(param.name)
