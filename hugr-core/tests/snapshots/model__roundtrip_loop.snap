@@ -5,15 +5,16 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-loop
 (hugr 0)
 
 (define-func example.loop
-  (forall ?0 type)
-  [?0] [?0] (ext)
+  (param ?0 core.type)
+  (core.fn [?0] [?0] (ext))
   (dfg
     [%0] [%1]
-    (signature (-> [?0] [?0] (ext)))
+    (signature (core.fn [?0] [?0] (ext)))
     (tail-loop
       [%0] [%1]
-      (signature (-> [?0] [?0] (ext)))
+      (signature (core.fn [?0] [?0] (ext)))
       (dfg
         [%2] [%3]
-        (signature (-> [?0] [(adt [[?0] [?0]])] (ext)))
-        (tag 0 [%2] [%3] (signature (-> [?0] [(adt [[?0] [?0]])] (ext))))))))
+        (signature (core.fn [?0] [(core.adt [[?0] [?0]])] (ext)))
+        ((core.make_adt _ _ 0) [%2] [%3]
+          (signature (core.fn [?0] [(core.adt [[?0] [?0]])] (ext))))))))
