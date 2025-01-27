@@ -23,8 +23,6 @@ use hugr_model::v0::{self as model};
 use petgraph::unionfind::UnionFind;
 use std::fmt::Write;
 
-const TERM_PARAM_TUPLE: &str = "param.tuple";
-
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
     let mut ctx = Context::new(hugr, bump);
@@ -948,11 +946,7 @@ impl<'a> Context<'a> {
                         .map(|param| model::ListPart::Item(self.export_type_param(param, None))),
                 );
                 let types = self.make_term(model::Term::List(parts));
-                let symbol = self.resolve_symbol(TERM_PARAM_TUPLE);
-                self.make_term(model::Term::Apply(
-                    symbol,
-                    self.bump.alloc_slice_copy(&[types]),
-                ))
+                self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
             TypeParam::Extensions => self.make_term_apply(model::CORE_EXT_SET, &[]),
         }
