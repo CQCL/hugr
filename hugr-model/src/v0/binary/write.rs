@@ -84,7 +84,7 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
 }
 
 fn write_symbol(mut builder: hugr_capnp::symbol::Builder, symbol: &model::Symbol) {
-    let _ = builder.set_name(symbol.name);
+    builder.set_name(symbol.name);
     write_list!(builder, init_params, write_param, symbol.params);
     let _ = builder.set_constraints(model::TermId::unwrap_slice(symbol.constraints));
     builder.set_signature(symbol.signature.0);
