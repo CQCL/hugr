@@ -13,14 +13,14 @@ mod monomorphize;
 // TODO: Deprecated re-export. Remove on a breaking release.
 #[deprecated(
     since = "0.14.1",
-    note = "Use `hugr::algorithms::call_graph::RemoveDeadFuncsPass` instead."
+    note = "Use `hugr_passes::RemoveDeadFuncsPass` instead."
 )]
 #[allow(deprecated)]
 pub use monomorphize::remove_polyfuncs;
 // TODO: Deprecated re-export. Remove on a breaking release.
 #[deprecated(
     since = "0.14.1",
-    note = "Use `hugr::algorithms::MonomorphizePass` instead."
+    note = "Use `hugr_passes::MonomorphizePass` instead."
 )]
 #[allow(deprecated)]
 pub use monomorphize::monomorphize;
