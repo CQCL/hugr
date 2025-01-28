@@ -4,7 +4,7 @@
 
 pub mod value_handle;
 use std::collections::{HashMap, HashSet, VecDeque};
-use thiserror::Error;
+use std::convert::Infallible;
 
 use hugr_core::{
     hugr::{
@@ -20,36 +20,21 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
+use crate::composable::validate_if_test;
 use crate::dataflow::{
     partial_from_const, AbstractValue, AnalysisResults, ConstLoader, ConstLocation, DFContext,
     Machine, PartialValue, TailLoopTermination,
 };
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::ComposablePass;
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
-    validation: ValidationLevel,
     allow_increase_termination: bool,
     inputs: HashMap<IncomingPort, Value>,
 }
 
-#[derive(Debug, Error)]
-#[non_exhaustive]
-/// Errors produced by [ConstantFoldPass].
-pub enum ConstFoldError {
-    #[error(transparent)]
-    #[allow(missing_docs)]
-    ValidationError(#[from] ValidatePassError),
-}
-
 impl ConstantFoldPass {
-    /// Sets the validation level used before and after the pass is run
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
     /// Allows the pass to remove potentially-non-terminating [TailLoop]s and [CFG] if their
     /// result (if/when they do terminate) is either known or not needed.
     ///
@@ -71,8 +56,63 @@ impl ConstantFoldPass {
         self
     }
 
-    /// Run the Constant Folding pass.
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
+    fn find_needed_nodes<H: HugrView>(
+        &self,
+        results: &AnalysisResults<ValueHandle, H>,
+        needed: &mut HashSet<Node>,
+    ) {
+        let mut q = VecDeque::new();
+        let h = results.hugr();
+        q.push_back(h.root());
+        while let Some(n) = q.pop_front() {
+            if !needed.insert(n) {
+                continue;
+            };
+
+            if h.get_optype(n).is_cfg() {
+                for bb in h.children(n) {
+                    //if results.bb_reachable(bb).unwrap() { // no, we'd need to patch up predicates
+                    q.push_back(bb);
+                }
+            } else if let Some(inout) = h.get_io(n) {
+                // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
+                q.extend(inout); // Input also necessary for legality even if unreachable
+
+                if !self.allow_increase_termination {
+                    // Also add on anything that might not terminate (even if results not required -
+                    // if its results are required we'll add it by following dataflow, below.)
+                    for ch in h.children(n) {
+                        if might_diverge(results, ch) {
+                            q.push_back(ch);
+                        }
+                    }
+                }
+            }
+            // Also follow dataflow demand
+            for (src, op) in h.all_linked_outputs(n) {
+                let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
+                    EdgeKind::Value(_) => {
+                        h.get_optype(src).is_load_constant()
+                            || results
+                                .try_read_wire_concrete::<Value, _, _>(Wire::new(src, op))
+                                .is_err()
+                    }
+                    EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
+                    EdgeKind::ControlFlow => false, // we always include all children of a CFG above
+                    _ => true, // needed as EdgeKind non-exhaustive; not knowing what it is, assume the worst
+                };
+                if needs_predecessor {
+                    q.push_back(src);
+                }
+            }
+        }
+    }
+}
+
+impl ComposablePass for ConstantFoldPass {
+    type Err = Infallible;
+
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
@@ -136,62 +176,8 @@ impl ConstantFoldPass {
         Ok(())
     }
 
-    /// Run the pass using this configuration
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
-    }
-
-    fn find_needed_nodes<H: HugrView>(
-        &self,
-        results: &AnalysisResults<ValueHandle, H>,
-        needed: &mut HashSet<Node>,
-    ) {
-        let mut q = VecDeque::new();
-        let h = results.hugr();
-        q.push_back(h.root());
-        while let Some(n) = q.pop_front() {
-            if !needed.insert(n) {
-                continue;
-            };
-
-            if h.get_optype(n).is_cfg() {
-                for bb in h.children(n) {
-                    //if results.bb_reachable(bb).unwrap() { // no, we'd need to patch up predicates
-                    q.push_back(bb);
-                }
-            } else if let Some(inout) = h.get_io(n) {
-                // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
-                q.extend(inout); // Input also necessary for legality even if unreachable
-
-                if !self.allow_increase_termination {
-                    // Also add on anything that might not terminate (even if results not required -
-                    // if its results are required we'll add it by following dataflow, below.)
-                    for ch in h.children(n) {
-                        if might_diverge(results, ch) {
-                            q.push_back(ch);
-                        }
-                    }
-                }
-            }
-            // Also follow dataflow demand
-            for (src, op) in h.all_linked_outputs(n) {
-                let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
-                    EdgeKind::Value(_) => {
-                        h.get_optype(src).is_load_constant()
-                            || results
-                                .try_read_wire_concrete::<Value, _, _>(Wire::new(src, op))
-                                .is_err()
-                    }
-                    EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
-                    EdgeKind::ControlFlow => false, // we always include all children of a CFG above
-                    _ => true, // needed as EdgeKind non-exhaustive; not knowing what it is, assume the worst
-                };
-                if needs_predecessor {
-                    q.push_back(src);
-                }
-            }
-        }
+    fn add_entry_point(&mut self, _func_node: Node) {
+        todo!()
     }
 }
 
@@ -219,7 +205,7 @@ fn might_diverge<V: AbstractValue>(results: &AnalysisResults<V, impl HugrView>, 
 
 /// Exhaustively apply constant folding to a HUGR.
 pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
-    ConstantFoldPass::default().run(h).unwrap()
+    validate_if_test(ConstantFoldPass::default(), h).unwrap()
 }
 
 struct ConstFoldContext<'a, H>(&'a H);
