@@ -175,10 +175,6 @@ impl ComposablePass for ConstantFoldPass {
         }
         Ok(())
     }
-
-    fn add_entry_point(&mut self, _func_node: Node) {
-        todo!()
-    }
 }
 
 // "Diverge" aka "never-terminate"

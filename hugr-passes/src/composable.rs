@@ -3,13 +3,12 @@
 use std::{error::Error, marker::PhantomData};
 
 use hugr_core::hugr::{hugrmut::HugrMut, ValidationError};
-use hugr_core::{HugrView, Node};
+use hugr_core::HugrView;
 use itertools::Either;
 
 pub trait ComposablePass: Sized {
     type Err: Error;
     fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err>;
-    fn add_entry_point(&mut self, func_node: Node);
     fn map_err<E2: Error>(self, f: impl Fn(Self::Err) -> E2) -> impl ComposablePass<Err = E2> {
         ErrMapper::new(self, f)
     }
@@ -42,10 +41,6 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Err) -> E> ComposablePass for ErrMapp
     fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err> {
         self.0.run(hugr).map_err(&self.1)
     }
-
-    fn add_entry_point(&mut self, func_node: Node) {
-        self.0.add_entry_point(func_node)
-    }
 }
 
 impl<E: Error, P1: ComposablePass<Err = E>, P2: ComposablePass<Err = E>> ComposablePass
@@ -56,11 +51,6 @@ impl<E: Error, P1: ComposablePass<Err = E>, P2: ComposablePass<Err = E>> Composa
     fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err> {
         self.0.run(hugr)?;
         self.1.run(hugr)
-    }
-
-    fn add_entry_point(&mut self, func_node: Node) {
-        self.0.add_entry_point(func_node);
-        self.1.add_entry_point(func_node);
     }
 }
 
@@ -124,10 +114,6 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
             err,
             pretty_hugr,
         })
-    }
-
-    fn add_entry_point(&mut self, func_node: Node) {
-        self.0.add_entry_point(func_node);
     }
 }
 
