@@ -30,17 +30,7 @@ use thiserror::Error;
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-#[deprecated(
-    since = "0.14.1",
-    note = "Use `hugr::algorithms::MonomorphizePass` instead."
-)]
-// TODO: Deprecated. Remove on a breaking release and rename private `monomorphize_ref` to `monomorphize`.
-pub fn monomorphize(mut h: Hugr) -> Hugr {
-    monomorphize_ref(&mut h);
-    h
-}
-
-fn monomorphize_ref(h: &mut impl HugrMut) {
+pub fn monomorphize(h: &mut impl HugrMut) {
     let root = h.root();
     // If the root is a polymorphic function, then there are no external calls, so nothing to do
     if !is_polymorphic_funcdefn(h.get_optype(root)) {
@@ -294,7 +284,7 @@ impl MonomorphizePass {
 
     /// Run the Monomorphization pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), MonomorphizeError> {
-        monomorphize_ref(hugr);
+        monomorphize(hugr);
         Ok(())
     }
 
