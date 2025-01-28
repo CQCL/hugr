@@ -87,7 +87,7 @@ pub struct ValidatingPass<P>(P, bool);
 
 impl<P: ComposablePass> ValidatingPass<P> {
     pub fn new_default(underlying: P) -> Self {
-        Self(underlying, false)
+        Self(underlying, cfg!(feature = "extension_inference"))
     }
 
     pub fn new_validating_extensions(underlying: P) -> Self {
