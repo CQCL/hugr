@@ -1,5 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    convert::Infallible,
     fmt::Write,
     ops::Deref,
 };
@@ -12,7 +13,9 @@ use hugr_core::{
 
 use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
 use itertools::Itertools as _;
-use thiserror::Error;
+
+use crate::composable::{validate_if_test, ValidatePassError};
+use crate::ComposablePass;
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -30,16 +33,8 @@ use thiserror::Error;
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-pub fn monomorphize(h: &mut impl HugrMut) {
-    let root = h.root();
-    // If the root is a polymorphic function, then there are no external calls, so nothing to do
-    if !is_polymorphic_funcdefn(h.get_optype(root)) {
-        mono_scan(h, root, None, &mut HashMap::new());
-        if !h.get_optype(root).is_module() {
-            #[allow(deprecated)] // TODO remove in next breaking release and update docs
-            remove_polyfuncs_ref(h);
-        }
-    }
+pub fn monomorphize(hugr: &mut impl HugrMut) -> Result<(), ValidatePassError<Infallible>> {
+    validate_if_test(MonomorphizePass, hugr)
 }
 
 /// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
@@ -244,8 +239,6 @@ fn instantiate(
     mono_tgt
 }
 
-use crate::validation::{ValidatePassError, ValidationLevel};
-
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
@@ -262,36 +255,22 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
 #[derive(Debug, Clone, Default)]
-pub struct MonomorphizePass {
-    validation: ValidationLevel,
-}
+pub struct MonomorphizePass;
 
-#[derive(Debug, Error)]
-#[non_exhaustive]
-/// Errors produced by [MonomorphizePass].
-pub enum MonomorphizeError {
-    #[error(transparent)]
-    #[allow(missing_docs)]
-    ValidationError(#[from] ValidatePassError),
-}
+impl ComposablePass for MonomorphizePass {
+    type Err = Infallible;
 
-impl MonomorphizePass {
-    /// Sets the validation level used before and after the pass is run.
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
-    /// Run the Monomorphization pass.
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), MonomorphizeError> {
-        monomorphize(hugr);
+    fn run(&self, h: &mut impl HugrMut) -> Result<(), Self::Err> {
+        let root = h.root();
+        // If the root is a polymorphic function, then there are no external calls, so nothing to do
+        if !is_polymorphic_funcdefn(h.get_optype(root)) {
+            mono_scan(h, root, None, &mut HashMap::new());
+            if !h.get_optype(root).is_module() {
+                #[allow(deprecated)] // TODO remove in next breaking release and update docs
+                remove_polyfuncs_ref(h);
+            }
+        }
         Ok(())
-    }
-
-    /// Run the pass using specified configuration.
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), MonomorphizeError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 }
 
@@ -377,7 +356,7 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::remove_dead_funcs;
+    use crate::{remove_dead_funcs, ComposablePass};
 
     use super::{is_polymorphic, mangle_inner_func, mangle_name, MonomorphizePass};
 
