@@ -1,13 +1,15 @@
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 
+use hugr_core::ops::handle::NodeHandle;
+use hugr_core::ops::Const;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
 
 use hugr_core::builder::{
     endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    SubContainer,
+    HugrBuilder, ModuleBuilder, SubContainer,
 };
 use hugr_core::extension::prelude::{
     bool_t, const_ok, error_type, string_type, sum_with_error, ConstError, ConstString, MakeTuple,
@@ -1579,4 +1581,30 @@ fn test_cfg(
     } else {
         assert_eq!(output_src, nested);
     }
+}
+
+#[test]
+fn test_module() -> Result<(), Box<dyn std::error::Error>> {
+    let mut mb = ModuleBuilder::new();
+    let mut main = mb.define_function("main", Signature::new_endo(INT_TYPES[5].clone()))?;
+    let c7 = main.add_load_value(ConstInt::new_u(5, 7)?);
+    let c17 = main.add_load_value(ConstInt::new_u(5, 17)?);
+    let res = main.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [c7, c17])?;
+    let main = main.finish_with_outputs(res.outputs())?;
+    let mut hugr = mb.finish_hugr()?;
+    constant_fold_pass(&mut hugr);
+    assert!(hugr.get_optype(hugr.root()).is_module());
+    assert_eq!(hugr.children(hugr.root()).collect_vec(), [main.node()]);
+    assert_eq!(
+        hugr.children(main.node())
+            .map(|n| hugr.get_optype(n).tag())
+            .collect_vec(),
+        [OpTag::Input, OpTag::Output, OpTag::Const, OpTag::LoadConst,]
+    );
+    assert_eq!(
+        hugr.children(main.node())
+            .find_map(|n| hugr.get_optype(n).as_const()),
+        Some(&Const::new(ConstInt::new_u(5, 24).unwrap().into()))
+    );
+    Ok(())
 }
