@@ -32,7 +32,7 @@ use thiserror::Error;
 /// whenever the names of their parents are unique, but this is not guaranteed.
 #[deprecated(
     since = "0.14.1",
-    note = "Use `hugr::passes::MonomorphizePass` instead."
+    note = "Use `hugr_passes::MonomorphizePass` instead."
 )]
 // TODO: Deprecated. Remove on a breaking release and rename private `monomorphize_ref` to `monomorphize`.
 pub fn monomorphize(mut h: Hugr) -> Hugr {
