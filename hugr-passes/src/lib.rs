@@ -1,8 +1,8 @@
 //! Compilation passes acting on the HUGR program representation.
 
 pub mod call_graph;
-mod composable;
-pub use composable::{validate_if_test, ComposablePass, ValidatePassError, ValidatingPass};
+pub mod composable;
+pub use composable::ComposablePass;
 pub mod const_fold;
 pub mod dataflow;
 mod dead_funcs;
