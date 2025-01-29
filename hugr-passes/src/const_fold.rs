@@ -3,7 +3,7 @@
 //! An (example) use of the [dataflow analysis framework](super::dataflow).
 
 pub mod value_handle;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
@@ -20,10 +20,14 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::dataflow::{
-    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
-};
 use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::{
+    dataflow::{
+        partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
+        TailLoopTermination,
+    },
+    dead_code::NodeDivergence,
+};
 use crate::{dead_code::DeadCodeElimPass, find_main};
 
 #[derive(Debug, Clone, Default)]
@@ -111,6 +115,13 @@ impl ConstantFoldPass {
                 ))
             })
             .collect::<Vec<_>>();
+        // Sadly the results immutably borrow the hugr, so we must extract everything we need before mutation
+        let terminating_tail_loops = hugr
+            .nodes()
+            .filter(|n| {
+                results.tail_loop_terminates(*n) == Some(TailLoopTermination::NeverContinues)
+            })
+            .collect::<Vec<_>>();
 
         for (n, inport, v) in wires_to_break {
             let parent = hugr.get_parent(n).unwrap();
@@ -126,11 +137,19 @@ impl ConstantFoldPass {
         let mut dce = DeadCodeElimPass::default();
         if hugr.get_optype(hugr.root()).is_module() {
             dce = dce.with_entry_points([find_main(hugr).unwrap()])
-        };
-        if self.allow_increase_termination {
-            dce = dce.allow_increase_termination()
         }
-        dce.run(hugr)?;
+        dce.set_diverge_callback(if self.allow_increase_termination {
+            Arc::new(|_, _| NodeDivergence::CanRemove)
+        } else {
+            Arc::new(move |_, n| {
+                if terminating_tail_loops.contains(&n) {
+                    NodeDivergence::RemoveIfAllChildrenCanBeRemoved
+                } else {
+                    NodeDivergence::UseDefault
+                }
+            })
+        })
+        .run(hugr)?;
         Ok(())
     }
 
