@@ -28,7 +28,7 @@ pub enum RemoveDeadFuncsError {
     InvalidEntryPoint {
         /// The invalid node.
         node: Node,
-    }
+    },
 }
 
 fn reachable_funcs<'a>(
