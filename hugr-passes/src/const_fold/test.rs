@@ -29,6 +29,7 @@ use hugr_core::types::{Signature, SumType, Type, TypeRow, TypeRowRV};
 use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 
 use crate::dataflow::{partial_from_const, DFContext, PartialValue};
+use crate::ComposablePass as _;
 
 use super::{constant_fold_pass, ConstFoldContext, ConstantFoldPass, ValueHandle};
 
