@@ -20,9 +20,9 @@ type PV<V> = PartialValue<V>;
 /// Basic structure for performing an analysis. Usage:
 /// 1. Make a new instance via [Self::new()]
 /// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] and/or
-///    [Self::prepopulate_df_inputs] with initial values.
+///    [Self::prepopulate_inputs] with initial values.
 ///    For example, to analyse a [Module](OpType::Module)-rooted Hugr,
-///    [Self::prepopulate_df_inputs] can be used on each externally-callable
+///    [Self::prepopulate_inputs] can be used on each externally-callable
 ///    [FuncDefn](OpType::FuncDefn) to set all inputs to [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
 pub struct Machine<H: HugrView, V: AbstractValue>(
