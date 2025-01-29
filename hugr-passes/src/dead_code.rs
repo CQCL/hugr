@@ -13,7 +13,7 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 #[derive(Clone, Default)]
 pub struct DeadCodeElimPass {
     entry_points: Vec<Node>,
-    diverge_callback: Option<Arc<dyn Fn(&Hugr, Node) -> NodeDivergence>>,
+    diverge_callback: Option<Arc<DivergeCallback>>,
     validation: ValidationLevel,
 }
 
@@ -37,6 +37,8 @@ impl Debug for DeadCodeElimPass {
         )
     }
 }
+
+pub type DivergeCallback = dyn Fn(&Hugr, Node) -> NodeDivergence;
 
 pub enum NodeDivergence {
     #[allow(unused)]
@@ -67,7 +69,7 @@ impl DeadCodeElimPass {
     /// [Call]: hugr_core::ops::Call
     /// [CFG]: hugr_core::ops::CFG
     /// [TailLoop]: hugr_core::ops::TailLoop
-    pub fn set_diverge_callback(mut self, cb: Arc<dyn Fn(&Hugr, Node) -> NodeDivergence>) -> Self {
+    pub fn set_diverge_callback(mut self, cb: Arc<DivergeCallback>) -> Self {
         self.diverge_callback = Some(cb);
         self
     }
