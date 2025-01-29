@@ -1,20 +1,20 @@
 ---
-source: src/emit/test.rs
-expression: module.to_string()
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define { { { i32, {}, {}, {}, {} }, i16 } } @_hl.main.1() {
+define { i2, i16 } @_hl.main.1() {
 alloca_block:
-  %"0" = alloca { { { i32, {}, {}, {}, {} }, i16 } }, align 8
-  %"5_0" = alloca { { { i32, {}, {}, {}, {} }, i16 } }, align 8
+  %"0" = alloca { i2, i16 }, align 8
+  %"5_0" = alloca { i2, i16 }, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store { { { i32, {}, {}, {}, {} }, i16 } } { { { i32, {}, {}, {}, {} }, i16 } { { i32, {}, {}, {}, {} } { i32 2, {} poison, {} poison, {} undef, {} poison }, i16 -24 } }, { { { i32, {}, {}, {}, {} }, i16 } }* %"5_0", align 4
-  %"5_01" = load { { { i32, {}, {}, {}, {} }, i16 } }, { { { i32, {}, {}, {}, {} }, i16 } }* %"5_0", align 4
-  store { { { i32, {}, {}, {}, {} }, i16 } } %"5_01", { { { i32, {}, {}, {}, {} }, i16 } }* %"0", align 4
-  %"02" = load { { { i32, {}, {}, {}, {} }, i16 } }, { { { i32, {}, {}, {}, {} }, i16 } }* %"0", align 4
-  ret { { { i32, {}, {}, {}, {} }, i16 } } %"02"
+  store { i2, i16 } { i2 -2, i16 -24 }, { i2, i16 }* %"5_0", align 2
+  %"5_01" = load { i2, i16 }, { i2, i16 }* %"5_0", align 2
+  store { i2, i16 } %"5_01", { i2, i16 }* %"0", align 2
+  %"02" = load { i2, i16 }, { i2, i16 }* %"0", align 2
+  ret { i2, i16 } %"02"
 }

@@ -1,0 +1,8 @@
+---
+source: hugr-llvm/src/sum.rs
+expression: module.to_string()
+---
+define { i1, i1 } @untag_tag({ i1, i1 } %0) {
+  %2 = extractvalue { i1, i1 } %0, 0
+  ret { i1, i1 } { i1 true, i1 poison }
+}

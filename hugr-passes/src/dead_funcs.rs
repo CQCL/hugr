@@ -21,8 +21,14 @@ use super::call_graph::{CallGraph, CallGraphNode};
 #[non_exhaustive]
 /// Errors produced by [RemoveDeadFuncsPass].
 pub enum RemoveDeadFuncsError {
-    #[error("Node {0} was not a FuncDefn child of the Module root")]
-    InvalidEntryPoint(Node),
+    /// The specified entry point is not a FuncDefn node or is not a child of the root.
+    #[error(
+        "Entrypoint for RemoveDeadFuncsPass {node} was not a function definition in the root module"
+    )]
+    InvalidEntryPoint {
+        /// The invalid node.
+        node: Node,
+    }
 }
 
 fn reachable_funcs<'a>(
@@ -37,7 +43,7 @@ fn reachable_funcs<'a>(
         d.stack.clear();
         for n in entry_points {
             if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.root()) {
-                return Err(RemoveDeadFuncsError::InvalidEntryPoint(n));
+                return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
             }
             d.stack.push(cg.node_index(n).unwrap())
         }
@@ -45,7 +51,7 @@ fn reachable_funcs<'a>(
     } else {
         if let Some(n) = entry_points.next() {
             // Can't be a child of the module root as there isn't a module root!
-            return Err(RemoveDeadFuncsError::InvalidEntryPoint(n));
+            return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
         }
         Dfs::new(g, cg.node_index(h.root()).unwrap())
     };

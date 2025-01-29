@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+env:
+  LLVM_VERSION: "14.0"
+
 jobs:
   release-plz:
     name: Release-plz
@@ -18,8 +21,19 @@ jobs:
           token: ${{ secrets.HUGRBOT_PAT }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      # These are needed when doing a crate release, since `cargo release`
+      # checks that the crate can be compiled before publishing it.
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
+          # Use a temporary directory to avoid polluting the workspace,
+          # otherwise release-plz fails due to uncommitted changes.
+          directory: ${{ runner.temp }}/llvm
+
       - name: Run release-plz
         uses: MarcoIeni/release-plz-action@v0.5
         env:

@@ -31,7 +31,7 @@ struct Node {
     outputs @2 :List(LinkIndex);
     params @3 :List(TermId);
     regions @4 :List(RegionId);
-    meta @5 :List(MetaItem);
+    meta @5 :List(TermId);
     signature @6 :OptionalTermId;
 }
 
@@ -55,6 +55,7 @@ struct Operation {
         constructorDecl @15 :ConstructorDecl;
         operationDecl @16 :OperationDecl;
         import @17 :Text;
+        const @18 :TermId;
     }
 
     struct FuncDefn {
@@ -104,7 +105,7 @@ struct Region {
     sources @1 :List(LinkIndex);
     targets @2 :List(LinkIndex);
     children @3 :List(NodeId);
-    meta @4 :List(MetaItem);
+    meta @4 :List(TermId);
     signature @5 :OptionalTermId;
     scope @6 :RegionScope;
 }
@@ -123,11 +124,6 @@ enum RegionKind {
     module @2;
 }
 
-struct MetaItem {
-    name @0 :Text;
-    value @1 :UInt32;
-}
-
 struct Term {
     union {
         wildcard @0 :Void;
@@ -140,7 +136,7 @@ struct Term {
         }
         apply @5 :Apply;
         applyFull @6 :ApplyFull;
-        quote @7 :TermId;
+        const @7 :Const;
         list @8 :ListTerm;
         listType @9 :TermId;
         string @10 :Text;
@@ -154,6 +150,13 @@ struct Term {
         control @18 :TermId;
         controlType @19 :Void;
         nonLinearConstraint @20 :TermId;
+        constFunc @22 :RegionId;
+        constAdt @23 :ConstAdt;
+        bytes @24 :Data;
+        bytesType @25 :Void;
+        meta @26 :Void;
+        float @27 :Float64;
+        floatType @28 :Void;
     }
 
     struct Apply {
@@ -188,10 +191,20 @@ struct Term {
         }
     }
 
+    struct ConstAdt {
+        tag @0 :UInt16;
+        values @1 :TermId;
+    }
+
     struct FuncType {
         inputs @0 :TermId;
         outputs @1 :TermId;
         extensions @2 :TermId;
+    }
+
+    struct Const {
+        type @0 :TermId;
+        extensions @1 :TermId;
     }
 }
 

@@ -1,3 +1,4 @@
+use base64::{prelude::BASE64_STANDARD, Engine};
 use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
 use pest::{
@@ -8,8 +9,8 @@ use thiserror::Error;
 
 use crate::v0::{
     scope::{LinkTable, SymbolTable, UnknownSymbolError, VarTable},
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, MetaItem, Module, Node,
-    NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkIndex, ListPart, Module, Node, NodeId,
+    Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, RegionScope,
     ScopeClosure, Term, TermId,
 };
 
@@ -113,6 +114,7 @@ impl<'a> ParseContext<'a> {
         debug_assert_eq!(pair.as_rule(), Rule::term);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
+        let str_slice = pair.as_str();
         let mut inner = pair.into_inner();
 
         let term =
@@ -125,6 +127,7 @@ impl<'a> ParseContext<'a> {
                 Rule::term_nat_type => Term::NatType,
                 Rule::term_ctrl_type => Term::ControlType,
                 Rule::term_ext_set_type => Term::ExtSetType,
+                Rule::term_meta => Term::Meta,
 
                 Rule::term_var => {
                     let name_token = inner.next().unwrap();
@@ -165,9 +168,10 @@ impl<'a> ParseContext<'a> {
                     }
                 }
 
-                Rule::term_quote => {
+                Rule::term_const => {
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Term::Quote { r#type }
+                    let extensions = self.parse_term(inner.next().unwrap())?;
+                    Term::Const { r#type, extensions }
                 }
 
                 Rule::term_list => {
@@ -200,7 +204,7 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Rule::term_nat => {
-                    let value = inner.next().unwrap().as_str().parse().unwrap();
+                    let value = str_slice.trim().parse().unwrap();
                     Term::Nat(value)
                 }
 
@@ -248,6 +252,39 @@ impl<'a> ParseContext<'a> {
                 Rule::term_non_linear => {
                     let term = self.parse_term(inner.next().unwrap())?;
                     Term::NonLinearConstraint { term }
+                }
+
+                Rule::term_const_func => {
+                    let region = self.parse_region(inner.next().unwrap(), ScopeClosure::Closed)?;
+                    Term::ConstFunc { region }
+                }
+
+                Rule::term_const_adt => {
+                    let tag = inner.next().unwrap().as_str().parse().unwrap();
+                    let values = self.parse_term(inner.next().unwrap())?;
+                    Term::ConstAdt { tag, values }
+                }
+
+                Rule::term_bytes_type => Term::BytesType,
+
+                Rule::term_bytes => {
+                    let token = inner.next().unwrap();
+                    let slice = token.as_str();
+                    // Remove the quotes
+                    let slice = &slice[1..slice.len() - 1];
+                    let data = BASE64_STANDARD.decode(slice).map_err(|_| {
+                        ParseError::custom("invalid base64 encoding", token.as_span())
+                    })?;
+                    let data = self.bump.alloc_slice_copy(&data);
+                    Term::Bytes { data }
+                }
+
+                Rule::term_float_type => Term::FloatType,
+                Rule::term_float => {
+                    let value: f64 = str_slice.trim().parse().unwrap();
+                    Term::Float {
+                        value: value.into(),
+                    }
                 }
 
                 r => unreachable!("term: {:?}", r),
@@ -584,6 +621,23 @@ impl<'a> ParseContext<'a> {
                 }
             }
 
+            Rule::node_const => {
+                let value = self.parse_term(inner.next().unwrap())?;
+                let inputs = self.parse_port_list(&mut inner)?;
+                let outputs = self.parse_port_list(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
+                let meta = self.parse_meta(&mut inner)?;
+                Node {
+                    operation: Operation::Const { value },
+                    inputs,
+                    outputs,
+                    params: &[],
+                    regions: &[],
+                    meta,
+                    signature,
+                }
+            }
+
             _ => unreachable!(),
         };
 
@@ -836,14 +890,13 @@ impl<'a> ParseContext<'a> {
         Ok(self.links.use_link(name))
     }
 
-    fn parse_meta(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [MetaItem<'a>]> {
+    fn parse_meta(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [TermId]> {
         let mut items = Vec::new();
 
         for meta in filter_rule(pairs, Rule::meta) {
             let mut inner = meta.into_inner();
-            let name = self.parse_symbol(&mut inner)?;
             let value = self.parse_term(inner.next().unwrap())?;
-            items.push(MetaItem { name, value })
+            items.push(value)
         }
 
         Ok(self.bump.alloc_slice_copy(&items))

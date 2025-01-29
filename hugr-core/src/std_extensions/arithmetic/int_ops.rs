@@ -201,7 +201,7 @@ impl MakeOpDef for IntOpDef {
             idiv_s => "as idivmod_s but discarding the second output",
             imod_checked_s => "as idivmod_checked_s but discarding the first output",
             imod_s => "as idivmod_s but discarding the first output",
-            ipow => "raise first input to the power of second input",
+            ipow => "raise first input to the power of second input, the exponent is treated as an unsigned integer",
             iabs => "convert signed to unsigned by taking absolute value",
             iand => "bitwise AND",
             ior => "bitwise OR",

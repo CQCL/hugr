@@ -1,0 +1,86 @@
+---
+source: hugr-core/tests/model.rs
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-const.edn\"))"
+---
+(hugr 0)
+
+(import collections.array.array)
+
+(import collections.array.const)
+
+(import compat.const-json)
+
+(import arithmetic.float.types.float64)
+
+(import arithmetic.int.const)
+
+(import arithmetic.int.types.int)
+
+(import arithmetic.float.const-f64)
+
+(define-func example.bools
+  [] [(adt [[] []]) (adt [[] []])] (ext)
+  (dfg
+    [] [%0 %1]
+    (signature (-> [] [(adt [[] []]) (adt [[] []])] (ext)))
+    (const (tag 0 []) [] [%0] (signature (-> [] [(adt [[] []])] (ext))))
+    (const (tag 1 []) [] [%1] (signature (-> [] [(adt [[] []])] (ext))))))
+
+(define-func example.make-pair
+  []
+  [(adt
+     [[(@ collections.array.array 5 (@ arithmetic.int.types.int 6))
+       (@ arithmetic.float.types.float64)]])]
+  (ext)
+  (dfg
+    [] [%0]
+    (signature
+      (->
+        []
+        [(adt
+           [[(@ collections.array.array 5 (@ arithmetic.int.types.int 6))
+             (@ arithmetic.float.types.float64)]])]
+        (ext)))
+    (const
+      (tag
+        0
+        [(@
+           collections.array.const
+           5
+           (@ arithmetic.int.types.int 6)
+           [(@ arithmetic.int.const 6 1)
+            (@ arithmetic.int.const 6 2)
+            (@ arithmetic.int.const 6 3)
+            (@ arithmetic.int.const 6 4)
+            (@ arithmetic.int.const 6 5)])
+         (@ arithmetic.float.const-f64 -3.0)])
+      [] [%0]
+      (signature
+        (->
+          []
+          [(adt
+             [[(@ collections.array.array 5 (@ arithmetic.int.types.int 6))
+               (@ arithmetic.float.types.float64)]])]
+          (ext))))))
+
+(define-func example.f64-json
+  [] [(@ arithmetic.float.types.float64)] (ext)
+  (dfg
+    [] [%0 %1]
+    (signature
+      (->
+        []
+        [(@ arithmetic.float.types.float64) (@ arithmetic.float.types.float64)]
+        (ext)))
+    (const
+      (@ arithmetic.float.const-f64 1.0)
+      [] [%0]
+      (signature (-> [] [(@ arithmetic.float.types.float64)] (ext))))
+    (const
+      (@
+        compat.const-json
+        (@ arithmetic.float.types.float64)
+        "{\"c\":\"ConstUnknown\",\"v\":{\"value\":1.0}}"
+        (ext))
+      [] [%1]
+      (signature (-> [] [(@ arithmetic.float.types.float64)] (ext))))))

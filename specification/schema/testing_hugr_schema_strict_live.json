@@ -7,9 +7,6 @@
                 "t": {
                     "const": "Alias",
                     "default": "Alias",
-                    "enum": [
-                        "Alias"
-                    ],
                     "title": "T",
                     "type": "string"
                 },
@@ -38,9 +35,6 @@
                 "op": {
                     "const": "AliasDecl",
                     "default": "AliasDecl",
-                    "enum": [
-                        "AliasDecl"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -70,9 +64,6 @@
                 "op": {
                     "const": "AliasDefn",
                     "default": "AliasDefn",
-                    "enum": [
-                        "AliasDefn"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -98,9 +89,6 @@
                 "tya": {
                     "const": "BoundedNat",
                     "default": "BoundedNat",
-                    "enum": [
-                        "BoundedNat"
-                    ],
                     "title": "Tya",
                     "type": "string"
                 },
@@ -121,9 +109,6 @@
                 "tp": {
                     "const": "BoundedNat",
                     "default": "BoundedNat",
-                    "enum": [
-                        "BoundedNat"
-                    ],
                     "title": "Tp",
                     "type": "string"
                 },
@@ -156,9 +141,6 @@
                 "op": {
                     "const": "CFG",
                     "default": "CFG",
-                    "enum": [
-                        "CFG"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -183,9 +165,6 @@
                 "op": {
                     "const": "Call",
                     "default": "Call",
-                    "enum": [
-                        "Call"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -223,9 +202,6 @@
                 "op": {
                     "const": "CallIndirect",
                     "default": "CallIndirect",
-                    "enum": [
-                        "CallIndirect"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -250,9 +226,6 @@
                 "op": {
                     "const": "Case",
                     "default": "Case",
-                    "enum": [
-                        "Case"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -277,9 +250,6 @@
                 "op": {
                     "const": "Conditional",
                     "default": "Conditional",
-                    "enum": [
-                        "Conditional"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -333,9 +303,6 @@
                 "op": {
                     "const": "Const",
                     "default": "Const",
-                    "enum": [
-                        "Const"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -375,9 +342,6 @@
                 "v": {
                     "const": "Extension",
                     "default": "Extension",
-                    "enum": [
-                        "Extension"
-                    ],
                     "title": "ValueTag",
                     "type": "string"
                 },
@@ -414,9 +378,6 @@
                 "op": {
                     "const": "DFG",
                     "default": "DFG",
-                    "enum": [
-                        "DFG"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -441,9 +402,6 @@
                 "op": {
                     "const": "DataflowBlock",
                     "default": "DataflowBlock",
-                    "enum": [
-                        "DataflowBlock"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -497,9 +455,6 @@
                 "op": {
                     "const": "ExitBlock",
                     "default": "ExitBlock",
-                    "enum": [
-                        "ExitBlock"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -523,9 +478,6 @@
                 "b": {
                     "const": "Explicit",
                     "default": "Explicit",
-                    "enum": [
-                        "Explicit"
-                    ],
                     "title": "B",
                     "type": "string"
                 },
@@ -542,6 +494,7 @@
         "Extension": {
             "properties": {
                 "version": {
+                    "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
                     "title": "Version",
                     "type": "string"
                 },
@@ -601,9 +554,6 @@
                 "op": {
                     "const": "Extension",
                     "default": "Extension",
-                    "enum": [
-                        "Extension"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -667,9 +617,6 @@
                 "tya": {
                     "const": "Extensions",
                     "default": "Extensions",
-                    "enum": [
-                        "Extensions"
-                    ],
                     "title": "Tya",
                     "type": "string"
                 },
@@ -693,9 +640,6 @@
                 "tp": {
                     "const": "Extensions",
                     "default": "Extensions",
-                    "enum": [
-                        "Extensions"
-                    ],
                     "title": "Tp",
                     "type": "string"
                 }
@@ -728,9 +672,6 @@
                 "b": {
                     "const": "FromParams",
                     "default": "FromParams",
-                    "enum": [
-                        "FromParams"
-                    ],
                     "title": "B",
                     "type": "string"
                 },
@@ -759,9 +700,6 @@
                 "op": {
                     "const": "FuncDecl",
                     "default": "FuncDecl",
-                    "enum": [
-                        "FuncDecl"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -792,9 +730,6 @@
                 "op": {
                     "const": "FuncDefn",
                     "default": "FuncDefn",
-                    "enum": [
-                        "FuncDefn"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -821,9 +756,6 @@
                 "t": {
                     "const": "G",
                     "default": "G",
-                    "enum": [
-                        "G"
-                    ],
                     "title": "T",
                     "type": "string"
                 },
@@ -863,9 +795,6 @@
                 "v": {
                     "const": "Function",
                     "default": "Function",
-                    "enum": [
-                        "Function"
-                    ],
                     "title": "ValueTag",
                     "type": "string"
                 },
@@ -886,18 +815,12 @@
                 "t": {
                     "const": "Sum",
                     "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
                     "title": "T",
                     "type": "string"
                 },
                 "s": {
                     "const": "General",
                     "default": "General",
-                    "enum": [
-                        "General"
-                    ],
                     "title": "S",
                     "type": "string"
                 },
@@ -929,9 +852,6 @@
                 "op": {
                     "const": "Input",
                     "default": "Input",
-                    "enum": [
-                        "Input"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -955,9 +875,6 @@
                 "tp": {
                     "const": "List",
                     "default": "List",
-                    "enum": [
-                        "List"
-                    ],
                     "title": "Tp",
                     "type": "string"
                 },
@@ -982,9 +899,6 @@
                 "op": {
                     "const": "LoadConstant",
                     "default": "LoadConstant",
-                    "enum": [
-                        "LoadConstant"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -1010,9 +924,6 @@
                 "op": {
                     "const": "LoadFunction",
                     "default": "LoadFunction",
-                    "enum": [
-                        "LoadFunction"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -1050,9 +961,6 @@
                 "op": {
                     "const": "Module",
                     "default": "Module",
-                    "enum": [
-                        "Module"
-                    ],
                     "title": "Op",
                     "type": "string"
                 }
@@ -1228,9 +1136,6 @@
                 "t": {
                     "const": "Opaque",
                     "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
                     "title": "T",
                     "type": "string"
                 },
@@ -1273,9 +1178,6 @@
                 "op": {
                     "const": "Output",
                     "default": "Output",
-                    "enum": [
-                        "Output"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -1345,9 +1247,6 @@
                 "t": {
                     "const": "Q",
                     "default": "Q",
-                    "enum": [
-                        "Q"
-                    ],
                     "title": "T",
                     "type": "string"
                 }
@@ -1362,9 +1261,6 @@
                 "t": {
                     "const": "R",
                     "default": "R",
-                    "enum": [
-                        "R"
-                    ],
                     "title": "T",
                     "type": "string"
                 },
@@ -1389,9 +1285,6 @@
                 "tya": {
                     "const": "Sequence",
                     "default": "Sequence",
-                    "enum": [
-                        "Sequence"
-                    ],
                     "title": "Tya",
                     "type": "string"
                 },
@@ -1525,9 +1418,6 @@
                 "tya": {
                     "const": "String",
                     "default": "String",
-                    "enum": [
-                        "String"
-                    ],
                     "title": "Tya",
                     "type": "string"
                 },
@@ -1548,9 +1438,6 @@
                 "tp": {
                     "const": "String",
                     "default": "String",
-                    "enum": [
-                        "String"
-                    ],
                     "title": "Tp",
                     "type": "string"
                 }
@@ -1586,9 +1473,6 @@
                 "v": {
                     "const": "Sum",
                     "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
                     "title": "ValueTag",
                     "type": "string"
                 },
@@ -1626,9 +1510,6 @@
                 "op": {
                     "const": "Tag",
                     "default": "Tag",
-                    "enum": [
-                        "Tag"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -1666,9 +1547,6 @@
                 "op": {
                     "const": "TailLoop",
                     "default": "TailLoop",
-                    "enum": [
-                        "TailLoop"
-                    ],
                     "title": "Op",
                     "type": "string"
                 },
@@ -1792,9 +1670,6 @@
                 "tp": {
                     "const": "Tuple",
                     "default": "Tuple",
-                    "enum": [
-                        "Tuple"
-                    ],
                     "title": "Tp",
                     "type": "string"
                 },
@@ -1819,9 +1694,6 @@
                 "v": {
                     "const": "Tuple",
                     "default": "Tuple",
-                    "enum": [
-                        "Tuple"
-                    ],
                     "title": "ValueTag",
                     "type": "string"
                 },
@@ -2028,9 +1900,6 @@
                 "tya": {
                     "const": "Type",
                     "default": "Type",
-                    "enum": [
-                        "Type"
-                    ],
                     "title": "Tya",
                     "type": "string"
                 },
@@ -2050,9 +1919,6 @@
                 "tp": {
                     "const": "Type",
                     "default": "Type",
-                    "enum": [
-                        "Type"
-                    ],
                     "title": "Tp",
                     "type": "string"
                 },
@@ -2073,9 +1939,6 @@
                 "t": {
                     "const": "I",
                     "default": "I",
-                    "enum": [
-                        "I"
-                    ],
                     "title": "T",
                     "type": "string"
                 }
@@ -2090,18 +1953,12 @@
                 "t": {
                     "const": "Sum",
                     "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
                     "title": "T",
                     "type": "string"
                 },
                 "s": {
                     "const": "Unit",
                     "default": "Unit",
-                    "enum": [
-                        "Unit"
-                    ],
                     "title": "S",
                     "type": "string"
                 },
@@ -2153,9 +2010,6 @@
                 "t": {
                     "const": "V",
                     "default": "V",
-                    "enum": [
-                        "V"
-                    ],
                     "title": "T",
                     "type": "string"
                 },
@@ -2180,9 +2034,6 @@
                 "tya": {
                     "const": "Variable",
                     "default": "Variable",
-                    "enum": [
-                        "Variable"
-                    ],
                     "title": "Tya",
                     "type": "string"
                 },

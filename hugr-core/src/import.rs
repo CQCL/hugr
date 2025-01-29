@@ -10,14 +10,19 @@ use crate::{
     extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
     hugr::{HugrMut, IdentList},
     ops::{
-        AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, DataflowBlock, ExitBlock,
-        FuncDecl, FuncDefn, Input, LoadFunction, Module, OpType, OpaqueOp, Output, Tag, TailLoop,
-        CFG, DFG,
+        constant::{CustomConst, CustomSerialized, OpaqueValue},
+        AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock,
+        ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
+        Output, Tag, TailLoop, Value, CFG, DFG,
+    },
+    std_extensions::{
+        arithmetic::{float_types::ConstF64, int_types::ConstInt},
+        collections::array::ArrayValue,
     },
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
-        TypeEnum, TypeRow,
+        TypeEnum, TypeName, TypeRow,
     },
     Direction, Hugr, HugrView, Node, Port,
 };
@@ -26,8 +31,6 @@ use hugr_model::v0::{self as model};
 use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
-
-const TERM_JSON: &str = "prelude.json";
 
 /// Error during import.
 #[derive(Debug, Clone, Error)]
@@ -52,6 +55,14 @@ pub enum ImportError {
         missing_ext: ExtensionId,
         /// The available extensions in the registry.
         available: Vec<ExtensionId>,
+    },
+    /// An extension type is missing.
+    #[error("Importing the hugr requires extension {ext} to have a type named {name}, but it was not found.")]
+    ExtensionType {
+        /// The extension that is missing the type.
+        ext: ExtensionId,
+        /// The name of the missing type.
+        name: TypeName,
     },
     /// The model is not well-formed.
     #[error("validate error: {0}")]
@@ -172,8 +183,8 @@ impl<'a> Context<'a> {
         for meta_item in node_data.meta {
             // TODO: For now we expect all metadata to be JSON since this is how
             // it is handled in `hugr-core`.
-            let value = self.import_json_value(meta_item.value)?;
-            self.hugr.set_metadata(node, meta_item.name, value);
+            let (name, value) = self.import_json_meta(*meta_item)?;
+            self.hugr.set_metadata(node, name, value);
         }
 
         Ok(node)
@@ -214,24 +225,26 @@ impl<'a> Context<'a> {
                 }
             }
 
-            if inputs.is_empty() || outputs.is_empty() {
-                return Err(error_unsupported!(
-                    "link {}#{} is missing either an input or an output port",
-                    link_id.0,
-                    link_id.1
-                ));
-            }
-
-            // We connect the first output to all the inputs, and the first input to all the outputs
-            // (except the first one, which we already connected to the first input). This should
-            // result in the hugr having a (hyper)edge that connects all the ports.
-            // There should be a better way to do this.
-            for (node, port) in inputs.iter() {
-                self.hugr.connect(outputs[0].0, outputs[0].1, *node, *port);
-            }
-
-            for (node, port) in outputs.iter().skip(1) {
-                self.hugr.connect(*node, *port, inputs[0].0, inputs[0].1);
+            match (inputs.as_slice(), outputs.as_slice()) {
+                ([], []) => {
+                    unreachable!();
+                }
+                (_, [output]) => {
+                    for (node, port) in inputs.iter() {
+                        self.hugr.connect(output.0, output.1, *node, *port);
+                    }
+                }
+                ([input], _) => {
+                    for (node, port) in outputs.iter() {
+                        self.hugr.connect(*node, *port, input.0, input.1);
+                    }
+                }
+                _ => {
+                    return Err(error_unsupported!(
+                        "link {:?} would require hyperedge",
+                        link_id
+                    ));
+                }
             }
 
             inputs.clear();
@@ -442,12 +455,6 @@ impl<'a> Context<'a> {
 
                 let node = self.make_node(node_id, optype, parent)?;
 
-                match node_data.regions {
-                    [] => {}
-                    [region] => self.import_dfg_region(node_id, *region, node)?,
-                    _ => return Err(error_unsupported!("multiple regions in custom operation")),
-                }
-
                 Ok(Some(node))
             }
 
@@ -508,6 +515,36 @@ impl<'a> Context<'a> {
 
             model::Operation::DeclareConstructor { .. } => Ok(None),
             model::Operation::DeclareOperation { .. } => Ok(None),
+
+            model::Operation::Const { value } => {
+                let signature = node_data
+                    .signature
+                    .ok_or_else(|| error_uninferred!("node signature"))?;
+                let (_, outputs, _) = self.get_func_type(signature)?;
+                let outputs = self.import_closed_list(outputs)?;
+                let output = outputs
+                    .first()
+                    .ok_or(model::ModelError::TypeError(signature))?;
+                let datatype = self.import_type(*output)?;
+
+                let imported_value = self.import_value(value, *output)?;
+
+                let load_const_node = self.make_node(
+                    node_id,
+                    OpType::LoadConstant(LoadConstant {
+                        datatype: datatype.clone(),
+                    }),
+                    parent,
+                )?;
+
+                let const_node = self
+                    .hugr
+                    .add_node_with_parent(parent, OpType::Const(Const::new(imported_value)));
+
+                self.hugr.connect(const_node, 0, load_const_node, 0);
+
+                Ok(Some(load_const_node))
+            }
         }
     }
 
@@ -896,8 +933,9 @@ impl<'a> Context<'a> {
             model::Term::Var { .. } => Err(error_unsupported!("type variable as `TypeParam`")),
             model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
             model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
-
-            model::Term::Quote { .. } => Err(error_unsupported!("`(quote ...)` as `TypeParam`")),
+            model::Term::BytesType { .. } => Err(error_unsupported!("`bytes` as `TypeParam`")),
+            model::Term::FloatType { .. } => Err(error_unsupported!("`float` as `TypeParam`")),
+            model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
             model::Term::ListType { item_type } => {
@@ -918,9 +956,12 @@ impl<'a> Context<'a> {
             | model::Term::ExtSet { .. }
             | model::Term::Adt { .. }
             | model::Term::Control { .. }
-            | model::Term::NonLinearConstraint { .. } => {
-                Err(model::ModelError::TypeError(term_id).into())
-            }
+            | model::Term::NonLinearConstraint { .. }
+            | model::Term::ConstFunc { .. }
+            | model::Term::Bytes { .. }
+            | model::Term::Meta
+            | model::Term::Float { .. }
+            | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ControlType => {
                 Err(error_unsupported!("type of control types as `TypeParam`"))
@@ -959,9 +1000,6 @@ impl<'a> Context<'a> {
                 arg: value.to_string(),
             }),
 
-            model::Term::Quote { .. } => Ok(TypeArg::Type {
-                ty: self.import_type(term_id)?,
-            }),
             model::Term::Nat(value) => Ok(TypeArg::BoundedNat { n: *value }),
             model::Term::ExtSet { .. } => Ok(TypeArg::Extensions {
                 es: self.import_extension_set(term_id)?,
@@ -972,14 +1010,28 @@ impl<'a> Context<'a> {
             model::Term::ListType { .. } => Err(error_unsupported!("`(list ...)` as `TypeArg`")),
             model::Term::ExtSetType => Err(error_unsupported!("`ext-set` as `TypeArg`")),
             model::Term::Type => Err(error_unsupported!("`type` as `TypeArg`")),
-            model::Term::ApplyFull { .. } => Err(error_unsupported!("custom types as `TypeArg`")),
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeArg`")),
             model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
             model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
+            model::Term::BytesType => Err(error_unsupported!("`bytes` as `TypeArg`")),
+            model::Term::FloatType => Err(error_unsupported!("`float` as `TypeArg`")),
+            model::Term::Bytes { .. } => Err(error_unsupported!("`(bytes ..)` as `TypeArg`")),
+            model::Term::Const { .. } => Err(error_unsupported!("`const` as `TypeArg`")),
+            model::Term::Float { .. } => Err(error_unsupported!("float literal as `TypeArg`")),
+            model::Term::ConstAdt { .. } => Err(error_unsupported!("adt constant as `TypeArg`")),
+            model::Term::ConstFunc { .. } => {
+                Err(error_unsupported!("function constant as `TypeArg`"))
+            }
 
             model::Term::FuncType { .. }
             | model::Term::Adt { .. }
-            | model::Term::Control { .. }
+            | model::Term::ApplyFull { .. } => {
+                let ty = self.import_type(term_id)?;
+                Ok(TypeArg::Type { ty })
+            }
+
+            model::Term::Control { .. }
+            | model::Term::Meta
             | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }
@@ -1045,20 +1097,28 @@ impl<'a> Context<'a> {
                 let (extension, id) = self.import_custom_name(name)?;
 
                 let extension_ref =
-                    self.extensions.get(&extension.to_string()).ok_or_else(|| {
-                        ImportError::Extension {
+                    self.extensions
+                        .get(&extension)
+                        .ok_or_else(|| ImportError::Extension {
                             missing_ext: extension.clone(),
                             available: self.extensions.ids().cloned().collect(),
-                        }
-                    })?;
+                        })?;
+
+                let ext_type =
+                    extension_ref
+                        .get_type(&id)
+                        .ok_or_else(|| ImportError::ExtensionType {
+                            ext: extension.clone(),
+                            name: id.clone(),
+                        })?;
+
+                let bound = ext_type.bound(&args);
 
                 Ok(TypeBase::new_extension(CustomType::new(
                     id,
                     args,
                     extension,
-                    // As part of the migration from `TypeBound`s to constraints, we pretend that all
-                    // `TypeBound`s are copyable.
-                    TypeBound::Copyable,
+                    bound,
                     &Arc::downgrade(extension_ref),
                 )))
             }
@@ -1090,16 +1150,21 @@ impl<'a> Context<'a> {
             | model::Term::StaticType
             | model::Term::Type
             | model::Term::Constraint
-            | model::Term::Quote { .. }
+            | model::Term::Const { .. }
             | model::Term::Str(_)
             | model::Term::ExtSet { .. }
             | model::Term::List { .. }
             | model::Term::Control { .. }
             | model::Term::ControlType
             | model::Term::Nat(_)
-            | model::Term::NonLinearConstraint { .. } => {
-                Err(model::ModelError::TypeError(term_id).into())
-            }
+            | model::Term::NonLinearConstraint { .. }
+            | model::Term::Bytes { .. }
+            | model::Term::BytesType
+            | model::Term::FloatType
+            | model::Term::Float { .. }
+            | model::Term::ConstFunc { .. }
+            | model::Term::Meta
+            | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
         }
     }
 
@@ -1234,10 +1299,10 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn import_json_value(
+    fn import_json_meta(
         &mut self,
         term_id: model::TermId,
-    ) -> Result<serde_json::Value, ImportError> {
+    ) -> Result<(&'a str, serde_json::Value), ImportError> {
         let (global, args) = match self.get_term(term_id)? {
             model::Term::Apply { symbol, args } | model::Term::ApplyFull { symbol, args } => {
                 (symbol, args)
@@ -1246,11 +1311,15 @@ impl<'a> Context<'a> {
         };
 
         let global = self.get_symbol_name(*global)?;
-        if global != TERM_JSON {
+        if global != model::COMPAT_META_JSON {
             return Err(model::ModelError::TypeError(term_id).into());
         }
 
-        let [json_arg] = args else {
+        let [name_arg, json_arg] = args else {
+            return Err(model::ModelError::TypeError(term_id).into());
+        };
+
+        let model::Term::Str(name) = self.get_term(*name_arg)? else {
             return Err(model::ModelError::TypeError(term_id).into());
         };
 
@@ -1261,7 +1330,179 @@ impl<'a> Context<'a> {
         let json_value =
             serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
 
-        Ok(json_value)
+        Ok((name, json_value))
+    }
+
+    fn import_value(
+        &mut self,
+        term_id: model::TermId,
+        type_id: model::TermId,
+    ) -> Result<Value, ImportError> {
+        let term_data = self.get_term(term_id)?;
+
+        match term_data {
+            model::Term::Wildcard => Err(error_uninferred!("wildcard")),
+            model::Term::Apply { .. } => {
+                Err(error_uninferred!("application with implicit parameters"))
+            }
+            model::Term::Var(_) => Err(error_unsupported!("constant value containing a variable")),
+
+            model::Term::ApplyFull { symbol, args } => {
+                let symbol_name = self.get_symbol_name(*symbol)?;
+
+                if symbol_name == model::COMPAT_CONST_JSON {
+                    let value = args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
+
+                    let model::Term::Str(json) = self.get_term(*value)? else {
+                        return Err(model::ModelError::TypeError(term_id).into());
+                    };
+
+                    // We attempt to deserialize as the custom const directly.
+                    // This might fail due to the custom const struct not being included when
+                    // this code was compiled; in that case, we fall back to the serialized form.
+                    let value: Option<Box<dyn CustomConst>> = serde_json::from_str(json).ok();
+
+                    if let Some(value) = value {
+                        let opaque_value = OpaqueValue::from(value);
+                        return Ok(Value::Extension { e: opaque_value });
+                    } else {
+                        let runtime_type =
+                            args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        let runtime_type = self.import_type(*runtime_type)?;
+
+                        let extensions =
+                            args.get(2).ok_or(model::ModelError::TypeError(term_id))?;
+                        let extensions = self.import_extension_set(*extensions)?;
+
+                        let value: serde_json::Value = serde_json::from_str(json)
+                            .map_err(|_| model::ModelError::TypeError(term_id))?;
+                        let custom_const = CustomSerialized::new(runtime_type, value, extensions);
+                        let opaque_value = OpaqueValue::new(custom_const);
+                        return Ok(Value::Extension { e: opaque_value });
+                    }
+                }
+
+                // NOTE: We have special cased arrays, integers, and floats for now.
+                // TODO: Allow arbitrary extension values to be imported from terms.
+
+                if symbol_name == ArrayValue::CTR_NAME {
+                    let element_type_term =
+                        args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
+                    let element_type = self.import_type(*element_type_term)?;
+
+                    let contents = {
+                        let contents = args.get(2).ok_or(model::ModelError::TypeError(term_id))?;
+                        let contents = self.import_closed_list(*contents)?;
+                        contents
+                            .iter()
+                            .map(|item| self.import_value(*item, *element_type_term))
+                            .collect::<Result<Vec<_>, _>>()?
+                    };
+
+                    return Ok(ArrayValue::new(element_type, contents).into());
+                }
+
+                if symbol_name == ConstInt::CTR_NAME {
+                    let bitwidth = {
+                        let bitwidth = args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Nat(bitwidth) = self.get_term(*bitwidth)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        if *bitwidth > 6 {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        }
+                        *bitwidth as u8
+                    };
+
+                    let value = {
+                        let value = args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Nat(value) = self.get_term(*value)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        *value
+                    };
+
+                    return Ok(ConstInt::new_u(bitwidth, value)
+                        .map_err(|_| model::ModelError::TypeError(term_id))?
+                        .into());
+                }
+
+                if symbol_name == ConstF64::CTR_NAME {
+                    let value = {
+                        let value = args.first().ok_or(model::ModelError::TypeError(term_id))?;
+                        let model::Term::Float { value } = self.get_term(*value)? else {
+                            return Err(model::ModelError::TypeError(term_id).into());
+                        };
+                        value.into_inner()
+                    };
+
+                    return Ok(ConstF64::new(value).into());
+                }
+
+                Err(error_unsupported!("unknown custom constant value"))
+                // TODO: This should ultimately include the following cases:
+                // - function definitions
+                // - custom constructors for values
+            }
+
+            model::Term::StaticType
+            | model::Term::Constraint
+            | model::Term::Const { .. }
+            | model::Term::List { .. }
+            | model::Term::ListType { .. }
+            | model::Term::Str(_)
+            | model::Term::StrType
+            | model::Term::Nat(_)
+            | model::Term::NatType
+            | model::Term::ExtSet { .. }
+            | model::Term::ExtSetType
+            | model::Term::Adt { .. }
+            | model::Term::FuncType { .. }
+            | model::Term::Control { .. }
+            | model::Term::ControlType
+            | model::Term::Type
+            | model::Term::Bytes { .. }
+            | model::Term::BytesType
+            | model::Term::Meta
+            | model::Term::Float { .. }
+            | model::Term::FloatType
+            | model::Term::NonLinearConstraint { .. } => {
+                Err(model::ModelError::TypeError(term_id).into())
+            }
+
+            model::Term::ConstFunc { .. } => Err(error_unsupported!("constant function value")),
+
+            model::Term::ConstAdt { tag, values } => {
+                let model::Term::Adt { variants } = self.get_term(type_id)? else {
+                    return Err(model::ModelError::TypeError(term_id).into());
+                };
+
+                let values = self.import_closed_list(*values)?;
+                let variants = self.import_closed_list(*variants)?;
+
+                let variant = variants
+                    .get(*tag as usize)
+                    .ok_or(model::ModelError::TypeError(term_id))?;
+                let variant = self.import_closed_list(*variant)?;
+
+                let items = values
+                    .iter()
+                    .zip(variant.iter())
+                    .map(|(value, typ)| self.import_value(*value, *typ))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let typ = {
+                    // TODO: Import as a `SumType` directly and avoid the copy.
+                    let typ: Type = self.import_type(type_id)?;
+                    match typ.as_type_enum() {
+                        TypeEnum::Sum(sum) => sum.clone(),
+                        _ => unreachable!(),
+                    }
+                };
+
+                Ok(Value::sum(*tag as _, items, typ).unwrap())
+            }
+        }
     }
 }
 

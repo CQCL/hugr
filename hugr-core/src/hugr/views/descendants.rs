@@ -38,7 +38,7 @@ pub struct DescendantsGraph<'g, Root = Node> {
     /// The operation handle of the root node.
     _phantom: std::marker::PhantomData<Root>,
 }
-impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
+impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.pg_index())
@@ -137,7 +137,7 @@ where
         let hugr = hugr.base_hugr();
         Ok(Self {
             root,
-            graph: RegionGraph::new_region(&hugr.graph, &hugr.hierarchy, root.pg_index()),
+            graph: RegionGraph::new(&hugr.graph, &hugr.hierarchy, root.pg_index()),
             hugr,
             _phantom: std::marker::PhantomData,
         })
@@ -247,7 +247,7 @@ pub(super) mod test {
             Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
         assert_eq!(inner_region.node_count(), 3);
-        assert_eq!(inner_region.edge_count(), 2);
+        assert_eq!(inner_region.edge_count(), 1);
         assert_eq!(inner_region.children(inner).count(), 2);
         assert_eq!(inner_region.children(hugr.root()).count(), 0);
         assert_eq!(

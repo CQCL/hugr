@@ -1,0 +1,7 @@
+---
+source: hugr-llvm/src/sum.rs
+expression: module.to_string()
+---
+define {} @untag_tag({} %0) {
+  ret {} undef
+}

@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"fixtures/model-loop.edn\"))"
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-loop.edn\"))"
 ---
 (hugr 0)
 
@@ -9,11 +9,11 @@ expression: "roundtrip(include_str!(\"fixtures/model-loop.edn\"))"
   [?0] [?0] (ext)
   (dfg
     [%0] [%1]
-    (signature (fn [?0] [?0] (ext)))
+    (signature (-> [?0] [?0] (ext)))
     (tail-loop
       [%0] [%1]
-      (signature (fn [?0] [?0] (ext)))
+      (signature (-> [?0] [?0] (ext)))
       (dfg
         [%2] [%3]
-        (signature (fn [?0] [(adt [[?0] [?0]])] (ext)))
-        (tag 0 [%2] [%3] (signature (fn [?0] [(adt [[?0] [?0]])] (ext))))))))
+        (signature (-> [?0] [(adt [[?0] [?0]])] (ext)))
+        (tag 0 [%2] [%3] (signature (-> [?0] [(adt [[?0] [?0]])] (ext))))))))

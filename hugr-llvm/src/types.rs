@@ -126,7 +126,7 @@ pub mod test {
     #[rstest]
     #[case(0, SumType::new_unary(0))]
     #[case(1, SumType::new_unary(1))]
-    #[case(2,SumType::new([vec![Type::new_unit_sum(0), Type::new_unit_sum(1)], vec![Type::new_unit_sum(2), Type::new_unit_sum(3)]]))]
+    #[case(2,SumType::new([vec![Type::new_unit_sum(4), Type::new_unit_sum(1)], vec![Type::new_unit_sum(2), Type::new_unit_sum(3)]]))]
     #[case(3, SumType::new_unary(2))]
     fn sum_types(#[case] _id: i32, #[with(_id)] llvm_ctx: TestContext, #[case] st: SumType) {
         assert_snapshot!(

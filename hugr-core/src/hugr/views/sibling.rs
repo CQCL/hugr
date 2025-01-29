@@ -85,7 +85,7 @@ macro_rules! impl_base_members {
     };
 }
 
-impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
+impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
     impl_base_members! {}
 
     #[inline]
@@ -149,7 +149,7 @@ impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
         let hugr = hugr.base_hugr();
         Self {
             root,
-            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.pg_index()),
+            graph: FlatRegionGraph::new(&hugr.graph, &hugr.hierarchy, root.pg_index()),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -249,7 +249,7 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
         Root: 'p;
 
     fn portgraph(&self) -> Self::Portgraph<'_> {
-        FlatRegionGraph::new_flat_region(
+        FlatRegionGraph::new(
             &self.base_hugr().graph,
             &self.base_hugr().hierarchy,
             self.root.pg_index(),
@@ -265,7 +265,7 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     }
 }
 
-impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
+impl<Root: NodeHandle> HugrView for SiblingMut<'_, Root> {
     impl_base_members! {}
 
     fn contains_node(&self, node: Node) -> bool {

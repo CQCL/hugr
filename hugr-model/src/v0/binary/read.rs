@@ -75,7 +75,7 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
     let outputs = read_scalar_list!(bump, reader, get_outputs, model::LinkIndex);
     let params = read_scalar_list!(bump, reader, get_params, model::TermId);
     let regions = read_scalar_list!(bump, reader, get_regions, model::RegionId);
-    let meta = read_list!(bump, reader, get_meta, read_meta_item);
+    let meta = read_scalar_list!(bump, reader, get_meta, model::TermId);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
     Ok(model::Node {
@@ -198,6 +198,9 @@ fn read_operation<'a>(
         Which::Import(name) => model::Operation::Import {
             name: bump.alloc_str(name?.to_str()?),
         },
+        Which::Const(value) => model::Operation::Const {
+            value: model::TermId(value),
+        },
     })
 }
 
@@ -214,7 +217,7 @@ fn read_region<'a>(
     let sources = read_scalar_list!(bump, reader, get_sources, model::LinkIndex);
     let targets = read_scalar_list!(bump, reader, get_targets, model::LinkIndex);
     let children = read_scalar_list!(bump, reader, get_children, model::NodeId);
-    let meta = read_list!(bump, reader, get_meta, read_meta_item);
+    let meta = read_scalar_list!(bump, reader, get_meta, model::TermId);
     let signature = reader.get_signature().checked_sub(1).map(model::TermId);
 
     let scope = if reader.has_scope() {
@@ -253,6 +256,7 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::NatType(()) => model::Term::NatType,
         Which::ExtSetType(()) => model::Term::ExtSetType,
         Which::ControlType(()) => model::Term::ControlType,
+        Which::Meta(()) => model::Term::Meta,
 
         Which::Variable(reader) => {
             let node = model::NodeId(reader.get_variable_node());
@@ -274,9 +278,13 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             model::Term::ApplyFull { symbol, args }
         }
 
-        Which::Quote(r#type) => model::Term::Quote {
-            r#type: model::TermId(r#type),
-        },
+        Which::Const(reader) => {
+            let reader = reader?;
+            model::Term::Const {
+                r#type: model::TermId(reader.get_type()),
+                extensions: model::TermId(reader.get_extensions()),
+            }
+        }
 
         Which::List(reader) => {
             let reader = reader?;
@@ -317,16 +325,28 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::NonLinearConstraint(term) => model::Term::NonLinearConstraint {
             term: model::TermId(term),
         },
-    })
-}
 
-fn read_meta_item<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::meta_item::Reader,
-) -> ReadResult<model::MetaItem<'a>> {
-    let name = bump.alloc_str(reader.get_name()?.to_str()?);
-    let value = model::TermId(reader.get_value());
-    Ok(model::MetaItem { name, value })
+        Which::ConstFunc(region) => model::Term::ConstFunc {
+            region: model::RegionId(region),
+        },
+
+        Which::ConstAdt(reader) => {
+            let reader = reader?;
+            let tag = reader.get_tag();
+            let values = model::TermId(reader.get_values());
+            model::Term::ConstAdt { tag, values }
+        }
+
+        Which::Bytes(bytes) => model::Term::Bytes {
+            data: bump.alloc_slice_copy(bytes?),
+        },
+        Which::BytesType(()) => model::Term::BytesType,
+
+        Which::Float(value) => model::Term::Float {
+            value: value.into(),
+        },
+        Which::FloatType(()) => model::Term::FloatType,
+    })
 }
 
 fn read_list_part(

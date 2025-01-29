@@ -44,7 +44,7 @@ pub fn monomorphize(hugr: &mut impl HugrMut) -> Result<(), ValidatePassError<Inf
 /// Deprecated: use [crate::remove_dead_funcs] instead.
 #[deprecated(
     since = "0.14.1",
-    note = "Use hugr::algorithms::dead_funcs::RemoveDeadFuncsPass instead"
+    note = "Use hugr_passes::RemoveDeadFuncsPass instead"
 )]
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     #[allow(deprecated)] // we are in a deprecated function, so remove both at same time
@@ -54,7 +54,7 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
 
 #[deprecated(
     since = "0.14.1",
-    note = "Use hugr::algorithms::dead_funcs::RemoveDeadFuncsPass instead"
+    note = "Use hugr_passes::RemoveDeadFuncsPass instead"
 )]
 fn remove_polyfuncs_ref(h: &mut impl HugrMut) {
     let mut pfs_to_delete = Vec::new();

@@ -1,13 +1,21 @@
 (hugr 0)
 
 (declare-func array.replicate
-  (forall ?t type)
   (forall ?n nat)
+  (forall ?t type)
   (where (nonlinear ?t))
-  [?t] [(@ prelude.Array ?t ?n)]
+  [?t] [(@ collections.array.array ?n ?t)]
   (ext))
 
 (declare-func array.copy
+  (forall ?n nat)
   (forall ?t type)
   (where (nonlinear ?t))
-  [(@ prelude.Array ?t)] [(@ prelude.Array ?t) (@ prelude.Array ?t)] (ext))
+  [(@ collections.array.array ?n ?t)] [(@ collections.array.array ?n ?t) (@ collections.array.array ?n ?t)] (ext))
+
+(define-func util.copy
+  (forall ?t type)
+  (where (nonlinear ?t))
+  [?t] [?t ?t] (ext)
+  (dfg [%0] [%0 %0]
+    (signature (-> [?t] [?t ?t] (ext)))))

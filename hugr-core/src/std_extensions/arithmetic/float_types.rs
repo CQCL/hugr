@@ -38,6 +38,18 @@ pub fn float64_type() -> Type {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// A floating-point value.
+///
+/// This constant type does **not** implement equality. Any two instances of
+/// `ConstF64` are considered different.
+//
+// The main problem for equality checking is comparisons of serialized values
+// with different precision in `CustomSerialized`.
+// For example, `3.3508025818765467e243 /= 3.350802581876547e243` for serde,
+// but they would be equal after loaded as a `ConstF64` type.
+//
+// `serde_json` provides some options to overcome this issue, but since
+// custom values are encoded inside `serde_json::Value`s they are not directly
+// reachable by these solutions.
 pub struct ConstF64 {
     /// The value.
     value: f64,
@@ -52,6 +64,9 @@ impl std::ops::Deref for ConstF64 {
 }
 
 impl ConstF64 {
+    /// Name of the constructor for creating constant 64bit floats.
+    pub(crate) const CTR_NAME: &'static str = "arithmetic.float.const-f64";
+
     /// Create a new [`ConstF64`]
     pub fn new(value: f64) -> Self {
         // This function can't be `const` because `is_finite()` is not yet stable as a const function.

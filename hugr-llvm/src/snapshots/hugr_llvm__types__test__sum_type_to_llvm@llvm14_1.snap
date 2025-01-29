@@ -1,5 +1,5 @@
 ---
-source: src/types.rs
-expression: "[]"
+source: hugr-llvm/src/types.rs
+expression: Unit
 ---
-"{ {} }"
+"{}"

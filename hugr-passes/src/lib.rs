@@ -6,7 +6,7 @@ pub use composable::ComposablePass;
 pub mod const_fold;
 pub mod dataflow;
 mod dead_funcs;
-pub use dead_funcs::{remove_dead_funcs, RemoveDeadFuncsPass};
+pub use dead_funcs::{remove_dead_funcs, RemoveDeadFuncsError, RemoveDeadFuncsPass};
 pub mod force_order;
 mod half_node;
 pub mod lower;
@@ -15,7 +15,7 @@ mod monomorphize;
 // TODO: Deprecated re-export. Remove on a breaking release.
 #[deprecated(
     since = "0.14.1",
-    note = "Use `hugr::algorithms::call_graph::RemoveDeadFuncsPass` instead."
+    note = "Use `hugr_passes::RemoveDeadFuncsPass` instead."
 )]
 #[allow(deprecated)]
 pub use monomorphize::remove_polyfuncs;

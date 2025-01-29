@@ -49,15 +49,11 @@ impl<'a> TypeMapping for LLVMTypeMapping<'a> {
 
     fn map_sum_type<'c>(
         &self,
-        sum_type: &HugrSumType,
+        _sum_type: &HugrSumType,
         context: TypingSession<'c, 'a>,
         variants: impl IntoIterator<Item = Vec<Self::OutV<'c>>>,
     ) -> Result<Self::SumOutV<'c>> {
-        LLVMSumType::try_new2(
-            context.iw_context(),
-            variants.into_iter().collect(),
-            sum_type.clone(),
-        )
+        LLVMSumType::try_new(context.iw_context(), variants.into_iter().collect_vec())
     }
 
     fn map_function_type<'c>(

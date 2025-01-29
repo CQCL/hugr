@@ -261,7 +261,7 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             let make_tuple = MakeTuple::from_extension_op(args.node().as_ref())?;
             let llvm_sum_type = context.llvm_sum_type(SumType::new([make_tuple.0]))?;
             let r = llvm_sum_type.build_tag(context.builder(), 0, args.inputs)?;
-            args.outputs.finish(context.builder(), [r])
+            args.outputs.finish(context.builder(), [r.into()])
         }
         _ => Err(anyhow!("Unsupported TupleOpDef")),
     })

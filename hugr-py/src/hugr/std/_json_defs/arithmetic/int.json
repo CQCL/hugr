@@ -2459,7 +2459,7 @@
     "ipow": {
       "extension": "arithmetic.int",
       "name": "ipow",
-      "description": "raise first input to the power of second input",
+      "description": "raise first input to the power of second input, the exponent is treated as an unsigned integer",
       "signature": {
         "params": [
           {

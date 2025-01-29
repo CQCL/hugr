@@ -80,6 +80,14 @@ impl<'c> Emission<'c> {
 
     /// JIT and execute the function named `entry` in the inner module.
     ///
+    /// That function must take no arguments and return an `i64`.
+    pub fn exec_i64(&self, entry: impl AsRef<str>) -> Result<i64> {
+        let gv = self.exec_impl(entry)?;
+        Ok(gv.as_int(true) as i64)
+    }
+
+    /// JIT and execute the function named `entry` in the inner module.
+    ///
     /// That function must take no arguments and return an `f64`.
     pub fn exec_f64(&self, entry: impl AsRef<str>) -> Result<f64> {
         let gv = self.exec_impl(entry)?;
@@ -305,7 +313,7 @@ mod test_fns {
     fn emit_hugr_conditional(llvm_ctx: TestContext) {
         let hugr = {
             let input_v_rows: Vec<TypeRow> =
-                (0..3).map(Type::new_unit_sum).map_into().collect_vec();
+                (1..4).map(Type::new_unit_sum).map_into().collect_vec();
             let output_v_rows = {
                 let mut r = input_v_rows.clone();
                 r.reverse();

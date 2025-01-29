@@ -475,7 +475,10 @@ impl LoadFunction {
     }
 }
 
-/// Operations that is the parent of a dataflow graph.
+/// An operation that is the parent of a dataflow graph.
+///
+/// The children region contains an input and an output node matching the
+/// signature returned by [`DataflowParent::inner_signature`].
 pub trait DataflowParent {
     /// Signature of the inner dataflow graph.
     fn inner_signature(&self) -> Cow<'_, Signature>;

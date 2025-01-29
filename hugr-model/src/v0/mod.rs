@@ -87,8 +87,38 @@
 //! [#1546]: https://github.com/CQCL/hugr/issues/1546
 //! [#1553]: https://github.com/CQCL/hugr/issues/1553
 //! [#1554]: https://github.com/CQCL/hugr/issues/1554
+use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 use thiserror::Error;
+
+/// Constructor for documentation metadata.
+///
+/// - **Parameter:** `?description : str`
+/// - **Result:** `meta`
+pub const CORE_META_DESCRIPTION: &str = "core.meta.description";
+
+/// Constructor for JSON encoded metadata.
+///
+/// This is included in the model to allow for compatibility with `hugr-core`.
+/// The intention is to deprecate this in the future in favor of metadata
+/// expressed with custom constructors.
+///
+/// - **Parameter:** `?name : str`
+/// - **Parameter:** `?json : str`
+/// - **Result:** `meta`
+pub const COMPAT_META_JSON: &str = "compat.meta-json";
+
+/// Constructor for JSON encoded constants.
+///
+/// This is included in the model to allow for compatibility with `hugr-core`.
+/// The intention is to deprecate this in the future in favor of constants
+/// expressed with custom constructors.
+///
+/// - **Parameter:** `?type : type`
+/// - **Parameter:** `?json : str`
+/// - **Parameter:** `?exts : ext-set`
+/// - **Result:** `(const ?type ?exts)`
+pub const COMPAT_CONST_JSON: &str = "compat.const-json";
 
 pub mod binary;
 pub mod scope;
@@ -252,7 +282,7 @@ pub struct Node<'a> {
     /// The regions of the node.
     pub regions: &'a [RegionId],
     /// The meta information attached to the node.
-    pub meta: &'a [MetaItem<'a>],
+    pub meta: &'a [TermId],
     /// The signature of the node.
     ///
     /// Can be `None` to indicate that the node's signature should be inferred,
@@ -375,6 +405,12 @@ pub enum Operation<'a> {
         /// The name of the symbol to be imported.
         name: &'a str,
     },
+
+    /// Create a constant value.
+    Const {
+        /// The term that describes how to construct the constant value.
+        value: TermId,
+    },
 }
 
 impl<'a> Operation<'a> {
@@ -405,7 +441,7 @@ pub struct Region<'a> {
     /// The nodes in the region. The order of the nodes is not significant.
     pub children: &'a [NodeId],
     /// The metadata attached to the region.
-    pub meta: &'a [MetaItem<'a>],
+    pub meta: &'a [TermId],
     /// The signature of the region.
     ///
     /// Can be `None` to indicate that the region signature should be inferred.
@@ -495,15 +531,6 @@ pub struct OperationDecl<'a> {
     pub r#type: TermId,
 }
 
-/// A metadata item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MetaItem<'a> {
-    /// Name of the metadata item.
-    pub name: &'a str,
-    /// Value of the metadata item.
-    pub value: TermId,
-}
-
 /// An index of a variable within a node's parameter list.
 pub type VarIndex = u16;
 
@@ -559,14 +586,18 @@ pub enum Term<'a> {
         args: &'a [TermId],
     },
 
-    /// Quote a runtime type as a static type.
+    /// Type for a constant runtime value.
     ///
-    /// `(quote T) : static` where `T : type`.
-    Quote {
-        /// The runtime type to be quoted.
+    /// `(const T) : static` where `T : type`.
+    Const {
+        /// The runtime type of the constant value.
         ///
         /// **Type:** `type`
         r#type: TermId,
+        /// The extension set required to be present in order to use the constant value.
+        ///
+        /// **Type:** `ext-set`
+        extensions: TermId,
     },
 
     /// A list. May include individual items or other lists to be spliced in.
@@ -662,6 +693,41 @@ pub enum Term<'a> {
         /// The runtime type that must be copyable and discardable.
         term: TermId,
     },
+
+    /// A constant anonymous function.
+    ConstFunc {
+        /// The body of the constant anonymous function.
+        region: RegionId,
+    },
+
+    /// A constant value for an algebraic data type.
+    ConstAdt {
+        /// The tag of the variant.
+        tag: u16,
+        /// The values of the variant.
+        values: TermId,
+    },
+
+    /// A literal byte string.
+    Bytes {
+        /// The data of the byte string.
+        data: &'a [u8],
+    },
+
+    /// The type of byte strings.
+    BytesType,
+
+    /// The type of metadata.
+    Meta,
+
+    /// A literal floating-point number.
+    Float {
+        /// The value of the floating-point number.
+        value: OrderedFloat<f64>,
+    },
+
+    /// The type of floating-point numbers.
+    FloatType,
 }
 
 /// A part of a list term.

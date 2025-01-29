@@ -21,7 +21,6 @@ use itertools::Itertools;
 use crate::emit::emit_value;
 use crate::{
     emit::{deaggregate_call_result, EmitFuncContext, RowPromise},
-    sum::LLVMSumType,
     types::{HugrType, TypingSession},
 };
 use crate::{CodegenExtension, CodegenExtsBuilder};
@@ -332,7 +331,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                 let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
                     Err(anyhow!("ArrayOp::get output is not a sum type"))?
                 };
-                LLVMSumType::try_new(&ts, st.clone())?
+                ts.llvm_sum_type(st.clone())?
             };
 
             let exit_rmb = ctx.new_row_mail_box([res_hugr_ty], "")?;
@@ -353,7 +352,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                         builder.build_load(elem_addr, "")
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v])?;
-                    exit_rmb.write(ctx.builder(), [success_v])?;
+                    exit_rmb.write(ctx.builder(), [success_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -362,7 +361,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                 ctx.build_positioned_new_block("", Some(success_block), |ctx, bb| {
                     let builder = ctx.builder();
                     let failure_v = res_sum_ty.build_tag(builder, 0, vec![])?;
-                    exit_rmb.write(ctx.builder(), [failure_v])?;
+                    exit_rmb.write(ctx.builder(), [failure_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -395,7 +394,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                 let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
                     Err(anyhow!("ArrayOp::set output is not a sum type"))?
                 };
-                LLVMSumType::try_new(&ts, st.clone())?
+                ts.llvm_sum_type(st.clone())?
             };
 
             let exit_rmb = ctx.new_row_mail_box([res_hugr_ty], "")?;
@@ -426,7 +425,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                         Ok((elem_v, array_v))
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v, array_v])?;
-                    exit_rmb.write(ctx.builder(), [success_v])?;
+                    exit_rmb.write(ctx.builder(), [success_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -436,7 +435,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                     let builder = ctx.builder();
                     let failure_v =
                         res_sum_ty.build_tag(builder, 0, vec![value_v, array_v.into()])?;
-                    exit_rmb.write(ctx.builder(), [failure_v])?;
+                    exit_rmb.write(ctx.builder(), [failure_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -469,7 +468,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                 let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
                     Err(anyhow!("ArrayOp::swap output is not a sum type"))?
                 };
-                LLVMSumType::try_new(&ts, st.clone())?
+                ts.llvm_sum_type(st.clone())?
             };
 
             let exit_rmb = ctx.new_row_mail_box([res_hugr_ty], "")?;
@@ -510,7 +509,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                         builder.build_load(ptr, "")
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![array_v])?;
-                    exit_rmb.write(ctx.builder(), [success_v])?;
+                    exit_rmb.write(ctx.builder(), [success_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -519,7 +518,7 @@ pub fn emit_array_op<'c, H: HugrView>(
                 ctx.build_positioned_new_block("", Some(success_block), |ctx, bb| {
                     let builder = ctx.builder();
                     let failure_v = res_sum_ty.build_tag(builder, 0, vec![array_v.into()])?;
-                    exit_rmb.write(ctx.builder(), [failure_v])?;
+                    exit_rmb.write(ctx.builder(), [failure_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -586,15 +585,12 @@ fn emit_pop_op<'c>(
     array_v: ArrayValue<'c>,
     pop_left: bool,
 ) -> Result<BasicValueEnum<'c>> {
-    let ret_ty = LLVMSumType::try_new(
-        ts,
-        option_type(vec![
-            elem_ty.clone(),
-            array_type(size.saturating_add_signed(-1), elem_ty),
-        ]),
-    )?;
+    let ret_ty = ts.llvm_sum_type(option_type(vec![
+        elem_ty.clone(),
+        array_type(size.saturating_add_signed(-1), elem_ty),
+    ]))?;
     if size == 0 {
-        return ret_ty.build_tag(builder, 0, vec![]);
+        return Ok(ret_ty.build_tag(builder, 0, vec![])?.into());
     }
     let ctx = builder.get_insert_block().unwrap().get_context();
     let (elem_v, array_v) = with_array_alloca(builder, array_v, |ptr| {
@@ -621,7 +617,7 @@ fn emit_pop_op<'c>(
         let array_v = builder.build_load(ptr, "")?;
         Ok((elem_v, array_v))
     })?;
-    ret_ty.build_tag(builder, 1, vec![elem_v, array_v])
+    Ok(ret_ty.build_tag(builder, 1, vec![elem_v, array_v])?.into())
 }
 
 /// Emits an [ArrayRepeat] op.

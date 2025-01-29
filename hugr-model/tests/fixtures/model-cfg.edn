@@ -4,14 +4,14 @@
   (forall ?a type)
   [?a] [?a] (ext)
   (dfg [%0] [%1]
-    (signature (fn [?a] [?a] (ext)))
+    (signature (-> [?a] [?a] (ext)))
     (cfg [%0] [%1]
-      (signature (fn [?a] [?a] (ext)))
+      (signature (-> [?a] [?a] (ext)))
       (cfg [%2] [%4]
-        (signature (fn [(ctrl [?a])] [(ctrl [?a])] (ext)))
-        (block [%2] [%4]
-          (signature (fn [(ctrl [?a])] [(ctrl [?a])] (ext)))
+        (signature (-> [(ctrl [?a])] [(ctrl [?a])] (ext)))
+        (block [%2] [%4 %2]
+          (signature (-> [(ctrl [?a])] [(ctrl [?a]) (ctrl [?a])] (ext)))
           (dfg [%5] [%6]
-            (signature (fn [?a] [(adt [[?a]])] (ext)))
+            (signature (-> [?a] [(adt [[?a] [?a]])] (ext)))
             (tag 0 [%5] [%6]
-              (signature (fn [?a] [(adt [[?a]])] (ext))))))))))
+              (signature (-> [?a] [(adt [[?a] [?a]])] (ext))))))))))
