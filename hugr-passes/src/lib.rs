@@ -3,6 +3,7 @@
 pub mod call_graph;
 pub mod const_fold;
 pub mod dataflow;
+mod dead_code;
 mod dead_funcs;
 pub use dead_funcs::{remove_dead_funcs, RemoveDeadFuncsError, RemoveDeadFuncsPass};
 pub mod force_order;
