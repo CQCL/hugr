@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use hugr_core::ops::handle::NodeHandle;
 use hugr_core::ops::Const;
+use hugr_core::std_extensions::arithmetic::{int_ops, int_types};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
@@ -1586,7 +1587,12 @@ fn test_cfg(
 #[test]
 fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let mut mb = ModuleBuilder::new();
-    let mut main = mb.define_function("main", Signature::new_endo(INT_TYPES[5].clone()))?;
+    let mut main = mb.define_function(
+        "main",
+        Signature::new_endo(INT_TYPES[5].clone())
+            .with_extension_delta(int_types::EXTENSION_ID)
+            .with_extension_delta(int_ops::EXTENSION_ID),
+    )?;
     let c7 = main.add_load_value(ConstInt::new_u(5, 7)?);
     let c17 = main.add_load_value(ConstInt::new_u(5, 17)?);
     let res = main.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [c7, c17])?;
