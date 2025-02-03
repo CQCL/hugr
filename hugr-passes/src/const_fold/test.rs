@@ -1588,7 +1588,7 @@ fn test_cfg(
 fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let mut mb = ModuleBuilder::new();
     // Define a top-level constant, if this is removed validation will fail
-    let c7 = mb.add_constant(Value::from(ConstInt::new_u(5,7)?));
+    let c7 = mb.add_constant(Value::from(ConstInt::new_u(5, 7)?));
     let mut main = mb.define_function(
         "main",
         Signature::new_endo(INT_TYPES[5].clone())
