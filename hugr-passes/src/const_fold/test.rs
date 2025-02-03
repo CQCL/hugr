@@ -1587,27 +1587,39 @@ fn test_cfg(
 #[test]
 fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let mut mb = ModuleBuilder::new();
-    // Define a top-level constant, if this is removed validation will fail
+    // Define a top-level constant, (only) the second of which can be removed
     let c7 = mb.add_constant(Value::from(ConstInt::new_u(5, 7)?));
+    let c17 = mb.add_constant(Value::from(ConstInt::new_u(5, 17)?));
     let mut main = mb.define_function(
         "main",
-        Signature::new_endo(INT_TYPES[5].clone())
+        Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2])
             .with_extension_delta(int_types::EXTENSION_ID)
             .with_extension_delta(int_ops::EXTENSION_ID),
     )?;
-    let c7 = main.load_const(&c7);
-    let c17 = main.add_load_value(ConstInt::new_u(5, 17)?);
-    let res = main.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [c7, c17])?;
-    let main = main.finish_with_outputs(res.outputs())?;
+    let lc7 = main.load_const(&c7);
+    let lc17 = main.load_const(&c17);
+    let [add] = main
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [lc7, lc17])?
+        .outputs_arr();
+    let main = main.finish_with_outputs([lc7, add])?;
     let mut hugr = mb.finish_hugr()?;
     constant_fold_pass(&mut hugr);
     assert!(hugr.get_optype(hugr.root()).is_module());
-    assert_eq!(hugr.children(hugr.root()).collect_vec(), [main.node()]);
+    assert_eq!(
+        hugr.children(hugr.root()).collect_vec(),
+        [c7.node(), main.node()]
+    );
     assert_eq!(
         hugr.children(main.node())
             .map(|n| hugr.get_optype(n).tag())
             .collect_vec(),
-        [OpTag::Input, OpTag::Output, OpTag::Const, OpTag::LoadConst,]
+        [
+            OpTag::Input,
+            OpTag::Output,
+            OpTag::LoadConst,
+            OpTag::Const,
+            OpTag::LoadConst,
+        ]
     );
     assert_eq!(
         hugr.children(main.node())
