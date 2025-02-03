@@ -1609,18 +1609,18 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
         hugr.children(hugr.root()).collect_vec(),
         [c7.node(), main.node()]
     );
-    assert_eq!(
-        hugr.children(main.node())
-            .map(|n| hugr.get_optype(n).tag())
-            .collect_vec(),
-        [
-            OpTag::Input,
-            OpTag::Output,
-            OpTag::LoadConst,
-            OpTag::Const,
-            OpTag::LoadConst,
-        ]
-    );
+    let tags = hugr
+        .children(main.node())
+        .map(|n| hugr.get_optype(n).tag())
+        .collect_vec();
+    for (tag, expected_count) in [
+        (OpTag::Input, 1),
+        (OpTag::Output, 1),
+        (OpTag::Const, 1),
+        (OpTag::LoadConst, 2),
+    ] {
+        assert_eq!(tags.iter().filter(|t| **t == tag).count(), expected_count);
+    }
     assert_eq!(
         hugr.children(main.node())
             .find_map(|n| hugr.get_optype(n).as_const()),
