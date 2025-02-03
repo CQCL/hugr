@@ -220,7 +220,7 @@ pub const CORE_TUPLE_TYPE: &str = "core.tuple";
 /// - **Parameter:** `?inputs : (core.list core.type)`
 /// - **Parameter:** `?outputs : (core.list core.type)`
 /// - **Parameter:** `?ext : core.ext_set`
-/// - **Parameter:** `?func : (core.const (core.fn ?inputs ?outputs ?ext) ?ext)`
+/// - **Parameter:** `?fn : (core.const (core.fn ?inputs ?outputs ?ext) ?ext)`
 /// - **Result:** `(core.fn ?inputs ?outputs ?ext)`
 pub const CORE_CALL: &str = "core.call";
 

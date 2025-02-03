@@ -1,0 +1,105 @@
+(hugr 0)
+
+(declare-ctr core.fn
+  (param ?inputs (core.list core.type))
+  (param ?outputs (core.list core.type))
+  core.type
+  (meta (core.meta.description "Runtime function type.")))
+
+(declare-ctr core.type core.static
+  (meta (core.meta.description "Type of types.")))
+
+(declare-ctr core.static core.static
+  (meta (core.meta.description "Type of static values.")))
+
+(declare-ctr core.constraint core.static
+  (meta (core.meta.description "Type of constraints.")))
+
+(declare-ctr core.nonlinear
+  (param ?type core.type)
+  core.constraint
+  (meta (core.meta.description "Nonlinear constraint.")))
+
+(declare-ctr core.meta core.static
+  (meta (core.meta.description "Type of metadata.")))
+
+(declare-ctr core.adt
+  (param ?variants (core.list (core.list core.type)))
+  core.type)
+
+(declare-ctr core.str core.static)
+
+(declare-ctr core.nat core.static)
+
+(declare-ctr core.bytes core.static)
+
+(declare-ctr core.float core.static)
+
+(declare-ctr core.ctrl
+  (param ?types (core.list core.type))
+  core.static)
+
+(declare-ctr core.ctrl_type core.static)
+
+(declare-ctr core.ext_set core.static)
+
+(declare-ctr core.const
+  (param ?type core.type)
+  (param ?ext core.ext_set)
+  core.static)
+
+(declare-ctr core.const.adt
+  (param ?variants (core.list (core.list core.type)))
+  (param ?ext core.ext_set)
+  (param ?types (core.list core.static))
+  (param ?tag core.nat)
+  (param ?values (core.tuple ?types))
+  (where (core.const.adt_types ?variants ?ext ?tag ?types))
+  (core.const (core.adt ?variants) ?ext))
+
+(declare-ctr core.const.adt_types
+  (param ?variants (core.list (core.list core.type)))
+  (param ?ext core.ext_set)
+  (param ?types (core.list core.static))
+  (param ?tag core.nat)
+  core.constraint)
+
+(declare-ctr core.list
+  (param ?type core.static)
+  core.static)
+
+(declare-ctr core.tuple
+  (param ?type (core.list core.static))
+  core.static)
+
+(declare-ctr core.meta.description
+  (param ?description core.str)
+  core.meta)
+
+(declare-operation core.call
+  (param ?inputs (core.list core.type))
+  (param ?outputs (core.list core.type))
+  (param ?ext core.ext_set)
+  (param ?fn (core.const (core.fn ?inputs ?outputs ?ext) ?ext))
+  (core.fn ?inputs ?outputs ?ext)
+  (meta (core.meta.description "Call a statically known function.")))
+
+(declare-operation core.call_indirect
+  (param ?inputs (core.list core.type))
+  (param ?outputs (core.list core.type))
+  (param ?ext core.ext_set)
+  (core.fn [(core.fn ?inputs ?outputs ?ext) ?inputs ...] ?outputs ?ext)
+  (meta (core.meta.description "Call a function provided at runtime.")))
+
+(declare-operation core.load_const
+  (param ?type core.type)
+  (param ?ext core.ext_set)
+  (param ?value (core.const ?type ?ext))
+  (core.fn [] [?type] ?ext)
+  (meta (core.meta.description "Load a constant value.")))
+
+(declare-operation core.make_adt
+  (param ?variants (core.list (core.list core.type)))
+  (param ?types (core.list core.type))
+  (param ?tag core.nat)
+  (core.fn ?types [(core.adt ?variants)] (ext)))
