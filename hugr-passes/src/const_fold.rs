@@ -13,7 +13,7 @@ use hugr_core::{
     },
     ops::{
         constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-        Value,
+        OpType, Value,
     },
     types::{EdgeKind, TypeArg},
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
@@ -88,8 +88,7 @@ impl ConstantFoldPass {
         });
 
         let results = Machine::new(&hugr).run(ConstFoldContext(hugr), inputs);
-        let mut keep_nodes = HashSet::new();
-        self.find_needed_nodes(&results, &mut keep_nodes);
+        let keep_nodes = self.find_needed_nodes(&results);
         let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
         let remove_nodes = hugr
@@ -145,17 +144,30 @@ impl ConstantFoldPass {
     fn find_needed_nodes<H: HugrView>(
         &self,
         results: &AnalysisResults<ValueHandle, H>,
-        needed: &mut HashSet<Node>,
-    ) {
-        let mut q = VecDeque::new();
+    ) -> HashSet<Node> {
+        let mut needed = HashSet::new();
         let h = results.hugr();
-        q.push_back(h.root());
+        let mut q = VecDeque::from_iter([h.root()]);
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
             };
-
-            if h.get_optype(n).is_cfg() {
+            if h.get_optype(n).is_module() {
+                for ch in h.children(n) {
+                    match h.get_optype(ch) {
+                        OpType::AliasDecl(_) | OpType::AliasDefn(_) => {
+                            // Use of these is done via names, rather than following edges.
+                            // We could track these as well but for now be conservative.
+                            q.push_back(ch);
+                        }
+                        OpType::FuncDefn(f) if f.name == "main" => {
+                            // Dataflow analysis will have applied any inputs the 'main' function, so assume reachable.
+                            q.push_back(ch);
+                        }
+                        _ => (),
+                    }
+                }
+            } else if h.get_optype(n).is_cfg() {
                 for bb in h.children(n) {
                     //if results.bb_reachable(bb).unwrap() { // no, we'd need to patch up predicates
                     q.push_back(bb);
@@ -192,6 +204,7 @@ impl ConstantFoldPass {
                 }
             }
         }
+        needed
     }
 }
 
