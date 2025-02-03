@@ -91,12 +91,10 @@ impl DeadCodeElimPass {
             if !needed.insert(n) {
                 continue;
             };
-            // TODO if we really want to support
             if matches!(
                 h.get_optype(n),
                 OpType::Conditional(_) | OpType::CFG(_) | OpType::Module(_)
             ) {
-                // All Cases are reachable, but don't assume so for e.g. Constants/FuncDefns
                 for ch in h.children(n) {
                     match h.get_optype(ch) {
                         // Include only if reachable by static edges (from Call/LoadConst/LoadFunction):
