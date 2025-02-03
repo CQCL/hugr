@@ -1587,13 +1587,15 @@ fn test_cfg(
 #[test]
 fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let mut mb = ModuleBuilder::new();
+    // Define a top-level constant, if this is removed validation will fail
+    let c7 = mb.add_constant(Value::from(ConstInt::new_u(5,7)?));
     let mut main = mb.define_function(
         "main",
         Signature::new_endo(INT_TYPES[5].clone())
             .with_extension_delta(int_types::EXTENSION_ID)
             .with_extension_delta(int_ops::EXTENSION_ID),
     )?;
-    let c7 = main.add_load_value(ConstInt::new_u(5, 7)?);
+    let c7 = main.load_const(&c7);
     let c17 = main.add_load_value(ConstInt::new_u(5, 17)?);
     let res = main.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [c7, c17])?;
     let main = main.finish_with_outputs(res.outputs())?;
