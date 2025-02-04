@@ -238,12 +238,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.7
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
+      - name: Get cargo binstall
+        uses: cargo-bins/cargo-binstall@main
       - name: Install capnproto-rust plugin
-        run: cargo install capnpc
+        run: cargo binstall capnpc
       - name: Regenerate the capnp code
         run: |
           capnp compile \
