@@ -15,8 +15,8 @@ pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<model::Mo
 
 /// Read a list of structs from a reader into a slice allocated through the bump allocator.
 macro_rules! read_list {
-    ($bump:expr, $reader:expr, $get:ident, $read:expr) => {{
-        let mut __list_reader = $reader.$get()?;
+    ($bump:expr, $reader:expr, $read:expr) => {{
+        let mut __list_reader = $reader;
         let mut __list = BumpVec::with_capacity_in(__list_reader.len() as _, $bump);
         for __item_reader in __list_reader.iter() {
             __list.push($read($bump, __item_reader)?);
@@ -102,104 +102,90 @@ fn read_operation<'a>(
         Which::FuncDefn(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
+            let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let signature = model::TermId(reader.get_signature());
-            let decl = bump.alloc(model::FuncDecl {
+            let symbol = bump.alloc(model::Symbol {
                 name,
                 params,
                 constraints,
                 signature,
             });
-            model::Operation::DefineFunc { decl }
+            model::Operation::DefineFunc(symbol)
         }
         Which::FuncDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
+            let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let signature = model::TermId(reader.get_signature());
-            let decl = bump.alloc(model::FuncDecl {
+            let symbol = bump.alloc(model::Symbol {
                 name,
                 params,
                 constraints,
                 signature,
             });
-            model::Operation::DeclareFunc { decl }
+            model::Operation::DeclareFunc(symbol)
         }
         Which::AliasDefn(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
-            let r#type = model::TermId(reader.get_type());
-            let value = model::TermId(reader.get_value());
-            let decl = bump.alloc(model::AliasDecl {
+            let params = read_list!(bump, reader.get_params()?, read_param);
+            let signature = model::TermId(reader.get_signature());
+            let symbol = bump.alloc(model::Symbol {
                 name,
                 params,
-                r#type,
+                constraints: &[],
+                signature,
             });
-            model::Operation::DefineAlias { decl, value }
+            model::Operation::DefineAlias(symbol)
         }
         Which::AliasDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
-            let r#type = model::TermId(reader.get_type());
-            let decl = bump.alloc(model::AliasDecl {
+            let params = read_list!(bump, reader.get_params()?, read_param);
+            let signature = model::TermId(reader.get_signature());
+            let symbol = bump.alloc(model::Symbol {
                 name,
                 params,
-                r#type,
+                constraints: &[],
+                signature,
             });
-            model::Operation::DeclareAlias { decl }
+            model::Operation::DeclareAlias(symbol)
         }
         Which::ConstructorDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
+            let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
-            let r#type = model::TermId(reader.get_type());
-            let decl = bump.alloc(model::ConstructorDecl {
+            let signature = model::TermId(reader.get_signature());
+            let symbol = bump.alloc(model::Symbol {
                 name,
                 params,
                 constraints,
-                r#type,
+                signature,
             });
-            model::Operation::DeclareConstructor { decl }
+            model::Operation::DeclareConstructor(symbol)
         }
         Which::OperationDecl(reader) => {
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader, get_params, read_param);
+            let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
-            let r#type = model::TermId(reader.get_type());
-            let decl = bump.alloc(model::OperationDecl {
+            let signature = model::TermId(reader.get_signature());
+            let symbol = bump.alloc(model::Symbol {
                 name,
                 params,
                 constraints,
-                r#type,
+                signature,
             });
-            model::Operation::DeclareOperation { decl }
+            model::Operation::DeclareOperation(symbol)
         }
-        Which::Custom(operation) => model::Operation::Custom {
-            operation: model::NodeId(operation),
-        },
-        Which::CustomFull(operation) => model::Operation::CustomFull {
-            operation: model::NodeId(operation),
-        },
-        Which::Tag(tag) => model::Operation::Tag { tag },
+        Which::Custom(operation) => model::Operation::Custom(model::NodeId(operation)),
         Which::TailLoop(()) => model::Operation::TailLoop,
         Which::Conditional(()) => model::Operation::Conditional,
-        Which::CallFunc(func) => model::Operation::CallFunc {
-            func: model::TermId(func),
-        },
-        Which::LoadFunc(func) => model::Operation::LoadFunc {
-            func: model::TermId(func),
-        },
         Which::Import(name) => model::Operation::Import {
             name: bump.alloc_str(name?.to_str()?),
-        },
-        Which::Const(value) => model::Operation::Const {
-            value: model::TermId(value),
         },
     })
 }
@@ -247,105 +233,40 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
     use hugr_capnp::term::Which;
     Ok(match reader.which()? {
         Which::Wildcard(()) => model::Term::Wildcard,
-        Which::RuntimeType(()) => model::Term::Type,
-        Which::StaticType(()) => model::Term::StaticType,
-        Which::Constraint(()) => model::Term::Constraint,
         Which::String(value) => model::Term::Str(bump.alloc_str(value?.to_str()?)),
-        Which::StringType(()) => model::Term::StrType,
         Which::Nat(value) => model::Term::Nat(value),
-        Which::NatType(()) => model::Term::NatType,
-        Which::ExtSetType(()) => model::Term::ExtSetType,
-        Which::ControlType(()) => model::Term::ControlType,
-        Which::Meta(()) => model::Term::Meta,
 
         Which::Variable(reader) => {
-            let node = model::NodeId(reader.get_variable_node());
-            let index = reader.get_variable_index();
+            let node = model::NodeId(reader.get_node());
+            let index = reader.get_index();
             model::Term::Var(model::VarId(node, index))
         }
 
         Which::Apply(reader) => {
-            let reader = reader?;
             let symbol = model::NodeId(reader.get_symbol());
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::Apply { symbol, args }
-        }
-
-        Which::ApplyFull(reader) => {
-            let reader = reader?;
-            let symbol = model::NodeId(reader.get_symbol());
-            let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::ApplyFull { symbol, args }
-        }
-
-        Which::Const(reader) => {
-            let reader = reader?;
-            model::Term::Const {
-                r#type: model::TermId(reader.get_type()),
-                extensions: model::TermId(reader.get_extensions()),
-            }
+            model::Term::Apply(symbol, args)
         }
 
         Which::List(reader) => {
-            let reader = reader?;
-            let parts = read_list!(bump, reader, get_items, read_list_part);
-            model::Term::List { parts }
+            let parts = read_list!(bump, reader?, read_list_part);
+            model::Term::List(parts)
         }
-
-        Which::ListType(item_type) => model::Term::ListType {
-            item_type: model::TermId(item_type),
-        },
 
         Which::ExtSet(reader) => {
-            let reader = reader?;
-            let parts = read_list!(bump, reader, get_items, read_ext_set_part);
-            model::Term::ExtSet { parts }
+            let parts = read_list!(bump, reader?, read_ext_set_part);
+            model::Term::ExtSet(parts)
         }
 
-        Which::Adt(variants) => model::Term::Adt {
-            variants: model::TermId(variants),
-        },
-
-        Which::FuncType(reader) => {
-            let reader = reader?;
-            let inputs = model::TermId(reader.get_inputs());
-            let outputs = model::TermId(reader.get_outputs());
-            let extensions = model::TermId(reader.get_extensions());
-            model::Term::FuncType {
-                inputs,
-                outputs,
-                extensions,
-            }
+        Which::Tuple(reader) => {
+            let parts = read_list!(bump, reader?, read_tuple_part);
+            model::Term::Tuple(parts)
         }
 
-        Which::Control(values) => model::Term::Control {
-            values: model::TermId(values),
-        },
+        Which::ConstFunc(region) => model::Term::ConstFunc(model::RegionId(region)),
 
-        Which::NonLinearConstraint(term) => model::Term::NonLinearConstraint {
-            term: model::TermId(term),
-        },
-
-        Which::ConstFunc(region) => model::Term::ConstFunc {
-            region: model::RegionId(region),
-        },
-
-        Which::ConstAdt(reader) => {
-            let reader = reader?;
-            let tag = reader.get_tag();
-            let values = model::TermId(reader.get_values());
-            model::Term::ConstAdt { tag, values }
-        }
-
-        Which::Bytes(bytes) => model::Term::Bytes {
-            data: bump.alloc_slice_copy(bytes?),
-        },
-        Which::BytesType(()) => model::Term::BytesType,
-
-        Which::Float(value) => model::Term::Float {
-            value: value.into(),
-        },
-        Which::FloatType(()) => model::Term::FloatType,
+        Which::Bytes(bytes) => model::Term::Bytes(bump.alloc_slice_copy(bytes?)),
+        Which::Float(value) => model::Term::Float(value.into()),
     })
 }
 
@@ -357,6 +278,17 @@ fn read_list_part(
     Ok(match reader.which()? {
         Which::Item(term) => model::ListPart::Item(model::TermId(term)),
         Which::Splice(list) => model::ListPart::Splice(model::TermId(list)),
+    })
+}
+
+fn read_tuple_part(
+    _: &Bump,
+    reader: hugr_capnp::term::tuple_part::Reader,
+) -> ReadResult<model::TuplePart> {
+    use hugr_capnp::term::tuple_part::Which;
+    Ok(match reader.which()? {
+        Which::Item(term) => model::TuplePart::Item(model::TermId(term)),
+        Which::Splice(list) => model::TuplePart::Splice(model::TermId(list)),
     })
 }
 
@@ -377,11 +309,5 @@ fn read_param<'a>(
 ) -> ReadResult<model::Param<'a>> {
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
     let r#type = model::TermId(reader.get_type());
-
-    let sort = match reader.get_sort()? {
-        hugr_capnp::ParamSort::Implicit => model::ParamSort::Implicit,
-        hugr_capnp::ParamSort::Explicit => model::ParamSort::Explicit,
-    };
-
-    Ok(model::Param { name, r#type, sort })
+    Ok(model::Param { name, r#type })
 }

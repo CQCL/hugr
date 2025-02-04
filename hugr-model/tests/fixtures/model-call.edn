@@ -1,24 +1,26 @@
 (hugr 0)
 
-(declare-func example.callee
-  (forall ?ext ext-set)
-  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int ?ext ...)
-  (meta (compat.meta-json "title" "\"Callee\""))
-  (meta (compat.meta-json "description" "\"This is a function declaration.\"")))
+(declare-func
+ example.callee
+ (param ?ext core.ext_set)
+ (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext arithmetic.int ?ext ...))
+ (meta (compat.meta_json "title" "\"Callee\""))
+ (meta (compat.meta_json "description" "\"This is a function declaration.\"")))
 
 (define-func example.caller
-  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int)
-  (meta (compat.meta-json "title" "\"Caller\""))
-  (meta (compat.meta-json "description" "\"This defines a function that calls the function which we declared earlier.\""))
+  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext arithmetic.int))
+  (meta (compat.meta_json "title" "\"Caller\""))
+  (meta (compat.meta_json "description" "\"This defines a function that calls the function which we declared earlier.\""))
   (dfg [%3] [%4]
-    (signature (-> [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))
-    (call (@ example.callee (ext)) [%3] [%4]
-      (signature (-> [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext))))))
+       (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
+       ((core.call _ _ _ (example.callee (ext))) [%3] [%4]
+                                                 (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))))))
 
-(define-func example.load
-  [] [(-> [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int))] (ext)
+(define-func
+  example.load
+  (core.fn [] [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext arithmetic.int))] (ext))
   (dfg
-    []
-    [%5]
-    (signature (-> [] [(-> [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int))] (ext)))
-    (load-func (@ example.caller) [] [%5])))
+   []
+   [%5]
+   (signature (core.fn [] [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext arithmetic.int))] (ext)))
+   ((core.load_const _ _ example.caller) [] [%5])))
