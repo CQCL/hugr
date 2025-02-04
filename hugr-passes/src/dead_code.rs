@@ -193,7 +193,9 @@ mod test {
 
     #[test]
     fn test_cfg_callback() {
-        let mut cb = CFGBuilder::new(Signature::new_endo(type_row![]).with_extension_delta(PRELUDE_ID)).unwrap();
+        let mut cb =
+            CFGBuilder::new(Signature::new_endo(type_row![]).with_extension_delta(PRELUDE_ID))
+                .unwrap();
         let cst_unused = cb.add_constant(Value::from(ConstUsize::new(3)));
         let cst_used_in_dfg = cb.add_constant(Value::from(ConstUsize::new(5)));
         let cst_used = cb.add_constant(Value::unary_unit_sum());
@@ -215,9 +217,11 @@ mod test {
             DeadCodeElimPass::default(),
             // keep the node inside the DFG, but remove the DFG without checking its children:
             DeadCodeElimPass::default().set_preserve_callback(Arc::new(move |h, n| {
-                (n == dfg_unused || h.get_optype(n).is_const())
-                    .then_some(PreserveNode::CanRemove)
-                    .unwrap_or(PreserveNode::MustKeep)
+                if n == dfg_unused || h.get_optype(n).is_const() {
+                    PreserveNode::CanRemove
+                } else {
+                    PreserveNode::MustKeep
+                }
             })),
         ] {
             let mut h = orig.clone();
@@ -236,8 +240,11 @@ mod test {
 
         // Callbacks that prevent removing any node...
         fn keep_if(b: bool) -> PreserveNode {
-            b.then_some(PreserveNode::MustKeep)
-                .unwrap_or(PreserveNode::UseDefault)
+            if b {
+                PreserveNode::MustKeep
+            } else {
+                PreserveNode::UseDefault
+            }
         }
         for dce in [
             DeadCodeElimPass::default()
