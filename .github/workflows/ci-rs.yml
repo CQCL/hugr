@@ -74,8 +74,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Install LLVM and Clang
@@ -99,8 +97,6 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.7
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
@@ -126,8 +122,6 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
 
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
@@ -154,8 +148,6 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
 
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
@@ -199,8 +191,6 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
@@ -283,8 +273,6 @@ jobs:
           # Nightly is required to count doctests coverage
           toolchain: "nightly"
           components: llvm-tools-preview
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
