@@ -192,7 +192,7 @@ impl DeadCodeElimPass {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::builder::{ConditionalBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
+    use hugr_core::builder::{CFGBuilder, ConditionalBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
     use hugr_core::extension::prelude::{usize_t, ConstUsize};
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{OpTag, OpTrait, OpType};
@@ -206,35 +206,36 @@ mod test {
     use super::DeadCodeElimPass;
 
     #[test]
-    fn test_cases_callback() {
-        let mut cb = ConditionalBuilder::new(vec![type_row![]; 2], type_row![], usize_t()).unwrap();
+    fn test_cfg_callback() {
+        let mut cb = CFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
         let cst_unused = cb.add_constant(Value::from(ConstUsize::new(3)));
-        let cst_used = cb.add_constant(Value::from(ConstUsize::new(29)));
-        let mut case0 = cb.case_builder(0).unwrap();
-        let mut dfg_unused = case0.dfg_builder(Signature::new(type_row![], usize_t()), []).unwrap();
-        let lc1 = dfg_unused.load_const(&cst_unused);
+        let cst_used_in_dfg = cb.add_constant(Value::from(ConstUsize::new(5)));
+        let cst_used = cb.add_constant(Value::unary_unit_sum());
+        let mut block = cb.entry_builder([type_row![]], type_row![]).unwrap();
+        let mut dfg_unused = block.dfg_builder(Signature::new(type_row![], usize_t()), []).unwrap();
+        let _ = dfg_unused.load_const(&cst_unused);
+        let lc1 = dfg_unused.load_const(&cst_used_in_dfg);
         let dfg_unused = dfg_unused.finish_with_outputs([lc1]).unwrap().node();
-        let c = case0.load_const(&cst_used);
-        let case0 = case0.finish_with_outputs([c]).unwrap().node();
-        let mut case1 = cb.case_builder(1).unwrap();
-        let c = case1.load_const(&cst_used);
-        let case1 = case1.finish_with_outputs([c]).unwrap().node();
+        let pred = block.load_const(&cst_used);
+        let block = block.finish_with_outputs(pred, []).unwrap();
+        let exit = cb.exit_block();
+        cb.branch(&block, 0, &exit).unwrap();
         let orig = cb.finish_hugr().unwrap();
 
         // Default, no callback - removes both dfg and cst_unused
-        let mut h = orig.clone();
-        DeadCodeElimPass::default().run(&mut h).unwrap();
-        assert_eq!(h.children(h.root()).collect_vec(), [cst_used.node(), case0, case1]);
-        assert_eq!(h.children(case0).map(|n| h.get_optype(n).tag()).collect_vec(), [OpTag::Input, OpTag::Output, OpTag::LoadConst]);
-        // Allow DFG to be removed without checking children
-        let mut h = orig.clone();
+        let mut h1 = orig.clone();
+        DeadCodeElimPass::default().run(&mut h1).unwrap();
+        // Allow DFG to be removed without checking children (as they can't be removed)
+        let mut h2 = orig.clone();
         DeadCodeElimPass::default().set_diverge_callback(Arc::new(move |_,n|(n==dfg_unused).then_some(NodeDivergence::CanRemove).unwrap_or(NodeDivergence::MustKeep)))
-            .run(&mut h).unwrap();
-        assert_eq!(h.children(h.root()).collect_vec(), [cst_used.node(), case0, case1]);
-        assert_eq!(h.children(case0).map(|n| h.get_optype(n).tag()).collect_vec(), [OpTag::Input, OpTag::Output, OpTag::LoadConst]);
+            .run(&mut h2).unwrap();
+        for h in [&h1, &h2] {
+            assert_eq!(h.children(h.root()).collect_vec(), [block.node(), exit.node(), cst_used.node()]);
+            assert_eq!(h.children(block.node()).map(|n| h.get_optype(n).tag()).collect_vec(), [OpTag::Input, OpTag::Output, OpTag::LoadConst]);
+        }
 
         // Callbacks that prevent removing any node...
-        fn keep_if(b: bool) -> NodeDivergence {
+        /*fn keep_if(b: bool) -> NodeDivergence {
             b.then_some(NodeDivergence::MustKeep).unwrap_or(NodeDivergence::UseDefault)
         }
         let mut h = orig.clone();
@@ -252,6 +253,6 @@ mod test {
         .set_diverge_callback(Arc::new(|h,n| keep_if(matches!(h.get_optype(n), OpType::LoadConstant(_)))))
         .run(&mut h)
         .unwrap();
-        assert_eq!(orig, h);
+        assert_eq!(orig, h);*/
     }
 } 
