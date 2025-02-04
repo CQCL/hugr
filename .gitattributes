@@ -1,1 +1,3 @@
 **/snapshots/*.snap -diff
+
+hugr-model/src/capnp/hugr_*.rs linguist-generated=true

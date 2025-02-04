@@ -50,6 +50,13 @@ miri *TEST_ARGS:
 update-schema:
     uv run scripts/generate_schema.py specification/schema/
 
+# Update the `hugr-model` capnproto definitions.
+update-model-capnp:
+    # Always use the latest version of capnproto-rust
+    cargo install capnpc
+    @# When modifying the schema version, update the `ci-rs.yml` file too.
+    capnp compile -orust:hugr-model/src --src-prefix=hugr-model hugr-model/capnp/hugr-v0.capnp
+
 # Update snapshots used in the pytest tests.
 update-pytest-snapshots:
     uv run pytest --snapshot-update

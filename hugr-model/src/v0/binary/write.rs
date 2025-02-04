@@ -1,4 +1,4 @@
-use crate::hugr_v0_capnp as hugr_capnp;
+use crate::capnp::hugr_v0_capnp as hugr_capnp;
 use crate::v0 as model;
 
 /// Write a list of items into a list builder.
