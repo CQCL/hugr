@@ -24,7 +24,7 @@ use crate::dataflow::{
     partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
     TailLoopTermination,
 };
-use crate::dead_code::NodeDivergence;
+use crate::dead_code::PreserveNode;
 use crate::validation::{ValidatePassError, ValidationLevel};
 use crate::{find_main, DeadCodeElimPass};
 
@@ -137,14 +137,14 @@ impl ConstantFoldPass {
                 // No main => remove everything, so not much use
                 || find_main(hugr).unwrap(),
             ))
-            .set_diverge_callback(if self.allow_increase_termination {
-                Arc::new(|_, _| NodeDivergence::CanRemove)
+            .set_preserve_callback(if self.allow_increase_termination {
+                Arc::new(|_, _| PreserveNode::CanRemove)
             } else {
                 Arc::new(move |_, n| {
                     if terminating_tail_loops.contains(&n) {
-                        NodeDivergence::RemoveIfAllChildrenCanBeRemoved
+                        PreserveNode::RemoveIfAllChildrenCanBeRemoved
                     } else {
-                        NodeDivergence::UseDefault
+                        PreserveNode::UseDefault
                     }
                 })
             })

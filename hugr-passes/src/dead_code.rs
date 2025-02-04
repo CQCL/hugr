@@ -13,7 +13,7 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 #[derive(Clone, Default)]
 pub struct DeadCodeElimPass {
     entry_points: Vec<Node>,
-    diverge_callback: Option<Arc<DivergeCallback>>,
+    preserve_callback: Option<Arc<PreserveCallback>>,
     validation: ValidationLevel,
 }
 
@@ -38,13 +38,23 @@ impl Debug for DeadCodeElimPass {
     }
 }
 
-pub type DivergeCallback = dyn Fn(&Hugr, Node) -> NodeDivergence;
+pub type PreserveCallback = dyn Fn(&Hugr, Node) -> PreserveNode;
 
-pub enum NodeDivergence {
-    #[allow(unused)]
+/// Signal that a node must be preserved even when its result is not used
+pub enum PreserveNode {
+    /// The node must be kept (nodes inside it may be removed)
     MustKeep,
+    /// The node can be removed, even if nodes inside it must be kept - the descendants'
+    /// [PreserveNode] will be ignored and they will be removed too, so use with care.
     CanRemove,
+    /// The default is that [Cfg], [Call] and [TailLoop] nodes must always be kept,
+    /// but otherwise like [Self::RemoveIfAllChildrenCanBeRemoved]
+    ///
+    /// [Call]: hugr_core::ops::Call
+    /// [CFG]: hugr_core::ops::CFG
+    /// [TailLoop]: hugr_core::ops::TailLoop
     UseDefault,
+    /// The node must be kept if (and only if) any of its descendants must be kept
     RemoveIfAllChildrenCanBeRemoved,
 }
 
@@ -56,21 +66,10 @@ impl DeadCodeElimPass {
         self
     }
 
-    /// Allows setting a callback that determines whether a node is considered as diverging
-    /// (non-terminating) - that is, nodes for which the callback returns
-    ///   * Some(true) => cannot be removed, even if we don't need their results
-    ///   * Some(false) => can be removed so long as we don't need their results
-    ///     (note that this means we can remove their descendants too, *even if* said descendants diverge)
-    ///   * None => use default algorithm for whether we can remove or not
-    ///
-    /// The default algorithm says that [Cfg], [Call] and [TailLoop] nodes can never be removed,
-    /// nor can any node that (recursively) contains a diverging node.
-    ///
-    /// [Call]: hugr_core::ops::Call
-    /// [CFG]: hugr_core::ops::CFG
-    /// [TailLoop]: hugr_core::ops::TailLoop
-    pub fn set_diverge_callback(mut self, cb: Arc<DivergeCallback>) -> Self {
-        self.diverge_callback = Some(cb);
+    /// Allows setting a callback that determines whether a node must be preserved
+    /// (even when its result is not used)
+    pub fn set_preserve_callback(mut self, cb: Arc<PreserveCallback>) -> Self {
+        self.preserve_callback = Some(cb);
         self
     }
 
@@ -92,7 +91,7 @@ impl DeadCodeElimPass {
                 continue;
             };
             for ch in h.children(n) {
-                if self.might_diverge(&h, ch)
+                if self.must_preserve(&h, ch)
                     || matches!(
                         h.get_optype(ch),
                         OpType::Case(_) // Include all Cases in Conditionals
@@ -137,15 +136,15 @@ impl DeadCodeElimPass {
 
     // "Diverge" aka "never-terminate"
     // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
-    fn might_diverge(&self, h: &impl HugrView, n: Node) -> bool {
+    fn must_preserve(&self, h: &impl HugrView, n: Node) -> bool {
         match self
-            .diverge_callback
+            .preserve_callback
             .as_ref()
-            .map_or(NodeDivergence::UseDefault, |f| f(h.base_hugr(), n))
+            .map_or(PreserveNode::UseDefault, |f| f(h.base_hugr(), n))
         {
-            NodeDivergence::MustKeep => return true,
-            NodeDivergence::CanRemove => return false,
-            NodeDivergence::UseDefault => {
+            PreserveNode::MustKeep => return true,
+            PreserveNode::CanRemove => return false,
+            PreserveNode::UseDefault => {
                 match h.get_optype(n) {
                     OpType::CFG(_) => {
                         // TODO if the CFG has no cycles (that are possible given predicates)
@@ -167,11 +166,11 @@ impl DeadCodeElimPass {
                     _ => (), // fall through to check children
                 }
             }
-            NodeDivergence::RemoveIfAllChildrenCanBeRemoved => (), // fall through to check children
+            PreserveNode::RemoveIfAllChildrenCanBeRemoved => (), // fall through to check children
         }
 
         // Node does not introduce non-termination, but still non-terminates if any of its children does
-        h.children(n).any(|ch| self.might_diverge(h, ch))
+        h.children(n).any(|ch| self.must_preserve(h, ch))
     }
 }
 
@@ -188,7 +187,7 @@ mod test {
     use hugr_core::{ops::Value, type_row};
     use itertools::Itertools;
 
-    use crate::dead_code::NodeDivergence;
+    use crate::dead_code::PreserveNode;
 
     use super::DeadCodeElimPass;
 
@@ -215,10 +214,10 @@ mod test {
         for dce in [
             DeadCodeElimPass::default(),
             // keep the node inside the DFG, but remove the DFG without checking its children:
-            DeadCodeElimPass::default().set_diverge_callback(Arc::new(move |h, n| {
+            DeadCodeElimPass::default().set_preserve_callback(Arc::new(move |h, n| {
                 (n == dfg_unused || h.get_optype(n).is_const())
-                    .then_some(NodeDivergence::CanRemove)
-                    .unwrap_or(NodeDivergence::MustKeep)
+                    .then_some(PreserveNode::CanRemove)
+                    .unwrap_or(PreserveNode::MustKeep)
             })),
         ] {
             let mut h = orig.clone();
@@ -236,16 +235,16 @@ mod test {
         }
 
         // Callbacks that prevent removing any node...
-        fn keep_if(b: bool) -> NodeDivergence {
-            b.then_some(NodeDivergence::MustKeep)
-                .unwrap_or(NodeDivergence::UseDefault)
+        fn keep_if(b: bool) -> PreserveNode {
+            b.then_some(PreserveNode::MustKeep)
+                .unwrap_or(PreserveNode::UseDefault)
         }
         for dce in [
             DeadCodeElimPass::default()
-                .set_diverge_callback(Arc::new(|_, _| NodeDivergence::MustKeep)),
+                .set_preserve_callback(Arc::new(|_, _| PreserveNode::MustKeep)),
             // keeping the unused node in the DFG, means keeping the DFG (which uses its other children)
             DeadCodeElimPass::default()
-                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == lc_unused.node()))),
+                .set_preserve_callback(Arc::new(move |_, n| keep_if(n == lc_unused.node()))),
         ] {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
@@ -255,9 +254,9 @@ mod test {
         // Callbacks that keep the DFG but allow removing the unused constant
         for dce in [
             DeadCodeElimPass::default()
-                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == dfg_unused))),
+                .set_preserve_callback(Arc::new(move |_, n| keep_if(n == dfg_unused))),
             DeadCodeElimPass::default()
-                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == lc1.node()))),
+                .set_preserve_callback(Arc::new(move |_, n| keep_if(n == lc1.node()))),
         ] {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
@@ -287,7 +286,7 @@ mod test {
             let cst_unused = cst_unused.node();
             let mut h = orig.clone();
             DeadCodeElimPass::default()
-                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == cst_unused)))
+                .set_preserve_callback(Arc::new(move |_, n| keep_if(n == cst_unused)))
                 .run(&mut h)
                 .unwrap();
             assert_eq!(
