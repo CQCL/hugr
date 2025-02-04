@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.14.1"
+version = "0.14.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -54,9 +54,8 @@ serde_json = { workspace = true }
 delegate = { workspace = true }
 paste = { workspace = true }
 strum = { workspace = true }
-strum_macros = { workspace = true }
 semver = { version = "1.0.23", features = ["serde"] }
-hugr-model = { version = "0.16.0", path = "../hugr-model", optional = true }
+hugr-model = { version = "0.17.1", path = "../hugr-model", optional = true }
 zstd = { version = "0.13.2", optional = true }
 packed_struct = { version =  "0.10.1", features = ["byte_types_64"] }
 

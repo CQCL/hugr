@@ -1,7 +1,7 @@
 use std::{io::{self, BufReader, Read, Write}, mem};
 
 use itertools::Itertools as _;
-use packed_struct::prelude::{PackedStruct, PrimitiveEnum, PrimitiveEnum_u64};
+use packed_struct::{prelude::{PackedStruct, PrimitiveEnum, PrimitiveEnum_u64}, types::ReservedZeroes, PackedStructSlice};
 
 use crate::{
     extension::ExtensionRegistry,
@@ -53,13 +53,76 @@ pub enum EnvelopeError {
     },
 }
 
-// #[derive(packed_struct::derive::PackedStruct)]
-// #[packed_struct(endian = "lsb", bit_numbering = "msb0")]
+#[derive(Debug, Eq, PartialEq)]
+#[derive(packed_struct::derive::PackedStruct)]
+#[packed_struct(endian = "lsb", bit_numbering = "msb0", size_bytes=16)]
 pub struct EnvelopeHeader {
-    // #[packed_field(bytes = "0")]
+    #[packed_field(bytes = "0..", size_bytes = "8")]
     magic: u64,
-    // #[packed_field(bytes = "8", ty = "enum")]
+    #[packed_field(bytes = "8..", size_bytes="8", ty = "enum")]
     payload_type: PayloadType,
+}
+
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(packed_struct::derive::PrimitiveEnum_u8)]
+#[repr(u8)]
+pub enum ModelOrJson {
+    Model = 0,
+    Json = 1,
+}
+
+
+#[derive(Debug, Eq, PartialEq, Clone,Copy)]
+#[derive(packed_struct::derive::PackedStruct)]
+#[packed_struct(endian = "lsb", bit_numbering = "msb0", size_bytes=7)]
+pub struct PayloadTypeV0 {
+    #[packed_field(bits = "0..", size_bits="51")]
+    _reserved: ReservedZeroes::<packed_struct::prelude::packed_bits::Bits::<51>>,
+    #[packed_field(bits = "51", size_bits="1", ty="enum")]
+    model_or_json: ModelOrJson,
+    #[packed_field(bits = "52", size_bits="1")]
+    zstd: bool,
+    #[packed_field(bits = "53", size_bits="1")]
+    is_package: bool,
+}
+
+#[derive(Debug,Eq,PartialEq,Copy,Clone)]
+#[repr(u8)]
+pub enum PayloadType {
+    V0(PayloadTypeV0) = 1
+}
+
+impl PrimitiveEnum for PayloadType {
+    type Primitive = u64;
+
+    fn from_primitive(val: Self::Primitive) -> Option<Self> {
+        // https://doc.rust-lang.org/reference/items/enumerations.html#pointer-casting
+        let discriminant = unsafe { *(&val as *const Self::Primitive as *const u8) };
+        match discriminant {
+            1 => Some(PayloadType::V0(PayloadTypeV0::unpack_from_slice(&val.to_ne_bytes()[1..]).ok()?)),
+            _ => None,
+        }
+    }
+
+    fn to_primitive(&self) -> Self::Primitive {
+        todo!()
+    }
+
+    fn from_str(s: &str) -> Option<Self> {
+        todo!()
+    }
+
+    fn from_str_lower(s: &str) -> Option<Self> {
+        todo!()
+    }
+}
+
+
+impl From<PayloadType> for EnvelopeHeader {
+    fn from(payload_type: PayloadType) -> Self {
+        Self {  payload_type, magic: MAGIC_NUMBER }
+    }
 }
 
 impl EnvelopeHeader {
@@ -72,19 +135,27 @@ impl EnvelopeHeader {
         }
         Ok(())
     }
+
+    pub fn read(mut reader: impl io::Read) -> Result<Self, EnvelopeError> {
+        use packed_struct::PackedStruct;
+        let mut buf: <Self as PackedStruct>::ByteArray = Default::default();
+        reader.read_exact(&mut buf)?;
+        let envelope = Self::unpack(&buf)?;
+        envelope.validate()?;
+        Ok(envelope)
+    }
+
+    pub fn write(&self, mut writer: impl io::Write) -> Result<(), EnvelopeError> {
+        self.validate()?;
+        writer.write_all(&self.pack()?)?;
+        Ok(())
+    }
+
 }
 
 pub const MAGIC_NUMBER: u64 = 0xAAAAAAAAAAAAAAAA;
 pub const DEFAULT_PAYLOAD_TYPE: PayloadType = PayloadType::JsonZstd;
 
-#[derive(PrimitiveEnum_u64, Clone, Copy, Eq, PartialEq, Debug, derive_more::Display)]
-#[repr(u64)]
-pub enum PayloadType {
-    Json = 1,
-    JsonZstd = 2,
-    Model = 3,
-    ModelZstd = 4,
-}
 
 impl PayloadType {
     pub fn from_str(s: impl AsRef<str>) -> Option<Self> {
@@ -93,7 +164,7 @@ impl PayloadType {
 }
 
 pub fn read_envelope(mut reader: impl io::Read, registry: &ExtensionRegistry) -> Result<Package, EnvelopeError> {
-    let header = read_header(&mut reader)?;
+    let header = EnvelopeHeader::read(&mut reader)?;
     decode_package(header.payload_type, reader, registry)
 }
 
@@ -103,32 +174,9 @@ pub fn write_envelope(
     payload_type: Option<PayloadType>,
 ) -> Result<(), EnvelopeError> {
     let payload_type = payload_type.unwrap_or(DEFAULT_PAYLOAD_TYPE);
-    let header = EnvelopeHeader {
-        magic: MAGIC_NUMBER,
-        payload_type,
-    };
-    write_header(&header, &mut writer)?;
+    let header = EnvelopeHeader::from(payload_type);
+    header.write(&mut writer)?;
     encode_package(package, payload_type, writer)
-}
-
-
-fn write_header(header: &EnvelopeHeader, writer: &mut impl Write) -> Result<(), EnvelopeError> {
-    header.validate()?;
-    let magic_bytes = header.magic.to_ne_bytes();
-    let payload_type_bytes = (header.payload_type as u64).to_ne_bytes();
-    writer.write_all(&magic_bytes)?;
-    writer.write_all(&payload_type_bytes)?;
-    Ok(())
-}
-
-fn read_header(reader: &mut impl Read) -> Result<EnvelopeHeader, EnvelopeError> {
-    let mut magic_bytes = [0;8];
-    let mut payload_type_bytes = [0;8];
-    reader.read_exact(&mut magic_bytes)?;
-    reader.read_exact(&mut payload_type_bytes)?;
-    let header = EnvelopeHeader { magic: u64::from_ne_bytes(magic_bytes), payload_type: unsafe { mem::transmute(u64::from_ne_bytes(payload_type_bytes)) }};
-    header.validate()?;
-    Ok(header)
 }
 
 pub fn encode_package(
@@ -220,4 +268,23 @@ fn decode_model(
     let package = Package { modules, extensions  };
     package.validate()?;
     Ok(package)
+}
+
+#[cfg(test)]
+mod test {
+    use rstest::rstest;
+
+    use super::*;
+    #[rstest]
+    #[case(PayloadType::Json)]
+    fn round_trip_header(#[case]payload_type: PayloadType) {
+        let header = EnvelopeHeader::from(payload_type);
+        let mut vec: Vec<u8> = Default::default();
+
+        header.write(&mut vec).unwrap();
+
+        let header2 = EnvelopeHeader::read(vec.as_slice()).unwrap();
+
+        assert_eq!(header, header2);
+    }
 }
