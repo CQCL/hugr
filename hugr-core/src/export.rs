@@ -363,7 +363,7 @@ impl<'a> Context<'a> {
                 let args = args.into_bump_slice();
                 let func = self.make_term(model::Term::Apply(symbol, args));
 
-                // PERFORMANCE: Avoid exporting the signature here again.
+                // TODO PERFORMANCE: Avoid exporting the signature here again.
                 let signature = call.signature();
                 let inputs = self.export_type_row(&signature.input);
                 let outputs = self.export_type_row(&signature.output);
