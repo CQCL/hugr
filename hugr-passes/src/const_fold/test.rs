@@ -28,7 +28,7 @@ use hugr_core::std_extensions::arithmetic::{
     int_types::{ConstInt, INT_TYPES},
 };
 use hugr_core::std_extensions::logic::LogicOp;
-use hugr_core::types::{Signature, SumType, Type, TypeRow, TypeRowRV};
+use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 
 use crate::dataflow::{partial_from_const, DFContext, PartialValue};
@@ -1590,6 +1590,8 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     // Define a top-level constant, (only) the second of which can be removed
     let c7 = mb.add_constant(Value::from(ConstInt::new_u(5, 7)?));
     let c17 = mb.add_constant(Value::from(ConstInt::new_u(5, 17)?));
+    let ad1 = mb.add_alias_declare("unused", TypeBound::Any)?;
+    let ad2 = mb.add_alias_def("unused2", INT_TYPES[3].clone())?;
     let mut main = mb.define_function(
         "main",
         Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2])
@@ -1607,7 +1609,7 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     assert!(hugr.get_optype(hugr.root()).is_module());
     assert_eq!(
         hugr.children(hugr.root()).collect_vec(),
-        [c7.node(), main.node()]
+        [c7.node(), ad1.node(), ad2.node(), main.node()]
     );
     let tags = hugr
         .children(main.node())
