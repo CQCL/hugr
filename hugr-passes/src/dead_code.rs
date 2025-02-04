@@ -91,34 +91,21 @@ impl DeadCodeElimPass {
             if !needed.insert(n) {
                 continue;
             };
-            if matches!(
-                h.get_optype(n),
-                OpType::Conditional(_) | OpType::CFG(_) | OpType::Module(_)
-            ) {
-                for ch in h.children(n) {
-                    match h.get_optype(ch) {
-                        // Include only if reachable by static edges (from Call/LoadConst/LoadFunction):
-                        OpType::FuncDecl(_) | OpType::FuncDefn(_) | OpType::Const(_) => continue,
-                        // Include all cases / BBs, and Aliases (we do not track their uses in types)
-                        OpType::Case(_)
-                        | OpType::DataflowBlock(_)
-                        | OpType::ExitBlock(_)
-                        | OpType::AliasDecl(_)
-                        | OpType::AliasDefn(_) => q.push_back(ch),
-                        op => panic!("Unexpected optype {}", op),
-                    }
-                }
-            } else if let Some(inout) = h.get_io(n) {
-                // Dataflow container, e.g. FuncDefn. Find minimal nodes necessary to compute output,
-                // including StateOrder edges.
-                q.extend(inout); // Input also necessary for legality even if unreachable
-
-                // Also add on anything that might not terminate (even if results not required -
-                // if its results are required we'll add it by following dataflow, below.)
-                for ch in h.children(n) {
-                    if self.might_diverge(&h, ch) {
-                        q.push_back(ch);
-                    }
+            for ch in h.children(n) {
+                if self.might_diverge(&h, ch)
+                    || matches!(
+                        h.get_optype(ch),
+                        OpType::Case(_) // Include all Cases in Conditionals
+                    | OpType::DataflowBlock(_) // and all Basic Blocks in CFGs
+                    | OpType::ExitBlock(_)
+                    | OpType::AliasDecl(_) // and all Aliases (we do not track their uses in types)
+                    | OpType::AliasDefn(_)
+                    | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
+                    | OpType::Output(_) // Do not include FuncDecl / FuncDefn / Const unless reachable by static edges
+                                                                // (from Call/LoadConst/LoadFunction):
+                    )
+                {
+                    q.push_back(ch);
                 }
             }
             // Finally, follow dataflow demand (including e.g. edges from Call to FuncDefn)
@@ -192,10 +179,10 @@ impl DeadCodeElimPass {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::builder::{CFGBuilder, ConditionalBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use hugr_core::extension::prelude::{usize_t, ConstUsize};
+    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
+    use hugr_core::extension::prelude::{usize_t, ConstUsize, PRELUDE_ID};
     use hugr_core::ops::handle::NodeHandle;
-    use hugr_core::ops::{OpTag, OpTrait, OpType};
+    use hugr_core::ops::{OpTag, OpTrait};
     use hugr_core::types::Signature;
     use hugr_core::HugrView;
     use hugr_core::{ops::Value, type_row};
@@ -207,13 +194,15 @@ mod test {
 
     #[test]
     fn test_cfg_callback() {
-        let mut cb = CFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
+        let mut cb = CFGBuilder::new(Signature::new_endo(type_row![]).with_extension_delta(PRELUDE_ID)).unwrap();
         let cst_unused = cb.add_constant(Value::from(ConstUsize::new(3)));
         let cst_used_in_dfg = cb.add_constant(Value::from(ConstUsize::new(5)));
         let cst_used = cb.add_constant(Value::unary_unit_sum());
         let mut block = cb.entry_builder([type_row![]], type_row![]).unwrap();
-        let mut dfg_unused = block.dfg_builder(Signature::new(type_row![], usize_t()), []).unwrap();
-        let _ = dfg_unused.load_const(&cst_unused);
+        let mut dfg_unused = block
+            .dfg_builder(Signature::new(type_row![], usize_t()), [])
+            .unwrap();
+        let lc_unused = dfg_unused.load_const(&cst_unused);
         let lc1 = dfg_unused.load_const(&cst_used_in_dfg);
         let dfg_unused = dfg_unused.finish_with_outputs([lc1]).unwrap().node();
         let pred = block.load_const(&cst_used);
@@ -222,37 +211,95 @@ mod test {
         cb.branch(&block, 0, &exit).unwrap();
         let orig = cb.finish_hugr().unwrap();
 
-        // Default, no callback - removes both dfg and cst_unused
-        let mut h1 = orig.clone();
-        DeadCodeElimPass::default().run(&mut h1).unwrap();
-        // Allow DFG to be removed without checking children (as they can't be removed)
-        let mut h2 = orig.clone();
-        DeadCodeElimPass::default().set_diverge_callback(Arc::new(move |_,n|(n==dfg_unused).then_some(NodeDivergence::CanRemove).unwrap_or(NodeDivergence::MustKeep)))
-            .run(&mut h2).unwrap();
-        for h in [&h1, &h2] {
-            assert_eq!(h.children(h.root()).collect_vec(), [block.node(), exit.node(), cst_used.node()]);
-            assert_eq!(h.children(block.node()).map(|n| h.get_optype(n).tag()).collect_vec(), [OpTag::Input, OpTag::Output, OpTag::LoadConst]);
+        // Callbacks that allow removing the DFG (and cst_unused)
+        for dce in [
+            DeadCodeElimPass::default(),
+            // keep the node inside the DFG, but remove the DFG without checking its children:
+            DeadCodeElimPass::default().set_diverge_callback(Arc::new(move |h, n| {
+                (n == dfg_unused || h.get_optype(n).is_const())
+                    .then_some(NodeDivergence::CanRemove)
+                    .unwrap_or(NodeDivergence::MustKeep)
+            })),
+        ] {
+            let mut h = orig.clone();
+            dce.run(&mut h).unwrap();
+            assert_eq!(
+                h.children(h.root()).collect_vec(),
+                [block.node(), exit.node(), cst_used.node()]
+            );
+            assert_eq!(
+                h.children(block.node())
+                    .map(|n| h.get_optype(n).tag())
+                    .collect_vec(),
+                [OpTag::Input, OpTag::Output, OpTag::LoadConst]
+            );
         }
 
         // Callbacks that prevent removing any node...
-        /*fn keep_if(b: bool) -> NodeDivergence {
-            b.then_some(NodeDivergence::MustKeep).unwrap_or(NodeDivergence::UseDefault)
+        fn keep_if(b: bool) -> NodeDivergence {
+            b.then_some(NodeDivergence::MustKeep)
+                .unwrap_or(NodeDivergence::UseDefault)
         }
-        let mut h = orig.clone();
-        DeadCodeElimPass::default()
-        .set_diverge_callback(Arc::new(|_,_| NodeDivergence::MustKeep))
-        .run(&mut h)
-        .unwrap();
-        assert_eq!(orig, h);
-        DeadCodeElimPass::default()
-        .set_diverge_callback(Arc::new(move |_,n| keep_if(n == dfg_unused)))
-        .run(&mut h)
-        .unwrap();
-        assert_eq!(orig, h);
-        DeadCodeElimPass::default()
-        .set_diverge_callback(Arc::new(|h,n| keep_if(matches!(h.get_optype(n), OpType::LoadConstant(_)))))
-        .run(&mut h)
-        .unwrap();
-        assert_eq!(orig, h);*/
+        for dce in [
+            DeadCodeElimPass::default()
+                .set_diverge_callback(Arc::new(|_, _| NodeDivergence::MustKeep)),
+            // keeping the unused node in the DFG, means keeping the DFG (which uses its other children)
+            DeadCodeElimPass::default()
+                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == lc_unused.node()))),
+        ] {
+            let mut h = orig.clone();
+            dce.run(&mut h).unwrap();
+            assert_eq!(orig, h);
+        }
+
+        // Callbacks that keep the DFG but allow removing the unused constant
+        for dce in [
+            DeadCodeElimPass::default()
+                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == dfg_unused))),
+            DeadCodeElimPass::default()
+                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == lc1.node()))),
+        ] {
+            let mut h = orig.clone();
+            dce.run(&mut h).unwrap();
+            assert_eq!(
+                h.children(h.root()).collect_vec(),
+                [
+                    block.node(),
+                    exit.node(),
+                    cst_used_in_dfg.node(),
+                    cst_used.node()
+                ]
+            );
+            assert_eq!(
+                h.children(block.node()).skip(2).collect_vec(),
+                [dfg_unused, pred.node()]
+            );
+            assert_eq!(
+                h.children(dfg_unused.node())
+                    .map(|n| h.get_optype(n).tag())
+                    .collect_vec(),
+                [OpTag::Input, OpTag::Output, OpTag::LoadConst]
+            );
+        }
+
+        // Callback that allows removing the DFG but require keeping cst_unused
+        {
+            let cst_unused = cst_unused.node();
+            let mut h = orig.clone();
+            DeadCodeElimPass::default()
+                .set_diverge_callback(Arc::new(move |_, n| keep_if(n == cst_unused)))
+                .run(&mut h)
+                .unwrap();
+            assert_eq!(
+                h.children(h.root()).collect_vec(),
+                [block.node(), exit.node(), cst_unused, cst_used.node()]
+            );
+            assert_eq!(
+                h.children(block.node())
+                    .map(|n| h.get_optype(n).tag())
+                    .collect_vec(),
+                [OpTag::Input, OpTag::Output, OpTag::LoadConst]
+            );
+        }
     }
-} 
+}
