@@ -40,6 +40,7 @@ jobs:
     outputs:
       rust: ${{ steps.filter.outputs.rust == 'true' || steps.override.outputs.out == 'true' }}
       python: ${{ steps.filter.outputs.python == 'true' || steps.override.outputs.out == 'true' }}
+      model: ${{ steps.filter.outputs.model == 'true' || steps.override.outputs.out == 'true' }}
       llvm: ${{ steps.filter.outputs.llvm == 'true' || steps.override.outputs.out == 'true' }}
     steps:
     - uses: actions/checkout@v4
@@ -236,6 +237,35 @@ jobs:
           if [ $? -ne 0 ]; then
             echo "The serialized standard extensions are not up to date"
             echo "Please run 'just gen-extensions' and commit the changes"
+            exit 1
+          fi
+
+  # Ensure that the generated capnp implementation in `hugr-model` is up to date
+  model-capnp:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.model == 'true' && github.event_name != 'merge_group' }}
+    name: Keep hugr-model capnp schema updated
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
+      - name: Install capnproto-rust plugin
+        run: cargo install capnpc
+      - name: Regenerate the capnp code
+        run: |
+          capnp compile \
+            -orust:hugr-model/src \
+            --src-prefix=hugr-model \
+            hugr-model/capnp/hugr-v0.capnp
+      - name: Check if the generated capnproto code is up to date
+        run: |
+          git diff --exit-code --name-only hugr-model/capnp/
+          if [ $? -ne 0 ]; then
+            echo "The capnp generated code is not up to date"
+            echo "Please run 'just update-model-capnp' and commit the changes"
             exit 1
           fi
 
