@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.2...hugr-passes-v0.15.0) - 2025-02-05
+
+### Bug Fixes
+
+- Export `RemoveDeadFuncsError` (#1883)
+- const-folding Module keeps at least "main" (#1901)
+
+### Documentation
+
+- Fix deprecation warning messages (#1891)
+
 ## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.1...hugr-passes-v0.14.2) - 2025-01-20
 
 ### New Features
