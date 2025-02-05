@@ -81,3 +81,96 @@ impl Rewrite for InlineCall {
         Some(self.0).into_iter()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use itertools::Itertools;
+
+    use crate::{
+        builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        ops::{handle::NodeHandle, Value},
+        std_extensions::arithmetic::{
+            int_ops::IntOpDef,
+            int_types::{self, ConstInt, INT_TYPES},
+        },
+        types::Signature,
+        HugrView,
+    };
+
+    use super::{HugrMut, InlineCall};
+
+    #[test]
+    fn test_inline() -> Result<(), Box<dyn std::error::Error>> {
+        let mut mb = ModuleBuilder::new();
+        let cst3 = mb.add_constant(Value::from(ConstInt::new_u(4, 3)?));
+        let func = {
+            let mut fb = mb.define_function(
+                "foo",
+                Signature::new_endo(INT_TYPES[4].clone())
+                    .with_extension_delta(int_types::EXTENSION_ID),
+            )?;
+            let c1 = fb.load_const(&cst3);
+            let [i] = fb.input_wires_arr();
+            let add = fb.add_dataflow_op(IntOpDef::iadd.with_log_width(4), [i, c1])?;
+            fb.finish_with_outputs(add.outputs())?
+        };
+        let mut main = mb.define_function("main", Signature::new_endo(INT_TYPES[4].clone()))?;
+        let call1 = main.call(func.handle(), &[], main.input_wires())?;
+        let call2 = main.call(func.handle(), &[], call1.outputs())?;
+        main.finish_with_outputs(call2.outputs())?;
+        let mut hugr = mb.finish_hugr()?;
+        let call1 = call1.node();
+        let call2 = call2.node();
+        assert_eq!(
+            hugr.output_neighbours(func.node()).collect_vec(),
+            [call1, call2]
+        );
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_call())
+                .collect_vec(),
+            [call1, call2]
+        );
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_extension_op())
+                .count(),
+            1
+        );
+
+        hugr.apply_rewrite(InlineCall(call1.node())).unwrap();
+        hugr.validate().unwrap();
+        assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [call2]);
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_call())
+                .collect_vec(),
+            [call2]
+        );
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_extension_op())
+                .count(),
+            2
+        );
+        assert!(!hugr.contains_node(call1.node()));
+
+        hugr.apply_rewrite(InlineCall(call2.node())).unwrap();
+        hugr.validate().unwrap();
+        assert_eq!(hugr.output_neighbours(func.node()).next(), None);
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_call())
+                .next(),
+            None
+        );
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_extension_op())
+                .count(),
+            3
+        );
+
+        Ok(())
+    }
+}
