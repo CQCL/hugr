@@ -43,5 +43,7 @@ jobs:
     needs: [changes]
     if: ${{ needs.changes.outputs.rust == 'true' }}
     uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
+    with:
+      apt-dependencies: llvm-14
     secrets:
       GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
