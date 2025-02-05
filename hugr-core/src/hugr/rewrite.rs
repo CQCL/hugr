@@ -1,6 +1,7 @@
 //! Rewrite operations on the HUGR - replacement, outlining, etc.
 
 pub mod consts;
+pub mod inline_call;
 pub mod inline_dfg;
 pub mod insert_identity;
 pub mod outline_cfg;
