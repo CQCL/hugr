@@ -2,12 +2,10 @@
 //! into a DFG which replaces the Call node.
 use thiserror::Error;
 
-use crate::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use crate::ops::DataflowParent;
-use crate::ops::{handle::FuncID, OpType, DFG};
+use crate::ops::{OpType, DFG};
 use crate::{HugrView, Node};
 
-use super::simple_replace::HugrMutInternals;
 use super::{HugrMut, Rewrite};
 
 /// Rewrite to inline a [Call](OpType::Call) to a known [FuncDefn](OpType::FuncDefn)
@@ -44,32 +42,20 @@ impl Rewrite for InlineCall {
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
-        let function = DescendantsGraph::<FuncID<true>>::try_new(&h, orig_func).unwrap();
-        // Ideally we'd like the following to preserve uses from within "function" of Consts outside
-        // the function, but (see https://github.com/CQCL/hugr/discussions/1642) this probably won't happen at the moment - TODO XXX FIXME
-        let mut func = function.extract_hugr();
-        let recursive_calls = func
-            .static_targets(func.root())
-            .unwrap()
-            .collect::<Vec<_>>();
+        let func_copy = h
+            .copy_subtree(orig_func, h.get_parent(self.0).unwrap())
+            .new_root;
         let new_op = OpType::from(DFG {
-            signature: func
-                .root_type()
+            signature: h
+                .get_optype(orig_func)
                 .as_func_defn()
                 .unwrap()
                 .inner_signature()
                 .into_owned(),
         });
         let (in_ports, out_ports) = (new_op.input_count(), new_op.output_count());
-        func.replace_op(func.root(), new_op).unwrap();
-        func.set_num_ports(func.root(), in_ports as _, out_ports as _);
-        let func_copy = h.insert_hugr(h.get_parent(self.0).unwrap(), func);
-        for (rc, p) in recursive_calls.into_iter() {
-            let call_node = func_copy.node_map.get(&rc).unwrap();
-            h.disconnect(*call_node, p);
-            h.connect(orig_func, 0, *call_node, p);
-        }
-        let func_copy = func_copy.new_root;
+        h.replace_op(func_copy, new_op).unwrap();
+        h.set_num_ports(func_copy, in_ports as _, out_ports as _);
         let new_connections = h
             .all_linked_outputs(self.0)
             .filter(|(n, _)| *n != orig_func)
