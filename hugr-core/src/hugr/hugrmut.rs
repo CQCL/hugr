@@ -1,7 +1,7 @@
 //! Low-level interface for modifying a HUGR.
 
 use core::panic;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
@@ -144,6 +144,15 @@ pub trait HugrMut: HugrMutInternals {
             self.remove_subtree(ch)
         }
         self.hugr_mut().remove_node(node);
+    }
+
+    /// Copies the subtree rooted at `root`, and makes the copy of that root be a child of `new_parent`.
+    /// Incoming edges (to `root` and nonlocal edges to nodes within) are duplicated;
+    /// outgoing edges from `root` are removed in the copy
+    fn copy_subtree(&mut self, root: Node, new_parent: Node) -> InsertionResult {
+        panic_invalid_node(self, root);
+        panic_invalid_node(self, new_parent);
+        self.hugr_mut().copy_subtree(root, new_parent)
     }
 
     /// Connect two nodes at the given ports.
@@ -447,6 +456,43 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
             }
         }
         translate_indices(node_map)
+    }
+
+    fn copy_subtree(&mut self, root: Node, new_parent: Node) -> InsertionResult {
+        // TODO should we check that we will not invalidate the Hugr?
+        // * any linear-typed edge incoming to `root`
+        // * any non-local edge incoming from anywhere that is not child of an ancestor of new_parent
+        //   (we know the sources are children of some ancestor of `root`, but the requirement
+        //    is only guaranteed if new_parent is a descendant of root's parent, or at least,
+        //    of the lowest ancestor of root whose children actually have edges to nodes in the subtree)
+        /*if let Some(root_ancestor) = self.get_parent(root) {
+            if successors(Some(new_parent), |n| self.get_parent(n)).any(|n| n == root_ancestor) {
+                // Copying to somewhere that can "see" any incoming static/nonlocal edges to n.
+                // Could still be invalid if there are incoming linear edges
+            } else {
+                // *May* be invalid if there are incoming static/nonlocal edges
+            }
+        }*/
+        let mut nodes = HashSet::new();
+        let mut q = VecDeque::from_iter([root]);
+        while let Some(n) = q.pop_front() {
+            if nodes.insert(n.pg_index()) {
+                q.extend(self.children(n))
+            }
+        }
+        let node_map: HashMap<Node, Node> =
+            portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
+                .copy_in_parent()
+                .expect("Is a MultiPortGraph")
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect();
+        let new_root = *node_map.get(&root).unwrap();
+        self.set_parent(new_root, new_parent);
+        for p in self.node_outputs(new_root).collect::<Vec<_>>() {
+            self.disconnect(new_root, p);
+        }
+        InsertionResult { new_root, node_map }
     }
 }
 
