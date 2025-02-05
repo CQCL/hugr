@@ -84,18 +84,19 @@ impl Rewrite for InlineCall {
 
 #[cfg(test)]
 mod test {
+    use std::iter::successors;
+
     use itertools::Itertools;
 
-    use crate::{
-        builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::{handle::NodeHandle, Value},
-        std_extensions::arithmetic::{
-            int_ops::IntOpDef,
-            int_types::{self, ConstInt, INT_TYPES},
-        },
-        types::Signature,
-        HugrView,
+    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::ops::handle::FuncID;
+    use crate::ops::{handle::NodeHandle, Value};
+    use crate::std_extensions::arithmetic::{
+        int_ops::IntOpDef,
+        int_types::{self, ConstInt, INT_TYPES},
     };
+    use crate::Hugr;
+    use crate::{types::Signature, HugrView};
 
     use super::{HugrMut, InlineCall};
 
@@ -171,6 +172,46 @@ mod test {
             3
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_recursion() -> Result<(), Box<dyn std::error::Error>> {
+        let mut mb = ModuleBuilder::new();
+        let (func, rec_call) = {
+            let mut fb = mb.define_function("foo", Signature::new_endo(INT_TYPES[5].clone()))?;
+            let cst1 = fb.add_load_value(ConstInt::new_u(5,1)?);
+            let [i] = fb.input_wires_arr();
+            let add = fb.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [i,cst1])?;
+            let call = fb.call(&FuncID::<true>::from(fb.container_node()), &[], add.outputs())?;
+            (fb.finish_with_outputs(call.outputs())?, call)
+        };
+        let mut main = mb.define_function("main", Signature::new_endo(INT_TYPES[5].clone()))?;
+        let call = main.call(func.handle(), &[], main.input_wires())?;
+        let main = main.finish_with_outputs(call.outputs())?;
+        let mut hugr = mb.finish_hugr()?;
+
+        let get_nonrec_call = |h: &Hugr| {
+            let v = h.nodes().filter(|n|h.get_optype(*n).is_call()).collect_vec();
+            //assert!(v.iter().all(|n|h.static_source(*n) == Some(func.node())));
+            assert_eq!(v[0], rec_call.node());
+            v.into_iter().skip(1).exactly_one()
+        };
+
+        let mut call = call.node();
+        for i in 2..10 {
+            hugr.apply_rewrite(InlineCall(call))?;
+            assert_eq!(hugr.nodes().filter(|n| hugr.get_optype(*n).is_extension_op()).count(), i);
+            call = get_nonrec_call(&hugr).unwrap();
+            //assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [rec_call.node(), call.node()]);
+            let mut ancestors = successors(hugr.get_parent(call), |n| hugr.get_parent(*n));
+            for _ in 1..i {
+                assert!(hugr.get_optype(ancestors.next().unwrap()).is_dfg());
+            }
+            assert_eq!(ancestors.next(), Some(main.node()));
+            assert_eq!(ancestors.next(), Some(hugr.root()));
+            assert_eq!(ancestors.next(), None);
+        }
         Ok(())
     }
 }
