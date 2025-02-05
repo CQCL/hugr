@@ -30,17 +30,21 @@ impl Rewrite for InlineCall {
     type ApplyResult = ();
     type Error = InlineCallError;
     fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
-        match h.get_optype(self.0) {
-            OpType::Call(_) => Ok(()),
-            op => Err(InlineCallError::NotCallNode(self.0, op.clone())),
+        let call_ty = h.get_optype(self.0);
+        if !call_ty.is_call() {
+            return Err(InlineCallError::NotCallNode(self.0, call_ty.clone()));
         }
+        let func_ty = h.get_optype(h.static_source(self.0).unwrap());
+        if !func_ty.is_func_defn() {
+            return Err(InlineCallError::CallTargetNotFuncDefn(func_ty.clone()));
+        }
+        Ok(())
     }
 
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
-        self.verify(h)?;
+        self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
-        let function = DescendantsGraph::<FuncID<true>>::try_new(&h, orig_func)
-            .map_err(|_| InlineCallError::CallTargetNotFuncDefn(h.get_optype(orig_func).clone()))?;
+        let function = DescendantsGraph::<FuncID<true>>::try_new(&h, orig_func).unwrap();
         // Ideally we'd like the following to preserve uses from within "function" of Consts outside
         // the function, but (see https://github.com/CQCL/hugr/discussions/1642) this probably won't happen at the moment - TODO XXX FIXME
         let mut func = function.extract_hugr();
