@@ -4,6 +4,9 @@ on:
     branches:
       - main
 
+env:
+  LLVM_VERSION: "14.0"
+
 jobs:
   # Check if changes were made to the relevant files.
   # Always returns true if running on the default branch, to ensure all changes are throughly checked.
@@ -42,6 +45,12 @@ jobs:
   rs-semver-checks:
     needs: [changes]
     if: ${{ needs.changes.outputs.rust == 'true' }}
-    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
+    steps:
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
+      - uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
+
     secrets:
       GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
