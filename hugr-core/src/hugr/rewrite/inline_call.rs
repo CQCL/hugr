@@ -42,9 +42,8 @@ impl Rewrite for InlineCall {
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
-        let func_copy = h
-            .copy_subtree(orig_func, h.get_parent(self.0).unwrap())
-            .new_root;
+        h.disconnect(self.0, h.get_optype(self.0).static_input_port().unwrap());
+
         let new_op = OpType::from(DFG {
             signature: h
                 .get_optype(orig_func)
@@ -54,22 +53,10 @@ impl Rewrite for InlineCall {
                 .into_owned(),
         });
         let (in_ports, out_ports) = (new_op.input_count(), new_op.output_count());
-        h.replace_op(func_copy, new_op).unwrap();
-        h.set_num_ports(func_copy, in_ports as _, out_ports as _);
-        let new_connections = h
-            .all_linked_outputs(self.0)
-            .filter(|(n, _)| *n != orig_func)
-            .enumerate()
-            .map(|(tgt_port, (src, src_port))| (src, src_port, func_copy, tgt_port.into()))
-            .chain(h.node_outputs(self.0).flat_map(|src_port| {
-                h.linked_inputs(self.0, src_port)
-                    .map(move |(tgt, tgt_port)| (func_copy, src_port, tgt, tgt_port))
-            }))
-            .collect::<Vec<_>>();
-        h.remove_node(self.0);
-        for (src_node, src_port, tgt_node, tgt_port) in new_connections {
-            h.connect(src_node, src_port, tgt_node, tgt_port);
-        }
+        h.replace_op(self.0, new_op).unwrap();
+        h.set_num_ports(self.0, in_ports as _, out_ports as _);
+        h.copy_descendants(orig_func, self.0);
+
         Ok(())
     }
 
@@ -154,7 +141,6 @@ mod test {
                 .count(),
             2
         );
-        assert!(!hugr.contains_node(call1.node()));
 
         hugr.apply_rewrite(InlineCall(call2.node())).unwrap();
         hugr.validate().unwrap();
@@ -180,10 +166,14 @@ mod test {
         let mut mb = ModuleBuilder::new();
         let (func, rec_call) = {
             let mut fb = mb.define_function("foo", Signature::new_endo(INT_TYPES[5].clone()))?;
-            let cst1 = fb.add_load_value(ConstInt::new_u(5,1)?);
+            let cst1 = fb.add_load_value(ConstInt::new_u(5, 1)?);
             let [i] = fb.input_wires_arr();
-            let add = fb.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [i,cst1])?;
-            let call = fb.call(&FuncID::<true>::from(fb.container_node()), &[], add.outputs())?;
+            let add = fb.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [i, cst1])?;
+            let call = fb.call(
+                &FuncID::<true>::from(fb.container_node()),
+                &[],
+                add.outputs(),
+            )?;
             (fb.finish_with_outputs(call.outputs())?, call)
         };
         let mut main = mb.define_function("main", Signature::new_endo(INT_TYPES[5].clone()))?;
@@ -192,8 +182,11 @@ mod test {
         let mut hugr = mb.finish_hugr()?;
 
         let get_nonrec_call = |h: &Hugr| {
-            let v = h.nodes().filter(|n|h.get_optype(*n).is_call()).collect_vec();
-            //assert!(v.iter().all(|n|h.static_source(*n) == Some(func.node())));
+            let v = h
+                .nodes()
+                .filter(|n| h.get_optype(*n).is_call())
+                .collect_vec();
+            assert!(v.iter().all(|n| h.static_source(*n) == Some(func.node())));
             assert_eq!(v[0], rec_call.node());
             v.into_iter().skip(1).exactly_one()
         };
@@ -201,9 +194,17 @@ mod test {
         let mut call = call.node();
         for i in 2..10 {
             hugr.apply_rewrite(InlineCall(call))?;
-            assert_eq!(hugr.nodes().filter(|n| hugr.get_optype(*n).is_extension_op()).count(), i);
+            assert_eq!(
+                hugr.nodes()
+                    .filter(|n| hugr.get_optype(*n).is_extension_op())
+                    .count(),
+                i
+            );
             call = get_nonrec_call(&hugr).unwrap();
-            //assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [rec_call.node(), call.node()]);
+            assert_eq!(
+                hugr.output_neighbours(func.node()).collect_vec(),
+                [rec_call.node(), call.node()]
+            );
             let mut ancestors = successors(hugr.get_parent(call), |n| hugr.get_parent(*n));
             for _ in 1..i {
                 assert!(hugr.get_optype(ancestors.next().unwrap()).is_dfg());
