@@ -480,13 +480,22 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
                 q.extend(self.children(n))
             }
         }
-        let node_map: HashMap<Node, Node> =
+        let node_map = translate_indices(
             portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
                 .copy_in_parent()
-                .expect("Is a MultiPortGraph")
-                .into_iter()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect();
+                .expect("Is a MultiPortGraph"),
+        );
+
+        // Copy the optypes, metadata, and hierarchy
+        for (&node, &new_node) in node_map.iter() {
+            for child in self.children(node).collect::<Vec<_>>() {
+                self.set_parent((*node_map.get(&child).unwrap()), new_node);
+            }
+            let nodetype = self.get_optype(node).clone();
+            self.as_mut().op_types.set(new_node.pg_index(), nodetype);
+            let meta = self.base_hugr().metadata.get(node.pg_index()).clone();
+            self.as_mut().metadata.set(new_node.pg_index(), meta);
+        }
         let new_root = *node_map.get(&root).unwrap();
         self.set_parent(new_root, new_parent);
         for p in self.node_outputs(new_root).collect::<Vec<_>>() {
