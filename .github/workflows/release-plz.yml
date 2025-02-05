@@ -24,8 +24,6 @@ jobs:
 
       # These are needed when doing a crate release, since `cargo release`
       # checks that the crate can be compiled before publishing it.
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:

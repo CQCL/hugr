@@ -1,12 +1,15 @@
 # Filters used by [dorny/path-filters](https://github.com/dorny/paths-filter)
 # to detect changes in each subproject, and only run the corresponding jobs.
 
+model: &model
+  - "hugr-model/**"
+
 rust: &rust
   - "hugr/**"
   - "hugr-cli/**"
   - "hugr-core/**"
   - "hugr-passes/**"
-  - "hugr-model/**"
+  - *model
   - "Cargo.toml"
   - "specification/schema/**"
   - ".github/workflows/ci-rs.yml"
@@ -18,7 +21,6 @@ python:
   - "uv.lock"
   - "specification/schema/**"
   - ".github/workflows/ci-py.yml"
-
 
 llvm:
   - "hugr-llvm/**"
