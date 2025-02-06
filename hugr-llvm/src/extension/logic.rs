@@ -57,6 +57,13 @@ fn emit_logic_op<'c, H: HugrView>(
             acc
         }
         LogicOp::Not => builder.build_not(inputs[0], "")?,
+        LogicOp::Xor => {
+            let mut acc = inputs[0];
+            for inp in inputs.into_iter().skip(1) {
+                acc = builder.build_xor(acc, inp, "")?;
+            }
+            acc
+        }
         op => {
             return Err(anyhow!("LogicOpEmitter: Unknown op: {op:?}"));
         }
@@ -80,6 +87,7 @@ pub fn add_logic_extensions<'a, H: HugrView + 'a>(
         .extension_op(logic::EXTENSION_ID, LogicOp::And.name(), emit_logic_op)
         .extension_op(logic::EXTENSION_ID, LogicOp::Or.name(), emit_logic_op)
         .extension_op(logic::EXTENSION_ID, LogicOp::Not.name(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Xor.name(), emit_logic_op) // Added Xor
 }
 
 impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
@@ -146,6 +154,13 @@ mod test {
     fn not(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
         let hugr = test_logic_op(LogicOp::Not, 1);
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn xor(mut llvm_ctx: TestContext) {
+        llvm_ctx.add_extensions(add_logic_extensions);
+        let hugr = test_logic_op(LogicOp::Xor, 2);
         check_emission!(hugr, llvm_ctx);
     }
 }
