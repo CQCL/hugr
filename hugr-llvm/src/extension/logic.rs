@@ -32,38 +32,11 @@ fn emit_logic_op<'c, H: HugrView>(
         inputs.push(bool_val.build_get_tag(builder)?);
     }
     let res = match lot {
-        LogicOp::And => {
-            let mut acc = inputs[0];
-            for inp in inputs.into_iter().skip(1) {
-                acc = builder.build_and(acc, inp, "")?;
-            }
-            acc
-        }
-        LogicOp::Or => {
-            let mut acc = inputs[0];
-            for inp in inputs.into_iter().skip(1) {
-                acc = builder.build_or(acc, inp, "")?;
-            }
-            acc
-        }
-        LogicOp::Eq => {
-            let x = inputs.pop().unwrap();
-            let y = inputs.pop().unwrap();
-            let mut acc = builder.build_int_compare(IntPredicate::EQ, x, y, "")?;
-            for inp in inputs {
-                let eq = builder.build_int_compare(IntPredicate::EQ, inp, x, "")?;
-                acc = builder.build_and(acc, eq, "")?;
-            }
-            acc
-        }
+        LogicOp::And => builder.build_and(inputs[0], inputs[1], "")?,
+        LogicOp::Or => builder.build_or(inputs[0], inputs[1], "")?,
+        LogicOp::Xor => builder.build_xor(inputs[0], inputs[1], "")?,
+        LogicOp::Eq => builder.build_int_compare(IntPredicate::EQ, inputs[0], inputs[1], "")?,
         LogicOp::Not => builder.build_not(inputs[0], "")?,
-        LogicOp::Xor => {
-            let mut acc = inputs[0];
-            for inp in inputs.into_iter().skip(1) {
-                acc = builder.build_xor(acc, inp, "")?;
-            }
-            acc
-        }
         op => {
             return Err(anyhow!("LogicOpEmitter: Unknown op: {op:?}"));
         }
