@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.3...hugr-core-v0.14.4) - 2025-02-06
+
+### New Features
+
+- add xor to logic extension (#1911)
+
 ## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.2...hugr-core-v0.14.3) - 2025-02-05
 
 ### Bug Fixes
