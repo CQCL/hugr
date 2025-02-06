@@ -76,16 +76,25 @@ mod test {
     use itertools::Itertools;
 
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
-    use crate::ops::handle::FuncID;
-    use crate::ops::{handle::NodeHandle, Value};
+    use crate::ops::handle::{FuncID, NodeHandle};
+    use crate::ops::Value;
     use crate::std_extensions::arithmetic::{
         int_ops::IntOpDef,
         int_types::{self, ConstInt, INT_TYPES},
     };
-    use crate::Hugr;
-    use crate::{types::Signature, HugrView};
+    use crate::{types::Signature, Hugr, HugrView, Node};
 
     use super::{HugrMut, InlineCall};
+
+    fn calls(h: &impl HugrView) -> Vec<Node> {
+        h.nodes().filter(|n| h.get_optype(*n).is_call()).collect()
+    }
+
+    fn extension_ops(h: &impl HugrView) -> Vec<Node> {
+        h.nodes()
+            .filter(|n| h.get_optype(*n).is_extension_op())
+            .collect()
+    }
 
     #[test]
     fn test_inline() -> Result<(), Box<dyn std::error::Error>> {
@@ -113,50 +122,20 @@ mod test {
             hugr.output_neighbours(func.node()).collect_vec(),
             [call1, call2]
         );
-        assert_eq!(
-            hugr.nodes()
-                .filter(|n| hugr.get_optype(*n).is_call())
-                .collect_vec(),
-            [call1, call2]
-        );
-        assert_eq!(
-            hugr.nodes()
-                .filter(|n| hugr.get_optype(*n).is_extension_op())
-                .count(),
-            1
-        );
+        assert_eq!(calls(&hugr), [call1, call2]);
+        assert_eq!(extension_ops(&hugr).len(), 1);
 
         hugr.apply_rewrite(InlineCall(call1.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [call2]);
-        assert_eq!(
-            hugr.nodes()
-                .filter(|n| hugr.get_optype(*n).is_call())
-                .collect_vec(),
-            [call2]
-        );
-        assert_eq!(
-            hugr.nodes()
-                .filter(|n| hugr.get_optype(*n).is_extension_op())
-                .count(),
-            2
-        );
+        assert_eq!(calls(&hugr), [call2]);
+        assert_eq!(extension_ops(&hugr).len(), 2);
 
         hugr.apply_rewrite(InlineCall(call2.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).next(), None);
-        assert_eq!(
-            hugr.nodes()
-                .filter(|n| hugr.get_optype(*n).is_call())
-                .next(),
-            None
-        );
-        assert_eq!(
-            hugr.nodes()
-                .filter(|n| hugr.get_optype(*n).is_extension_op())
-                .count(),
-            3
-        );
+        assert_eq!(calls(&hugr), []);
+        assert_eq!(extension_ops(&hugr).len(), 3);
 
         Ok(())
     }
@@ -182,10 +161,7 @@ mod test {
         let mut hugr = mb.finish_hugr()?;
 
         let get_nonrec_call = |h: &Hugr| {
-            let v = h
-                .nodes()
-                .filter(|n| h.get_optype(*n).is_call())
-                .collect_vec();
+            let v = calls(h);
             assert!(v.iter().all(|n| h.static_source(*n) == Some(func.node())));
             assert_eq!(v[0], rec_call.node());
             v.into_iter().skip(1).exactly_one()
@@ -194,13 +170,8 @@ mod test {
         let mut call = call.node();
         for i in 2..10 {
             hugr.apply_rewrite(InlineCall(call))?;
-            assert_eq!(
-                hugr.nodes()
-                    .filter(|n| hugr.get_optype(*n).is_extension_op())
-                    .count(),
-                i
-            );
             hugr.validate().unwrap();
+            assert_eq!(extension_ops(&hugr).len(), i);
             call = get_nonrec_call(&hugr).unwrap();
             assert_eq!(
                 hugr.output_neighbours(func.node()).collect_vec(),
