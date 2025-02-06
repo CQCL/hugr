@@ -24,6 +24,7 @@ lazy_static = { workspace = true }
 paste = { workspace = true }
 thiserror = { workspace = true }
 petgraph = { workspace = true }
+derive_more = { workspace = true, features = ["from", "error", "display"] }
 
 [features]
 extension_inference = ["hugr-core/extension_inference"]

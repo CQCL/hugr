@@ -4,7 +4,6 @@ use ascent::hashbrown::HashMap;
 //
 //TODO Add `remove_nonlocal_edges` and `add_nonlocal_edges` functions
 use itertools::{Either, Itertools as _};
-use thiserror::Error;
 
 use hugr_core::{
     builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder},
@@ -13,6 +12,34 @@ use hugr_core::{
     types::{EdgeKind, Type, TypeRow},
     HugrView, IncomingPort, Node, PortIndex, Wire,
 };
+
+use crate::validation::{ValidatePassError, ValidationLevel};
+
+/// TODO docs
+#[derive(Debug, Clone, Default)]
+pub struct UnNonLocalPass {
+    validation: ValidationLevel,
+}
+
+impl UnNonLocalPass  {
+    /// Sets the validation level used before and after the pass is run.
+    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
+        self.validation = level;
+        self
+    }
+
+    /// Run the Monomorphization pass.
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), NonLocalEdgesError> {
+        remove_nonlocal_edges(hugr)?;
+        Ok(())
+    }
+
+    /// Run the pass using specified configuration.
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), NonLocalEdgesError> {
+        self.validation
+            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
+    }
+}
 
 /// Returns an iterator over all non local edges in a Hugr.
 ///
@@ -29,10 +56,14 @@ pub fn nonlocal_edges(hugr: &impl HugrView) -> impl Iterator<Item = (Node, Incom
     })
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(derive_more::Error, derive_more::From, derive_more::Display, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum NonLocalEdgesError {
-    #[error("Found {} nonlocal edges", .0.len())]
+    #[display("Found {} nonlocal edges", _0.len())]
+    #[error(ignore)]
     Edges(Vec<(Node, IncomingPort)>),
+    #[from]
+    ValidationError(ValidatePassError),
 }
 
 /// Verifies that there are no non local value edges in the Hugr.
