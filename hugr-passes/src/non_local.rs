@@ -196,7 +196,6 @@ pub fn remove_nonlocal_edges(hugr: &mut impl HugrMut) -> Result<(), NonLocalEdge
     let mut parent_source_map = HashMap::new();
 
     while let Some(WorkItem { source, target, ty }) = non_local_edges.pop() {
-        dbg!(&source, target, &ty);
         let parent = hugr.get_parent(target.0).unwrap();
         let local_source = if hugr.get_parent(source.node()).unwrap() == parent {
             source
@@ -206,7 +205,6 @@ pub fn remove_nonlocal_edges(hugr: &mut impl HugrMut) -> Result<(), NonLocalEdge
             let (workitem, wire) = match hugr.get_optype(parent).clone() {
                 OpType::DFG(mut dfg) => {
                     let new_port_index = dfg.signature.input.len();
-                    dbg!(&dfg, new_port_index);
                     dfg.signature.input.to_mut().push(ty.clone());
                     hugr.replace_op(parent, dfg).unwrap();
                     let dfg_port = hugr.insert_incoming_port(parent, new_port_index);
