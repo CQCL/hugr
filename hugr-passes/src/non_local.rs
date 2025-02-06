@@ -180,7 +180,7 @@ pub fn remove_nonlocal_edges(hugr: &mut impl HugrMut) -> Result<(), NonLocalEdge
                 hugr.get_parent(source.node()).unwrap() != hugr.get_parent(node).unwrap()
             );
             let Some(EdgeKind::Value(ty)) = hugr
-                .get_optype(hugr.get_parent(source.node()).unwrap())
+                .get_optype(source.node())
                 .port_kind(source.source())
             else {
                 panic!("impossible")
