@@ -199,36 +199,62 @@ pub fn remove_nonlocal_edges(hugr: &mut impl HugrMut) -> Result<(), NonLocalEdge
         dbg!(&source, target, &ty);
         let parent = hugr.get_parent(target.0).unwrap();
         let local_source = if hugr.get_parent(source.node()).unwrap() == parent {
-            &source
+            source
+        } else if let Some(wire) = parent_source_map.get(&(parent,source)) {
+            *wire
         } else {
-            parent_source_map
-                .entry((parent, source))
-                .or_insert_with(|| {
-                    let (workitem, wire) = match hugr.get_optype(parent).clone() {
-                        OpType::DFG(mut dfg) => {
-                            let new_port_index = dfg.signature.input.len();
-                            dbg!(&dfg, new_port_index);
-                            dfg.signature.input.to_mut().push(ty.clone());
-                            hugr.replace_op(parent, dfg).unwrap();
-                            let dfg_port = hugr.insert_incoming_port(parent, new_port_index);
-                            hugr.connect(source.node(), source.source(), parent, dfg_port);
-                            (
-                                WorkItem {
-                                    source,
-                                    target: (parent, dfg_port),
-                                    ty: ty.clone(),
-                                },
-                                thread_dataflow_parent(hugr, parent, dfg_port.index(), ty),
-                            )
+            let (workitem, wire) = match hugr.get_optype(parent).clone() {
+                OpType::DFG(mut dfg) => {
+                    let new_port_index = dfg.signature.input.len();
+                    dbg!(&dfg, new_port_index);
+                    dfg.signature.input.to_mut().push(ty.clone());
+                    hugr.replace_op(parent, dfg).unwrap();
+                    let dfg_port = hugr.insert_incoming_port(parent, new_port_index);
+                    hugr.connect(source.node(), source.source(), parent, dfg_port);
+                    let wire = thread_dataflow_parent(hugr, parent, dfg_port.index(), ty.clone());
+                    let _ = parent_source_map.insert((parent, source), wire);
+                    (
+                        WorkItem {
+                            source,
+                            target: (parent, dfg_port),
+                            ty
+                        },
+                        wire
+                    )
+                }
+                OpType::DataflowBlock(dataflow_block) => todo!(),
+                OpType::TailLoop(_) => {
+                    let (workitem, wire) = do_tailloop(hugr, parent, source, ty);
+                    let _ = parent_source_map.insert((parent, source), wire);
+                    (workitem, wire)
+                }
+                OpType::Case(_) => {
+                    let cond_node = hugr.get_parent(parent).unwrap();
+                    let mut cond = hugr.get_optype(cond_node).as_conditional().unwrap().clone();
+                    let new_port_index = cond.signature().input().len();
+                    cond.other_inputs.to_mut().push(ty.clone());
+                    hugr.replace_op(cond_node, cond).unwrap();
+                    let cond_port = hugr.insert_incoming_port(cond_node, new_port_index);
+                    let mut this_wire = None;
+                    for (case_n, mut case) in hugr.children(cond_node).filter_map(|n| {
+                        let case = hugr.get_optype(n).as_case()?;
+                        Some((n, case.clone()))
+                    }).collect_vec() {
+                        let case_port_index = case.signature.input().len();
+                        case.signature.input.to_mut().push(ty.clone());
+                        hugr.replace_op(case_n, case).unwrap();
+                        let case_input_wire = thread_dataflow_parent(hugr, case_n, case_port_index, ty.clone());
+                        let _ = parent_source_map.insert((case_n, source), case_input_wire);
+                        if case_n == parent {
+                            this_wire = Some(case_input_wire);
                         }
-                        OpType::DataflowBlock(dataflow_block) => todo!(),
-                        OpType::TailLoop(_) => do_tailloop(hugr, parent, source, ty),
-                        OpType::Case(case) => todo!(),
-                        _ => panic!("impossible"),
-                    };
-                    non_local_edges.push(workitem);
-                    wire
-                })
+                    }
+                    (WorkItem { source, target: (cond_node, cond_port), ty }, this_wire.unwrap())
+                }
+                _ => panic!("impossible"),
+            };
+            non_local_edges.push(workitem);
+            wire
         };
         hugr.disconnect(target.0, target.1);
         hugr.connect(
@@ -245,9 +271,9 @@ pub fn remove_nonlocal_edges(hugr: &mut impl HugrMut) -> Result<(), NonLocalEdge
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer},
         extension::prelude::{bool_t, Noop},
-        ops::{handle::NodeHandle, Tag, TailLoop},
+        ops::{handle::NodeHandle, Tag, TailLoop, Value},
         type_row,
         types::Signature,
     };
@@ -354,6 +380,49 @@ mod test {
                     .outputs_arr()
             };
             outer.finish_hugr_with_outputs([s1, s2, s3]).unwrap()
+        };
+        assert!(ensure_no_nonlocal_edges(&hugr).is_err());
+        remove_nonlocal_edges(&mut hugr).unwrap();
+        hugr.validate().unwrap_or_else(|e| panic!("{e}"));
+        assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
+    }
+
+    #[test]
+    fn remove_nonlocal_edges_cond() {
+        let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
+        let out_variants = vec![t1.clone().into(), t2.clone().into()];
+        let out_type = Type::new_sum(out_variants.clone());
+        let mut hugr = {
+            let mut outer = DFGBuilder::new(Signature::new(vec![
+                t1.clone(),
+                t2.clone(),
+                t3.clone()
+            ], out_type.clone()))
+            .unwrap();
+            let [s1, s2, s3] = outer.input_wires_arr();
+            let [out] = {
+                let mut cond = outer
+                    .conditional_builder((vec![type_row![];3], s3), [], out_type.into()).unwrap();
+
+                {
+                    let mut case = cond.case_builder(0).unwrap();
+                    let [r] = case.add_dataflow_op(Tag::new(0, out_variants.clone()), [s1]).unwrap().outputs_arr();
+                    case.finish_with_outputs([r]).unwrap();
+                }
+                {
+                    let mut case = cond.case_builder(1).unwrap();
+                    let [r] = case.add_dataflow_op(Tag::new(1, out_variants.clone()), [s2]).unwrap().outputs_arr();
+                    case.finish_with_outputs([r]).unwrap();
+                }
+                {
+                    let mut case = cond.case_builder(2).unwrap();
+                    let u = case.add_load_value(Value::unit());
+                    let [r] = case.add_dataflow_op(Tag::new(0, out_variants.clone()), [u]).unwrap().outputs_arr();
+                    case.finish_with_outputs([r]).unwrap();
+                }
+                cond.finish_sub_container().unwrap().outputs_arr()
+            };
+            outer.finish_hugr_with_outputs([out]).unwrap()
         };
         assert!(ensure_no_nonlocal_edges(&hugr).is_err());
         remove_nonlocal_edges(&mut hugr).unwrap();
