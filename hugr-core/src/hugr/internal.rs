@@ -245,6 +245,13 @@ pub trait HugrMutInternals: RootTagged {
         }
         self.hugr_mut().replace_op(node, op)
     }
+
+    /// TODO docs
+    fn get_optype_mut(&mut self, node: Node) -> Result<&mut OpType, HugrError> {
+        panic_invalid_node(self, node);
+        // TODO refuse if node == self.root() because tag might be violated
+        self.hugr_mut().get_optype_mut(node)
+    }
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -305,7 +312,13 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
         // We know RootHandle=Node here so no need to check
-        let cur = self.hugr_mut().op_types.get_mut(node.pg_index());
-        Ok(std::mem::replace(cur, op.into()))
+        Ok(std::mem::replace(
+            self.hugr_mut().get_optype_mut(node)?,
+            op.into(),
+        ))
+    }
+
+    fn get_optype_mut(&mut self, node: Node) -> Result<&mut OpType, HugrError> {
+        Ok(self.hugr_mut().op_types.get_mut(node.pg_index()))
     }
 }

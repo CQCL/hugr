@@ -4,6 +4,7 @@ use core::panic;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use itertools::Itertools as _;
 use portgraph::view::{NodeFilter, NodeFiltered};
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
@@ -11,7 +12,7 @@ use crate::extension::ExtensionRegistry;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
-use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
+use crate::{Direction, Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
 use super::NodeMetadataMap;
@@ -277,6 +278,48 @@ pub trait HugrMut: HugrMutInternals {
     /// Returns a mutable reference to the extension registry for this hugr.
     fn extensions_mut(&mut self) -> &mut ExtensionRegistry {
         &mut self.hugr_mut().extensions
+    }
+
+    /// TODO perhaps these should be on HugrMut?
+    fn insert_incoming_port(&mut self, node: Node, index: usize) -> IncomingPort {
+        let _ = self
+            .add_ports(node, Direction::Incoming, 1)
+            .exactly_one()
+            .unwrap();
+
+        for (to, from) in (index..self.num_inputs(node))
+            .map_into::<IncomingPort>()
+            .rev()
+            .tuple_windows()
+        {
+            let linked_outputs = self.linked_outputs(node, from).collect_vec();
+            self.disconnect(node, from);
+            for (linked_node, linked_port) in linked_outputs {
+                self.connect(linked_node, linked_port, node, to);
+            }
+        }
+        index.into()
+    }
+
+    /// TODO perhaps these should be on HugrMut?
+    fn insert_outgoing_port(&mut self, node: Node, index: usize) -> OutgoingPort {
+        let _ = self
+            .add_ports(node, Direction::Outgoing, 1)
+            .exactly_one()
+            .unwrap();
+
+        for (to, from) in (index..self.num_outputs(node))
+            .map_into::<OutgoingPort>()
+            .rev()
+            .tuple_windows()
+        {
+            let linked_inputs = self.linked_inputs(node, from).collect_vec();
+            self.disconnect(node, from);
+            for (linked_node, linked_port) in linked_inputs {
+                self.connect(node, to, linked_node, linked_port);
+            }
+        }
+        index.into()
     }
 }
 

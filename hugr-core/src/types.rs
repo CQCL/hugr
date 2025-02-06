@@ -27,7 +27,7 @@ pub use type_row::{TypeRow, TypeRowRV};
 pub(crate) use poly_func::PolyFuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
-use itertools::{repeat_n, Itertools};
+use itertools::{repeat_n, Either, Itertools};
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -256,6 +256,16 @@ impl SumType {
             _ => None,
         }
     }
+
+    /// TODO docs
+    pub fn iter_variants(&self) -> impl Iterator<Item = &TypeRowRV> {
+        match self {
+            SumType::Unit { size } => {
+                Either::Left(repeat_n(TypeRV::EMPTY_TYPEROW_REF, *size as usize))
+            }
+            SumType::General { rows } => Either::Right(rows.iter()),
+        }
+    }
 }
 
 impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
@@ -451,6 +461,14 @@ impl<RV: MaybeRV> TypeBase<RV> {
     #[inline(always)]
     pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
         &mut self.0
+    }
+
+    /// TODO docs
+    pub fn as_sum_type(&self) -> Option<&SumType> {
+        match &self.0 {
+            TypeEnum::Sum(s) => Some(s),
+            _ => None,
+        }
     }
 
     /// Report if the type is copyable - i.e.the least upper bound of the type
