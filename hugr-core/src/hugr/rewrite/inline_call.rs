@@ -200,6 +200,7 @@ mod test {
                     .count(),
                 i
             );
+            hugr.validate().unwrap();
             call = get_nonrec_call(&hugr).unwrap();
             assert_eq!(
                 hugr.output_neighbours(func.node()).collect_vec(),
