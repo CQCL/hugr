@@ -79,7 +79,7 @@ mod test {
     use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::Value;
     use crate::std_extensions::arithmetic::{
-        int_ops::IntOpDef,
+        int_ops::{self, IntOpDef},
         int_types::{self, ConstInt, INT_TYPES},
     };
     use crate::{types::Signature, HugrView, Node};
@@ -100,18 +100,17 @@ mod test {
     fn test_inline() -> Result<(), Box<dyn std::error::Error>> {
         let mut mb = ModuleBuilder::new();
         let cst3 = mb.add_constant(Value::from(ConstInt::new_u(4, 3)?));
+        let sig = Signature::new_endo(INT_TYPES[4].clone())
+            .with_extension_delta(int_ops::EXTENSION_ID)
+            .with_extension_delta(int_types::EXTENSION_ID);
         let func = {
-            let mut fb = mb.define_function(
-                "foo",
-                Signature::new_endo(INT_TYPES[4].clone())
-                    .with_extension_delta(int_types::EXTENSION_ID),
-            )?;
+            let mut fb = mb.define_function("foo", sig.clone())?;
             let c1 = fb.load_const(&cst3);
             let [i] = fb.input_wires_arr();
             let add = fb.add_dataflow_op(IntOpDef::iadd.with_log_width(4), [i, c1])?;
             fb.finish_with_outputs(add.outputs())?
         };
-        let mut main = mb.define_function("main", Signature::new_endo(INT_TYPES[4].clone()))?;
+        let mut main = mb.define_function("main", sig)?;
         let call1 = main.call(func.handle(), &[], main.input_wires())?;
         let call2 = main.call(func.handle(), &[], call1.outputs())?;
         main.finish_with_outputs(call2.outputs())?;
@@ -143,8 +142,11 @@ mod test {
     #[test]
     fn test_recursion() -> Result<(), Box<dyn std::error::Error>> {
         let mut mb = ModuleBuilder::new();
+        let sig = Signature::new_endo(INT_TYPES[5].clone())
+            .with_extension_delta(int_ops::EXTENSION_ID)
+            .with_extension_delta(int_types::EXTENSION_ID);
         let (func, rec_call) = {
-            let mut fb = mb.define_function("foo", Signature::new_endo(INT_TYPES[5].clone()))?;
+            let mut fb = mb.define_function("foo", sig.clone())?;
             let cst1 = fb.add_load_value(ConstInt::new_u(5, 1)?);
             let [i] = fb.input_wires_arr();
             let add = fb.add_dataflow_op(IntOpDef::iadd.with_log_width(5), [i, cst1])?;
@@ -155,7 +157,7 @@ mod test {
             )?;
             (fb.finish_with_outputs(call.outputs())?, call)
         };
-        let mut main = mb.define_function("main", Signature::new_endo(INT_TYPES[5].clone()))?;
+        let mut main = mb.define_function("main", sig)?;
         let call = main.call(func.handle(), &[], main.input_wires())?;
         let main = main.finish_with_outputs(call.outputs())?;
         let mut hugr = mb.finish_hugr()?;
