@@ -82,7 +82,7 @@ mod test {
         int_ops::IntOpDef,
         int_types::{self, ConstInt, INT_TYPES},
     };
-    use crate::{types::Signature, Hugr, HugrView, Node};
+    use crate::{types::Signature, HugrView, Node};
 
     use super::{HugrMut, InlineCall};
 
@@ -160,23 +160,20 @@ mod test {
         let main = main.finish_with_outputs(call.outputs())?;
         let mut hugr = mb.finish_hugr()?;
 
-        let get_nonrec_call = |h: &Hugr| {
-            let v = calls(h);
-            assert!(v.iter().all(|n| h.static_source(*n) == Some(func.node())));
-            assert_eq!(v[0], rec_call.node());
-            v.into_iter().skip(1).exactly_one()
-        };
-
+        let func = func.node();
         let mut call = call.node();
         for i in 2..10 {
             hugr.apply_rewrite(InlineCall(call))?;
             hugr.validate().unwrap();
             assert_eq!(extension_ops(&hugr).len(), i);
-            call = get_nonrec_call(&hugr).unwrap();
-            assert_eq!(
-                hugr.output_neighbours(func.node()).collect_vec(),
-                [rec_call.node(), call.node()]
-            );
+            let v = calls(&hugr);
+            assert!(v.iter().all(|n| hugr.static_source(*n) == Some(func)));
+
+            let [rec, nonrec] = v.try_into().expect("Should be two");
+            assert_eq!(rec, rec_call.node());
+            assert_eq!(hugr.output_neighbours(func).collect_vec(), [rec, nonrec]);
+            call = nonrec;
+
             let mut ancestors = successors(hugr.get_parent(call), |n| hugr.get_parent(*n));
             for _ in 1..i {
                 assert!(hugr.get_optype(ancestors.next().unwrap()).is_dfg());
