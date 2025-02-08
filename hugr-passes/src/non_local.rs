@@ -720,7 +720,7 @@ mod test {
     }
 
     #[test]
-    fn dfg() {
+    fn unnonlocal_dfg() {
         let mut hugr = {
             let mut outer = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
             let [w0] = outer.input_wires_arr();
@@ -740,7 +740,7 @@ mod test {
     }
 
     #[test]
-    fn tailloop() {
+    fn unnonlocal_tailloop() {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
         let mut hugr = {
             let mut outer = DFGBuilder::new(Signature::new_endo(vec![
@@ -784,7 +784,7 @@ mod test {
     }
 
     #[test]
-    fn conditional() {
+    fn unnonlocal_conditional() {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
         let out_variants = vec![t1.clone().into(), t2.clone().into()];
         let out_type = Type::new_sum(out_variants.clone());
@@ -837,7 +837,7 @@ mod test {
     }
 
     #[test]
-    fn cfg() {
+    fn unnonlocal_cfg() {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
         // let out_variants = vec![t1.clone().into(), t2.clone().into()];
         let out_type = t1.clone();
