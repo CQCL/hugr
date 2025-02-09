@@ -224,12 +224,12 @@ impl<'a> ThreadState<'a> {
             else {
                 panic!("impossible")
             };
-            let Some(sum_type) = control_type.as_sum_type() else {
+            let Some(sum_type) = control_type.as_sum() else {
                 panic!("impossible")
             };
 
             let old_sum_rows: Vec<TypeRow> = sum_type
-                .iter_variants()
+                .variants()
                 .map(|x| x.clone().try_into().unwrap())
                 .collect_vec();
             let new_sum_rows: Vec<TypeRow> =
@@ -364,12 +364,12 @@ impl<'a> ThreadState<'a> {
             else {
                 panic!("impossible")
             };
-            let Some(sum_type) = control_type.as_sum_type() else {
+            let Some(sum_type) = control_type.as_sum() else {
                 panic!("impossible")
             };
 
             let old_sum_rows: Vec<TypeRow> = sum_type
-                .iter_variants()
+                .variants()
                 .map(|x| x.clone().try_into().unwrap())
                 .collect_vec();
             let new_sum_rows = {
@@ -665,8 +665,8 @@ pub fn remove_nonlocal_edges(
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer},
-        extension::prelude::{bool_t, Noop},
+        builder::{Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer},
+        extension::prelude::{bool_t, either_type, option_type, Noop},
         ops::{handle::NodeHandle, Tag, TailLoop, Value},
         type_row,
         types::Signature,
@@ -841,35 +841,77 @@ mod test {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
         // let out_variants = vec![t1.clone().into(), t2.clone().into()];
         let out_type = t1.clone();
+        // Cfg consists of 4 dataflow blocks and an exit block
+        //
+        // The 4 dataflow blocks form a diamond, and the bottom block branches
+        // either to the entry block or the exit block.
+        //
+        // Two non-local uses in the left block means that these values must
+        // be threaded through all blocks, because of the loop.
+        //
+        // All non-trivial(i.e. more than one choice of successor) branching is
+        // done on an option type to exercise both empty and occupied control
+        // sums.
+        //
+        // All branches have an other-output.
         let mut hugr = {
+            let branch_sum_type = either_type(Type::UNIT, Type::UNIT);
+            let branch_type = Type::from(branch_sum_type.clone());
+            let branch_variants = branch_sum_type.variants().cloned().map(|x| x.try_into().unwrap()).collect_vec();
+            let nonlocal1_type = bool_t();
+            let nonlocal2_type = Type::new_unit_sum(3);
+            let other_output_type = branch_type.clone();
             let mut outer = DFGBuilder::new(Signature::new(
-                vec![t1.clone(), t2.clone(), t3.clone()],
-                out_type.clone(),
+                vec![branch_type.clone(), nonlocal1_type.clone(), nonlocal2_type.clone(), Type::UNIT],
+                vec![Type::UNIT, other_output_type.clone()]
             ))
             .unwrap();
-            let [s1, s2, s3] = outer.input_wires_arr();
-            let [out] = {
-                let mut cfg = outer.cfg_builder([], out_type.into()).unwrap();
+            let [b, nl1, nl2, unit] = outer.input_wires_arr();
+            let [unit, out] = {
+                let mut cfg = outer.cfg_builder([(Type::UNIT, unit), (branch_type.clone(), b)], vec![Type::UNIT, other_output_type.clone()].into()).unwrap();
 
                 let entry = {
-                    let mut entry = cfg.entry_builder([type_row![]], type_row![]).unwrap();
-                    let w = entry.add_load_value(Value::unit());
-                    entry.finish_with_outputs(w, []).unwrap()
+                    let entry = cfg.entry_builder(branch_variants.clone(), other_output_type.clone().into()).unwrap();
+                    let [_, b] = entry.input_wires_arr();
+
+                    entry.finish_with_outputs(b, [b]).unwrap()
                 };
                 let exit = cfg.exit_block();
 
-                let bb1 = {
+                let bb_left = {
                     let mut entry = cfg
-                        .block_builder(type_row![], [type_row![]], t1.clone().into())
+                        .block_builder(vec![Type::UNIT, other_output_type.clone()].into(), [type_row![]], other_output_type.clone().into())
                         .unwrap();
-                    let w = entry.add_load_value(Value::unit());
-                    entry.finish_with_outputs(w, [s1]).unwrap()
+                    let [unit, oo] = entry.input_wires_arr();
+                    let [_] = entry.add_dataflow_op(Noop::new(nonlocal1_type), [nl1]).unwrap().outputs_arr();
+                    let [_] = entry.add_dataflow_op(Noop::new(nonlocal2_type), [nl2]).unwrap().outputs_arr();
+                    entry.finish_with_outputs(unit, [oo]).unwrap()
                 };
-                cfg.branch(&entry, 0, &bb1).unwrap();
-                cfg.branch(&bb1, 0, &exit).unwrap();
+
+                let bb_right = {
+                    let entry = cfg
+                        .block_builder(vec![Type::UNIT, other_output_type.clone()].into(), [type_row![]], other_output_type.clone().into())
+                        .unwrap();
+                    let [b, oo] = entry.input_wires_arr();
+                    entry.finish_with_outputs(unit, [oo]).unwrap()
+                };
+
+                let bb_bottom = {
+                    let entry = cfg
+                        .block_builder(branch_type.clone().into(), branch_variants, other_output_type.clone().into())
+                        .unwrap();
+                    let [oo] = entry.input_wires_arr();
+                    entry.finish_with_outputs(oo, [oo]).unwrap()
+                };
+                cfg.branch(&entry, 0, &bb_left).unwrap();
+                cfg.branch(&entry, 1, &bb_right).unwrap();
+                cfg.branch(&bb_left, 0, &bb_bottom).unwrap();
+                cfg.branch(&bb_right, 0, &bb_bottom).unwrap();
+                cfg.branch(&bb_bottom, 0, &entry).unwrap();
+                cfg.branch(&bb_bottom, 1, &exit).unwrap();
                 cfg.finish_sub_container().unwrap().outputs_arr()
             };
-            outer.finish_hugr_with_outputs([out]).unwrap()
+            outer.finish_hugr_with_outputs([unit, out]).unwrap()
         };
         assert!(ensure_no_nonlocal_edges(&hugr).is_err());
         let root = hugr.root();
