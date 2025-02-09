@@ -732,13 +732,37 @@ pub(crate) mod test {
         assert_eq!(pred1, Type::from(pred_direct));
     }
 
+    #[test]
+    fn as_sum() {
+        let t = Type::new_unit_sum(0);
+        assert!(t.as_sum().is_some());
+    }
+
+    #[test]
+    fn sum_variants() {
+        {
+            let variants: Vec<TypeRowRV> = vec![
+                TypeRV::UNIT.into(),
+                vec![TypeRV::new_row_var_use(0, TypeBound::Any)].into(),
+            ];
+            let t = SumType::new(variants.clone());
+            assert_eq!(variants, t.variants().cloned().collect_vec());
+        }
+        {
+            assert_eq!(
+                vec![&TypeRV::EMPTY_TYPEROW;3],
+                SumType::new_unary(3).variants().collect_vec()
+            );
+        }
+    }
+
     mod proptest {
 
         use crate::proptest::RecursionDepth;
 
         use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
         use crate::types::{CustomType, FuncValueType, SumType, TypeRowRV};
-        use ::proptest::prelude::*;
+        use proptest::prelude::*;
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;
