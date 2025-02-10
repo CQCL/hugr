@@ -288,10 +288,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
         index: usize,
         amount: usize,
     ) -> Range<usize> {
-        let old_num_ports = match direction {
-            Direction::Incoming => self.base_hugr().graph.num_inputs(node.pg_index()),
-            Direction::Outgoing => self.base_hugr().graph.num_outputs(node.pg_index()),
-        };
+        let old_num_ports = self.base_hugr().graph.num_ports(node.pg_index(), direction);
 
         self.add_ports(node, direction, amount as isize);
 
