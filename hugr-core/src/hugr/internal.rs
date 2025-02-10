@@ -293,7 +293,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
             Direction::Outgoing => self.base_hugr().graph.num_outputs(node.pg_index()),
         };
 
-        let new_ports = self.add_ports(node, direction, amount as isize);
+        self.add_ports(node, direction, amount as isize);
 
         for swap_from_port in (index..old_num_ports).rev() {
             let swap_to_port = swap_from_port + amount;
@@ -318,7 +318,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
                     .expect("Ports exist");
             }
         }
-        index..new_ports.len()
+        index..index + amount
     }
 
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
@@ -374,7 +374,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
 #[cfg(test)]
 mod test {
     use crate::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr},
+        builder::{Container, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::Noop,
         hugr::internal::HugrMutInternals as _,
         ops::handle::NodeHandle,
@@ -390,6 +390,7 @@ mod test {
             let nop = builder
                 .add_dataflow_op(Noop::new(Type::UNIT), [nop_in])
                 .unwrap();
+            builder.add_other_wire(nop.node(), builder.output().node());
             let [nop_out] = nop.outputs_arr();
             (
                 nop.node(),
@@ -397,10 +398,11 @@ mod test {
             )
         };
         let [i, o] = hugr.get_io(hugr.root()).unwrap();
-        hugr.insert_ports(nop, Direction::Incoming, 0, 2);
-        hugr.insert_ports(nop, Direction::Outgoing, 0, 2);
+        assert_eq!(0..2, hugr.insert_ports(nop, Direction::Incoming, 0, 2));
+        assert_eq!(1..3, hugr.insert_ports(nop, Direction::Outgoing, 1, 2));
 
         assert_eq!(hugr.single_linked_input(i, 0), Some((nop, 2.into())));
-        assert_eq!(hugr.single_linked_output(o, 0), Some((nop, 2.into())));
+        assert_eq!(hugr.single_linked_output(o, 0), Some((nop, 0.into())));
+        assert_eq!(hugr.single_linked_output(o, 1), Some((nop, 3.into())));
     }
 }
