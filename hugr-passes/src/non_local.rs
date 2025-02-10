@@ -881,7 +881,7 @@ mod test {
                     Type::UNIT,
                 ],
                 vec![Type::UNIT, other_output_type.clone()],
-            ))
+            ).with_prelude())
             .unwrap();
             let [b, nl1, nl2, unit] = outer.input_wires_arr();
             let [unit, out] = {
