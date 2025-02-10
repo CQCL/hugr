@@ -6,7 +6,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use delegate::delegate;
-use portgraph::{LinkView, MultiPortGraph, PortMut, PortView};
+use itertools::Itertools;
+use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
@@ -174,6 +175,26 @@ pub trait HugrMutInternals: RootTagged {
         self.hugr_mut().add_ports(node, direction, amount)
     }
 
+    /// Insert `amount` new ports for a node, starting at `index`.  The
+    /// `direction` parameter specifies whether to add ports to the incoming or
+    /// outgoing list. Links from this node are preserved, even when ports are
+    /// renumbered by the insertion.
+    ///
+    /// Returns the range of newly created ports.
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
+    fn insert_ports(
+        &mut self,
+        node: Node,
+        direction: Direction,
+        index: usize,
+        amount: usize,
+    ) -> Range<usize> {
+        panic_invalid_node(self, node);
+        self.hugr_mut().insert_ports(node, direction, index, amount)
+    }
+
     /// Sets the parent of a node.
     ///
     /// The node becomes the parent's last child.
@@ -267,6 +288,46 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
             .set_num_ports(node.pg_index(), incoming, outgoing, |_, _| {})
     }
 
+    fn insert_ports(
+        &mut self,
+        node: Node,
+        direction: Direction,
+        index: usize,
+        amount: usize,
+    ) -> Range<usize> {
+        let old_num_ports = match direction {
+            Direction::Incoming => self.base_hugr().graph.num_inputs(node.pg_index()),
+            Direction::Outgoing => self.base_hugr().graph.num_outputs(node.pg_index()),
+        };
+
+        self.add_ports(node, direction, amount as isize);
+
+        for swap_from_port in (index..old_num_ports).rev() {
+            let swap_to_port = swap_from_port + amount;
+            let [from_port_index, to_port_index] = [swap_from_port, swap_to_port].map(|p| {
+                self.base_hugr()
+                    .graph
+                    .port_index(node.pg_index(), PortOffset::new(direction, p))
+                    .unwrap()
+            });
+            let linked_ports = self
+                .base_hugr()
+                .graph
+                .port_links(from_port_index)
+                .map(|(_, to_subport)| to_subport.port())
+                .collect_vec();
+            self.hugr_mut().graph.unlink_port(from_port_index);
+            for linked_port_index in linked_ports {
+                let _ = self
+                    .hugr_mut()
+                    .graph
+                    .link_ports(to_port_index, linked_port_index)
+                    .expect("Ports exist");
+            }
+        }
+        index..index + amount
+    }
+
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
         let mut incoming = self.hugr_mut().graph.num_inputs(node.pg_index());
         let mut outgoing = self.hugr_mut().graph.num_outputs(node.pg_index());
@@ -320,5 +381,42 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
 
     fn get_optype_mut(&mut self, node: Node) -> Result<&mut OpType, HugrError> {
         Ok(self.hugr_mut().op_types.get_mut(node.pg_index()))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        builder::{Container, DFGBuilder, Dataflow, DataflowHugr},
+        extension::prelude::Noop,
+        hugr::internal::HugrMutInternals as _,
+        ops::handle::NodeHandle,
+        types::{Signature, Type},
+        Direction, HugrView as _,
+    };
+
+    #[test]
+    fn insert_ports() {
+        let (nop, mut hugr) = {
+            let mut builder =
+                DFGBuilder::new(Signature::new_endo(Type::UNIT).with_prelude()).unwrap();
+            let [nop_in] = builder.input_wires_arr();
+            let nop = builder
+                .add_dataflow_op(Noop::new(Type::UNIT), [nop_in])
+                .unwrap();
+            builder.add_other_wire(nop.node(), builder.output().node());
+            let [nop_out] = nop.outputs_arr();
+            (
+                nop.node(),
+                builder.finish_hugr_with_outputs([nop_out]).unwrap(),
+            )
+        };
+        let [i, o] = hugr.get_io(hugr.root()).unwrap();
+        assert_eq!(0..2, hugr.insert_ports(nop, Direction::Incoming, 0, 2));
+        assert_eq!(1..3, hugr.insert_ports(nop, Direction::Outgoing, 1, 2));
+
+        assert_eq!(hugr.single_linked_input(i, 0), Some((nop, 2.into())));
+        assert_eq!(hugr.single_linked_output(o, 0), Some((nop, 0.into())));
+        assert_eq!(hugr.single_linked_output(o, 1), Some((nop, 3.into())));
     }
 }
