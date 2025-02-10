@@ -322,7 +322,7 @@ impl<'a> ThreadState<'a> {
             output_node: o,
             variant_source_prefixes: new_sum_row_prefixes
                 .into_iter()
-                .map(|v| v.into_iter().map(|i| sources[i].0.clone()).collect_vec())
+                .map(|v| v.into_iter().map(|i| sources[i].0).collect_vec())
                 .collect_vec(),
         });
     }
@@ -667,7 +667,7 @@ fn vec_prepend<T>(v: &mut Vec<T>, ts: impl IntoIterator<Item = T>) {
 }
 
 fn vec_insert<T>(v: &mut Vec<T>, ts: impl IntoIterator<Item = T>, index: usize) {
-    let mut old_v_iter = mem::replace(v, vec![]).into_iter();
+    let mut old_v_iter = mem::take(v).into_iter();
     v.extend(old_v_iter.by_ref().take(index).chain(ts));
     v.extend(old_v_iter);
 }
