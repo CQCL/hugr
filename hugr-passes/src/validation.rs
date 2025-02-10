@@ -23,7 +23,7 @@ pub enum ValidationLevel {
     WithExtensions,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum ValidatePassError {
     #[error("Failed to validate input HUGR: {err}\n{pretty_hugr}")]
