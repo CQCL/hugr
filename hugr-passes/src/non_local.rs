@@ -114,7 +114,7 @@ impl ParentSourceMap {
         &self,
         parent: Node,
         source: Wire,
-        ref hugr: impl HugrView,
+        hugr: impl HugrView,
     ) -> (Wire, Type) {
         let r @ (w, _) = self
             .0
@@ -470,7 +470,8 @@ impl BBNeedsSourcesMapBuilder {
         self.0.entry(bb).or_default().insert(source, ty);
     }
 
-    fn extend_parent_needs_for(&mut self, ref hugr: impl HugrView, child: Node) -> bool {
+    fn extend_parent_needs_for(&mut self, hugr: impl HugrView, child: Node) -> bool {
+        let hugr = &hugr;
         let parent = hugr.get_parent(child).unwrap();
         let parent_needs = self
             .0
