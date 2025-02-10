@@ -155,7 +155,7 @@ impl<'a> ThreadState<'a> {
     delegate! {
         to self.parent_source_map {
             // fn contains_parent(&self, parent: Node) -> bool;
-            fn get_source_in_parent(&self, parent: Node, source: Wire) -> Option<Wire>;
+            // fn get_source_in_parent(&self, parent: Node, source: Wire) -> Option<Wire>;
             fn insert_sources_in_parent(&mut self, parent: Node, sources: impl IntoIterator<Item = (Wire, Wire)>);
             fn thread_dataflow_parent(
                 &mut self,
@@ -183,33 +183,24 @@ impl<'a> ThreadState<'a> {
     ) {
         let types = sources.iter().map(|x| x.1.clone()).collect_vec();
         let new_sum_row_prefixes = {
-            let mut dfb = hugr.get_optype(node).as_dataflow_block().unwrap().clone();
-            let mut nsrp = vec![vec![]; dfb.sum_rows.len()];
-            dfb.inputs.to_mut().extend(types.clone());
+            let mut this_dfb = hugr.get_optype(node).as_dataflow_block().unwrap().clone();
+            let mut nsrp = vec![vec![]; this_dfb.sum_rows.len()];
+            vec_prepend(this_dfb.inputs.to_mut(), types.clone());
+
             for (this_p, succ_n) in hugr.node_outputs(node).filter_map(|out_p| {
                 let (succ_n, _) = hugr.single_linked_input(node, out_p).unwrap();
-                if hugr.get_optype(succ_n).is_exit_block() {
-                    None
-                } else {
-                    Some((out_p.index(), succ_n))
-                }
+                hugr.get_optype(succ_n).is_dataflow_block().then_some((out_p.index(), succ_n))
             }) {
                 let succ_needs = &self.needs[&succ_n];
-                let new_tys = succ_needs
+                let succ_needs_source_indices = succ_needs
                     .iter()
-                    .map(|(&w, ty)| {
-                        (
-                            sources.iter().find_position(|(x, _)| x == &w).unwrap().0,
-                            ty.clone(),
-                        )
-                    })
+                    .map(|(&w, _)| sources.iter().find_position(|(x, _)| x == &w).unwrap().0)
                     .collect_vec();
-                nsrp[this_p] = new_tys.clone();
-                let tys = dfb.sum_rows[this_p].to_mut();
-                let old_tys = mem::replace(tys, new_tys.into_iter().map(|x| x.1).collect_vec());
-                tys.extend(old_tys);
+                let succ_needs_tys = succ_needs_source_indices.iter().copied().map(|x| sources[x].1.clone()).collect_vec();
+                vec_prepend(this_dfb.sum_rows[this_p].to_mut(), succ_needs_tys);
+                nsrp[this_p] = succ_needs_source_indices;
             }
-            hugr.replace_op(node, dfb).unwrap();
+            hugr.replace_op(node, this_dfb).unwrap();
             nsrp
         };
 
@@ -233,11 +224,11 @@ impl<'a> ThreadState<'a> {
                 .map(|x| x.clone().try_into().unwrap())
                 .collect_vec();
             let new_sum_rows: Vec<TypeRow> =
-                itertools::zip_eq(new_sum_row_prefixes.clone(), old_sum_rows.iter())
-                    .map(|(new, old)| {
-                        new.into_iter()
-                            .map(|x| x.1)
-                            .chain(old.iter().cloned())
+                itertools::zip_eq(new_sum_row_prefixes.iter(), old_sum_rows.iter())
+                    .map(|(new_source_indices, old_tys)| {
+                        new_source_indices.into_iter()
+                            .map(|&x| sources[x].1.clone())
+                            .chain(old_tys.iter().cloned())
                             .collect_vec()
                             .into()
                     })
@@ -250,11 +241,11 @@ impl<'a> ThreadState<'a> {
                 new_control_type.clone(),
             )
             .unwrap();
-            for (i, row) in new_sum_row_prefixes.iter().enumerate() {
+            for (i, new_source_indices) in new_sum_row_prefixes.into_iter().enumerate() {
                 let mut case = cond.case_builder(i).unwrap();
                 let case_inputs = case.input_wires().collect_vec();
                 let mut args = vec![];
-                for (source_i, _) in row {
+                for source_i in new_source_indices {
                     args.push(case_inputs[old_sum_rows[i].len() + source_i]);
                 }
 
@@ -279,6 +270,7 @@ impl<'a> ThreadState<'a> {
         let mut output = hugr.get_optype(o).as_output().unwrap().clone();
         output.types.to_mut()[0] = new_control_type;
         hugr.replace_op(o, output).unwrap();
+        dbg!(hugr.single_linked_output(o, 0));
     }
 
     fn do_cfg(&mut self, hugr: &mut impl HugrMut, node: Node, sources: Vec<(Wire, Type)>) {
@@ -429,10 +421,7 @@ fn thread_sources(
 ) -> (Vec<WorkItem>, ParentSourceMap) {
     let mut state = ThreadState::new(bb_needs_sources_map);
     for (&bb, sources) in bb_needs_sources_map {
-        let sources = sources
-            .iter()
-            .map(|(&w, ty)| (w, ty.clone()))
-            .collect_vec();
+        let sources = sources.iter().map(|(&w, ty)| (w, ty.clone())).collect_vec();
         match hugr.get_optype(bb).clone() {
             OpType::DFG(_) => state.do_dfg(hugr, bb, sources),
             OpType::Conditional(_) => state.do_conditional(hugr, bb, sources),
@@ -662,11 +651,18 @@ pub fn remove_nonlocal_edges(
     Ok(())
 }
 
+fn vec_prepend<T>(v: &mut Vec<T>, ts: impl IntoIterator<Item = T>) {
+    let mut old_v = mem::replace(v, ts.into_iter().collect());
+    v.extend(old_v.drain(..));
+}
+
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer},
-        extension::prelude::{bool_t, either_type, option_type, Noop},
+        builder::{
+            DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
+        },
+        extension::prelude::{bool_t, either_type, Noop},
         ops::{handle::NodeHandle, Tag, TailLoop, Value},
         type_row,
         types::Signature,
@@ -838,9 +834,6 @@ mod test {
 
     #[test]
     fn unnonlocal_cfg() {
-        let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
-        // let out_variants = vec![t1.clone().into(), t2.clone().into()];
-        let out_type = t1.clone();
         // Cfg consists of 4 dataflow blocks and an exit block
         //
         // The 4 dataflow blocks form a diamond, and the bottom block branches
@@ -857,21 +850,37 @@ mod test {
         let mut hugr = {
             let branch_sum_type = either_type(Type::UNIT, Type::UNIT);
             let branch_type = Type::from(branch_sum_type.clone());
-            let branch_variants = branch_sum_type.variants().cloned().map(|x| x.try_into().unwrap()).collect_vec();
+            let branch_variants = branch_sum_type
+                .variants()
+                .cloned()
+                .map(|x| x.try_into().unwrap())
+                .collect_vec();
             let nonlocal1_type = bool_t();
             let nonlocal2_type = Type::new_unit_sum(3);
             let other_output_type = branch_type.clone();
             let mut outer = DFGBuilder::new(Signature::new(
-                vec![branch_type.clone(), nonlocal1_type.clone(), nonlocal2_type.clone(), Type::UNIT],
-                vec![Type::UNIT, other_output_type.clone()]
+                vec![
+                    branch_type.clone(),
+                    nonlocal1_type.clone(),
+                    nonlocal2_type.clone(),
+                    Type::UNIT,
+                ],
+                vec![Type::UNIT, other_output_type.clone()],
             ))
             .unwrap();
             let [b, nl1, nl2, unit] = outer.input_wires_arr();
             let [unit, out] = {
-                let mut cfg = outer.cfg_builder([(Type::UNIT, unit), (branch_type.clone(), b)], vec![Type::UNIT, other_output_type.clone()].into()).unwrap();
+                let mut cfg = outer
+                    .cfg_builder(
+                        [(Type::UNIT, unit), (branch_type.clone(), b)],
+                        vec![Type::UNIT, other_output_type.clone()].into(),
+                    )
+                    .unwrap();
 
                 let entry = {
-                    let entry = cfg.entry_builder(branch_variants.clone(), other_output_type.clone().into()).unwrap();
+                    let entry = cfg
+                        .entry_builder(branch_variants.clone(), other_output_type.clone().into())
+                        .unwrap();
                     let [_, b] = entry.input_wires_arr();
 
                     entry.finish_with_outputs(b, [b]).unwrap()
@@ -880,25 +889,43 @@ mod test {
 
                 let bb_left = {
                     let mut entry = cfg
-                        .block_builder(vec![Type::UNIT, other_output_type.clone()].into(), [type_row![]], other_output_type.clone().into())
+                        .block_builder(
+                            vec![Type::UNIT, other_output_type.clone()].into(),
+                            [type_row![]],
+                            other_output_type.clone().into(),
+                        )
                         .unwrap();
                     let [unit, oo] = entry.input_wires_arr();
-                    let [_] = entry.add_dataflow_op(Noop::new(nonlocal1_type), [nl1]).unwrap().outputs_arr();
-                    let [_] = entry.add_dataflow_op(Noop::new(nonlocal2_type), [nl2]).unwrap().outputs_arr();
+                    let [_] = entry
+                        .add_dataflow_op(Noop::new(nonlocal1_type), [nl1])
+                        .unwrap()
+                        .outputs_arr();
+                    let [_] = entry
+                        .add_dataflow_op(Noop::new(nonlocal2_type), [nl2])
+                        .unwrap()
+                        .outputs_arr();
                     entry.finish_with_outputs(unit, [oo]).unwrap()
                 };
 
                 let bb_right = {
                     let entry = cfg
-                        .block_builder(vec![Type::UNIT, other_output_type.clone()].into(), [type_row![]], other_output_type.clone().into())
+                        .block_builder(
+                            vec![Type::UNIT, other_output_type.clone()].into(),
+                            [type_row![]],
+                            other_output_type.clone().into(),
+                        )
                         .unwrap();
-                    let [b, oo] = entry.input_wires_arr();
+                    let [_b, oo] = entry.input_wires_arr();
                     entry.finish_with_outputs(unit, [oo]).unwrap()
                 };
 
                 let bb_bottom = {
                     let entry = cfg
-                        .block_builder(branch_type.clone().into(), branch_variants, other_output_type.clone().into())
+                        .block_builder(
+                            branch_type.clone().into(),
+                            branch_variants,
+                            other_output_type.clone().into(),
+                        )
                         .unwrap();
                     let [oo] = entry.input_wires_arr();
                     entry.finish_with_outputs(oo, [oo]).unwrap()

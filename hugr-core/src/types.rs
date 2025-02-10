@@ -750,7 +750,7 @@ pub(crate) mod test {
         }
         {
             assert_eq!(
-                vec![&TypeRV::EMPTY_TYPEROW;3],
+                vec![&TypeRV::EMPTY_TYPEROW; 3],
                 SumType::new_unary(3).variants().collect_vec()
             );
         }
