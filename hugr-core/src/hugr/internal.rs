@@ -363,10 +363,8 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
         // We know RootHandle=Node here so no need to check
-        Ok(std::mem::replace(
-            self.hugr_mut().op_types.get_mut(node.pg_index()),
-            op.into(),
-        ))
+        let cur = self.hugr_mut().op_types.get_mut(node.pg_index());
+        Ok(std::mem::replace(cur, op.into()))
     }
 }
 
