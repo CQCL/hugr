@@ -27,7 +27,10 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
-    pub(super) fn create_with_io(
+    /// Initialize new builder for a dataflow region rooted in `base`.
+    ///
+    /// The `base` HUGR must contain the node `parent` with dataflow signature `signature`.
+    pub fn create_with_io(
         mut base: T,
         parent: Node,
         signature: Signature,

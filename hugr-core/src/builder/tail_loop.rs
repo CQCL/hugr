@@ -15,7 +15,11 @@ use super::{
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
-    pub(super) fn create_with_io(
+    /// Initialize new builder for a [`ops::TailLoop`] rooted in `base`.
+    ///
+    /// The `base` HUGR must contain the node `loop_node` with [`ops::TailLoop`]
+    /// operation `tail_loop`.
+    pub fn create_with_io(
         base: B,
         loop_node: Node,
         tail_loop: &ops::TailLoop,
@@ -25,6 +29,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
+
     /// Set the outputs of the [`ops::TailLoop`], with `out_variant` as the value of the
     /// termination Sum, and `rest` being the remaining outputs.
     pub fn set_outputs(
