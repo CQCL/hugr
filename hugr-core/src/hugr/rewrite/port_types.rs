@@ -9,7 +9,7 @@ use derive_more::From;
 /// A port in either the host or replacement graph.
 ///
 /// This is used to represent boundary edges that will be added between the host and
-/// replacement graphs when applying a [`SimpleReplacement`].
+/// replacement graphs when applying a rewrite.
 #[derive(Debug, Clone, Copy)]
 pub enum BoundaryPort<P> {
     /// A port in the host graph.
@@ -75,3 +75,36 @@ impl_port_conversion!(
     ReplacementPort<Port>,
     ReplacementPort
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{IncomingPort, OutgoingPort, Port};
+
+    #[test]
+    fn test_port_conversions() {
+        let node = Node::new(1);
+
+        // Test HostPort conversions
+        let host_out = HostPort(node, OutgoingPort::from(0));
+        let host_port: HostPort<Port> = host_out.into();
+        assert_eq!(host_port.0, node);
+        assert_eq!(host_port.1, Port::from(OutgoingPort::from(0)));
+
+        let host_in = HostPort(node, IncomingPort::from(1));
+        let host_port: HostPort<Port> = host_in.into();
+        assert_eq!(host_port.0, node);
+        assert_eq!(host_port.1, Port::from(IncomingPort::from(1)));
+
+        // Test ReplacementPort conversions
+        let repl_out = ReplacementPort(node, OutgoingPort::from(0));
+        let repl_port: ReplacementPort<Port> = repl_out.into();
+        assert_eq!(repl_port.0, node);
+        assert_eq!(repl_port.1, Port::from(OutgoingPort::from(0)));
+
+        let repl_in = ReplacementPort(node, IncomingPort::from(1));
+        let repl_port: ReplacementPort<Port> = repl_in.into();
+        assert_eq!(repl_port.0, node);
+        assert_eq!(repl_port.1, Port::from(IncomingPort::from(1)));
+    }
+}
