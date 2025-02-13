@@ -7,23 +7,26 @@ pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node};
+use crate::{Hugr, IncomingPort, Node, OutgoingPort};
+
+use itertools::Itertools;
 use thiserror::Error;
 
 use super::inline_dfg::InlineDFGError;
+use super::{BoundaryPort, HostPort, ReplacementPort};
 
 /// Specification of a simple replacement operation.
 #[derive(Debug, Clone)]
 pub struct SimpleReplacement {
-    /// The subgraph of the hugr to be replaced.
+    /// The subgraph of the host hugr to be replaced.
     subgraph: SiblingSubgraph,
     /// A hugr with DFG root (consisting of replacement nodes).
     replacement: Hugr,
-    /// A map from (target ports of edges from the Input node of `replacement`) to (target ports of
-    /// edges from nodes not in `removal` to nodes in `removal`).
+    /// A map from (target ports of edges from the Input node of `replacement`)
+    /// to (target ports of edges from nodes not in `subgraph` to nodes in `subgraph`).
     nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)>,
-    /// A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
-    /// (input ports of the Output node of `replacement`).
+    /// A map from (target ports of edges from nodes in `subgraph` to nodes not
+    /// in `subgraph`) to (input ports of the Output node of `replacement`).
     nu_out: HashMap<(Node, IncomingPort), IncomingPort>,
 }
 
@@ -49,11 +52,201 @@ impl SimpleReplacement {
     pub fn replacement(&self) -> &Hugr {
         &self.replacement
     }
+    /// Consume self and return the replacement hugr.
+
+    #[inline]
+    pub fn into_replacement(self) -> Hugr {
+        self.replacement
+    }
 
     /// Subgraph to be replaced.
     #[inline]
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
+    }
+
+    /// Check if the replacement can be applied to the given hugr.
+    #[must_use]
+    pub fn is_valid_rewrite(&self, h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+        let parent = self.subgraph.get_parent(h);
+
+        // 1. Check the parent node exists and is a DataflowParent.
+        if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
+            return Err(SimpleReplacementError::InvalidParentNode());
+        }
+
+        // 2. Check that all the to-be-removed nodes are children of it and are leaves.
+        for node in self.subgraph.nodes() {
+            if h.get_parent(*node) != Some(parent) || h.children(*node).next().is_some() {
+                return Err(SimpleReplacementError::InvalidRemovedNode());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get the input and output nodes of the replacement hugr.
+    pub fn get_replacement_io(&self) -> Result<[Node; 2], SimpleReplacementError> {
+        self.replacement
+            .get_io(self.replacement.root())
+            .ok_or(SimpleReplacementError::InvalidParentNode())
+    }
+
+    /// Get all edges that the replacement would add from outgoing ports in
+    /// `host` to incoming ports in `self.replacement`.
+    ///
+    /// The incoming ports returned are always connected to outputs of
+    /// the [`OpTag::Input`] node of `self.replacement`.
+    ///
+    /// For each pair in the returned vector, the first element is a port in
+    /// `host` and the second is a port in `self.replacement`.
+    #[must_use]
+    pub fn incoming_boundary<'a>(
+        &'a self,
+        host: &'a impl HugrView,
+    ) -> impl Iterator<Item = (HostPort<OutgoingPort>, ReplacementPort<IncomingPort>)> + 'a {
+        // For each p = self.nu_inp[q] such that q is not an Output port,
+        // there will be an edge from the predecessor of p to (the new copy of) q.
+        self.nu_inp
+            .iter()
+            .filter(|&((rep_inp_node, _), _)| {
+                self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output
+            })
+            .map(
+                |(&(rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port))| {
+                    // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
+                    let (rem_inp_pred_node, rem_inp_pred_port) = host
+                        .single_linked_output(*rem_inp_node, *rem_inp_port)
+                        .unwrap();
+                    (
+                        HostPort(rem_inp_pred_node, rem_inp_pred_port),
+                        ReplacementPort(rep_inp_node, rep_inp_port),
+                    )
+                },
+            )
+    }
+
+    /// Get all edges that the replacement would add from outgoing ports in
+    /// `self.replacement` to incoming ports in `host`.
+    ///
+    /// The outgoing ports returned are always connected to inputs of
+    /// the [`OpTag::Output`] node of `self.replacement`.
+    ///
+    /// For each pair in the returned vector, the first element is a port in
+    /// `self.replacement` and the second is a port in `host`.
+    ///
+    /// This panics if self.replacement is not a DFG.
+    #[must_use]
+    pub fn outgoing_boundary<'a>(
+        &'a self,
+        _host: &'a impl HugrView,
+    ) -> impl Iterator<Item = (ReplacementPort<OutgoingPort>, HostPort<IncomingPort>)> + 'a {
+        let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
+
+        // For each q = self.nu_out[p] such that the predecessor of q is not an Input port,
+        // there will be an edge from (the new copy of) the predecessor of q to p.
+        self.nu_out
+            .iter()
+            .filter_map(move |(&(rem_out_node, rem_out_port), rep_out_port)| {
+                let (rep_out_pred_node, rep_out_pred_port) = self
+                    .replacement
+                    .single_linked_output(replacement_output_node, *rep_out_port)
+                    .unwrap();
+                (self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input).then_some({
+                    (
+                        // the new output node will be updated after insertion
+                        ReplacementPort(rep_out_pred_node, rep_out_pred_port),
+                        HostPort(rem_out_node, rem_out_port),
+                    )
+                })
+            })
+    }
+
+    /// Get all edges that the replacement would add between ports in `host`.
+    ///
+    /// These correspond to direct edges between the input and output nodes
+    /// in the replacement graph.
+    ///
+    /// For each pair in the returned vector, the both ports are in `host`.
+    ///
+    /// This panics if self.replacement is not a DFG.
+    #[must_use]
+    pub fn host_to_host_boundary<'a>(
+        &'a self,
+        host: &'a impl HugrView,
+    ) -> impl Iterator<Item = (HostPort<OutgoingPort>, HostPort<IncomingPort>)> + 'a {
+        let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
+
+        // For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
+        // to p1.
+        self.nu_out
+            .iter()
+            .filter_map(move |(&(rem_out_node, rem_out_port), &rep_out_port)| {
+                self.nu_inp
+                    .get(&(replacement_output_node, rep_out_port))
+                    .map(|&(rem_inp_node, rem_inp_port)| {
+                        let (rem_inp_pred_node, rem_inp_pred_port) = host
+                            .single_linked_output(rem_inp_node, rem_inp_port)
+                            .unwrap();
+                        (
+                            HostPort(rem_inp_pred_node, rem_inp_pred_port),
+                            HostPort(rem_out_node, rem_out_port),
+                        )
+                    })
+            })
+    }
+
+    /// Get the incoming port at the output node of `self.replacement` that
+    /// corresponds to the given host output port.
+    ///
+    /// This panics if self.replacement is not a DFG.
+    pub fn map_host_output(
+        &self,
+        port: impl Into<HostPort<IncomingPort>>,
+    ) -> Option<ReplacementPort<IncomingPort>> {
+        let HostPort(node, port) = port.into();
+        let [_, rep_output] = self.get_replacement_io().expect("replacement is a DFG");
+        self.nu_out
+            .get(&(node, port))
+            .map(|&rep_out_port| ReplacementPort(rep_output, rep_out_port))
+    }
+
+    /// Get the incoming port in `subgraph` that corresponds to the given
+    /// replacement input port.
+    ///
+    /// This panics if self.replacement is not a DFG.
+    pub fn map_replacement_input(
+        &self,
+        port: impl Into<ReplacementPort<IncomingPort>>,
+    ) -> Option<HostPort<IncomingPort>> {
+        let ReplacementPort(node, port) = port.into();
+        self.nu_inp.get(&(node, port)).copied().map(Into::into)
+    }
+
+    /// Get all edges that the replacement would add between `host` and
+    /// `self.replacement`.
+    ///
+    /// This is equivalent to chaining the results of [`Self::incoming_boundary`],
+    /// [`Self::outgoing_boundary`], and [`Self::host_to_host_boundary`].
+    ///
+    /// This panics if self.replacement is not a DFG.
+    pub fn all_boundary_edges<'a>(
+        &'a self,
+        host: &'a impl HugrView,
+    ) -> impl Iterator<Item = (BoundaryPort<OutgoingPort>, BoundaryPort<IncomingPort>)> + 'a {
+        let incoming_boundary = self
+            .incoming_boundary(host)
+            .map(|(src, tgt)| (src.into(), tgt.into()));
+        let outgoing_boundary = self
+            .outgoing_boundary(host)
+            .map(|(src, tgt)| (src.into(), tgt.into()));
+        let host_to_host_boundary = self
+            .host_to_host_boundary(host)
+            .map(|(src, tgt)| (src.into(), tgt.into()));
+
+        incoming_boundary
+            .chain(outgoing_boundary)
+            .chain(host_to_host_boundary)
     }
 }
 
@@ -62,85 +255,31 @@ impl Rewrite for SimpleReplacement {
     type ApplyResult = Vec<(Node, OpType)>;
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, _h: &impl HugrView) -> Result<(), SimpleReplacementError> {
-        unimplemented!()
+    fn verify(&self, h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+        self.is_valid_rewrite(h)
     }
 
     fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
-        let Self {
-            subgraph,
-            replacement,
-            nu_inp,
-            nu_out,
-        } = self;
-        let parent = subgraph.get_parent(h);
-        // 1. Check the parent node exists and is a DataflowParent.
-        if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
-            return Err(SimpleReplacementError::InvalidParentNode());
-        }
-        // 2. Check that all the to-be-removed nodes are children of it and are leaves.
-        for node in subgraph.nodes() {
-            if h.get_parent(*node) != Some(parent) || h.children(*node).next().is_some() {
-                return Err(SimpleReplacementError::InvalidRemovedNode());
-            }
-        }
+        self.is_valid_rewrite(h)?;
 
-        let replacement_output_node = replacement
-            .get_io(replacement.root())
-            .expect("parent already checked.")[1];
+        let parent = self.subgraph.get_parent(h);
 
-        // 3. Do the replacement.
-        // Now we proceed to connect the edges between the newly inserted
+        // We proceed to connect the edges between the newly inserted
         // replacement and the rest of the graph.
         //
         // Existing connections to the removed subgraph will be automatically
         // removed when the nodes are removed.
 
-        // 3.1. For each p = self.nu_inp[q] such that q is not an Output port, add an edge from the
-        // predecessor of p to (the new copy of) q.
-        let nu_inp_connects: Vec<_> = nu_inp
-            .iter()
-            .filter(|&((rep_inp_node, _), _)| {
-                replacement.get_optype(*rep_inp_node).tag() != OpTag::Output
-            })
-            .map(
-                |((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port))| {
-                    // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
-                    let (rem_inp_pred_node, rem_inp_pred_port) = h
-                        .single_linked_output(*rem_inp_node, *rem_inp_port)
-                        .unwrap();
-                    (
-                        rem_inp_pred_node,
-                        rem_inp_pred_port,
-                        // the new input node will be updated after insertion
-                        rep_inp_node,
-                        rep_inp_port,
-                    )
-                },
-            )
-            .collect();
+        // 1. Get the boundary edges
+        let boundary_edges = self.all_boundary_edges(h).collect_vec();
 
-        // 3.2. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
-        // edge from (the new copy of) the predecessor of q to p.
-        let nu_out_connects: Vec<_> = nu_out
-            .iter()
-            .filter_map(|((rem_out_node, rem_out_port), rep_out_port)| {
-                let (rep_out_pred_node, rep_out_pred_port) = replacement
-                    .single_linked_output(replacement_output_node, *rep_out_port)
-                    .unwrap();
-                (replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input).then_some({
-                    (
-                        // the new output node will be updated after insertion
-                        rep_out_pred_node,
-                        rep_out_pred_port,
-                        rem_out_node,
-                        rem_out_port,
-                    )
-                })
-            })
-            .collect();
+        let Self {
+            replacement,
+            subgraph,
+            ..
+        } = self;
 
-        // 3.3. Insert the replacement as a whole.
+        // 2. Insert the replacement as a whole.
         let InsertionResult {
             new_root,
             node_map: index_map,
@@ -158,46 +297,14 @@ impl Rewrite for SimpleReplacement {
         // remove the replacement root (which now has no children and no edges)
         h.remove_node(new_root);
 
-        // 3.4. Update replacement nodes according to insertion mapping and connect
-        for (src_node, src_port, tgt_node, tgt_port) in nu_inp_connects {
-            h.connect(
-                src_node,
-                src_port,
-                *index_map.get(tgt_node).unwrap(),
-                *tgt_port,
-            )
+        // 3. Insert all boundary edges.
+        for (src, tgt) in boundary_edges {
+            let (src_node, src_port) = src.map_replacement(&index_map);
+            let (tgt_node, tgt_port) = tgt.map_replacement(&index_map);
+            h.connect(src_node, src_port, tgt_node, tgt_port);
         }
 
-        for (src_node, src_port, tgt_node, tgt_port) in nu_out_connects {
-            h.connect(
-                *index_map.get(&src_node).unwrap(),
-                src_port,
-                *tgt_node,
-                *tgt_port,
-            )
-        }
-        // 3.5. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
-        // to p1.
-        //
-        // i.e. the replacement graph has direct edges between the input and output nodes.
-        for ((rem_out_node, rem_out_port), &rep_out_port) in &nu_out {
-            let rem_inp_nodeport = nu_inp.get(&(replacement_output_node, rep_out_port));
-            if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
-                // add edge from predecessor of (rem_inp_node, rem_inp_port) to (rem_out_node, rem_out_port):
-                let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .single_linked_output(*rem_inp_node, *rem_inp_port)
-                    .unwrap();
-
-                h.connect(
-                    rem_inp_pred_node,
-                    rem_inp_pred_port,
-                    *rem_out_node,
-                    *rem_out_port,
-                );
-            }
-        }
-
-        // 3.6. Remove all nodes in subgraph and edges between them.
+        // 4. Remove all nodes in subgraph and edges between them.
         Ok(subgraph
             .nodes()
             .iter()

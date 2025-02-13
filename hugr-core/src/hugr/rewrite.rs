@@ -4,10 +4,12 @@ pub mod consts;
 pub mod inline_dfg;
 pub mod insert_identity;
 pub mod outline_cfg;
+mod port_types;
 pub mod replace;
 pub mod simple_replace;
 
 use crate::{Hugr, HugrView, Node};
+pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
 use super::HugrMut;
