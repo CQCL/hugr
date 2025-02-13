@@ -52,8 +52,8 @@ impl SimpleReplacement {
     pub fn replacement(&self) -> &Hugr {
         &self.replacement
     }
-    /// Consume self and return the replacement hugr.
 
+    /// Consume self and return the replacement hugr.
     #[inline]
     pub fn into_replacement(self) -> Hugr {
         self.replacement
@@ -66,7 +66,6 @@ impl SimpleReplacement {
     }
 
     /// Check if the replacement can be applied to the given hugr.
-    #[must_use]
     pub fn is_valid_rewrite(&self, h: &impl HugrView) -> Result<(), SimpleReplacementError> {
         let parent = self.subgraph.get_parent(h);
 
@@ -100,7 +99,6 @@ impl SimpleReplacement {
     ///
     /// For each pair in the returned vector, the first element is a port in
     /// `host` and the second is a port in `self.replacement`.
-    #[must_use]
     pub fn incoming_boundary<'a>(
         &'a self,
         host: &'a impl HugrView,
@@ -136,7 +134,6 @@ impl SimpleReplacement {
     /// `self.replacement` and the second is a port in `host`.
     ///
     /// This panics if self.replacement is not a DFG.
-    #[must_use]
     pub fn outgoing_boundary<'a>(
         &'a self,
         _host: &'a impl HugrView,
@@ -170,7 +167,6 @@ impl SimpleReplacement {
     /// For each pair in the returned vector, the both ports are in `host`.
     ///
     /// This panics if self.replacement is not a DFG.
-    #[must_use]
     pub fn host_to_host_boundary<'a>(
         &'a self,
         host: &'a impl HugrView,
