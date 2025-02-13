@@ -10,6 +10,8 @@ use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::ops::{OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
+use crate::find_main;
+
 use super::value_row::ValueRow;
 use super::{
     partial_from_const, row_contains_bottom, AbstractValue, AnalysisResults, DFContext,
@@ -83,12 +85,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         // we must find the corresponding Input node.
         let input_node_parent = match self.0.get_optype(root) {
             OpType::Module(_) => {
-                let main = self.0.children(root).find(|n| {
-                    self.0
-                        .get_optype(*n)
-                        .as_func_defn()
-                        .is_some_and(|f| f.name == "main")
-                });
+                let main = find_main(&self.0);
                 if main.is_none() && in_values.next().is_some() {
                     panic!("Cannot give inputs to module with no 'main'");
                 }
