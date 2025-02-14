@@ -35,6 +35,19 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     }
 }
 
+impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
+    /// Begin building a module from a pre-existing HUGR node.
+    ///
+    /// Returns `none` if the HUGR node is not a module.
+    #[must_use]
+    pub fn from_hugr(hugr: T, node: Node) -> Option<Self> {
+        match hugr.as_ref().get_optype(node).is_module() {
+            true => Some(Self(hugr)),
+            false => None,
+        }
+    }
+}
+
 impl ModuleBuilder<Hugr> {
     /// Begin building a new module.
     #[must_use]
