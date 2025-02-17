@@ -1,0 +1,257 @@
+(hugr 0)
+
+(declare-ctr arithmetic.int.types.int
+  (param ?bitwidth core.nat)
+  core.type
+  (meta (core.meta.description "Integer type.")))
+
+(declare-ctr arithmetic.int.const
+  (param ?bitwidth core.nat)
+  (param ?value core.nat)
+  (core.const (arithmetic.int.types.int ?bitwidth) (ext))
+  (meta (core.meta.description "Constant integer value.")))
+
+(declare-operation arithmetic.int.iwiden_u
+  (param ?from_width core.nat)
+  (param ?to_width core.nat)
+  (where (core.nat_le ?from_width ?to_width))
+  (core.fn [(arithmetic.int.int ?from_width)] [(arithmetic.int.int ?to_width)] (ext))
+  (meta (core.meta.description "Widen an unsigned integer preserving value")))
+
+(declare-operation arithmetic.int.iwiden_s
+  (param ?from_width core.nat)
+  (param ?to_width core.nat)
+  (where (core.nat_le ?from_width ?to_width))
+  (core.fn [(arithmetic.int.int ?from_width)] [(arithmetic.int.int ?to_width)] (ext))
+  (meta (core.meta.description "Widen a signed integer preserving value")))
+
+(declare-operation arithmetic.int.inarrow_u
+  (param ?from_width core.nat)
+  (param ?to_width core.nat)
+  (where (core.nat_le ?to_width ?from_width))
+  (core.fn [(arithmetic.int.int ?from_width)] [(core.adt [[] [(arithmetic.int.int ?to_width)]])] (ext))
+  (meta (core.meta.description "Narrow an unsigned integer, returning error if value doesn't fit")))
+
+(declare-operation arithmetic.int.inarrow_s
+  (param ?from_width core.nat)
+  (param ?to_width core.nat)
+  (where (core.nat_le ?to_width ?from_width))
+  (core.fn [(arithmetic.int.int ?from_width)] [(core.adt [[] [(arithmetic.int.int ?to_width)]])] (ext))
+  (meta (core.meta.description "Narrow a signed integer, returning error if value doesn't fit")))
+
+;; Comparison operations
+(declare-operation arithmetic.int.ieq
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Integer equality test")))
+
+(declare-operation arithmetic.int.ilt_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Unsigned integer less than")))
+
+(declare-operation arithmetic.int.ilt_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Signed integer less than")))
+
+(declare-operation arithmetic.int.igt_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Unsigned integer greater than")))
+
+(declare-operation arithmetic.int.igt_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Signed integer greater than")))
+
+(declare-operation arithmetic.int.ile_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Unsigned integer less than or equal")))
+
+(declare-operation arithmetic.int.ile_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Signed integer less than or equal")))
+
+(declare-operation arithmetic.int.ige_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Unsigned integer greater than or equal")))
+
+(declare-operation arithmetic.int.ige_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [prelude.bool] (ext))
+  (meta (core.meta.description "Signed integer greater than or equal")))
+
+(declare-operation arithmetic.int.imax_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Maximum of unsigned integers")))
+
+(declare-operation arithmetic.int.imax_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Maximum of signed integers")))
+
+(declare-operation arithmetic.int.imin_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Minimum of unsigned integers")))
+
+(declare-operation arithmetic.int.imin_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Minimum of signed integers")))
+
+;; Arithmetic operations
+(declare-operation arithmetic.int.iadd
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Integer addition modulo 2^N")))
+
+(declare-operation arithmetic.int.isub
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Integer subtraction modulo 2^N")))
+
+(declare-operation arithmetic.int.imul
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Integer multiplication modulo 2^N")))
+
+(declare-operation arithmetic.int.ipow
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Raise first input to the power of second input, the exponent is treated as an unsigned integer")))
+
+(declare-operation arithmetic.int.iabs
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Convert signed to unsigned by taking absolute value")))
+
+;; Division operations
+(declare-operation arithmetic.int.idivmod_checked_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(core.adt [[] [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]])] (ext))
+  (meta (core.meta.description "Checked unsigned integer division and modulus with divide-by-zero checking")))
+
+(declare-operation arithmetic.int.idivmod_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Unchecked unsigned integer division and modulus")))
+
+(declare-operation arithmetic.int.idivmod_checked_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(core.adt [[] [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]])] (ext))
+  (meta (core.meta.description "Checked signed integer division and modulus with divide-by-zero checking")))
+
+(declare-operation arithmetic.int.idivmod_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Unchecked signed integer division and modulus")))
+
+(declare-operation arithmetic.int.idiv_checked_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(core.adt [[] [(arithmetic.int.int ?width)]])] (ext))
+  (meta (core.meta.description "Checked unsigned integer division with divide-by-zero checking")))
+
+(declare-operation arithmetic.int.idiv_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Unchecked unsigned integer division")))
+
+(declare-operation arithmetic.int.imod_checked_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(core.adt [[] [(arithmetic.int.int ?width)]])] (ext))
+  (meta (core.meta.description "Checked unsigned integer modulus with divide-by-zero checking")))
+
+(declare-operation arithmetic.int.imod_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Unchecked unsigned integer modulus")))
+
+(declare-operation arithmetic.int.idiv_checked_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(core.adt [[] [(arithmetic.int.int ?width)]])] (ext))
+  (meta (core.meta.description "Checked signed integer division with divide-by-zero checking")))
+
+(declare-operation arithmetic.int.idiv_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Unchecked signed integer division")))
+
+(declare-operation arithmetic.int.imod_checked_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(core.adt [[] [(arithmetic.int.int ?width)]])] (ext))
+  (meta (core.meta.description "Checked signed integer modulus with divide-by-zero checking")))
+
+(declare-operation arithmetic.int.imod_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)]
+           [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Unchecked signed integer modulus")))
+
+;; Bitwise operations
+(declare-operation arithmetic.int.iand
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Bitwise AND")))
+
+(declare-operation arithmetic.int.ior
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Bitwise OR")))
+
+(declare-operation arithmetic.int.ixor
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Bitwise XOR")))
+
+(declare-operation arithmetic.int.inot
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Bitwise NOT")))
+
+(declare-operation arithmetic.int.ishl
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Shift first input left by k bits where k is unsigned interpretation of second input (leftmost bits dropped, rightmost bits set to zero)")))
+
+(declare-operation arithmetic.int.ishr
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)")))
+
+(declare-operation arithmetic.int.irotl
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)")))
+
+(declare-operation arithmetic.int.irotr
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width) (arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)")))
+
+;; Type conversion operations
+(declare-operation arithmetic.int.is_to_u
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Convert signed to unsigned")))
+
+(declare-operation arithmetic.int.iu_to_s
+  (param ?width core.nat)
+  (core.fn [(arithmetic.int.int ?width)] [(arithmetic.int.int ?width)] (ext))
+  (meta (core.meta.description "Convert unsigned to signed")))

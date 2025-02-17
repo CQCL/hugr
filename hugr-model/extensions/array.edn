@@ -1,0 +1,115 @@
+(hugr 0)
+
+(declare-ctr collections.array.array
+  (param ?len core.nat)
+  (param ?type core.type)
+  core.type
+  (meta (core.meta.description "Fixed-length array.")))
+
+(declare-ctr collections.array.const
+  (param ?len core.nat)
+  (param ?type core.type)
+  (param ?ext core.ext_set)
+  (param ?values (core.list (core.const ?type ?ext)))
+  (core.const (collections.array.array ?len ?type) ?ext)
+  (meta (core.meta.description "Constant array value.")))
+
+(declare-operation collections.array.new_array
+  (param ?len core.nat)
+  (param ?type core.type)
+  (param ?inputs (core.list core.type))
+  (where (core.repeated ?type ?len ?inputs))
+  (core.fn ?inputs [(collections.array.array ?len ?type)] (ext))
+  (meta (core.meta.description "Create a new array from elements.")))
+
+(declare-operation collections.array.get
+  (param ?len core.nat)
+  (param ?type core.type)
+  (where (core.nonlinear ?type))
+  (core.fn
+    [(collections.array.array ?len ?type) prelude.usize]
+    [(core.adt [[] [?type]])]
+    (ext))
+  (meta (core.meta.description "Get an element from an array.")))
+
+(declare-operation collections.array.set
+  (param ?len core.nat)
+  (param ?type core.type)
+  (core.fn
+    [(collections.array.array ?len ?type) prelude.usize ?type]
+    [(core.adt
+      [[?type (collections.array.array ?len ?type)]
+       [?type (collections.array.array ?len ?type)]])]
+    (ext))
+  (meta (core.meta.description "Set an element in an array.")))
+
+(declare-operation collections.array.swap
+  (param ?len core.nat)
+  (param ?type core.type)
+  (core.fn
+    [(collections.array.array ?len ?type) prelude.usize prelude.usize]
+    [(core.adt
+      [[(collections.array.array ?len ?type)]
+       [(collections.array.array ?len ?type)]])]
+    (ext))
+  (meta (core.meta.description "Swap two elements in an array.")))
+
+(declare-operation collections.array.discard_empty
+  (param ?type core.type)
+  (core.fn
+    [(collections.array.array 0 ?type)]
+    []
+    (ext))
+  (meta (core.meta.description "Discard an empty array.")))
+
+(declare-operation collections.array.pop_left
+  (param ?len core.nat)
+  (param ?type core.type)
+  ; The reduced_len parameter is not present in `hugr_core` but is necessary
+  ; to compute the length of the resulting array. There might be an argument here
+  ; for allowing implicit parameters after all which always have to be inferred?
+  (param ?reduced_len core.nat)
+  (where (core.nat_sum ?reduced_len 1 ?len))
+  (core.fn
+    [(collections.array.array ?len ?type)]
+    [(core.adt [[] [?type (collections.array.array ?reduced_len ?type)]])]
+    (ext))
+  (meta (core.meta.description "Pop an element from the left of an array.")))
+
+(declare-operation collections.array.pop_right
+  (param ?len core.nat)
+  (param ?type core.type)
+  (param ?reduced_len core.nat)
+  (where (core.nat_sum ?reduced_len 1 ?len))
+  (core.fn
+    [(collections.array.array ?len ?type)]
+    [(core.adt [[] [?type (collections.array.array ?reduced_len ?type)]])]
+    (ext))
+  (meta (core.meta.description "Pop an element from the right of an array.")))
+
+(declare-operation collections.array.repeat
+  (param ?len core.nat)
+  (param ?type core.type)
+  (param ?ext core.ext_set)
+  ; This is taken as-is from the `hugr_core` extension, but it does not seem to be ideal.
+  ; Aren't function values linear to allow for the possibility that they captured variables?
+  (core.fn
+    [(core.fn [] [?type] ?ext)]
+    [(collections.array.array ?len ?type)]
+    ?ext)
+  (meta (core.meta.description "Creates a new array whose elements are initialised by calling the given function n times.")))
+
+(declare-operation collections.array.scan
+  (param ?len core.nat)
+  (param ?t1 core.type)
+  (param ?t2 core.type)
+  (param ?s (core.list core.type))
+  (param ?ext core.ext_set)
+  ; This is taken as-is from the `hugr_core` extension. The same issue with linearity of functions types.
+  ; Also `scan` is not a good name for this operation. As a higher-order function, `scan` has an established
+  ; meaning which does not match what this function does.
+  (core.fn
+    [(collections.array.array ?len ?t1) (core.fn [?t1 ?s ...] [?t2 ?s ...] ?ext) ?s ...]
+    [(collections.array.array ?len ?t2) ?s ...]
+    ?ext)
+  (meta (core.meta.description "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.")))
