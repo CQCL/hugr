@@ -67,8 +67,9 @@ macro_rules! hugr_view_methods {
                 fn get_io(&self, node: Node) -> Option<[Node; 2]>;
                 fn inner_function_type(&self) -> Option<Cow<'_, Signature>>;
                 fn poly_func_type(&self) -> Option<PolyFuncType>;
-                // TODO: cannot use delegate: return type of `as_petgraph`
-                // depends on Self
+                // TODO: cannot use delegate here. `PetgraphWrapper` is a thin
+                // wrapper around `Self`, so falling back to the default impl
+                // should be harmless.
                 // fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>;
                 fn mermaid_string(&self) -> String;
                 fn mermaid_string_with_config(&self, config: RenderConfig) -> String;
