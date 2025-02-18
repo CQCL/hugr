@@ -43,24 +43,44 @@ pub fn main() {
 
         for param in symbol.params {
             let param_ident = format_ident!("r#{}", param.name);
-            field_decls.push(quote! { pub #param_ident: model::TermId });
+            field_decls.push(quote! {
+                #[allow(missing_docs)]
+                pub #param_ident: model::TermId
+            });
             field_names.push(param_ident);
         }
+
+        let view_impl = match node.operation {
+            model::Operation::DeclareConstructor(_) => quote! {
+                impl<'a> View<'a> for #symbol_ident {
+                    type Id = model::TermId;
+                    fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
+                        let [#(#field_names),*] = view_term_apply(module, id, #symbol_string)?;
+                        Some(Self { #(#field_names),* })
+                    }
+                }
+            },
+            model::Operation::DeclareOperation(_) => quote! {
+                impl<'a> View<'a> for #symbol_ident {
+                    type Id = model::NodeId;
+                    fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
+                        let [#(#field_names),*] = view_node_custom(module, id, #symbol_string)?;
+                        Some(Self { #(#field_names),* })
+                    }
+                }
+            },
+            _ => unreachable!(),
+        };
 
         out.push(quote! {
             #[doc = #docs]
             #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+            #[allow(non_camel_case_types)]
             pub struct #symbol_ident {
                 #(#field_decls),*
             }
 
-            impl<'a> View<'a> for #symbol_ident {
-                type Id = model::TermId;
-                fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
-                    let [#(#field_names),*] = view_term_apply(module, id, #symbol_string)?;
-                    Some(Self { #(#field_names),* })
-                }
-            }
+            #view_impl
         });
     }
 
@@ -112,6 +132,28 @@ fn view_term_apply<const N: usize>(
     }
 
     (*args).try_into().ok()
+}
+
+fn view_node_custom<const N: usize>(
+    module: &model::Module,
+    node_id: model::NodeId,
+    name: &str,
+) -> Option<[model::TermId; N]> {
+    let node = module.get_node(node_id)?;
+
+    // TODO: Follow alias chains?
+
+    let model::Operation::Custom(symbol) = &node.operation else {
+        return None;
+    };
+
+    let symbol_name = module.get_node(*symbol)?.operation.symbol()?;
+
+    if name != symbol_name {
+        return None;
+    }
+
+    (*node.params).try_into().ok()
 }
 
 trait View<'a>: Sized {
