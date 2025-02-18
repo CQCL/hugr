@@ -423,6 +423,10 @@ impl<'a> Module<'a> {
         self.regions.push(region);
         id
     }
+
+    pub fn view<V: View<'a>>(&'a self, id: V::Id) -> Option<V> {
+        V::view(self, id)
+    }
 }
 
 /// Nodes in the hugr graph.
@@ -730,4 +734,20 @@ pub enum ModelError {
     /// There is a node that is not well-formed or has the invalid operation.
     #[error("invalid operation on node: {0}")]
     InvalidOperation(NodeId),
+}
+
+pub trait View<'a>: Sized {
+    type Id;
+    fn view(module: &'a Module<'a>, id: Self::Id) -> Option<Self>;
+}
+
+impl<'a> View<'a> for &'a str {
+    type Id = TermId;
+
+    fn view(module: &'a Module<'a>, id: Self::Id) -> Option<Self> {
+        match module.get_term(id)? {
+            Term::Str(s) => Some(s),
+            _ => None,
+        }
+    }
 }

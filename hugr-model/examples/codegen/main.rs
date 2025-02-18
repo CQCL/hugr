@@ -3,13 +3,16 @@ use quote::{format_ident, quote};
 
 use bumpalo::Bump;
 use hugr_model::v0 as model;
+use hugr_model::v0::View;
 
+mod collections_array;
 mod core;
+mod core_meta;
 
 pub fn main() {
     let bump = Bump::new();
-    let input = include_str!("../../extensions/core.edn");
-    let extension = "core";
+    let input = include_str!("../../extensions/array.edn");
+    let extension = "collections.array";
     let module = model::text::parse(input, &bump).unwrap().module;
 
     let root = module.get_region(module.root).unwrap();
@@ -52,7 +55,7 @@ pub fn main() {
 
         let view_impl = match node.operation {
             model::Operation::DeclareConstructor(_) => quote! {
-                impl<'a> View<'a> for #symbol_ident {
+                impl<'a> ::hugr_model::v0::View<'a> for #symbol_ident {
                     type Id = model::TermId;
                     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
                         let [#(#field_names),*] = view_term_apply(module, id, #symbol_string)?;
@@ -61,7 +64,7 @@ pub fn main() {
                 }
             },
             model::Operation::DeclareOperation(_) => quote! {
-                impl<'a> View<'a> for #symbol_ident {
+                impl<'a> ::hugr_model::v0::View<'a> for #symbol_ident {
                     type Id = model::NodeId;
                     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
                         let [#(#field_names),*] = view_node_custom(module, id, #symbol_string)?;
@@ -86,7 +89,7 @@ pub fn main() {
 
     let out = quote! {
         use hugr_model::v0 as model;
-        use super::{view_term_apply, View};
+        use super::{view_term_apply, view_node_custom};
         #(#out)*
     };
 
@@ -98,18 +101,10 @@ pub fn main() {
 fn find_doc_meta<'a>(module: &'a model::Module<'a>, node_id: model::NodeId) -> Option<&'a str> {
     let node = module.get_node(node_id)?;
 
-    for term_id in node.meta {
-        let Some([doc]) = view_term_apply(module, *term_id, "core.meta.description") else {
-            continue;
-        };
-
-        match module.get_term(doc)? {
-            model::Term::Str(doc) => return Some(doc),
-            _ => {}
-        }
-    }
-
-    None
+    node.meta
+        .iter()
+        .filter_map(|id| module.view::<core_meta::description>(*id))
+        .find_map(|doc| module.view(doc.description))
 }
 
 fn view_term_apply<const N: usize>(
@@ -154,22 +149,4 @@ fn view_node_custom<const N: usize>(
     }
 
     (*node.params).try_into().ok()
-}
-
-trait View<'a>: Sized {
-    type Id;
-    fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self>;
-}
-
-struct r#fn {
-    pub inputs: model::TermId,
-    pub outputs: model::TermId,
-}
-
-impl<'a> View<'a> for r#fn {
-    type Id = model::TermId;
-    fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
-        let [inputs, outputs] = view_term_apply(module, id, "core.fn")?;
-        Some(Self { inputs, outputs })
-    }
 }

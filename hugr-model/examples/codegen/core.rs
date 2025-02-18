@@ -1,5 +1,5 @@
 use hugr_model::v0 as model;
-use super::{view_term_apply, View};
+use super::{view_term_apply, view_node_custom, View};
 ///`core.fn`: Runtime function type.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[allow(non_camel_case_types)]
