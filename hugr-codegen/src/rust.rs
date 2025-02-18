@@ -1,4 +1,7 @@
-use hugr_model::v0::{Module, NodeId, Operation, Term, TermId, View};
+use hugr_model::v0::{
+    view::{NamedConstructor, View},
+    Module, NodeId, Operation, TermId,
+};
 use quote::{format_ident, quote};
 
 pub fn generate(module: &Module, extension: &str) {
@@ -42,19 +45,31 @@ pub fn generate(module: &Module, extension: &str) {
 
         let view_impl = match node.operation {
             Operation::DeclareConstructor(_) => quote! {
-                impl<'a> ::hugr_model::v0::View<'a> for #symbol_ident {
-                    type Id = model::TermId;
+                impl<'a> ::hugr_model::v0::view::View<'a> for #symbol_ident {
+                    type Id = ::hugr_model::v0::TermId;
                     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
-                        let [#(#field_names),*] = view_term_apply(module, id, #symbol_string)?;
+                        let apply: ::hugr_model::v0::view::NamedConstructor = module.view(id)?;
+
+                        if apply.symbol != #symbol_string {
+                            return None;
+                        }
+
+                        let [#(#field_names),*] = apply.args.try_into().ok()?;
                         Some(Self { #(#field_names),* })
                     }
                 }
             },
             Operation::DeclareOperation(_) => quote! {
-                impl<'a> ::hugr_model::v0::View<'a> for #symbol_ident {
-                    type Id = model::NodeId;
+                impl<'a> ::hugr_model::v0::view::View<'a> for #symbol_ident {
+                    type Id = ::hugr_model::v0::NodeId;
                     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
-                        let [#(#field_names),*] = view_node_custom(module, id, #symbol_string)?;
+                        let operation: ::hugr_model::v0::view::NamedOperation = module.view(id)?;
+
+                        if operation.name != #symbol_string {
+                            return None;
+                        }
+
+                        let [#(#field_names),*] = operation.params.try_into().ok()?;
                         Some(Self { #(#field_names),* })
                     }
                 }
@@ -74,12 +89,7 @@ pub fn generate(module: &Module, extension: &str) {
         });
     }
 
-    let out = quote! {
-        use hugr_model::v0 as model;
-        use super::{view_term_apply, view_node_custom};
-        #(#out)*
-    };
-
+    let out = quote! { #(#out)* };
     let ast = syn::parse2(out).unwrap();
     let pretty = prettyplease::unparse(&ast);
     println!("{}", pretty);
@@ -91,7 +101,13 @@ impl<'a> View<'a> for MetaDoc<'a> {
     type Id = TermId;
 
     fn view(module: &'a Module<'a>, id: Self::Id) -> Option<Self> {
-        let [doc] = view_term_apply(module, id, "core.meta.description")?;
+        let apply: NamedConstructor = module.view(id)?;
+
+        if apply.name != "core.meta.description" {
+            return None;
+        }
+
+        let [doc] = apply.args.try_into().ok()?;
         Some(MetaDoc(module.view(doc)?))
     }
 }
@@ -103,48 +119,4 @@ fn find_doc_meta<'a>(module: &'a Module<'a>, node_id: NodeId) -> Option<&'a str>
         .iter()
         .find_map(|meta| module.view::<MetaDoc>(*meta))
         .map(|MetaDoc(doc)| doc)
-}
-
-fn view_term_apply<const N: usize>(
-    module: &Module,
-    term_id: TermId,
-    name: &str,
-) -> Option<[TermId; N]> {
-    let term = module.get_term(term_id)?;
-
-    // TODO: Follow alias chains?
-
-    let Term::Apply(symbol, args) = term else {
-        return None;
-    };
-
-    let symbol_name = module.get_node(*symbol)?.operation.symbol()?;
-
-    if name != symbol_name {
-        return None;
-    }
-
-    (*args).try_into().ok()
-}
-
-fn view_node_custom<const N: usize>(
-    module: &Module,
-    node_id: NodeId,
-    name: &str,
-) -> Option<[TermId; N]> {
-    let node = module.get_node(node_id)?;
-
-    // TODO: Follow alias chains?
-
-    let Operation::Custom(symbol) = &node.operation else {
-        return None;
-    };
-
-    let symbol_name = module.get_node(*symbol)?.operation.symbol()?;
-
-    if name != symbol_name {
-        return None;
-    }
-
-    (*node.params).try_into().ok()
 }

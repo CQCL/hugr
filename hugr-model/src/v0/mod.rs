@@ -90,6 +90,7 @@
 use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 use thiserror::Error;
+use view::View;
 
 /// Core function types.
 ///
@@ -280,6 +281,7 @@ pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 pub mod binary;
 pub mod scope;
 pub mod text;
+pub mod view;
 
 macro_rules! define_index {
     ($(#[$meta:meta])* $vis:vis struct $name:ident(pub u32);) => {
@@ -424,6 +426,7 @@ impl<'a> Module<'a> {
         id
     }
 
+    /// Try to view a substructure of the module as a specific type.
     pub fn view<V: View<'a>>(&'a self, id: V::Id) -> Option<V> {
         V::view(self, id)
     }
@@ -734,20 +737,4 @@ pub enum ModelError {
     /// There is a node that is not well-formed or has the invalid operation.
     #[error("invalid operation on node: {0}")]
     InvalidOperation(NodeId),
-}
-
-pub trait View<'a>: Sized {
-    type Id;
-    fn view(module: &'a Module<'a>, id: Self::Id) -> Option<Self>;
-}
-
-impl<'a> View<'a> for &'a str {
-    type Id = TermId;
-
-    fn view(module: &'a Module<'a>, id: Self::Id) -> Option<Self> {
-        match module.get_term(id)? {
-            Term::Str(s) => Some(s),
-            _ => None,
-        }
-    }
 }
