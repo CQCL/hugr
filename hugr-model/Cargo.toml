@@ -26,8 +26,15 @@ ordered-float = { workspace = true }
 pest = { workspace = true }
 pest_derive = { workspace = true }
 pretty = { workspace = true }
+prettyplease = "0.2.29"
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
+syn = { version = "2", default-features = false, features = [
+    "full",
+    "parsing",
+] }
+quote = "1.0.38"
+proc-macro2 = "1.0.93"
 
 [lints]
 workspace = true
