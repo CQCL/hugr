@@ -1,0 +1,21 @@
+[package]
+name = "hugr-codegen"
+version = "0.1.0"
+rust-version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+hugr-model = { version = "0.17.1", path = "../hugr-model" }
+syn = { version = "2", default-features = false, features = [
+    "full",
+    "parsing",
+] }
+quote = "1.0.38"
+proc-macro2 = "1.0.93"
+prettyplease = "0.2.29"
+
+[lints]
+workspace = true

@@ -1,30 +1,17 @@
-#![allow(missing_docs)]
+use hugr_model::v0::{Module, NodeId, Operation, Term, TermId, View};
 use quote::{format_ident, quote};
 
-use bumpalo::Bump;
-use hugr_model::v0 as model;
-use hugr_model::v0::View;
-
-mod collections_array;
-mod core;
-mod core_meta;
-
-pub fn main() {
-    let bump = Bump::new();
-    let input = include_str!("../../extensions/array.edn");
-    let extension = "collections.array";
-    let module = model::text::parse(input, &bump).unwrap().module;
-
+pub fn generate(module: &Module, extension: &str) {
     let root = module.get_region(module.root).unwrap();
+
     let mut out = Vec::new();
-    // let mut out = String::new();
 
     for node_id in root.children {
         let node = module.get_node(*node_id).unwrap();
 
         let symbol = match node.operation {
-            model::Operation::DeclareConstructor(symbol) => symbol,
-            model::Operation::DeclareOperation(symbol) => symbol,
+            Operation::DeclareConstructor(symbol) => symbol,
+            Operation::DeclareOperation(symbol) => symbol,
             _ => continue,
         };
 
@@ -54,7 +41,7 @@ pub fn main() {
         }
 
         let view_impl = match node.operation {
-            model::Operation::DeclareConstructor(_) => quote! {
+            Operation::DeclareConstructor(_) => quote! {
                 impl<'a> ::hugr_model::v0::View<'a> for #symbol_ident {
                     type Id = model::TermId;
                     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
@@ -63,7 +50,7 @@ pub fn main() {
                     }
                 }
             },
-            model::Operation::DeclareOperation(_) => quote! {
+            Operation::DeclareOperation(_) => quote! {
                 impl<'a> ::hugr_model::v0::View<'a> for #symbol_ident {
                     type Id = model::NodeId;
                     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
@@ -98,25 +85,36 @@ pub fn main() {
     println!("{}", pretty);
 }
 
-fn find_doc_meta<'a>(module: &'a model::Module<'a>, node_id: model::NodeId) -> Option<&'a str> {
-    let node = module.get_node(node_id)?;
+struct MetaDoc<'a>(pub &'a str);
 
-    node.meta
+impl<'a> View<'a> for MetaDoc<'a> {
+    type Id = TermId;
+
+    fn view(module: &'a Module<'a>, id: Self::Id) -> Option<Self> {
+        let [doc] = view_term_apply(module, id, "core.meta.description")?;
+        Some(MetaDoc(module.view(doc)?))
+    }
+}
+
+fn find_doc_meta<'a>(module: &'a Module<'a>, node_id: NodeId) -> Option<&'a str> {
+    module
+        .get_node(node_id)?
+        .meta
         .iter()
-        .filter_map(|id| module.view::<core_meta::description>(*id))
-        .find_map(|doc| module.view(doc.description))
+        .find_map(|meta| module.view::<MetaDoc>(*meta))
+        .map(|MetaDoc(doc)| doc)
 }
 
 fn view_term_apply<const N: usize>(
-    module: &model::Module,
-    term_id: model::TermId,
+    module: &Module,
+    term_id: TermId,
     name: &str,
-) -> Option<[model::TermId; N]> {
+) -> Option<[TermId; N]> {
     let term = module.get_term(term_id)?;
 
     // TODO: Follow alias chains?
 
-    let model::Term::Apply(symbol, args) = term else {
+    let Term::Apply(symbol, args) = term else {
         return None;
     };
 
@@ -130,15 +128,15 @@ fn view_term_apply<const N: usize>(
 }
 
 fn view_node_custom<const N: usize>(
-    module: &model::Module,
-    node_id: model::NodeId,
+    module: &Module,
+    node_id: NodeId,
     name: &str,
-) -> Option<[model::TermId; N]> {
+) -> Option<[TermId; N]> {
     let node = module.get_node(node_id)?;
 
     // TODO: Follow alias chains?
 
-    let model::Operation::Custom(symbol) = &node.operation else {
+    let Operation::Custom(symbol) = &node.operation else {
         return None;
     };
 

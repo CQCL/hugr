@@ -9,7 +9,7 @@ members = [
     "hugr-passes",
     "hugr-cli",
     "hugr-model",
-    "hugr-llvm",
+    "hugr-llvm", "hugr-codegen",
 ]
 default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
