@@ -1,13 +1,13 @@
-use hugr_model::v0::{
-    view::{NamedConstructor, View},
-    Module, NodeId, Operation, TermId,
-};
+use crate::util::find_node_docs;
+use hugr_model::v0::{Module, Operation};
 use quote::{format_ident, quote};
+use std::collections::HashMap;
 
-pub fn generate(module: &Module, extension: &str) {
+pub fn generate(module: &Module) -> String {
     let root = module.get_region(module.root).unwrap();
 
-    let mut out = Vec::new();
+    // We group the symbols by their extension in order to generate a Rust module per extension.
+    let mut modules = HashMap::<&str, Vec<_>>::new();
 
     for node_id in root.children {
         let node = module.get_node(*node_id).unwrap();
@@ -22,11 +22,8 @@ pub fn generate(module: &Module, extension: &str) {
         let (symbol_ext, symbol_name) = symbol.name.rsplit_once(".").unwrap();
         let symbol_ident = format_ident!("r#{}", symbol_name);
 
-        if symbol_ext != extension {
-            continue;
-        }
-
-        let docs = match find_doc_meta(&module, *node_id) {
+        // We use metadata in order to find human-readable documentation for the symbol.
+        let docs = match find_node_docs(&module, *node_id) {
             Some(docs) => format!("`{}`: {}", symbol.name, docs),
             None => format!("`{}`.", symbol.name),
         };
@@ -77,7 +74,7 @@ pub fn generate(module: &Module, extension: &str) {
             _ => unreachable!(),
         };
 
-        out.push(quote! {
+        modules.entry(symbol_ext).or_default().push(quote! {
             #[doc = #docs]
             #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #[allow(non_camel_case_types)]
@@ -89,34 +86,21 @@ pub fn generate(module: &Module, extension: &str) {
         });
     }
 
-    let out = quote! { #(#out)* };
-    let ast = syn::parse2(out).unwrap();
-    let pretty = prettyplease::unparse(&ast);
-    println!("{}", pretty);
-}
+    let mut out = Vec::new();
 
-struct MetaDoc<'a>(pub &'a str);
+    for (symbol_ext, content) in modules {
+        let module_name = format_ident!("r#{}", symbol_ext.replace(".", "_"));
 
-impl<'a> View<'a> for MetaDoc<'a> {
-    type Id = TermId;
-
-    fn view(module: &'a Module<'a>, id: Self::Id) -> Option<Self> {
-        let apply: NamedConstructor = module.view(id)?;
-
-        if apply.name != "core.meta.description" {
-            return None;
-        }
-
-        let [doc] = apply.args.try_into().ok()?;
-        Some(MetaDoc(module.view(doc)?))
+        out.push(quote! {
+            pub mod #module_name {
+                #(#content)*
+            }
+        });
     }
-}
 
-fn find_doc_meta<'a>(module: &'a Module<'a>, node_id: NodeId) -> Option<&'a str> {
-    module
-        .get_node(node_id)?
-        .meta
-        .iter()
-        .find_map(|meta| module.view::<MetaDoc>(*meta))
-        .map(|MetaDoc(doc)| doc)
+    let out = quote! { #(#out)* };
+
+    // The generated Rust code is pretty-printed.
+    let ast = syn::parse2(out).unwrap();
+    prettyplease::unparse(&ast)
 }
