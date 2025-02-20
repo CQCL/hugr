@@ -3,9 +3,9 @@ use std::{borrow::Cow, fmt::Display};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use pretty::{Arena, DocAllocator as _, RefDoc};
 
-use super::{ListPart, Symbol, Term, TuplePart, Var};
+use super::{Link, ListPart, Symbol, Term, TuplePart, Var};
 
-pub struct Printer<'a> {
+struct Printer<'a> {
     /// The arena in which to allocate the pretty-printed documents.
     arena: &'a Arena<'a>,
     /// Parts of the document to be concatenated.
@@ -19,8 +19,7 @@ fn print_to_fmt<P: Print>(f: &mut std::fmt::Formatter<'_>, what: &P) -> std::fmt
     let mut printer = Printer::new(&arena);
     printer.print(what);
     let doc = printer.finish();
-    let width = f.width().unwrap_or(120);
-    doc.render_fmt(width, f)
+    doc.render_fmt(80, f)
 }
 
 impl<'a> Printer<'a> {
@@ -113,7 +112,7 @@ impl<'a> Printer<'a> {
     }
 }
 
-pub trait Print {
+trait Print {
     fn print<'a>(&'a self, printer: &mut Printer<'a>);
 }
 
@@ -201,7 +200,7 @@ impl Print for Symbol {
 
 impl Print for Var {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.text(format!("?{}", self.0))
+        printer.text(format!("{}", self))
     }
 }
 
@@ -224,7 +223,23 @@ macro_rules! impl_display {
 }
 
 impl_display!(Term);
-impl_display!(Var);
-impl_display!(Symbol);
 impl_display!(ListPart);
 impl_display!(TuplePart);
+
+impl Display for Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "?{}", self.0)
+    }
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Display for Link {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "%{}", self.0)
+    }
+}
