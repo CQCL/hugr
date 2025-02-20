@@ -59,7 +59,7 @@ impl Generator {
                 None => format!("`{}`.", symbol.name),
             };
 
-            let doc = format!("{}\n\n__Type__:\n```{}\n```", doc_head, sig);
+            let doc = format!("{}\n\n__Type__:\n```text\n{}\n```\n", doc_head, sig);
 
             let view_impl = match node.operation {
                 Operation::DeclareConstructor(_) => quote! {
