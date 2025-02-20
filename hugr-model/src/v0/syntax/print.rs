@@ -156,6 +156,11 @@ impl Print for Term {
                 printer.print(tuple_parts);
                 printer.parens_exit();
             }
+            Term::ExtSet => {
+                printer.parens_enter();
+                printer.text("ext");
+                printer.parens_exit();
+            }
         }
     }
 }
@@ -166,7 +171,7 @@ impl Print for ListPart {
             ListPart::Item(term) => {
                 printer.print(term);
             }
-            ListPart::Spread(term) => {
+            ListPart::Splice(term) => {
                 printer.print(term);
                 printer.text("...");
             }
@@ -180,7 +185,7 @@ impl Print for TuplePart {
             TuplePart::Item(term) => {
                 printer.print(term);
             }
-            TuplePart::Spread(term) => {
+            TuplePart::Splice(term) => {
                 printer.print(term);
                 printer.text("...");
             }

@@ -16,6 +16,7 @@ syn = { version = "2", default-features = false, features = [
 quote = "1.0.38"
 proc-macro2 = "1.0.93"
 prettyplease = "0.2.29"
+bumpalo.workspace = true
 
 [lints]
 workspace = true

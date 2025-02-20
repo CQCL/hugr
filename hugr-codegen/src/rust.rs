@@ -1,4 +1,5 @@
 use crate::util::find_node_docs;
+use hugr_model::v0::syntax;
 use hugr_model::v0::{Module, Operation};
 use quote::{format_ident, quote};
 use std::collections::HashMap;
@@ -22,32 +23,40 @@ pub fn generate(module: &Module) -> String {
         let (symbol_ext, symbol_name) = symbol.name.rsplit_once(".").unwrap();
         let symbol_ident = format_ident!("r#{}", symbol_name);
 
-        // We use metadata in order to find human-readable documentation for the symbol.
-        let docs = match find_node_docs(&module, *node_id) {
-            Some(docs) => format!("`{}`: {}", symbol.name, docs),
-            None => format!("`{}`.", symbol.name),
-        };
-
         let mut field_decls = Vec::new();
         let mut field_names = Vec::new();
+        let mut field_docs = Vec::new();
 
         for param in symbol.params {
             let param_ident = format_ident!("r#{}", param.name);
             field_decls.push(quote! {
                 #[allow(missing_docs)]
-                pub #param_ident: model::TermId
+                pub #param_ident: hugr_model::v0::TermId
             });
             field_names.push(param_ident);
+
+            let param_type = module.view::<syntax::Term>(param.r#type).unwrap();
+            field_docs.push(format!("`{} : {}`", param.name, param_type));
         }
+
+        let sig = module.view::<syntax::Term>(symbol.signature).unwrap();
+
+        // We use metadata in order to find human-readable documentation for the symbol.
+        let doc_head = match find_node_docs(&module, *node_id) {
+            Some(docs) => format!("{}", docs),
+            None => format!("`{}`.", symbol.name),
+        };
+
+        let doc = format!("{}\n\n__Type__: `{}`", doc_head, sig);
 
         let view_impl = match node.operation {
             Operation::DeclareConstructor(_) => quote! {
                 impl<'a> ::hugr_model::v0::view::View<'a> for #symbol_ident {
                     type Id = ::hugr_model::v0::TermId;
-                    fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
+                    fn view(module: &'a ::hugr_model::v0::Module<'a>, id: Self::Id) -> Option<Self> {
                         let apply: ::hugr_model::v0::view::NamedConstructor = module.view(id)?;
 
-                        if apply.symbol != #symbol_string {
+                        if apply.name != #symbol_string {
                             return None;
                         }
 
@@ -59,7 +68,7 @@ pub fn generate(module: &Module) -> String {
             Operation::DeclareOperation(_) => quote! {
                 impl<'a> ::hugr_model::v0::view::View<'a> for #symbol_ident {
                     type Id = ::hugr_model::v0::NodeId;
-                    fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
+                    fn view(module: &'a ::hugr_model::v0::Module<'a>, id: Self::Id) -> Option<Self> {
                         let operation: ::hugr_model::v0::view::NamedOperation = module.view(id)?;
 
                         if operation.name != #symbol_string {
@@ -75,11 +84,14 @@ pub fn generate(module: &Module) -> String {
         };
 
         modules.entry(symbol_ext).or_default().push(quote! {
-            #[doc = #docs]
+            #[doc = #doc]
             #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #[allow(non_camel_case_types)]
             pub struct #symbol_ident {
-                #(#field_decls),*
+                #(
+                    #[doc = #field_docs]
+                    #field_decls
+                ),*
             }
 
             #view_impl
