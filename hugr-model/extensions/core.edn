@@ -25,15 +25,20 @@
 
 (declare-ctr core.adt
   (param ?variants (core.list (core.list core.type)))
-  core.type)
+  core.type
+  (meta (core.meta.description "Algebraic data types (ADTs).")))
 
-(declare-ctr core.str core.static)
+(declare-ctr core.str core.static
+  (meta (core.meta.description "String literals.")))
 
-(declare-ctr core.nat core.static)
+(declare-ctr core.nat core.static
+  (meta (core.meta.description "Natural number literals.")))
 
-(declare-ctr core.bytes core.static)
+(declare-ctr core.bytes core.static
+  (meta (core.meta.description "Byte literals.")))
 
-(declare-ctr core.float core.static)
+(declare-ctr core.float core.static
+  (meta (core.meta.description "Float literals.")))
 
 (declare-ctr core.ctrl
   (param ?types (core.list core.type))
@@ -46,7 +51,8 @@
 (declare-ctr core.const
   (param ?type core.type)
   (param ?ext core.ext_set)
-  core.static)
+  core.static
+  (meta (core.meta.description "Constant values.")))
 
 (declare-ctr core.const.adt
   (param ?variants (core.list (core.list core.type)))
@@ -66,15 +72,18 @@
 
 (declare-ctr core.list
   (param ?type core.static)
-  core.static)
+  core.static
+  (meta (core.meta.description "Static lists.")))
 
 (declare-ctr core.tuple
   (param ?type (core.list core.static))
-  core.static)
+  core.static
+  (meta (core.meta.description "Static tuples.")))
 
 (declare-ctr core.meta.description
   (param ?description core.str)
-  core.meta)
+  core.meta
+  (meta (core.meta.description "Metadata for documentation.")))
 
 (declare-operation core.call
   (param ?inputs (core.list core.type))
@@ -102,4 +111,5 @@
   (param ?variants (core.list (core.list core.type)))
   (param ?types (core.list core.type))
   (param ?tag core.nat)
-  (core.fn ?types [(core.adt ?variants)] (ext)))
+  (core.fn ?types [(core.adt ?variants)] (ext))
+  (meta (core.meta.description "Create a value for an ADT.")))
