@@ -8,7 +8,8 @@ use thiserror::Error;
 use crate::core::NodeIndex;
 use crate::hugr::Hugr;
 use crate::ops::OpType;
-use crate::{Node, PortIndex};
+use crate::types::EdgeKind;
+use crate::{Node, Port, PortIndex};
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, PortView};
 
@@ -180,10 +181,14 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             .expect("Could not reach one of the nodes");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
-            let op = hugr.get_optype(node);
-            let is_value_port = offset < op.value_port_count(dir);
-            let is_static_input = op.static_port(dir).is_some_and(|p| p.index() == offset);
-            let offset = (is_value_port || is_static_input).then_some(offset as u16);
+            let offset = matches!(
+                hugr.get_optype(node).port_kind(Port::new(dir, offset)),
+                Some(EdgeKind::ControlFlow)
+                    | Some(EdgeKind::Function(_))
+                    | Some(EdgeKind::Const(_))
+                    | Some(EdgeKind::Value(_))
+            )
+            .then_some(offset as u16);
             (node_rekey[&node], offset)
         };
 
