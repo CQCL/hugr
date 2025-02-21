@@ -88,10 +88,12 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
-    name: Build benchmarks 🏋️
+    name: Continuous benchmarking 🏋️
     needs: changes
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.7
@@ -101,10 +103,18 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      - name: Build benchmarks with no features
-        run: cargo bench --verbose --no-run  --no-default-features
-      - name: Build benchmarks with all features
-        run: cargo bench --verbose --no-run  --all-features
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-codspeed
+        run: cargo binstall cargo-codspeed --force
+      - name: Override criterion with the CodSpeed harness
+        run: cargo add --dev codspeed-criterion-compat --rename criterion
+      - name: Build benchmarks
+        run: cargo codspeed build --profile bench
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v3
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: "cargo codspeed run"
 
   # Run tests on Rust stable
   tests-stable-no-features:
