@@ -624,7 +624,7 @@ pub trait Dataflow: Container {
         let make_op = self.add_dataflow_op(
             Tag {
                 tag,
-                variants: variants.into_iter().map(Into::into).collect_vec(),
+                variants: variants.into_iter().collect_vec(),
             },
             values.into_iter().collect_vec(),
         )?;
