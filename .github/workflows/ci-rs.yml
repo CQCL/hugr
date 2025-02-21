@@ -107,7 +107,7 @@ jobs:
       - name: Install cargo-codspeed
         run: cargo binstall cargo-codspeed --force
       - name: Override criterion with the CodSpeed harness
-        run: cargo add --dev codspeed-criterion-compat --rename criterion
+        run: cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
       - name: Build benchmarks
         run: cargo codspeed build --profile bench
       - name: Run benchmarks
