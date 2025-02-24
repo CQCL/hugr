@@ -7,7 +7,7 @@ pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node, OutgoingPort};
+use crate::{Hugr, IncomingPort, Node, NodeIndex, OutgoingPort};
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -16,28 +16,32 @@ use super::inline_dfg::InlineDFGError;
 use super::{BoundaryPort, HostPort, ReplacementPort};
 
 /// Specification of a simple replacement operation.
+///
+/// # Type parameters
+///
+/// - `N`: The type of nodes in the host hugr.
 #[derive(Debug, Clone)]
-pub struct SimpleReplacement {
+pub struct SimpleReplacement<HostNode = Node> {
     /// The subgraph of the host hugr to be replaced.
-    subgraph: SiblingSubgraph,
+    subgraph: SiblingSubgraph<HostNode>,
     /// A hugr with DFG root (consisting of replacement nodes).
     replacement: Hugr,
     /// A map from (target ports of edges from the Input node of `replacement`)
     /// to (target ports of edges from nodes not in `subgraph` to nodes in `subgraph`).
-    nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)>,
+    nu_inp: HashMap<(Node, IncomingPort), (HostNode, IncomingPort)>,
     /// A map from (target ports of edges from nodes in `subgraph` to nodes not
     /// in `subgraph`) to (input ports of the Output node of `replacement`).
-    nu_out: HashMap<(Node, IncomingPort), IncomingPort>,
+    nu_out: HashMap<(HostNode, IncomingPort), IncomingPort>,
 }
 
-impl SimpleReplacement {
+impl<HostNode: NodeIndex> SimpleReplacement<HostNode> {
     /// Create a new [`SimpleReplacement`] specification.
     #[inline]
     pub fn new(
-        subgraph: SiblingSubgraph,
+        subgraph: SiblingSubgraph<HostNode>,
         replacement: Hugr,
-        nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)>,
-        nu_out: HashMap<(Node, IncomingPort), IncomingPort>,
+        nu_inp: HashMap<(Node, IncomingPort), (HostNode, IncomingPort)>,
+        nu_out: HashMap<(HostNode, IncomingPort), IncomingPort>,
     ) -> Self {
         Self {
             subgraph,
@@ -61,12 +65,15 @@ impl SimpleReplacement {
 
     /// Subgraph to be replaced.
     #[inline]
-    pub fn subgraph(&self) -> &SiblingSubgraph {
+    pub fn subgraph(&self) -> &SiblingSubgraph<HostNode> {
         &self.subgraph
     }
 
     /// Check if the replacement can be applied to the given hugr.
-    pub fn is_valid_rewrite(&self, h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+    pub fn is_valid_rewrite(
+        &self,
+        h: &impl HugrView<Node = HostNode>,
+    ) -> Result<(), SimpleReplacementError> {
         let parent = self.subgraph.get_parent(h);
 
         // 1. Check the parent node exists and is a DataflowParent.
@@ -90,7 +97,9 @@ impl SimpleReplacement {
             .get_io(self.replacement.root())
             .ok_or(SimpleReplacementError::InvalidParentNode())
     }
+}
 
+impl<HostNode: NodeIndex> SimpleReplacement<HostNode> {
     /// Get all edges that the replacement would add from outgoing ports in
     /// `host` to incoming ports in `self.replacement`.
     ///
@@ -101,8 +110,13 @@ impl SimpleReplacement {
     /// `host` and the second is a port in `self.replacement`.
     pub fn incoming_boundary<'a>(
         &'a self,
-        host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (HostPort<OutgoingPort>, ReplacementPort<IncomingPort>)> + 'a {
+        host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            HostPort<HostNode, OutgoingPort>,
+            ReplacementPort<IncomingPort>,
+        ),
+    > + 'a {
         // For each p = self.nu_inp[q] such that q is not an Output port,
         // there will be an edge from the predecessor of p to (the new copy of) q.
         self.nu_inp
@@ -136,8 +150,13 @@ impl SimpleReplacement {
     /// This panics if self.replacement is not a DFG.
     pub fn outgoing_boundary<'a>(
         &'a self,
-        _host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (ReplacementPort<OutgoingPort>, HostPort<IncomingPort>)> + 'a {
+        _host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            ReplacementPort<OutgoingPort>,
+            HostPort<HostNode, IncomingPort>,
+        ),
+    > + 'a {
         let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
 
         // For each q = self.nu_out[p] such that the predecessor of q is not an Input port,
@@ -169,8 +188,13 @@ impl SimpleReplacement {
     /// This panics if self.replacement is not a DFG.
     pub fn host_to_host_boundary<'a>(
         &'a self,
-        host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (HostPort<OutgoingPort>, HostPort<IncomingPort>)> + 'a {
+        host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            HostPort<HostNode, OutgoingPort>,
+            HostPort<HostNode, IncomingPort>,
+        ),
+    > + 'a {
         let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
 
         // For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
@@ -198,7 +222,7 @@ impl SimpleReplacement {
     /// This panics if self.replacement is not a DFG.
     pub fn map_host_output(
         &self,
-        port: impl Into<HostPort<IncomingPort>>,
+        port: impl Into<HostPort<HostNode, IncomingPort>>,
     ) -> Option<ReplacementPort<IncomingPort>> {
         let HostPort(node, port) = port.into();
         let [_, rep_output] = self.get_replacement_io().expect("replacement is a DFG");
@@ -214,7 +238,7 @@ impl SimpleReplacement {
     pub fn map_replacement_input(
         &self,
         port: impl Into<ReplacementPort<IncomingPort>>,
-    ) -> Option<HostPort<IncomingPort>> {
+    ) -> Option<HostPort<HostNode, IncomingPort>> {
         let ReplacementPort(node, port) = port.into();
         self.nu_inp.get(&(node, port)).copied().map(Into::into)
     }
@@ -228,8 +252,13 @@ impl SimpleReplacement {
     /// This panics if self.replacement is not a DFG.
     pub fn all_boundary_edges<'a>(
         &'a self,
-        host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (BoundaryPort<OutgoingPort>, BoundaryPort<IncomingPort>)> + 'a {
+        host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            BoundaryPort<HostNode, OutgoingPort>,
+            BoundaryPort<HostNode, IncomingPort>,
+        ),
+    > + 'a {
         let incoming_boundary = self
             .incoming_boundary(host)
             .map(|(src, tgt)| (src.into(), tgt.into()));
@@ -251,7 +280,7 @@ impl Rewrite for SimpleReplacement {
     type ApplyResult = Vec<(Node, OpType)>;
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), SimpleReplacementError> {
         self.is_valid_rewrite(h)
     }
 
@@ -931,7 +960,7 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     use crate::hugr::rewrite::replace::Replacement;
-    fn to_replace(h: &impl HugrView, s: SimpleReplacement) -> Replacement {
+    fn to_replace(h: &impl HugrView<Node = Node>, s: SimpleReplacement) -> Replacement {
         use crate::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec};
 
         let mut replacement = s.replacement;

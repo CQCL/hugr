@@ -302,11 +302,19 @@ impl<OT, H> NodeIndex for FatNode<'_, OT, H> {
     fn index(self) -> usize {
         self.node.index()
     }
+
+    fn pg_index(self) -> usize {
+        self.node.pg_index()
+    }
 }
 
 impl<OT, H> NodeIndex for &FatNode<'_, OT, H> {
     fn index(self) -> usize {
         self.node.index()
+    }
+
+    fn pg_index(self) -> usize {
+        self.node.pg_index()
     }
 }
 

@@ -37,7 +37,7 @@ impl OutlineCfg {
     /// the combined extension_deltas of all of the blocks.
     fn compute_entry_exit_outside_extensions(
         &self,
-        h: &impl HugrView,
+        h: &impl HugrView<Node = Node>,
     ) -> Result<(Node, Node, Node, ExtensionSet), OutlineCfgError> {
         let cfg_n = match self
             .blocks
@@ -102,11 +102,11 @@ impl Rewrite for OutlineCfg {
     type ApplyResult = (Node, Node);
 
     const UNCHANGED_ON_FAILURE: bool = true;
-    fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), OutlineCfgError> {
         self.compute_entry_exit_outside_extensions(h)?;
         Ok(())
     }
-    fn apply(self, h: &mut impl HugrMut) -> Result<(Node, Node), OutlineCfgError> {
+    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<(Node, Node), OutlineCfgError> {
         let (entry, exit, outside, extension_delta) =
             self.compute_entry_exit_outside_extensions(h)?;
         // 1. Compute signature

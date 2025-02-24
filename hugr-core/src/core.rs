@@ -44,9 +44,14 @@ pub trait PortIndex {
 }
 
 /// A trait for getting the index of a node.
-pub trait NodeIndex {
+pub trait NodeIndex:
+    Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash + From<portgraph::NodeIndex>
+{
     /// Returns the index of the node.
     fn index(self) -> usize;
+
+    /// Returns the node as a portgraph `NodeIndex`.
+    fn pg_index(self) -> portgraph::NodeIndex;
 }
 
 /// A port in the incoming direction.
@@ -73,7 +78,7 @@ pub type Direction = portgraph::Direction;
 )]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
-pub struct Wire(Node, OutgoingPort);
+pub struct Wire<N = Node>(N, OutgoingPort);
 
 impl Node {
     /// Returns the node as a portgraph `NodeIndex`.
@@ -202,18 +207,22 @@ impl NodeIndex for Node {
     fn index(self) -> usize {
         self.index.into()
     }
+
+    fn pg_index(self) -> portgraph::NodeIndex {
+        self.index
+    }
 }
 
-impl Wire {
+impl<N: NodeIndex> Wire<N> {
     /// Create a new wire from a node and a port.
     #[inline]
-    pub fn new(node: Node, port: impl Into<OutgoingPort>) -> Self {
+    pub fn new(node: N, port: impl Into<OutgoingPort>) -> Self {
         Self(node, port.into())
     }
 
     /// The node that this wire is connected to.
     #[inline]
-    pub fn node(&self) -> Node {
+    pub fn node(&self) -> N {
         self.0
     }
 
@@ -224,7 +233,7 @@ impl Wire {
     }
 }
 
-impl std::fmt::Display for Wire {
+impl<N: NodeIndex> std::fmt::Display for Wire<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Wire({}, {})", self.0.index(), self.1.index)
     }
@@ -238,9 +247,9 @@ impl std::fmt::Display for Wire {
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-pub enum CircuitUnit {
+pub enum CircuitUnit<N = Node> {
     /// Arbitrary input wire.
-    Wire(Wire),
+    Wire(Wire<N>),
     /// Index to region input.
     Linear(usize),
 }
