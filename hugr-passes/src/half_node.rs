@@ -2,6 +2,7 @@ use std::hash::Hash;
 
 use super::nest_cfgs::CfgNodeMap;
 
+use hugr_core::hugr::internal::HugrInternals;
 use hugr_core::hugr::RootTagged;
 
 use hugr_core::ops::handle::CfgID;
@@ -18,17 +19,17 @@ use hugr_core::{Direction, Node};
 /// the in-edge from that extra/empty BB, might be the endpoint of a useful SESE region,
 /// but we don't have a way to identify *which subset* to select. (Here we say *all preds* if >1 succ)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-enum HalfNode {
+enum HalfNode<N = Node> {
     /// All predecessors of original BB; successors if this does not break rule, else the X
-    N(Node),
+    N(N),
     // Exists only for BBs with multiple preds _and_ succs; has a single pred (the N), plus original succs
-    X(Node),
+    X(N),
 }
 
-struct HalfNodeView<H> {
+struct HalfNodeView<H: HugrInternals> {
     h: H,
-    entry: Node,
-    exit: Node,
+    entry: H::Node,
+    exit: H::Node,
 }
 
 impl<H: RootTagged<RootHandle = CfgID>> HalfNodeView<H> {
@@ -42,12 +43,12 @@ impl<H: RootTagged<RootHandle = CfgID>> HalfNodeView<H> {
         Self { h, entry, exit }
     }
 
-    fn is_multi_node(&self, n: Node) -> bool {
+    fn is_multi_node(&self, n: H::Node) -> bool {
         // TODO if <n> is the entry-node, should we pretend there's an extra predecessor? (The "outside")
         // We could also setify here before counting, but never
         self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4
     }
-    fn resolve_out(&self, n: Node) -> HalfNode {
+    fn resolve_out(&self, n: H::Node) -> HalfNode<H::Node> {
         if self.is_multi_node(n) {
             HalfNode::X(n)
         } else {
@@ -55,23 +56,23 @@ impl<H: RootTagged<RootHandle = CfgID>> HalfNodeView<H> {
         }
     }
 
-    fn bb_succs(&self, n: Node) -> impl Iterator<Item = Node> + '_ {
+    fn bb_succs(&self, n: H::Node) -> impl Iterator<Item = H::Node> + '_ {
         self.h.neighbours(n, Direction::Outgoing)
     }
-    fn bb_preds(&self, n: Node) -> impl Iterator<Item = Node> + '_ {
+    fn bb_preds(&self, n: H::Node) -> impl Iterator<Item = H::Node> + '_ {
         self.h.neighbours(n, Direction::Incoming)
     }
 }
 
-impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<H> {
-    fn entry_node(&self) -> HalfNode {
+impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode<H::Node>> for HalfNodeView<H> {
+    fn entry_node(&self) -> HalfNode<H::Node> {
         HalfNode::N(self.entry)
     }
-    fn exit_node(&self) -> HalfNode {
+    fn exit_node(&self) -> HalfNode<H::Node> {
         assert!(self.bb_succs(self.exit).count() == 0);
         HalfNode::N(self.exit)
     }
-    fn predecessors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> {
+    fn predecessors(&self, h: HalfNode<H::Node>) -> impl Iterator<Item = HalfNode<H::Node>> {
         let mut ps = Vec::new();
         match h {
             HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
@@ -82,7 +83,7 @@ impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<H>
         }
         ps.into_iter()
     }
-    fn successors(&self, n: HalfNode) -> impl Iterator<Item = HalfNode> {
+    fn successors(&self, n: HalfNode<H::Node>) -> impl Iterator<Item = HalfNode<H::Node>> {
         let mut succs = Vec::new();
         match n {
             HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),

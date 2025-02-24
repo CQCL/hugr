@@ -5,13 +5,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
-use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
+use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::extension::ExtensionRegistry;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
-use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
+use crate::{Extension, Hugr, IncomingPort, NodeIndex, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
 use super::NodeMetadataMap;
@@ -64,7 +64,7 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Retrieve the complete metadata map for a node.
-    fn take_node_metadata(&mut self, node: Node) -> Option<NodeMetadataMap> {
+    fn take_node_metadata(&mut self, node: Self::Node) -> Option<NodeMetadataMap> {
         if !self.valid_node(node) {
             return None;
         }
@@ -292,12 +292,14 @@ pub struct InsertionResult {
     pub node_map: HashMap<Node, Node>,
 }
 
-fn translate_indices(node_map: HashMap<NodeIndex, NodeIndex>) -> HashMap<Node, Node> {
+fn translate_indices(
+    node_map: HashMap<portgraph::NodeIndex, portgraph::NodeIndex>,
+) -> HashMap<Node, Node> {
     HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into())))
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
+impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T {
     fn add_node_with_parent(&mut self, parent: Node, node: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(node.into());
         self.as_mut()
@@ -462,7 +464,7 @@ fn insert_hugr_internal(
     hugr: &mut Hugr,
     root: Node,
     other: &impl HugrView,
-) -> (Node, HashMap<NodeIndex, NodeIndex>) {
+) -> (Node, HashMap<portgraph::NodeIndex, portgraph::NodeIndex>) {
     let node_map = hugr
         .graph
         .insert_graph(&other.portgraph())
@@ -504,7 +506,7 @@ fn insert_subgraph_internal(
     root: Node,
     other: &impl HugrView,
     portgraph: &impl portgraph::LinkView,
-) -> HashMap<NodeIndex, NodeIndex> {
+) -> HashMap<portgraph::NodeIndex, portgraph::NodeIndex> {
     let node_map = hugr
         .graph
         .insert_graph(&portgraph)
@@ -527,7 +529,7 @@ fn insert_subgraph_internal(
 
 /// Panic if [`HugrView::valid_node`] fails.
 #[track_caller]
-pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: Node) {
+pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
     if !hugr.valid_node(node) {
         panic!(
             "Received an invalid node {node} while mutating a HUGR:\n\n {}",
@@ -538,7 +540,7 @@ pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: Node) {
 
 /// Panic if [`HugrView::valid_non_root`] fails.
 #[track_caller]
-pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: Node) {
+pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
     if !hugr.valid_non_root(node) {
         panic!(
             "Received an invalid non-root node {node} while mutating a HUGR:\n\n {}",

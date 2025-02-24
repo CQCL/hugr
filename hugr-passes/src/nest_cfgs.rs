@@ -51,7 +51,7 @@ use hugr_core::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
-use hugr_core::{Direction, Hugr, Node};
+use hugr_core::{Direction, Hugr};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
@@ -214,10 +214,10 @@ fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> Cf
 }
 
 /// A straightforward view of a Cfg as it appears in a Hugr
-pub struct IdentityCfgMap<H> {
+pub struct IdentityCfgMap<H: HugrView> {
     h: H,
-    entry: Node,
-    exit: Node,
+    entry: H::Node,
+    exit: H::Node,
 }
 impl<H: RootTagged<RootHandle = CfgID>> IdentityCfgMap<H> {
     /// Creates an [IdentityCfgMap] for the specified CFG
@@ -228,26 +228,30 @@ impl<H: RootTagged<RootHandle = CfgID>> IdentityCfgMap<H> {
         Self { h, entry, exit }
     }
 }
-impl<H: HugrView> CfgNodeMap<Node> for IdentityCfgMap<H> {
-    fn entry_node(&self) -> Node {
+impl<H: HugrView> CfgNodeMap<H::Node> for IdentityCfgMap<H> {
+    fn entry_node(&self) -> H::Node {
         self.entry
     }
 
-    fn exit_node(&self) -> Node {
+    fn exit_node(&self) -> H::Node {
         self.exit
     }
 
-    fn successors(&self, node: Node) -> impl Iterator<Item = Node> {
+    fn successors(&self, node: H::Node) -> impl Iterator<Item = H::Node> {
         self.h.neighbours(node, Direction::Outgoing)
     }
 
-    fn predecessors(&self, node: Node) -> impl Iterator<Item = Node> {
+    fn predecessors(&self, node: H::Node) -> impl Iterator<Item = H::Node> {
         self.h.neighbours(node, Direction::Incoming)
     }
 }
 
-impl<H: HugrMut> CfgNester<Node> for IdentityCfgMap<H> {
-    fn nest_sese_region(&mut self, entry_edge: (Node, Node), exit_edge: (Node, Node)) -> Node {
+impl<H: HugrMut> CfgNester<H::Node> for IdentityCfgMap<H> {
+    fn nest_sese_region(
+        &mut self,
+        entry_edge: (H::Node, H::Node),
+        exit_edge: (H::Node, H::Node),
+    ) -> H::Node {
         // The algorithm only calls with entry/exit edges for a SESE region; panic if they don't
         let blocks = region_blocks(self, entry_edge, exit_edge).unwrap();
         assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
@@ -578,6 +582,7 @@ pub(crate) mod test {
     use hugr_core::ops::Value;
     use hugr_core::types::{EdgeKind, Signature};
     use hugr_core::utils::depth;
+    use hugr_core::Node;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();

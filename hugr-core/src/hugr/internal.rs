@@ -11,7 +11,7 @@ use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
-use crate::{Direction, Hugr, Node};
+use crate::{Direction, Hugr, Node, NodeIndex};
 
 use super::hugrmut::{panic_invalid_node, panic_invalid_non_root};
 use super::{HugrError, OpType, RootTagged};
@@ -26,6 +26,9 @@ pub trait HugrInternals {
     where
         Self: 'p;
 
+    /// The type of nodes in the Hugr.
+    type Node: NodeIndex;
+
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
 
@@ -33,7 +36,7 @@ pub trait HugrInternals {
     fn base_hugr(&self) -> &Hugr;
 
     /// Return the root node of this view.
-    fn root_node(&self) -> Node;
+    fn root_node(&self) -> Self::Node;
 }
 
 impl HugrInternals for Hugr {
@@ -41,6 +44,8 @@ impl HugrInternals for Hugr {
         = &'p MultiPortGraph
     where
         Self: 'p;
+
+    type Node = Node;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -53,7 +58,7 @@ impl HugrInternals for Hugr {
     }
 
     #[inline]
-    fn root_node(&self) -> Node {
+    fn root_node(&self) -> Self::Node {
         self.root.into()
     }
 }
@@ -63,11 +68,13 @@ impl<T: HugrInternals> HugrInternals for &T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
         }
     }
 }
@@ -77,11 +84,13 @@ impl<T: HugrInternals> HugrInternals for &mut T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
         }
     }
 }
@@ -91,11 +100,13 @@ impl<T: HugrInternals> HugrInternals for Rc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
         }
     }
 }
@@ -105,11 +116,13 @@ impl<T: HugrInternals> HugrInternals for Arc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
         }
     }
 }
@@ -119,11 +132,13 @@ impl<T: HugrInternals> HugrInternals for Box<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
         }
     }
 }
@@ -133,11 +148,13 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
         }
     }
 }
@@ -145,7 +162,7 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
 /// invalidate the HUGR.
-pub trait HugrMutInternals: RootTagged {
+pub trait HugrMutInternals: RootTagged<Node = Node> {
     /// Returns the Hugr at the base of a chain of views.
     fn hugr_mut(&mut self) -> &mut Hugr;
 
@@ -269,7 +286,7 @@ pub trait HugrMutInternals: RootTagged {
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
+impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMutInternals for T {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.as_mut()
     }

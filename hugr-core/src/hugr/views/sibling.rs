@@ -8,7 +8,7 @@ use portgraph::{LinkView, MultiPortGraph, PortView};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
-use crate::{Direction, Hugr, Node, Port};
+use crate::{Direction, Hugr, Node, NodeIndex, Port};
 
 use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView, RootTagged};
 
@@ -29,9 +29,9 @@ type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 ///
 /// [`DescendantsGraph`]: super::DescendantsGraph
 #[derive(Clone)]
-pub struct SiblingGraph<'g, Root = Node> {
+pub struct SiblingGraph<'g, Root = Node, N = Node> {
     /// The chosen root node.
-    root: Node,
+    root: N,
 
     /// The filtered portgraph encoding the adjacency structure of the HUGR.
     graph: FlatRegionGraph<'g>,
@@ -61,7 +61,7 @@ macro_rules! impl_base_members {
         }
 
         #[inline]
-        fn nodes(&self) -> impl Iterator<Item = Node> + Clone {
+        fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone {
             // Faster implementation than filtering all the nodes in the internal graph.
             let children = self
                 .base_hugr()
@@ -71,7 +71,10 @@ macro_rules! impl_base_members {
             iter::once(self.root).chain(children)
         }
 
-        fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
+        fn children(
+            &self,
+            node: Self::Node,
+        ) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
             // Same as SiblingGraph
             match node == self.root {
                 true => self
@@ -85,29 +88,29 @@ macro_rules! impl_base_members {
     };
 }
 
-impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
+impl<Root: NodeHandle, N: NodeIndex> HugrView for SiblingGraph<'_, Root, N> {
     impl_base_members! {}
 
     #[inline]
-    fn contains_node(&self, node: Node) -> bool {
+    fn contains_node(&self, node: N) -> bool {
         self.graph.contains_node(node.pg_index())
     }
 
     #[inline]
-    fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
+    fn node_ports(&self, node: N, dir: Direction) -> impl Iterator<Item = Port> + Clone {
         self.graph.port_offsets(node.pg_index(), dir).map_into()
     }
 
     #[inline]
-    fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
+    fn all_node_ports(&self, node: N) -> impl Iterator<Item = Port> + Clone {
         self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
     fn linked_ports(
         &self,
-        node: Node,
+        node: N,
         port: impl Into<Port>,
-    ) -> impl Iterator<Item = (Node, Port)> + Clone {
+    ) -> impl Iterator<Item = (N, Port)> + Clone {
         let port = self
             .graph
             .port_index(node.pg_index(), port.into().pg_offset())
@@ -119,33 +122,33 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
         })
     }
 
-    fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
+    fn node_connections(&self, node: N, other: N) -> impl Iterator<Item = [Port; 2]> + Clone {
         self.graph
             .get_connections(node.pg_index(), other.pg_index())
             .map(|(p1, p2)| [p1, p2].map(|link| self.graph.port_offset(link).unwrap().into()))
     }
 
     #[inline]
-    fn num_ports(&self, node: Node, dir: Direction) -> usize {
+    fn num_ports(&self, node: N, dir: Direction) -> usize {
         self.graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
-    fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
+    fn neighbours(&self, node: N, dir: Direction) -> impl Iterator<Item = N> + Clone {
         self.graph.neighbours(node.pg_index(), dir).map_into()
     }
 
     #[inline]
-    fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
+    fn all_neighbours(&self, node: N) -> impl Iterator<Item = N> + Clone {
         self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
-impl<Root: NodeHandle> RootTagged for SiblingGraph<'_, Root> {
+impl<Root: NodeHandle, N: NodeIndex> RootTagged for SiblingGraph<'_, Root, N> {
     type RootHandle = Root;
 }
 
-impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
-    fn new_unchecked(hugr: &'a impl HugrView, root: Node) -> Self {
+impl<'a, Root: NodeHandle, N: NodeIndex> SiblingGraph<'a, Root, N> {
+    fn new_unchecked(hugr: &'a impl HugrView<Node = N>, root: N) -> Self {
         let hugr = hugr.base_hugr();
         Self {
             root,
@@ -156,24 +159,25 @@ impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
     }
 }
 
-impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
+impl<'a, Root, N> HierarchyView<'a> for SiblingGraph<'a, Root, N>
 where
     Root: NodeHandle,
+    N: NodeIndex,
 {
-    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+    fn try_new(hugr: &'a impl HugrView<Node = N>, root: N) -> Result<Self, HugrError> {
         assert!(
             hugr.valid_node(root),
             "Cannot create a sibling graph from an invalid node {}.",
             root
         );
-        check_tag::<Root>(hugr, root)?;
+        check_tag::<Root, N>(hugr, root)?;
         Ok(Self::new_unchecked(hugr, root))
     }
 }
 
 impl<Root: NodeHandle> ExtractHugr for SiblingGraph<'_, Root> {}
 
-impl<'g, Root> HugrInternals for SiblingGraph<'g, Root>
+impl<'g, Root, N: NodeIndex> HugrInternals for SiblingGraph<'g, Root, N>
 where
     Root: NodeHandle,
 {
@@ -181,6 +185,7 @@ where
         = &'p FlatRegionGraph<'g>
     where
         Self: 'p;
+    type Node = N;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -193,7 +198,7 @@ where
     }
 
     #[inline]
-    fn root_node(&self) -> Node {
+    fn root_node(&self) -> N {
         self.root
     }
 }
@@ -230,7 +235,7 @@ impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
                 actual: Root::TAG,
             });
         }
-        check_tag::<Root>(hugr, root)?;
+        check_tag::<Root, _>(hugr, root)?;
         Ok(Self {
             hugr: hugr.hugr_mut(),
             root,
@@ -247,6 +252,7 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     where
         'g: 'p,
         Root: 'p;
+    type Node = Node;
 
     fn portgraph(&self) -> Self::Portgraph<'_> {
         FlatRegionGraph::new(
@@ -357,7 +363,7 @@ mod test {
         inner_region: T,
     ) -> Result<(), Box<dyn std::error::Error>>
     where
-        T: HugrView + Sized,
+        T: HugrView<Node = Node> + Sized,
     {
         let def_io = region.get_io(def).unwrap();
 

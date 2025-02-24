@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
-use hugr_core::{Hugr, Node};
+use hugr_core::{Hugr, Node, NodeIndex};
 use itertools::Either;
 
 use crate::dataflow::{AbstractValue, ConstLocation};
@@ -44,13 +44,13 @@ impl Hash for HashedConst {
 
 /// An [Eq]-able and [Hash]-able leaf (non-[Sum](Value::Sum)) Value
 #[derive(Clone, Debug)]
-pub enum ValueHandle {
+pub enum ValueHandle<N = Node> {
     /// A [Value::Extension] that has been hashed
     Hashable(HashedConst),
     /// Either a [Value::Extension] that can't be hashed, or a [Value::Function].
     Unhashable {
         /// The node (i.e. a [Const](hugr_core::ops::Const)) containing the constant
-        node: Node,
+        node: N,
         /// Indices within [Value::Sum]s containing the unhashable [Self::Unhashable::leaf]
         fields: Vec<usize>,
         /// The unhashable [Value::Extension] or [Value::Function]
@@ -58,7 +58,7 @@ pub enum ValueHandle {
     },
 }
 
-fn node_and_fields(loc: &ConstLocation) -> (Node, Vec<usize>) {
+fn node_and_fields<N: NodeIndex>(loc: &ConstLocation<N>) -> (N, Vec<usize>) {
     match loc {
         ConstLocation::Node(n) => (*n, vec![]),
         ConstLocation::Field(idx, elem) => {
@@ -69,10 +69,13 @@ fn node_and_fields(loc: &ConstLocation) -> (Node, Vec<usize>) {
     }
 }
 
-impl ValueHandle {
+impl<N: NodeIndex> ValueHandle<N> {
     /// Makes a new instance from an [OpaqueValue] given the node and (for a [Sum](Value::Sum))
     /// field indices within that (used only if the custom constant is not hashable).
-    pub fn new_opaque<'a>(loc: impl Into<ConstLocation<'a>>, val: OpaqueValue) -> Self {
+    pub fn new_opaque<'a>(loc: impl Into<ConstLocation<'a, N>>, val: OpaqueValue) -> Self
+    where
+        N: 'a,
+    {
         let arc = Arc::new(val);
         let (node, fields) = node_and_fields(&loc.into());
         HashedConst::try_new(arc.clone()).map_or(
@@ -86,7 +89,10 @@ impl ValueHandle {
     }
 
     /// New instance for a [Value::Function] found within a node
-    pub fn new_const_hugr<'a>(loc: impl Into<ConstLocation<'a>>, val: Box<Hugr>) -> Self {
+    pub fn new_const_hugr<'a>(loc: impl Into<ConstLocation<'a, N>>, val: Box<Hugr>) -> Self
+    where
+        N: 'a,
+    {
         let (node, fields) = node_and_fields(&loc.into());
         Self::Unhashable {
             node,
@@ -96,9 +102,9 @@ impl ValueHandle {
     }
 }
 
-impl AbstractValue for ValueHandle {}
+impl<N: NodeIndex> AbstractValue for ValueHandle<N> {}
 
-impl PartialEq for ValueHandle {
+impl<N: NodeIndex> PartialEq for ValueHandle<N> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Hashable(h1), Self::Hashable(h2)) => h1 == h2,
@@ -126,9 +132,9 @@ impl PartialEq for ValueHandle {
     }
 }
 
-impl Eq for ValueHandle {}
+impl<N: NodeIndex> Eq for ValueHandle<N> {}
 
-impl Hash for ValueHandle {
+impl<N: NodeIndex> Hash for ValueHandle<N> {
     fn hash<I: Hasher>(&self, state: &mut I) {
         match self {
             ValueHandle::Hashable(hc) => hc.hash(state),
@@ -146,8 +152,8 @@ impl Hash for ValueHandle {
 
 // Unfortunately we need From<ValueHandle> for Value to be able to pass
 // Value's into interpret_leaf_op. So that probably doesn't make sense...
-impl From<ValueHandle> for Value {
-    fn from(value: ValueHandle) -> Self {
+impl<N: NodeIndex> From<ValueHandle<N>> for Value {
+    fn from(value: ValueHandle<N>) -> Self {
         match value {
             ValueHandle::Hashable(HashedConst { val, .. })
             | ValueHandle::Unhashable {

@@ -29,7 +29,7 @@ impl<H: RootTagged + AsRef<Hugr>, Root: NodeHandle> RootChecked<H, Root> {
                 actual: Root::TAG,
             });
         }
-        check_tag::<Root>(&hugr, hugr.root())?;
+        check_tag::<Root, _>(&hugr, hugr.root())?;
         Ok(Self(hugr, PhantomData))
     }
 }
@@ -53,6 +53,8 @@ impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
         = &'p MultiPortGraph
     where
         Self: 'p;
+    type Node = Node;
+
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
