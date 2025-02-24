@@ -23,7 +23,7 @@ use crate::types::{
 use crate::utils::sorted_consts;
 use crate::{type_row, Extension};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use super::resolution::{resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry};
 use super::ExtensionRegistry;
