@@ -2,7 +2,7 @@
 //! Data structure for call graphs of a Hugr
 use std::collections::HashMap;
 
-use hugr_core::{ops::OpType, HugrView, Node, NodeIndex};
+use hugr_core::{core::HugrNode, ops::OpType, HugrView, Node};
 use petgraph::Graph;
 
 /// Weight for an edge in a [CallGraph]
@@ -40,7 +40,7 @@ pub struct CallGraph<N = Node> {
     node_to_g: HashMap<N, petgraph::graph::NodeIndex<u32>>,
 }
 
-impl<N: NodeIndex> CallGraph<N> {
+impl<N: HugrNode> CallGraph<N> {
     /// Makes a new CallGraph for a specified (subview) of a Hugr.
     /// Calls to functions outside the view will be dropped.
     pub fn new(hugr: &impl HugrView<Node = N>) -> Self {
@@ -60,7 +60,7 @@ impl<N: NodeIndex> CallGraph<N> {
         for (func, cg_node) in node_to_g.iter() {
             traverse(hugr, *cg_node, *func, &mut g, &node_to_g)
         }
-        fn traverse<N: NodeIndex>(
+        fn traverse<N: HugrNode>(
             h: &impl HugrView<Node = N>,
             enclosing_func: petgraph::graph::NodeIndex<u32>,
             node: N, // Nonstrict-descendant of `enclosing_func``

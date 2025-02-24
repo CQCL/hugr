@@ -20,13 +20,14 @@ use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
+use crate::core::HugrNode;
 use crate::extension::ExtensionSet;
 use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
 use crate::types::{Signature, Type};
-use crate::{Hugr, IncomingPort, Node, NodeIndex, OutgoingPort, Port, SimpleReplacement};
+use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
@@ -80,7 +81,7 @@ pub type IncomingPorts<N = Node> = Vec<Vec<(N, IncomingPort)>>;
 /// The type of the outgoing boundary of [`SiblingSubgraph`].
 pub type OutgoingPorts<N = Node> = Vec<(N, OutgoingPort)>;
 
-impl<N: NodeIndex> SiblingSubgraph<N> {
+impl<N: HugrNode> SiblingSubgraph<N> {
     /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`]-rooted
     /// HUGR.
     ///
@@ -182,7 +183,10 @@ impl<N: NodeIndex> SiblingSubgraph<N> {
 
         // Ordering of the edges here is preserved and becomes ordering of the signature.
         let subpg = Subgraph::new_subgraph(pg.clone(), make_boundary(hugr, &inputs, &outputs));
-        let nodes = subpg.nodes_iter().map_into().collect_vec();
+        let nodes = subpg
+            .nodes_iter()
+            .map(|index| hugr.from_pg_index(index))
+            .collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 
         if !subpg.is_convex_with_checker(checker) {
@@ -487,21 +491,21 @@ impl SiblingSubgraph {
 }
 
 /// Returns an iterator over the input ports.
-fn iter_incoming<N: NodeIndex>(
+fn iter_incoming<N: HugrNode>(
     inputs: &IncomingPorts<N>,
 ) -> impl Iterator<Item = (N, IncomingPort)> + '_ {
     inputs.iter().flat_map(|part| part.iter().copied())
 }
 
 /// Returns an iterator over the output ports.
-fn iter_outgoing<N: NodeIndex>(
+fn iter_outgoing<N: HugrNode>(
     outputs: &OutgoingPorts<N>,
 ) -> impl Iterator<Item = (N, OutgoingPort)> + '_ {
     outputs.iter().copied()
 }
 
 /// Returns an iterator over both incoming and outgoing ports.
-fn iter_io<'a, N: NodeIndex>(
+fn iter_io<'a, N: HugrNode>(
     inputs: &'a IncomingPorts<N>,
     outputs: &'a OutgoingPorts<N>,
 ) -> impl Iterator<Item = (N, Port)> + 'a {
@@ -510,14 +514,14 @@ fn iter_io<'a, N: NodeIndex>(
         .chain(iter_outgoing(outputs).map(|(n, p)| (n, Port::from(p))))
 }
 
-fn make_boundary<'a, N: NodeIndex>(
+fn make_boundary<'a, N: HugrNode>(
     hugr: &impl HugrView<Node = N>,
     inputs: &'a IncomingPorts<N>,
     outputs: &'a OutgoingPorts<N>,
 ) -> Boundary {
     let to_pg_index = |n: N, p: Port| {
         hugr.portgraph()
-            .port_index(n.pg_index(), p.pg_offset())
+            .port_index(hugr.to_pg_index(n), p.pg_offset())
             .unwrap()
     };
     Boundary::new(
@@ -773,7 +777,7 @@ pub enum InvalidReplacement {
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
-pub enum InvalidSubgraph<N: NodeIndex = Node> {
+pub enum InvalidSubgraph<N: HugrNode = Node> {
     /// The subgraph is not convex.
     #[error("The subgraph is not convex.")]
     NotConvex,
@@ -804,7 +808,7 @@ pub enum InvalidSubgraph<N: NodeIndex = Node> {
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
-pub enum InvalidSubgraphBoundary<N: NodeIndex = Node> {
+pub enum InvalidSubgraphBoundary<N: HugrNode = Node> {
     /// A boundary port's node is not in the set of nodes.
     #[error("(node {0}, port {1}) is in the boundary, but node {0} is not in the set.")]
     PortNodeNotInSet(N, Port),
@@ -846,7 +850,7 @@ mod tests {
 
     use super::*;
 
-    impl<N: NodeIndex> SiblingSubgraph<N> {
+    impl<N: HugrNode> SiblingSubgraph<N> {
         /// A sibling subgraph from a HUGR.
         ///
         /// The subgraph is given by the sibling graph of the root. If you wish to

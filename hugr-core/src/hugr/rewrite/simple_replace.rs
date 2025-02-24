@@ -2,12 +2,13 @@
 
 use std::collections::HashMap;
 
+use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
 pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node, NodeIndex};
+use crate::{Hugr, IncomingPort, Node};
 
 use thiserror::Error;
 
@@ -32,7 +33,7 @@ pub struct SimpleReplacement<HostNode = Node> {
     nu_out: HashMap<(HostNode, IncomingPort), IncomingPort>,
 }
 
-impl<HostNode: NodeIndex> SimpleReplacement<HostNode> {
+impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Create a new [`SimpleReplacement`] specification.
     #[inline]
     pub fn new(
