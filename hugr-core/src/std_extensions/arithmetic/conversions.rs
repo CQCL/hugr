@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::sum_with_error;
 use crate::extension::prelude::{bool_t, string_type, usize_t};
