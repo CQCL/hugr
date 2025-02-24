@@ -83,7 +83,11 @@ pub struct Replacement {
 }
 
 impl NewEdgeSpec {
-    fn check_src(&self, h: &impl HugrView, err_spec: &NewEdgeSpec) -> Result<(), ReplaceError> {
+    fn check_src(
+        &self,
+        h: &impl HugrView<Node = Node>,
+        err_spec: &NewEdgeSpec,
+    ) -> Result<(), ReplaceError> {
         let optype = h.get_optype(self.src);
         let ok = match self.kind {
             NewEdgeKind::Order => optype.other_output() == Some(EdgeKind::StateOrder),
@@ -101,7 +105,11 @@ impl NewEdgeSpec {
         ok.then_some(())
             .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Outgoing, err_spec.clone()))
     }
-    fn check_tgt(&self, h: &impl HugrView, err_spec: &NewEdgeSpec) -> Result<(), ReplaceError> {
+    fn check_tgt(
+        &self,
+        h: &impl HugrView<Node = Node>,
+        err_spec: &NewEdgeSpec,
+    ) -> Result<(), ReplaceError> {
         let optype = h.get_optype(self.tgt);
         let ok = match self.kind {
             NewEdgeKind::Order => optype.other_input() == Some(EdgeKind::StateOrder),
@@ -123,7 +131,7 @@ impl NewEdgeSpec {
 
     fn check_existing_edge(
         &self,
-        h: &impl HugrView,
+        h: &impl HugrView<Node = Node>,
         legal_src_ancestors: &HashSet<Node>,
         err_edge: impl Fn() -> NewEdgeSpec,
     ) -> Result<(), ReplaceError> {
@@ -150,7 +158,7 @@ impl NewEdgeSpec {
 }
 
 impl Replacement {
-    fn check_parent(&self, h: &impl HugrView) -> Result<Node, ReplaceError> {
+    fn check_parent(&self, h: &impl HugrView<Node = Node>) -> Result<Node, ReplaceError> {
         let parent = self
             .removal
             .iter()
@@ -173,7 +181,10 @@ impl Replacement {
         Ok(parent)
     }
 
-    fn get_removed_nodes(&self, h: &impl HugrView) -> Result<HashSet<Node>, ReplaceError> {
+    fn get_removed_nodes(
+        &self,
+        h: &impl HugrView<Node = Node>,
+    ) -> Result<HashSet<Node>, ReplaceError> {
         // Check the keys of the transfer map too, the values we'll use imminently
         self.adoptions.keys().try_for_each(|&n| {
             (self.replacement.contains_node(n)
@@ -218,7 +229,7 @@ impl Rewrite for Replacement {
 
     const UNCHANGED_ON_FAILURE: bool = false;
 
-    fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
         self.check_parent(h)?;
         let removed = self.get_removed_nodes(h)?;
         // Edge sources...

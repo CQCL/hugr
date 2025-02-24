@@ -7,34 +7,39 @@ pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node};
+use crate::{Hugr, IncomingPort, Node, NodeIndex};
+
 use thiserror::Error;
 
 use super::inline_dfg::InlineDFGError;
 
 /// Specification of a simple replacement operation.
+///
+/// # Type parameters
+///
+/// - `N`: The type of nodes in the host hugr.
 #[derive(Debug, Clone)]
-pub struct SimpleReplacement {
-    /// The subgraph of the hugr to be replaced.
-    subgraph: SiblingSubgraph,
+pub struct SimpleReplacement<HostNode = Node> {
+    /// The subgraph of the host hugr to be replaced.
+    subgraph: SiblingSubgraph<HostNode>,
     /// A hugr with DFG root (consisting of replacement nodes).
     replacement: Hugr,
     /// A map from (target ports of edges from the Input node of `replacement`) to (target ports of
     /// edges from nodes not in `removal` to nodes in `removal`).
-    nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)>,
+    nu_inp: HashMap<(Node, IncomingPort), (HostNode, IncomingPort)>,
     /// A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
     /// (input ports of the Output node of `replacement`).
-    nu_out: HashMap<(Node, IncomingPort), IncomingPort>,
+    nu_out: HashMap<(HostNode, IncomingPort), IncomingPort>,
 }
 
-impl SimpleReplacement {
+impl<HostNode: NodeIndex> SimpleReplacement<HostNode> {
     /// Create a new [`SimpleReplacement`] specification.
     #[inline]
     pub fn new(
-        subgraph: SiblingSubgraph,
+        subgraph: SiblingSubgraph<HostNode>,
         replacement: Hugr,
-        nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)>,
-        nu_out: HashMap<(Node, IncomingPort), IncomingPort>,
+        nu_inp: HashMap<(Node, IncomingPort), (HostNode, IncomingPort)>,
+        nu_out: HashMap<(HostNode, IncomingPort), IncomingPort>,
     ) -> Self {
         Self {
             subgraph,
@@ -52,7 +57,7 @@ impl SimpleReplacement {
 
     /// Subgraph to be replaced.
     #[inline]
-    pub fn subgraph(&self) -> &SiblingSubgraph {
+    pub fn subgraph(&self) -> &SiblingSubgraph<HostNode> {
         &self.subgraph
     }
 }
@@ -62,7 +67,7 @@ impl Rewrite for SimpleReplacement {
     type ApplyResult = Vec<(Node, OpType)>;
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, _h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+    fn verify(&self, _h: &impl HugrView<Node = Node>) -> Result<(), SimpleReplacementError> {
         unimplemented!()
     }
 
@@ -828,7 +833,7 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     use crate::hugr::rewrite::replace::Replacement;
-    fn to_replace(h: &impl HugrView, s: SimpleReplacement) -> Replacement {
+    fn to_replace(h: &impl HugrView<Node = Node>, s: SimpleReplacement) -> Replacement {
         use crate::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec};
 
         let mut replacement = s.replacement;

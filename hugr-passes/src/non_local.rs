@@ -5,13 +5,13 @@
 use itertools::Itertools as _;
 use thiserror::Error;
 
-use hugr_core::{HugrView, IncomingPort, Node};
+use hugr_core::{HugrView, IncomingPort};
 
 /// Returns an iterator over all non local edges in a Hugr.
 ///
 /// All `(node, in_port)` pairs are returned where `in_port` is a value port
 /// connected to a node with a parent other than the parent of `node`.
-pub fn nonlocal_edges(hugr: &impl HugrView) -> impl Iterator<Item = (Node, IncomingPort)> + '_ {
+pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, IncomingPort)> + '_ {
     hugr.nodes().flat_map(move |node| {
         hugr.in_value_types(node).filter_map(move |(in_p, _)| {
             let parent = hugr.get_parent(node);
@@ -23,13 +23,13 @@ pub fn nonlocal_edges(hugr: &impl HugrView) -> impl Iterator<Item = (Node, Incom
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum NonLocalEdgesError {
+pub enum NonLocalEdgesError<N> {
     #[error("Found {} nonlocal edges", .0.len())]
-    Edges(Vec<(Node, IncomingPort)>),
+    Edges(Vec<(N, IncomingPort)>),
 }
 
 /// Verifies that there are no non local value edges in the Hugr.
-pub fn ensure_no_nonlocal_edges(hugr: &impl HugrView) -> Result<(), NonLocalEdgesError> {
+pub fn ensure_no_nonlocal_edges<H: HugrView>(hugr: &H) -> Result<(), NonLocalEdgesError<H::Node>> {
     let non_local_edges: Vec<_> = nonlocal_edges(hugr).collect_vec();
     if non_local_edges.is_empty() {
         Ok(())

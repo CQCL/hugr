@@ -46,7 +46,7 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
 }
 
 fn mk_rep(
-    cfg: &impl RootTagged<RootHandle = CfgID>,
+    cfg: &impl RootTagged<RootHandle = CfgID, Node = Node>,
     pred: Node,
     succ: Node,
 ) -> (Replacement, Node, [Node; 2]) {

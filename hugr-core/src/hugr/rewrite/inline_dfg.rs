@@ -28,7 +28,7 @@ impl Rewrite for InlineDFG {
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl crate::HugrView<Node = Node>) -> Result<(), Self::Error> {
         let n = self.0.node();
         if h.get_optype(n).as_dfg().is_none() {
             return Err(InlineDFGError::NotDFG(n));
@@ -147,17 +147,17 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension;
-    use crate::{type_row, Direction, HugrView, Node, Port};
+    use crate::{type_row, Direction, HugrView, Port};
     use crate::{Hugr, Wire};
 
     use super::InlineDFG;
 
-    fn find_dfgs(h: &impl HugrView) -> Vec<Node> {
+    fn find_dfgs<H: HugrView>(h: &H) -> Vec<H::Node> {
         h.nodes()
             .filter(|n| h.get_optype(*n).as_dfg().is_some())
             .collect()
     }
-    fn extension_ops(h: &impl HugrView) -> Vec<Node> {
+    fn extension_ops<H: HugrView>(h: &H) -> Vec<H::Node> {
         h.nodes()
             .filter(|n| matches!(h.get_optype(*n), OpType::ExtensionOp(_)))
             .collect()
