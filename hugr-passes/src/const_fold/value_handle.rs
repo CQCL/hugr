@@ -4,9 +4,10 @@ use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+use hugr_core::core::HugrNode;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
-use hugr_core::{Hugr, Node, NodeIndex};
+use hugr_core::{Hugr, Node};
 use itertools::Either;
 
 use crate::dataflow::{AbstractValue, ConstLocation};
@@ -58,7 +59,7 @@ pub enum ValueHandle<N = Node> {
     },
 }
 
-fn node_and_fields<N: NodeIndex>(loc: &ConstLocation<N>) -> (N, Vec<usize>) {
+fn node_and_fields<N: HugrNode>(loc: &ConstLocation<N>) -> (N, Vec<usize>) {
     match loc {
         ConstLocation::Node(n) => (*n, vec![]),
         ConstLocation::Field(idx, elem) => {
@@ -69,7 +70,7 @@ fn node_and_fields<N: NodeIndex>(loc: &ConstLocation<N>) -> (N, Vec<usize>) {
     }
 }
 
-impl<N: NodeIndex> ValueHandle<N> {
+impl<N: HugrNode> ValueHandle<N> {
     /// Makes a new instance from an [OpaqueValue] given the node and (for a [Sum](Value::Sum))
     /// field indices within that (used only if the custom constant is not hashable).
     pub fn new_opaque<'a>(loc: impl Into<ConstLocation<'a, N>>, val: OpaqueValue) -> Self
@@ -102,9 +103,9 @@ impl<N: NodeIndex> ValueHandle<N> {
     }
 }
 
-impl<N: NodeIndex> AbstractValue for ValueHandle<N> {}
+impl<N: HugrNode> AbstractValue for ValueHandle<N> {}
 
-impl<N: NodeIndex> PartialEq for ValueHandle<N> {
+impl<N: HugrNode> PartialEq for ValueHandle<N> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Hashable(h1), Self::Hashable(h2)) => h1 == h2,
@@ -132,9 +133,9 @@ impl<N: NodeIndex> PartialEq for ValueHandle<N> {
     }
 }
 
-impl<N: NodeIndex> Eq for ValueHandle<N> {}
+impl<N: HugrNode> Eq for ValueHandle<N> {}
 
-impl<N: NodeIndex> Hash for ValueHandle<N> {
+impl<N: HugrNode> Hash for ValueHandle<N> {
     fn hash<I: Hasher>(&self, state: &mut I) {
         match self {
             ValueHandle::Hashable(hc) => hc.hash(state),
@@ -152,7 +153,7 @@ impl<N: NodeIndex> Hash for ValueHandle<N> {
 
 // Unfortunately we need From<ValueHandle> for Value to be able to pass
 // Value's into interpret_leaf_op. So that probably doesn't make sense...
-impl<N: NodeIndex> From<ValueHandle<N>> for Value {
+impl<N: HugrNode> From<ValueHandle<N>> for Value {
     fn from(value: ValueHandle<N>) -> Self {
         match value {
             ValueHandle::Hashable(HashedConst { val, .. })

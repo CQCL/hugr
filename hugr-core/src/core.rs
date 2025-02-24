@@ -44,15 +44,15 @@ pub trait PortIndex {
 }
 
 /// A trait for getting the index of a node.
-pub trait NodeIndex:
-    Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash + From<portgraph::NodeIndex>
-{
+pub trait NodeIndex {
     /// Returns the index of the node.
     fn index(self) -> usize;
-
-    /// Returns the node as a portgraph `NodeIndex`.
-    fn pg_index(self) -> portgraph::NodeIndex;
 }
+
+/// A trait for nodes in the Hugr.
+pub trait HugrNode: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash {}
+
+impl<T: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash> HugrNode for T {}
 
 /// A port in the incoming direction.
 #[derive(
@@ -207,13 +207,9 @@ impl NodeIndex for Node {
     fn index(self) -> usize {
         self.index.into()
     }
-
-    fn pg_index(self) -> portgraph::NodeIndex {
-        self.index
-    }
 }
 
-impl<N: NodeIndex> Wire<N> {
+impl<N: HugrNode> Wire<N> {
     /// Create a new wire from a node and a port.
     #[inline]
     pub fn new(node: N, port: impl Into<OutgoingPort>) -> Self {
@@ -233,9 +229,9 @@ impl<N: NodeIndex> Wire<N> {
     }
 }
 
-impl<N: NodeIndex> std::fmt::Display for Wire<N> {
+impl<N: HugrNode> std::fmt::Display for Wire<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Wire({}, {})", self.0.index(), self.1.index)
+        write!(f, "Wire({}, {})", self.0, self.1.index)
     }
 }
 
