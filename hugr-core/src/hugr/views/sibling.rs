@@ -72,7 +72,7 @@ macro_rules! impl_base_members {
                 .base_hugr()
                 .hierarchy
                 .children(self.to_pg_index(self.root))
-                .map(|n| self.from_pg_index(n));
+                .map(|n| self.to_node(n));
             iter::once(self.root).chain(children)
         }
 
@@ -85,7 +85,7 @@ macro_rules! impl_base_members {
                 true => self.base_hugr().hierarchy.children(self.to_pg_index(node)),
                 false => portgraph::hierarchy::Children::default(),
             };
-            children.map(|n| self.from_pg_index(n))
+            children.map(|n| self.to_node(n))
         }
     };
 }
@@ -124,7 +124,7 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
         self.graph.port_links(port).map(|(_, link)| {
             let node = self.graph.port_node(link).unwrap();
             let offset = self.graph.port_offset(link).unwrap();
-            (self.from_pg_index(node), offset.into())
+            (self.to_node(node), offset.into())
         })
     }
 
@@ -143,14 +143,14 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
         self.graph
             .neighbours(self.to_pg_index(node), dir)
-            .map(|n| self.from_pg_index(n))
+            .map(|n| self.to_node(n))
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.graph
             .all_neighbours(self.to_pg_index(node))
-            .map(|n| self.from_pg_index(n))
+            .map(|n| self.to_node(n))
     }
 }
 impl<Root: NodeHandle> RootTagged for SiblingGraph<'_, Root> {
@@ -217,8 +217,8 @@ where
     }
 
     #[inline]
-    fn from_pg_index(&self, index: portgraph::NodeIndex) -> Node {
-        self.hugr.from_pg_index(index)
+    fn to_node(&self, index: portgraph::NodeIndex) -> Node {
+        self.hugr.to_node(index)
     }
 }
 
@@ -295,8 +295,8 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     }
 
     #[inline]
-    fn from_pg_index(&self, index: portgraph::NodeIndex) -> Node {
-        self.hugr.from_pg_index(index)
+    fn to_node(&self, index: portgraph::NodeIndex) -> Node {
+        self.hugr.to_node(index)
     }
 }
 

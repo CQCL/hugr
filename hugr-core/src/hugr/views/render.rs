@@ -36,7 +36,7 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
     config: RenderConfig,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
     fn node_name<H: HugrView + ?Sized>(h: &H, n: NodeIndex) -> String {
-        match h.get_optype(h.from_pg_index(n)) {
+        match h.get_optype(h.to_node(n)) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.name),
             OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.name),
             op => op.name().to_string(),
@@ -64,7 +64,7 @@ pub(super) fn port_style<H: HugrView + ?Sized>(
     let graph = h.portgraph();
     Box::new(move |port| {
         let node = graph.port_node(port).unwrap();
-        let optype = h.get_optype(h.from_pg_index(node));
+        let optype = h.get_optype(h.to_node(node));
         let offset = graph.port_offset(port).unwrap();
         match optype.port_kind(offset).unwrap() {
             EdgeKind::Function(pf) => PortStyle::new(html_escape::encode_text(&format!("{}", pf))),
@@ -95,7 +95,7 @@ pub(super) fn edge_style<H: HugrView + ?Sized>(
     let graph = h.portgraph();
     Box::new(move |src, tgt| {
         let src_node = graph.port_node(src).unwrap();
-        let src_optype = h.get_optype(h.from_pg_index(src_node));
+        let src_optype = h.get_optype(h.to_node(src_node));
         let src_offset = graph.port_offset(src).unwrap();
         let tgt_offset = graph.port_offset(tgt).unwrap();
 

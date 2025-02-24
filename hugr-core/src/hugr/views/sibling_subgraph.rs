@@ -185,7 +185,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let subpg = Subgraph::new_subgraph(pg.clone(), make_boundary(hugr, &inputs, &outputs));
         let nodes = subpg
             .nodes_iter()
-            .map(|index| hugr.from_pg_index(index))
+            .map(|index| hugr.to_node(index))
             .collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 

@@ -58,9 +58,7 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
 
     #[inline]
     fn nodes(&self) -> impl Iterator<Item = Node> + Clone {
-        self.graph
-            .nodes_iter()
-            .map(|index| self.from_pg_index(index))
+        self.graph.nodes_iter().map(|index| self.to_node(index))
     }
 
     #[inline]
@@ -90,7 +88,7 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
             let port: PortIndex = link.into();
             let node = self.graph.port_node(port).unwrap();
             let offset = self.graph.port_offset(port).unwrap();
-            (self.from_pg_index(node), offset.into())
+            (self.to_node(node), offset.into())
         })
     }
 
@@ -116,21 +114,21 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
             true => self.base_hugr().hierarchy.children(self.to_pg_index(node)),
             false => portgraph::hierarchy::Children::default(),
         };
-        children.map(|index| self.from_pg_index(index))
+        children.map(|index| self.to_node(index))
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
         self.graph
             .neighbours(self.to_pg_index(node), dir)
-            .map(|index| self.from_pg_index(index))
+            .map(|index| self.to_node(index))
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.graph
             .all_neighbours(self.to_pg_index(node))
-            .map(|index| self.from_pg_index(index))
+            .map(|index| self.to_node(index))
     }
 }
 impl<Root: NodeHandle> RootTagged for DescendantsGraph<'_, Root> {
@@ -187,8 +185,8 @@ where
     }
 
     #[inline]
-    fn from_pg_index(&self, index: portgraph::NodeIndex) -> Node {
-        self.hugr.from_pg_index(index)
+    fn to_node(&self, index: portgraph::NodeIndex) -> Node {
+        self.hugr.to_node(index)
     }
 }
 
