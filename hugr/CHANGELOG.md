@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-v0.14.3...hugr-v0.14.4) - 2025-02-24
+
+### Bug Fixes
+
+- delegate default impls in HugrView (#1921)
+
+### New Features
+
+- add xor to logic extension (#1911)
+- Add `Type::as_sum` and `SumType::variants`. (#1914)
+- Add `HugrMutInternals::insert_ports` (#1915)
+
 ## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-v0.14.2...hugr-v0.14.3) - 2025-02-05
 
 ### Bug Fixes
