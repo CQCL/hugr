@@ -65,9 +65,6 @@
 (declare-operation collections.array.pop_left
   (param ?len core.nat)
   (param ?type core.type)
-  ; The reduced_len parameter is not present in `hugr_core` but is necessary
-  ; to compute the length of the resulting array. There might be an argument here
-  ; for allowing implicit parameters after all which always have to be inferred?
   (param ?reduced_len core.nat)
   (where (core.nat_sum ?reduced_len 1 ?len))
   (core.fn
@@ -91,8 +88,6 @@
   (param ?len core.nat)
   (param ?type core.type)
   (param ?ext core.ext_set)
-  ; This is taken as-is from the `hugr_core` extension, but it does not seem to be ideal.
-  ; Aren't function values linear to allow for the possibility that they captured variables?
   (core.fn
     [(core.fn [] [?type] ?ext)]
     [(collections.array.array ?len ?type)]
@@ -101,15 +96,12 @@
 
 (declare-operation collections.array.scan
   (param ?len core.nat)
-  (param ?t1 core.type)
-  (param ?t2 core.type)
-  (param ?s (core.list core.type))
+  (param ?a core.type)
+  (param ?b core.type)
+  (param ?state (core.list core.type))
   (param ?ext core.ext_set)
-  ; This is taken as-is from the `hugr_core` extension. The same issue with linearity of functions types.
-  ; Also `scan` is not a good name for this operation. As a higher-order function, `scan` has an established
-  ; meaning which does not match what this function does.
   (core.fn
-    [(collections.array.array ?len ?t1) (core.fn [?t1 ?s ...] [?t2 ?s ...] ?ext) ?s ...]
-    [(collections.array.array ?len ?t2) ?s ...]
+    [(collections.array.array ?len ?a) (core.fn [?a ?state ...] [?b ?state ...] ?ext) ?state ...]
+    [(collections.array.array ?len ?b) ?state ...]
     ?ext)
-  (meta (core.meta.description "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.")))
+  (meta (core.meta.description "A combination of map and foldl.\n\nApplies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.")))

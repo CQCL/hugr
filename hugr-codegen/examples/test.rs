@@ -10,6 +10,7 @@ pub fn main() {
         include_str!("../../hugr-model/extensions/core.edn"),
         include_str!("../../hugr-model/extensions/int.edn"),
         include_str!("../../hugr-model/extensions/array.edn"),
+        include_str!("../../hugr-model/extensions/logic.edn"),
     ];
 
     for file in files {

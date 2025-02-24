@@ -1,35 +1,87 @@
+use std::sync::Arc;
+
 use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 
-use super::{view::View, NodeId, TermId, VarId};
+use super::{view::View, NodeId, RegionKind, ScopeClosure, TermId, VarId};
 use crate::v0 as model;
 
 mod print;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
-    pub inputs: Vec<Link>,
-    pub outputs: Vec<Link>,
-    pub params: Vec<Term>,
-    pub regions: Vec<Region>,
-    pub meta: Vec<Term>,
-    pub signature: Vec<Term>,
+    pub operation: Operation,
+    pub inputs: Arc<[Link]>,
+    pub outputs: Arc<[Link]>,
+    pub params: Arc<[Term]>,
+    pub regions: Arc<[Region]>,
+    pub meta: Arc<[MetaItem]>,
+    pub signature: Option<Signature>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Region {}
+pub enum Operation {
+    Invalid,
+    Dfg,
+    Cfg,
+    Block,
+    DefineFunc(Arc<SymbolSignature>),
+    DeclareFunc(Arc<SymbolSignature>),
+    Custom(Symbol),
+    DefineAlias(Arc<SymbolSignature>),
+    DeclareAlias(Arc<SymbolSignature>),
+    TailLoop,
+    Conditional,
+    DeclareConstructor(Arc<SymbolSignature>),
+    DeclareOperation(Arc<SymbolSignature>),
+    Import(Symbol),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SymbolSignature {
+    pub name: Symbol,
+    pub params: Arc<[Param]>,
+    pub constraints: Arc<[Constraint]>,
+    pub signature: Arc<Term>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Param {
+    pub name: Var,
+    pub r#type: Arc<Term>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Constraint(pub Arc<Term>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Region {
+    pub kind: RegionKind,
+    pub sources: Arc<[Link]>,
+    pub targets: Arc<[Link]>,
+    pub children: Arc<[Node]>,
+    pub meta: Arc<[MetaItem]>,
+    pub signature: Option<Signature>,
+    pub scope: ScopeClosure,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetaItem(pub Arc<Term>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Signature(pub Arc<Term>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
     Wildcard,
     Var(Var),
-    Apply(Symbol, Vec<Term>),
-    List(Vec<ListPart>),
+    Apply(Symbol, Arc<[Term]>),
+    List(Arc<[ListPart]>),
     Str(SmolStr),
     Nat(u64),
-    Bytes(Vec<u8>),
+    Bytes(Arc<[u8]>),
     Float(OrderedFloat<f64>),
-    Tuple(Vec<TuplePart>),
+    Tuple(Arc<[TuplePart]>),
     ExtSet,
 }
 
@@ -55,9 +107,11 @@ impl<'a> View<'a> for Term {
                 let list_parts = list_parts
                     .iter()
                     .map(|part| match part {
-                        model::ListPart::Item(term) => Some(ListPart::Item(module.view(*term)?)),
+                        model::ListPart::Item(term) => {
+                            Some(ListPart::Item(Arc::new(module.view(*term)?)))
+                        }
                         model::ListPart::Splice(term) => {
-                            Some(ListPart::Splice(module.view(*term)?))
+                            Some(ListPart::Splice(Arc::new(module.view(*term)?)))
                         }
                     })
                     .collect::<Option<_>>()?;
@@ -71,9 +125,11 @@ impl<'a> View<'a> for Term {
                 let list_parts = tuple_parts
                     .iter()
                     .map(|part| match part {
-                        model::TuplePart::Item(term) => Some(ListPart::Item(module.view(*term)?)),
+                        model::TuplePart::Item(term) => {
+                            Some(ListPart::Item(Arc::new(module.view(*term)?)))
+                        }
                         model::TuplePart::Splice(term) => {
-                            Some(ListPart::Splice(module.view(*term)?))
+                            Some(ListPart::Splice(Arc::new(module.view(*term)?)))
                         }
                     })
                     .collect::<Option<_>>()?;
@@ -125,12 +181,12 @@ pub struct Link(SmolStr);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListPart {
-    Item(Term),
-    Splice(Term),
+    Item(Arc<Term>),
+    Splice(Arc<Term>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TuplePart {
-    Item(Term),
-    Splice(Term),
+    Item(Arc<Term>),
+    Splice(Arc<Term>),
 }

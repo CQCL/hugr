@@ -1,0 +1,36 @@
+(hugr 0)
+
+(declare-operation logic.and
+  (core.fn
+    [(core.adt [[] []]) (core.adt [[] []])]
+    [(core.adt [[] []])]
+    (ext))
+  (meta (core.meta.description "Logical `and`.")))
+
+(declare-operation logic.or
+  (core.fn
+    [(core.adt [[] []]) (core.adt [[] []])]
+    [(core.adt [[] []])]
+    (ext))
+  (meta (core.meta.description "Logical `or`.")))
+
+(declare-operation logic.xor
+  (core.fn
+    [(core.adt [[] []]) (core.adt [[] []])]
+    [(core.adt [[] []])]
+    (ext))
+  (meta (core.meta.description "Logical `xor`.")))
+
+(declare-operation logic.eq
+  (core.fn
+    [(core.adt [[] []]) (core.adt [[] []])]
+    [(core.adt [[] []])]
+    (ext))
+  (meta (core.meta.description "Boolean equality.")))
+
+(declare-operation logic.not
+  (core.fn
+    [(core.adt [[] []])]
+    [(core.adt [[] []])]
+    (ext))
+  (meta (core.meta.description "Logical `not`.")))
