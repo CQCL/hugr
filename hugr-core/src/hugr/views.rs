@@ -33,7 +33,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
-use crate::{Direction, IncomingPort, NodeIndex, OutgoingPort, Port};
+use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 use itertools::Either;
 
@@ -80,15 +80,15 @@ pub trait HugrView: HugrInternals {
         };
         self.base_hugr()
             .hierarchy
-            .parent(node.pg_index())
-            .map(Into::into)
+            .parent(self.to_pg_index(node))
+            .map(|index| self.from_pg_index(index))
     }
 
     /// Returns the operation type of a node.
     #[inline]
     fn get_optype(&self, node: Self::Node) -> &OpType {
         match self.contains_node(node) {
-            true => self.base_hugr().op_types.get(node.pg_index()),
+            true => self.base_hugr().op_types.get(self.to_pg_index(node)),
             false => &DEFAULT_OPTYPE,
         }
     }
@@ -107,7 +107,10 @@ pub trait HugrView: HugrInternals {
         if !self.valid_node(node) {
             return None;
         }
-        self.base_hugr().metadata.get(node.pg_index()).as_ref()
+        self.base_hugr()
+            .metadata
+            .get(self.to_pg_index(node))
+            .as_ref()
     }
 
     /// Returns the number of nodes in the hugr.

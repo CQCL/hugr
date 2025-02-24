@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use thiserror::Error;
 
 use hugr_core::{
+    core::HugrNode,
     hugr::{
         hugrmut::HugrMut,
         views::{DescendantsGraph, ExtractHugr, HierarchyView},
@@ -210,7 +211,7 @@ impl ConstantFoldPass {
 
 // "Diverge" aka "never-terminate"
 // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
-fn might_diverge<V: AbstractValue, N: NodeIndex>(
+fn might_diverge<V: AbstractValue, N: HugrNode>(
     results: &AnalysisResults<V, impl HugrView<Node = N>>,
     n: N,
 ) -> bool {
@@ -247,7 +248,7 @@ impl<H: HugrView> std::ops::Deref for ConstFoldContext<'_, H> {
     }
 }
 
-impl<H: HugrView> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
     type Node = H::Node;
 
     fn value_from_opaque(
@@ -277,7 +278,7 @@ impl<H: HugrView> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> 
         };
         // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
         // but not for transforming to a direct Call.
-        let func = DescendantsGraph::<FuncID<true>, H::Node>::try_new(&**self, node).ok()?;
+        let func = DescendantsGraph::<FuncID<true>>::try_new(&**self, node).ok()?;
         Some(ValueHandle::new_const_hugr(
             ConstLocation::Node(node),
             Box::new(func.extract_hugr()),
@@ -285,7 +286,7 @@ impl<H: HugrView> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> 
     }
 }
 
-impl<H: HugrView> DFContext<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
     fn interpret_leaf_op(
         &mut self,
         node: H::Node,

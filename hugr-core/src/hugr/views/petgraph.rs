@@ -1,9 +1,9 @@
 //! Implementations of petgraph's traits for Hugr Region views.
 
+use crate::core::HugrNode;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
 use crate::types::EdgeKind;
-use crate::NodeIndex;
 use crate::Port;
 
 use petgraph::visit as pv;
@@ -68,11 +68,11 @@ where
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
-        ix.index()
+        self.hugr.to_pg_index(ix).into()
     }
 
     fn from_index(&self, ix: usize) -> Self::NodeId {
-        portgraph::NodeIndex::new(ix).into()
+        self.hugr.from_pg_index(portgraph::NodeIndex::new(ix))
     }
 }
 
@@ -189,7 +189,7 @@ pub struct HugrNodeRef<'a, N> {
     op: &'a OpType,
 }
 
-impl<'a, N: NodeIndex> HugrNodeRef<'a, N> {
+impl<'a, N: HugrNode> HugrNodeRef<'a, N> {
     pub(self) fn from_node(node: N, hugr: &'a impl HugrView<Node = N>) -> Self {
         Self {
             node,
@@ -198,7 +198,7 @@ impl<'a, N: NodeIndex> HugrNodeRef<'a, N> {
     }
 }
 
-impl<N: NodeIndex> pv::NodeRef for HugrNodeRef<'_, N> {
+impl<N: HugrNode> pv::NodeRef for HugrNodeRef<'_, N> {
     type NodeId = N;
 
     type Weight = OpType;
