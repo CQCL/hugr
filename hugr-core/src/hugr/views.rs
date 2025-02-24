@@ -81,7 +81,7 @@ pub trait HugrView: HugrInternals {
         self.base_hugr()
             .hierarchy
             .parent(self.to_pg_index(node))
-            .map(|index| self.from_pg_index(index))
+            .map(|index| self.to_node(index))
     }
 
     /// Returns the operation type of a node.

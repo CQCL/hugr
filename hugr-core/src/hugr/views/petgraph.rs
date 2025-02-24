@@ -72,7 +72,7 @@ where
     }
 
     fn from_index(&self, ix: usize) -> Self::NodeId {
-        self.hugr.from_pg_index(portgraph::NodeIndex::new(ix))
+        self.hugr.to_node(portgraph::NodeIndex::new(ix))
     }
 }
 
