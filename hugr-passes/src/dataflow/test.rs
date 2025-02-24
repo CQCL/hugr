@@ -17,9 +17,12 @@ use hugr_core::{
     HugrView,
 };
 use hugr_core::{Hugr, Wire};
+use itertools::Either;
 use rstest::{fixture, rstest};
 
-use super::{AbstractValue, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination};
+use super::{
+    AbstractValue, ConstLoader, DFContext, Machine, PartialSum, PartialValue, TailLoopTermination,
+};
 
 // ------- Minimal implementation of DFContext and AbstractValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -536,4 +539,42 @@ fn test_module() {
             Some(pv_true_or_false())
         );
     }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
+enum FutureBool {
+    /// Definitely a future
+    Future,
+    /// Maybe a future, maybe an actual bool
+    Unknown,
+}
+
+impl AbstractValue for FutureBool {
+    fn try_join(self, other: Self) -> Option<(Self, bool)> {
+        Some((
+            if v == self { self } else { FutureBool::Unknown },
+            self == FutureBool::Future && other == FutureBool::Unknown,
+        ))
+    }
+
+    fn join_with_sum(self, other: PartialSum<Self>) -> (PartialValue<Self>, bool) {
+        assert!(variants
+            .iter()
+            .all(|(tag, values)| [0, 1].contains(tag) && values.len() == 0));
+        (
+            PartialValue::Value(FutureBool::Unknown),
+            self == FutureBool::Future,
+        )
+    }
+
+    fn try_meet(self, other: Self) -> Option<(Self, bool)> {
+        //(self == other).then_some((self, false))
+        Some(if self == other {
+            (self, false)
+        } else {
+            (FutureBool::Future, self == FutureBool::Unknown)
+        })
+    }
+
+    fn meet_with_sum(self, other: PartialSum<Self>) -> (PartialValue<Self>, bool) {}
 }
