@@ -112,14 +112,8 @@ mod test {
                 use proptest::collection::vec;
                 vec(any_ident_string(), 1..2)
                     .prop_map(|vs| {
-                        IdentList::new(
-                            itertools::intersperse(
-                                vs,
-                                ".".into()
-                            )
-                            .collect::<String>(),
-                        )
-                        .unwrap()
+                        IdentList::new(itertools::intersperse(vs, ".".into()).collect::<String>())
+                            .unwrap()
                     })
                     .boxed()
             }
