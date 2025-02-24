@@ -114,8 +114,8 @@ mod test {
                     .prop_map(|vs| {
                         IdentList::new(
                             itertools::intersperse(
-                                vs.into_iter().map(Into::<String>::into),
-                                ".".into(),
+                                vs,
+                                ".".into()
                             )
                             .collect::<String>(),
                         )
