@@ -25,6 +25,10 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
         (self == other).then_some((self, false))
     }
 
+    fn join_with_sum(self, _other: PartialSum<Self>) -> (PartialValue<Self>, bool) {
+        (PartialValue::Top, true)
+    }
+
     /// Computes the meet of two values (i.e. towards `Bottom`), if this is representable
     /// within the underlying domain. Return the new value, and whether this is different from
     /// the old `self`.
@@ -34,6 +38,10 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// the two are identical, otherwise `None`.
     fn try_meet(self, other: Self) -> Option<(Self, bool)> {
         (self == other).then_some((self, false))
+    }
+
+    fn meet_with_sum(self, other: PartialSum<Self>) -> (PartialValue<Self>, bool) {
+        (PartialValue::Bottom, true)
     }
 }
 
@@ -404,8 +412,11 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 Ok(ch) => (Self::PartialSum(ps1), ch),
                 Err(_) => (Self::Top, true),
             },
-            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
-                (Self::Top, true)
+            (Self::Value(v1), Self::PartialSum(ps2)) => v1.join_with_sum(ps2),
+            (Self::PartialSum(ps1), Self::Value(v2)) => {
+                let (pv, _) = v2.join_with_sum(ps1.clone());
+                let ch = pv == Self::PartialSum(ps1);
+                (pv, ch)
             }
         };
         *self = res;
