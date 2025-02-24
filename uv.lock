@@ -267,7 +267,7 @@ wheels = [
 
 [[package]]
 name = "hugr"
-version = "0.10.2"
+version = "0.10.3"
 source = { editable = "hugr-py" }
 dependencies = [
     { name = "graphviz" },
