@@ -401,9 +401,21 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
         let (res, ch) = match (old_self, other) {
             (old @ Self::Top, _) | (old, Self::Bottom) => (old, false),
             (_, other @ Self::Top) | (Self::Bottom, other) => (other, true),
-            (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_join(h2) {
+            (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_join(h2.clone()) {
                 Some((h3, b)) => (Self::Value(h3), b),
-                None => (Self::Top, true),
+                None => {
+                    match (h1.as_sum(), h2.as_sum()) {
+                        (Some(mut ps1), Some(ps2)) => match ps1.try_join_mut(ps2) {
+                            Ok(_) =>
+                            // At the least, the abstract value has become the less-informative PartialSum version thereof.
+                            {
+                                (PartialValue::PartialSum(ps1), true)
+                            }
+                            Err(_) => (Self::Top, true),
+                        },
+                        _ => (Self::Top, true),
+                    }
+                }
             },
             (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_join_mut(ps2) {
                 Ok(ch) => (Self::PartialSum(ps1), ch),
