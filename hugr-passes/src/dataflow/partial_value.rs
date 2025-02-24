@@ -25,6 +25,10 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
         (self == other).then_some((self, false))
     }
 
+    fn as_sum(&self) -> Option<PartialSum<Self>> {
+        None
+    }
+
     /// Computes the meet of two values (i.e. towards `Bottom`), if this is representable
     /// within the underlying domain. Return the new value, and whether this is different from
     /// the old `self`.
@@ -322,7 +326,8 @@ impl<V: AbstractValue> PartialValue<V> {
     /// if the value is believed, for that tag, to have a number of values other than `len`
     pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
         let vals = match self {
-            PartialValue::Bottom | PartialValue::Value(_) => return None,
+            PartialValue::Bottom => return None,
+            PartialValue::Value(v) => v.as_sum().and_then(|ps| ps.variant_values(tag))?,
             PartialValue::PartialSum(ps) => ps.variant_values(tag)?,
             PartialValue::Top => vec![PartialValue::Top; len],
         };

@@ -58,7 +58,7 @@ impl From<Node> for ConstLocation<'_> {
 /// Implementors will likely want to override some/all of [Self::value_from_opaque],
 /// [Self::value_from_const_hugr], and [Self::value_from_function]: the defaults
 /// are "correct" but maximally conservative (minimally informative).
-pub trait ConstLoader<V> {
+pub trait ConstLoader<V>: Sized {
     /// Produces an abstract value from an [OpaqueValue], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
     fn value_from_opaque(&self, _loc: ConstLocation, _val: &OpaqueValue) -> Option<V> {
@@ -81,13 +81,21 @@ pub trait ConstLoader<V> {
     fn value_from_function(&self, _node: Node, _type_args: &[TypeArg]) -> Option<V> {
         None
     }
+
+    fn partial_from_const<'a>(
+        &self,
+        loc: impl Into<ConstLocation<'a>>,
+        cst: &Value,
+    ) -> PartialValue<V> {
+        default_partial_from_const(self, loc, cst)
+    }
 }
 
 /// Produces a [PartialValue] from a constant. Traverses [Sum](Value::Sum) constants
 /// to their leaves ([Value::Extension] and [Value::Function]),
 /// converts these using [ConstLoader::value_from_opaque] and [ConstLoader::value_from_const_hugr],
 /// and builds nested [PartialValue::new_variant] to represent the structure.
-pub fn partial_from_const<'a, V>(
+pub fn default_partial_from_const<'a, V>(
     cl: &impl ConstLoader<V>,
     loc: impl Into<ConstLocation<'a>>,
     cst: &Value,
@@ -98,7 +106,7 @@ pub fn partial_from_const<'a, V>(
             let elems = values
                 .iter()
                 .enumerate()
-                .map(|(idx, elem)| partial_from_const(cl, ConstLocation::Field(idx, &loc), elem));
+                .map(|(idx, elem)| cl.partial_from_const(ConstLocation::Field(idx, &loc), elem));
             PartialValue::new_variant(*tag, elems)
         }
         Value::Extension { e } => cl

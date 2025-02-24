@@ -11,10 +11,7 @@ use hugr_core::ops::{OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
-use super::{
-    partial_from_const, row_contains_bottom, AbstractValue, AnalysisResults, DFContext,
-    PartialValue,
-};
+use super::{row_contains_bottom, AbstractValue, AnalysisResults, DFContext, PartialValue};
 
 type PV<V> = PartialValue<V>;
 
@@ -362,7 +359,7 @@ fn propagate_leaf_op<V: AbstractValue>(
                 .unwrap()
                 .0;
             let const_val = hugr.get_optype(const_node).as_const().unwrap().value();
-            Some(ValueRow::singleton(partial_from_const(ctx, n, const_val)))
+            Some(ValueRow::singleton(ctx.partial_from_const(n, const_val)))
         }
         OpType::LoadFunction(load_op) => {
             assert!(ins.is_empty()); // static edge

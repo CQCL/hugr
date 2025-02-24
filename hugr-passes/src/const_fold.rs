@@ -21,8 +21,8 @@ use hugr_core::{
 use value_handle::ValueHandle;
 
 use crate::dataflow::{
-    partial_from_const, AbstractValue, AnalysisResults, ConstLoader, ConstLocation, DFContext,
-    Machine, PartialValue, TailLoopTermination,
+    AbstractValue, AnalysisResults, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
+    TailLoopTermination,
 };
 use crate::validation::{ValidatePassError, ValidationLevel};
 
@@ -79,11 +79,8 @@ impl ConstantFoldPass {
         let inputs = self.inputs.iter().map(|(p, v)| {
             (
                 *p,
-                partial_from_const(
-                    &ConstFoldContext(hugr),
-                    ConstLocation::Field(p.index(), &fresh_node.into()),
-                    v,
-                ),
+                ConstFoldContext(hugr)
+                    .partial_from_const(ConstLocation::Field(p.index(), &fresh_node.into()), v),
             )
         });
 
@@ -295,7 +292,7 @@ impl<H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'_, H> {
             .collect::<Vec<_>>();
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
             outs[p.index()] =
-                partial_from_const(self, ConstLocation::Field(p.index(), &node.into()), &v);
+                self.partial_from_const(ConstLocation::Field(p.index(), &node.into()), &v);
         }
     }
 }
