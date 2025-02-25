@@ -38,7 +38,7 @@ pub trait DFContext<V>: ConstLoader<V> {
 }
 
 /// A location where a [Value] could be find in a Hugr. That is,
-/// (perhaps deeply nested within [Value::Sum]s) within a [Node]
+/// (perhaps deeply nested within [Value::Sum]s) within a node `N`
 /// that is a [Const](hugr_core::ops::Const).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ConstLocation<'a, N> {
