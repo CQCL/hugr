@@ -1,0 +1,11 @@
+---
+source: hugr-llvm/src/sum.rs
+expression: module.to_string()
+---
+define { i1, i1 } @untag_tag({ i1, i1 } %0) {
+  %2 = extractvalue { i1, i1 } %0, 0
+  %3 = extractvalue { i1, i1 } %0, 1
+  %4 = insertvalue { i1, i1 } poison, i1 %2, 0
+  %5 = insertvalue { i1, i1 } %4, i1 %3, 1
+  ret { i1, i1 } %5
+}

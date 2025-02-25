@@ -6,7 +6,6 @@
 use std::sync::Arc;
 
 use crate::{
-    export::OP_FUNC_CALL_INDIRECT,
     extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
     hugr::{HugrMut, IdentList},
     ops::{
@@ -15,10 +14,14 @@ use crate::{
         ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
         Output, Tag, TailLoop, Value, CFG, DFG,
     },
+    std_extensions::{
+        arithmetic::{float_types::ConstF64, int_types::ConstInt},
+        collections::array::ArrayValue,
+    },
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
-        TypeEnum, TypeRow,
+        TypeEnum, TypeName, TypeRow,
     },
     Direction, Hugr, HugrView, Node, Port,
 };
@@ -50,6 +53,14 @@ pub enum ImportError {
         missing_ext: ExtensionId,
         /// The available extensions in the registry.
         available: Vec<ExtensionId>,
+    },
+    /// An extension type is missing.
+    #[error("Importing the hugr requires extension {ext} to have a type named {name}, but it was not found.")]
+    ExtensionType {
+        /// The extension that is missing the type.
+        ext: ExtensionId,
+        /// The name of the missing type.
+        name: TypeName,
     },
     /// The model is not well-formed.
     #[error("validate error: {0}")]
@@ -267,13 +278,13 @@ impl<'a> Context<'a> {
         &mut self,
         func_node: model::NodeId,
     ) -> Result<PolyFuncType, ImportError> {
-        let decl = match self.get_node(func_node)?.operation {
-            model::Operation::DefineFunc { decl } => decl,
-            model::Operation::DeclareFunc { decl } => decl,
+        let symbol = match self.get_node(func_node)?.operation {
+            model::Operation::DefineFunc(symbol) => symbol,
+            model::Operation::DeclareFunc(symbol) => symbol,
             _ => return Err(model::ModelError::UnexpectedOperation(func_node).into()),
         };
 
-        self.import_poly_func_type(func_node, *decl, |_, signature| Ok(signature))
+        self.import_poly_func_type(func_node, *symbol, |_, signature| Ok(signature))
     }
 
     /// Import the root region of the module.
@@ -328,10 +339,10 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::DefineFunc { decl } => {
-                self.import_poly_func_type(node_id, *decl, |ctx, signature| {
+            model::Operation::DefineFunc(symbol) => {
+                self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
                     let optype = OpType::FuncDefn(FuncDefn {
-                        name: decl.name.to_string(),
+                        name: symbol.name.to_string(),
                         signature,
                     });
 
@@ -347,10 +358,10 @@ impl<'a> Context<'a> {
                 })
             }
 
-            model::Operation::DeclareFunc { decl } => {
-                self.import_poly_func_type(node_id, *decl, |ctx, signature| {
+            model::Operation::DeclareFunc(symbol) => {
+                self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
                     let optype = OpType::FuncDecl(FuncDecl {
-                        name: decl.name.to_string(),
+                        name: symbol.name.to_string(),
                         signature,
                     });
 
@@ -358,45 +369,6 @@ impl<'a> Context<'a> {
 
                     Ok(Some(node))
                 })
-            }
-
-            model::Operation::CallFunc { func } => {
-                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
-                    return Err(model::ModelError::TypeError(func).into());
-                };
-
-                let func_sig = self.get_func_signature(*symbol)?;
-
-                let type_args = args
-                    .iter()
-                    .map(|term| self.import_type_arg(*term))
-                    .collect::<Result<Vec<TypeArg>, _>>()?;
-
-                self.static_edges.push((*symbol, node_id));
-                let optype = OpType::Call(Call::try_new(func_sig, type_args)?);
-
-                let node = self.make_node(node_id, optype, parent)?;
-                Ok(Some(node))
-            }
-
-            model::Operation::LoadFunc { func } => {
-                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
-                    return Err(model::ModelError::TypeError(func).into());
-                };
-
-                let func_sig = self.get_func_signature(*symbol)?;
-
-                let type_args = args
-                    .iter()
-                    .map(|term| self.import_type_arg(*term))
-                    .collect::<Result<Vec<TypeArg>, _>>()?;
-
-                self.static_edges.push((*symbol, node_id));
-
-                let optype = OpType::LoadFunction(LoadFunction::try_new(func_sig, type_args)?);
-
-                let node = self.make_node(node_id, optype, parent)?;
-                Ok(Some(node))
             }
 
             model::Operation::TailLoop => {
@@ -408,13 +380,122 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::CustomFull { operation } => {
+            model::Operation::Custom(operation) => {
                 let name = self.get_symbol_name(operation)?;
 
-                if name == OP_FUNC_CALL_INDIRECT {
+                if name == model::CORE_CALL_INDIRECT {
                     let signature = self.get_node_signature(node_id)?;
                     let optype = OpType::CallIndirect(CallIndirect { signature });
                     let node = self.make_node(node_id, optype, parent)?;
+                    return Ok(Some(node));
+                }
+
+                if name == model::CORE_CALL {
+                    let &[_, _, _, func] = node_data.params else {
+                        return Err(model::ModelError::InvalidOperation(node_id).into());
+                    };
+
+                    let model::Term::Apply(symbol, args) = self.get_term(func)? else {
+                        return Err(model::ModelError::TypeError(func).into());
+                    };
+
+                    let func_sig = self.get_func_signature(*symbol)?;
+
+                    let type_args = args
+                        .iter()
+                        .map(|term| self.import_type_arg(*term))
+                        .collect::<Result<Vec<TypeArg>, _>>()?;
+
+                    self.static_edges.push((*symbol, node_id));
+                    let optype = OpType::Call(Call::try_new(func_sig, type_args)?);
+
+                    let node = self.make_node(node_id, optype, parent)?;
+                    return Ok(Some(node));
+                }
+
+                if name == model::CORE_LOAD_CONST {
+                    let &[_, _, value] = node_data.params else {
+                        return Err(model::ModelError::InvalidOperation(node_id).into());
+                    };
+
+                    // If the constant refers directly to a function, import this as the `LoadFunc` operation.
+                    if let model::Term::Apply(symbol, args) = self.get_term(value)? {
+                        let func_node_data = self
+                            .module
+                            .get_node(*symbol)
+                            .ok_or(model::ModelError::NodeNotFound(*symbol))?;
+
+                        if let model::Operation::DefineFunc(_) | model::Operation::DeclareFunc(_) =
+                            func_node_data.operation
+                        {
+                            let func_sig = self.get_func_signature(*symbol)?;
+                            let type_args = args
+                                .iter()
+                                .map(|term| self.import_type_arg(*term))
+                                .collect::<Result<Vec<TypeArg>, _>>()?;
+
+                            self.static_edges.push((*symbol, node_id));
+
+                            let optype =
+                                OpType::LoadFunction(LoadFunction::try_new(func_sig, type_args)?);
+
+                            let node = self.make_node(node_id, optype, parent)?;
+                            return Ok(Some(node));
+                        }
+                    }
+
+                    // Otherwise use const nodes
+                    let signature = node_data
+                        .signature
+                        .ok_or_else(|| error_uninferred!("node signature"))?;
+                    let [_, outputs, _] = self.get_func_type(signature)?;
+                    let outputs = self.import_closed_list(outputs)?;
+                    let output = outputs
+                        .first()
+                        .ok_or(model::ModelError::TypeError(signature))?;
+                    let datatype = self.import_type(*output)?;
+
+                    let imported_value = self.import_value(value, *output)?;
+
+                    let load_const_node = self.make_node(
+                        node_id,
+                        OpType::LoadConstant(LoadConstant {
+                            datatype: datatype.clone(),
+                        }),
+                        parent,
+                    )?;
+
+                    let const_node = self
+                        .hugr
+                        .add_node_with_parent(parent, OpType::Const(Const::new(imported_value)));
+
+                    self.hugr.connect(const_node, 0, load_const_node, 0);
+
+                    return Ok(Some(load_const_node));
+                }
+
+                if name == model::CORE_MAKE_ADT {
+                    let &[_, _, tag] = node_data.params else {
+                        return Err(model::ModelError::InvalidOperation(node_id).into());
+                    };
+
+                    let model::Term::Nat(tag) = self.get_term(tag)? else {
+                        return Err(model::ModelError::TypeError(tag).into());
+                    };
+
+                    let signature = node_data
+                        .signature
+                        .ok_or_else(|| error_uninferred!("node signature"))?;
+                    let [_, outputs, _] = self.get_func_type(signature)?;
+                    let (variants, _) = self.import_adt_and_rest(node_id, outputs)?;
+                    let node = self.make_node(
+                        node_id,
+                        OpType::Tag(Tag {
+                            variants,
+                            tag: *tag as usize,
+                        }),
+                        parent,
+                    )?;
                     return Ok(Some(node));
                 }
 
@@ -445,19 +526,19 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::Custom { .. } => Err(error_unsupported!(
-                "custom operation with implicit parameters"
-            )),
-
-            model::Operation::DefineAlias { decl, value } => {
-                if !decl.params.is_empty() {
+            model::Operation::DefineAlias(symbol) => {
+                if !symbol.params.is_empty() {
                     return Err(error_unsupported!(
                         "parameters or constraints in alias definition"
                     ));
                 }
 
+                let &[value] = node_data.params else {
+                    return Err(model::ModelError::InvalidOperation(node_id).into());
+                };
+
                 let optype = OpType::AliasDefn(AliasDefn {
-                    name: decl.name.to_smolstr(),
+                    name: symbol.name.to_smolstr(),
                     definition: self.import_type(value)?,
                 });
 
@@ -465,15 +546,15 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::DeclareAlias { decl } => {
-                if !decl.params.is_empty() {
+            model::Operation::DeclareAlias(symbol) => {
+                if !symbol.params.is_empty() {
                     return Err(error_unsupported!(
                         "parameters or constraints in alias declaration"
                     ));
                 }
 
                 let optype = OpType::AliasDecl(AliasDecl {
-                    name: decl.name.to_smolstr(),
+                    name: symbol.name.to_smolstr(),
                     bound: TypeBound::Copyable,
                 });
 
@@ -481,57 +562,10 @@ impl<'a> Context<'a> {
                 Ok(Some(node))
             }
 
-            model::Operation::Tag { tag } => {
-                let signature = node_data
-                    .signature
-                    .ok_or_else(|| error_uninferred!("node signature"))?;
-                let (_, outputs, _) = self.get_func_type(signature)?;
-                let (variants, _) = self.import_adt_and_rest(node_id, outputs)?;
-                let node = self.make_node(
-                    node_id,
-                    OpType::Tag(Tag {
-                        variants,
-                        tag: tag as _,
-                    }),
-                    parent,
-                )?;
-                Ok(Some(node))
-            }
-
             model::Operation::Import { .. } => Ok(None),
 
             model::Operation::DeclareConstructor { .. } => Ok(None),
             model::Operation::DeclareOperation { .. } => Ok(None),
-
-            model::Operation::Const { value } => {
-                let signature = node_data
-                    .signature
-                    .ok_or_else(|| error_uninferred!("node signature"))?;
-                let (_, outputs, _) = self.get_func_type(signature)?;
-                let outputs = self.import_closed_list(outputs)?;
-                let output = outputs
-                    .first()
-                    .ok_or(model::ModelError::TypeError(signature))?;
-                let datatype = self.import_type(*output)?;
-
-                let imported_value = self.import_value(value, *output)?;
-
-                let load_const_node = self.make_node(
-                    node_id,
-                    OpType::LoadConstant(LoadConstant {
-                        datatype: datatype.clone(),
-                    }),
-                    parent,
-                )?;
-
-                let const_node = self
-                    .hugr
-                    .add_node_with_parent(parent, OpType::Const(Const::new(imported_value)));
-
-                self.hugr.connect(const_node, 0, load_const_node, 0);
-
-                Ok(Some(load_const_node))
-            }
         }
     }
 
@@ -597,11 +631,8 @@ impl<'a> Context<'a> {
         };
 
         let sum_rows: Vec<_> = {
-            let model::Term::Adt { variants } = self.get_term(*first)? else {
-                return Err(model::ModelError::TypeError(*first).into());
-            };
-
-            self.import_type_rows(*variants)?
+            let [variants] = self.expect_symbol(*first, model::CORE_ADT)?;
+            self.import_type_rows(variants)?
         };
 
         let rest = rest
@@ -626,7 +657,7 @@ impl<'a> Context<'a> {
         };
         let region_data = self.get_region(*region)?;
 
-        let (_, region_outputs, _) = self.get_func_type(
+        let [_, region_outputs, _] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -667,7 +698,7 @@ impl<'a> Context<'a> {
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
         debug_assert_eq!(node_data.operation, model::Operation::Conditional);
-        let (inputs, outputs, _) = self.get_func_type(
+        let [inputs, outputs, _] = self.get_func_type(
             node_data
                 .signature
                 .ok_or_else(|| error_uninferred!("node signature"))?,
@@ -719,7 +750,7 @@ impl<'a> Context<'a> {
             self.region_scope = region;
         }
 
-        let (region_source, region_targets, _) = self.get_func_type(
+        let [region_source, region_targets, _] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -737,11 +768,8 @@ impl<'a> Context<'a> {
                     return Err(model::ModelError::TypeError(region_source).into());
                 };
 
-                let model::Term::Control { values: types } = self.get_term(*ctrl_type)? else {
-                    return Err(model::ModelError::TypeError(*ctrl_type).into());
-                };
-
-                self.import_type_row(*types)?
+                let [types] = self.expect_symbol(*ctrl_type, model::CORE_CTRL)?;
+                self.import_type_row(types)?
             };
 
             let entry = self.hugr.add_node_with_parent(
@@ -812,11 +840,8 @@ impl<'a> Context<'a> {
                     return Err(model::ModelError::TypeError(region_targets).into());
                 };
 
-                let model::Term::Control { values: types } = self.get_term(*ctrl_type)? else {
-                    return Err(model::ModelError::TypeError(*ctrl_type).into());
-                };
-
-                self.import_type_row(*types)?
+                let [types] = self.expect_symbol(*ctrl_type, model::CORE_CTRL)?;
+                self.import_type_row(types)?
             };
 
             let exit = self
@@ -842,7 +867,7 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         };
         let region_data = self.get_region(*region)?;
-        let (inputs, outputs, extensions) = self.get_func_type(
+        let [inputs, outputs, extensions] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -866,41 +891,40 @@ impl<'a> Context<'a> {
     fn import_poly_func_type<RV: MaybeRV, T>(
         &mut self,
         node: model::NodeId,
-        decl: model::FuncDecl<'a>,
+        symbol: model::Symbol<'a>,
         in_scope: impl FnOnce(&mut Self, PolyFuncTypeBase<RV>) -> Result<T, ImportError>,
     ) -> Result<T, ImportError> {
-        let mut imported_params = Vec::with_capacity(decl.params.len());
+        let mut imported_params = Vec::with_capacity(symbol.params.len());
 
-        for (index, param) in decl.params.iter().enumerate() {
+        for (index, param) in symbol.params.iter().enumerate() {
             self.local_vars
                 .insert(model::VarId(node, index as _), LocalVar::new(param.r#type));
         }
 
-        for constraint in decl.constraints {
-            match self.get_term(*constraint)? {
-                model::Term::NonLinearConstraint { term } => {
-                    let model::Term::Var(var) = self.get_term(*term)? else {
-                        return Err(error_unsupported!(
-                            "constraint on term that is not a variable"
-                        ));
-                    };
+        for constraint in symbol.constraints {
+            if let Some([term]) = self.match_symbol(*constraint, model::CORE_NON_LINEAR)? {
+                let model::Term::Var(var) = self.get_term(term)? else {
+                    return Err(error_unsupported!(
+                        "constraint on term that is not a variable"
+                    ));
+                };
 
-                    self.local_vars
-                        .get_mut(var)
-                        .ok_or(model::ModelError::InvalidVar(*var))?
-                        .bound = TypeBound::Copyable;
-                }
-                _ => return Err(error_unsupported!("constraint other than copy or discard")),
+                self.local_vars
+                    .get_mut(var)
+                    .ok_or(model::ModelError::InvalidVar(*var))?
+                    .bound = TypeBound::Copyable;
+            } else {
+                return Err(error_unsupported!("constraint other than copy or discard"));
             }
         }
 
-        for (index, param) in decl.params.iter().enumerate() {
+        for (index, param) in symbol.params.iter().enumerate() {
             // NOTE: `PolyFuncType` only has explicit type parameters at present.
             let bound = self.local_vars[&model::VarId(node, index as _)].bound;
             imported_params.push(self.import_type_param(param.r#type, bound)?);
         }
 
-        let body = self.import_func_type::<RV>(decl.signature)?;
+        let body = self.import_func_type::<RV>(symbol.signature)?;
         in_scope(self, PolyFuncTypeBase::new(imported_params, body))
     }
 
@@ -910,57 +934,163 @@ impl<'a> Context<'a> {
         term_id: model::TermId,
         bound: TypeBound,
     ) -> Result<TypeParam, ImportError> {
+        if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
+            return Ok(TypeParam::String);
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
+            return Ok(TypeParam::max_nat());
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeParam`",
+                model::CORE_BYTES_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeParam`",
+                model::CORE_FLOAT_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
+            return Ok(TypeParam::Type { b: bound });
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeParam`",
+                model::CORE_STATIC
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeParam`",
+                model::CORE_CONSTRAINT
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
+            return Err(error_unsupported!("`{}` as `TypeParam`", model::CORE_CONST));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeParam`",
+                model::CORE_CTRL_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_EXT_SET)? {
+            return Ok(TypeParam::Extensions);
+        }
+
+        if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
+            // At present `hugr-model` has no way to express that the item
+            // type of a list must be copyable. Therefore we import it as `Any`.
+            let param = Box::new(self.import_type_param(item_type, TypeBound::Any)?);
+            return Ok(TypeParam::List { param });
+        }
+
+        if let Some([_]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
+            // At present `hugr-model` has no way to express that the item
+            // types of a tuple must be copyable. Therefore we import it as `Any`.
+            todo!("import tuple type");
+        }
+
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
 
-            model::Term::Type => Ok(TypeParam::Type { b: bound }),
-
-            model::Term::StaticType => Err(error_unsupported!("`type` as `TypeParam`")),
-            model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeParam`")),
             model::Term::Var { .. } => Err(error_unsupported!("type variable as `TypeParam`")),
-            model::Term::Apply { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
-            model::Term::ApplyFull { .. } => Err(error_unsupported!("custom type as `TypeParam`")),
-            model::Term::BytesType { .. } => Err(error_unsupported!("`bytes` as `TypeParam`")),
-            model::Term::Const { .. } => Err(error_unsupported!("`(const ...)` as `TypeParam`")),
-            model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
-
-            model::Term::ListType { item_type } => {
-                // At present `hugr-model` has no way to express that the item
-                // type of a list must be copyable. Therefore we import it as `Any`.
-                let param = Box::new(self.import_type_param(*item_type, TypeBound::Any)?);
-                Ok(TypeParam::List { param })
+            model::Term::Apply(symbol, _) => {
+                let name = self.get_symbol_name(*symbol)?;
+                Err(error_unsupported!("custom type `{}` as `TypeParam`", name))
             }
 
-            model::Term::StrType => Ok(TypeParam::String),
-            model::Term::ExtSetType => Ok(TypeParam::Extensions),
-
-            model::Term::NatType => Ok(TypeParam::max_nat()),
-
             model::Term::Nat(_)
+            | model::Term::Tuple(_)
             | model::Term::Str(_)
             | model::Term::List { .. }
             | model::Term::ExtSet { .. }
-            | model::Term::Adt { .. }
-            | model::Term::Control { .. }
-            | model::Term::NonLinearConstraint { .. }
             | model::Term::ConstFunc { .. }
             | model::Term::Bytes { .. }
-            | model::Term::Meta
-            | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
-
-            model::Term::ControlType => {
-                Err(error_unsupported!("type of control types as `TypeParam`"))
-            }
+            | model::Term::Float { .. } => Err(model::ModelError::TypeError(term_id).into()),
         }
     }
 
     /// Import a `TypeArg` from a term that represents a static type or value.
     fn import_type_arg(&mut self, term_id: model::TermId) -> Result<TypeArg, ImportError> {
+        if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeArg`",
+                model::CORE_STR_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeArg`",
+                model::CORE_NAT_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeArg`",
+                model::CORE_BYTES_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeArg`",
+                model::CORE_FLOAT_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
+            return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_TYPE));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeArg`",
+                model::CORE_CONSTRAINT
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
+            return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_STATIC));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_EXT_SET)? {
+            return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_EXT_SET));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeArg`",
+                model::CORE_CTRL_TYPE
+            ));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
+            return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_CONST));
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
+            return Err(error_unsupported!(
+                "`{}` as `TypeArg`",
+                model::CORE_LIST_TYPE
+            ));
+        }
+
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
-            model::Term::Apply { .. } => {
-                Err(error_uninferred!("application with implicit parameters"))
-            }
 
             model::Term::Var(var) => {
                 let var_info = self
@@ -981,6 +1111,13 @@ impl<'a> Context<'a> {
                 Ok(TypeArg::Sequence { elems })
             }
 
+            model::Term::Tuple { .. } => {
+                // NOTE: While `TypeArg`s can represent tuples as
+                // `TypeArg::Sequence`s, this conflates lists and tuples. To
+                // avoid ambiguity we therefore report an error here for now.
+                Err(error_unsupported!("tuples as `TypeArg`"))
+            }
+
             model::Term::Str(value) => Ok(TypeArg::String {
                 arg: value.to_string(),
             }),
@@ -990,33 +1127,15 @@ impl<'a> Context<'a> {
                 es: self.import_extension_set(term_id)?,
             }),
 
-            model::Term::StrType => Err(error_unsupported!("`str` as `TypeArg`")),
-            model::Term::NatType => Err(error_unsupported!("`nat` as `TypeArg`")),
-            model::Term::ListType { .. } => Err(error_unsupported!("`(list ...)` as `TypeArg`")),
-            model::Term::ExtSetType => Err(error_unsupported!("`ext-set` as `TypeArg`")),
-            model::Term::Type => Err(error_unsupported!("`type` as `TypeArg`")),
-            model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeArg`")),
-            model::Term::StaticType => Err(error_unsupported!("`static` as `TypeArg`")),
-            model::Term::ControlType => Err(error_unsupported!("`ctrl` as `TypeArg`")),
-            model::Term::BytesType => Err(error_unsupported!("`bytes` as `TypeArg`")),
             model::Term::Bytes { .. } => Err(error_unsupported!("`(bytes ..)` as `TypeArg`")),
-            model::Term::Const { .. } => Err(error_unsupported!("`const` as `TypeArg`")),
-            model::Term::ConstAdt { .. } => Err(error_unsupported!("adt constant as `TypeArg`")),
+            model::Term::Float { .. } => Err(error_unsupported!("float literal as `TypeArg`")),
             model::Term::ConstFunc { .. } => {
                 Err(error_unsupported!("function constant as `TypeArg`"))
             }
 
-            model::Term::FuncType { .. }
-            | model::Term::Adt { .. }
-            | model::Term::ApplyFull { .. } => {
+            model::Term::Apply { .. } => {
                 let ty = self.import_type(term_id)?;
                 Ok(TypeArg::Type { ty })
-            }
-
-            model::Term::Control { .. }
-            | model::Term::Meta
-            | model::Term::NonLinearConstraint { .. } => {
-                Err(model::ModelError::TypeError(term_id).into())
             }
         }
     }
@@ -1036,7 +1155,7 @@ impl<'a> Context<'a> {
                     es.insert_type_var(*index as _);
                 }
 
-                model::Term::ExtSet { parts } => {
+                model::Term::ExtSet(parts) => {
                     for part in *parts {
                         match part {
                             model::ExtSetPart::Extension(ext) => {
@@ -1064,13 +1183,24 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: model::TermId,
     ) -> Result<TypeBase<RV>, ImportError> {
+        if let Some([_, _, _]) = self.match_symbol(term_id, model::CORE_FN)? {
+            let func_type = self.import_func_type::<RowVariable>(term_id)?;
+            return Ok(TypeBase::new_function(func_type));
+        }
+
+        if let Some([variants]) = self.match_symbol(term_id, model::CORE_ADT)? {
+            let variants = self.import_closed_list(variants)?;
+            let variants = variants
+                .iter()
+                .map(|variant| self.import_type_row::<RowVariable>(*variant))
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(TypeBase::new_sum(variants));
+        }
+
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
-            model::Term::Apply { .. } => {
-                Err(error_uninferred!("application with implicit parameters"))
-            }
 
-            model::Term::ApplyFull { symbol, args } => {
+            model::Term::Apply(symbol, args) => {
                 let args = args
                     .iter()
                     .map(|arg| self.import_type_arg(*arg))
@@ -1087,13 +1217,21 @@ impl<'a> Context<'a> {
                             available: self.extensions.ids().cloned().collect(),
                         })?;
 
+                let ext_type =
+                    extension_ref
+                        .get_type(&id)
+                        .ok_or_else(|| ImportError::ExtensionType {
+                            ext: extension.clone(),
+                            name: id.clone(),
+                        })?;
+
+                let bound = ext_type.bound(&args);
+
                 Ok(TypeBase::new_extension(CustomType::new(
                     id,
                     args,
                     extension,
-                    // As part of the migration from `TypeBound`s to constraints, we pretend that all
-                    // `TypeBound`s are copyable.
-                    TypeBound::Copyable,
+                    bound,
                     &Arc::downgrade(extension_ref),
                 )))
             }
@@ -1102,64 +1240,29 @@ impl<'a> Context<'a> {
                 Ok(TypeBase::new_var_use(*index as _, TypeBound::Copyable))
             }
 
-            model::Term::FuncType { .. } => {
-                let func_type = self.import_func_type::<RowVariable>(term_id)?;
-                Ok(TypeBase::new_function(func_type))
-            }
-
-            model::Term::Adt { variants } => {
-                let variants = self.import_closed_list(*variants)?;
-                let variants = variants
-                    .iter()
-                    .map(|variant| self.import_type_row::<RowVariable>(*variant))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(TypeBase::new_sum(variants))
-            }
-
             // The following terms are not runtime types, but the core `Type` only contains runtime types.
             // We therefore report a type error here.
-            model::Term::ListType { .. }
-            | model::Term::StrType
-            | model::Term::NatType
-            | model::Term::ExtSetType
-            | model::Term::StaticType
-            | model::Term::Type
-            | model::Term::Constraint
-            | model::Term::Const { .. }
-            | model::Term::Str(_)
+            model::Term::Str(_)
             | model::Term::ExtSet { .. }
             | model::Term::List { .. }
-            | model::Term::Control { .. }
-            | model::Term::ControlType
+            | model::Term::Tuple { .. }
             | model::Term::Nat(_)
-            | model::Term::NonLinearConstraint { .. }
             | model::Term::Bytes { .. }
-            | model::Term::BytesType
-            | model::Term::ConstFunc { .. }
-            | model::Term::Meta
-            | model::Term::ConstAdt { .. } => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::Float { .. }
+            | model::Term::ConstFunc { .. } => Err(model::ModelError::TypeError(term_id).into()),
         }
     }
 
-    fn get_func_type(
-        &mut self,
-        term_id: model::TermId,
-    ) -> Result<(model::TermId, model::TermId, model::TermId), ImportError> {
-        match self.get_term(term_id)? {
-            model::Term::FuncType {
-                inputs,
-                outputs,
-                extensions,
-            } => Ok((*inputs, *outputs, *extensions)),
-            _ => Err(model::ModelError::TypeError(term_id).into()),
-        }
+    fn get_func_type(&mut self, term_id: model::TermId) -> Result<[model::TermId; 3], ImportError> {
+        self.match_symbol(term_id, model::CORE_FN)?
+            .ok_or(model::ModelError::TypeError(term_id).into())
     }
 
     fn import_func_type<RV: MaybeRV>(
         &mut self,
         term_id: model::TermId,
     ) -> Result<FuncTypeBase<RV>, ImportError> {
-        let (inputs, outputs, extensions) = self.get_func_type(term_id)?;
+        let [inputs, outputs, extensions] = self.get_func_type(term_id)?;
         let inputs = self.import_type_row(inputs)?;
         let outputs = self.import_type_row(outputs)?;
         let extensions = self.import_extension_set(extensions)?;
@@ -1176,7 +1279,7 @@ impl<'a> Context<'a> {
             types: &mut Vec<model::TermId>,
         ) -> Result<(), ImportError> {
             match ctx.get_term(term_id)? {
-                model::Term::List { parts } => {
+                model::Term::List(parts) => {
                     types.reserve(parts.len());
 
                     for part in *parts {
@@ -1185,6 +1288,41 @@ impl<'a> Context<'a> {
                                 types.push(*term_id);
                             }
                             model::ListPart::Splice(term_id) => {
+                                import_into(ctx, *term_id, types)?;
+                            }
+                        }
+                    }
+                }
+                _ => return Err(model::ModelError::TypeError(term_id).into()),
+            }
+
+            Ok(())
+        }
+
+        let mut types = Vec::new();
+        import_into(self, term_id, &mut types)?;
+        Ok(types)
+    }
+
+    fn import_closed_tuple(
+        &mut self,
+        term_id: model::TermId,
+    ) -> Result<Vec<model::TermId>, ImportError> {
+        fn import_into(
+            ctx: &mut Context,
+            term_id: model::TermId,
+            types: &mut Vec<model::TermId>,
+        ) -> Result<(), ImportError> {
+            match ctx.get_term(term_id)? {
+                model::Term::Tuple(parts) => {
+                    types.reserve(parts.len());
+
+                    for part in *parts {
+                        match part {
+                            model::TuplePart::Item(term_id) => {
+                                types.push(*term_id);
+                            }
+                            model::TuplePart::Splice(term_id) => {
                                 import_into(ctx, *term_id, types)?;
                             }
                         }
@@ -1221,7 +1359,7 @@ impl<'a> Context<'a> {
             types: &mut Vec<TypeBase<RV>>,
         ) -> Result<(), ImportError> {
             match ctx.get_term(term_id)? {
-                model::Term::List { parts } => {
+                model::Term::List(parts) => {
                     types.reserve(parts.len());
 
                     for item in *parts {
@@ -1276,27 +1414,15 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: model::TermId,
     ) -> Result<(&'a str, serde_json::Value), ImportError> {
-        let (global, args) = match self.get_term(term_id)? {
-            model::Term::Apply { symbol, args } | model::Term::ApplyFull { symbol, args } => {
-                (symbol, args)
-            }
-            _ => return Err(model::ModelError::TypeError(term_id).into()),
-        };
+        let [name_arg, json_arg] = self
+            .match_symbol(term_id, model::COMPAT_META_JSON)?
+            .ok_or(model::ModelError::TypeError(term_id))?;
 
-        let global = self.get_symbol_name(*global)?;
-        if global != model::COMPAT_META_JSON {
-            return Err(model::ModelError::TypeError(term_id).into());
-        }
-
-        let [name_arg, json_arg] = args else {
+        let model::Term::Str(name) = self.get_term(name_arg)? else {
             return Err(model::ModelError::TypeError(term_id).into());
         };
 
-        let model::Term::Str(name) = self.get_term(*name_arg)? else {
-            return Err(model::ModelError::TypeError(term_id).into());
-        };
-
-        let model::Term::Str(json_str) = self.get_term(*json_arg)? else {
+        let model::Term::Str(json_str) = self.get_term(json_arg)? else {
             return Err(model::ModelError::TypeError(term_id).into());
         };
 
@@ -1313,110 +1439,166 @@ impl<'a> Context<'a> {
     ) -> Result<Value, ImportError> {
         let term_data = self.get_term(term_id)?;
 
+        // NOTE: We have special cased arrays, integers, and floats for now.
+        // TODO: Allow arbitrary extension values to be imported from terms.
+
+        if let Some([runtime_type, extensions, json]) =
+            self.match_symbol(term_id, model::COMPAT_CONST_JSON)?
+        {
+            let model::Term::Str(json) = self.get_term(json)? else {
+                return Err(model::ModelError::TypeError(term_id).into());
+            };
+
+            // We attempt to deserialize as the custom const directly.
+            // This might fail due to the custom const struct not being included when
+            // this code was compiled; in that case, we fall back to the serialized form.
+            let value: Option<Box<dyn CustomConst>> = serde_json::from_str(json).ok();
+
+            if let Some(value) = value {
+                let opaque_value = OpaqueValue::from(value);
+                return Ok(Value::Extension { e: opaque_value });
+            } else {
+                let runtime_type = self.import_type(runtime_type)?;
+                let extensions = self.import_extension_set(extensions)?;
+
+                let value: serde_json::Value = serde_json::from_str(json)
+                    .map_err(|_| model::ModelError::TypeError(term_id))?;
+                let custom_const = CustomSerialized::new(runtime_type, value, extensions);
+                let opaque_value = OpaqueValue::new(custom_const);
+                return Ok(Value::Extension { e: opaque_value });
+            }
+        }
+
+        if let Some([_, element_type_term, contents]) =
+            self.match_symbol(term_id, ArrayValue::CTR_NAME)?
+        {
+            let element_type = self.import_type(element_type_term)?;
+            let contents = self.import_closed_list(contents)?;
+            let contents = contents
+                .iter()
+                .map(|item| self.import_value(*item, element_type_term))
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(ArrayValue::new(element_type, contents).into());
+        }
+
+        if let Some([bitwidth, value]) = self.match_symbol(term_id, ConstInt::CTR_NAME)? {
+            let bitwidth = {
+                let model::Term::Nat(bitwidth) = self.get_term(bitwidth)? else {
+                    return Err(model::ModelError::TypeError(term_id).into());
+                };
+                if *bitwidth > 6 {
+                    return Err(model::ModelError::TypeError(term_id).into());
+                }
+                *bitwidth as u8
+            };
+
+            let value = {
+                let model::Term::Nat(value) = self.get_term(value)? else {
+                    return Err(model::ModelError::TypeError(term_id).into());
+                };
+                *value
+            };
+
+            return Ok(ConstInt::new_u(bitwidth, value)
+                .map_err(|_| model::ModelError::TypeError(term_id))?
+                .into());
+        }
+
+        if let Some([value]) = self.match_symbol(term_id, ConstF64::CTR_NAME)? {
+            let model::Term::Float(value) = self.get_term(value)? else {
+                return Err(model::ModelError::TypeError(term_id).into());
+            };
+
+            return Ok(ConstF64::new(value.into_inner()).into());
+        }
+
+        if let Some([_, _, _, tag, values]) = self.match_symbol(term_id, model::CORE_CONST_ADT)? {
+            let [variants] = self.expect_symbol(type_id, model::CORE_ADT)?;
+            let values = self.import_closed_tuple(values)?;
+            let variants = self.import_closed_list(variants)?;
+
+            let model::Term::Nat(tag) = self.get_term(tag)? else {
+                return Err(model::ModelError::TypeError(term_id).into());
+            };
+
+            let variant = variants
+                .get(*tag as usize)
+                .ok_or(model::ModelError::TypeError(term_id))?;
+
+            let variant = self.import_closed_list(*variant)?;
+
+            let items = values
+                .iter()
+                .zip(variant.iter())
+                .map(|(value, typ)| self.import_value(*value, *typ))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let typ = {
+                // TODO: Import as a `SumType` directly and avoid the copy.
+                let typ: Type = self.import_type(type_id)?;
+                match typ.as_type_enum() {
+                    TypeEnum::Sum(sum) => sum.clone(),
+                    _ => unreachable!(),
+                }
+            };
+
+            return Ok(Value::sum(*tag as _, items, typ).unwrap());
+        }
+
         match term_data {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
-            model::Term::Apply { .. } => {
-                Err(error_uninferred!("application with implicit parameters"))
-            }
             model::Term::Var(_) => Err(error_unsupported!("constant value containing a variable")),
 
-            model::Term::ApplyFull { symbol, args } => {
+            model::Term::Apply(symbol, _) => {
                 let symbol_name = self.get_symbol_name(*symbol)?;
-
-                if symbol_name == model::COMPAT_CONST_JSON {
-                    let value = args.get(1).ok_or(model::ModelError::TypeError(term_id))?;
-
-                    let model::Term::Str(json) = self.get_term(*value)? else {
-                        return Err(model::ModelError::TypeError(term_id).into());
-                    };
-
-                    // We attempt to deserialize as the custom const directly.
-                    // This might fail due to the custom const struct not being included when
-                    // this code was compiled; in that case, we fall back to the serialized form.
-                    let value: Option<Box<dyn CustomConst>> = serde_json::from_str(json).ok();
-
-                    if let Some(value) = value {
-                        let opaque_value = OpaqueValue::from(value);
-                        return Ok(Value::Extension { e: opaque_value });
-                    } else {
-                        let runtime_type =
-                            args.first().ok_or(model::ModelError::TypeError(term_id))?;
-                        let runtime_type = self.import_type(*runtime_type)?;
-
-                        let extensions =
-                            args.get(2).ok_or(model::ModelError::TypeError(term_id))?;
-                        let extensions = self.import_extension_set(*extensions)?;
-
-                        let value: serde_json::Value = serde_json::from_str(json)
-                            .map_err(|_| model::ModelError::TypeError(term_id))?;
-                        let custom_const = CustomSerialized::new(runtime_type, value, extensions);
-                        let opaque_value = OpaqueValue::new(custom_const);
-                        return Ok(Value::Extension { e: opaque_value });
-                    }
-                }
-
-                Err(error_unsupported!("constant value that is not JSON data"))
+                Err(error_unsupported!(
+                    "unknown custom constant value `{}`",
+                    symbol_name
+                ))
                 // TODO: This should ultimately include the following cases:
                 // - function definitions
                 // - custom constructors for values
             }
 
-            model::Term::StaticType
-            | model::Term::Constraint
-            | model::Term::Const { .. }
-            | model::Term::List { .. }
-            | model::Term::ListType { .. }
+            model::Term::List { .. }
             | model::Term::Str(_)
-            | model::Term::StrType
             | model::Term::Nat(_)
-            | model::Term::NatType
             | model::Term::ExtSet { .. }
-            | model::Term::ExtSetType
-            | model::Term::Adt { .. }
-            | model::Term::FuncType { .. }
-            | model::Term::Control { .. }
-            | model::Term::ControlType
-            | model::Term::Type
             | model::Term::Bytes { .. }
-            | model::Term::BytesType
-            | model::Term::Meta
-            | model::Term::NonLinearConstraint { .. } => {
-                Err(model::ModelError::TypeError(term_id).into())
-            }
+            | model::Term::Tuple(_)
+            | model::Term::Float { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ConstFunc { .. } => Err(error_unsupported!("constant function value")),
-
-            model::Term::ConstAdt { tag, values } => {
-                let model::Term::Adt { variants } = self.get_term(type_id)? else {
-                    return Err(model::ModelError::TypeError(term_id).into());
-                };
-
-                let values = self.import_closed_list(*values)?;
-                let variants = self.import_closed_list(*variants)?;
-
-                let variant = variants
-                    .get(*tag as usize)
-                    .ok_or(model::ModelError::TypeError(term_id))?;
-                let variant = self.import_closed_list(*variant)?;
-
-                let items = values
-                    .iter()
-                    .zip(variant.iter())
-                    .map(|(value, typ)| self.import_value(*value, *typ))
-                    .collect::<Result<Vec<_>, _>>()?;
-
-                let typ = {
-                    // TODO: Import as a `SumType` directly and avoid the copy.
-                    let typ: Type = self.import_type(type_id)?;
-                    match typ.as_type_enum() {
-                        TypeEnum::Sum(sum) => sum.clone(),
-                        _ => unreachable!(),
-                    }
-                };
-
-                Ok(Value::sum(*tag as _, items, typ).unwrap())
-            }
         }
+    }
+
+    fn match_symbol<const N: usize>(
+        &self,
+        term_id: model::TermId,
+        name: &str,
+    ) -> Result<Option<[model::TermId; N]>, ImportError> {
+        let term = self.get_term(term_id)?;
+
+        // TODO: Follow alias chains?
+
+        let model::Term::Apply(symbol, args) = term else {
+            return Ok(None);
+        };
+
+        if name != self.get_symbol_name(*symbol)? {
+            return Ok(None);
+        }
+
+        Ok((*args).try_into().ok())
+    }
+
+    fn expect_symbol<const N: usize>(
+        &self,
+        term_id: model::TermId,
+        name: &str,
+    ) -> Result<[model::TermId; N], ImportError> {
+        self.match_symbol(term_id, name)?
+            .ok_or(model::ModelError::TypeError(term_id).into())
     }
 }
 

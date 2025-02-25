@@ -10,7 +10,7 @@ use std::sync::{Arc, Weak};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::resolution::{

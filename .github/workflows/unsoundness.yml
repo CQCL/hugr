@@ -34,8 +34,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: v0-miri
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Test with Miri
         run: cargo miri test
 
@@ -43,7 +41,7 @@ jobs:
   create-issue:
     uses: CQCL/hugrverse-actions/.github/workflows/create-issue.yml@main
     needs: miri
-    if: always() && needs.miri.result == 'failure' && github.event_name == 'push'
+    if: always() && needs.miri.result == 'failure'
     secrets:
         GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
     with:

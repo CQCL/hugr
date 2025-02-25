@@ -2,9 +2,9 @@
 //! This crate defines data structures that capture the structure of a HUGR graph and
 //! all its associated information in a form that can be stored on disk. The data structures
 //! are not designed for efficient traversal or modification, but for simplicity and serialization.
+mod capnp;
+
 pub mod v0;
 
-#[allow(clippy::needless_lifetimes)]
-pub(crate) mod hugr_v0_capnp {
-    include!(concat!(env!("OUT_DIR"), "/hugr_v0_capnp.rs"));
-}
+// This is required here since the generated code assumes it's in the package root.
+use capnp::hugr_v0_capnp;

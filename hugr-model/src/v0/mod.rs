@@ -87,13 +87,171 @@
 //! [#1546]: https://github.com/CQCL/hugr/issues/1546
 //! [#1553]: https://github.com/CQCL/hugr/issues/1553
 //! [#1554]: https://github.com/CQCL/hugr/issues/1554
+use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 use thiserror::Error;
 
+/// Core function types.
+///
+/// - **Parameter:** `?inputs : (core.list core.type)`
+/// - **Parameter:** `?outputs : (core.list core.type)`
+/// - **Parameter:** `?ext : core.ext-set`
+/// - **Result:** `core.type`
+pub const CORE_FN: &str = "core.fn";
+
+/// The type of runtime types.
+///
+/// Runtime types are the types of values that can flow between nodes at runtime.
+///
+/// - **Result:** `?type : core.static`
+pub const CORE_TYPE: &str = "core.type";
+
+/// The type of static types.
+///
+/// Static types are the types of statically known parameters.
+///
+/// This is the only term that is its own type.
+///
+/// - **Result:** `?type : core.static`
+pub const CORE_STATIC: &str = "core.static";
+
+/// The type of constraints.
+///
+/// - **Result:** `?type : core.static`
+pub const CORE_CONSTRAINT: &str = "core.constraint";
+
+/// The constraint for non-linear runtime data.
+///
+/// Runtime values are copied implicitly by connecting an output port to more
+/// than one input port. Similarly runtime values can be deleted implicitly when
+/// an output port is not connected to any input port. In either of these cases
+/// the type of the runtime value must satisfy this constraint.
+///
+/// - **Parameter:** `?type : core.type`
+/// - **Result:** `core.constraint`
+pub const CORE_NON_LINEAR: &str = "core.nonlinear";
+
+/// The type of metadata.
+///
+/// - **Result:** `?type : core.static`
+pub const CORE_META: &str = "core.meta";
+
+/// Runtime algebraic data types.
+///
+/// Algebraic data types are sums of products of other runtime types.
+///
+/// - **Parameter:** `?variants : (core.list (core.list core.type))`
+/// - **Result:** `core.type`
+pub const CORE_ADT: &str = "core.adt";
+
+/// Type of string literals.
+///
+/// - **Result:** `core.static`
+pub const CORE_STR_TYPE: &str = "core.str";
+
+/// Type of natural number literals.
+///
+/// - **Result:** `core.static`
+pub const CORE_NAT_TYPE: &str = "core.nat";
+
+/// Type of bytes literals.
+///
+/// - **Result:** `core.static`
+pub const CORE_BYTES_TYPE: &str = "core.bytes";
+
+/// Type of float literals.
+///
+/// - **Result:** `core.static`
+pub const CORE_FLOAT_TYPE: &str = "core.float";
+
+/// Type of a control flow edge.
+///
+/// - **Parameter:** `?types : (core.list core.type)`
+/// - **Result:** `core.ctrl_type`
+pub const CORE_CTRL: &str = "core.ctrl";
+
+/// The type of the types for control flow edges.
+///
+/// - **Result:** `?type : core.static`
+pub const CORE_CTRL_TYPE: &str = "core.ctrl_type";
+
+/// The type of extension sets.
+///
+/// - **Result:** `?type : core.static`
+pub const CORE_EXT_SET: &str = "core.ext_set";
+
+/// The type for runtime constants.
+///
+/// - **Parameter:** `?type : core.type`
+/// - **Parameter:** `?ext : core.ext_set`
+/// - **Result:** `core.static`
+pub const CORE_CONST: &str = "core.const";
+
+/// Constants for runtime algebraic data types.
+///
+/// - **Parameter:** `?variants : (core.list core.type)`
+/// - **Parameter:** `?ext : core.ext_set`
+/// - **Parameter:** `?types : (core.list core.static)`
+/// - **Parameter:** `?tag : core.nat`
+/// - **Parameter:** `?values : (core.tuple ?types)`
+/// - **Result:** `(core.const (core.adt ?variants) ?ext)`
+pub const CORE_CONST_ADT: &str = "core.const.adt";
+
+/// The type for lists of static data.
+///
+/// Lists are finite sequences such that all elements have the same type.
+/// For heterogeneous sequences, see [`CORE_TUPLE_TYPE`].
+///
+/// - **Parameter:** `?type : core.static`
+/// - **Result:** `core.static`
+pub const CORE_LIST_TYPE: &str = "core.list";
+
+/// The type for tuples of static data.
+///
+/// Tuples are finite sequences that allow elements to have different types.
+/// For homogeneous sequences, see [`CORE_LIST_TYPE`].
+///
+/// - **Parameter:** `?types : (core.list core.static)`
+/// - **Result:** `core.static`
+pub const CORE_TUPLE_TYPE: &str = "core.tuple";
+
+/// Operation to call a statically known function.
+///
+/// - **Parameter:** `?inputs : (core.list core.type)`
+/// - **Parameter:** `?outputs : (core.list core.type)`
+/// - **Parameter:** `?ext : core.ext_set`
+/// - **Parameter:** `?func : (core.const (core.fn ?inputs ?outputs ?ext) ?ext)`
+/// - **Result:** `(core.fn ?inputs ?outputs ?ext)`
+pub const CORE_CALL: &str = "core.call";
+
+/// Operation to call a functiion known at runtime.
+///
+/// - **Parameter:** `?inputs : (core.list core.type)`
+/// - **Parameter:** `?outputs : (core.list core.type)`
+/// - **Parameter:** `?ext : core.ext_set`
+/// - **Result:** `(core.fn [(core.fn ?inputs ?outputs ?ext) ?inputs ...] ?outputs ?ext)`
+pub const CORE_CALL_INDIRECT: &str = "core.call_indirect";
+
+/// Operation to load a constant value.
+///
+/// - **Parameter:** `?type : core.type`
+/// - **Parameter:** `?ext : core.ext_set`
+/// - **Parameter:** `?value : (core.const ?type ?ext)`
+/// - **Result:** `(core.fn [] [?type] ?ext)`
+pub const CORE_LOAD_CONST: &str = "core.load_const";
+
+/// Operation to create a value of an algebraic data type.
+///
+/// - **Parameter:** `?variants : (core.list (core.list core.type))`
+/// - **Parameter:** `?types : (core.list core.type)`
+/// - **Parameter:** `?tag : core.nat`
+/// - **Result:** `(core.fn ?types [(core.adt ?variants)] (ext))`
+pub const CORE_MAKE_ADT: &str = "core.make_adt";
+
 /// Constructor for documentation metadata.
 ///
-/// - **Parameter:** `?description : str`
-/// - **Result:** `meta`
+/// - **Parameter:** `?description : core.str`
+/// - **Result:** `core.meta`
 pub const CORE_META_DESCRIPTION: &str = "core.meta.description";
 
 /// Constructor for JSON encoded metadata.
@@ -102,10 +260,10 @@ pub const CORE_META_DESCRIPTION: &str = "core.meta.description";
 /// The intention is to deprecate this in the future in favor of metadata
 /// expressed with custom constructors.
 ///
-/// - **Parameter:** `?name : str`
-/// - **Parameter:** `?json : str`
-/// - **Result:** `meta`
-pub const COMPAT_META_JSON: &str = "compat.meta-json";
+/// - **Parameter:** `?name : core.str`
+/// - **Parameter:** `?json : core.str`
+/// - **Result:** `core.meta`
+pub const COMPAT_META_JSON: &str = "compat.meta_json";
 
 /// Constructor for JSON encoded constants.
 ///
@@ -113,11 +271,11 @@ pub const COMPAT_META_JSON: &str = "compat.meta-json";
 /// The intention is to deprecate this in the future in favor of constants
 /// expressed with custom constructors.
 ///
-/// - **Parameter:** `?type : type`
-/// - **Parameter:** `?json : str`
-/// - **Parameter:** `?exts : ext-set`
-/// - **Result:** `(const ?type ?exts)`
-pub const COMPAT_CONST_JSON: &str = "compat.const-json";
+/// - **Parameter:** `?type : core.type`
+/// - **Parameter:** `?ext : core.ext_set`
+/// - **Parameter:** `?json : core.str`
+/// - **Result:** `(core.const ?type ?ext)`
+pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 
 pub mod binary;
 pub mod scope;
@@ -308,58 +466,15 @@ pub enum Operation<'a> {
     /// Basic blocks.
     Block,
     /// Function definitions.
-    DefineFunc {
-        /// The declaration of the function to be defined.
-        decl: &'a FuncDecl<'a>,
-    },
+    DefineFunc(&'a Symbol<'a>),
     /// Function declarations.
-    DeclareFunc {
-        /// The function to be declared.
-        decl: &'a FuncDecl<'a>,
-    },
-    /// Function calls.
-    CallFunc {
-        /// The function to be called.
-        func: TermId,
-    },
-    /// Function constants.
-    LoadFunc {
-        /// The function to be loaded.
-        func: TermId,
-    },
+    DeclareFunc(&'a Symbol<'a>),
     /// Custom operation.
-    ///
-    /// The node's parameters correspond to the explicit parameter of the custom operation,
-    /// leaving out the implicit parameters. Once the declaration of the custom operation
-    /// becomes known by resolving the reference, the node can be transformed into a [`Operation::CustomFull`]
-    /// by inferring terms for the implicit parameters or at least filling them in with a wildcard term.
-    Custom {
-        /// The symbol of the custom operation.
-        operation: NodeId,
-    },
-    /// Custom operation with full parameters.
-    ///
-    /// The node's parameters correspond to both the explicit and implicit parameters of the custom operation.
-    /// Since this can be tedious to write, the [`Operation::Custom`] variant can be used to indicate that
-    /// the implicit parameters should be inferred.
-    CustomFull {
-        /// The symbol of the custom operation.
-        operation: NodeId,
-    },
+    Custom(NodeId),
     /// Alias definitions.
-    DefineAlias {
-        /// The declaration of the alias to be defined.
-        decl: &'a AliasDecl<'a>,
-        /// The value of the alias.
-        value: TermId,
-    },
-
+    DefineAlias(&'a Symbol<'a>),
     /// Alias declarations.
-    DeclareAlias {
-        /// The alias to be declared.
-        decl: &'a AliasDecl<'a>,
-    },
-
+    DeclareAlias(&'a Symbol<'a>),
     /// Tail controlled loop.
     /// Nodes with this operation contain a dataflow graph that is executed in a loop.
     /// The loop body is executed at least once, producing a result that indicates whether
@@ -381,38 +496,20 @@ pub enum Operation<'a> {
     /// - **Outputs**: `outputs`
     Conditional,
 
-    /// Create an ADT value from a sequence of inputs.
-    Tag {
-        /// The tag of the ADT value.
-        tag: u16,
-    },
-
     /// Declaration for a term constructor.
     ///
     /// Nodes with this operation must be within a module region.
-    DeclareConstructor {
-        /// The declaration of the constructor.
-        decl: &'a ConstructorDecl<'a>,
-    },
+    DeclareConstructor(&'a Symbol<'a>),
 
     /// Declaration for a operation.
     ///
     /// Nodes with this operation must be within a module region.
-    DeclareOperation {
-        /// The declaration of the operation.
-        decl: &'a OperationDecl<'a>,
-    },
+    DeclareOperation(&'a Symbol<'a>),
 
     /// Import a symbol.
     Import {
         /// The name of the symbol to be imported.
         name: &'a str,
-    },
-
-    /// Create a constant value.
-    Const {
-        /// The term that describes how to construct the constant value.
-        value: TermId,
     },
 }
 
@@ -420,12 +517,12 @@ impl<'a> Operation<'a> {
     /// Returns the symbol introduced by the operation, if any.
     pub fn symbol(&self) -> Option<&'a str> {
         match self {
-            Operation::DefineFunc { decl } => Some(decl.name),
-            Operation::DeclareFunc { decl } => Some(decl.name),
-            Operation::DefineAlias { decl, .. } => Some(decl.name),
-            Operation::DeclareAlias { decl } => Some(decl.name),
-            Operation::DeclareConstructor { decl } => Some(decl.name),
-            Operation::DeclareOperation { decl } => Some(decl.name),
+            Operation::DefineFunc(symbol) => Some(symbol.name),
+            Operation::DeclareFunc(symbol) => Some(symbol.name),
+            Operation::DefineAlias(symbol) => Some(symbol.name),
+            Operation::DeclareAlias(symbol) => Some(symbol.name),
+            Operation::DeclareConstructor(symbol) => Some(symbol.name),
+            Operation::DeclareOperation(symbol) => Some(symbol.name),
             Operation::Import { name } => Some(name),
             _ => None,
         }
@@ -484,54 +581,17 @@ pub enum RegionKind {
     Module = 2,
 }
 
-/// A function declaration.
+/// A symbol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FuncDecl<'a> {
-    /// The name of the function to be declared.
+pub struct Symbol<'a> {
+    /// The name of the symbol.
     pub name: &'a str,
-    /// The static parameters of the function.
+    /// The static parameters.
     pub params: &'a [Param<'a>],
     /// The constraints on the static parameters.
     pub constraints: &'a [TermId],
-    /// The signature of the function.
+    /// The signature of the symbol.
     pub signature: TermId,
-}
-
-/// An alias declaration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AliasDecl<'a> {
-    /// The name of the alias to be declared.
-    pub name: &'a str,
-    /// The static parameters of the alias.
-    pub params: &'a [Param<'a>],
-    /// The type of the alias.
-    pub r#type: TermId,
-}
-
-/// A term constructor declaration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ConstructorDecl<'a> {
-    /// The name of the constructor to be declared.
-    pub name: &'a str,
-    /// The static parameters of the constructor.
-    pub params: &'a [Param<'a>],
-    /// The constraints on the static parameters.
-    pub constraints: &'a [TermId],
-    /// The type of the constructed term.
-    pub r#type: TermId,
-}
-
-/// An operation declaration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct OperationDecl<'a> {
-    /// The name of the operation to be declared.
-    pub name: &'a str,
-    /// The static parameters of the operation.
-    pub params: &'a [Param<'a>],
-    /// The constraints on the static parameters.
-    pub constraints: &'a [TermId],
-    /// The type of the operation. This must be a function type.
-    pub r#type: TermId,
 }
 
 /// An index of a variable within a node's parameter list.
@@ -544,184 +604,68 @@ pub enum Term<'a> {
     #[default]
     Wildcard,
 
-    /// The type of runtime types.
-    ///
-    /// `type : static`
-    Type,
-
-    /// The type of static types.
-    ///
-    /// `static : static`
-    StaticType,
-
-    /// The type of constraints.
-    ///
-    /// `constraint : static`
-    Constraint,
-
     /// A local variable.
     Var(VarId),
 
-    /// A symbolic function application.
+    /// Apply a symbol to a sequence of arguments.
     ///
-    /// The arguments of this application cover only the explicit parameters of the referenced declaration,
-    /// leaving out the implicit parameters. Once the type of the declaration is known, the implicit parameters
-    /// can be inferred and the term replaced with [`Term::ApplyFull`].
-    ///
-    /// `(GLOBAL ARG-0 ... ARG-n)`
-    Apply {
-        /// Reference to the symbol to apply.
-        symbol: NodeId,
-        /// Arguments to the function, covering only the explicit parameters.
-        args: &'a [TermId],
-    },
+    /// The symbol is defined by a node in the same graph. The type of this term
+    /// is derived from instantiating the symbol's parameters in the symbol's
+    /// signature.
+    Apply(NodeId, &'a [TermId]),
 
-    /// A symbolic function application with all arguments applied.
+    /// List of static data.
     ///
-    /// The arguments to this application cover both the implicit and explicit parameters of the referenced declaration.
-    /// Since this can be tedious to write out, only the explicit parameters can be provided via [`Term::Apply`].
+    /// Lists can include individual items or other lists to be spliced in.
     ///
-    /// `(@GLOBAL ARG-0 ... ARG-n)`
-    ApplyFull {
-        /// Reference to the symbol to apply.
-        symbol: NodeId,
-        /// Arguments to the function, covering both implicit and explicit parameters.
-        args: &'a [TermId],
-    },
-
-    /// Type for a constant runtime value.
-    ///
-    /// `(const T) : static` where `T : type`.
-    Const {
-        /// The runtime type of the constant value.
-        ///
-        /// **Type:** `type`
-        r#type: TermId,
-        /// The extension set required to be present in order to use the constant value.
-        ///
-        /// **Type:** `ext-set`
-        extensions: TermId,
-    },
-
-    /// A list. May include individual items or other lists to be spliced in.
-    List {
-        /// The parts of the list.
-        parts: &'a [ListPart],
-    },
-
-    /// The type of lists, given a type for the items.
-    ///
-    /// `(list T) : static` where `T : static`.
-    ListType {
-        /// The type of the items in the list.
-        ///
-        /// `item_type : static`
-        item_type: TermId,
-    },
+    /// **Type:** `(core.list ?t)`
+    List(&'a [ListPart]),
 
     /// A literal string.
     ///
-    /// `"STRING" : str`
+    /// **Type:** `core.str`
     Str(&'a str),
-
-    /// The type of literal strings.
-    ///
-    /// `str : static`
-    StrType,
 
     /// A literal natural number.
     ///
-    /// `N : nat`
+    /// **Type:** `core.nat`
     Nat(u64),
 
-    /// The type of literal natural numbers.
-    ///
-    /// `nat : static`
-    NatType,
-
     /// Extension set.
-    ExtSet {
-        /// The parts of the extension set.
-        ///
-        /// Since extension sets are unordered, the parts may occur in any order.
-        parts: &'a [ExtSetPart<'a>],
-    },
-
-    /// The type of extension sets.
     ///
-    /// `ext-set : static`
-    ExtSetType,
-
-    /// An algebraic data type.
-    ///
-    /// `(adt VARIANTS) : type` where `VARIANTS : (list (list type))`.
-    Adt {
-        /// List of variants in the algrebaic data type.
-        /// Each of the variants is itself a list of runtime types.
-        variants: TermId,
-    },
-
-    /// The type of functions, given lists of input and output types and an extension set.
-    FuncType {
-        /// The input types of the function, given as a list of runtime types.
-        ///
-        /// `inputs : (list type)`
-        inputs: TermId,
-        /// The output types of the function, given as a list of runtime types.
-        ///
-        /// `outputs : (list type)`
-        outputs: TermId,
-        /// The set of extensions that the function requires to be present in
-        /// order to be called.
-        ///
-        /// `extensions : ext-set`
-        extensions: TermId,
-    },
-
-    /// Control flow.
-    ///
-    /// `(ctrl VALUES) : ctrl` where `VALUES : (list type)`.
-    Control {
-        /// List of values.
-        values: TermId,
-    },
-
-    /// Type of control flow edges.
-    ///
-    /// `ctrl : static`
-    ControlType,
-
-    /// Constraint that requires a runtime type to be copyable and discardable.
-    NonLinearConstraint {
-        /// The runtime type that must be copyable and discardable.
-        term: TermId,
-    },
+    /// **Type:** `core.ext_set`
+    ExtSet(&'a [ExtSetPart<'a>]),
 
     /// A constant anonymous function.
-    ConstFunc {
-        /// The body of the constant anonymous function.
-        region: RegionId,
-    },
-
-    /// A constant value for an algebraic data type.
-    ConstAdt {
-        /// The tag of the variant.
-        tag: u16,
-        /// The values of the variant.
-        values: TermId,
-    },
+    ///
+    /// **Type:** `(core.const (core.fn ?ins ?outs ?ext) (ext))`
+    ConstFunc(RegionId),
 
     /// A literal byte string.
-    Bytes {
-        /// The data of the byte string.
-        data: &'a [u8],
-    },
+    ///
+    /// **Type:**: `core.bytes`
+    Bytes(&'a [u8]),
 
-    /// The type of byte strings.
-    BytesType,
+    /// A literal floating-point number.
+    ///
+    /// **Type:** `core.float`
+    Float(OrderedFloat<f64>),
 
-    /// The type of metadata.
-    Meta,
+    /// Tuple of static data.
+    ///
+    /// Tuples can include individual items or other tuples to be spliced in.
+    ///
+    /// **Type:** `(core.tuple ?types)`
+    Tuple(&'a [TuplePart]),
+}
+
+/// A part of a tuple term.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TuplePart {
+    /// A single item.
+    Item(TermId),
+    /// A tuple to be spliced into the parent tuple.
+    Splice(TermId),
 }
 
 /// A part of a list term.
@@ -745,25 +689,12 @@ pub enum ExtSetPart<'a> {
 /// A parameter to a function or alias.
 ///
 /// Parameter names must be unique within a parameter list.
-/// Implicit and explicit parameters share a namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Param<'a> {
     /// The name of the parameter.
     pub name: &'a str,
     /// The type of the parameter.
     pub r#type: TermId,
-    /// The sort of the parameter (implicit or explicit).
-    pub sort: ParamSort,
-}
-
-/// The sort of a parameter (implicit or explicit).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ParamSort {
-    /// The parameter is implicit and should be inferred, unless a full application form is used
-    /// (see [`Term::ApplyFull`] and [`Operation::CustomFull`]).
-    Implicit,
-    /// The parameter is explicit and should always be provided.
-    Explicit,
 }
 
 /// Errors that can occur when traversing and interpreting the model.

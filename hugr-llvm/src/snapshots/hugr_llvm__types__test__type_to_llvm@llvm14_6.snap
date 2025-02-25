@@ -1,5 +1,5 @@
 ---
-source: src/types.rs
-expression: "[int([BoundedNat { n: 6 }]), []]+[[]+[], int([BoundedNat { n: 2 }])]"
+source: hugr-llvm/src/types.rs
+expression: "[int(6), Unit]+[Bool, int(2)]"
 ---
-"{ i32, { i64, { {} } }, { { i32, {}, {} }, i8 } }"
+"{ i1, i8, i64, i1 }"

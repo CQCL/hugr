@@ -26,233 +26,213 @@ entry_block:                                      ; preds = %alloca_block
   %2 = icmp ult i64 0, 2
   %3 = icmp ult i64 1, 2
   %4 = and i1 %2, %3
-  br i1 %4, label %8, label %5
+  br i1 %4, label %7, label %5
 
 5:                                                ; preds = %entry_block
-  %6 = insertvalue { [2 x i64] } undef, [2 x i64] %1, 0
-  %7 = insertvalue { i32, { [2 x i64] }, { [2 x i64] } } { i32 0, { [2 x i64] } poison, { [2 x i64] } poison }, { [2 x i64] } %6, 1
-  br label %19
+  %6 = insertvalue { i1, [2 x i64] } { i1 false, [2 x i64] poison }, [2 x i64] %1, 1
+  br label %17
 
-8:                                                ; preds = %entry_block
-  %9 = alloca i64, i32 2, align 8
-  %10 = bitcast i64* %9 to [2 x i64]*
-  store [2 x i64] %1, [2 x i64]* %10, align 4
-  %11 = getelementptr inbounds i64, i64* %9, i64 0
-  %12 = load i64, i64* %11, align 4
-  %13 = getelementptr inbounds i64, i64* %9, i64 1
-  %14 = load i64, i64* %13, align 4
-  store i64 %14, i64* %11, align 4
-  store i64 %12, i64* %13, align 4
-  %15 = bitcast i64* %9 to [2 x i64]*
-  %16 = load [2 x i64], [2 x i64]* %15, align 4
-  %17 = insertvalue { [2 x i64] } undef, [2 x i64] %16, 0
-  %18 = insertvalue { i32, { [2 x i64] }, { [2 x i64] } } { i32 1, { [2 x i64] } poison, { [2 x i64] } poison }, { [2 x i64] } %17, 2
-  br label %19
+7:                                                ; preds = %entry_block
+  %8 = alloca i64, i32 2, align 8
+  %9 = bitcast i64* %8 to [2 x i64]*
+  store [2 x i64] %1, [2 x i64]* %9, align 4
+  %10 = getelementptr inbounds i64, i64* %8, i64 0
+  %11 = load i64, i64* %10, align 4
+  %12 = getelementptr inbounds i64, i64* %8, i64 1
+  %13 = load i64, i64* %12, align 4
+  store i64 %13, i64* %10, align 4
+  store i64 %11, i64* %12, align 4
+  %14 = bitcast i64* %8 to [2 x i64]*
+  %15 = load [2 x i64], [2 x i64]* %14, align 4
+  %16 = insertvalue { i1, [2 x i64] } { i1 true, [2 x i64] poison }, [2 x i64] %15, 1
+  br label %17
 
-19:                                               ; preds = %5, %8
-  %"0.0" = phi { i32, { [2 x i64] }, { [2 x i64] } } [ %18, %8 ], [ %7, %5 ]
-  %20 = extractvalue { i32, { [2 x i64] }, { [2 x i64] } } %"0.0", 0
-  switch i32 %20, label %21 [
-    i32 1, label %24
+17:                                               ; preds = %5, %7
+  %"0.0" = phi { i1, [2 x i64] } [ %16, %7 ], [ %6, %5 ]
+  %18 = extractvalue { i1, [2 x i64] } %"0.0", 0
+  switch i1 %18, label %19 [
+    i1 true, label %21
   ]
 
-21:                                               ; preds = %19
-  %22 = extractvalue { i32, { [2 x i64] }, { [2 x i64] } } %"0.0", 1
-  %23 = extractvalue { [2 x i64] } %22, 0
+19:                                               ; preds = %17
+  %20 = extractvalue { i1, [2 x i64] } %"0.0", 1
   br label %cond_16_case_0
 
-24:                                               ; preds = %19
-  %25 = extractvalue { i32, { [2 x i64] }, { [2 x i64] } } %"0.0", 2
-  %26 = extractvalue { [2 x i64] } %25, 0
+21:                                               ; preds = %17
+  %22 = extractvalue { i1, [2 x i64] } %"0.0", 1
   br label %cond_16_case_1
 
-cond_16_case_0:                                   ; preds = %21
-  %27 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @0, i32 0, i32 0) }, 0
-  %28 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @0, i32 0, i32 0) }, 1
-  %29 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 %27, i8* %28)
+cond_16_case_0:                                   ; preds = %19
+  %23 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @0, i32 0, i32 0) }, 0
+  %24 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @0, i32 0, i32 0) }, 1
+  %25 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 %23, i8* %24)
   call void @abort()
   br label %cond_exit_16
 
-cond_16_case_1:                                   ; preds = %24
+cond_16_case_1:                                   ; preds = %21
   br label %cond_exit_16
 
 cond_exit_16:                                     ; preds = %cond_16_case_1, %cond_16_case_0
-  %"08.0" = phi [2 x i64] [ zeroinitializer, %cond_16_case_0 ], [ %26, %cond_16_case_1 ]
-  %30 = icmp ult i64 0, 2
-  br i1 %30, label %32, label %31
+  %"08.0" = phi [2 x i64] [ zeroinitializer, %cond_16_case_0 ], [ %22, %cond_16_case_1 ]
+  %26 = icmp ult i64 0, 2
+  br i1 %26, label %28, label %27
 
-31:                                               ; preds = %cond_exit_16
-  br label %39
+27:                                               ; preds = %cond_exit_16
+  br label %34
 
-32:                                               ; preds = %cond_exit_16
-  %33 = alloca i64, i32 2, align 8
-  %34 = bitcast i64* %33 to [2 x i64]*
-  store [2 x i64] %"08.0", [2 x i64]* %34, align 4
-  %35 = getelementptr inbounds i64, i64* %33, i64 0
-  %36 = load i64, i64* %35, align 4
-  %37 = insertvalue { i64 } undef, i64 %36, 0
-  %38 = insertvalue { i32, {}, { i64 } } { i32 1, {} poison, { i64 } poison }, { i64 } %37, 2
-  br label %39
+28:                                               ; preds = %cond_exit_16
+  %29 = alloca i64, i32 2, align 8
+  %30 = bitcast i64* %29 to [2 x i64]*
+  store [2 x i64] %"08.0", [2 x i64]* %30, align 4
+  %31 = getelementptr inbounds i64, i64* %29, i64 0
+  %32 = load i64, i64* %31, align 4
+  %33 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %32, 1
+  br label %34
 
-39:                                               ; preds = %31, %32
-  %"020.0" = phi { i32, {}, { i64 } } [ %38, %32 ], [ { i32 0, {} undef, { i64 } poison }, %31 ]
-  %40 = extractvalue { i32, {}, { i64 } } %"020.0", 0
-  switch i32 %40, label %41 [
-    i32 1, label %43
+34:                                               ; preds = %27, %28
+  %"020.0" = phi { i1, i64 } [ %33, %28 ], [ { i1 false, i64 poison }, %27 ]
+  %35 = extractvalue { i1, i64 } %"020.0", 0
+  switch i1 %35, label %36 [
+    i1 true, label %37
   ]
 
-41:                                               ; preds = %39
-  %42 = extractvalue { i32, {}, { i64 } } %"020.0", 1
+36:                                               ; preds = %34
   br label %cond_28_case_0
 
-43:                                               ; preds = %39
-  %44 = extractvalue { i32, {}, { i64 } } %"020.0", 2
-  %45 = extractvalue { i64 } %44, 0
+37:                                               ; preds = %34
+  %38 = extractvalue { i1, i64 } %"020.0", 1
   br label %cond_28_case_1
 
-cond_28_case_0:                                   ; preds = %41
-  %46 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @1, i32 0, i32 0) }, 0
-  %47 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @1, i32 0, i32 0) }, 1
-  %48 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.1, i32 0, i32 0), i32 %46, i8* %47)
+cond_28_case_0:                                   ; preds = %36
+  %39 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @1, i32 0, i32 0) }, 0
+  %40 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @1, i32 0, i32 0) }, 1
+  %41 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.1, i32 0, i32 0), i32 %39, i8* %40)
   call void @abort()
   br label %cond_exit_28
 
-cond_28_case_1:                                   ; preds = %43
+cond_28_case_1:                                   ; preds = %37
   br label %cond_exit_28
 
 cond_exit_28:                                     ; preds = %cond_28_case_1, %cond_28_case_0
-  %"023.0" = phi i64 [ 0, %cond_28_case_0 ], [ %45, %cond_28_case_1 ]
-  %49 = icmp ult i64 1, 2
-  br i1 %49, label %54, label %50
+  %"023.0" = phi i64 [ 0, %cond_28_case_0 ], [ %38, %cond_28_case_1 ]
+  %42 = icmp ult i64 1, 2
+  br i1 %42, label %46, label %43
 
-50:                                               ; preds = %cond_exit_28
-  %51 = insertvalue { i64, [2 x i64] } undef, i64 %"023.0", 0
-  %52 = insertvalue { i64, [2 x i64] } %51, [2 x i64] %"08.0", 1
-  %53 = insertvalue { i32, { i64, [2 x i64] }, { i64, [2 x i64] } } { i32 0, { i64, [2 x i64] } poison, { i64, [2 x i64] } poison }, { i64, [2 x i64] } %52, 1
-  br label %64
+43:                                               ; preds = %cond_exit_28
+  %44 = insertvalue { i1, i64, [2 x i64] } { i1 false, i64 poison, [2 x i64] poison }, i64 %"023.0", 1
+  %45 = insertvalue { i1, i64, [2 x i64] } %44, [2 x i64] %"08.0", 2
+  br label %55
 
-54:                                               ; preds = %cond_exit_28
-  %55 = alloca i64, i32 2, align 8
-  %56 = bitcast i64* %55 to [2 x i64]*
-  store [2 x i64] %"08.0", [2 x i64]* %56, align 4
-  %57 = getelementptr inbounds i64, i64* %55, i64 1
-  %58 = load i64, i64* %57, align 4
-  store i64 %"023.0", i64* %57, align 4
-  %59 = bitcast i64* %55 to [2 x i64]*
-  %60 = load [2 x i64], [2 x i64]* %59, align 4
-  %61 = insertvalue { i64, [2 x i64] } undef, i64 %58, 0
-  %62 = insertvalue { i64, [2 x i64] } %61, [2 x i64] %60, 1
-  %63 = insertvalue { i32, { i64, [2 x i64] }, { i64, [2 x i64] } } { i32 1, { i64, [2 x i64] } poison, { i64, [2 x i64] } poison }, { i64, [2 x i64] } %62, 2
-  br label %64
+46:                                               ; preds = %cond_exit_28
+  %47 = alloca i64, i32 2, align 8
+  %48 = bitcast i64* %47 to [2 x i64]*
+  store [2 x i64] %"08.0", [2 x i64]* %48, align 4
+  %49 = getelementptr inbounds i64, i64* %47, i64 1
+  %50 = load i64, i64* %49, align 4
+  store i64 %"023.0", i64* %49, align 4
+  %51 = bitcast i64* %47 to [2 x i64]*
+  %52 = load [2 x i64], [2 x i64]* %51, align 4
+  %53 = insertvalue { i1, i64, [2 x i64] } { i1 true, i64 poison, [2 x i64] poison }, i64 %50, 1
+  %54 = insertvalue { i1, i64, [2 x i64] } %53, [2 x i64] %52, 2
+  br label %55
 
-64:                                               ; preds = %50, %54
-  %"033.0" = phi { i32, { i64, [2 x i64] }, { i64, [2 x i64] } } [ %63, %54 ], [ %53, %50 ]
-  %65 = extractvalue { i32, { i64, [2 x i64] }, { i64, [2 x i64] } } %"033.0", 0
-  switch i32 %65, label %66 [
-    i32 1, label %70
+55:                                               ; preds = %43, %46
+  %"033.0" = phi { i1, i64, [2 x i64] } [ %54, %46 ], [ %45, %43 ]
+  %56 = extractvalue { i1, i64, [2 x i64] } %"033.0", 0
+  switch i1 %56, label %57 [
+    i1 true, label %60
   ]
 
-66:                                               ; preds = %64
-  %67 = extractvalue { i32, { i64, [2 x i64] }, { i64, [2 x i64] } } %"033.0", 1
-  %68 = extractvalue { i64, [2 x i64] } %67, 0
-  %69 = extractvalue { i64, [2 x i64] } %67, 1
+57:                                               ; preds = %55
+  %58 = extractvalue { i1, i64, [2 x i64] } %"033.0", 1
+  %59 = extractvalue { i1, i64, [2 x i64] } %"033.0", 2
   br label %cond_40_case_0
 
-70:                                               ; preds = %64
-  %71 = extractvalue { i32, { i64, [2 x i64] }, { i64, [2 x i64] } } %"033.0", 2
-  %72 = extractvalue { i64, [2 x i64] } %71, 0
-  %73 = extractvalue { i64, [2 x i64] } %71, 1
+60:                                               ; preds = %55
+  %61 = extractvalue { i1, i64, [2 x i64] } %"033.0", 1
+  %62 = extractvalue { i1, i64, [2 x i64] } %"033.0", 2
   br label %cond_40_case_1
 
-cond_40_case_0:                                   ; preds = %66
-  %74 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @2, i32 0, i32 0) }, 0
-  %75 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @2, i32 0, i32 0) }, 1
-  %76 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.2, i32 0, i32 0), i32 %74, i8* %75)
+cond_40_case_0:                                   ; preds = %57
+  %63 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @2, i32 0, i32 0) }, 0
+  %64 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @2, i32 0, i32 0) }, 1
+  %65 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.2, i32 0, i32 0), i32 %63, i8* %64)
   call void @abort()
   br label %cond_exit_40
 
-cond_40_case_1:                                   ; preds = %70
+cond_40_case_1:                                   ; preds = %60
   br label %cond_exit_40
 
 cond_exit_40:                                     ; preds = %cond_40_case_1, %cond_40_case_0
-  %"036.0" = phi i64 [ 0, %cond_40_case_0 ], [ %72, %cond_40_case_1 ]
-  %"1.0" = phi [2 x i64] [ zeroinitializer, %cond_40_case_0 ], [ %73, %cond_40_case_1 ]
-  %77 = alloca i64, i32 2, align 8
-  %78 = bitcast i64* %77 to [2 x i64]*
-  store [2 x i64] %"1.0", [2 x i64]* %78, align 4
-  %79 = getelementptr i64, i64* %77, i32 1
-  %80 = load i64, i64* %77, align 4
-  %81 = bitcast i64* %79 to [1 x i64]*
-  %82 = load [1 x i64], [1 x i64]* %81, align 4
-  %83 = insertvalue { i64, [1 x i64] } undef, i64 %80, 0
-  %84 = insertvalue { i64, [1 x i64] } %83, [1 x i64] %82, 1
-  %85 = insertvalue { i32, {}, { i64, [1 x i64] } } { i32 1, {} poison, { i64, [1 x i64] } poison }, { i64, [1 x i64] } %84, 2
-  %86 = extractvalue { i32, {}, { i64, [1 x i64] } } %85, 0
-  switch i32 %86, label %87 [
-    i32 1, label %89
+  %"036.0" = phi i64 [ 0, %cond_40_case_0 ], [ %61, %cond_40_case_1 ]
+  %"1.0" = phi [2 x i64] [ zeroinitializer, %cond_40_case_0 ], [ %62, %cond_40_case_1 ]
+  %66 = alloca i64, i32 2, align 8
+  %67 = bitcast i64* %66 to [2 x i64]*
+  store [2 x i64] %"1.0", [2 x i64]* %67, align 4
+  %68 = getelementptr i64, i64* %66, i32 1
+  %69 = load i64, i64* %66, align 4
+  %70 = bitcast i64* %68 to [1 x i64]*
+  %71 = load [1 x i64], [1 x i64]* %70, align 4
+  %72 = insertvalue { i1, i64, [1 x i64] } { i1 true, i64 poison, [1 x i64] poison }, i64 %69, 1
+  %73 = insertvalue { i1, i64, [1 x i64] } %72, [1 x i64] %71, 2
+  %74 = extractvalue { i1, i64, [1 x i64] } %73, 0
+  switch i1 %74, label %75 [
+    i1 true, label %76
   ]
 
-87:                                               ; preds = %cond_exit_40
-  %88 = extractvalue { i32, {}, { i64, [1 x i64] } } %85, 1
+75:                                               ; preds = %cond_exit_40
   br label %cond_51_case_0
 
-89:                                               ; preds = %cond_exit_40
-  %90 = extractvalue { i32, {}, { i64, [1 x i64] } } %85, 2
-  %91 = extractvalue { i64, [1 x i64] } %90, 0
-  %92 = extractvalue { i64, [1 x i64] } %90, 1
+76:                                               ; preds = %cond_exit_40
+  %77 = extractvalue { i1, i64, [1 x i64] } %73, 1
+  %78 = extractvalue { i1, i64, [1 x i64] } %73, 2
   br label %cond_51_case_1
 
-cond_51_case_0:                                   ; preds = %87
-  %93 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @3, i32 0, i32 0) }, 0
-  %94 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @3, i32 0, i32 0) }, 1
-  %95 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.3, i32 0, i32 0), i32 %93, i8* %94)
+cond_51_case_0:                                   ; preds = %75
+  %79 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @3, i32 0, i32 0) }, 0
+  %80 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @3, i32 0, i32 0) }, 1
+  %81 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.3, i32 0, i32 0), i32 %79, i8* %80)
   call void @abort()
   br label %cond_exit_51
 
-cond_51_case_1:                                   ; preds = %89
+cond_51_case_1:                                   ; preds = %76
   br label %cond_exit_51
 
 cond_exit_51:                                     ; preds = %cond_51_case_1, %cond_51_case_0
-  %"056.0" = phi i64 [ 0, %cond_51_case_0 ], [ %91, %cond_51_case_1 ]
-  %"157.0" = phi [1 x i64] [ zeroinitializer, %cond_51_case_0 ], [ %92, %cond_51_case_1 ]
-  %96 = alloca i64, align 8
-  %97 = bitcast i64* %96 to [1 x i64]*
-  store [1 x i64] %"157.0", [1 x i64]* %97, align 4
-  %98 = getelementptr i64, i64* %96, i32 0
-  %99 = load i64, i64* %98, align 4
-  %100 = bitcast i64* %96 to [0 x i64]*
-  %101 = load [0 x i64], [0 x i64]* %100, align 4
-  %102 = insertvalue { i64, [0 x i64] } undef, i64 %99, 0
-  %103 = insertvalue { i64, [0 x i64] } %102, [0 x i64] %101, 1
-  %104 = insertvalue { i32, {}, { i64, [0 x i64] } } { i32 1, {} poison, { i64, [0 x i64] } poison }, { i64, [0 x i64] } %103, 2
-  %105 = extractvalue { i32, {}, { i64, [0 x i64] } } %104, 0
-  switch i32 %105, label %106 [
-    i32 1, label %108
+  %"056.0" = phi i64 [ 0, %cond_51_case_0 ], [ %77, %cond_51_case_1 ]
+  %"157.0" = phi [1 x i64] [ zeroinitializer, %cond_51_case_0 ], [ %78, %cond_51_case_1 ]
+  %82 = alloca i64, align 8
+  %83 = bitcast i64* %82 to [1 x i64]*
+  store [1 x i64] %"157.0", [1 x i64]* %83, align 4
+  %84 = getelementptr i64, i64* %82, i32 0
+  %85 = load i64, i64* %84, align 4
+  %86 = bitcast i64* %82 to [0 x i64]*
+  %87 = load [0 x i64], [0 x i64]* %86, align 4
+  %88 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %85, 1
+  %89 = extractvalue { i1, i64 } %88, 0
+  switch i1 %89, label %90 [
+    i1 true, label %91
   ]
 
-106:                                              ; preds = %cond_exit_51
-  %107 = extractvalue { i32, {}, { i64, [0 x i64] } } %104, 1
+90:                                               ; preds = %cond_exit_51
   br label %cond_62_case_0
 
-108:                                              ; preds = %cond_exit_51
-  %109 = extractvalue { i32, {}, { i64, [0 x i64] } } %104, 2
-  %110 = extractvalue { i64, [0 x i64] } %109, 0
-  %111 = extractvalue { i64, [0 x i64] } %109, 1
+91:                                               ; preds = %cond_exit_51
+  %92 = extractvalue { i1, i64 } %88, 1
   br label %cond_62_case_1
 
-cond_62_case_0:                                   ; preds = %106
-  %112 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @4, i32 0, i32 0) }, 0
-  %113 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @4, i32 0, i32 0) }, 1
-  %114 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.4, i32 0, i32 0), i32 %112, i8* %113)
+cond_62_case_0:                                   ; preds = %90
+  %93 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @4, i32 0, i32 0) }, 0
+  %94 = extractvalue { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @4, i32 0, i32 0) }, 1
+  %95 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.4, i32 0, i32 0), i32 %93, i8* %94)
   call void @abort()
   br label %cond_exit_62
 
-cond_62_case_1:                                   ; preds = %108
+cond_62_case_1:                                   ; preds = %91
   br label %cond_exit_62
 
 cond_exit_62:                                     ; preds = %cond_62_case_1, %cond_62_case_0
-  %"071.0" = phi i64 [ 0, %cond_62_case_0 ], [ %110, %cond_62_case_1 ]
-  %"172.0" = phi [0 x i64] [ zeroinitializer, %cond_62_case_0 ], [ %111, %cond_62_case_1 ]
+  %"071.0" = phi i64 [ 0, %cond_62_case_0 ], [ %92, %cond_62_case_1 ]
   ret void
 }
 

@@ -20,7 +20,7 @@ use crate::{
 };
 
 use lazy_static::lazy_static;
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 mod const_fold;
 

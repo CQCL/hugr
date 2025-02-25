@@ -4,66 +4,68 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 ---
 (hugr 0)
 
-(import compat.meta-json)
-
-(import arithmetic.int.types.int)
-
 (declare-func example.callee
-  (forall ?0 ext-set)
-  [(@ arithmetic.int.types.int)]
-  [(@ arithmetic.int.types.int)]
-  (ext ?0 ... arithmetic.int)
-  (meta
-    (@ compat.meta-json "description" "\"This is a function declaration.\""))
-  (meta (@ compat.meta-json "title" "\"Callee\"")))
+  (param ?0 core.ext_set)
+  (core.fn
+    [arithmetic.int.types.int]
+    [arithmetic.int.types.int]
+    (ext ?0 ... arithmetic.int))
+  (meta (compat.meta_json "description" "\"This is a function declaration.\""))
+  (meta (compat.meta_json "title" "\"Callee\"")))
 
 (define-func example.caller
-  [(@ arithmetic.int.types.int)]
-  [(@ arithmetic.int.types.int)]
-  (ext arithmetic.int)
+  (core.fn
+    [arithmetic.int.types.int]
+    [arithmetic.int.types.int]
+    (ext arithmetic.int))
   (meta
-    (@
-      compat.meta-json
+    (compat.meta_json
       "description"
       "\"This defines a function that calls the function which we declared earlier.\""))
-  (meta (@ compat.meta-json "title" "\"Caller\""))
+  (meta (compat.meta_json "title" "\"Caller\""))
   (dfg
     [%0] [%1]
     (signature
-      (->
-        [(@ arithmetic.int.types.int)]
-        [(@ arithmetic.int.types.int)]
+      (core.fn
+        [arithmetic.int.types.int]
+        [arithmetic.int.types.int]
         (ext arithmetic.int)))
-    (call (@ example.callee (ext)) [%0] [%1]
+    ((core.call_indirect
+        [arithmetic.int.types.int]
+        [arithmetic.int.types.int]
+        (ext arithmetic.int)
+        (example.callee (ext)))
+      [%0] [%1]
       (signature
-        (->
-          [(@ arithmetic.int.types.int)]
-          [(@ arithmetic.int.types.int)]
+        (core.fn
+          [arithmetic.int.types.int]
+          [arithmetic.int.types.int]
           (ext arithmetic.int))))))
 
 (define-func example.load
-  []
-  [(->
-     [(@ arithmetic.int.types.int)]
-     [(@ arithmetic.int.types.int)]
-     (ext arithmetic.int))]
-  (ext)
+  (core.fn
+    []
+    [(core.fn
+       [arithmetic.int.types.int]
+       [arithmetic.int.types.int]
+       (ext arithmetic.int))]
+    (ext))
   (dfg
     [] [%0]
     (signature
-      (->
+      (core.fn
         []
-        [(->
-           [(@ arithmetic.int.types.int)]
-           [(@ arithmetic.int.types.int)]
+        [(core.fn
+           [arithmetic.int.types.int]
+           [arithmetic.int.types.int]
            (ext arithmetic.int))]
         (ext)))
-    (load-func (@ example.caller) [] [%0]
+    ((core.load_const _ _ example.caller) [] [%0]
       (signature
-        (->
+        (core.fn
           []
-          [(->
-             [(@ arithmetic.int.types.int)]
-             [(@ arithmetic.int.types.int)]
+          [(core.fn
+             [arithmetic.int.types.int]
+             [arithmetic.int.types.int]
              (ext arithmetic.int))]
           (ext))))))

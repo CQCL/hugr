@@ -1,5 +1,5 @@
 ---
-source: src/types.rs
-expression: "Function([[]+[]] -> [[]][[]+[]+[]])"
+source: hugr-llvm/src/types.rs
+expression: "[Bool] -> [[]+[]+[]]"
 ---
-"{ i32, {}, {}, {} } ({ i32, {}, {} })*"
+"i2 (i1)*"

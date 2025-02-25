@@ -4,21 +4,23 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 ---
 (hugr 0)
 
-(import prelude.Array)
-
 (declare-func array.replicate
-  (forall ?0 type)
-  (forall ?1 nat)
-  (where (nonlinear ?0))
-  [?0] [(@ prelude.Array ?0 ?1)] (ext))
+  (param ?0 core.nat)
+  (param ?1 core.type)
+  (where (core.nonlinear ?1))
+  (core.fn [?1] [(collections.array.array ?0 ?1)] (ext)))
 
 (declare-func array.copy
-  (forall ?0 type)
-  (where (nonlinear ?0))
-  [(@ prelude.Array ?0)] [(@ prelude.Array ?0) (@ prelude.Array ?0)] (ext))
+  (param ?0 core.nat)
+  (param ?1 core.type)
+  (where (core.nonlinear ?1))
+  (core.fn
+    [(collections.array.array ?0 ?1)]
+    [(collections.array.array ?0 ?1) (collections.array.array ?0 ?1)]
+    (ext)))
 
 (define-func util.copy
-  (forall ?0 type)
-  (where (nonlinear ?0))
-  [?0] [?0 ?0] (ext)
-  (dfg [%0] [%0 %0] (signature (-> [?0] [?0 ?0] (ext)))))
+  (param ?0 core.type)
+  (where (core.nonlinear ?0))
+  (core.fn [?0] [?0 ?0] (ext))
+  (dfg [%0] [%0 %0] (signature (core.fn [?0] [?0 ?0] (ext)))))

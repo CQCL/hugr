@@ -268,7 +268,7 @@ fn emit_list_op<'c, H: HugrView>(
             let unit =
                 ctx.llvm_sum_type(SumType::new_unary(1))?
                     .build_tag(ctx.builder(), 0, vec![])?;
-            let ok_or = build_ok_or_else(ctx, ok, unit, Type::UNIT, elem, hugr_elem_ty)?;
+            let ok_or = build_ok_or_else(ctx, ok, unit.into(), Type::UNIT, elem, hugr_elem_ty)?;
             args.outputs.finish(ctx.builder(), vec![list, ok_or])?;
         }
         ListOp::length => {

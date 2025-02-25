@@ -1,6 +1,6 @@
 ---
-source: src/emit/ops/cfg.rs
-expression: module.to_string()
+source: hugr-llvm/src/emit/ops/cfg.rs
+expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
@@ -12,38 +12,33 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   br label %2
 
-2:                                                ; preds = %14, %entry_block
-  %"7_0.0" = phi i8 [ %0, %entry_block ], [ %16, %14 ]
-  %"7_1.0" = phi i8 [ %1, %entry_block ], [ %9, %14 ]
-  %3 = insertvalue { i8, i8 } undef, i8 %"7_0.0", 0
+2:                                                ; preds = %11, %entry_block
+  %"7_0.0" = phi i8 [ %0, %entry_block ], [ %12, %11 ]
+  %"7_1.0" = phi i8 [ %1, %entry_block ], [ %7, %11 ]
+  %3 = insertvalue { i8, i8 } poison, i8 %"7_0.0", 0
   %4 = insertvalue { i8, i8 } %3, i8 %"7_1.0", 1
-  %5 = insertvalue { { i8, i8 } } poison, { i8, i8 } %4, 0
-  switch i32 0, label %6 [
+  switch i1 false, label %5 [
   ]
 
-6:                                                ; preds = %2
-  %7 = extractvalue { { i8, i8 } } %5, 0
-  %8 = extractvalue { i8, i8 } %7, 0
-  %9 = extractvalue { i8, i8 } %7, 1
-  br label %10
+5:                                                ; preds = %2
+  %6 = extractvalue { i8, i8 } %4, 0
+  %7 = extractvalue { i8, i8 } %4, 1
+  br label %8
 
-10:                                               ; preds = %6
-  %11 = insertvalue { i8 } undef, i8 %8, 0
-  %12 = insertvalue { i32, { i8 }, {} } { i32 0, { i8 } poison, {} poison }, { i8 } %11, 1
-  %13 = extractvalue { i32, { i8 }, {} } %12, 0
-  switch i32 %13, label %14 [
-    i32 1, label %17
+8:                                                ; preds = %5
+  %9 = insertvalue { i1, i8 } { i1 false, i8 poison }, i8 %6, 1
+  %10 = extractvalue { i1, i8 } %9, 0
+  switch i1 %10, label %11 [
+    i1 true, label %13
   ]
 
-14:                                               ; preds = %10
-  %15 = extractvalue { i32, { i8 }, {} } %12, 1
-  %16 = extractvalue { i8 } %15, 0
+11:                                               ; preds = %8
+  %12 = extractvalue { i1, i8 } %9, 1
   br label %2
 
-17:                                               ; preds = %10
-  %18 = extractvalue { i32, { i8 }, {} } %12, 2
-  br label %19
+13:                                               ; preds = %8
+  br label %14
 
-19:                                               ; preds = %17
-  ret i8 %9
+14:                                               ; preds = %13
+  ret i8 %7
 }

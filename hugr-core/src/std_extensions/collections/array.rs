@@ -42,6 +42,10 @@ pub struct ArrayValue {
 }
 
 impl ArrayValue {
+    /// Name of the constructor for creating constant arrays.
+    #[cfg_attr(not(feature = "model_unstable"), allow(dead_code))]
+    pub(crate) const CTR_NAME: &'static str = "collections.array.const";
+
     /// Create a new [CustomConst] for an array of values of type `typ`.
     /// That all values are of type `typ` is not checked here.
     pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {

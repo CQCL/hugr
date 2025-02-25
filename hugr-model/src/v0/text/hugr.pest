@@ -27,8 +27,6 @@ node = {
   | node_block
   | node_define_func
   | node_declare_func
-  | node_call_func
-  | node_load_func
   | node_define_alias
   | node_declare_alias
   | node_declare_ctr
@@ -37,7 +35,6 @@ node = {
   | node_cond
   | node_tag
   | node_import
-  | node_const
   | node_custom
 }
 
@@ -46,8 +43,6 @@ node_cfg               = { "(" ~ "cfg" ~ port_lists? ~ signature? ~ meta* ~ regi
 node_block             = { "(" ~ "block" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_define_func       = { "(" ~ "define-func" ~ func_header ~ meta* ~ region* ~ ")" }
 node_declare_func      = { "(" ~ "declare-func" ~ func_header ~ meta* ~ ")" }
-node_call_func         = { "(" ~ "call" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
-node_load_func         = { "(" ~ "load-func" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
 node_define_alias      = { "(" ~ "define-alias" ~ alias_header ~ term ~ meta* ~ ")" }
 node_declare_alias     = { "(" ~ "declare-alias" ~ alias_header ~ meta* ~ ")" }
 node_declare_ctr       = { "(" ~ "declare-ctr" ~ ctr_header ~ meta* ~ ")" }
@@ -56,20 +51,16 @@ node_tail_loop         = { "(" ~ "tail-loop" ~ port_lists? ~ signature? ~ meta* 
 node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_tag               = { "(" ~ "tag" ~ tag ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_import            = { "(" ~ "import" ~ symbol ~ meta* ~ ")" }
-node_const             = { "(" ~ "const" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
-node_custom            = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_custom            = { "(" ~ term_apply ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
 signature        = { "(" ~ "signature" ~ term ~ ")" }
-func_header      = { symbol ~ param* ~ where_clause* ~ term ~ term ~ term }
+func_header      = { symbol ~ param* ~ where_clause* ~ term }
 alias_header     = { symbol ~ param* ~ term }
 ctr_header       = { symbol ~ param* ~ where_clause* ~ term }
 operation_header = { symbol ~ param* ~ where_clause* ~ term }
 
-param = { param_implicit | param_explicit }
-
-param_implicit = { "(" ~ "forall" ~ term_var ~ term ~ ")" }
-param_explicit = { "(" ~ "param" ~ term_var ~ term ~ ")" }
-where_clause   = { "(" ~ "where" ~ term ~ ")" }
+param        = { "(" ~ "param" ~ term_var ~ term ~ ")" }
+where_clause = { "(" ~ "where" ~ term ~ ")" }
 
 region     = { region_dfg | region_cfg }
 region_dfg = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ node* ~ ")" }
@@ -77,58 +68,37 @@ region_cfg = { "(" ~ "cfg" ~ port_lists? ~ signature? ~ meta* ~ node* ~ ")" }
 
 term = {
     term_wildcard
-  | term_type
-  | term_static
-  | term_constraint
   | term_var
   | term_const
   | term_list
   | term_list_type
   | term_str
-  | term_str_type
+  | term_float
   | term_nat
-  | term_nat_type
   | term_ext_set
-  | term_ext_set_type
-  | term_adt
-  | term_func_type
-  | term_ctrl
-  | term_ctrl_type
-  | term_apply_full
   | term_apply
-  | term_non_linear
   | term_const_func
   | term_const_adt
-  | term_bytes_type
   | term_bytes
   | term_meta
+  | term_float
+  | term_tuple
 }
 
-term_wildcard     = { "_" }
-term_type         = { "type" }
-term_static       = { "static" }
-term_constraint   = { "constraint" }
-term_var          = { "?" ~ identifier }
-term_apply_full   = { ("(" ~ "@" ~ symbol ~ term* ~ ")") }
-term_apply        = { symbol | ("(" ~ symbol ~ term* ~ ")") }
-term_const        = { "(" ~ "const" ~ term ~ term ~ ")" }
-term_list         = { "[" ~ (spliced_term | term)* ~ "]" }
-term_list_type    = { "(" ~ "list" ~ term ~ ")" }
-term_str          = { string }
-term_str_type     = { "str" }
-term_nat          = { (ASCII_DIGIT)+ }
-term_nat_type     = { "nat" }
-term_ext_set      = { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
-term_ext_set_type = { "ext-set" }
-term_adt          = { "(" ~ "adt" ~ term ~ ")" }
-term_func_type    = { "(" ~ "->" ~ term ~ term ~ term ~ ")" }
-term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
-term_ctrl_type    = { "ctrl" }
-term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }
-term_const_func   = { "(" ~ "fn" ~ term ~ ")" }
-term_const_adt    = { "(" ~ "tag" ~ tag ~ term* ~ ")" }
-term_bytes_type   = { "bytes" }
-term_bytes        = { "(" ~ "bytes" ~ base64_string ~ ")" }
-term_meta         = { "meta" }
+term_wildcard   =  { "_" }
+term_var        =  { "?" ~ identifier }
+term_apply      =  { symbol | ("(" ~ symbol ~ term* ~ ")") }
+term_const      =  { "(" ~ "const" ~ term ~ term ~ ")" }
+term_list       =  { "[" ~ (spliced_term | term)* ~ "]" }
+term_tuple      =  { "(" ~ "tuple" ~ (spliced_term | term)* ~ ")" }
+term_list_type  =  { "(" ~ "list" ~ term ~ ")" }
+term_str        =  { string }
+term_nat        = @{ (ASCII_DIGIT)+ }
+term_ext_set    =  { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
+term_const_func =  { "(" ~ "fn" ~ term ~ ")" }
+term_const_adt  =  { "(" ~ "tag" ~ tag ~ term* ~ ")" }
+term_bytes      =  { "(" ~ "bytes" ~ base64_string ~ ")" }
+term_meta       =  { "meta" }
+term_float      = @{ ("+" | "-")? ~ (ASCII_DIGIT)+ ~ "." ~ (ASCII_DIGIT)+ }
 
 spliced_term = { term ~ "..." }

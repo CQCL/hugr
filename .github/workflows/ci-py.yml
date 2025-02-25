@@ -86,8 +86,6 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.7
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Install CapnProto
-        run: sudo apt-get install -y capnproto
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts

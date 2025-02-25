@@ -104,6 +104,10 @@ pub struct ConstInt {
 }
 
 impl ConstInt {
+    /// Name of the constructor for creating constant integers.
+    #[cfg_attr(not(feature = "model_unstable"), allow(dead_code))]
+    pub(crate) const CTR_NAME: &'static str = "arithmetic.int.const";
+
     /// Create a new [`ConstInt`] with a given width and unsigned value
     pub fn new_u(log_width: u8, value: u64) -> Result<Self, ConstTypeError> {
         if !is_valid_log_width(log_width) {

@@ -1,4 +1,5 @@
 (hugr 0)
 
-(define-alias mod.string str "\"\n\r\t\\\u{1F44D}")
-(define-alias mod.bytes bytes (bytes "SGVsbG8gd29ybGQg8J+Yig=="))
+(define-alias mod.string core.str "\"\n\r\t\\\u{1F44D}")
+(define-alias mod.bytes core.bytes (bytes "SGVsbG8gd29ybGQg8J+Yig=="))
+(define-alias mod.float core.float -3.141)

@@ -32,7 +32,7 @@ use thiserror::Error;
 /// whenever the names of their parents are unique, but this is not guaranteed.
 #[deprecated(
     since = "0.14.1",
-    note = "Use `hugr::algorithms::MonomorphizePass` instead."
+    note = "Use `hugr_passes::MonomorphizePass` instead."
 )]
 // TODO: Deprecated. Remove on a breaking release and rename private `monomorphize_ref` to `monomorphize`.
 pub fn monomorphize(mut h: Hugr) -> Hugr {
@@ -59,7 +59,7 @@ fn monomorphize_ref(h: &mut impl HugrMut) {
 /// Deprecated: use [crate::remove_dead_funcs] instead.
 #[deprecated(
     since = "0.14.1",
-    note = "Use hugr::algorithms::dead_funcs::RemoveDeadFuncsPass instead"
+    note = "Use hugr_passes::RemoveDeadFuncsPass instead"
 )]
 pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     #[allow(deprecated)] // we are in a deprecated function, so remove both at same time
@@ -69,7 +69,7 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
 
 #[deprecated(
     since = "0.14.1",
-    note = "Use hugr::algorithms::dead_funcs::RemoveDeadFuncsPass instead"
+    note = "Use hugr_passes::RemoveDeadFuncsPass instead"
 )]
 fn remove_polyfuncs_ref(h: &mut impl HugrMut) {
     let mut pfs_to_delete = Vec::new();

@@ -3,8 +3,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, LinkIndex, ListPart, ModelError, Module, NodeId, Operation, Param, ParamSort,
-    RegionId, RegionKind, Term, TermId, VarId,
+    ExtSetPart, LinkIndex, ListPart, ModelError, Module, NodeId, Operation, Param, RegionId,
+    RegionKind, Term, TermId, TuplePart, VarId,
 };
 
 type PrintError = ModelError;
@@ -135,6 +135,11 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             .get_node(node_id)
             .ok_or(PrintError::NodeNotFound(node_id))?;
 
+        // Skip printing import nodes.
+        if let Operation::Import { .. } = node_data.operation {
+            return Ok(());
+        }
+
         self.print_parens(|this| match &node_data.operation {
             Operation::Invalid => Err(ModelError::InvalidOperation(node_id)),
             Operation::Dfg => {
@@ -165,87 +170,33 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_regions(node_data.regions)
             }
 
-            Operation::DefineFunc { decl } => this.with_local_scope(decl.params, |this| {
+            Operation::DefineFunc(symbol) => this.with_local_scope(symbol.params, |this| {
                 this.print_group(|this| {
                     this.print_text("define-func");
-                    this.print_text(decl.name);
+                    this.print_text(symbol.name);
                 });
 
-                this.print_params(decl.params)?;
-                this.print_constraints(decl.constraints)?;
-
-                match self.module.get_term(decl.signature) {
-                    Some(Term::FuncType {
-                        inputs,
-                        outputs,
-                        extensions,
-                    }) => {
-                        this.print_group(|this| {
-                            this.print_term(*inputs)?;
-                            this.print_term(*outputs)?;
-                            this.print_term(*extensions)
-                        })?;
-                    }
-                    Some(_) => return Err(PrintError::TypeError(decl.signature)),
-                    None => return Err(PrintError::TermNotFound(decl.signature)),
-                }
-
+                this.print_params(symbol.params)?;
+                this.print_constraints(symbol.constraints)?;
+                this.print_term(symbol.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }),
 
-            Operation::DeclareFunc { decl } => this.with_local_scope(decl.params, |this| {
+            Operation::DeclareFunc(symbol) => this.with_local_scope(symbol.params, |this| {
                 this.print_group(|this| {
                     this.print_text("declare-func");
-                    this.print_text(decl.name);
+                    this.print_text(symbol.name);
                 });
 
-                this.print_params(decl.params)?;
-                this.print_constraints(decl.constraints)?;
-
-                match self.module.get_term(decl.signature) {
-                    Some(Term::FuncType {
-                        inputs,
-                        outputs,
-                        extensions,
-                    }) => {
-                        this.print_group(|this| {
-                            this.print_term(*inputs)?;
-                            this.print_term(*outputs)?;
-                            this.print_term(*extensions)
-                        })?;
-                    }
-                    Some(_) => return Err(PrintError::TypeError(decl.signature)),
-                    None => return Err(PrintError::TermNotFound(decl.signature)),
-                }
-
+                this.print_params(symbol.params)?;
+                this.print_constraints(symbol.constraints)?;
+                this.print_term(symbol.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }),
 
-            Operation::CallFunc { func } => {
-                this.print_group(|this| {
-                    this.print_text("call");
-                    this.print_term(*func)?;
-                    this.print_port_lists(node_data.inputs, node_data.outputs)
-                })?;
-                this.print_signature(node_data.signature)?;
-                this.print_meta(node_data.meta)?;
-                Ok(())
-            }
-
-            Operation::LoadFunc { func } => {
-                this.print_group(|this| {
-                    this.print_text("load-func");
-                    this.print_term(*func)?;
-                    this.print_port_lists(node_data.inputs, node_data.outputs)
-                })?;
-                this.print_signature(node_data.signature)?;
-                this.print_meta(node_data.meta)?;
-                Ok(())
-            }
-
-            Operation::Custom { operation } => {
+            Operation::Custom(operation) => {
                 this.print_group(|this| {
                     if node_data.params.is_empty() {
                         this.print_symbol(*operation)?;
@@ -268,76 +219,54 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_regions(node_data.regions)
             }
 
-            Operation::CustomFull { operation } => {
-                this.print_group(|this| {
-                    this.print_parens(|this| {
-                        this.print_text("@");
-                        this.print_symbol(*operation)?;
-
-                        for param in node_data.params {
-                            this.print_term(*param)?;
-                        }
-
-                        Ok(())
-                    })?;
-
-                    this.print_port_lists(node_data.inputs, node_data.outputs)
-                })?;
-                this.print_signature(node_data.signature)?;
-                this.print_meta(node_data.meta)?;
-                this.print_regions(node_data.regions)
-            }
-
-            Operation::DefineAlias { decl, value } => this.with_local_scope(decl.params, |this| {
+            Operation::DefineAlias(symbol) => this.with_local_scope(symbol.params, |this| {
                 this.print_group(|this| {
                     this.print_text("define-alias");
-                    this.print_text(decl.name);
+                    this.print_text(symbol.name);
                 });
 
-                this.print_params(decl.params)?;
-
-                this.print_term(decl.r#type)?;
-                this.print_term(*value)?;
+                this.print_params(symbol.params)?;
+                this.print_term(symbol.signature)?;
+                for param in node_data.params {
+                    this.print_term(*param)?;
+                }
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }),
-            Operation::DeclareAlias { decl } => this.with_local_scope(decl.params, |this| {
+            Operation::DeclareAlias(symbol) => this.with_local_scope(symbol.params, |this| {
                 this.print_group(|this| {
                     this.print_text("declare-alias");
-                    this.print_text(decl.name);
+                    this.print_text(symbol.name);
                 });
 
-                this.print_params(decl.params)?;
-
-                this.print_term(decl.r#type)?;
+                this.print_params(symbol.params)?;
+                this.print_term(symbol.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }),
 
-            Operation::DeclareConstructor { decl } => this.with_local_scope(decl.params, |this| {
+            Operation::DeclareConstructor(symbol) => this.with_local_scope(symbol.params, |this| {
                 this.print_group(|this| {
                     this.print_text("declare-ctr");
-                    this.print_text(decl.name);
+                    this.print_text(symbol.name);
                 });
 
-                this.print_params(decl.params)?;
-                this.print_constraints(decl.constraints)?;
-
-                this.print_term(decl.r#type)?;
+                this.print_params(symbol.params)?;
+                this.print_constraints(symbol.constraints)?;
+                this.print_term(symbol.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }),
 
-            Operation::DeclareOperation { decl } => this.with_local_scope(decl.params, |this| {
+            Operation::DeclareOperation(symbol) => this.with_local_scope(symbol.params, |this| {
                 this.print_group(|this| {
                     this.print_text("declare-operation");
-                    this.print_text(decl.name);
+                    this.print_text(symbol.name);
                 });
 
-                this.print_params(decl.params)?;
-                this.print_constraints(decl.constraints)?;
-
-                this.print_term(decl.r#type)?;
+                this.print_params(symbol.params)?;
+                this.print_constraints(symbol.constraints)?;
+                this.print_term(symbol.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }),
@@ -358,26 +287,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_regions(node_data.regions)
             }
 
-            Operation::Tag { tag } => {
-                this.print_text("tag");
-                this.print_text(format!("{}", tag));
-                this.print_port_lists(node_data.inputs, node_data.outputs)?;
-                this.print_signature(node_data.signature)?;
-                this.print_meta(node_data.meta)
-            }
-
-            Operation::Import { name } => {
-                this.print_text("import");
-                this.print_text(*name);
-                this.print_meta(node_data.meta)
-            }
-
-            Operation::Const { value } => {
-                this.print_text("const");
-                this.print_term(*value)?;
-                this.print_port_lists(node_data.inputs, node_data.outputs)?;
-                this.print_signature(node_data.signature)?;
-                this.print_meta(node_data.meta)
+            Operation::Import { .. } => {
+                unreachable!()
             }
         })
     }
@@ -460,11 +371,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
     fn print_param(&mut self, param: Param<'a>) -> PrintResult<()> {
         self.print_parens(|this| {
-            match param.sort {
-                ParamSort::Implicit => this.print_text("forall"),
-                ParamSort::Explicit => this.print_text("param"),
-            };
-
+            this.print_text("param");
             this.print_text(format!("?{}", param.name));
             this.print_term(param.r#type)
         })
@@ -492,20 +399,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("_");
                 Ok(())
             }
-            Term::Type => {
-                self.print_text("type");
-                Ok(())
-            }
-            Term::StaticType => {
-                self.print_text("static");
-                Ok(())
-            }
-            Term::Constraint => {
-                self.print_text("constraint");
-                Ok(())
-            }
             Term::Var(var) => self.print_var(*var),
-            Term::Apply { symbol, args } => {
+            Term::Apply(symbol, args) => {
                 if args.is_empty() {
                     self.print_symbol(*symbol)?;
                 } else {
@@ -520,39 +415,17 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }
-            Term::ApplyFull { symbol, args } => self.print_parens(|this| {
-                this.print_text("@");
-                this.print_symbol(*symbol)?;
-                for arg in args.iter() {
-                    this.print_term(*arg)?;
-                }
-
-                Ok(())
-            }),
-            Term::Const { r#type, extensions } => self.print_parens(|this| {
-                this.print_text("const");
-                this.print_term(*r#type)?;
-                this.print_term(*extensions)
-            }),
             Term::List { .. } => self.print_brackets(|this| this.print_list_parts(term_id)),
-            Term::ListType { item_type } => self.print_parens(|this| {
-                this.print_text("list");
-                this.print_term(*item_type)
+            Term::Tuple { .. } => self.print_parens(|this| {
+                this.print_text("tuple");
+                this.print_tuple_parts(term_id)
             }),
             Term::Str(str) => {
                 self.print_string(str);
                 Ok(())
             }
-            Term::StrType => {
-                self.print_text("str");
-                Ok(())
-            }
             Term::Nat(n) => {
                 self.print_text(n.to_string());
-                Ok(())
-            }
-            Term::NatType => {
-                self.print_text("nat");
                 Ok(())
             }
             Term::ExtSet { .. } => self.print_parens(|this| {
@@ -560,56 +433,18 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_ext_set_parts(term_id)?;
                 Ok(())
             }),
-            Term::ExtSetType => {
-                self.print_text("ext-set");
-                Ok(())
-            }
-            Term::Adt { variants } => self.print_parens(|this| {
-                this.print_text("adt");
-                this.print_term(*variants)
-            }),
-            Term::FuncType {
-                inputs,
-                outputs,
-                extensions,
-            } => self.print_parens(|this| {
-                this.print_text("->");
-                this.print_term(*inputs)?;
-                this.print_term(*outputs)?;
-                this.print_term(*extensions)
-            }),
-            Term::Control { values } => self.print_parens(|this| {
-                this.print_text("ctrl");
-                this.print_term(*values)
-            }),
-            Term::ControlType => {
-                self.print_text("ctrl");
-                Ok(())
-            }
-            Term::NonLinearConstraint { term } => self.print_parens(|this| {
-                this.print_text("nonlinear");
-                this.print_term(*term)
-            }),
-            Term::ConstFunc { region } => self.print_parens(|this| {
+            Term::ConstFunc(region) => self.print_parens(|this| {
                 this.print_text("fn");
                 this.print_region(*region)
             }),
-            Term::ConstAdt { tag, values } => self.print_parens(|this| {
-                this.print_text("tag");
-                this.print_text(tag.to_string());
-                this.print_term(*values)
-            }),
-            Term::BytesType => {
-                self.print_text("bytes");
-                Ok(())
-            }
-            Term::Bytes { data } => self.print_parens(|this| {
+            Term::Bytes(data) => self.print_parens(|this| {
                 this.print_text("bytes");
                 this.print_byte_string(data);
                 Ok(())
             }),
-            Term::Meta => {
-                self.print_text("meta");
+            Term::Float(value) => {
+                // The debug representation of a float always includes a decimal point.
+                self.print_text(format!("{:?}", value.into_inner()));
                 Ok(())
             }
         }
@@ -624,11 +459,35 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             .get_term(term_id)
             .ok_or(PrintError::TermNotFound(term_id))?;
 
-        if let Term::List { parts } = term_data {
+        if let Term::List(parts) = term_data {
             for part in *parts {
                 match part {
                     ListPart::Item(term) => self.print_term(*term)?,
                     ListPart::Splice(list) => self.print_list_parts(*list)?,
+                }
+            }
+        } else {
+            self.print_term(term_id)?;
+            self.print_text("...");
+        }
+
+        Ok(())
+    }
+
+    /// Prints the contents of a tuple.
+    ///
+    /// This is used so that spliced tuples are merged into the parent tuple.
+    fn print_tuple_parts(&mut self, term_id: TermId) -> PrintResult<()> {
+        let term_data = self
+            .module
+            .get_term(term_id)
+            .ok_or(PrintError::TermNotFound(term_id))?;
+
+        if let Term::Tuple(parts) = term_data {
+            for part in *parts {
+                match part {
+                    TuplePart::Item(term) => self.print_term(*term)?,
+                    TuplePart::Splice(list) => self.print_tuple_parts(*list)?,
                 }
             }
         } else {
@@ -648,7 +507,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             .get_term(term_id)
             .ok_or(PrintError::TermNotFound(term_id))?;
 
-        if let Term::ExtSet { parts } = term_data {
+        if let Term::ExtSet(parts) = term_data {
             for part in *parts {
                 match part {
                     ExtSetPart::Extension(ext) => self.print_text(*ext),

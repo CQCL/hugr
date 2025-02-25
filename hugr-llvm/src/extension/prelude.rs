@@ -63,6 +63,19 @@ pub trait PreludeCodegen: Clone {
         ))
     }
 
+    /// Return the llvm type of [hugr_core::extension::prelude::string_type()].
+    ///
+    /// The returned type must always match the type of the returned value of
+    /// [Self::emit_const_string], and the `text` argument of [Self::emit_print].
+    ///
+    /// The default implementation is i8*.
+    fn string_type<'c>(&self, session: &TypingSession<'c, '_>) -> Result<impl BasicType<'c>> {
+        Ok(session
+            .iw_context()
+            .i8_type()
+            .ptr_type(AddressSpace::default()))
+    }
+
     /// Emit a [hugr_core::extension::prelude::PRINT_OP_ID] node.
     fn emit_print<H: HugrView>(
         &self,
@@ -132,6 +145,27 @@ pub trait PreludeCodegen: Clone {
         emit_libc_printf(ctx, &[format_str.into(), signal.into(), msg.into()])?;
         emit_libc_abort(ctx)
     }
+
+    /// Emit instructions to materialise an LLVM value representing `str`.
+    ///
+    /// The type of the returned value must match [Self::string_type].
+    ///
+    /// The default implementation creates a global C string.
+    fn emit_const_string<'c, H: HugrView>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        str: &ConstString,
+    ) -> Result<BasicValueEnum<'c>> {
+        let default_str_type = ctx
+            .iw_context()
+            .i8_type()
+            .ptr_type(AddressSpace::default())
+            .as_basic_type_enum();
+        let str_type = ctx.llvm_type(&str.get_type())?.as_basic_type_enum();
+        ensure!(str_type == default_str_type, "The default implementation of PreludeCodegen::string_type was overriden, but the default implementation of emit_const_string was not. String type is: {str_type}");
+        let s = ctx.builder().build_global_string_ptr(str.value(), "")?;
+        Ok(s.as_basic_value_enum())
+    }
 }
 
 /// A trivial implementation of [PreludeCodegen] which passes all methods
@@ -196,19 +230,13 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.usize_type(&ts).as_basic_type_enum())
     })
-    .custom_type((prelude::PRELUDE_ID, STRING_TYPE_NAME.clone()), {
-        move |ts, _| {
-            // TODO allow customising string type
-            Ok(ts
-                .iw_context()
-                .i8_type()
-                .ptr_type(AddressSpace::default())
-                .into())
-        }
-    })
     .custom_type((prelude::PRELUDE_ID, ERROR_TYPE_NAME.clone()), {
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.error_type(&ts)?.as_basic_type_enum())
+    })
+    .custom_type((prelude::PRELUDE_ID, STRING_TYPE_NAME.clone()), {
+        let pcg = pcg.clone();
+        move |ts, _| Ok(pcg.string_type(&ts)?.as_basic_type_enum())
     })
     .custom_const::<ConstUsize>(|context, k| {
         let ty: IntType = context
@@ -226,10 +254,18 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             .builder()
             .build_load(global.as_pointer_value(), &k.symbol)?)
     })
-    .custom_const::<ConstString>(|context, k| {
-        // TODO we should allow overriding the representation of strings
-        let s = context.builder().build_global_string_ptr(k.value(), "")?;
-        Ok(s.as_basic_value_enum())
+    .custom_const::<ConstString>({
+        let pcg = pcg.clone();
+        move |context, k| {
+            let err = pcg.emit_const_string(context, k)?;
+            ensure!(
+                err.get_type()
+                    == pcg
+                        .string_type(&context.typing_session())?
+                        .as_basic_type_enum()
+            );
+            Ok(err)
+        }
     })
     .custom_const::<ConstError>({
         let pcg = pcg.clone();
@@ -261,7 +297,7 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             let make_tuple = MakeTuple::from_extension_op(args.node().as_ref())?;
             let llvm_sum_type = context.llvm_sum_type(SumType::new([make_tuple.0]))?;
             let r = llvm_sum_type.build_tag(context.builder(), 0, args.inputs)?;
-            args.outputs.finish(context.builder(), [r])
+            args.outputs.finish(context.builder(), [r.into()])
         }
         _ => Err(anyhow!("Unsupported TupleOpDef")),
     })

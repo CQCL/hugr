@@ -1,13 +1,16 @@
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 
+use hugr_core::ops::handle::NodeHandle;
+use hugr_core::ops::Const;
+use hugr_core::std_extensions::arithmetic::{int_ops, int_types};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
 
 use hugr_core::builder::{
     endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    SubContainer,
+    HugrBuilder, ModuleBuilder, SubContainer,
 };
 use hugr_core::extension::prelude::{
     bool_t, const_ok, error_type, string_type, sum_with_error, ConstError, ConstString, MakeTuple,
@@ -25,7 +28,7 @@ use hugr_core::std_extensions::arithmetic::{
     int_types::{ConstInt, INT_TYPES},
 };
 use hugr_core::std_extensions::logic::LogicOp;
-use hugr_core::types::{Signature, SumType, Type, TypeRow, TypeRowRV};
+use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 
 use crate::dataflow::{partial_from_const, DFContext, PartialValue};
@@ -1579,4 +1582,51 @@ fn test_cfg(
     } else {
         assert_eq!(output_src, nested);
     }
+}
+
+#[test]
+fn test_module() -> Result<(), Box<dyn std::error::Error>> {
+    let mut mb = ModuleBuilder::new();
+    // Define a top-level constant, (only) the second of which can be removed
+    let c7 = mb.add_constant(Value::from(ConstInt::new_u(5, 7)?));
+    let c17 = mb.add_constant(Value::from(ConstInt::new_u(5, 17)?));
+    let ad1 = mb.add_alias_declare("unused", TypeBound::Any)?;
+    let ad2 = mb.add_alias_def("unused2", INT_TYPES[3].clone())?;
+    let mut main = mb.define_function(
+        "main",
+        Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2])
+            .with_extension_delta(int_types::EXTENSION_ID)
+            .with_extension_delta(int_ops::EXTENSION_ID),
+    )?;
+    let lc7 = main.load_const(&c7);
+    let lc17 = main.load_const(&c17);
+    let [add] = main
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [lc7, lc17])?
+        .outputs_arr();
+    let main = main.finish_with_outputs([lc7, add])?;
+    let mut hugr = mb.finish_hugr()?;
+    constant_fold_pass(&mut hugr);
+    assert!(hugr.get_optype(hugr.root()).is_module());
+    assert_eq!(
+        hugr.children(hugr.root()).collect_vec(),
+        [c7.node(), ad1.node(), ad2.node(), main.node()]
+    );
+    let tags = hugr
+        .children(main.node())
+        .map(|n| hugr.get_optype(n).tag())
+        .collect_vec();
+    for (tag, expected_count) in [
+        (OpTag::Input, 1),
+        (OpTag::Output, 1),
+        (OpTag::Const, 1),
+        (OpTag::LoadConst, 2),
+    ] {
+        assert_eq!(tags.iter().filter(|t| **t == tag).count(), expected_count);
+    }
+    assert_eq!(
+        hugr.children(main.node())
+            .find_map(|n| hugr.get_optype(n).as_const()),
+        Some(&Const::new(ConstInt::new_u(5, 24).unwrap().into()))
+    );
+    Ok(())
 }
