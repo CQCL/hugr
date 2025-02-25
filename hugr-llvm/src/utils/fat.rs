@@ -129,6 +129,7 @@ impl<'hugr, H: HugrView + ?Sized> FatNode<'hugr, OpType, H, H::Node> {
 impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
     /// If there is exactly one OutgoingPort connected to this IncomingPort,
     /// return it and its node.
+    #[allow(clippy::type_complexity)]
     pub fn single_linked_output(
         &self,
         port: IncomingPort,
@@ -159,6 +160,7 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
 
     /// Get the input and output child nodes of a dataflow parent.
     /// If the node isn't a dataflow parent, then return None
+    #[allow(clippy::type_complexity)]
     pub fn get_io(
         &self,
     ) -> Option<(
@@ -202,6 +204,7 @@ impl<'hugr, H: HugrView> FatNode<'hugr, CFG, H, H::Node> {
     ///
     /// These are guaranteed to exist the `Hugr` is valid. Panics if they do not
     /// exist.
+    #[allow(clippy::type_complexity)]
     pub fn get_entry_exit(
         &self,
     ) -> (
@@ -346,6 +349,7 @@ pub trait FatExt: HugrView {
 
     /// Try to create [Input] and [Output] [FatNode]s for a given [Node]. This
     /// will succeed only for DataFlow Parent Nodes.
+    #[allow(clippy::type_complexity)]
     fn fat_io(
         &self,
         node: Self::Node,

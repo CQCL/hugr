@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use hugr_core::{
     ops::{DataflowBlock, ExitBlock, OpType, CFG},
     types::SumType,
-    HugrView, NodeIndex,
+    HugrView, Node, NodeIndex,
 };
 use inkwell::{basic_block::BasicBlock, values::BasicValueEnum};
 use itertools::Itertools as _;
@@ -29,7 +29,7 @@ pub struct CfgEmitter<'c, 'hugr, H> {
     exit_node: FatNode<'hugr, ExitBlock, H>,
 }
 
-impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
+impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
     // Constructs a new CfgEmitter. Creates a basic block for each of
     // the children in the llvm function. Note that this does not move the
     // position of the builder.
