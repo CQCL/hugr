@@ -72,7 +72,7 @@ fxhash = "0.2.1"
 bumpalo = { version = "3.16.0" }
 pathsearch = "0.2.0"
 base64 = "0.22.1"
-ordered-float = "4.6.0"
+ordered-float = "5.0.0"
 pest = "2.7.12"
 pest_derive = "2.7.12"
 pretty = "0.12.3"
