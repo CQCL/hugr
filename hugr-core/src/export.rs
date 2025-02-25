@@ -17,12 +17,14 @@ use crate::{
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
-use std::fmt::Write;
-
-use hugr_model::v0::{self as model, bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump}};
 
 use fxhash::{FxBuildHasher, FxHashMap};
+use hugr_model::v0::{
+    self as model,
+    bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump},
+};
 use petgraph::unionfind::UnionFind;
+use std::fmt::Write;
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {

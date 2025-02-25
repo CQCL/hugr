@@ -3,16 +3,7 @@ use crate::v0 as model;
 use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
 
-/// An error encounted while deserialising a model.
-#[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
-#[non_exhaustive]
-pub enum ReadError {
-    #[from(forward)]
-    /// An error encounted while decoding a model from a `capnproto` buffer.
-    DecodingError(capnp::Error),
-}
-
-type ReadResult<T> = Result<T, ReadError>;
+type ReadResult<T> = Result<T, capnp::Error>;
 
 /// Read a hugr module from a byte slice.
 pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<model::Module<'a>> {

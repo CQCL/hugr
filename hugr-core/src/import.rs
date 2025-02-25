@@ -25,7 +25,8 @@ use crate::{
     },
     Direction, Hugr, HugrView, Node, Port,
 };
-use hugr_model::v0::{self as model, fxhash::FxHashMap};
+use fxhash::FxHashMap;
+use hugr_model::v0::{self as model};
 use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;

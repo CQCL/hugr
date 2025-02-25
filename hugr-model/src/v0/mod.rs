@@ -282,8 +282,6 @@ pub mod scope;
 pub mod text;
 
 pub use bumpalo;
-pub use fxhash;
-pub use indexmap;
 
 macro_rules! define_index {
     ($(#[$meta:meta])* $vis:vis struct $name:ident(pub u32);) => {

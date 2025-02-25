@@ -2,5 +2,5 @@
 mod read;
 mod write;
 
-pub use read::{read_from_slice, ReadError};
+pub use read::read_from_slice;
 pub use write::write_to_vec;
