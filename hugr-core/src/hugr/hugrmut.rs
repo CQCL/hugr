@@ -459,17 +459,15 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
 
     fn copy_descendants(&mut self, root: Node, new_parent: Node) -> HashMap<Node, Node> {
         // TODO should we check that we will not invalidate the Hugr?
-        // * any linear-typed edge incoming to `root`
-        // * any non-local edge incoming from anywhere that is not child of an ancestor of new_parent
+        // * any `Ext` edge incoming from anywhere that is not child of an ancestor of new_parent
         //   (we know the sources are children of some ancestor of `root`, but the requirement
         //    is only guaranteed if new_parent is a descendant of root's parent, or at least,
         //    of the lowest ancestor of root whose children actually have edges to nodes in the subtree)
+        // * `Dom` edges...aaiieee
         /*if let Some(root_ancestor) = self.get_parent(root) {
-            if successors(Some(new_parent), |n| self.get_parent(n)).any(|n| n == root_ancestor) {
-                // Copying to somewhere that can "see" any incoming static/nonlocal edges to n.
-                // Could still be invalid if there are incoming linear edges
-            } else {
-                // *May* be invalid if there are incoming static/nonlocal edges
+            let new_ancestors = successors(Some(new_parent), |n| self.get_parent(n));
+            if !new_ancestors.any(|n| n == root_ancestor) {
+                // *May* be invalid if there are incoming static/Ext edges.
             }
         }*/
         let mut nodes = Vec::new();
