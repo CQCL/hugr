@@ -35,7 +35,6 @@ hugr-passes = { path = "../hugr-passes", version = "0.14.4" }
 hugr-llvm = { path = "../hugr-llvm", version = "0.14.4", optional = true }
 
 [dev-dependencies]
-rstest = { workspace = true }
 lazy_static = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
 serde_json = { workspace = true }

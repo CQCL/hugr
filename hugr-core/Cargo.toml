@@ -33,7 +33,6 @@ portgraph = { workspace = true, features = ["serde", "petgraph"] }
 thiserror = { workspace = true }
 regex = { workspace = true }
 cgmath = { workspace = true, features = ["serde"] }
-num-rational = { workspace = true, features = ["serde"] }
 downcast-rs = { workspace = true }
 # Rc used here for Extension, but unfortunately we must turn the feature on globally
 serde = { workspace = true, features = ["derive", "rc"] }
@@ -43,7 +42,6 @@ smol_str = { workspace = true, features = ["serde"] }
 derive_more = { workspace = true, features = ["display", "error", "from"] }
 itertools = { workspace = true }
 html-escape = { workspace = true }
-bitvec = { workspace = true, features = ["serde"] }
 enum_dispatch = { workspace = true }
 lazy_static = { workspace = true }
 petgraph = { workspace = true }
@@ -64,7 +62,6 @@ insta = { workspace = true, features = ["yaml"] }
 jsonschema = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-regex-syntax = { workspace = true }
 
 
 # Required for documentation examples
