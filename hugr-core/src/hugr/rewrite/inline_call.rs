@@ -12,7 +12,7 @@ use super::{HugrMut, Rewrite};
 pub struct InlineCall(Node);
 
 /// Error in performing [InlineCall] rewrite.
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum InlineCallError {
     /// The specified Node was not a [Call](OpType::Call)
@@ -20,8 +20,8 @@ pub enum InlineCallError {
     NotCallNode(Node, OpType),
     /// The node was a Call, but the target was not a [FuncDefn](OpType::FuncDefn)
     /// - presumably a [FuncDecl](OpType::FuncDecl), if the Hugr is valid.
-    #[error("Can only inline Call nodes targetting FuncDefn's not {0}")]
-    CallTargetNotFuncDefn(OpType),
+    #[error("Call targetted node {0} which must be a FuncDefn but was {1}")]
+    CallTargetNotFuncDefn(Node, OpType),
 }
 
 impl Rewrite for InlineCall {
@@ -32,9 +32,13 @@ impl Rewrite for InlineCall {
         if !call_ty.is_call() {
             return Err(InlineCallError::NotCallNode(self.0, call_ty.clone()));
         }
-        let func_ty = h.get_optype(h.static_source(self.0).unwrap());
+        let func = h.static_source(self.0).unwrap();
+        let func_ty = h.get_optype(func);
         if !func_ty.is_func_defn() {
-            return Err(InlineCallError::CallTargetNotFuncDefn(func_ty.clone()));
+            return Err(InlineCallError::CallTargetNotFuncDefn(
+                func,
+                func_ty.clone(),
+            ));
         }
         Ok(())
     }
@@ -77,14 +81,14 @@ mod test {
 
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::ops::handle::{FuncID, NodeHandle};
-    use crate::ops::Value;
+    use crate::ops::{Input, Value};
     use crate::std_extensions::arithmetic::{
         int_ops::{self, IntOpDef},
         int_types::{self, ConstInt, INT_TYPES},
     };
     use crate::{types::Signature, HugrView, Node};
 
-    use super::{HugrMut, InlineCall};
+    use super::{HugrMut, InlineCall, InlineCallError};
 
     fn calls(h: &impl HugrView) -> Vec<Node> {
         h.nodes().filter(|n| h.get_optype(*n).is_call()).collect()
@@ -185,5 +189,46 @@ mod test {
             assert_eq!(ancestors.next(), None);
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_bad() {
+        let mut modb = ModuleBuilder::new();
+        let decl = modb
+            .declare(
+                "UndefinedFunc",
+                Signature::new_endo(INT_TYPES[3].clone()).into(),
+            )
+            .unwrap();
+        let mut main = modb
+            .define_function("main", Signature::new_endo(INT_TYPES[3].clone()))
+            .unwrap();
+        let call = main.call(&decl, &[], main.input_wires()).unwrap();
+        let main = main.finish_with_outputs(call.outputs()).unwrap();
+        let h = modb.finish_hugr().unwrap();
+        let mut h2 = h.clone();
+        assert_eq!(
+            h2.apply_rewrite(InlineCall(call.node())),
+            Err(InlineCallError::CallTargetNotFuncDefn(
+                decl.node(),
+                h.get_optype(decl.node()).clone()
+            ))
+        );
+        assert_eq!(h, h2);
+        let [inp, _out, _call] = h
+            .children(main.node())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        assert_eq!(
+            h2.apply_rewrite(InlineCall(inp)),
+            Err(InlineCallError::NotCallNode(
+                inp,
+                Input {
+                    types: INT_TYPES[3].clone().into()
+                }
+                .into()
+            ))
+        )
     }
 }
