@@ -1,6 +1,7 @@
 use std::{borrow::Cow, rc::Rc, sync::Arc};
 
 use delegate::delegate;
+use itertools::Either;
 
 use super::{render::RenderConfig, HugrView, RootChecked};
 use crate::{

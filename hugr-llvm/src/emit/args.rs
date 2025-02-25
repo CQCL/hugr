@@ -1,4 +1,4 @@
-use hugr_core::{ops::OpType, HugrView};
+use hugr_core::{ops::OpType, HugrView, Node};
 use inkwell::values::BasicValueEnum;
 
 use crate::utils::fat::FatNode;
@@ -23,7 +23,7 @@ impl<'hugr, OT, H> EmitOpArgs<'_, 'hugr, OT, H> {
     }
 }
 
-impl<'c, 'hugr, H: HugrView> EmitOpArgs<'c, 'hugr, OpType, H> {
+impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
     /// Attempt to specialise the internal [FatNode].
     pub fn try_into_ot<OT>(self) -> Result<EmitOpArgs<'c, 'hugr, OT, H>, Self>
     where

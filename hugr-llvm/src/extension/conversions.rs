@@ -8,7 +8,7 @@ use hugr_core::{
     ops::{constant::Value, custom::ExtensionOp, DataflowOpTrait as _},
     std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
     types::{TypeArg, TypeEnum, TypeRow},
-    HugrView,
+    HugrView, Node,
 };
 
 use inkwell::{types::IntType, values::BasicValue, FloatPredicate, IntPredicate};
@@ -24,7 +24,7 @@ use crate::{
     types::HugrType,
 };
 
-fn build_trunc_op<'c, H: HugrView>(
+fn build_trunc_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     signed: bool,
     log_width: u64,
@@ -134,7 +134,7 @@ fn build_trunc_op<'c, H: HugrView>(
     })
 }
 
-fn emit_conversion_op<'c, H: HugrView>(
+fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     conversion_op: ConvertOpDef,
@@ -225,7 +225,7 @@ fn emit_conversion_op<'c, H: HugrView>(
 pub struct ConversionExtension;
 
 impl CodegenExtension for ConversionExtension {
-    fn add_extension<'a, H: HugrView + 'a>(
+    fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H>
@@ -236,7 +236,7 @@ impl CodegenExtension for ConversionExtension {
     }
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     pub fn add_conversion_extensions(self) -> Self {
         self.add_extension(ConversionExtension)
     }
