@@ -3,6 +3,7 @@ use hugr_core::ops::{
     constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
     LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, CFG,
 };
+use hugr_core::Node;
 use hugr_core::{
     hugr::views::SiblingGraph,
     types::{SumType, Type, TypeEnum},
@@ -32,7 +33,7 @@ struct DataflowParentEmitter<'c, 'hugr, OT, H> {
     outputs: Option<RowPromise<'c>>,
 }
 
-impl<'c, 'hugr, OT: OpTrait, H: HugrView> DataflowParentEmitter<'c, 'hugr, OT, H>
+impl<'c, 'hugr, OT: OpTrait, H: HugrView<Node = Node>> DataflowParentEmitter<'c, 'hugr, OT, H>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
@@ -113,7 +114,7 @@ fn get_exactly_one_sum_type(ts: impl IntoIterator<Item = Type>) -> Result<SumTyp
     Ok(sum_type)
 }
 
-pub fn emit_value<'c, H: HugrView>(
+pub fn emit_value<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     v: &Value,
 ) -> Result<BasicValueEnum<'c>> {
@@ -139,7 +140,7 @@ pub fn emit_value<'c, H: HugrView>(
     }
 }
 
-pub(crate) fn emit_dataflow_parent<'c, 'hugr, OT: OpTrait, H: HugrView>(
+pub(crate) fn emit_dataflow_parent<'c, 'hugr, OT: OpTrait, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, 'hugr, OT, H>,
 ) -> Result<()>
@@ -149,7 +150,7 @@ where
     DataflowParentEmitter::new(args).emit_children(context)
 }
 
-fn emit_tag<'c, H: HugrView>(
+fn emit_tag<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, Tag, H>,
 ) -> Result<()> {
@@ -163,7 +164,7 @@ fn emit_tag<'c, H: HugrView>(
     )
 }
 
-fn emit_conditional<'c, H: HugrView>(
+fn emit_conditional<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     EmitOpArgs {
         node,
@@ -220,7 +221,7 @@ fn emit_conditional<'c, H: HugrView>(
     Ok(())
 }
 
-fn emit_load_constant<'c, H: HugrView>(
+fn emit_load_constant<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, LoadConstant, H>,
 ) -> Result<()> {
@@ -235,7 +236,7 @@ fn emit_load_constant<'c, H: HugrView>(
     args.outputs.finish(context.builder(), [r])
 }
 
-fn emit_call<'c, H: HugrView>(
+fn emit_call<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, Call, H>,
 ) -> Result<()> {
@@ -258,7 +259,7 @@ fn emit_call<'c, H: HugrView>(
     args.outputs.finish(builder, call_results)
 }
 
-fn emit_call_indirect<'c, H: HugrView>(
+fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, CallIndirect, H>,
 ) -> Result<()> {
@@ -275,7 +276,7 @@ fn emit_call_indirect<'c, H: HugrView>(
     args.outputs.finish(builder, call_results)
 }
 
-fn emit_load_function<'c, H: HugrView>(
+fn emit_load_function<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, LoadFunction, H>,
 ) -> Result<()> {
@@ -298,14 +299,14 @@ fn emit_load_function<'c, H: HugrView>(
     )
 }
 
-fn emit_cfg<'c, H: HugrView>(
+fn emit_cfg<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, CFG, H>,
 ) -> Result<()> {
     cfg::CfgEmitter::new(context, args)?.emit_children(context)
 }
 
-fn emit_tail_loop<'c, H: HugrView>(
+fn emit_tail_loop<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, TailLoop, H>,
 ) -> Result<()> {
@@ -358,7 +359,7 @@ fn emit_tail_loop<'c, H: HugrView>(
     Ok(())
 }
 
-fn emit_optype<'c, H: HugrView>(
+fn emit_optype<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, OpType, H>,
 ) -> Result<()> {
@@ -401,7 +402,7 @@ pub(crate) fn emit_custom_unary_op<'c, 'hugr, H, F>(
     go: F,
 ) -> Result<()>
 where
-    H: HugrView,
+    H: HugrView<Node = Node>,
     F: FnOnce(
         &mut EmitFuncContext<'c, '_, H>,
         BasicValueEnum<'c>,
@@ -442,7 +443,7 @@ pub(crate) fn emit_custom_binary_op<'c, 'hugr, H, F>(
     go: F,
 ) -> Result<()>
 where
-    H: HugrView,
+    H: HugrView<Node = Node>,
     F: FnOnce(
         &mut EmitFuncContext<'c, '_, H>,
         (BasicValueEnum<'c>, BasicValueEnum<'c>),
