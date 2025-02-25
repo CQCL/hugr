@@ -281,10 +281,6 @@ pub mod binary;
 pub mod scope;
 pub mod text;
 
-pub use bumpalo;
-pub use fxhash;
-pub use indexmap;
-
 macro_rules! define_index {
     ($(#[$meta:meta])* $vis:vis struct $name:ident(pub u32);) => {
         #[repr(transparent)]
@@ -368,13 +364,6 @@ pub struct Module<'a> {
     pub regions: Vec<Region<'a>>,
     /// Table of [`Term`]s.
     pub terms: Vec<Term<'a>>,
-}
-
-/// TODO docs
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct ModuleList<'a> {
-    /// TODO docs
-    pub modules: Vec<Module<'a>>,
 }
 
 impl<'a> Module<'a> {

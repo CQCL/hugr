@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
+use bumpalo::Bump;
 use hugr_model::v0 as model;
-use model::bumpalo::Bump;
 use pretty_assertions::assert_eq;
 
 /// Reads a module from a string, serializes it to binary, and then deserializes it back to a module.

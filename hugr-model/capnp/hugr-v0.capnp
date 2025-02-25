@@ -129,7 +129,3 @@ struct Param {
     name @0 :Text;
     type @1 :TermId;
 }
-
-struct ModuleList {
-    modules @0 :List(Module);
-}

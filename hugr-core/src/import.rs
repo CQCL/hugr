@@ -25,7 +25,8 @@ use crate::{
     },
     Direction, Hugr, HugrView, Node, Port,
 };
-use hugr_model::v0::{self as model, fxhash::FxHashMap};
+use fxhash::FxHashMap;
+use hugr_model::v0::{self as model};
 use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
@@ -75,17 +76,6 @@ macro_rules! error_unsupported {
 /// Helper macro to create an `ImportError::Uninferred` error with a formatted message.
 macro_rules! error_uninferred {
     ($($e:expr),*) => { ImportError::Uninferred(format!($($e),*)) }
-}
-
-pub fn import_hugr_list(list: &model::ModuleList,
-    extensions: &ExtensionRegistry,
-) -> Result<Vec<Hugr>, ImportError> {
-    let mut hugrs = Vec::with_capacity(list.modules.len());
-    for module in &list.modules {
-        let hugr = import_hugr(module, extensions)?;
-        hugrs.push(hugr);
-    }
-    Ok(hugrs)
 }
 
 /// Import a `hugr` module from its model representation.

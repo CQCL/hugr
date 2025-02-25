@@ -87,7 +87,7 @@ pub struct PayloadTypeV0 {
     is_package: bool,
 }
 
-#[derive(Debug,Eq,PartialEq,Copy,Clone)]
+#[derive(Debug,Eq,PartialEq,Copy,Clone,derive_more::Display)]
 #[repr(u8)]
 pub enum PayloadType {
     V0(PayloadTypeV0) = 1
@@ -154,7 +154,7 @@ impl EnvelopeHeader {
 }
 
 pub const MAGIC_NUMBER: u64 = 0xAAAAAAAAAAAAAAAA;
-pub const DEFAULT_PAYLOAD_TYPE: PayloadType = PayloadType::JsonZstd;
+// pub const DEFAULT_PAYLOAD_TYPE: PayloadType = PayloadType::JsonZstd;
 
 
 impl PayloadType {
@@ -173,7 +173,8 @@ pub fn write_envelope(
     mut writer: impl io::Write,
     payload_type: Option<PayloadType>,
 ) -> Result<(), EnvelopeError> {
-    let payload_type = payload_type.unwrap_or(DEFAULT_PAYLOAD_TYPE);
+    // let payload_type = payload_type.unwrap_or(DEFAULT_PAYLOAD_TYPE);
+    let payload_type = todo!();
     let header = EnvelopeHeader::from(payload_type);
     header.write(&mut writer)?;
     encode_package(package, payload_type, writer)
@@ -185,27 +186,28 @@ pub fn encode_package(
     // extension_registry: &ExtensionRegistry,
     writer: impl Write,
 ) -> Result<(), EnvelopeError> {
-    match payload_type {
-        PayloadType::Json => encode_json(writer, package),
-        #[cfg(feature = "zstd")]
-        PayloadType::JsonZstd => {
-            let mut encoder = zstd::Encoder::new(writer, 0)?;
-            encode_json(&mut encoder, package)?;
-            encoder.finish()?;
-            Ok(())
-        },
-        #[cfg(feature = "model_unstable")]
-        PayloadType::Model => encode_model(writer, package),
-        #[cfg(all(feature = "model_unstable", feature = "zstd"))]
-        PayloadType::ModelZstd => {
-            let mut encoder = zstd::Encoder::new(writer, 0)?;
-            encode_model(&mut encoder, package)?;
-            encoder.finish()?;
-            Ok(())
-        },
-        #[allow(unreachable_patterns)]
-        unsupported => Err(EnvelopeError::TypeNotSupported(unsupported))
-    }
+    todo!()
+    // match payload_type {
+    //     PayloadType::Json => encode_json(writer, package),
+    //     #[cfg(feature = "zstd")]
+    //     PayloadType::JsonZstd => {
+    //         let mut encoder = zstd::Encoder::new(writer, 0)?;
+    //         encode_json(&mut encoder, package)?;
+    //         encoder.finish()?;
+    //         Ok(())
+    //     },
+    //     #[cfg(feature = "model_unstable")]
+    //     PayloadType::Model => encode_model(writer, package),
+    //     #[cfg(all(feature = "model_unstable", feature = "zstd"))]
+    //     PayloadType::ModelZstd => {
+    //         let mut encoder = zstd::Encoder::new(writer, 0)?;
+    //         encode_model(&mut encoder, package)?;
+    //         encoder.finish()?;
+    //         Ok(())
+    //     },
+    //     #[allow(unreachable_patterns)]
+    //     unsupported => Err(EnvelopeError::TypeNotSupported(unsupported))
+    // }
 }
 
 fn encode_json(writer: impl Write, package: &Package) -> Result<(), EnvelopeError> {
@@ -224,24 +226,25 @@ pub fn decode_package(
     payload: impl Read,
     extension_registry: &ExtensionRegistry,
 ) -> Result<Package, EnvelopeError> {
-    match payload_type {
+    todo!()
+    // match payload_type {
 
-        PayloadType::Json => decode_json(payload, extension_registry),
-        #[cfg(feature = "zstd")]
-        PayloadType::JsonZstd => decode_json(zstd::Decoder::new(payload)?, extension_registry),
-        #[cfg(feature = "model_unstable")]
-        PayloadType::Model =>decode_model(
-                        BufReader::new(payload),
-                        extension_registry,
-                    ),
-        #[cfg(all(feature = "model_unstable", feature = "zstd"))]
-        PayloadType::ModelZstd => decode_model(
-                        BufReader::new(zstd::Decoder::new(payload)?),
-                        extension_registry,
-                    ),
-        #[allow(unreachable_patterns)]
-        unsupported => Err(EnvelopeError::TypeNotSupported(unsupported))
-    }
+    //     PayloadType::Json => decode_json(payload, extension_registry),
+    //     #[cfg(feature = "zstd")]
+    //     PayloadType::JsonZstd => decode_json(zstd::Decoder::new(payload)?, extension_registry),
+    //     #[cfg(feature = "model_unstable")]
+    //     PayloadType::Model =>decode_model(
+    //                     BufReader::new(payload),
+    //                     extension_registry,
+    //                 ),
+    //     #[cfg(all(feature = "model_unstable", feature = "zstd"))]
+    //     PayloadType::ModelZstd => decode_model(
+    //                     BufReader::new(zstd::Decoder::new(payload)?),
+    //                     extension_registry,
+    //                 ),
+    //     #[allow(unreachable_patterns)]
+    //     unsupported => Err(EnvelopeError::TypeNotSupported(unsupported))
+    // }
 }
 
 #[cfg(feature = "model_unstable")]
