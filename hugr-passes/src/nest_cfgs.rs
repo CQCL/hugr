@@ -56,7 +56,7 @@ use hugr_core::{Direction, Hugr};
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
 ///
-/// `T` is the type of basic block; this can just be a BasicBlock (e.g. [`Node`]) in the Hugr,
+/// `T` is the type of basic block; this can just be a BasicBlock (e.g. [`hugr_core::Node`]) in the Hugr,
 /// or an [IdentityCfgMap] if the extra level of indirection is not required. However, since
 /// SESE regions are bounded by edges between pairs of such `T`, such splitting may allow the
 /// algorithm to identify more regions than existed in the underlying CFG, without mutating the
