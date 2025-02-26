@@ -145,11 +145,13 @@ impl DeadCodeElimPass {
     }
 
     pub fn run(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
-        self.validation
-            .run_validated_pass(hugr, |h, _| self.run_no_validate(h))
+        self.validation.run_validated_pass(hugr, |h, _| {
+            self.run_no_validate(h);
+            Ok(())
+        })
     }
 
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) {
         let needed = self.find_needed_nodes(&*hugr);
         let remove = hugr
             .nodes()
@@ -158,7 +160,6 @@ impl DeadCodeElimPass {
         for n in remove {
             hugr.remove_node(n);
         }
-        Ok(())
     }
 
     // "Diverge" aka "never-terminate"
