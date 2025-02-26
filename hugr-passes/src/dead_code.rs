@@ -63,9 +63,10 @@ pub enum PreserveNode {
     MustKeep,
     /// The node can be removed, even if nodes inside it must be kept - the descendants'
     /// [PreserveNode] will be ignored and they will be removed too, so use with care.
-    CanRemove,
-    /// The node must be kept if (and only if) any of its descendants must be kept
-    RemoveIfAllChildrenCanBeRemoved,
+    RemoveIgnoreChildren,
+    /// The node may be removed if all of its children can
+    /// (must be kept if, and only if, any of its children must be kept)
+    RemoveIfChildren,
 }
 
 impl PreserveNode {
@@ -79,7 +80,7 @@ impl PreserveNode {
     pub fn default_for(h: &Hugr, n: Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
-            _ => Self::RemoveIfAllChildrenCanBeRemoved,
+            _ => Self::RemoveIfChildren,
         }
     }
 }
@@ -167,10 +168,8 @@ impl DeadCodeElimPass {
     fn must_preserve(&self, h: &impl HugrView, n: Node) -> bool {
         match self.preserve_callback.as_ref()(h.base_hugr(), n) {
             PreserveNode::MustKeep => true,
-            PreserveNode::CanRemove => false,
-            PreserveNode::RemoveIfAllChildrenCanBeRemoved => {
-                h.children(n).any(|ch| self.must_preserve(h, ch))
-            }
+            PreserveNode::RemoveIgnoreChildren => false,
+            PreserveNode::RemoveIfChildren => h.children(n).any(|ch| self.must_preserve(h, ch)),
         }
     }
 }
@@ -215,7 +214,7 @@ mod test {
             // keep the node inside the DFG, but remove the DFG without checking its children:
             DeadCodeElimPass::default().set_preserve_callback(Arc::new(move |h, n| {
                 if n == dfg_unused || h.get_optype(n).is_const() {
-                    PreserveNode::CanRemove
+                    PreserveNode::RemoveIgnoreChildren
                 } else {
                     PreserveNode::MustKeep
                 }
@@ -240,7 +239,7 @@ mod test {
             if b {
                 PreserveNode::MustKeep
             } else {
-                PreserveNode::RemoveIfAllChildrenCanBeRemoved
+                PreserveNode::RemoveIfChildren
             }
         }
         for dce in [
