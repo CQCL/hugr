@@ -40,6 +40,7 @@ impl Debug for DeadCodeElimPass {
 
 pub type PreserveCallback = dyn Fn(&Hugr, Node) -> PreserveNode;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 /// Signal that a node must be preserved even when its result is not used
 pub enum PreserveNode {
     /// The node must be kept (nodes inside it may be removed)
@@ -47,15 +48,33 @@ pub enum PreserveNode {
     /// The node can be removed, even if nodes inside it must be kept - the descendants'
     /// [PreserveNode] will be ignored and they will be removed too, so use with care.
     CanRemove,
-    /// The default is that [Cfg], [Call] and [TailLoop] nodes must always be kept,
-    /// but otherwise like [Self::RemoveIfAllChildrenCanBeRemoved]
-    ///
-    /// [Call]: hugr_core::ops::Call
-    /// [CFG]: hugr_core::ops::CFG
-    /// [TailLoop]: hugr_core::ops::TailLoop
-    UseDefault,
     /// The node must be kept if (and only if) any of its descendants must be kept
     RemoveIfAllChildrenCanBeRemoved,
+}
+
+impl PreserveNode {
+    pub fn default_for(h: &Hugr, n: Node) -> PreserveNode {
+        match h.get_optype(n) {
+            OpType::CFG(_) => {
+                // TODO if the CFG has no cycles (that are possible given predicates)
+                // then we could say it definitely terminates (i.e. return false)
+                PreserveNode::MustKeep
+            }
+            OpType::TailLoop(_) => {
+                // If the TailLoop never continues, clearly it doesn't terminate, but we haven't got
+                // dataflow results to tell us that. (Even just an upper-bound on the number of
+                // iterations would allow returning false.)
+                //Instead rely on an earlier pass having rewritten any such TailLoop into a non-loop.
+                PreserveNode::MustKeep
+            }
+            OpType::Call(_) => {
+                // We could scan the target FuncDefn, but that might contain calls to itself,
+                // so we'd need a "seen" set...instead just rely on removable calls being inlined.
+                PreserveNode::MustKeep
+            }
+            _ => Self::RemoveIfAllChildrenCanBeRemoved,
+        }
+    }
 }
 
 impl DeadCodeElimPass {
@@ -137,40 +156,14 @@ impl DeadCodeElimPass {
     // "Diverge" aka "never-terminate"
     // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
     fn must_preserve(&self, h: &impl HugrView, n: Node) -> bool {
-        match self
-            .preserve_callback
-            .as_ref()
-            .map_or(PreserveNode::UseDefault, |f| f(h.base_hugr(), n))
-        {
-            PreserveNode::MustKeep => return true,
-            PreserveNode::CanRemove => return false,
-            PreserveNode::UseDefault => {
-                match h.get_optype(n) {
-                    OpType::CFG(_) => {
-                        // TODO if the CFG has no cycles (that are possible given predicates)
-                        // then we could say it definitely terminates (i.e. return false)
-                        return true;
-                    }
-                    OpType::TailLoop(_) => {
-                        // If the TailLoop never continues, clearly it doesn't terminate, but we haven't got
-                        // dataflow results to tell us that. Instead rely on an earlier pass having rewritten
-                        // such a TailLoop into a non-loop.
-                        // Even just an upper-bound on the number of iterations would allow returning false.
-                        return true;
-                    }
-                    OpType::Call(_) => {
-                        // We could scan the target FuncDefn, but that might contain calls to itself, so we'd need
-                        // a "seen" set...instead just rely on calls being inlined if we want to remove them.
-                        return true;
-                    }
-                    _ => (), // fall through to check children
-                }
+        let def: Arc<dyn Fn(&Hugr, Node) -> PreserveNode> = Arc::new(PreserveNode::default_for);
+        match self.preserve_callback.as_ref().unwrap_or(&def)(h.base_hugr(), n) {
+            PreserveNode::MustKeep => true,
+            PreserveNode::CanRemove => false,
+            PreserveNode::RemoveIfAllChildrenCanBeRemoved => {
+                h.children(n).any(|ch| self.must_preserve(h, ch))
             }
-            PreserveNode::RemoveIfAllChildrenCanBeRemoved => (), // fall through to check children
         }
-
-        // Node does not introduce non-termination, but still non-terminates if any of its children does
-        h.children(n).any(|ch| self.must_preserve(h, ch))
     }
 }
 
@@ -180,16 +173,12 @@ mod test {
 
     use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
     use hugr_core::extension::prelude::{usize_t, ConstUsize, PRELUDE_ID};
-    use hugr_core::ops::handle::NodeHandle;
-    use hugr_core::ops::{OpTag, OpTrait};
+    use hugr_core::ops::{handle::NodeHandle, OpTag, OpTrait};
     use hugr_core::types::Signature;
-    use hugr_core::HugrView;
-    use hugr_core::{ops::Value, type_row};
+    use hugr_core::{ops::Value, type_row, HugrView};
     use itertools::Itertools;
 
-    use crate::dead_code::PreserveNode;
-
-    use super::DeadCodeElimPass;
+    use super::{DeadCodeElimPass, PreserveNode};
 
     #[test]
     fn test_cfg_callback() {
@@ -243,7 +232,7 @@ mod test {
             if b {
                 PreserveNode::MustKeep
             } else {
-                PreserveNode::UseDefault
+                PreserveNode::RemoveIfAllChildrenCanBeRemoved
             }
         }
         for dce in [

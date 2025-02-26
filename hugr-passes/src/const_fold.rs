@@ -140,11 +140,11 @@ impl ConstantFoldPass {
             .set_preserve_callback(if self.allow_increase_termination {
                 Arc::new(|_, _| PreserveNode::CanRemove)
             } else {
-                Arc::new(move |_, n| {
+                Arc::new(move |h, n| {
                     if terminating_tail_loops.contains(&n) {
                         PreserveNode::RemoveIfAllChildrenCanBeRemoved
                     } else {
-                        PreserveNode::UseDefault
+                        PreserveNode::default_for(h, n)
                     }
                 })
             })
