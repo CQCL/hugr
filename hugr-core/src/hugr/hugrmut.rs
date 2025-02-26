@@ -1,7 +1,7 @@
 //! Low-level interface for modifying a HUGR.
 
 use core::panic;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
@@ -144,6 +144,14 @@ pub trait HugrMut: HugrMutInternals {
             self.remove_subtree(ch)
         }
         self.hugr_mut().remove_node(node);
+    }
+
+    /// Copies the strict descendants of `root` to under the `new_parent`.
+    /// (That is, the immediate children of root, are copied to make children of `new_parent`).
+    fn copy_descendants(&mut self, root: Node, new_parent: Node) -> HashMap<Node, Node> {
+        panic_invalid_node(self, root);
+        panic_invalid_node(self, new_parent);
+        self.hugr_mut().copy_descendants(root, new_parent)
     }
 
     /// Connect two nodes at the given ports.
@@ -447,6 +455,48 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
             }
         }
         translate_indices(node_map)
+    }
+
+    fn copy_descendants(&mut self, root: Node, new_parent: Node) -> HashMap<Node, Node> {
+        // TODO should we check that we will not invalidate the Hugr?
+        // * any `Ext` edge incoming from anywhere that is not child of an ancestor of new_parent
+        //   (we know the sources are children of some ancestor of `root`, but the requirement
+        //    is only guaranteed if new_parent is a descendant of root's parent, or at least,
+        //    of the lowest ancestor of root whose children actually have edges to nodes in the subtree)
+        // * `Dom` edges...aaiieee
+        /*if let Some(root_ancestor) = self.get_parent(root) {
+            let new_ancestors = successors(Some(new_parent), |n| self.get_parent(n));
+            if !new_ancestors.any(|n| n == root_ancestor) {
+                // *May* be invalid if there are incoming static/Ext edges.
+            }
+        }*/
+        let mut nodes = Vec::new();
+        let mut q = VecDeque::from_iter(self.children(root));
+        while let Some(n) = q.pop_front() {
+            nodes.push(n.pg_index());
+            q.extend(self.children(n));
+        }
+        let node_map = translate_indices(
+            portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
+                .copy_in_parent()
+                .expect("Is a MultiPortGraph"),
+        );
+
+        for node in self.children(root).collect::<Vec<_>>() {
+            self.set_parent(*node_map.get(&node).unwrap(), new_parent);
+        }
+
+        // Copy the optypes, metadata, and hierarchy
+        for (&node, &new_node) in node_map.iter() {
+            for ch in self.children(node).collect::<Vec<_>>() {
+                self.set_parent(*node_map.get(&ch).unwrap(), new_node);
+            }
+            let nodetype = self.get_optype(node).clone();
+            self.as_mut().op_types.set(new_node.pg_index(), nodetype);
+            let meta = self.base_hugr().metadata.get(node.pg_index()).clone();
+            self.as_mut().metadata.set(new_node.pg_index(), meta);
+        }
+        node_map
     }
 }
 
