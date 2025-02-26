@@ -6,16 +6,17 @@ use smol_str::SmolStr;
 use super::{view::View, NodeId, RegionKind, ScopeClosure, TermId, VarId};
 use crate::v0 as model;
 
+mod parse;
 mod print;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
     pub operation: Operation,
-    pub inputs: Arc<[Link]>,
-    pub outputs: Arc<[Link]>,
-    pub params: Arc<[Term]>,
-    pub regions: Arc<[Region]>,
-    pub meta: Arc<[MetaItem]>,
+    pub inputs: Box<[LinkName]>,
+    pub outputs: Box<[LinkName]>,
+    pub params: Box<[Term]>,
+    pub regions: Box<[Region]>,
+    pub meta: Box<[MetaItem]>,
     pub signature: Option<Signature>,
 }
 
@@ -25,63 +26,64 @@ pub enum Operation {
     Dfg,
     Cfg,
     Block,
-    DefineFunc(Arc<SymbolSignature>),
-    DeclareFunc(Arc<SymbolSignature>),
-    Custom(Symbol),
-    DefineAlias(Arc<SymbolSignature>),
-    DeclareAlias(Arc<SymbolSignature>),
+    DefineFunc(Arc<Symbol>),
+    DeclareFunc(Arc<Symbol>),
+    Custom(SymbolName),
+    DefineAlias(Arc<Symbol>),
+    DeclareAlias(Arc<Symbol>),
     TailLoop,
     Conditional,
-    DeclareConstructor(Arc<SymbolSignature>),
-    DeclareOperation(Arc<SymbolSignature>),
-    Import(Symbol),
+    DeclareConstructor(Arc<Symbol>),
+    DeclareOperation(Arc<Symbol>),
+    Import(SymbolName),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SymbolSignature {
-    pub name: Symbol,
+pub struct Symbol {
+    pub name: SymbolName,
     pub params: Arc<[Param]>,
     pub constraints: Arc<[Constraint]>,
-    pub signature: Arc<Term>,
+    pub signature: Term,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Param {
-    pub name: Var,
+    pub name: VarName,
     pub r#type: Arc<Term>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Constraint(pub Arc<Term>);
+pub struct Constraint(pub Term);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Region {
     pub kind: RegionKind,
-    pub sources: Arc<[Link]>,
-    pub targets: Arc<[Link]>,
-    pub children: Arc<[Node]>,
-    pub meta: Arc<[MetaItem]>,
+    pub sources: Box<[LinkName]>,
+    pub targets: Box<[LinkName]>,
+    pub children: Box<[Node]>,
+    pub meta: Box<[MetaItem]>,
     pub signature: Option<Signature>,
     pub scope: ScopeClosure,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MetaItem(pub Arc<Term>);
+pub struct MetaItem(pub Term);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Signature(pub Arc<Term>);
+pub struct Signature(pub Term);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
     Wildcard,
-    Var(Var),
-    Apply(Symbol, Arc<[Term]>),
+    Var(VarName),
+    Apply(SymbolName, Arc<[Term]>),
     List(Arc<[ListPart]>),
     Str(SmolStr),
     Nat(u64),
     Bytes(Arc<[u8]>),
     Float(OrderedFloat<f64>),
     Tuple(Arc<[TuplePart]>),
+    Func(Arc<Region>),
     ExtSet,
 }
 
@@ -107,11 +109,9 @@ impl<'a> View<'a> for Term {
                 let list_parts = list_parts
                     .iter()
                     .map(|part| match part {
-                        model::ListPart::Item(term) => {
-                            Some(ListPart::Item(Arc::new(module.view(*term)?)))
-                        }
+                        model::ListPart::Item(term) => Some(ListPart::Item(module.view(*term)?)),
                         model::ListPart::Splice(term) => {
-                            Some(ListPart::Splice(Arc::new(module.view(*term)?)))
+                            Some(ListPart::Splice(module.view(*term)?))
                         }
                     })
                     .collect::<Option<_>>()?;
@@ -125,11 +125,9 @@ impl<'a> View<'a> for Term {
                 let list_parts = tuple_parts
                     .iter()
                     .map(|part| match part {
-                        model::TuplePart::Item(term) => {
-                            Some(ListPart::Item(Arc::new(module.view(*term)?)))
-                        }
+                        model::TuplePart::Item(term) => Some(ListPart::Item(module.view(*term)?)),
                         model::TuplePart::Splice(term) => {
-                            Some(ListPart::Splice(Arc::new(module.view(*term)?)))
+                            Some(ListPart::Splice(module.view(*term)?))
                         }
                     })
                     .collect::<Option<_>>()?;
@@ -140,9 +138,9 @@ impl<'a> View<'a> for Term {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Var(SmolStr);
+pub struct VarName(SmolStr);
 
-impl<'a> View<'a> for Var {
+impl<'a> View<'a> for VarName {
     type Id = VarId;
 
     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
@@ -164,9 +162,9 @@ impl<'a> View<'a> for Var {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Symbol(SmolStr);
+pub struct SymbolName(SmolStr);
 
-impl<'a> View<'a> for Symbol {
+impl<'a> View<'a> for SymbolName {
     type Id = NodeId;
 
     fn view(module: &'a model::Module<'a>, id: Self::Id) -> Option<Self> {
@@ -177,16 +175,16 @@ impl<'a> View<'a> for Symbol {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Link(SmolStr);
+pub struct LinkName(SmolStr);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListPart {
-    Item(Arc<Term>),
-    Splice(Arc<Term>),
+    Item(Term),
+    Splice(Term),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TuplePart {
-    Item(Arc<Term>),
-    Splice(Arc<Term>),
+    Item(Term),
+    Splice(Term),
 }

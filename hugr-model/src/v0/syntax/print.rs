@@ -6,8 +6,8 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 use crate::v0::RegionKind;
 
 use super::{
-    Constraint, Link, ListPart, MetaItem, Node, Operation, Param, Region, Signature, Symbol,
-    SymbolSignature, Term, TuplePart, Var,
+    Constraint, LinkName, ListPart, MetaItem, Node, Operation, Param, Region, Signature, Symbol,
+    SymbolName, Term, TuplePart, VarName,
 };
 
 struct Printer<'a> {
@@ -173,6 +173,12 @@ impl Print for Term {
                 printer.text("ext");
                 printer.parens_exit();
             }
+            Term::Func(region) => {
+                printer.parens_enter();
+                printer.text("fn");
+                printer.print(region);
+                printer.parens_exit();
+            }
         }
     }
 }
@@ -209,19 +215,19 @@ impl Print for TuplePart {
     }
 }
 
-impl Print for Symbol {
+impl Print for SymbolName {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
         printer.text(self.0.as_str())
     }
 }
 
-impl Print for Var {
+impl Print for VarName {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
         printer.text(format!("{}", self))
     }
 }
 
-impl Print for Link {
+impl Print for LinkName {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
         printer.text(format!("{}", self))
     }
@@ -320,7 +326,7 @@ impl Print for Region {
     }
 }
 
-impl Print for SymbolSignature {
+impl Print for Symbol {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
         printer.print(&self.name);
         printer.print(&self.params);
@@ -388,6 +394,14 @@ impl<P: Print> Print for Arc<[P]> {
     }
 }
 
+impl<P: Print> Print for Box<[P]> {
+    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
+        for item in self.iter() {
+            printer.print(item);
+        }
+    }
+}
+
 impl<P: Print> Print for Option<P> {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
         if let Some(item) = self.as_ref() {
@@ -408,23 +422,27 @@ macro_rules! impl_display {
 
 impl_display!(Node);
 impl_display!(Region);
+impl_display!(Param);
+impl_display!(Constraint);
+impl_display!(MetaItem);
+impl_display!(Signature);
 impl_display!(Term);
 impl_display!(ListPart);
 impl_display!(TuplePart);
 
-impl Display for Var {
+impl Display for VarName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "?{}", self.0)
     }
 }
 
-impl Display for Symbol {
+impl Display for SymbolName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Display for Link {
+impl Display for LinkName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "%{}", self.0)
     }
