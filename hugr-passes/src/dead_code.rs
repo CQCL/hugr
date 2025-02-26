@@ -3,7 +3,7 @@
 use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, Hugr, HugrView, Node};
 use std::fmt::{Debug, Formatter};
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
 };
 
@@ -111,6 +111,7 @@ impl DeadCodeElimPass {
     }
 
     fn find_needed_nodes(&self, h: impl HugrView) -> HashSet<Node> {
+        let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
         q.push_front(h.root());
@@ -119,7 +120,7 @@ impl DeadCodeElimPass {
                 continue;
             };
             for ch in h.children(n) {
-                if self.must_preserve(&h, ch)
+                if self.must_preserve(&h, &mut must_preserve, ch)
                     || matches!(
                         h.get_optype(ch),
                         OpType::Case(_) // Include all Cases in Conditionals
@@ -163,14 +164,16 @@ impl DeadCodeElimPass {
         }
     }
 
-    // "Diverge" aka "never-terminate"
-    // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
-    fn must_preserve(&self, h: &impl HugrView, n: Node) -> bool {
-        match self.preserve_callback.as_ref()(h.base_hugr(), n) {
+    fn must_preserve(&self, h: &impl HugrView, cache: &mut HashMap<Node, bool>, n: Node) -> bool {
+        let res = match self.preserve_callback.as_ref()(h.base_hugr(), n) {
             PreserveNode::MustKeep => true,
             PreserveNode::RemoveIgnoreChildren => false,
-            PreserveNode::RemoveIfChildren => h.children(n).any(|ch| self.must_preserve(h, ch)),
-        }
+            PreserveNode::RemoveIfChildren => {
+                h.children(n).any(|ch| self.must_preserve(h, cache, ch))
+            }
+        };
+        cache.insert(n, res);
+        res
     }
 }
 
