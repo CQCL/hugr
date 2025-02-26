@@ -10,11 +10,21 @@ use std::{
 use crate::validation::{ValidatePassError, ValidationLevel};
 
 /// Configuration for Dead Code Elimination pass
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct DeadCodeElimPass {
     entry_points: Vec<Node>,
-    preserve_callback: Option<Arc<PreserveCallback>>,
+    preserve_callback: Arc<PreserveCallback>,
     validation: ValidationLevel,
+}
+
+impl Default for DeadCodeElimPass {
+    fn default() -> Self {
+        Self {
+            entry_points: Default::default(),
+            preserve_callback: Arc::new(PreserveNode::default_for),
+            validation: ValidationLevel::default(),
+        }
+    }
 }
 
 impl Debug for DeadCodeElimPass {
@@ -88,7 +98,7 @@ impl DeadCodeElimPass {
     /// Allows setting a callback that determines whether a node must be preserved
     /// (even when its result is not used)
     pub fn set_preserve_callback(mut self, cb: Arc<PreserveCallback>) -> Self {
-        self.preserve_callback = Some(cb);
+        self.preserve_callback = cb;
         self
     }
 
@@ -156,8 +166,7 @@ impl DeadCodeElimPass {
     // "Diverge" aka "never-terminate"
     // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
     fn must_preserve(&self, h: &impl HugrView, n: Node) -> bool {
-        let def: Arc<dyn Fn(&Hugr, Node) -> PreserveNode> = Arc::new(PreserveNode::default_for);
-        match self.preserve_callback.as_ref().unwrap_or(&def)(h.base_hugr(), n) {
+        match self.preserve_callback.as_ref()(h.base_hugr(), n) {
             PreserveNode::MustKeep => true,
             PreserveNode::CanRemove => false,
             PreserveNode::RemoveIfAllChildrenCanBeRemoved => {
