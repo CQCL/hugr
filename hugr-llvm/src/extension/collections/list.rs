@@ -3,7 +3,7 @@ use hugr_core::{
     ops::{ExtensionOp, NamedOp},
     std_extensions::collections::list::{self, ListOp, ListValue},
     types::{SumType, Type, TypeArg},
-    HugrView,
+    HugrView, Node,
 };
 use inkwell::values::FunctionValue;
 use inkwell::{
@@ -82,7 +82,7 @@ impl ListRtFunc {
     /// Returns the extern function corresponding to this [ListRtFunc].
     ///
     /// Requires a [ListCodegen] to determine the function signature.
-    pub fn get_extern<'c, H: HugrView>(
+    pub fn get_extern<'c, H: HugrView<Node = Node>>(
         self,
         ctx: &EmitFuncContext<'c, '_, H>,
         ccg: &(impl ListCodegen + 'c),
@@ -158,7 +158,7 @@ impl<CCG: ListCodegen> From<CCG> for ListCodegenExtension<CCG> {
 }
 
 impl<CCG: ListCodegen> CodegenExtension for ListCodegenExtension<CCG> {
-    fn add_extension<'a, H: HugrView + 'a>(
+    fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H>
@@ -180,7 +180,7 @@ impl<CCG: ListCodegen> CodegenExtension for ListCodegenExtension<CCG> {
     }
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Add a [ListCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
     /// as the implementation.
     pub fn add_default_list_extensions(self) -> Self {
@@ -194,7 +194,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
     }
 }
 
-fn emit_list_op<'c, H: HugrView>(
+fn emit_list_op<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &(impl ListCodegen + 'c),
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
@@ -287,7 +287,7 @@ fn emit_list_op<'c, H: HugrView>(
     Ok(())
 }
 
-fn emit_list_value<'c, H: HugrView>(
+fn emit_list_value<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &(impl ListCodegen + 'c),
     val: &ListValue,
@@ -331,7 +331,7 @@ fn emit_list_value<'c, H: HugrView>(
 /// Optionally also stores a value at that location.
 ///
 /// Returns an i8 pointer to the allocated memory.
-fn build_alloca_i8_ptr<'c, H: HugrView>(
+fn build_alloca_i8_ptr<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ty: BasicTypeEnum<'c>,
     value: Option<BasicValueEnum<'c>>,
@@ -350,7 +350,7 @@ fn build_alloca_i8_ptr<'c, H: HugrView>(
 }
 
 /// Helper function to load a value from an i8 pointer.
-fn build_load_i8_ptr<'c, H: HugrView>(
+fn build_load_i8_ptr<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     i8_ptr: PointerValue<'c>,
     ty: BasicTypeEnum<'c>,

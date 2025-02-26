@@ -3,7 +3,7 @@ use hugr_core::{
     ops::{ExtensionOp, NamedOp, Value},
     std_extensions::logic::{self, LogicOp},
     types::SumType,
-    HugrView,
+    HugrView, Node,
 };
 use inkwell::IntPredicate;
 
@@ -15,7 +15,7 @@ use crate::{
 
 use anyhow::{anyhow, Result};
 
-fn emit_logic_op<'c, H: HugrView>(
+fn emit_logic_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
 ) -> Result<()> {
@@ -53,7 +53,7 @@ fn emit_logic_op<'c, H: HugrView>(
 
 /// Populates a [CodegenExtsBuilder] with all extensions needed to lower logic
 /// ops.
-pub fn add_logic_extensions<'a, H: HugrView + 'a>(
+pub fn add_logic_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
 ) -> CodegenExtsBuilder<'a, H> {
     cem.extension_op(logic::EXTENSION_ID, LogicOp::Eq.name(), emit_logic_op)
@@ -63,7 +63,7 @@ pub fn add_logic_extensions<'a, H: HugrView + 'a>(
         .extension_op(logic::EXTENSION_ID, LogicOp::Xor.name(), emit_logic_op) // Added Xor
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Populates a [CodegenExtsBuilder] with all extensions needed to lower
     /// logic ops.
     pub fn add_logic_extensions(self) -> Self {

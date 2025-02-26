@@ -10,7 +10,7 @@ use self::extension_op::{ExtensionOpFn, ExtensionOpMap};
 use hugr_core::{
     extension::{simple_op::MakeOpDef, ExtensionId},
     ops::{constant::CustomConst, ExtensionOp, OpName},
-    HugrView,
+    HugrView, Node,
 };
 
 use strum::IntoEnumIterator;
@@ -38,7 +38,7 @@ pub mod types;
 pub trait CodegenExtension {
     /// Implementers should add each of their handlers to `builder` and return the
     /// resulting [CodegenExtsBuilder].
-    fn add_extension<'a, H: HugrView + 'a>(
+    fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H>
@@ -67,7 +67,7 @@ pub struct CodegenExtsBuilder<'a, H> {
     type_converter: TypeConverter<'a>,
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Forwards to [CodegenExtension::add_extension].
     ///
     /// ```
