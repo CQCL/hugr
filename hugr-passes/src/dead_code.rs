@@ -12,7 +12,11 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
 pub struct DeadCodeElimPass {
+    /// Nodes that are definitely needed - e.g. FuncDefns, but could be anything.
+    /// Hugr Root is assumed to be an entry point even if not mentioned here.
     entry_points: Vec<Node>,
+    /// Callback identifying nodes that must be preserved even if their
+    /// results are not used. Defaults to [PreserveNode::default_for].
     preserve_callback: Arc<PreserveCallback>,
     validation: ValidationLevel,
 }
@@ -48,6 +52,8 @@ impl Debug for DeadCodeElimPass {
     }
 }
 
+/// Callback that identifies nodes that must be preserved even if their
+/// results are not used. For example, (the default) [PreserveNode::default_for].
 pub type PreserveCallback = dyn Fn(&Hugr, Node) -> PreserveNode;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -63,25 +69,16 @@ pub enum PreserveNode {
 }
 
 impl PreserveNode {
+    /// A conservative default for a given node. Just examines the node's [OpType]:
+    /// * Assumes all Calls must be preserved. (One could scan the called FuncDefn, but would
+    ///   also need to check for cycles in the [CallGraph](super::call_graph::CallGraph).)
+    /// * Assumes all CFGs must be preserved. (One could, for example, allow acyclic
+    ///   CFGs to be removed.)
+    /// * Assumes all TailLoops must be preserved. (One could, for example, use dataflow
+    ///   analysis to allow removal of TailLoops that never [Continue](hugr::ops::TailLoop::CONTINUE_TAG).)
     pub fn default_for(h: &Hugr, n: Node) -> PreserveNode {
         match h.get_optype(n) {
-            OpType::CFG(_) => {
-                // TODO if the CFG has no cycles (that are possible given predicates)
-                // then we could say it definitely terminates (i.e. return false)
-                PreserveNode::MustKeep
-            }
-            OpType::TailLoop(_) => {
-                // If the TailLoop never continues, clearly it doesn't terminate, but we haven't got
-                // dataflow results to tell us that. (Even just an upper-bound on the number of
-                // iterations would allow returning false.)
-                //Instead rely on an earlier pass having rewritten any such TailLoop into a non-loop.
-                PreserveNode::MustKeep
-            }
-            OpType::Call(_) => {
-                // We could scan the target FuncDefn, but that might contain calls to itself,
-                // so we'd need a "seen" set...instead just rely on removable calls being inlined.
-                PreserveNode::MustKeep
-            }
+            OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
             _ => Self::RemoveIfAllChildrenCanBeRemoved,
         }
     }
@@ -102,10 +99,11 @@ impl DeadCodeElimPass {
         self
     }
 
-    /// Mark some nodes as entry-points to the Hugr.
+    /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
+    /// used to evaluate these nodes.
     /// The root node is assumed to be an entry point;
     /// for Module roots the client will want to mark some of the FuncDefn children
-    /// as entry-points too.
+    /// as entry points too.
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = Node>) -> Self {
         self.entry_points.extend(entry_points);
         self
