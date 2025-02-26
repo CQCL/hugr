@@ -165,6 +165,9 @@ impl DeadCodeElimPass {
     }
 
     fn must_preserve(&self, h: &impl HugrView, cache: &mut HashMap<Node, bool>, n: Node) -> bool {
+        if let Some(res) = cache.get(&n) {
+            return *res;
+        }
         let res = match self.preserve_callback.as_ref()(h.base_hugr(), n) {
             PreserveNode::MustKeep => true,
             PreserveNode::RemoveIgnoreChildren => false,
