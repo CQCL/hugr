@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.14.4"
+version = "0.15.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -50,7 +50,7 @@ delegate = { workspace = true }
 paste = { workspace = true }
 strum = { workspace = true , features = ["derive"]}
 semver = { version = "1.0.23", features = ["serde"] }
-hugr-model = { version = "0.17.1", path = "../hugr-model", optional = true }
+hugr-model = { version = "0.18.0", path = "../hugr-model", optional = true }
 indexmap.workspace = true
 fxhash.workspace = true
 

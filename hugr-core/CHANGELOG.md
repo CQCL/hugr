@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.4...hugr-core-v0.15.0) - 2025-02-26
+
+### Refactor
+
+- [**breaking**] remove unused dependencies (#1935)
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` (#1870)
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.3...hugr-core-v0.14.4) - 2025-02-24
 
 ### Bug Fixes
