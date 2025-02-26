@@ -53,7 +53,6 @@ semver = { version = "1.0.23", features = ["serde"] }
 hugr-model = { version = "0.17.1", path = "../hugr-model", optional = true }
 indexmap.workspace = true
 fxhash.workspace = true
-bumpalo = { workspace = true, features = ["collections"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
