@@ -76,7 +76,7 @@ impl PreserveNode {
     /// * Assumes all CFGs must be preserved. (One could, for example, allow acyclic
     ///   CFGs to be removed.)
     /// * Assumes all TailLoops must be preserved. (One could, for example, use dataflow
-    ///   analysis to allow removal of TailLoops that never [Continue](hugr::ops::TailLoop::CONTINUE_TAG).)
+    ///   analysis to allow removal of TailLoops that never [Continue](hugr_core::ops::TailLoop::CONTINUE_TAG).)
     pub fn default_for(h: &Hugr, n: Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
