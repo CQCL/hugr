@@ -47,7 +47,7 @@ node_declare_operation = { "(" ~ "declare-operation" ~ symbol ~ meta* ~ ")" }
 node_tail_loop         = { "(" ~ "tail-loop" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_import            = { "(" ~ "import" ~ symbol_name ~ meta* ~ ")" }
-node_custom            = { "(" ~ term_apply ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_custom            = { "(" ~ term ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
 symbol = { symbol_name ~ param* ~ where_clause* ~ term }
 

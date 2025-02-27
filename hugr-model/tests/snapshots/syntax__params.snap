@@ -1,0 +1,12 @@
+---
+source: hugr-model/tests/syntax.rs
+expression: "roundtrip(include_str!(\"fixtures/model-params.edn\"))"
+---
+(hugr 0)
+
+(define-func
+  example.swap
+  (param ?a core.type)
+  (param ?b core.type)
+  (core.fn [?a ?b] [?b ?a] (ext))
+  (dfg [%a %b] [%b %a] (signature (core.fn [?a ?b] [?b ?a] (ext)))))

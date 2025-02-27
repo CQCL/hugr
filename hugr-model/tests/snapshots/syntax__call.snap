@@ -1,0 +1,44 @@
+---
+source: hugr-model/tests/syntax.rs
+expression: "roundtrip(include_str!(\"fixtures/model-call.edn\"))"
+---
+(hugr 0)
+
+(declare-func
+  example.callee
+  (param ?ext core.ext_set)
+  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))
+  (meta (compat.meta_json "title" "\"Callee\""))
+  (meta (compat.meta_json "description" "\"This is a function declaration.\"")))
+
+(define-func
+  example.caller
+  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))
+  (meta (compat.meta_json "title" "\"Caller\""))
+  (meta
+    (compat.meta_json
+      "description"
+      "\"This defines a function that calls the function which we declared earlier.\""))
+  (dfg [%3] [%4]
+    (signature
+      (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
+    ((core.call _ _ _ (example.callee (ext))) [%3] [%4]
+      (signature
+        (core.fn
+          [arithmetic.int.types.int]
+          [arithmetic.int.types.int]
+          (ext))))))
+
+(define-func
+  example.load
+  (core.fn
+    []
+    [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))]
+    (ext))
+  (dfg [] [%5]
+    (signature
+      (core.fn
+        []
+        [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))]
+        (ext)))
+    ((core.load_const _ _ example.caller) [] [%5])))

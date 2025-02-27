@@ -20,8 +20,8 @@ use pest_parser::{HugrParser, Rule};
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::v0::syntax::{LinkName, ListPart, Operation, TuplePart};
-use crate::v0::RegionKind;
+use crate::v0::syntax::{LinkName, ListPart, Module, Operation, TuplePart};
+use crate::v0::{RegionKind, ScopeClosure};
 
 use super::{Constraint, MetaItem, Node, Param, Region, Signature, Symbol, VarName};
 
@@ -66,7 +66,7 @@ impl Parse for VarName {
 
     fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
         debug_assert_eq!(Self::RULE, pair.as_rule());
-        Ok(VarName(pair.as_str().into()))
+        Ok(VarName(pair.as_str()[1..].into()))
     }
 }
 
@@ -75,7 +75,7 @@ impl Parse for LinkName {
 
     fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
         debug_assert_eq!(Self::RULE, pair.as_rule());
-        Ok(LinkName(pair.as_str().into()))
+        Ok(LinkName(pair.as_str()[1..].into()))
     }
 }
 
@@ -172,6 +172,25 @@ impl Parse for TuplePart {
     }
 }
 
+impl Parse for Module {
+    const RULE: Rule = Rule::module;
+
+    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
+        debug_assert_eq!(pair.as_rule(), Self::RULE);
+        let mut pairs = pair.into_inner();
+        let meta = MetaItem::parse_many(&mut pairs)?;
+        let children = Node::parse_many(&mut pairs)?;
+        Ok(Module {
+            root: Region {
+                kind: RegionKind::Module,
+                children,
+                meta,
+                ..Default::default()
+            },
+        })
+    }
+}
+
 impl Parse for Region {
     const RULE: Rule = Rule::region;
 
@@ -223,8 +242,6 @@ impl Parse for Node {
         let rule = pair.as_rule();
         let mut pairs = pair.into_inner();
 
-        let mut params: Box<[Term]> = Default::default();
-
         let operation = match rule {
             Rule::node_dfg => Operation::Dfg,
             Rule::node_cfg => Operation::Cfg,
@@ -238,12 +255,8 @@ impl Parse for Node {
             }
 
             Rule::node_custom => {
-                let term_apply = pairs.next().unwrap();
-                debug_assert_eq!(Rule::term_apply, term_apply.as_rule());
-                let mut apply_pairs = term_apply.into_inner();
-                let symbol = SymbolName::parse_pairs(&mut apply_pairs)?;
-                params = Term::parse_many(&mut apply_pairs)?;
-                Operation::Custom(symbol)
+                let term = Term::parse_pairs(&mut pairs)?;
+                Operation::Custom(term)
             }
 
             Rule::node_define_func => {
@@ -257,8 +270,7 @@ impl Parse for Node {
             Rule::node_define_alias => {
                 let symbol = Symbol::parse_pairs(&mut pairs)?;
                 let value = Term::parse_pairs(&mut pairs)?;
-                params = vec![value].into();
-                Operation::DefineAlias(Arc::new(symbol))
+                Operation::DefineAlias(Arc::new(symbol), value)
             }
             Rule::node_declare_alias => {
                 let symbol = Symbol::parse_pairs(&mut pairs)?;
@@ -286,7 +298,6 @@ impl Parse for Node {
             operation,
             inputs,
             outputs,
-            params,
             regions,
             meta,
             signature,
@@ -478,3 +489,4 @@ impl_from_str!(Region, region);
 impl_from_str!(MetaItem, meta);
 impl_from_str!(Signature, signature);
 impl_from_str!(Param, param);
+impl_from_str!(Module, module);

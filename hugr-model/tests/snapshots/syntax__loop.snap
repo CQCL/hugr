@@ -1,0 +1,15 @@
+---
+source: hugr-model/tests/syntax.rs
+expression: "roundtrip(include_str!(\"fixtures/model-loop.edn\"))"
+---
+(hugr 0)
+
+(define-func example.loop (param ?a core.type) (core.fn [?a] [?a] (ext))
+  (dfg [%0] [%1]
+    (signature (core.fn [?a] [?a] (ext)))
+    (tail-loop [%0] [%1]
+      (signature (core.fn [?a] [?a] (ext)))
+      (dfg [%2] [%3]
+        (signature (core.fn [?a] [(core.adt [[?a] [?a]])] (ext)))
+        ((core.make_adt _ _ 0) [%2] [%3]
+          (signature (core.fn [?a] [(core.adt [[?a] [?a]])] (ext))))))))

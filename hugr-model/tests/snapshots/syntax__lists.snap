@@ -1,0 +1,27 @@
+---
+source: hugr-model/tests/syntax.rs
+expression: "roundtrip(include_str!(\"fixtures/model-lists.edn\"))"
+---
+(hugr 0)
+
+(declare-operation
+  core.call-indirect
+  (param ?inputs (core.list core.type))
+  (param ?outputs (core.list core.type))
+  (param ?exts core.ext-set)
+  (core.fn [(core.fn ?inputs ?outputs ?exts) ?inputs ...] ?outputs ?exts))
+
+(declare-operation
+  core.compose-parallel
+  (param ?inputs-0 (core.list core.type))
+  (param ?inputs-1 (core.list core.type))
+  (param ?outputs-0 (core.list core.type))
+  (param ?outputs-1 (core.list core.type))
+  (param ?exts core.ext-set)
+  (core.fn
+    [(core.fn ?inputs-0 ?outputs-0 ?exts)
+     (core.fn ?inputs-1 ?outputs-1 ?exts)
+     ?inputs-0 ...
+     ?inputs-1 ...]
+    [?outputs-0 ... ?outputs-1 ...]
+    ?exts))

@@ -6,8 +6,8 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 use crate::v0::RegionKind;
 
 use super::{
-    Constraint, LinkName, ListPart, MetaItem, Node, Operation, Param, Region, Signature, Symbol,
-    SymbolName, Term, TuplePart, VarName,
+    Constraint, LinkName, ListPart, MetaItem, Module, Node, Operation, Param, Region, Signature,
+    Symbol, SymbolName, Term, TuplePart, VarName,
 };
 
 struct Printer<'a> {
@@ -233,12 +233,28 @@ impl Print for LinkName {
     }
 }
 
+impl Print for Module {
+    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
+        printer.parens_enter();
+        printer.text("hugr");
+        printer.text("0");
+        printer.parens_exit();
+
+        printer.print(&self.root.meta);
+        printer.print(&self.root.children);
+    }
+}
+
 impl Print for Node {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
         printer.parens_enter();
+
+        printer.group_enter();
         printer.print(&self.operation);
 
         if !self.inputs.is_empty() || !self.outputs.is_empty() {
+            printer.group_enter();
+
             printer.brackets_enter();
             printer.print(&self.inputs);
             printer.brackets_exit();
@@ -246,7 +262,10 @@ impl Print for Node {
             printer.brackets_enter();
             printer.print(&self.outputs);
             printer.brackets_exit();
+
+            printer.group_exit();
         }
+        printer.group_exit();
 
         printer.print(&self.signature);
         printer.print(&self.meta);
@@ -264,23 +283,27 @@ impl Print for Operation {
             Operation::Cfg => printer.text("cfg"),
             Operation::Block => printer.text("block"),
             Operation::DefineFunc(symbol_signature) => {
-                printer.text("declare-func");
+                printer.text("define-func");
                 printer.print(symbol_signature);
             }
             Operation::DeclareFunc(symbol_signature) => {
                 printer.text("declare-func");
                 printer.print(symbol_signature);
             }
-            Operation::Custom(symbol) => printer.print(symbol),
-            Operation::DefineAlias(symbol_signature) => {
+            Operation::Custom(symbol) => {
+                // TODO: Params!
+                printer.print(symbol)
+            }
+            Operation::DefineAlias(symbol_signature, value) => {
                 printer.text("define-alias");
                 printer.print(symbol_signature);
+                printer.print(value);
             }
             Operation::DeclareAlias(symbol_signature) => {
                 printer.text("declare-alias");
                 printer.print(symbol_signature);
             }
-            Operation::TailLoop => printer.text("loop"),
+            Operation::TailLoop => printer.text("tail-loop"),
             Operation::Conditional => printer.text("cond"),
             Operation::DeclareConstructor(symbol_signature) => {
                 printer.text("declare-ctr");
@@ -301,6 +324,7 @@ impl Print for Operation {
 impl Print for Region {
     fn print<'a>(&'a self, printer: &mut Printer<'a>) {
         printer.parens_enter();
+        printer.group_enter();
 
         printer.text(match self.kind {
             RegionKind::DataFlow => "dfg",
@@ -309,6 +333,8 @@ impl Print for Region {
         });
 
         if !self.sources.is_empty() || !self.targets.is_empty() {
+            printer.group_enter();
+
             printer.brackets_enter();
             printer.print(&self.sources);
             printer.brackets_exit();
@@ -316,7 +342,10 @@ impl Print for Region {
             printer.brackets_enter();
             printer.print(&self.targets);
             printer.brackets_exit();
+
+            printer.group_exit();
         }
+        printer.group_exit();
 
         printer.print(&self.signature);
         printer.print(&self.meta);
@@ -420,6 +449,7 @@ macro_rules! impl_display {
     };
 }
 
+impl_display!(Module);
 impl_display!(Node);
 impl_display!(Region);
 impl_display!(Param);

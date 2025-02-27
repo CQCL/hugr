@@ -10,11 +10,15 @@ mod parse;
 mod print;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Module {
+    pub root: Region,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
     pub operation: Operation,
     pub inputs: Box<[LinkName]>,
     pub outputs: Box<[LinkName]>,
-    pub params: Box<[Term]>,
     pub regions: Box<[Region]>,
     pub meta: Box<[MetaItem]>,
     pub signature: Option<Signature>,
@@ -28,8 +32,8 @@ pub enum Operation {
     Block,
     DefineFunc(Arc<Symbol>),
     DeclareFunc(Arc<Symbol>),
-    Custom(SymbolName),
-    DefineAlias(Arc<Symbol>),
+    Custom(Term),
+    DefineAlias(Arc<Symbol>, Term),
     DeclareAlias(Arc<Symbol>),
     TailLoop,
     Conditional,
@@ -55,7 +59,7 @@ pub struct Param {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Constraint(pub Term);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Region {
     pub kind: RegionKind,
     pub sources: Box<[LinkName]>,
@@ -72,8 +76,9 @@ pub struct MetaItem(pub Term);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature(pub Term);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Term {
+    #[default]
     Wildcard,
     Var(VarName),
     Apply(SymbolName, Arc<[Term]>),

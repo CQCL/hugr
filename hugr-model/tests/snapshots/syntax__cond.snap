@@ -1,0 +1,39 @@
+---
+source: hugr-model/tests/syntax.rs
+expression: "roundtrip(include_str!(\"fixtures/model-cond.edn\"))"
+---
+(hugr 0)
+
+(define-func
+  example.cond
+  (core.fn
+    [(core.adt [[] []]) arithmetic.int.types.int]
+    [arithmetic.int.types.int]
+    (ext))
+  (dfg [%0 %1] [%2]
+    (signature
+      (core.fn
+        [(core.adt [[] []]) arithmetic.int.types.int]
+        [arithmetic.int.types.int]
+        (ext)))
+    (cond [%0 %1] [%2]
+      (signature
+        (core.fn
+          [(core.adt [[] []]) arithmetic.int.types.int]
+          [arithmetic.int.types.int]
+          (ext)))
+      (dfg [%3] [%3]
+        (signature
+          (core.fn
+            [arithmetic.int.types.int]
+            [arithmetic.int.types.int]
+            (ext))))
+      (dfg [%4] [%5]
+        (signature
+          (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
+        (arithmetic.int.ineg [%4] [%5]
+          (signature
+            (core.fn
+              [arithmetic.int.types.int]
+              [arithmetic.int.types.int]
+              (ext))))))))
