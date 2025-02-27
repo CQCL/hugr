@@ -1,7 +1,7 @@
 //! Low-level interface for modifying a HUGR.
 
 use core::panic;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
@@ -470,12 +470,10 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
                 // *May* be invalid if there are incoming static/Ext edges.
             }
         }*/
-        let mut nodes = Vec::new();
-        let mut q = VecDeque::from_iter(self.children(root));
-        while let Some(n) = q.pop_front() {
-            nodes.push(n.pg_index());
-            q.extend(self.children(n));
-        }
+        let mut descendants = self.base_hugr().hierarchy.descendants(root.pg_index());
+        let root2 = descendants.next();
+        debug_assert_eq!(root2, Some(root));
+        let nodes = Vec::from_iter(descendants);
         let node_map = translate_indices(
             portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
                 .copy_in_parent()
