@@ -472,7 +472,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         }*/
         let mut descendants = self.base_hugr().hierarchy.descendants(root.pg_index());
         let root2 = descendants.next();
-        debug_assert_eq!(root2, Some(root));
+        debug_assert_eq!(root2, Some(root.pg_index()));
         let nodes = Vec::from_iter(descendants);
         let node_map = translate_indices(
             portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
