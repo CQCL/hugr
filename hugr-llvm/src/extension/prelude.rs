@@ -6,6 +6,7 @@ use hugr_core::extension::prelude::{
 };
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
 use hugr_core::types::TypeArg;
+use hugr_core::Node;
 use hugr_core::{
     extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst, types::SumType,
     HugrView,
@@ -77,7 +78,7 @@ pub trait PreludeCodegen: Clone {
     }
 
     /// Emit a [hugr_core::extension::prelude::PRINT_OP_ID] node.
-    fn emit_print<H: HugrView>(
+    fn emit_print<H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<H>,
         text: BasicValueEnum,
@@ -95,7 +96,7 @@ pub trait PreludeCodegen: Clone {
     ///
     /// The default implementation materialises an LLVM struct with the
     /// [ConstError::signal] and [ConstError::message] of `err`.
-    fn emit_const_error<'c, H: HugrView>(
+    fn emit_const_error<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         err: &ConstError,
@@ -122,7 +123,7 @@ pub trait PreludeCodegen: Clone {
     ///
     /// Note that implementations of `emit_panic` must not emit `unreachable`
     /// terminators, that, if appropriate, is the responsibility of the caller.
-    fn emit_panic<H: HugrView>(
+    fn emit_panic<H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<H>,
         err: BasicValueEnum,
@@ -151,7 +152,7 @@ pub trait PreludeCodegen: Clone {
     /// The type of the returned value must match [Self::string_type].
     ///
     /// The default implementation creates a global C string.
-    fn emit_const_string<'c, H: HugrView>(
+    fn emit_const_string<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         str: &ConstString,
@@ -191,7 +192,7 @@ impl<PCG: PreludeCodegen> From<PCG> for PreludeCodegenExtension<PCG> {
 }
 
 impl<PCG: PreludeCodegen> CodegenExtension for PreludeCodegenExtension<PCG> {
-    fn add_extension<'a, H: HugrView + 'a>(
+    fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H>
@@ -202,7 +203,7 @@ impl<PCG: PreludeCodegen> CodegenExtension for PreludeCodegenExtension<PCG> {
     }
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Add a [PreludeCodegenExtension] to the given [CodegenExtsBuilder] using `pcg`
     /// as the implementation.
     pub fn add_default_prelude_extensions(self) -> Self {
@@ -218,7 +219,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 
 /// Add a [PreludeCodegenExtension] to the given [CodegenExtsMap] using `pcg`
 /// as the implementation.
-fn add_prelude_extensions<'a, H: HugrView + 'a>(
+fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
     pcg: impl PreludeCodegen + 'a,
 ) -> CodegenExtsBuilder<'a, H> {

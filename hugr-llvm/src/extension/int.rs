@@ -5,7 +5,7 @@ use hugr_core::{
         int_types::{self, ConstInt},
     },
     types::{CustomType, TypeArg},
-    HugrView,
+    HugrView, Node,
 };
 use inkwell::{
     types::{BasicType, BasicTypeEnum, IntType},
@@ -24,7 +24,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 
 /// Emit an integer comparison operation.
-fn emit_icmp<'c, H: HugrView>(
+fn emit_icmp<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     pred: inkwell::IntPredicate,
@@ -50,7 +50,7 @@ fn emit_icmp<'c, H: HugrView>(
 /// Emit an ipow operation. This isn't directly supported in llvm, so we do a
 /// loop over the exponent, performing `imul`s instead.
 /// The insertion pointer is expected to be pointing to the end of `launch_bb`.
-fn emit_ipow<'c, H: HugrView>(
+fn emit_ipow<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
 ) -> Result<()> {
@@ -104,7 +104,7 @@ fn emit_ipow<'c, H: HugrView>(
     })
 }
 
-fn emit_int_op<'c, H: HugrView>(
+fn emit_int_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     op: IntOpDef,
@@ -311,7 +311,7 @@ fn llvm_type<'c>(
     ))
 }
 
-fn emit_const_int<'c, H: HugrView>(
+fn emit_const_int<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     k: &ConstInt,
 ) -> Result<BasicValueEnum<'c>> {
@@ -324,7 +324,7 @@ fn emit_const_int<'c, H: HugrView>(
 
 /// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
 /// ops, types, and constants.
-pub fn add_int_extensions<'a, H: HugrView + 'a>(
+pub fn add_int_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
 ) -> CodegenExtsBuilder<'a, H> {
     cem.custom_const(emit_const_int)
@@ -332,7 +332,7 @@ pub fn add_int_extensions<'a, H: HugrView + 'a>(
         .simple_extension_op::<IntOpDef>(emit_int_op)
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
     /// ops, types, and constants.
     pub fn add_int_extensions(self) -> Self {
