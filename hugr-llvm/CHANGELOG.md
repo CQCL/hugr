@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.3...hugr-llvm-v0.14.4) - 2025-02-24
+
+### New Features
+
+- add xor to logic extension (#1911)
+- *(hugr-llvm)* Add extension points to `PreludeCodegen` for customising string lowering (#1918)
+
 ## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.1...hugr-llvm-v0.14.2) - 2025-01-20
 
 ### New Features

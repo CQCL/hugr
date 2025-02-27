@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.14.3"
+version = "0.14.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -30,16 +30,18 @@ llvm-test = ["hugr-llvm/llvm14-0", "hugr-llvm/test-utils"]
 
 [dependencies]
 hugr-model = { path = "../hugr-model", optional = true, version = "0.17.1" }
-hugr-core = { path = "../hugr-core", version = "0.14.3" }
-hugr-passes = { path = "../hugr-passes", version = "0.14.3" }
-hugr-llvm = { path = "../hugr-llvm", version = "0.14.3", optional = true }
+hugr-core = { path = "../hugr-core", version = "0.14.4" }
+hugr-passes = { path = "../hugr-passes", version = "0.14.4" }
+hugr-llvm = { path = "../hugr-llvm", version = "0.14.4", optional = true }
 
 [dev-dependencies]
-rstest = { workspace = true }
 lazy_static = { workspace = true }
-criterion = { workspace = true, features = ["html_reports"] }
 serde_json = { workspace = true }
 bumpalo = { workspace = true, features = ["collections"] }
+
+# Defined here so it can be overridden by the codspeed CI job
+# using `cargo add`.
+criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]
 name = "bench_main"

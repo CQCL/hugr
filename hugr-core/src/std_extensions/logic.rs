@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
