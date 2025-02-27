@@ -68,11 +68,11 @@ where
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
-        self.hugr.to_pg_index(ix).into()
+        self.hugr.get_pg_index(ix).into()
     }
 
     fn from_index(&self, ix: usize) -> Self::NodeId {
-        self.hugr.to_node(portgraph::NodeIndex::new(ix))
+        self.hugr.get_node(portgraph::NodeIndex::new(ix))
     }
 }
 

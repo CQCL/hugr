@@ -60,8 +60,8 @@ impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Node;
-            fn to_pg_index(&self, node: Node) -> portgraph::NodeIndex;
-            fn to_node(&self, index: portgraph::NodeIndex) -> Node;
+            fn get_pg_index(&self, node: Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Node;
         }
     }
 }

@@ -80,15 +80,15 @@ pub trait HugrView: HugrInternals {
         };
         self.base_hugr()
             .hierarchy
-            .parent(self.to_pg_index(node))
-            .map(|index| self.to_node(index))
+            .parent(self.get_pg_index(node))
+            .map(|index| self.get_node(index))
     }
 
     /// Returns the operation type of a node.
     #[inline]
     fn get_optype(&self, node: Self::Node) -> &OpType {
         match self.contains_node(node) {
-            true => self.base_hugr().op_types.get(self.to_pg_index(node)),
+            true => self.base_hugr().op_types.get(self.get_pg_index(node)),
             false => &DEFAULT_OPTYPE,
         }
     }
@@ -109,7 +109,7 @@ pub trait HugrView: HugrInternals {
         }
         self.base_hugr()
             .metadata
-            .get(self.to_pg_index(node))
+            .get(self.get_pg_index(node))
             .as_ref()
     }
 

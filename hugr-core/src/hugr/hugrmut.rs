@@ -408,14 +408,14 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_optype(other.to_node(node));
+            let nodetype = other.get_optype(other.get_node(node));
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
             self.as_mut().metadata.set(new_node, meta.clone());
         }
         debug_assert_eq!(
             Some(&new_root.pg_index()),
-            node_map.get(&other.to_pg_index(other.root()))
+            node_map.get(&other.get_pg_index(other.root()))
         );
         InsertionResult {
             new_root,
@@ -439,7 +439,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         let node_map = insert_subgraph_internal(self.as_mut(), root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_optype(other.to_node(node));
+            let nodetype = other.get_optype(other.get_node(node));
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
             self.as_mut().metadata.set(new_node, meta.clone());
@@ -469,16 +469,16 @@ fn insert_hugr_internal<H: HugrView>(
         .graph
         .insert_graph(&other.portgraph())
         .unwrap_or_else(|e| panic!("Internal error while inserting a hugr into another: {e}"));
-    let other_root = node_map[&other.to_pg_index(other.root())];
+    let other_root = node_map[&other.get_pg_index(other.root())];
 
     // Update hierarchy and optypes
     hugr.hierarchy
         .push_child(other_root, root.pg_index())
         .expect("Inserting a newly-created node into the hierarchy should never fail.");
     for (&node, &new_node) in node_map.iter() {
-        other.children(other.to_node(node)).for_each(|child| {
+        other.children(other.get_node(node)).for_each(|child| {
             hugr.hierarchy
-                .push_child(node_map[&other.to_pg_index(child)], new_node)
+                .push_child(node_map[&other.get_pg_index(child)], new_node)
                 .expect("Inserting a newly-created node into the hierarchy should never fail.");
         });
     }
@@ -516,8 +516,8 @@ fn insert_subgraph_internal(
     // update the hierarchy with their new id.
     for (&node, &new_node) in node_map.iter() {
         let new_parent = other
-            .get_parent(other.to_node(node))
-            .and_then(|parent| node_map.get(&other.to_pg_index(parent)).copied())
+            .get_parent(other.get_node(node))
+            .and_then(|parent| node_map.get(&other.get_pg_index(parent)).copied())
             .unwrap_or(root.pg_index());
         hugr.hierarchy
             .push_child(new_node, new_parent)
