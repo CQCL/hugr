@@ -5,7 +5,7 @@ use hugr_core::{export::export_hugr, import::import_hugr};
 use hugr_model::v0 as model;
 
 fn roundtrip(source: &str) -> String {
-    let bump = bumpalo::Bump::new();
+    let bump = model::bumpalo::Bump::new();
     let parsed_model = model::text::parse(source, &bump).unwrap();
     let imported_hugr = import_hugr(&parsed_model.module, &std_reg()).unwrap();
     let exported_model = export_hugr(&imported_hugr, &bump);

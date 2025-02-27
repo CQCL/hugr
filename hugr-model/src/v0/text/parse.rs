@@ -1,5 +1,8 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
-use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
+use bumpalo::{
+    collections::{String as BumpString, Vec as BumpVec},
+    Bump,
+};
 use fxhash::FxHashMap;
 use pest::{
     iterators::{Pair, Pairs},
