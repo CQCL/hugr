@@ -9,7 +9,7 @@ use hugr_core::std_extensions::collections::array::{
     self, array_type, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan,
 };
 use hugr_core::types::{TypeArg, TypeEnum};
-use hugr_core::HugrView;
+use hugr_core::{HugrView, Node};
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
@@ -25,7 +25,7 @@ use crate::{
 };
 use crate::{CodegenExtension, CodegenExtsBuilder};
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
     /// as the implementation.
     pub fn add_default_array_extensions(self) -> Self {
@@ -53,7 +53,7 @@ pub trait ArrayCodegen: Clone {
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayValue].
-    fn emit_array_value<'c, H: HugrView>(
+    fn emit_array_value<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         value: &array::ArrayValue,
@@ -62,7 +62,7 @@ pub trait ArrayCodegen: Clone {
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayOp].
-    fn emit_array_op<'c, H: HugrView>(
+    fn emit_array_op<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         op: ArrayOp,
@@ -73,7 +73,7 @@ pub trait ArrayCodegen: Clone {
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayRepeat] op.
-    fn emit_array_repeat<'c, H: HugrView>(
+    fn emit_array_repeat<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         op: ArrayRepeat,
@@ -85,7 +85,7 @@ pub trait ArrayCodegen: Clone {
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayScan] op.
     ///
     /// Returns the resulting array and the final values of the accumulators.
-    fn emit_array_scan<'c, H: HugrView>(
+    fn emit_array_scan<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         op: ArrayScan,
@@ -120,7 +120,7 @@ impl<CCG: ArrayCodegen> From<CCG> for ArrayCodegenExtension<CCG> {
 }
 
 impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
-    fn add_extension<'a, H: HugrView + 'a>(
+    fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H>
@@ -219,7 +219,7 @@ fn with_array_alloca<'c, T, E: From<BuilderError>>(
 ///
 /// The provided closure is called to build the loop body. Afterwards, the builder is positioned at
 /// the end of the loop exit block.
-fn build_loop<'c, T, H: HugrView>(
+fn build_loop<'c, T, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     iters: IntValue<'c>,
     go: impl FnOnce(&mut EmitFuncContext<'c, '_, H>, IntValue<'c>) -> Result<T>,
@@ -257,7 +257,7 @@ fn build_loop<'c, T, H: HugrView>(
     Ok(val)
 }
 
-pub fn emit_array_value<'c, H: HugrView>(
+pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
     ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     value: &array::ArrayValue,
@@ -282,7 +282,7 @@ pub fn emit_array_value<'c, H: HugrView>(
     Ok(array_v.into())
 }
 
-pub fn emit_array_op<'c, H: HugrView>(
+pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
     ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     op: ArrayOp,
@@ -621,7 +621,7 @@ fn emit_pop_op<'c>(
 }
 
 /// Emits an [ArrayRepeat] op.
-pub fn emit_repeat_op<'c, H: HugrView>(
+pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     op: ArrayRepeat,
     func: BasicValueEnum<'c>,
@@ -652,7 +652,7 @@ pub fn emit_repeat_op<'c, H: HugrView>(
 /// Emits an [ArrayScan] op.
 ///
 /// Returns the resulting array and the final values of the accumulators.
-pub fn emit_scan_op<'c, H: HugrView>(
+pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     op: ArrayScan,
     src_array: BasicValueEnum<'c>,

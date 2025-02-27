@@ -26,6 +26,9 @@ pub trait HugrInternals {
     where
         Self: 'p;
 
+    /// The type of nodes in the Hugr.
+    type Node: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash;
+
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
 
@@ -33,7 +36,13 @@ pub trait HugrInternals {
     fn base_hugr(&self) -> &Hugr;
 
     /// Return the root node of this view.
-    fn root_node(&self) -> Node;
+    fn root_node(&self) -> Self::Node;
+
+    /// Convert a node to a portgraph node index.
+    fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+
+    /// Convert a portgraph node index to a node.
+    fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
 }
 
 impl HugrInternals for Hugr {
@@ -41,6 +50,8 @@ impl HugrInternals for Hugr {
         = &'p MultiPortGraph
     where
         Self: 'p;
+
+    type Node = Node;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -53,8 +64,16 @@ impl HugrInternals for Hugr {
     }
 
     #[inline]
-    fn root_node(&self) -> Node {
+    fn root_node(&self) -> Self::Node {
         self.root.into()
+    }
+
+    fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex {
+        node.pg_index()
+    }
+
+    fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node {
+        index.into()
     }
 }
 
@@ -63,11 +82,15 @@ impl<T: HugrInternals> HugrInternals for &T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -77,11 +100,15 @@ impl<T: HugrInternals> HugrInternals for &mut T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -91,11 +118,15 @@ impl<T: HugrInternals> HugrInternals for Rc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -105,11 +136,15 @@ impl<T: HugrInternals> HugrInternals for Arc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -119,11 +154,15 @@ impl<T: HugrInternals> HugrInternals for Box<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -133,11 +172,15 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -145,7 +188,7 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
 /// invalidate the HUGR.
-pub trait HugrMutInternals: RootTagged {
+pub trait HugrMutInternals: RootTagged<Node = Node> {
     /// Returns the Hugr at the base of a chain of views.
     fn hugr_mut(&mut self) -> &mut Hugr;
 
@@ -269,7 +312,7 @@ pub trait HugrMutInternals: RootTagged {
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
+impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMutInternals for T {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.as_mut()
     }

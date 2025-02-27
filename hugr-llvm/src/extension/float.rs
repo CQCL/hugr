@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use hugr_core::ops::ExtensionOp;
 use hugr_core::ops::{constant::CustomConst, Value};
 use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
+use hugr_core::Node;
 use hugr_core::{
     std_extensions::arithmetic::float_types::{self, ConstF64},
     HugrView,
@@ -18,7 +19,7 @@ use crate::emit::{func::EmitFuncContext, EmitOpArgs};
 use crate::custom::CodegenExtsBuilder;
 
 /// Emit a float comparison operation.
-fn emit_fcmp<'c, H: HugrView>(
+fn emit_fcmp<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     pred: inkwell::FloatPredicate,
@@ -41,7 +42,7 @@ fn emit_fcmp<'c, H: HugrView>(
     })
 }
 
-fn emit_float_op<'c, H: HugrView>(
+fn emit_float_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     op: FloatOps,
@@ -100,7 +101,7 @@ fn emit_float_op<'c, H: HugrView>(
     }
 }
 
-fn emit_constf64<'c, H: HugrView>(
+fn emit_constf64<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     k: &ConstF64,
 ) -> Result<BasicValueEnum<'c>> {
@@ -108,7 +109,7 @@ fn emit_constf64<'c, H: HugrView>(
     Ok(ty.const_float(k.value()).as_basic_value_enum())
 }
 
-pub fn add_float_extensions<'a, H: HugrView + 'a>(
+pub fn add_float_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
 ) -> CodegenExtsBuilder<'a, H> {
     cem.custom_type(
@@ -122,7 +123,7 @@ pub fn add_float_extensions<'a, H: HugrView + 'a>(
     .simple_extension_op::<FloatOps>(emit_float_op)
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     pub fn add_float_extensions(self) -> Self {
         add_float_extensions(self)
     }

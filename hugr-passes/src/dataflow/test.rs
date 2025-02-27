@@ -16,7 +16,7 @@ use hugr_core::{
     types::{Signature, SumType, Type},
     HugrView,
 };
-use hugr_core::{Hugr, Wire};
+use hugr_core::{Hugr, Node, Wire};
 use rstest::{fixture, rstest};
 
 use super::{AbstractValue, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination};
@@ -29,7 +29,9 @@ impl AbstractValue for Void {}
 
 struct TestContext;
 
-impl ConstLoader<Void> for TestContext {}
+impl ConstLoader<Void> for TestContext {
+    type Node = Node;
+}
 impl DFContext<Void> for TestContext {}
 
 // This allows testing creation of tuple/sum Values (only)

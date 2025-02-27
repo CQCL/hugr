@@ -5,7 +5,7 @@ use hugr_core::{
     extension::prelude::{either_type, option_type},
     ops::{constant::CustomConst, ExtensionOp, FuncDecl, FuncDefn},
     types::Type,
-    HugrView, NodeIndex, PortIndex, Wire,
+    HugrView, Node, NodeIndex, PortIndex, Wire,
 };
 use inkwell::{
     basic_block::BasicBlock,
@@ -57,7 +57,7 @@ where
     launch_bb: BasicBlock<'c>,
 }
 
-impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
+impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
     delegate! {
         to self.emit_context {
             /// Returns the inkwell [Context].
@@ -317,7 +317,7 @@ impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
 }
 
 /// Builds an optional value wrapping `some_value` conditioned on the provided `is_some` flag.
-pub fn build_option<'c, H: HugrView>(
+pub fn build_option<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     is_some: IntValue<'c>,
     some_value: BasicValueEnum<'c>,
@@ -333,7 +333,7 @@ pub fn build_option<'c, H: HugrView>(
 
 /// Builds a result value wrapping either `ok_value` or `else_value` depending on the provided
 /// `is_ok` flag.
-pub fn build_ok_or_else<'c, H: HugrView>(
+pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     is_ok: IntValue<'c>,
     ok_value: BasicValueEnum<'c>,
