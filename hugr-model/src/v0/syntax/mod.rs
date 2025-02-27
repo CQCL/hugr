@@ -49,7 +49,7 @@ pub struct Symbol {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Param {
     pub name: VarName,
-    pub r#type: Arc<Term>,
+    pub r#type: Term,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

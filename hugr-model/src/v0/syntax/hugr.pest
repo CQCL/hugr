@@ -16,8 +16,7 @@ module = { "(" ~ "hugr" ~ "0" ~ ")" ~ meta* ~ node* ~ EOI }
 
 meta = { "(" ~ "meta" ~ term ~ ")" }
 
-port       =  { link_name }
-port_list  =  { "[" ~ port* ~ "]" }
+port_list  =  { "[" ~ link_name* ~ "]" }
 port_lists = _{ port_list ~ port_list }
 
 node = {
