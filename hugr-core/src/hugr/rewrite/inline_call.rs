@@ -24,6 +24,13 @@ pub enum InlineCallError {
     CallTargetNotFuncDefn(Node, OpType),
 }
 
+impl InlineCall {
+    /// TODO docs
+    pub fn new(node: Node) -> Self {
+        Self(node)
+    }
+}
+
 impl Rewrite for InlineCall {
     type ApplyResult = ();
     type Error = InlineCallError;
