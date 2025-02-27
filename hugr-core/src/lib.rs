@@ -9,6 +9,7 @@
 #![cfg_attr(test, allow(non_local_definitions))]
 pub mod builder;
 pub mod core;
+pub mod envelope;
 #[cfg(feature = "model_unstable")]
 pub mod export;
 pub mod extension;

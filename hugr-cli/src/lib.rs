@@ -6,7 +6,7 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 use clio::{Input, Output};
 use derive_more::{Display, Error, From};
 use hugr::extension::ExtensionRegistry;
-use hugr::package::{EnvelopeError, PackageEncodingError, PackageValidationError, PayloadType};
+use hugr::package::{EnvelopeError, PackageEncodingError, PackageValidationError, PayloadDescriptor};
 use hugr::Hugr;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::{ffi::OsString, path::PathBuf};
@@ -90,8 +90,8 @@ pub struct HugrOutputArgs {
     #[arg(short, long, value_parser)]
     pub output: Option<Output>,
 
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new(["json","json-zstd","model","model-zstd"]).map(|s| PayloadType::from_str(&s).unwrap()))]
-    pub output_format: Option<PayloadType>
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new(["json","json-zstd","model","model-zstd"]).map(|s| PayloadDescriptor::from_str(&s).unwrap()))]
+    pub output_format: Option<PayloadDescriptor>,
 }
 
 #[derive(clap::Args)]
@@ -103,7 +103,7 @@ pub struct PayloadTypeArg {
 
 pub enum InputFormatArgs {
     Auto,
-    Envelope(hugr::package::PayloadType)
+    Envelope(hugr::package::PayloadDescriptor),
 }
 
 /// A simple enum containing either a package or a single hugr.

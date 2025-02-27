@@ -56,6 +56,7 @@ semver = { version = "1.0.23", features = ["serde"] }
 hugr-model = { version = "0.17.1", path = "../hugr-model", optional = true }
 zstd = { version = "0.13.2", optional = true }
 packed_struct = { version =  "0.10.1", features = ["byte_types_64"] }
+zerocopy.workspace = true
 
 [dev-dependencies]
 rstest = { workspace = true }
