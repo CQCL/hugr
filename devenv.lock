@@ -3,10 +3,10 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1736426010,
+        "lastModified": 1740397996,
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "1c384bc4be3ee571511fbbc6fdc94fe47d60f6cf",
+        "rev": "74832581642f2a59f0c2a5b74c6ef221080f3c39",
         "type": "github"
       },
       "original": {
@@ -24,10 +24,10 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1736490741,
+        "lastModified": 1740378829,
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "ff8cb1e6d1755aa3ace7c662f79f74882cc5022f",
+        "rev": "92823f1b0c919d7e2d806956aaf98e90f3761ab7",
         "type": "github"
       },
       "original": {
@@ -73,15 +73,14 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1736320768,
+        "lastModified": 1740409026,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "4bc9c909d9ac828a039f288cf872d16d38185db8",
+        "rev": "e6fd0fc703258b59028875d35a28eeafac4e6492",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -110,10 +109,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1735882644,
+        "lastModified": 1737465171,
         "owner": "cachix",
         "repo": "pre-commit-hooks.nix",
-        "rev": "a5a961387e75ae44cc20f0a57ae463da5e959656",
+        "rev": "9364dc02281ce2d37a1f55b6e51f7c0f65a75f17",
         "type": "github"
       },
       "original": {
@@ -134,10 +133,10 @@
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736424758,
+        "lastModified": 1740400918,
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "cc016df54b03d8c1bbb1aae761da01dbfae5f126",
+        "rev": "b3ee3a96a224225cf631036c4e9d6acae0422901",
         "type": "github"
       },
       "original": {

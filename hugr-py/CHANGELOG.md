@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.2...hugr-py-v0.10.3) (2025-02-17)
+
+
+### Features
+
+* add xor to logic extension ([#1911](https://github.com/CQCL/hugr/issues/1911)) ([5e7c81e](https://github.com/CQCL/hugr/commit/5e7c81e2a6e939629feac8448f79ed30d986349a))
+* **hugr-llvm:** Emit ipow ([#1839](https://github.com/CQCL/hugr/issues/1839)) ([89e671a](https://github.com/CQCL/hugr/commit/89e671a27501363994322a71c2a0d83f59ebebe4))
+
 ## [0.10.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.1...hugr-py-v0.10.2) (2024-12-20)
 
 

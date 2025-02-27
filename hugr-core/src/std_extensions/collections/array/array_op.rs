@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::simple_op::{

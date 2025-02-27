@@ -32,30 +32,10 @@ fn emit_logic_op<'c, H: HugrView>(
         inputs.push(bool_val.build_get_tag(builder)?);
     }
     let res = match lot {
-        LogicOp::And => {
-            let mut acc = inputs[0];
-            for inp in inputs.into_iter().skip(1) {
-                acc = builder.build_and(acc, inp, "")?;
-            }
-            acc
-        }
-        LogicOp::Or => {
-            let mut acc = inputs[0];
-            for inp in inputs.into_iter().skip(1) {
-                acc = builder.build_or(acc, inp, "")?;
-            }
-            acc
-        }
-        LogicOp::Eq => {
-            let x = inputs.pop().unwrap();
-            let y = inputs.pop().unwrap();
-            let mut acc = builder.build_int_compare(IntPredicate::EQ, x, y, "")?;
-            for inp in inputs {
-                let eq = builder.build_int_compare(IntPredicate::EQ, inp, x, "")?;
-                acc = builder.build_and(acc, eq, "")?;
-            }
-            acc
-        }
+        LogicOp::And => builder.build_and(inputs[0], inputs[1], "")?,
+        LogicOp::Or => builder.build_or(inputs[0], inputs[1], "")?,
+        LogicOp::Xor => builder.build_xor(inputs[0], inputs[1], "")?,
+        LogicOp::Eq => builder.build_int_compare(IntPredicate::EQ, inputs[0], inputs[1], "")?,
         LogicOp::Not => builder.build_not(inputs[0], "")?,
         op => {
             return Err(anyhow!("LogicOpEmitter: Unknown op: {op:?}"));
@@ -80,6 +60,7 @@ pub fn add_logic_extensions<'a, H: HugrView + 'a>(
         .extension_op(logic::EXTENSION_ID, LogicOp::And.name(), emit_logic_op)
         .extension_op(logic::EXTENSION_ID, LogicOp::Or.name(), emit_logic_op)
         .extension_op(logic::EXTENSION_ID, LogicOp::Not.name(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Xor.name(), emit_logic_op) // Added Xor
 }
 
 impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
@@ -146,6 +127,13 @@ mod test {
     fn not(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
         let hugr = test_logic_op(LogicOp::Not, 1);
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn xor(mut llvm_ctx: TestContext) {
+        llvm_ctx.add_extensions(add_logic_extensions);
+        let hugr = test_logic_op(LogicOp::Xor, 2);
         check_emission!(hugr, llvm_ctx);
     }
 }
