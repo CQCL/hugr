@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Display, sync::Arc};
+use std::{borrow::Cow, fmt::Display};
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use pretty::{Arena, DocAllocator as _, RefDoc};
@@ -17,14 +17,6 @@ struct Printer<'a> {
     docs: Vec<RefDoc<'a>>,
     /// Stack of indices into `docs` denoting the current nesting.
     docs_stack: Vec<usize>,
-}
-
-fn print_to_fmt<P: Print>(f: &mut std::fmt::Formatter<'_>, what: &P) -> std::fmt::Result {
-    let arena = Arena::new();
-    let mut printer = Printer::new(&arena);
-    printer.print(what);
-    let doc = printer.finish();
-    doc.render_fmt(80, f)
 }
 
 impl<'a> Printer<'a> {
@@ -119,346 +111,300 @@ impl<'a> Printer<'a> {
         output.push('"');
         self.text(output);
     }
-
-    fn print<P: Print>(&mut self, what: &'a P) {
-        what.print(self)
-    }
 }
 
-trait Print {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>);
-}
+fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
+    match term {
+        Term::Wildcard => printer.text("_"),
+        Term::Var(var) => print_var_name(printer, var),
+        Term::Apply(symbol, terms) => {
+            if terms.is_empty() {
+                print_symbol_name(printer, symbol);
+            } else {
+                printer.parens_enter();
+                print_symbol_name(printer, symbol);
 
-impl Print for Term {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        match self {
-            Term::Wildcard => printer.text("_"),
-            Term::Var(var) => printer.print(var),
-            Term::Apply(symbol, terms) => {
-                if terms.is_empty() {
-                    printer.print(symbol);
-                } else {
-                    printer.parens_enter();
-                    printer.print(symbol);
-                    printer.print(terms);
-                    printer.parens_exit();
+                for term in terms.iter() {
+                    print_term(printer, term);
                 }
-            }
-            Term::List(list_parts) => {
-                printer.brackets_enter();
-                printer.print(list_parts);
-                printer.brackets_exit();
-            }
-            Term::Str(str) => {
-                printer.string(str);
-            }
-            Term::Nat(nat) => {
-                printer.int(*nat);
-            }
-            Term::Bytes(bytes) => {
-                printer.bytes(bytes);
-            }
-            Term::Float(float) => {
-                // The debug representation of a float always includes a decimal point.
-                printer.text(format!("{:?}", float.into_inner()));
-            }
-            Term::Tuple(tuple_parts) => {
-                printer.parens_enter();
-                printer.text("tuple");
-                printer.print(tuple_parts);
+
                 printer.parens_exit();
             }
-            Term::ExtSet => {
-                printer.parens_enter();
-                printer.text("ext");
-                printer.parens_exit();
+        }
+        Term::List(list_parts) => {
+            printer.brackets_enter();
+            for part in list_parts.iter() {
+                print_list_part(printer, part);
             }
-            Term::Func(region) => {
-                printer.parens_enter();
-                printer.text("fn");
-                printer.print(region);
-                printer.parens_exit();
+            printer.brackets_exit();
+        }
+        Term::Str(str) => {
+            printer.string(str);
+        }
+        Term::Nat(nat) => {
+            printer.int(*nat);
+        }
+        Term::Bytes(bytes) => {
+            printer.bytes(bytes);
+        }
+        Term::Float(float) => {
+            // The debug representation of a float always includes a decimal point.
+            printer.text(format!("{:?}", float.into_inner()));
+        }
+        Term::Tuple(tuple_parts) => {
+            printer.parens_enter();
+            printer.text("tuple");
+            for part in tuple_parts.iter() {
+                print_tuple_part(printer, part);
             }
+            printer.parens_exit();
+        }
+        Term::ExtSet => {
+            printer.parens_enter();
+            printer.text("ext");
+            printer.parens_exit();
+        }
+        Term::Func(region) => {
+            printer.parens_enter();
+            printer.text("fn");
+            print_region(printer, region);
+            printer.parens_exit();
         }
     }
 }
 
-impl Print for ListPart {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        match self {
-            ListPart::Item(term) => {
-                printer.print(term);
-            }
-            ListPart::Splice(term) => {
-                printer.group_enter();
-                printer.print(term);
-                printer.text("...");
-                printer.group_exit();
-            }
+fn print_list_part<'a>(printer: &mut Printer<'a>, part: &'a ListPart) {
+    match part {
+        ListPart::Item(term) => {
+            print_term(printer, term);
         }
-    }
-}
-
-impl Print for TuplePart {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        match self {
-            TuplePart::Item(term) => {
-                printer.print(term);
-            }
-            TuplePart::Splice(term) => {
-                printer.group_enter();
-                printer.print(term);
-                printer.text("...");
-                printer.group_exit();
-            }
-        }
-    }
-}
-
-impl Print for SymbolName {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.text(self.0.as_str())
-    }
-}
-
-impl Print for VarName {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.text(format!("{}", self))
-    }
-}
-
-impl Print for LinkName {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.text(format!("{}", self))
-    }
-}
-
-impl Print for Module {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.parens_enter();
-        printer.text("hugr");
-        printer.text("0");
-        printer.parens_exit();
-
-        printer.print(&self.root.meta);
-        printer.print(&self.root.children);
-    }
-}
-
-impl Print for Node {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.parens_enter();
-
-        printer.group_enter();
-        printer.print(&self.operation);
-
-        if !self.inputs.is_empty() || !self.outputs.is_empty() {
+        ListPart::Splice(term) => {
             printer.group_enter();
-
-            printer.brackets_enter();
-            printer.print(&self.inputs);
-            printer.brackets_exit();
-
-            printer.brackets_enter();
-            printer.print(&self.outputs);
-            printer.brackets_exit();
-
+            print_term(printer, term);
+            printer.text("...");
             printer.group_exit();
         }
-        printer.group_exit();
-
-        printer.print(&self.signature);
-        printer.print(&self.meta);
-        printer.print(&self.regions);
-
-        printer.parens_exit();
     }
 }
 
-impl Print for Operation {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        match self {
-            Operation::Invalid => printer.text("invalid"),
-            Operation::Dfg => printer.text("dfg"),
-            Operation::Cfg => printer.text("cfg"),
-            Operation::Block => printer.text("block"),
-            Operation::DefineFunc(symbol_signature) => {
-                printer.text("define-func");
-                printer.print(symbol_signature);
-            }
-            Operation::DeclareFunc(symbol_signature) => {
-                printer.text("declare-func");
-                printer.print(symbol_signature);
-            }
-            Operation::Custom(symbol) => {
-                // TODO: Params!
-                printer.print(symbol)
-            }
-            Operation::DefineAlias(symbol_signature, value) => {
-                printer.text("define-alias");
-                printer.print(symbol_signature);
-                printer.print(value);
-            }
-            Operation::DeclareAlias(symbol_signature) => {
-                printer.text("declare-alias");
-                printer.print(symbol_signature);
-            }
-            Operation::TailLoop => printer.text("tail-loop"),
-            Operation::Conditional => printer.text("cond"),
-            Operation::DeclareConstructor(symbol_signature) => {
-                printer.text("declare-ctr");
-                printer.print(symbol_signature);
-            }
-            Operation::DeclareOperation(symbol_signature) => {
-                printer.text("declare-operation");
-                printer.print(symbol_signature);
-            }
-            Operation::Import(symbol) => {
-                printer.text("import");
-                printer.print(symbol);
-            }
+fn print_tuple_part<'a>(printer: &mut Printer<'a>, part: &'a TuplePart) {
+    match part {
+        TuplePart::Item(term) => {
+            print_term(printer, term);
         }
-    }
-}
-
-impl Print for Region {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.parens_enter();
-        printer.group_enter();
-
-        printer.text(match self.kind {
-            RegionKind::DataFlow => "dfg",
-            RegionKind::ControlFlow => "cfg",
-            RegionKind::Module => "mod",
-        });
-
-        if !self.sources.is_empty() || !self.targets.is_empty() {
+        TuplePart::Splice(term) => {
             printer.group_enter();
-
-            printer.brackets_enter();
-            printer.print(&self.sources);
-            printer.brackets_exit();
-
-            printer.brackets_enter();
-            printer.print(&self.targets);
-            printer.brackets_exit();
-
+            print_term(printer, term);
+            printer.text("...");
             printer.group_exit();
         }
-        printer.group_exit();
-
-        printer.print(&self.signature);
-        printer.print(&self.meta);
-        printer.print(&self.children);
-
-        printer.parens_exit();
     }
 }
 
-impl Print for Symbol {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.print(&self.name);
-        printer.print(&self.params);
-        printer.print(&self.constraints);
-        printer.print(&self.signature);
+fn print_symbol_name<'a>(printer: &mut Printer<'a>, name: &'a SymbolName) {
+    printer.text(name.0.as_str())
+}
+
+fn print_var_name<'a>(printer: &mut Printer<'a>, name: &'a VarName) {
+    printer.text(format!("{}", name))
+}
+
+fn print_link_name<'a>(printer: &mut Printer<'a>, name: &'a LinkName) {
+    printer.text(format!("{}", name))
+}
+
+fn print_port_lists<'a>(
+    printer: &mut Printer<'a>,
+    inputs: &'a [LinkName],
+    outputs: &'a [LinkName],
+) {
+    if inputs.is_empty() && outputs.is_empty() {
+        return;
+    }
+
+    printer.brackets_enter();
+    for input in inputs {
+        print_link_name(printer, input);
+    }
+    printer.brackets_exit();
+
+    printer.brackets_enter();
+    for output in outputs {
+        print_link_name(printer, output);
+    }
+    printer.brackets_exit();
+}
+
+fn print_module<'a>(printer: &mut Printer<'a>, module: &'a Module) {
+    printer.parens_enter();
+    printer.text("hugr");
+    printer.text("0");
+    printer.parens_exit();
+
+    for meta in &module.root.meta {
+        print_meta_item(printer, meta);
+    }
+
+    for child in &module.root.children {
+        print_node(printer, child);
     }
 }
 
-impl Print for Param {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.parens_enter();
-        printer.text("param");
-        printer.print(&self.name);
-        printer.print(&self.r#type);
-        printer.parens_exit();
-    }
-}
+fn print_node<'a>(printer: &mut Printer<'a>, node: &'a Node) {
+    printer.parens_enter();
 
-impl Print for Constraint {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.parens_enter();
-        printer.text("where");
-        printer.print(&self.0);
-        printer.parens_exit();
-    }
-}
-
-impl Print for MetaItem {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.parens_enter();
-        printer.text("meta");
-        printer.print(&self.0);
-        printer.parens_exit();
-    }
-}
-
-impl Print for Signature {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.parens_enter();
-        printer.text("signature");
-        printer.print(&self.0);
-        printer.parens_exit();
-    }
-}
-
-impl<P: Print> Print for Vec<P> {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        for item in self {
-            printer.print(item);
+    printer.group_enter();
+    match &node.operation {
+        Operation::Invalid => printer.text("invalid"),
+        Operation::Dfg => printer.text("dfg"),
+        Operation::Cfg => printer.text("cfg"),
+        Operation::Block => printer.text("block"),
+        Operation::DefineFunc(symbol_signature) => {
+            printer.text("define-func");
+            print_symbol(printer, symbol_signature);
+        }
+        Operation::DeclareFunc(symbol_signature) => {
+            printer.text("declare-func");
+            print_symbol(printer, symbol_signature);
+        }
+        Operation::Custom(term) => {
+            print_term(printer, term);
+        }
+        Operation::DefineAlias(symbol_signature, value) => {
+            printer.text("define-alias");
+            print_symbol(printer, symbol_signature);
+            print_term(printer, value);
+        }
+        Operation::DeclareAlias(symbol_signature) => {
+            printer.text("declare-alias");
+            print_symbol(printer, symbol_signature);
+        }
+        Operation::TailLoop => printer.text("tail-loop"),
+        Operation::Conditional => printer.text("cond"),
+        Operation::DeclareConstructor(symbol_signature) => {
+            printer.text("declare-ctr");
+            print_symbol(printer, symbol_signature);
+        }
+        Operation::DeclareOperation(symbol_signature) => {
+            printer.text("declare-operation");
+            print_symbol(printer, symbol_signature);
+        }
+        Operation::Import(symbol) => {
+            printer.text("import");
+            print_symbol_name(printer, symbol);
         }
     }
+
+    print_port_lists(printer, &node.inputs, &node.outputs);
+    printer.group_exit();
+
+    if let Some(signature) = &node.signature {
+        print_signature(printer, signature);
+    }
+
+    for meta in &node.meta {
+        print_meta_item(printer, meta);
+    }
+
+    for region in &node.regions {
+        print_region(printer, region);
+    }
+
+    printer.parens_exit();
 }
 
-impl<P: Print> Print for Arc<P> {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        printer.print(self.as_ref());
+fn print_region<'a>(printer: &mut Printer<'a>, region: &'a Region) {
+    printer.parens_enter();
+    printer.group_enter();
+
+    printer.text(match region.kind {
+        RegionKind::DataFlow => "dfg",
+        RegionKind::ControlFlow => "cfg",
+        RegionKind::Module => "mod",
+    });
+
+    print_port_lists(printer, &region.sources, &region.targets);
+    printer.group_exit();
+
+    if let Some(signature) = &region.signature {
+        print_signature(printer, signature);
     }
+
+    for meta in &region.meta {
+        print_meta_item(printer, meta);
+    }
+
+    for child in &region.children {
+        print_node(printer, child);
+    }
+
+    printer.parens_exit();
 }
 
-impl<P: Print> Print for Arc<[P]> {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        for item in self.iter() {
-            printer.print(item);
-        }
+fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
+    print_symbol_name(printer, &symbol.name);
+
+    for param in symbol.params.iter() {
+        print_param(printer, param);
     }
+
+    for constraint in symbol.constraints.iter() {
+        print_constraint(printer, constraint);
+    }
+
+    print_term(printer, &symbol.signature);
 }
 
-impl<P: Print> Print for Box<[P]> {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        for item in self.iter() {
-            printer.print(item);
-        }
-    }
+fn print_param<'a>(printer: &mut Printer<'a>, param: &'a Param) {
+    printer.parens_enter();
+    printer.text("param");
+    print_var_name(printer, &param.name);
+    print_term(printer, &param.r#type);
+    printer.parens_exit();
 }
 
-impl<P: Print> Print for Option<P> {
-    fn print<'a>(&'a self, printer: &mut Printer<'a>) {
-        if let Some(item) = self.as_ref() {
-            printer.print(item);
-        }
-    }
+fn print_constraint<'a>(printer: &mut Printer<'a>, constraint: &'a Constraint) {
+    printer.parens_enter();
+    printer.text("where");
+    print_term(printer, &constraint.0);
+    printer.parens_exit();
+}
+
+fn print_meta_item<'a>(printer: &mut Printer<'a>, meta: &'a MetaItem) {
+    printer.parens_enter();
+    printer.text("meta");
+    print_term(printer, &meta.0);
+    printer.parens_exit();
+}
+
+fn print_signature<'a>(printer: &mut Printer<'a>, signature: &'a Signature) {
+    printer.parens_enter();
+    printer.text("signature");
+    print_term(printer, &signature.0);
+    printer.parens_exit();
 }
 
 macro_rules! impl_display {
-    ($t:ident) => {
+    ($t:ident, $print:expr) => {
         impl Display for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                print_to_fmt(f, self)
+                let arena = Arena::new();
+                let mut printer = Printer::new(&arena);
+                $print(&mut printer, self);
+                let doc = printer.finish();
+                doc.render_fmt(80, f)
             }
         }
     };
 }
 
-impl_display!(Module);
-impl_display!(Node);
-impl_display!(Region);
-impl_display!(Param);
-impl_display!(Constraint);
-impl_display!(MetaItem);
-impl_display!(Signature);
-impl_display!(Term);
-impl_display!(ListPart);
-impl_display!(TuplePart);
+impl_display!(Module, print_module);
+impl_display!(Node, print_node);
+impl_display!(Region, print_region);
+impl_display!(Param, print_param);
+impl_display!(Term, print_term);
+impl_display!(ListPart, print_list_part);
+impl_display!(TuplePart, print_tuple_part);
 
 impl Display for VarName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
