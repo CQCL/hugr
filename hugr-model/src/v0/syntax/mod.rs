@@ -72,12 +72,12 @@ pub enum Term {
     Wildcard,
     Var(VarName),
     Apply(SymbolName, Arc<[Term]>),
-    List(Arc<[ListPart]>),
+    List(Arc<[SeqPart]>),
     Str(SmolStr),
     Nat(u64),
     Bytes(Arc<[u8]>),
     Float(OrderedFloat<f64>),
-    Tuple(Arc<[TuplePart]>),
+    Tuple(Arc<[SeqPart]>),
     Func(Arc<Region>),
     ExtSet,
 }
@@ -173,13 +173,7 @@ pub struct SymbolName(SmolStr);
 pub struct LinkName(SmolStr);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ListPart {
-    Item(Term),
-    Splice(Term),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TuplePart {
+pub enum SeqPart {
     Item(Term),
     Splice(Term),
 }

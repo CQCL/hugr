@@ -6,8 +6,7 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 use crate::v0::RegionKind;
 
 use super::{
-    LinkName, ListPart, Module, Node, Operation, Param, Region, Symbol, SymbolName, Term,
-    TuplePart, VarName,
+    LinkName, Module, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName,
 };
 
 struct Printer<'a> {
@@ -134,7 +133,7 @@ fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
         Term::List(list_parts) => {
             printer.brackets_enter();
             for part in list_parts.iter() {
-                print_list_part(printer, part);
+                print_seq_part(printer, part);
             }
             printer.brackets_exit();
         }
@@ -155,7 +154,7 @@ fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
             printer.parens_enter();
             printer.text("tuple");
             for part in tuple_parts.iter() {
-                print_tuple_part(printer, part);
+                print_seq_part(printer, part);
             }
             printer.parens_exit();
         }
@@ -173,26 +172,12 @@ fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
     }
 }
 
-fn print_list_part<'a>(printer: &mut Printer<'a>, part: &'a ListPart) {
+fn print_seq_part<'a>(printer: &mut Printer<'a>, part: &'a SeqPart) {
     match part {
-        ListPart::Item(term) => {
+        SeqPart::Item(term) => {
             print_term(printer, term);
         }
-        ListPart::Splice(term) => {
-            printer.group_enter();
-            print_term(printer, term);
-            printer.text("...");
-            printer.group_exit();
-        }
-    }
-}
-
-fn print_tuple_part<'a>(printer: &mut Printer<'a>, part: &'a TuplePart) {
-    match part {
-        TuplePart::Item(term) => {
-            print_term(printer, term);
-        }
-        TuplePart::Splice(term) => {
+        SeqPart::Splice(term) => {
             printer.group_enter();
             print_term(printer, term);
             printer.text("...");
@@ -403,8 +388,7 @@ impl_display!(Node, print_node);
 impl_display!(Region, print_region);
 impl_display!(Param, print_param);
 impl_display!(Term, print_term);
-impl_display!(ListPart, print_list_part);
-impl_display!(TuplePart, print_tuple_part);
+impl_display!(SeqPart, print_seq_part);
 
 impl Display for VarName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

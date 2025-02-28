@@ -20,7 +20,7 @@ use pest_parser::{HugrParser, Rule};
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::v0::syntax::{LinkName, ListPart, Module, Operation, TuplePart};
+use crate::v0::syntax::{LinkName, Module, Operation, SeqPart};
 use crate::v0::RegionKind;
 
 use super::{Node, Param, Region, Symbol, VarName};
@@ -56,12 +56,12 @@ fn parse_term<'a>(pair: Pair<'a, Rule>) -> ParseResult<Term> {
         }
         Rule::term_list => {
             let pairs = pair.into_inner();
-            let parts = pairs.map(parse_list_part).collect::<ParseResult<_>>()?;
+            let parts = pairs.map(parse_seq_part).collect::<ParseResult<_>>()?;
             Term::List(parts)
         }
         Rule::term_tuple => {
             let pairs = pair.into_inner();
-            let parts = pairs.map(parse_tuple_part).collect::<ParseResult<_>>()?;
+            let parts = pairs.map(parse_seq_part).collect::<ParseResult<_>>()?;
             Term::Tuple(parts)
         }
         Rule::term_str => {
@@ -92,31 +92,16 @@ fn parse_term<'a>(pair: Pair<'a, Rule>) -> ParseResult<Term> {
     })
 }
 
-fn parse_list_part<'a>(pair: Pair<'a, Rule>) -> ParseResult<ListPart> {
+fn parse_seq_part<'a>(pair: Pair<'a, Rule>) -> ParseResult<SeqPart> {
     debug_assert_eq!(pair.as_rule(), Rule::part);
     let pair = pair.into_inner().next().unwrap();
 
     Ok(match pair.as_rule() {
-        Rule::term => ListPart::Item(parse_term(pair)?),
+        Rule::term => SeqPart::Item(parse_term(pair)?),
         Rule::spliced_term => {
             let mut pairs = pair.into_inner();
             let term = parse_term(pairs.next().unwrap())?;
-            ListPart::Splice(term)
-        }
-        _ => unreachable!("expected term or spliced term"),
-    })
-}
-
-fn parse_tuple_part<'a>(pair: Pair<'a, Rule>) -> ParseResult<TuplePart> {
-    debug_assert_eq!(pair.as_rule(), Rule::part);
-    let pair = pair.into_inner().next().unwrap();
-
-    Ok(match pair.as_rule() {
-        Rule::term => TuplePart::Item(parse_term(pair)?),
-        Rule::spliced_term => {
-            let mut pairs = pair.into_inner();
-            let term = parse_term(pairs.next().unwrap())?;
-            TuplePart::Splice(term)
+            SeqPart::Splice(term)
         }
         _ => unreachable!("expected term or spliced term"),
     })
@@ -421,3 +406,4 @@ impl_from_str!(Node, node, parse_node);
 impl_from_str!(Region, region, parse_region);
 impl_from_str!(Param, param, parse_param);
 impl_from_str!(Module, module, parse_module);
+impl_from_str!(SeqPart, part, parse_seq_part);
