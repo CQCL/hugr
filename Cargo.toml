@@ -10,8 +10,16 @@ members = [
     "hugr-cli",
     "hugr-model",
     "hugr-llvm",
+    "hugr-py",
 ]
-default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
+default-members = [
+    "hugr",
+    "hugr-core",
+    "hugr-passes",
+    "hugr-cli",
+    "hugr-model",
+    "hugr-py",
+]
 
 [workspace.package]
 rust-version = "1.75"
@@ -76,6 +84,7 @@ pest = "2.7.12"
 pest_derive = "2.7.12"
 pretty = "0.12.3"
 pretty_assertions = "1.4.1"
+pyo3 = "0.23.4"
 
 [profile.dev.package]
 insta.opt-level = 3

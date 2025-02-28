@@ -5,9 +5,7 @@ requires-python = ">=3.10, <3.14"
 members = [
     "hugr",
 ]
-
-[manifest.dependency-groups]
-dev = [
+requirements = [
     { name = "mypy", specifier = ">=1.9.0,<2" },
     { name = "pre-commit", specifier = ">=3.6.2,<4" },
     { name = "pytest", specifier = ">=8.1.1,<9" },
