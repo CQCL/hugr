@@ -21,353 +21,290 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::v0::syntax::{LinkName, ListPart, Module, Operation, TuplePart};
-use crate::v0::{RegionKind, ScopeClosure};
+use crate::v0::RegionKind;
 
 use super::{Constraint, MetaItem, Node, Param, Region, Signature, Symbol, VarName};
-
 use super::{SymbolName, Term};
 
-trait Parse: Sized {
-    const RULE: Rule;
+fn parse_symbol_name<'a>(pair: Pair<'a, Rule>) -> ParseResult<SymbolName> {
+    debug_assert_eq!(Rule::symbol_name, pair.as_rule());
+    Ok(SymbolName(pair.as_str().into()))
+}
 
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self>;
+fn parse_var_name<'a>(pair: Pair<'a, Rule>) -> ParseResult<VarName> {
+    debug_assert_eq!(Rule::term_var, pair.as_rule());
+    Ok(VarName(pair.as_str()[1..].into()))
+}
 
-    fn parse_pairs<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Self> {
-        Self::parse_pair(pairs.next().unwrap())
-    }
+fn parse_link_name<'a>(pair: Pair<'a, Rule>) -> ParseResult<LinkName> {
+    debug_assert_eq!(Rule::link_name, pair.as_rule());
+    Ok(LinkName(pair.as_str()[1..].into()))
+}
 
-    fn parse_many<'a, C>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<C>
-    where
-        C: FromIterator<Self>,
-    {
-        take_rule(pairs, Self::RULE).map(Self::parse_pair).collect()
-    }
+fn parse_term<'a>(pair: Pair<'a, Rule>) -> ParseResult<Term> {
+    debug_assert_eq!(Rule::term, pair.as_rule());
+    let pair = pair.into_inner().next().unwrap();
 
-    fn parse_opt<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<Self>> {
-        if let Some(pair) = take_rule(pairs, Self::RULE).next() {
-            Ok(Some(Self::parse_pair(pair)?))
-        } else {
-            Ok(None)
+    Ok(match pair.as_rule() {
+        Rule::term_wildcard => Term::Wildcard,
+        Rule::term_var => Term::Var(parse_var_name(pair)?),
+        Rule::term_apply => {
+            let mut pairs = pair.into_inner();
+            let symbol = parse_symbol_name(pairs.next().unwrap())?;
+            let terms = pairs.map(parse_term).collect::<ParseResult<_>>()?;
+            Term::Apply(symbol, terms)
         }
-    }
+        Rule::term_list => {
+            let pairs = pair.into_inner();
+            let parts = pairs.map(parse_list_part).collect::<ParseResult<_>>()?;
+            Term::List(parts)
+        }
+        Rule::term_tuple => {
+            let pairs = pair.into_inner();
+            let parts = pairs.map(parse_tuple_part).collect::<ParseResult<_>>()?;
+            Term::Tuple(parts)
+        }
+        Rule::term_str => {
+            let mut pairs = pair.into_inner();
+            let string = parse_string(pairs.next().unwrap())?;
+            Term::Str(string)
+        }
+        Rule::term_nat => {
+            let value = pair.as_str().trim().parse().unwrap();
+            Term::Nat(value)
+        }
+        Rule::term_ext_set => Term::ExtSet,
+        Rule::term_bytes => {
+            let mut pairs = pair.into_inner();
+            let bytes = parse_bytes(pairs.next().unwrap())?;
+            Term::Bytes(bytes)
+        }
+        Rule::term_float => {
+            let value: f64 = pair.as_str().trim().parse().unwrap();
+            Term::Float(value.into())
+        }
+        Rule::term_const_func => {
+            let mut pairs = pair.into_inner();
+            let region = parse_region(pairs.next().unwrap())?;
+            Term::Func(Arc::new(region))
+        }
+        _ => unreachable!(),
+    })
 }
 
-impl Parse for SymbolName {
-    const RULE: Rule = Rule::symbol_name;
+fn parse_list_part<'a>(pair: Pair<'a, Rule>) -> ParseResult<ListPart> {
+    debug_assert_eq!(pair.as_rule(), Rule::part);
+    let pair = pair.into_inner().next().unwrap();
 
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        Ok(SymbolName(pair.as_str().into()))
-    }
+    Ok(match pair.as_rule() {
+        Rule::term => ListPart::Item(parse_term(pair)?),
+        Rule::spliced_term => {
+            let mut pairs = pair.into_inner();
+            let term = parse_term(pairs.next().unwrap())?;
+            ListPart::Splice(term)
+        }
+        _ => unreachable!("expected term or spliced term"),
+    })
 }
 
-impl Parse for VarName {
-    const RULE: Rule = Rule::term_var;
+fn parse_tuple_part<'a>(pair: Pair<'a, Rule>) -> ParseResult<TuplePart> {
+    debug_assert_eq!(pair.as_rule(), Rule::part);
+    let pair = pair.into_inner().next().unwrap();
 
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        Ok(VarName(pair.as_str()[1..].into()))
-    }
+    Ok(match pair.as_rule() {
+        Rule::term => TuplePart::Item(parse_term(pair)?),
+        Rule::spliced_term => {
+            let mut pairs = pair.into_inner();
+            let term = parse_term(pairs.next().unwrap())?;
+            TuplePart::Splice(term)
+        }
+        _ => unreachable!("expected term or spliced term"),
+    })
 }
 
-impl Parse for LinkName {
-    const RULE: Rule = Rule::link_name;
+fn parse_module<'a>(pair: Pair<'a, Rule>) -> ParseResult<Module> {
+    debug_assert_eq!(pair.as_rule(), Rule::module);
+    let mut pairs = pair.into_inner();
+    let meta = parse_meta_items(&mut pairs)?;
+    let children = pairs.map(parse_node).collect::<ParseResult<_>>()?;
 
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        Ok(LinkName(pair.as_str()[1..].into()))
-    }
-}
-
-impl Parse for Term {
-    const RULE: Rule = Rule::term;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        let pair = pair.into_inner().next().unwrap();
-
-        Ok(match pair.as_rule() {
-            Rule::term_wildcard => Term::Wildcard,
-            Rule::term_var => Term::Var(VarName::parse_pair(pair)?),
-            Rule::term_apply => {
-                let mut pairs = pair.into_inner();
-                let symbol = SymbolName::parse_pairs(&mut pairs)?;
-                let terms = Term::parse_many(&mut pairs)?;
-                Term::Apply(symbol, terms)
-            }
-            Rule::term_list => {
-                let mut pairs = pair.into_inner();
-                let parts = ListPart::parse_many(&mut pairs)?;
-                Term::List(parts)
-            }
-            Rule::term_tuple => {
-                let mut pairs = pair.into_inner();
-                let parts = TuplePart::parse_many(&mut pairs)?;
-                Term::Tuple(parts)
-            }
-            Rule::term_str => {
-                let mut pairs = pair.into_inner();
-                let string = parse_string(pairs.next().unwrap())?;
-                Term::Str(string)
-            }
-            Rule::term_nat => {
-                let value = pair.as_str().trim().parse().unwrap();
-                Term::Nat(value)
-            }
-            Rule::term_ext_set => Term::ExtSet,
-            Rule::term_bytes => {
-                let mut pairs = pair.into_inner();
-                let bytes = parse_bytes(pairs.next().unwrap())?;
-                Term::Bytes(bytes)
-            }
-            Rule::term_float => {
-                let value: f64 = pair.as_str().trim().parse().unwrap();
-                Term::Float(value.into())
-            }
-            Rule::term_const_func => {
-                let mut pairs = pair.into_inner();
-                let region = Region::parse_pairs(&mut pairs)?;
-                Term::Func(Arc::new(region))
-            }
-            _ => unreachable!(),
-        })
-    }
-}
-
-impl Parse for ListPart {
-    const RULE: Rule = Rule::part;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(pair.as_rule(), Self::RULE);
-        let pair = pair.into_inner().next().unwrap();
-
-        Ok(match pair.as_rule() {
-            Rule::term => Self::Item(Term::parse_pair(pair)?),
-            Rule::spliced_term => {
-                let mut pairs = pair.into_inner();
-                let term = Term::parse_pairs(&mut pairs)?;
-                Self::Splice(term)
-            }
-            _ => unreachable!("expected term or spliced term"),
-        })
-    }
-}
-
-impl Parse for TuplePart {
-    const RULE: Rule = Rule::part;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(pair.as_rule(), Self::RULE);
-        let pair = pair.into_inner().next().unwrap();
-
-        Ok(match pair.as_rule() {
-            Rule::term => Self::Item(Term::parse_pair(pair)?),
-            Rule::spliced_term => {
-                let mut pairs = pair.into_inner();
-                let term = Term::parse_pairs(&mut pairs)?;
-                Self::Splice(term)
-            }
-            _ => unreachable!("expected term or spliced term"),
-        })
-    }
-}
-
-impl Parse for Module {
-    const RULE: Rule = Rule::module;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(pair.as_rule(), Self::RULE);
-        let mut pairs = pair.into_inner();
-        let meta = MetaItem::parse_many(&mut pairs)?;
-        let children = Node::parse_many(&mut pairs)?;
-        Ok(Module {
-            root: Region {
-                kind: RegionKind::Module,
-                children,
-                meta,
-                ..Default::default()
-            },
-        })
-    }
-}
-
-impl Parse for Region {
-    const RULE: Rule = Rule::region;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(pair.as_rule(), Self::RULE);
-        let mut pairs = pair.into_inner();
-
-        let kind = RegionKind::parse_pairs(&mut pairs)?;
-        let sources = parse_port_list(&mut pairs)?;
-        let targets = parse_port_list(&mut pairs)?;
-        let signature = Signature::parse_opt(&mut pairs)?;
-        let meta = MetaItem::parse_many(&mut pairs)?;
-        let children = Node::parse_many(&mut pairs)?;
-
-        Ok(Self {
-            kind,
-            sources,
-            targets,
-            signature,
-            meta,
+    Ok(Module {
+        root: Region {
+            kind: RegionKind::Module,
             children,
-            scope: Default::default(), // TODO
-        })
-    }
-}
-
-impl Parse for RegionKind {
-    const RULE: Rule = Rule::region_kind;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-
-        Ok(match pair.as_str() {
-            "dfg" => Self::DataFlow,
-            "cfg" => Self::ControlFlow,
-            "mod" => Self::Module,
-            _ => unreachable!(),
-        })
-    }
-}
-
-impl Parse for Node {
-    const RULE: Rule = Rule::node;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        let mut pairs = pair.into_inner();
-        let pair = pairs.next().unwrap();
-        let rule = pair.as_rule();
-        let mut pairs = pair.into_inner();
-
-        let operation = match rule {
-            Rule::node_dfg => Operation::Dfg,
-            Rule::node_cfg => Operation::Cfg,
-            Rule::node_block => Operation::Block,
-            Rule::node_tail_loop => Operation::TailLoop,
-            Rule::node_cond => Operation::Conditional,
-
-            Rule::node_import => {
-                let name = SymbolName::parse_pairs(&mut pairs)?;
-                Operation::Import(name)
-            }
-
-            Rule::node_custom => {
-                let term = Term::parse_pairs(&mut pairs)?;
-                Operation::Custom(term)
-            }
-
-            Rule::node_define_func => {
-                let symbol = Symbol::parse_pairs(&mut pairs)?;
-                Operation::DefineFunc(Arc::new(symbol))
-            }
-            Rule::node_declare_func => {
-                let symbol = Symbol::parse_pairs(&mut pairs)?;
-                Operation::DeclareFunc(Arc::new(symbol))
-            }
-            Rule::node_define_alias => {
-                let symbol = Symbol::parse_pairs(&mut pairs)?;
-                let value = Term::parse_pairs(&mut pairs)?;
-                Operation::DefineAlias(Arc::new(symbol), value)
-            }
-            Rule::node_declare_alias => {
-                let symbol = Symbol::parse_pairs(&mut pairs)?;
-                Operation::DeclareAlias(Arc::new(symbol))
-            }
-            Rule::node_declare_ctr => {
-                let symbol = Symbol::parse_pairs(&mut pairs)?;
-                Operation::DeclareConstructor(Arc::new(symbol))
-            }
-            Rule::node_declare_operation => {
-                let symbol = Symbol::parse_pairs(&mut pairs)?;
-                Operation::DeclareOperation(Arc::new(symbol))
-            }
-
-            _ => unreachable!(),
-        };
-
-        let inputs = parse_port_list(&mut pairs)?;
-        let outputs = parse_port_list(&mut pairs)?;
-        let signature = Signature::parse_opt(&mut pairs)?;
-        let meta = MetaItem::parse_many(&mut pairs)?;
-        let regions = Region::parse_many(&mut pairs)?;
-
-        Ok(Node {
-            operation,
-            inputs,
-            outputs,
-            regions,
             meta,
-            signature,
-        })
+            ..Default::default()
+        },
+    })
+}
+
+fn parse_region<'a>(pair: Pair<'a, Rule>) -> ParseResult<Region> {
+    debug_assert_eq!(pair.as_rule(), Rule::region);
+    let mut pairs = pair.into_inner();
+
+    let kind = parse_region_kind(pairs.next().unwrap())?;
+    let sources = parse_port_list(&mut pairs)?;
+    let targets = parse_port_list(&mut pairs)?;
+    let signature = parse_optional_signature(&mut pairs)?;
+    let meta = parse_meta_items(&mut pairs)?;
+    let children = pairs.map(parse_node).collect::<ParseResult<_>>()?;
+
+    Ok(Region {
+        kind,
+        sources,
+        targets,
+        signature,
+        meta,
+        children,
+        scope: Default::default(), // TODO
+    })
+}
+
+fn parse_region_kind<'a>(pair: Pair<'a, Rule>) -> ParseResult<RegionKind> {
+    debug_assert_eq!(pair.as_rule(), Rule::region_kind);
+
+    Ok(match pair.as_str() {
+        "dfg" => RegionKind::DataFlow,
+        "cfg" => RegionKind::ControlFlow,
+        "mod" => RegionKind::Module,
+        _ => unreachable!(),
+    })
+}
+
+fn parse_node<'a>(pair: Pair<'a, Rule>) -> ParseResult<Node> {
+    debug_assert_eq!(pair.as_rule(), Rule::node);
+    let mut pairs = pair.into_inner();
+    let pair = pairs.next().unwrap();
+    let rule = pair.as_rule();
+    let mut pairs = pair.into_inner();
+
+    let operation = match rule {
+        Rule::node_dfg => Operation::Dfg,
+        Rule::node_cfg => Operation::Cfg,
+        Rule::node_block => Operation::Block,
+        Rule::node_tail_loop => Operation::TailLoop,
+        Rule::node_cond => Operation::Conditional,
+
+        Rule::node_import => {
+            let name = parse_symbol_name(pairs.next().unwrap())?;
+            Operation::Import(name)
+        }
+
+        Rule::node_custom => {
+            let term = parse_term(pairs.next().unwrap())?;
+            Operation::Custom(term)
+        }
+
+        Rule::node_define_func => {
+            let symbol = parse_symbol(pairs.next().unwrap())?;
+            Operation::DefineFunc(Arc::new(symbol))
+        }
+        Rule::node_declare_func => {
+            let symbol = parse_symbol(pairs.next().unwrap())?;
+            Operation::DeclareFunc(Arc::new(symbol))
+        }
+        Rule::node_define_alias => {
+            let symbol = parse_symbol(pairs.next().unwrap())?;
+            let value = parse_term(pairs.next().unwrap())?;
+            Operation::DefineAlias(Arc::new(symbol), value)
+        }
+        Rule::node_declare_alias => {
+            let symbol = parse_symbol(pairs.next().unwrap())?;
+            Operation::DeclareAlias(Arc::new(symbol))
+        }
+        Rule::node_declare_ctr => {
+            let symbol = parse_symbol(pairs.next().unwrap())?;
+            Operation::DeclareConstructor(Arc::new(symbol))
+        }
+        Rule::node_declare_operation => {
+            let symbol = parse_symbol(pairs.next().unwrap())?;
+            Operation::DeclareOperation(Arc::new(symbol))
+        }
+
+        _ => unreachable!(),
+    };
+
+    let inputs = parse_port_list(&mut pairs)?;
+    let outputs = parse_port_list(&mut pairs)?;
+    let signature = parse_optional_signature(&mut pairs)?;
+    let meta = parse_meta_items(&mut pairs)?;
+    let regions = pairs.map(parse_region).collect::<ParseResult<_>>()?;
+
+    Ok(Node {
+        operation,
+        inputs,
+        outputs,
+        regions,
+        meta,
+        signature,
+    })
+}
+
+fn parse_meta_items<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Box<[MetaItem]>> {
+    take_rule(pairs, Rule::meta).map(parse_meta_item).collect()
+}
+
+fn parse_meta_item<'a>(pair: Pair<'a, Rule>) -> ParseResult<MetaItem> {
+    debug_assert_eq!(pair.as_rule(), Rule::meta);
+    let mut pairs = pair.into_inner();
+    let term = parse_term(pairs.next().unwrap())?;
+    Ok(MetaItem(term))
+}
+
+fn parse_optional_signature<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<Signature>> {
+    if let Some(pair) = take_rule(pairs, Rule::signature).next() {
+        Ok(Some(parse_signature(pair)?))
+    } else {
+        Ok(None)
     }
 }
 
-impl Parse for MetaItem {
-    const RULE: Rule = Rule::meta;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        let mut pairs = pair.into_inner();
-        let term = Term::parse_pairs(&mut pairs)?;
-        Ok(Self(term))
-    }
+fn parse_signature<'a>(pair: Pair<'a, Rule>) -> ParseResult<Signature> {
+    debug_assert_eq!(Rule::signature, pair.as_rule());
+    let mut pairs = pair.into_inner();
+    let term = parse_term(pairs.next().unwrap())?;
+    Ok(Signature(term))
 }
 
-impl Parse for Signature {
-    const RULE: Rule = Rule::signature;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        let mut pairs = pair.into_inner();
-        let term = Term::parse_pairs(&mut pairs)?;
-        Ok(Self(term))
-    }
+fn parse_params<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Arc<[Param]>> {
+    take_rule(pairs, Rule::param).map(parse_param).collect()
 }
 
-impl Parse for Param {
-    const RULE: Rule = Rule::param;
-
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        let mut pairs = pair.into_inner();
-        let name = VarName::parse_pairs(&mut pairs)?;
-        let r#type = Term::parse_pairs(&mut pairs)?;
-        Ok(Self { name, r#type })
-    }
+fn parse_param<'a>(pair: Pair<'a, Rule>) -> ParseResult<Param> {
+    debug_assert_eq!(Rule::param, pair.as_rule());
+    let mut pairs = pair.into_inner();
+    let name = parse_var_name(pairs.next().unwrap())?;
+    let r#type = parse_term(pairs.next().unwrap())?;
+    Ok(Param { name, r#type })
 }
 
-impl Parse for Symbol {
-    const RULE: Rule = Rule::symbol;
+fn parse_symbol<'a>(pair: Pair<'a, Rule>) -> ParseResult<Symbol> {
+    debug_assert_eq!(Rule::symbol, pair.as_rule());
+    let mut pairs = pair.into_inner();
+    let name = parse_symbol_name(pairs.next().unwrap())?;
+    let params = parse_params(&mut pairs)?;
+    let constraints = parse_constraints(&mut pairs)?;
+    let signature = parse_term(pairs.next().unwrap())?;
 
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        let mut pairs = pair.into_inner();
-        let name = SymbolName::parse_pairs(&mut pairs)?;
-        let params = Param::parse_many(&mut pairs)?;
-        let constraints = Constraint::parse_many(&mut pairs)?;
-        let signature = Term::parse_pairs(&mut pairs)?;
-
-        Ok(Self {
-            name,
-            params,
-            constraints,
-            signature,
-        })
-    }
+    Ok(Symbol {
+        name,
+        params,
+        constraints,
+        signature,
+    })
 }
 
-impl Parse for Constraint {
-    const RULE: Rule = Rule::where_clause;
+fn parse_constraints<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Arc<[Constraint]>> {
+    take_rule(pairs, Rule::where_clause)
+        .map(parse_constraint)
+        .collect()
+}
 
-    fn parse_pair<'a>(pair: Pair<'a, Rule>) -> ParseResult<Self> {
-        debug_assert_eq!(Self::RULE, pair.as_rule());
-        let mut pairs = pair.into_inner();
-        let term = Term::parse_pairs(&mut pairs)?;
-        Ok(Self(term))
-    }
+fn parse_constraint<'a>(pair: Pair<'a, Rule>) -> ParseResult<Constraint> {
+    debug_assert_eq!(Rule::where_clause, pair.as_rule());
+    let mut pairs = pair.into_inner();
+    let term = parse_term(pairs.next().unwrap())?;
+    Ok(Constraint(term))
 }
 
 fn parse_port_list<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Box<[LinkName]>> {
@@ -375,9 +312,8 @@ fn parse_port_list<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Box<[LinkName
         return Ok(Default::default());
     };
 
-    let mut pairs = pair.into_inner();
-    let links = LinkName::parse_many(&mut pairs)?;
-    Ok(links)
+    let pairs = pair.into_inner();
+    pairs.map(parse_link_name).collect()
 }
 
 fn parse_string<'a>(pair: Pair<'a, Rule>) -> ParseResult<SmolStr> {
@@ -467,26 +403,24 @@ impl ParseError {
 }
 
 macro_rules! impl_from_str {
-    ($ident:ident, $rule:ident) => {
+    ($ident:ident, $rule:ident, $parse:expr) => {
         impl FromStr for $ident {
             type Err = ParseError;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 let mut pairs =
                     HugrParser::parse(Rule::$rule, s).map_err(|err| ParseError(Box::new(err)))?;
-                Self::parse_pairs(&mut pairs)
+                $parse(pairs.next().unwrap())
             }
         }
     };
 }
 
-impl_from_str!(SymbolName, symbol_name);
-impl_from_str!(VarName, term_var);
-impl_from_str!(LinkName, link_name);
-impl_from_str!(Term, term);
-impl_from_str!(Node, node);
-impl_from_str!(Region, region);
-impl_from_str!(MetaItem, meta);
-impl_from_str!(Signature, signature);
-impl_from_str!(Param, param);
-impl_from_str!(Module, module);
+impl_from_str!(SymbolName, symbol_name, parse_symbol_name);
+impl_from_str!(VarName, term_var, parse_var_name);
+impl_from_str!(LinkName, link_name, parse_link_name);
+impl_from_str!(Term, term, parse_term);
+impl_from_str!(Node, node, parse_node);
+impl_from_str!(Region, region, parse_region);
+impl_from_str!(Param, param, parse_param);
+impl_from_str!(Module, module, parse_module);
