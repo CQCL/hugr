@@ -66,7 +66,7 @@ impl std::ops::Deref for ConstF64 {
 impl ConstF64 {
     /// Name of the constructor for creating constant 64bit floats.
     #[cfg_attr(not(feature = "model_unstable"), allow(dead_code))]
-    pub(crate) const CTR_NAME: &'static str = "arithmetic.float.const-f64";
+    pub(crate) const CTR_NAME: &'static str = "arithmetic.float.const_f64";
 
     /// Create a new [`ConstF64`]
     pub fn new(value: f64) -> Self {

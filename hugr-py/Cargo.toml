@@ -1,0 +1,17 @@
+[package]
+name = "hugr-py"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "hugr_py"
+crate-type = ["cdylib", "rlib"]
+path = "rust/lib.rs"
+
+[dependencies]
+bumpalo = { workspace = true, features = ["collections"] }
+hugr-model = { version = "0.18", path = "../hugr-model", features = ["pyo3"] }
+paste.workspace = true
+pyo3 = { workspace = true }
+smol_str.workspace = true

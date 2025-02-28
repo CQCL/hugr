@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 import hugr._serialization.tys as stys
+import hugr.model as model
 from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
@@ -30,6 +31,10 @@ class TypeParam(Protocol):
     def _to_serial_root(self) -> stys.TypeParam:
         return stys.TypeParam(root=self._to_serial())  # type: ignore[arg-type]
 
+    def to_model(self) -> model.Term:
+        """Convert the type parameter to a model Term."""
+        raise NotImplementedError(self)
+
 
 @runtime_checkable
 class TypeArg(Protocol):
@@ -45,6 +50,10 @@ class TypeArg(Protocol):
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
         """Resolve types in the argument using the given registry."""
         return self
+
+    def to_model(self) -> model.Term | model.Splice:
+        """Convert the type argument to a model Term."""
+        raise NotImplementedError(self)
 
 
 @runtime_checkable
@@ -82,6 +91,10 @@ class Type(Protocol):
         """Resolve types in the type using the given registry."""
         return self
 
+    def to_model(self) -> model.Term | model.Splice:
+        """Convert the type to a model Term."""
+        raise NotImplementedError(self)
+
 
 #: Row of types.
 TypeRow = list[Type]
@@ -103,6 +116,10 @@ class TypeTypeParam(TypeParam):
     def __str__(self) -> str:
         return str(self.bound)
 
+    def to_model(self) -> model.Term:
+        # Note that we drop the bound.
+        return model.Apply("core.type")
+
 
 @dataclass(frozen=True)
 class BoundedNatParam(TypeParam):
@@ -118,6 +135,10 @@ class BoundedNatParam(TypeParam):
             return "Nat"
         return f"Nat({self.upper_bound})"
 
+    def to_model(self) -> model.Term:
+        # Note that we drop the bound.
+        return model.Apply("core.nat")
+
 
 @dataclass(frozen=True)
 class StringParam(TypeParam):
@@ -128,6 +149,9 @@ class StringParam(TypeParam):
 
     def __str__(self) -> str:
         return "String"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("core.str")
 
 
 @dataclass(frozen=True)
@@ -142,6 +166,10 @@ class ListParam(TypeParam):
     def __str__(self) -> str:
         return f"[{self.param}]"
 
+    def to_model(self) -> model.Term:
+        item_type = self.param.to_model()
+        return model.Apply("core.list", [item_type])
+
 
 @dataclass(frozen=True)
 class TupleParam(TypeParam):
@@ -155,6 +183,10 @@ class TupleParam(TypeParam):
     def __str__(self) -> str:
         return f"({comma_sep_str(self.params)})"
 
+    def to_model(self) -> model.Term:
+        item_types = model.List([param.to_model() for param in self.params])
+        return model.Apply("core.tuple", [item_types])
+
 
 @dataclass(frozen=True)
 class ExtensionsParam(TypeParam):
@@ -165,6 +197,9 @@ class ExtensionsParam(TypeParam):
 
     def __str__(self) -> str:
         return "Extensions"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("core.ext_set")
 
 
 # ------------------------------------------
@@ -187,6 +222,9 @@ class TypeTypeArg(TypeArg):
     def __str__(self) -> str:
         return f"Type({self.ty!s})"
 
+    def to_model(self) -> model.Term | model.Splice:
+        return self.ty.to_model()
+
 
 @dataclass(frozen=True)
 class BoundedNatArg(TypeArg):
@@ -200,6 +238,9 @@ class BoundedNatArg(TypeArg):
     def __str__(self) -> str:
         return str(self.n)
 
+    def to_model(self) -> model.Term:
+        return model.Literal(self.n)
+
 
 @dataclass(frozen=True)
 class StringArg(TypeArg):
@@ -212,6 +253,9 @@ class StringArg(TypeArg):
 
     def __str__(self) -> str:
         return f'"{self.value}"'
+
+    def to_model(self) -> model.Term:
+        return model.Literal(self.value)
 
 
 @dataclass(frozen=True)
@@ -229,6 +273,11 @@ class SequenceArg(TypeArg):
     def __str__(self) -> str:
         return f"({comma_sep_str(self.elems)})"
 
+    def to_model(self) -> model.Term:
+        # TODO: We should separate lists and tuples.
+        # For now we assume that this is a list.
+        return model.List([elem.to_model() for elem in self.elems])
+
 
 @dataclass(frozen=True)
 class ExtensionsArg(TypeArg):
@@ -241,6 +290,10 @@ class ExtensionsArg(TypeArg):
 
     def __str__(self) -> str:
         return f"Extensions({comma_sep_str(self.extensions)})"
+
+    def to_model(self) -> model.Term:
+        # Since extension sets will be deprecated, this is just a placeholder.
+        return model.ExtSet()
 
 
 @dataclass(frozen=True)
@@ -255,6 +308,9 @@ class VariableArg(TypeArg):
 
     def __str__(self) -> str:
         return f"${self.idx}"
+
+    def to_model(self) -> model.Term:
+        return model.Var(str(self.idx))
 
 
 # ----------------------------------------------
@@ -292,6 +348,12 @@ class Sum(Type):
     def resolve(self, registry: ext.ExtensionRegistry) -> Sum:
         """Resolve types in the sum type using the given registry."""
         return Sum([[ty.resolve(registry) for ty in row] for row in self.variant_rows])
+
+    def to_model(self) -> model.Term:
+        variants = model.List(
+            [model.List([typ.to_model() for typ in row]) for row in self.variant_rows]
+        )
+        return model.Apply("core.adt", [variants])
 
 
 @dataclass(eq=False)
@@ -386,6 +448,9 @@ class Variable(Type):
     def __repr__(self) -> str:
         return f"${self.idx}"
 
+    def to_model(self) -> model.Term:
+        return model.Var(str(self.idx))
+
 
 @dataclass(frozen=True)
 class RowVariable(Type):
@@ -403,6 +468,9 @@ class RowVariable(Type):
     def __repr__(self) -> str:
         return f"${self.idx}"
 
+    def to_model(self):
+        return model.Splice(model.Var(str(self.idx)))
+
 
 @dataclass(frozen=True)
 class USize(Type):
@@ -416,6 +484,9 @@ class USize(Type):
 
     def __repr__(self) -> str:
         return "USize"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("prelude.usize")
 
 
 @dataclass(frozen=True)
@@ -433,6 +504,9 @@ class Alias(Type):
 
     def __repr__(self) -> str:
         return self.name
+
+    def to_model(self) -> model.Term:
+        return model.Apply(self.name)
 
 
 @dataclass(frozen=True)
@@ -508,6 +582,12 @@ class FunctionType(Type):
     def __str__(self) -> str:
         return f"{comma_sep_str(self.input)} -> {comma_sep_str(self.output)}"
 
+    def to_model(self) -> model.Term:
+        inputs = model.List([input.to_model() for input in self.input])
+        outputs = model.List([output.to_model() for output in self.output])
+        exts = model.ExtSet()
+        return model.Apply("core.fn", [inputs, outputs, exts])
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -556,6 +636,11 @@ class PolyFuncType(Type):
         """
         return PolyFuncType(params=[], body=FunctionType.empty())
 
+    def to_model(self) -> model.Term:
+        # A `PolyFuncType` should not be a `Type`.
+        error = "PolyFuncType used as a Type"
+        raise TypeError(error)
+
 
 @dataclass
 class ExtType(Type):
@@ -599,6 +684,17 @@ class ExtType(Type):
         if isinstance(value, ExtType):
             return self.type_def == value.type_def and self.args == value.args
         return super().__eq__(value)
+
+    def to_model(self) -> model.Term:
+        # This cast is only neccessary because `Type` can both be an
+        # actual type or a row variable.
+        args = [cast(model.Term, arg.to_model()) for arg in self.args]
+
+        extension_name = self.type_def.get_extension().name
+        type_name = self.type_def.name
+        name = f"{extension_name}.{type_name}"
+
+        return model.Apply(name, args)
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
@@ -644,6 +740,13 @@ class Opaque(Type):
     def __str__(self) -> str:
         return _type_str(self.id, self.args)
 
+    def to_model(self) -> model.Term:
+        # This cast is only neccessary because `Type` can both be an
+        # actual type or a row variable.
+        args = [cast(model.Term, arg.to_model()) for arg in self.args]
+
+        return model.Apply(self.id, args)
+
 
 @dataclass
 class _QubitDef(Type):
@@ -655,6 +758,10 @@ class _QubitDef(Type):
 
     def __repr__(self) -> str:
         return "Qubit"
+
+    def to_model(self) -> model.Term:
+        # TODO: Is this the correct name?
+        return model.Apply("prelude.Qubit", [])
 
 
 #: Qubit type.
