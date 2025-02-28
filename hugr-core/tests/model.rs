@@ -1,15 +1,19 @@
 #![allow(missing_docs)]
 
+use std::str::FromStr;
+
 use hugr::std_extensions::std_reg;
 use hugr_core::{export::export_hugr, import::import_hugr};
-use hugr_model::v0 as model;
+use hugr_model::v0::{self as model};
 
 fn roundtrip(source: &str) -> String {
     let bump = model::bumpalo::Bump::new();
-    let parsed_model = model::text::parse(source, &bump).unwrap();
-    let imported_hugr = import_hugr(&parsed_model.module, &std_reg()).unwrap();
-    let exported_model = export_hugr(&imported_hugr, &bump);
-    model::text::print_to_string(&exported_model, 80).unwrap()
+    let module_ast = model::syntax::Module::from_str(source).unwrap();
+    let module_table = module_ast.resolve(&bump).unwrap();
+    let hugr = import_hugr(&module_table, &std_reg()).unwrap();
+    let exported_table = export_hugr(&hugr, &bump);
+    let exported_ast = exported_table.as_ast().unwrap();
+    exported_ast.to_string()
 }
 
 #[test]

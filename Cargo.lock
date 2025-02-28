@@ -1173,6 +1173,8 @@ dependencies = [
  "pest_derive",
  "pretty",
  "pretty_assertions",
+ "proptest",
+ "proptest-derive",
  "smol_str",
  "thiserror 2.0.12",
 ]

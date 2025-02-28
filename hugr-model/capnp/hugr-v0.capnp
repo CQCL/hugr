@@ -29,21 +29,23 @@ struct Node {
     operation @0 :Operation;
     inputs @1 :List(LinkIndex);
     outputs @2 :List(LinkIndex);
-    params @3 :List(TermId);
-    regions @4 :List(RegionId);
-    meta @5 :List(TermId);
-    signature @6 :OptionalTermId;
+    regions @3 :List(RegionId);
+    meta @4 :List(TermId);
+    signature @5 :OptionalTermId;
 }
 
 struct Operation {
     union {
-        custom @0 :NodeId;
+        custom @0 :TermId;
         dfg @1 :Void;
         cfg @2 :Void;
         block @3 :Void;
         funcDefn @4 :Symbol;
         funcDecl @5 :Symbol;
-        aliasDefn @6 :Symbol;
+        aliasDefn :group {
+            symbol @6 :Symbol;
+            value @14 :TermId;
+        }
         aliasDecl @7 :Symbol;
         invalid @8 :Void;
         tailLoop @9 :Void;
@@ -92,7 +94,7 @@ struct Term {
             node @2 :NodeId;
             index @3 :UInt16;
         }
-        list @4 :List(ListPart);
+        list @4 :List(SeqPart);
         string @5 :Text;
         nat @6 :UInt64;
         extSet @7 :List(ExtSetPart);
@@ -100,10 +102,10 @@ struct Term {
         float @9 :Float64;
         constFunc @10 :RegionId;
         wildcard @11 :Void;
-        tuple @12 :List(TuplePart);
+        tuple @12 :List(SeqPart);
     }
 
-    struct ListPart {
+    struct SeqPart {
         union {
             item @0 :TermId;
             splice @1 :TermId;
@@ -113,13 +115,6 @@ struct Term {
     struct ExtSetPart {
         union {
             extension @0 :Text;
-            splice @1 :TermId;
-        }
-    }
-
-    struct TuplePart {
-        union {
-            item @0 :TermId;
             splice @1 :TermId;
         }
     }

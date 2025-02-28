@@ -4,25 +4,47 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 ---
 (hugr 0)
 
-(define-func example.bools
+(import collections.array.array)
+
+(import compat.const_json)
+
+(import core.load_const)
+
+(import arithmetic.int.const)
+
+(import core.const.adt)
+
+(import arithmetic.int.types.int)
+
+(import collections.array.const)
+
+(import arithmetic.float.types.float64)
+
+(import core.fn)
+
+(import core.adt)
+
+(import arithmetic.float.const-f64)
+
+(define-func
+  example.bools
   (core.fn [] [(core.adt [[] []]) (core.adt [[] []])] (ext))
-  (dfg
-    [] [%0 %1]
+  (dfg [] [%0 %1]
     (signature (core.fn [] [(core.adt [[] []]) (core.adt [[] []])] (ext)))
-    ((core.load_const _ _ (core.const.adt [[] []] _ _ 0 (tuple))) [] [%0]
+    ((core.load_const _ _ (core.const.adt [[] []] _ _ 0 [])) [] [%0]
       (signature (core.fn [] [(core.adt [[] []])] (ext))))
-    ((core.load_const _ _ (core.const.adt [[] []] _ _ 1 (tuple))) [] [%1]
+    ((core.load_const _ _ (core.const.adt [[] []] _ _ 1 [])) [] [%1]
       (signature (core.fn [] [(core.adt [[] []])] (ext))))))
 
-(define-func example.make-pair
+(define-func
+  example.make-pair
   (core.fn
     []
     [(core.adt
        [[(collections.array.array 5 (arithmetic.int.types.int 6))
          arithmetic.float.types.float64]])]
     (ext))
-  (dfg
-    [] [%0]
+  (dfg [] [%0]
     (signature
       (core.fn
         []
@@ -39,16 +61,15 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
           _
           _
           0
-          (tuple
-            (collections.array.const
-              5
-              (arithmetic.int.types.int 6)
-              [(arithmetic.int.const 6 1)
-               (arithmetic.int.const 6 2)
-               (arithmetic.int.const 6 3)
-               (arithmetic.int.const 6 4)
-               (arithmetic.int.const 6 5)])
-            (arithmetic.float.const-f64 -3.0))))
+          [(collections.array.const
+             5
+             (arithmetic.int.types.int 6)
+             [(arithmetic.int.const 6 1)
+              (arithmetic.int.const 6 2)
+              (arithmetic.int.const 6 3)
+              (arithmetic.int.const 6 4)
+              (arithmetic.int.const 6 5)])
+           (arithmetic.float.const-f64 -3.0)]))
       [] [%0]
       (signature
         (core.fn
@@ -58,10 +79,10 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
                arithmetic.float.types.float64]])]
           (ext))))))
 
-(define-func example.f64-json
+(define-func
+  example.f64-json
   (core.fn [] [arithmetic.float.types.float64] (ext))
-  (dfg
-    [] [%0 %1]
+  (dfg [] [%0 %1]
     (signature
       (core.fn
         []

@@ -4,61 +4,59 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 ---
 (hugr 0)
 
-(declare-func example.callee
+(import core.call_indirect)
+
+(import core.load_const)
+
+(import core.fn)
+
+(import compat.meta_json)
+
+(import core.ext_set)
+
+(import arithmetic.int.types.int)
+
+(declare-func
+  example.callee
   (param ?0 core.ext_set)
-  (core.fn
-    [arithmetic.int.types.int]
-    [arithmetic.int.types.int]
-    (ext ?0 ... arithmetic.int))
+  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))
   (meta (compat.meta_json "description" "\"This is a function declaration.\""))
   (meta (compat.meta_json "title" "\"Callee\"")))
 
-(define-func example.caller
-  (core.fn
-    [arithmetic.int.types.int]
-    [arithmetic.int.types.int]
-    (ext arithmetic.int))
+(define-func
+  example.caller
+  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))
   (meta
     (compat.meta_json
       "description"
       "\"This defines a function that calls the function which we declared earlier.\""))
   (meta (compat.meta_json "title" "\"Caller\""))
-  (dfg
-    [%0] [%1]
+  (dfg [%0] [%1]
     (signature
-      (core.fn
-        [arithmetic.int.types.int]
-        [arithmetic.int.types.int]
-        (ext arithmetic.int)))
+      (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
     ((core.call_indirect
         [arithmetic.int.types.int]
         [arithmetic.int.types.int]
-        (ext arithmetic.int)
+        (ext)
         (example.callee (ext)))
       [%0] [%1]
       (signature
         (core.fn
           [arithmetic.int.types.int]
           [arithmetic.int.types.int]
-          (ext arithmetic.int))))))
+          (ext))))))
 
-(define-func example.load
+(define-func
+  example.load
   (core.fn
     []
-    [(core.fn
-       [arithmetic.int.types.int]
-       [arithmetic.int.types.int]
-       (ext arithmetic.int))]
+    [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))]
     (ext))
-  (dfg
-    [] [%0]
+  (dfg [] [%0]
     (signature
       (core.fn
         []
-        [(core.fn
-           [arithmetic.int.types.int]
-           [arithmetic.int.types.int]
-           (ext arithmetic.int))]
+        [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext))]
         (ext)))
     ((core.load_const _ _ example.caller) [] [%0]
       (signature
@@ -67,5 +65,5 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
           [(core.fn
              [arithmetic.int.types.int]
              [arithmetic.int.types.int]
-             (ext arithmetic.int))]
+             (ext))]
           (ext))))))
