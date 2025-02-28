@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from hugr import val
 from hugr.std import _load_extension
+import hugr.model as model
 
 FLOAT_TYPES_EXTENSION = _load_extension("arithmetic.float.types")
 
@@ -30,3 +31,6 @@ class FloatVal(val.ExtensionValue):
 
     def __str__(self) -> str:
         return f"{self.v}"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("arithmetic.float.const_f64", [model.Literal(self.v)])

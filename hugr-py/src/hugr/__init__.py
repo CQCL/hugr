@@ -4,6 +4,7 @@ representation.
 
 from .hugr.base import Hugr
 from .hugr.node_port import Direction, InPort, Node, OutPort, Wire
+from . import model
 
 __all__ = [
     "Hugr",
@@ -12,6 +13,7 @@ __all__ = [
     "InPort",
     "Direction",
     "Wire",
+    "model",
 ]
 
 # This is updated by our release-please workflow, triggered by this

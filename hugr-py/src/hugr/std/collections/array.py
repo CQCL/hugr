@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from hugr import tys, val
 from hugr.std import _load_extension
 from hugr.utils import comma_sep_str
+import hugr.model as model
+from typing import cast
 
 EXTENSION = _load_extension("collections.array")
 
@@ -79,3 +81,10 @@ class ArrayVal(val.ExtensionValue):
 
     def __str__(self) -> str:
         return f"array({comma_sep_str(self.v)})"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("collections.array.const", [
+            model.Literal(len(self.v)),
+            cast(model.Term, self.ty.ty.to_model()),
+            model.List([value.to_model() for value in self.v])
+        ])
