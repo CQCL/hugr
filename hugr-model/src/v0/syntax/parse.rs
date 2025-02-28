@@ -23,7 +23,7 @@ use thiserror::Error;
 use crate::v0::syntax::{LinkName, ListPart, Module, Operation, TuplePart};
 use crate::v0::RegionKind;
 
-use super::{Constraint, MetaItem, Node, Param, Region, Signature, Symbol, VarName};
+use super::{Node, Param, Region, Symbol, VarName};
 use super::{SymbolName, Term};
 
 fn parse_symbol_name<'a>(pair: Pair<'a, Rule>) -> ParseResult<SymbolName> {
@@ -240,18 +240,17 @@ fn parse_node<'a>(pair: Pair<'a, Rule>) -> ParseResult<Node> {
     })
 }
 
-fn parse_meta_items<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Box<[MetaItem]>> {
+fn parse_meta_items<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Box<[Term]>> {
     take_rule(pairs, Rule::meta).map(parse_meta_item).collect()
 }
 
-fn parse_meta_item<'a>(pair: Pair<'a, Rule>) -> ParseResult<MetaItem> {
+fn parse_meta_item<'a>(pair: Pair<'a, Rule>) -> ParseResult<Term> {
     debug_assert_eq!(pair.as_rule(), Rule::meta);
     let mut pairs = pair.into_inner();
-    let term = parse_term(pairs.next().unwrap())?;
-    Ok(MetaItem(term))
+    parse_term(pairs.next().unwrap())
 }
 
-fn parse_optional_signature<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<Signature>> {
+fn parse_optional_signature<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<Term>> {
     if let Some(pair) = take_rule(pairs, Rule::signature).next() {
         Ok(Some(parse_signature(pair)?))
     } else {
@@ -259,11 +258,10 @@ fn parse_optional_signature<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Opti
     }
 }
 
-fn parse_signature<'a>(pair: Pair<'a, Rule>) -> ParseResult<Signature> {
+fn parse_signature<'a>(pair: Pair<'a, Rule>) -> ParseResult<Term> {
     debug_assert_eq!(Rule::signature, pair.as_rule());
     let mut pairs = pair.into_inner();
-    let term = parse_term(pairs.next().unwrap())?;
-    Ok(Signature(term))
+    parse_term(pairs.next().unwrap())
 }
 
 fn parse_params<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Arc<[Param]>> {
@@ -294,17 +292,16 @@ fn parse_symbol<'a>(pair: Pair<'a, Rule>) -> ParseResult<Symbol> {
     })
 }
 
-fn parse_constraints<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Arc<[Constraint]>> {
+fn parse_constraints<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Arc<[Term]>> {
     take_rule(pairs, Rule::where_clause)
         .map(parse_constraint)
         .collect()
 }
 
-fn parse_constraint<'a>(pair: Pair<'a, Rule>) -> ParseResult<Constraint> {
+fn parse_constraint<'a>(pair: Pair<'a, Rule>) -> ParseResult<Term> {
     debug_assert_eq!(Rule::where_clause, pair.as_rule());
     let mut pairs = pair.into_inner();
-    let term = parse_term(pairs.next().unwrap())?;
-    Ok(Constraint(term))
+    parse_term(pairs.next().unwrap())
 }
 
 fn parse_port_list<'a>(pairs: &mut Pairs<'a, Rule>) -> ParseResult<Box<[LinkName]>> {

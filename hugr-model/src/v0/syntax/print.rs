@@ -6,8 +6,8 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 use crate::v0::RegionKind;
 
 use super::{
-    Constraint, LinkName, ListPart, MetaItem, Module, Node, Operation, Param, Region, Signature,
-    Symbol, SymbolName, Term, TuplePart, VarName,
+    LinkName, ListPart, Module, Node, Operation, Param, Region, Symbol, SymbolName, Term,
+    TuplePart, VarName,
 };
 
 struct Printer<'a> {
@@ -363,24 +363,24 @@ fn print_param<'a>(printer: &mut Printer<'a>, param: &'a Param) {
     printer.parens_exit();
 }
 
-fn print_constraint<'a>(printer: &mut Printer<'a>, constraint: &'a Constraint) {
+fn print_constraint<'a>(printer: &mut Printer<'a>, constraint: &'a Term) {
     printer.parens_enter();
     printer.text("where");
-    print_term(printer, &constraint.0);
+    print_term(printer, &constraint);
     printer.parens_exit();
 }
 
-fn print_meta_item<'a>(printer: &mut Printer<'a>, meta: &'a MetaItem) {
+fn print_meta_item<'a>(printer: &mut Printer<'a>, meta: &'a Term) {
     printer.parens_enter();
     printer.text("meta");
-    print_term(printer, &meta.0);
+    print_term(printer, &meta);
     printer.parens_exit();
 }
 
-fn print_signature<'a>(printer: &mut Printer<'a>, signature: &'a Signature) {
+fn print_signature<'a>(printer: &mut Printer<'a>, signature: &'a Term) {
     printer.parens_enter();
     printer.text("signature");
-    print_term(printer, &signature.0);
+    print_term(printer, &signature);
     printer.parens_exit();
 }
 

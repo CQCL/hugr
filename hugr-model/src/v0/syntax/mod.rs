@@ -19,8 +19,8 @@ pub struct Node {
     pub inputs: Box<[LinkName]>,
     pub outputs: Box<[LinkName]>,
     pub regions: Box<[Region]>,
-    pub meta: Box<[MetaItem]>,
-    pub signature: Option<Signature>,
+    pub meta: Box<[Term]>,
+    pub signature: Option<Term>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,7 +45,7 @@ pub enum Operation {
 pub struct Symbol {
     pub name: SymbolName,
     pub params: Arc<[Param]>,
-    pub constraints: Arc<[Constraint]>,
+    pub constraints: Arc<[Term]>,
     pub signature: Term,
 }
 
@@ -55,25 +55,16 @@ pub struct Param {
     pub r#type: Term,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Constraint(pub Term);
-
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Region {
     pub kind: RegionKind,
     pub sources: Box<[LinkName]>,
     pub targets: Box<[LinkName]>,
     pub children: Box<[Node]>,
-    pub meta: Box<[MetaItem]>,
-    pub signature: Option<Signature>,
+    pub meta: Box<[Term]>,
+    pub signature: Option<Term>,
     pub scope: ScopeClosure,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MetaItem(pub Term);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Signature(pub Term);
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Term {
