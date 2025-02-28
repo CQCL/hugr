@@ -3,6 +3,8 @@
 
 model: &model
   - "hugr-model/**"
+  - "Cargo.lock"
+  - "Cargo.toml"
 
 rust: &rust
   - "hugr/**"
@@ -10,6 +12,7 @@ rust: &rust
   - "hugr-core/**"
   - "hugr-passes/**"
   - *model
+  - "Cargo.lock"
   - "Cargo.toml"
   - "specification/schema/**"
   - ".github/workflows/ci-rs.yml"
