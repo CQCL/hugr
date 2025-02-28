@@ -43,5 +43,10 @@ homepage = "https://github.com/CQCL/hugr/tree/main/hugr-py"
 repository = "https://github.com/CQCL/hugr/tree/main/hugr-py"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "src/"
+module-name = "hugr._hugr"

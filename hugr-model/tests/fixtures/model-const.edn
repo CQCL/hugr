@@ -40,7 +40,7 @@
                                (arithmetic.int.const 6 3)
                                (arithmetic.int.const 6 4)
                                (arithmetic.int.const 6 5)])
-                             (arithmetic.float.const-f64 -3.0))))
+                             (arithmetic.float.const_f64 -3.0))))
     [] [%0]
     (signature
      (core.fn
