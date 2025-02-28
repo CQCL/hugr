@@ -279,6 +279,7 @@ pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 
 pub mod binary;
 pub mod scope;
+pub mod syntax;
 pub mod text;
 
 pub use bumpalo;
