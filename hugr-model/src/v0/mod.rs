@@ -281,8 +281,10 @@ pub mod binary;
 pub mod scope;
 pub mod syntax;
 pub mod text;
+pub mod view;
 
 pub use bumpalo;
+use view::View;
 
 macro_rules! define_index {
     ($(#[$meta:meta])* $vis:vis struct $name:ident(pub u32);) => {
@@ -425,6 +427,10 @@ impl<'a> Module<'a> {
         let id = RegionId::new(self.regions.len());
         self.regions.push(region);
         id
+    }
+
+    pub fn view<V: View<'a>>(&'a self, id: &'a V::Id) -> Option<V> {
+        V::view(self, id)
     }
 }
 
