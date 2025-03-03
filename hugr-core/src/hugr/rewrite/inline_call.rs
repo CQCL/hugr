@@ -4,7 +4,7 @@ use derive_more::{Display, Error};
 
 use crate::ops::{DataflowParent, OpType, DFG};
 use crate::types::Substitution;
-use crate::{HugrView, Node};
+use crate::{Direction, HugrView, Node};
 
 use super::{HugrMut, Rewrite};
 
@@ -54,7 +54,14 @@ impl Rewrite for InlineCall {
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
+
         h.disconnect(self.0, h.get_optype(self.0).static_input_port().unwrap());
+
+        // The order input port gets renumbered because the static input
+        // (which comes between the value inports and the order inport) gets removed
+        let old_order_in = h.get_optype(self.0).other_input_port().unwrap();
+        let order_preds = h.linked_outputs(self.0, old_order_in).collect::<Vec<_>>();
+        h.disconnect(self.0, old_order_in); // PortGraph currently does this anyway
 
         let new_op = OpType::from(DFG {
             signature: h
@@ -64,7 +71,8 @@ impl Rewrite for InlineCall {
                 .inner_signature()
                 .into_owned(),
         });
-        let (in_ports, out_ports) = (new_op.input_count(), new_op.output_count());
+        let new_order_in = new_op.other_input_port().unwrap();
+
         let ty_args = h
             .replace_op(self.0, new_op)
             .unwrap()
@@ -72,7 +80,13 @@ impl Rewrite for InlineCall {
             .unwrap()
             .type_args
             .clone();
-        h.set_num_ports(self.0, in_ports as _, out_ports as _);
+
+        h.add_ports(self.0, Direction::Incoming, -1);
+
+        // Reconnect order predecessors
+        for (src, srcp) in order_preds {
+            h.connect(src, srcp, self.0, new_order_in);
+        }
 
         h.copy_descendants(
             orig_func,
