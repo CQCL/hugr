@@ -12,7 +12,7 @@ use hugr_core::std_extensions::arithmetic::{
 };
 use hugr_core::std_extensions::{collections, logic};
 use hugr_core::types::TypeRow;
-use hugr_core::{Hugr, HugrView};
+use hugr_core::{Hugr, HugrView, Node};
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::values::GenericValue;
@@ -35,7 +35,7 @@ pub struct Emission<'c> {
 
 impl<'c> Emission<'c> {
     /// Create an `Emission` from a HUGR.
-    pub fn emit_hugr<'a: 'c, H: HugrView>(
+    pub fn emit_hugr<'a: 'c, H: HugrView<Node = Node>>(
         hugr: FatNode<'c, hugr_core::ops::Module, H>,
         eh: EmitHugr<'c, 'a, H>,
     ) -> Result<Self> where {

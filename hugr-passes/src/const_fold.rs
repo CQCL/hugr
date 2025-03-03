@@ -173,20 +173,30 @@ impl<H: HugrView> std::ops::Deref for ConstFoldContext<'_, H> {
     }
 }
 
-impl<H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'_, H> {
-    fn value_from_opaque(&self, loc: ConstLocation, val: &OpaqueValue) -> Option<ValueHandle> {
+impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+    type Node = H::Node;
+
+    fn value_from_opaque(
+        &self,
+        loc: ConstLocation<H::Node>,
+        val: &OpaqueValue,
+    ) -> Option<ValueHandle<H::Node>> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
 
     fn value_from_const_hugr(
         &self,
-        loc: ConstLocation,
+        loc: ConstLocation<H::Node>,
         h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle> {
+    ) -> Option<ValueHandle<H::Node>> {
         Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
     }
 
-    fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
+    fn value_from_function(
+        &self,
+        node: H::Node,
+        type_args: &[TypeArg],
+    ) -> Option<ValueHandle<H::Node>> {
         if !type_args.is_empty() {
             // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
             return None;
@@ -201,13 +211,13 @@ impl<H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'_, H> {
     }
 }
 
-impl<H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'_, H> {
+impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
     fn interpret_leaf_op(
         &mut self,
-        node: Node,
+        node: H::Node,
         op: &ExtensionOp,
-        ins: &[PartialValue<ValueHandle>],
-        outs: &mut [PartialValue<ValueHandle>],
+        ins: &[PartialValue<ValueHandle<H::Node>>],
+        outs: &mut [PartialValue<ValueHandle<H::Node>>],
     ) {
         let sig = op.signature();
         let known_ins = sig

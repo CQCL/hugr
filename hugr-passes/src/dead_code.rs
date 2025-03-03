@@ -110,7 +110,7 @@ impl DeadCodeElimPass {
         self
     }
 
-    fn find_needed_nodes(&self, h: impl HugrView) -> HashSet<Node> {
+    fn find_needed_nodes(&self, h: impl HugrView<Node = Node>) -> HashSet<Node> {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
@@ -164,7 +164,12 @@ impl DeadCodeElimPass {
         }
     }
 
-    fn must_preserve(&self, h: &impl HugrView, cache: &mut HashMap<Node, bool>, n: Node) -> bool {
+    fn must_preserve(
+        &self,
+        h: &impl HugrView<Node = Node>,
+        cache: &mut HashMap<Node, bool>,
+        n: Node,
+    ) -> bool {
         if let Some(res) = cache.get(&n) {
             return *res;
         }

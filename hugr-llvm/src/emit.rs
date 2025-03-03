@@ -145,7 +145,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         node: FatNode<'hugr, FuncDefn, H>,
     ) -> Result<FunctionValue<'c>>
     where
-        H: HugrView,
+        H: HugrView<Node = Node>,
     {
         self.get_hugr_func_impl(&node.name, node.node(), &node.signature)
     }
@@ -158,7 +158,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         node: FatNode<'hugr, FuncDecl, H>,
     ) -> Result<FunctionValue<'c>>
     where
-        H: HugrView,
+        H: HugrView<Node = Node>,
     {
         self.get_hugr_func_impl(&node.name, node.node(), &node.signature)
     }
@@ -246,7 +246,7 @@ where
     module_context: EmitModuleContext<'c, 'a, H>,
 }
 
-impl<'c, 'a, H: HugrView> EmitHugr<'c, 'a, H> {
+impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     delegate! {
         to self.module_context {
             /// Returns a reference to the inner [Context].

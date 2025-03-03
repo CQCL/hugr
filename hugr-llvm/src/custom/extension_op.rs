@@ -6,7 +6,7 @@ use hugr_core::{
         ExtensionId,
     },
     ops::{ExtensionOp, OpName},
-    HugrView,
+    HugrView, Node,
 };
 
 use anyhow::{bail, Result};
@@ -58,7 +58,7 @@ impl<
 #[derive(Default)]
 pub struct ExtensionOpMap<'a, H>(HashMap<(ExtensionId, OpName), Box<dyn ExtensionOpFn<'a, H>>>);
 
-impl<'a, H: HugrView> ExtensionOpMap<'a, H> {
+impl<'a, H: HugrView<Node = Node>> ExtensionOpMap<'a, H> {
     /// Register a callback to emit a [ExtensionOp], keyed by fully
     /// qualified [OpName].
     pub fn extension_op(
