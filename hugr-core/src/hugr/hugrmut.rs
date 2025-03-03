@@ -148,8 +148,18 @@ pub trait HugrMut: HugrMutInternals {
         self.hugr_mut().remove_node(node);
     }
 
-    /// Copies the strict descendants of `root` to under the `new_parent`.
-    /// (That is, the immediate children of root, are copied to make children of `new_parent`).
+    /// Copies the strict descendants of `root` to under the `new_parent`, optionally applying a
+    /// [Substitution] to the [OpType]s of the copied nodes.
+    ///
+    /// That is, the immediate children of root, are copied to make children of `new_parent`.
+    ///
+    /// Note this may invalidate the Hugr in two ways:
+    /// * Adding children of `root` may make the children-list of `new_parent` invalid e.g.
+    ///   leading to multiple [Input](OpType::Input), [Output](OpType::Output) or
+    ///   [ExitBlock](OpType::ExitBlock) nodes or Input/Output in the wrong positions
+    /// * Nonlocal edges incoming to the subtree of `root` will be copied to target the subtree under `new_parent`
+    ///   which may be invalid if `new_parent` is not a child of `root`s parent (for `Ext` edges - or
+    ///   correspondingly for `Dom` edges)
     fn copy_descendants(
         &mut self,
         root: Node,
@@ -472,18 +482,6 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         new_parent: Node,
         subst: Option<Substitution>,
     ) -> HashMap<Node, Node> {
-        // TODO should we check that we will not invalidate the Hugr?
-        // * any `Ext` edge incoming from anywhere that is not child of an ancestor of new_parent
-        //   (we know the sources are children of some ancestor of `root`, but the requirement
-        //    is only guaranteed if new_parent is a descendant of root's parent, or at least,
-        //    of the lowest ancestor of root whose children actually have edges to nodes in the subtree)
-        // * `Dom` edges...aaiieee
-        /*if let Some(root_ancestor) = self.get_parent(root) {
-            let new_ancestors = successors(Some(new_parent), |n| self.get_parent(n));
-            if !new_ancestors.any(|n| n == root_ancestor) {
-                // *May* be invalid if there are incoming static/Ext edges.
-            }
-        }*/
         let mut descendants = self.base_hugr().hierarchy.descendants(root.pg_index());
         let root2 = descendants.next();
         debug_assert_eq!(root2, Some(root.pg_index()));
