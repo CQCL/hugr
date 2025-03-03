@@ -111,15 +111,21 @@ mod test {
 
     use itertools::Itertools;
 
-    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::builder::{
+        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        ModuleBuilder,
+    };
+    use crate::extension::prelude::usize_t;
     use crate::hugr::views::RootChecked;
     use crate::ops::handle::{FuncID, ModuleRootID, NodeHandle};
-    use crate::ops::{Input, Value};
+    use crate::ops::{Input, OpType, Value};
     use crate::std_extensions::arithmetic::{
         int_ops::{self, IntOpDef},
         int_types::{self, ConstInt, INT_TYPES},
     };
-    use crate::{types::Signature, HugrView, Node};
+
+    use crate::types::{PolyFuncType, Signature, Type, TypeBound};
+    use crate::{HugrView, Node};
 
     use super::{HugrMut, InlineCall, InlineCallError};
 
@@ -284,5 +290,44 @@ mod test {
                 .into()
             ))
         )
+    }
+
+    #[test]
+    fn test_polymorphic() -> Result<(), Box<dyn std::error::Error>> {
+        let tuple_ty = Type::new_tuple(vec![usize_t(); 2]);
+        let mut fb = FunctionBuilder::new("mkpair", Signature::new(usize_t(), tuple_ty.clone()))?;
+        let inner = fb.define_function(
+            "id",
+            PolyFuncType::new(
+                [TypeBound::Copyable.into()],
+                Signature::new_endo(Type::new_var_use(0, TypeBound::Copyable)),
+            ),
+        )?;
+        let inps = inner.input_wires();
+        let inner = inner.finish_with_outputs(inps)?;
+        let call1 = fb.call(inner.handle(), &[usize_t().into()], fb.input_wires())?;
+        let [call1_out] = call1.outputs_arr();
+        let tup = fb.make_tuple([call1_out, call1_out])?;
+        let call2 = fb.call(inner.handle(), &[tuple_ty.into()], [tup])?;
+        let mut hugr = fb.finish_hugr_with_outputs(call2.outputs()).unwrap();
+
+        assert_eq!(
+            hugr.output_neighbours(inner.node()).collect::<Vec<_>>(),
+            [call1.node(), call2.node()]
+        );
+        hugr.apply_rewrite(InlineCall::new(call1.node()))?;
+
+        assert_eq!(
+            hugr.output_neighbours(inner.node()).collect::<Vec<_>>(),
+            [call2.node()]
+        );
+        assert!(hugr.get_optype(call1.node()).is_dfg());
+        assert!(matches!(
+            hugr.children(call1.node())
+                .map(|n| hugr.get_optype(n).clone())
+                .collect::<Vec<_>>()[..],
+            [OpType::Input(_), OpType::Output(_)]
+        ));
+        Ok(())
     }
 }
