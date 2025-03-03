@@ -137,6 +137,7 @@ mod test {
         };
         let mut main = mb.define_function("main", sig)?;
         let call1 = main.call(func.handle(), &[], main.input_wires())?;
+        main.add_other_wire(main.input().node(), call1.node());
         let call2 = main.call(func.handle(), &[], call1.outputs())?;
         main.finish_with_outputs(call2.outputs())?;
         let mut hugr = mb.finish_hugr()?;
@@ -149,6 +150,14 @@ mod test {
         assert_eq!(calls(&hugr), [call1, call2]);
         assert_eq!(extension_ops(&hugr).len(), 1);
 
+        assert_eq!(
+            hugr.linked_outputs(
+                call1.node(),
+                hugr.get_optype(call1).other_input_port().unwrap()
+            )
+            .count(),
+            1
+        );
         RootChecked::<_, ModuleRootID>::try_new(&mut hugr)
             .unwrap()
             .apply_rewrite(InlineCall(call1.node()))
@@ -157,7 +166,14 @@ mod test {
         assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [call2]);
         assert_eq!(calls(&hugr), [call2]);
         assert_eq!(extension_ops(&hugr).len(), 2);
-
+        assert_eq!(
+            hugr.linked_outputs(
+                call1.node(),
+                hugr.get_optype(call1).other_input_port().unwrap()
+            )
+            .count(),
+            1
+        );
         hugr.apply_rewrite(InlineCall(call2.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).next(), None);
