@@ -1,5 +1,7 @@
 //! Bundles of hugr modules along with the extension required to load them.
 
+mod envelope;
+
 use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use std::path::Path;
@@ -13,7 +15,6 @@ use crate::hugr::{ExtensionError, HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
 use crate::{Extension, Hugr};
 
-pub use crate::envelope::{PayloadDescriptor, EnvelopeError};
 
 #[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Package of module HUGRs.

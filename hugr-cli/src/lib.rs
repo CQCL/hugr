@@ -106,43 +106,7 @@ pub enum InputFormatArgs {
     Envelope(hugr::package::PayloadDescriptor),
 }
 
-/// A simple enum containing either a package or a single hugr.
-///
-/// This is required since `Package`s can only contain module-rooted hugrs.
-#[derive(Debug, Clone, PartialEq)]
-pub enum PackageOrHugr {
-    /// A package with module-rooted HUGRs and some required extensions.
-    Package(Package),
-    /// An arbitrary HUGR.
-    Hugr(Hugr),
-}
-
-impl PackageOrHugr {
-    /// Returns the list of hugrs in the package.
-    pub fn into_hugrs(self) -> Vec<Hugr> {
-        match self {
-            PackageOrHugr::Package(pkg) => pkg.modules,
-            PackageOrHugr::Hugr(hugr) => vec![hugr],
-        }
-    }
-
-    /// Validates the package or hugr.
-    pub fn validate(&self) -> Result<(), PackageValidationError> {
-        match self {
-            PackageOrHugr::Package(pkg) => pkg.validate(),
-            PackageOrHugr::Hugr(hugr) => Ok(hugr.validate()?),
-        }
-    }
-}
-
-impl AsRef<[Hugr]> for PackageOrHugr {
-    fn as_ref(&self) -> &[Hugr] {
-        match self {
-            PackageOrHugr::Package(pkg) => &pkg.modules,
-            PackageOrHugr::Hugr(hugr) => std::slice::from_ref(hugr),
-        }
-    }
-}
+pub use PackageOrHugr;
 
 impl HugrArgs {
     /// Read either a package or a single hugr from the input.

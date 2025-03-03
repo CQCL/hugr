@@ -17,10 +17,11 @@ categories = ["compilers"]
 workspace = true
 
 [features]
-default_features = ["model_unstable"]
+default_features = ["model_unstable", "zstd"]
 extension_inference = []
 declarative = ["serde_yaml"]
 model_unstable = ["hugr-model"]
+zstd = ["dep:zstd"]
 
 [lib]
 bench = false
