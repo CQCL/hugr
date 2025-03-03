@@ -129,9 +129,11 @@ mod test {
         let func = {
             let mut fb = mb.define_function("foo", sig.clone())?;
             let c1 = fb.load_const(&cst3);
-            let [i] = fb.input_wires_arr();
-            let add = fb.add_dataflow_op(IntOpDef::iadd.with_log_width(4), [i, c1])?;
-            fb.finish_with_outputs(add.outputs())?
+            let mut inner = fb.dfg_builder(sig.clone(), fb.input_wires())?;
+            let [i] = inner.input_wires_arr();
+            let add = inner.add_dataflow_op(IntOpDef::iadd.with_log_width(4), [i, c1])?;
+            let inner_res = inner.finish_with_outputs(add.outputs())?;
+            fb.finish_with_outputs(inner_res.outputs())?
         };
         let mut main = mb.define_function("main", sig)?;
         let call1 = main.call(func.handle(), &[], main.input_wires())?;
