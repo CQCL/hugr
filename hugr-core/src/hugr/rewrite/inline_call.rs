@@ -98,7 +98,8 @@ mod test {
     use itertools::Itertools;
 
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
-    use crate::ops::handle::{FuncID, NodeHandle};
+    use crate::hugr::views::RootChecked;
+    use crate::ops::handle::{FuncID, ModuleRootID, NodeHandle};
     use crate::ops::{Input, Value};
     use crate::std_extensions::arithmetic::{
         int_ops::{self, IntOpDef},
@@ -146,7 +147,10 @@ mod test {
         assert_eq!(calls(&hugr), [call1, call2]);
         assert_eq!(extension_ops(&hugr).len(), 1);
 
-        hugr.apply_rewrite(InlineCall(call1.node())).unwrap();
+        RootChecked::<_, ModuleRootID>::try_new(&mut hugr)
+            .unwrap()
+            .apply_rewrite(InlineCall(call1.node()))
+            .unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [call2]);
         assert_eq!(calls(&hugr), [call2]);
