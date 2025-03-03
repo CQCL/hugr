@@ -34,7 +34,7 @@ impl InlineCall {
 impl Rewrite for InlineCall {
     type ApplyResult = ();
     type Error = InlineCallError;
-    fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
         let call_ty = h.get_optype(self.0);
         if !call_ty.is_call() {
             return Err(InlineCallError::NotCallNode(self.0, call_ty.clone()));
@@ -107,11 +107,11 @@ mod test {
 
     use super::{HugrMut, InlineCall, InlineCallError};
 
-    fn calls(h: &impl HugrView) -> Vec<Node> {
+    fn calls(h: &impl HugrView<Node = Node>) -> Vec<Node> {
         h.nodes().filter(|n| h.get_optype(*n).is_call()).collect()
     }
 
-    fn extension_ops(h: &impl HugrView) -> Vec<Node> {
+    fn extension_ops(h: &impl HugrView<Node = Node>) -> Vec<Node> {
         h.nodes()
             .filter(|n| h.get_optype(*n).is_extension_op())
             .collect()
