@@ -138,11 +138,11 @@ impl ConstantFoldPass {
                 || find_main(hugr).unwrap(),
             ))
             .set_preserve_callback(if self.allow_increase_termination {
-                Arc::new(|_, _| PreserveNode::RemoveIgnoreChildren)
+                Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
             } else {
                 Arc::new(move |h, n| {
                     if terminating_tail_loops.contains(&n) {
-                        PreserveNode::RemoveIfChildren
+                        PreserveNode::DeferToChildren
                     } else {
                         PreserveNode::default_for(h, n)
                     }

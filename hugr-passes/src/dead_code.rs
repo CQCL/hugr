@@ -61,12 +61,12 @@ pub type PreserveCallback = dyn Fn(&Hugr, Node) -> PreserveNode;
 pub enum PreserveNode {
     /// The node must be kept (nodes inside it may be removed)
     MustKeep,
-    /// The node can be removed, even if nodes inside it must be kept - the descendants'
-    /// [PreserveNode] will be ignored and they will be removed too, so use with care.
-    RemoveIgnoreChildren,
-    /// The node may be removed if all of its children can
-    /// (must be kept if, and only if, any of its children must be kept)
-    RemoveIfChildren,
+    /// The node can be removed, even if nodes inside it must be kept
+    /// - this will remove the descendants too, so use with care.
+    CanRemoveIgnoringChildren,
+    /// The node may be removed if-and-only-if all of its children can
+    /// (must be kept iff any of its children must be kept).
+    DeferToChildren,
 }
 
 impl PreserveNode {
@@ -80,7 +80,7 @@ impl PreserveNode {
     pub fn default_for(h: &Hugr, n: Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
-            _ => Self::RemoveIfChildren,
+            _ => Self::DeferToChildren,
         }
     }
 }
@@ -170,8 +170,8 @@ impl DeadCodeElimPass {
         }
         let res = match self.preserve_callback.as_ref()(h.base_hugr(), n) {
             PreserveNode::MustKeep => true,
-            PreserveNode::RemoveIgnoreChildren => false,
-            PreserveNode::RemoveIfChildren => {
+            PreserveNode::CanRemoveIgnoringChildren => false,
+            PreserveNode::DeferToChildren => {
                 h.children(n).any(|ch| self.must_preserve(h, cache, ch))
             }
         };
@@ -220,7 +220,7 @@ mod test {
             // keep the node inside the DFG, but remove the DFG without checking its children:
             DeadCodeElimPass::default().set_preserve_callback(Arc::new(move |h, n| {
                 if n == dfg_unused || h.get_optype(n).is_const() {
-                    PreserveNode::RemoveIgnoreChildren
+                    PreserveNode::CanRemoveIgnoringChildren
                 } else {
                     PreserveNode::MustKeep
                 }
@@ -245,7 +245,7 @@ mod test {
             if b {
                 PreserveNode::MustKeep
             } else {
-                PreserveNode::RemoveIfChildren
+                PreserveNode::DeferToChildren
             }
         }
         for dce in [
