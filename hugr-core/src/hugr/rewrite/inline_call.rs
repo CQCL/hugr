@@ -25,7 +25,8 @@ pub enum InlineCallError {
 }
 
 impl InlineCall {
-    /// TODO docs
+    /// Create a new instance that will inline the specified node
+    /// (i.e. that should be a [Call](OpType::Call))
     pub fn new(node: Node) -> Self {
         Self(node)
     }
