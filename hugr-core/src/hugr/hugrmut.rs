@@ -11,6 +11,8 @@ use crate::extension::ExtensionRegistry;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
+use crate::ops::OpTrait;
+use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
@@ -148,10 +150,15 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Copies the strict descendants of `root` to under the `new_parent`.
     /// (That is, the immediate children of root, are copied to make children of `new_parent`).
-    fn copy_descendants(&mut self, root: Node, new_parent: Node) -> HashMap<Node, Node> {
+    fn copy_descendants(
+        &mut self,
+        root: Node,
+        new_parent: Node,
+        subst: Option<Substitution>,
+    ) -> HashMap<Node, Node> {
         panic_invalid_node(self, root);
         panic_invalid_node(self, new_parent);
-        self.hugr_mut().copy_descendants(root, new_parent)
+        self.hugr_mut().copy_descendants(root, new_parent, subst)
     }
 
     /// Connect two nodes at the given ports.
@@ -457,7 +464,12 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         translate_indices(node_map)
     }
 
-    fn copy_descendants(&mut self, root: Node, new_parent: Node) -> HashMap<Node, Node> {
+    fn copy_descendants(
+        &mut self,
+        root: Node,
+        new_parent: Node,
+        subst: Option<Substitution>,
+    ) -> HashMap<Node, Node> {
         // TODO should we check that we will not invalidate the Hugr?
         // * any `Ext` edge incoming from anywhere that is not child of an ancestor of new_parent
         //   (we know the sources are children of some ancestor of `root`, but the requirement
@@ -489,8 +501,11 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
             for ch in self.children(node).collect::<Vec<_>>() {
                 self.set_parent(*node_map.get(&ch).unwrap(), new_node);
             }
-            let nodetype = self.get_optype(node).clone();
-            self.as_mut().op_types.set(new_node.pg_index(), nodetype);
+            let new_optype = match subst {
+                None => self.get_optype(node).clone(),
+                Some(ref subst) => self.get_optype(node).substitute(subst),
+            };
+            self.as_mut().op_types.set(new_node.pg_index(), new_optype);
             let meta = self.base_hugr().metadata.get(node.pg_index()).clone();
             self.as_mut().metadata.set(new_node.pg_index(), meta);
         }

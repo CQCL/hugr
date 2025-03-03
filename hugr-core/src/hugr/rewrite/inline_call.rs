@@ -2,8 +2,8 @@
 //! into a DFG which replaces the Call node.
 use thiserror::Error;
 
-use crate::ops::DataflowParent;
-use crate::ops::{OpType, DFG};
+use crate::ops::{DataflowParent, OpType, DFG};
+use crate::types::Substitution;
 use crate::{HugrView, Node};
 
 use super::{HugrMut, Rewrite};
@@ -64,10 +64,20 @@ impl Rewrite for InlineCall {
                 .into_owned(),
         });
         let (in_ports, out_ports) = (new_op.input_count(), new_op.output_count());
-        h.replace_op(self.0, new_op).unwrap();
+        let ty_args = h
+            .replace_op(self.0, new_op)
+            .unwrap()
+            .as_call()
+            .unwrap()
+            .type_args
+            .clone();
         h.set_num_ports(self.0, in_ports as _, out_ports as _);
-        h.copy_descendants(orig_func, self.0);
 
+        h.copy_descendants(
+            orig_func,
+            self.0,
+            (!ty_args.is_empty()).then_some(Substitution::new(&ty_args)),
+        );
         Ok(())
     }
 
