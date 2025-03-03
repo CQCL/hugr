@@ -1,6 +1,6 @@
 //! Rewrite to inline a Call to a FuncDefn by copying the body of the function
 //! into a DFG which replaces the Call node.
-use thiserror::Error;
+use derive_more::{Display, Error};
 
 use crate::ops::{DataflowParent, OpType, DFG};
 use crate::types::Substitution;
@@ -12,15 +12,15 @@ use super::{HugrMut, Rewrite};
 pub struct InlineCall(Node);
 
 /// Error in performing [InlineCall] rewrite.
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Display, Error, PartialEq)]
 #[non_exhaustive]
 pub enum InlineCallError {
     /// The specified Node was not a [Call](OpType::Call)
-    #[error("Node to inline {0} expected to be a Call but actually {1}")]
+    #[display("Node to inline {_0} expected to be a Call but actually {_1}")]
     NotCallNode(Node, OpType),
     /// The node was a Call, but the target was not a [FuncDefn](OpType::FuncDefn)
     /// - presumably a [FuncDecl](OpType::FuncDecl), if the Hugr is valid.
-    #[error("Call targetted node {0} which must be a FuncDefn but was {1}")]
+    #[display("Call targetted node {_0} which must be a FuncDefn but was {_1}")]
     CallTargetNotFuncDefn(Node, OpType),
 }
 
