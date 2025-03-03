@@ -1,7 +1,7 @@
 //! Low-level interface for modifying a HUGR.
 
 use core::panic;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
@@ -165,7 +165,7 @@ pub trait HugrMut: HugrMutInternals {
         root: Node,
         new_parent: Node,
         subst: Option<Substitution>,
-    ) -> HashMap<Node, Node> {
+    ) -> BTreeMap<Node, Node> {
         panic_invalid_node(self, root);
         panic_invalid_node(self, new_parent);
         self.hugr_mut().copy_descendants(root, new_parent, subst)
@@ -319,8 +319,8 @@ pub struct InsertionResult {
 
 fn translate_indices(
     node_map: HashMap<portgraph::NodeIndex, portgraph::NodeIndex>,
-) -> HashMap<Node, Node> {
-    HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into())))
+) -> impl Iterator<Item = (Node, Node)> {
+    node_map.into_iter().map(|(k, v)| (k.into(), v.into()))
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -423,7 +423,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(node_map),
+            node_map: translate_indices(node_map).collect(),
         }
     }
 
@@ -444,7 +444,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(node_map),
+            node_map: translate_indices(node_map).collect(),
         }
     }
 
@@ -473,7 +473,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
                 self.use_extensions(exts);
             }
         }
-        translate_indices(node_map)
+        translate_indices(node_map).collect()
     }
 
     fn copy_descendants(
@@ -481,7 +481,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         root: Node,
         new_parent: Node,
         subst: Option<Substitution>,
-    ) -> HashMap<Node, Node> {
+    ) -> BTreeMap<Node, Node> {
         let mut descendants = self.base_hugr().hierarchy.descendants(root.pg_index());
         let root2 = descendants.next();
         debug_assert_eq!(root2, Some(root.pg_index()));
@@ -490,7 +490,8 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
             portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
                 .copy_in_parent()
                 .expect("Is a MultiPortGraph"),
-        );
+        )
+        .collect::<BTreeMap<_, _>>();
 
         for node in self.children(root).collect::<Vec<_>>() {
             self.set_parent(*node_map.get(&node).unwrap(), new_parent);
