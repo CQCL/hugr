@@ -502,9 +502,9 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
             for ch in self.children(node).collect::<Vec<_>>() {
                 self.set_parent(*node_map.get(&ch).unwrap(), new_node);
             }
-            let new_optype = match subst {
-                None => self.get_optype(node).clone(),
-                Some(ref subst) => self.get_optype(node).substitute(subst),
+            let new_optype = match (&subst, self.get_optype(node)) {
+                (None, op) => op.clone(),
+                (Some(subst), op) => op.substitute(subst),
             };
             self.as_mut().op_types.set(new_node.pg_index(), new_optype);
             let meta = self.base_hugr().metadata.get(node.pg_index()).clone();
