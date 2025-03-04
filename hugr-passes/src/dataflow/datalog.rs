@@ -38,7 +38,8 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
 }
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
-    /// Provide initial values for a wire - these will be `join`d with any computed.
+    /// Provide initial values for a wire - these will be `join`d with any computed
+    /// or any value previously prepopulated for the same Wire.
     pub fn prepopulate_wire(&mut self, w: Wire<H::Node>, v: PartialValue<V>) {
         for (n, inp) in self.0.linked_inputs(w.node(), w.source()) {
             self.1.entry(n).or_default().push((inp, v.clone()));
@@ -49,6 +50,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// (a [DataflowParent](hugr_core::ops::OpTag::DataflowParent), [CFG](hugr_core::ops::CFG)
     /// or [Conditional](hugr_core::ops::Conditional)).
     /// Any inputs not given values by `in_values`, are set to [PartialValue::Top].
+    /// Multiple calls for the same `parent` will `join` values for corresponding ports.
     pub fn prepopulate_inputs(
         &mut self,
         parent: H::Node,
