@@ -87,9 +87,12 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached).
-    /// As a shortcut, for non-[Module](OpType::Module)-rooted Hugrs only,
-    /// `in_values` may provide initial values for the root-node inputs, equivalent
-    /// to calling `prepopulate_inputs` with the root node.
+    /// As a shortcut, for Hugrs whose root is a [FuncDefn](OpType::FuncDefn),
+    /// [CFG](OpType::CFG), [DFG](OpType::DFG), [Conditional](OpType::Conditional)
+    /// or [TailLoop] only (that is: *not* [Module](OpType::Module),
+    /// [DataflowBlock](OpType::DataflowBlock) or [Case](OpType::Case)),
+    /// `in_values` may provide initial values for the root-node inputs,
+    ///  equivalent to calling `prepopulate_inputs` with the root node.
     ///
     /// The context passed in allows interpretation of leaf operations.
     ///
@@ -110,7 +113,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         } else {
             let mut p = in_values.into_iter().peekable();
             // We must provide some inputs to the root so that they are Top rather than Bottom.
-            // (However, this test will fail for DataflowBlock or Conditional roots, i.e. if no
+            // (However, this test will fail for DataflowBlock or Case roots, i.e. if no
             // inputs have been provided they will still see Bottom. We could store the "input"
             // values for even these nodes in self.1 and then convert to actual Wire values
             // (outputs from the Input node) before we run_datalog, but we would need to have
