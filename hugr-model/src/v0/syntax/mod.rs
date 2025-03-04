@@ -86,8 +86,20 @@ pub enum Term {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VarName(SmolStr);
 
+impl VarName {
+    pub fn new(name: impl Into<SmolStr>) -> Self {
+        Self(name.into())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SymbolName(SmolStr);
+
+impl SymbolName {
+    pub fn new(name: impl Into<SmolStr>) -> Self {
+        Self(name.into())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkName(SmolStr);

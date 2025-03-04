@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{LinkName, Node, Region, SeqPart, SymbolName, Term, VarName};
+use super::{LinkName, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName};
 use crate::v0::view::View;
 use crate::v0::{self as model, NodeId, RegionId, ScopeClosure, TermId, VarId};
 
@@ -59,6 +59,45 @@ impl<'a> View<'a> for Node {
     fn view(module: &'a model::Module<'a>, id: &'a Self::Id) -> Option<Self> {
         let node = module.get_node(*id)?;
 
+        let operation = match node.operation {
+            model::Operation::Invalid => Operation::Invalid,
+            model::Operation::Dfg => Operation::Dfg,
+            model::Operation::Cfg => Operation::Cfg,
+            model::Operation::Block => Operation::Block,
+            model::Operation::DefineFunc(symbol) => {
+                Operation::DefineFunc(Arc::new(module.view(symbol)?))
+            }
+            model::Operation::DeclareFunc(symbol) => {
+                Operation::DeclareFunc(Arc::new(module.view(symbol)?))
+            }
+            model::Operation::Custom(node_id) => {
+                let symbol = module.view(&node_id)?;
+                let params = node
+                    .params
+                    .iter()
+                    .map(|p| module.view(p))
+                    .collect::<Option<_>>()?;
+                Operation::Custom(Term::Apply(symbol, params))
+            }
+            model::Operation::DefineAlias(symbol) => {
+                let [value] = node.params.try_into().ok()?;
+                let value = module.view(&value)?;
+                Operation::DefineAlias(Arc::new(module.view(symbol)?), value)
+            }
+            model::Operation::DeclareAlias(symbol) => {
+                Operation::DeclareAlias(Arc::new(module.view(symbol)?))
+            }
+            model::Operation::DeclareConstructor(symbol) => {
+                Operation::DeclareConstructor(Arc::new(module.view(symbol)?))
+            }
+            model::Operation::DeclareOperation(symbol) => {
+                Operation::DeclareOperation(Arc::new(module.view(symbol)?))
+            }
+            model::Operation::TailLoop => Operation::TailLoop,
+            model::Operation::Conditional => Operation::Conditional,
+            model::Operation::Import { name } => Operation::Import(SymbolName::new(name)),
+        };
+
         let meta = node
             .meta
             .iter()
@@ -91,13 +130,52 @@ impl<'a> View<'a> for Node {
             .collect::<Option<_>>()?;
 
         Some(Node {
-            operation: todo!(),
+            operation,
             inputs,
             outputs,
             regions,
             meta,
             signature,
         })
+    }
+}
+
+impl<'a> View<'a> for Symbol {
+    type Id = model::Symbol<'a>;
+
+    fn view(module: &'a model::Module<'a>, id: &'a Self::Id) -> Option<Self> {
+        let name = SymbolName::new(id.name);
+
+        let params = id
+            .params
+            .iter()
+            .map(|p| module.view(p))
+            .collect::<Option<_>>()?;
+
+        let constraints = id
+            .constraints
+            .iter()
+            .map(|c| module.view(c))
+            .collect::<Option<_>>()?;
+
+        let signature = module.view(&id.signature)?;
+
+        Some(Symbol {
+            name,
+            params,
+            constraints,
+            signature,
+        })
+    }
+}
+
+impl<'a> View<'a> for Param {
+    type Id = model::Param<'a>;
+
+    fn view(module: &'a model::Module<'a>, param: &'a Self::Id) -> Option<Self> {
+        let name = VarName::new(param.name);
+        let r#type = module.view(&param.r#type)?;
+        Some(Param { name, r#type })
     }
 }
 
