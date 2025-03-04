@@ -1,5 +1,7 @@
 //! [ascent] datalog implementation of analysis.
 
+use std::collections::HashMap;
+
 use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
@@ -19,11 +21,14 @@ type PV<V> = PartialValue<V>;
 /// 1. Make a new instance via [Self::new()]
 /// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] and/or
 ///    [Self::prepopulate_df_inputs] with initial values.
-///    For example, to analyse a [Module](OpType::Module)-rooted Hugr as a library,
+///    For example, to analyse a [Module](OpType::Module)-rooted Hugr,
 ///    [Self::prepopulate_df_inputs] can be used on each externally-callable
 ///    [FuncDefn](OpType::FuncDefn) to set all inputs to [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
-pub struct Machine<H: HugrView, V: AbstractValue>(H, Vec<(H::Node, IncomingPort, PartialValue<V>)>);
+pub struct Machine<H: HugrView, V: AbstractValue>(
+    H,
+    HashMap<H::Node, Vec<(IncomingPort, PartialValue<V>)>>,
+);
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Create a new Machine to analyse the given Hugr(View)
@@ -35,17 +40,15 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Provide initial values for a wire - these will be `join`d with any computed.
     pub fn prepopulate_wire(&mut self, w: Wire<H::Node>, v: PartialValue<V>) {
-        self.1.extend(
-            self.0
-                .linked_inputs(w.node(), w.source())
-                .map(|(n, inp)| (n, inp, v.clone())),
-        );
+        for (n, inp) in self.0.linked_inputs(w.node(), w.source()) {
+            self.1.entry(n).or_default().push((inp, v.clone()));
+        }
     }
 
-    /// Provide initial values for the inputs to a [DataflowParent](hugr_core::ops::OpTag::DataflowParent)
-    /// (that is, values on the wires leaving the [Input](OpType::Input) child thereof).
-    /// Any out-ports of said same `Input` node, not given values by `in_values`, are set to [PartialValue::Top].
-    /// NOTE does not handle CFG or Conditional
+    /// Provide initial values for the inputs to a container node
+    /// (a [DataflowParent](hugr_core::ops::OpTag::DataflowParent), [CFG](hugr_core::ops::CFG)
+    /// or [Conditional](hugr_core::ops::Conditional)).
+    /// Any inputs not given values by `in_values`, are set to [PartialValue::Top].
     pub fn prepopulate_inputs(
         &mut self,
         parent: H::Node,
@@ -71,39 +74,59 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
                 for (ip, v) in in_values {
                     vals[ip.index()] = v;
                 }
-                self.1.extend(
-                    vals.into_iter()
-                        .enumerate()
-                        .map(|(i, v)| (parent, i.into(), v)),
-                );
+                self.1
+                    .entry(parent)
+                    .or_default()
+                    .extend(vals.into_iter().enumerate().map(|(i, v)| (i.into(), v)));
             }
             op => return Err(op.clone()),
         }
         Ok(())
     }
 
-    /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// given initial values for some of the root node inputs. For a
-    /// [Module](OpType::Module)-rooted Hugr, these are input to the function `"main"`.
+    /// Run the analysis (iterate until a lattice fixpoint is reached).
+    /// As a shortcut, for non-[Module](OpType::Module)-rooted Hugrs only,
+    /// `in_values` may provide initial values for the root-node inputs, equivalent
+    /// to calling `prepopulate_inputs` with the root node.
+    ///
     /// The context passed in allows interpretation of leaf operations.
     ///
     /// # Panics
     /// May panic in various ways if the Hugr is invalid;
-    /// or if any `in_values` are provided for a module-rooted Hugr without a function `"main"`.
+    /// or if any `in_values` are provided for a module-rooted Hugr.
     pub fn run(
         mut self,
         context: impl DFContext<V, Node = H::Node>,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
     ) -> AnalysisResults<V, H> {
         let root = self.0.root();
-        let mut p = in_values.into_iter().peekable();
-        if p.peek().is_some() {
-            // This handles all cases where the root node is a parent, panic otherwise
-            self.prepopulate_inputs(root, p).unwrap()
+        if self.0.get_optype(root).is_module() {
+            assert!(
+                in_values.into_iter().next().is_none(),
+                "No inputs possible for Module"
+            )
+        } else {
+            let mut p = in_values.into_iter().peekable();
+            // We must provide some inputs to the root so that they are Top rather than Bottom.
+            // (However, this test will fail for DataflowBlock or Conditional roots, i.e. if no
+            // inputs have been provided they will still see Bottom. We could store the "input"
+            // values for even these nodes in self.1 and then convert to actual Wire values
+            // (outputs from the Input node) before we run_datalog, but we would need to have
+            // a separate store of output-wire values in self to keep prepopulate_wire working.)
+            if p.peek().is_some() || !self.1.contains_key(&root) {
+                self.prepopulate_inputs(root, p).unwrap()
+            }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
         // for any nonlocal edges providing values from outside the region.
-        run_datalog(context, self.0, self.1)
+        run_datalog(
+            context,
+            self.0,
+            self.1
+                .into_iter()
+                .flat_map(|(n, vals)| vals.into_iter().map(move |(ip, v)| (n, ip, v)))
+                .collect(),
+        )
     }
 }
 
