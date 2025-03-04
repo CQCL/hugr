@@ -1939,9 +1939,9 @@ dependencies = [
 
 [[package]]
 name = "portgraph"
-version = "0.13.2"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f923403923182a2ddc882051fc292cdc8900ba98e98b0aa8ff2743c865bebc"
+checksum = "395d61e69996c0fe4b187149ab0e610a6be2af1b37bd13df8a567ae629f7359f"
 dependencies = [
  "bitvec",
  "delegate",
