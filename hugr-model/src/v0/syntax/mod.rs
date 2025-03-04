@@ -5,6 +5,7 @@ use smol_str::SmolStr;
 
 use super::{LinkId, LinkIndex, RegionKind, ScopeClosure};
 
+mod build;
 mod parse;
 mod print;
 mod view;
@@ -92,12 +93,24 @@ impl VarName {
     }
 }
 
+impl AsRef<str> for VarName {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SymbolName(SmolStr);
 
 impl SymbolName {
     pub fn new(name: impl Into<SmolStr>) -> Self {
         Self(name.into())
+    }
+}
+
+impl AsRef<str> for SymbolName {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
     }
 }
 

@@ -2,62 +2,34 @@ use std::sync::Arc;
 
 use super::{LinkName, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName};
 use crate::v0::view::View;
-use crate::v0::{self as model, NodeId, RegionId, ScopeClosure, TermId, VarId};
+use crate::v0::{self as model, NodeId, ScopeClosure, TermId, VarId};
 
-impl<'a> View<'a> for Term {
-    type Id = TermId;
-
-    fn view(module: &'a model::Module<'a>, id: &Self::Id) -> Option<Self> {
-        let term = module.get_term(*id)?;
+impl<'a> View<'a, TermId> for Term {
+    fn view(module: &'a model::Module<'a>, id: TermId) -> Option<Self> {
+        let term = module.get_term(id)?;
         Some(match term {
             model::Term::Wildcard => Term::Wildcard,
-            model::Term::Var(var) => Term::Var(module.view(var)?),
+            model::Term::Var(var) => Term::Var(module.view(*var)?),
             model::Term::Apply(symbol, terms) => {
-                let symbol = module.view(symbol)?;
-                let terms = terms
-                    .iter()
-                    .map(|t| module.view(t))
-                    .collect::<Option<_>>()?;
+                let symbol = module.view(*symbol)?;
+                let terms = module.view(*terms)?;
                 Term::Apply(symbol, terms)
             }
             model::Term::ExtSet(_) => Term::ExtSet,
-            model::Term::ConstFunc(region_id) => {
-                let region = module.view(region_id)?;
-                Term::Func(Arc::new(region))
-            }
-            model::Term::List(list_parts) => {
-                let list_parts = list_parts
-                    .iter()
-                    .map(|part| match part {
-                        model::ListPart::Item(term) => Some(SeqPart::Item(module.view(term)?)),
-                        model::ListPart::Splice(term) => Some(SeqPart::Splice(module.view(term)?)),
-                    })
-                    .collect::<Option<_>>()?;
-                Term::List(list_parts)
-            }
+            model::Term::ConstFunc(region_id) => Term::Func(Arc::new(module.view(*region_id)?)),
+            model::Term::List(list_parts) => Term::List(module.view(*list_parts)?),
             model::Term::Str(val) => Term::Str((*val).into()),
             model::Term::Nat(val) => Term::Nat(*val),
             model::Term::Bytes(bytes) => Term::Bytes((*bytes).into()),
             model::Term::Float(val) => Term::Float(*val),
-            model::Term::Tuple(tuple_parts) => {
-                let list_parts = tuple_parts
-                    .iter()
-                    .map(|part| match part {
-                        model::TuplePart::Item(term) => Some(SeqPart::Item(module.view(term)?)),
-                        model::TuplePart::Splice(term) => Some(SeqPart::Splice(module.view(term)?)),
-                    })
-                    .collect::<Option<_>>()?;
-                Term::List(list_parts)
-            }
+            model::Term::Tuple(tuple_parts) => Term::List(module.view(*tuple_parts)?),
         })
     }
 }
 
-impl<'a> View<'a> for Node {
-    type Id = NodeId;
-
-    fn view(module: &'a model::Module<'a>, id: &'a Self::Id) -> Option<Self> {
-        let node = module.get_node(*id)?;
+impl<'a> View<'a, NodeId> for Node {
+    fn view(module: &'a model::Module<'a>, id: NodeId) -> Option<Self> {
+        let node = module.get_node(id)?;
 
         let operation = match node.operation {
             model::Operation::Invalid => Operation::Invalid,
@@ -65,69 +37,40 @@ impl<'a> View<'a> for Node {
             model::Operation::Cfg => Operation::Cfg,
             model::Operation::Block => Operation::Block,
             model::Operation::DefineFunc(symbol) => {
-                Operation::DefineFunc(Arc::new(module.view(symbol)?))
+                Operation::DefineFunc(Arc::new(module.view(*symbol)?))
             }
             model::Operation::DeclareFunc(symbol) => {
-                Operation::DeclareFunc(Arc::new(module.view(symbol)?))
+                Operation::DeclareFunc(Arc::new(module.view(*symbol)?))
             }
             model::Operation::Custom(node_id) => {
-                let symbol = module.view(&node_id)?;
-                let params = node
-                    .params
-                    .iter()
-                    .map(|p| module.view(p))
-                    .collect::<Option<_>>()?;
+                let symbol = module.view(node_id)?;
+                let params = module.view(node.params)?;
                 Operation::Custom(Term::Apply(symbol, params))
             }
             model::Operation::DefineAlias(symbol) => {
                 let [value] = node.params.try_into().ok()?;
-                let value = module.view(&value)?;
-                Operation::DefineAlias(Arc::new(module.view(symbol)?), value)
+                let value = module.view(value)?;
+                Operation::DefineAlias(Arc::new(module.view(*symbol)?), value)
             }
             model::Operation::DeclareAlias(symbol) => {
-                Operation::DeclareAlias(Arc::new(module.view(symbol)?))
+                Operation::DeclareAlias(Arc::new(module.view(*symbol)?))
             }
             model::Operation::DeclareConstructor(symbol) => {
-                Operation::DeclareConstructor(Arc::new(module.view(symbol)?))
+                Operation::DeclareConstructor(Arc::new(module.view(*symbol)?))
             }
             model::Operation::DeclareOperation(symbol) => {
-                Operation::DeclareOperation(Arc::new(module.view(symbol)?))
+                Operation::DeclareOperation(Arc::new(module.view(*symbol)?))
             }
             model::Operation::TailLoop => Operation::TailLoop,
             model::Operation::Conditional => Operation::Conditional,
             model::Operation::Import { name } => Operation::Import(SymbolName::new(name)),
         };
 
-        let meta = node
-            .meta
-            .iter()
-            .map(|t| module.view(t))
-            .collect::<Option<_>>()?;
-
-        let signature = match node.signature {
-            Some(signature) => Some(module.view(&signature)?),
-            None => None,
-        };
-
-        let inputs = node
-            .inputs
-            .iter()
-            .copied()
-            .map(LinkName::new_index)
-            .collect();
-
-        let outputs = node
-            .inputs
-            .iter()
-            .copied()
-            .map(LinkName::new_index)
-            .collect();
-
-        let regions = node
-            .regions
-            .iter()
-            .map(|r| module.view(r))
-            .collect::<Option<_>>()?;
+        let meta = module.view(node.meta)?;
+        let signature = module.view(node.signature)?;
+        let inputs = module.view(node.inputs)?;
+        let outputs = module.view(node.outputs)?;
+        let regions = module.view(node.regions)?;
 
         Some(Node {
             operation,
@@ -140,26 +83,36 @@ impl<'a> View<'a> for Node {
     }
 }
 
-impl<'a> View<'a> for Symbol {
-    type Id = model::Symbol<'a>;
+impl<'a> View<'a, model::LinkIndex> for LinkName {
+    fn view(_module: &'a model::Module<'a>, index: model::LinkIndex) -> Option<Self> {
+        Some(LinkName::new_index(index))
+    }
+}
 
-    fn view(module: &'a model::Module<'a>, id: &'a Self::Id) -> Option<Self> {
+impl<'a> View<'a, model::ListPart> for SeqPart {
+    fn view(module: &'a model::Module<'a>, part: model::ListPart) -> Option<Self> {
+        Some(match part {
+            model::ListPart::Item(term_id) => SeqPart::Item(module.view(term_id)?),
+            model::ListPart::Splice(term_id) => SeqPart::Splice(module.view(term_id)?),
+        })
+    }
+}
+
+impl<'a> View<'a, model::TuplePart> for SeqPart {
+    fn view(module: &'a model::Module<'a>, part: model::TuplePart) -> Option<Self> {
+        Some(match part {
+            model::TuplePart::Item(term_id) => SeqPart::Item(module.view(term_id)?),
+            model::TuplePart::Splice(term_id) => SeqPart::Splice(module.view(term_id)?),
+        })
+    }
+}
+
+impl<'a> View<'a, model::Symbol<'a>> for Symbol {
+    fn view(module: &'a model::Module<'a>, id: model::Symbol<'a>) -> Option<Self> {
         let name = SymbolName::new(id.name);
-
-        let params = id
-            .params
-            .iter()
-            .map(|p| module.view(p))
-            .collect::<Option<_>>()?;
-
-        let constraints = id
-            .constraints
-            .iter()
-            .map(|c| module.view(c))
-            .collect::<Option<_>>()?;
-
-        let signature = module.view(&id.signature)?;
-
+        let params = module.view(id.params)?;
+        let constraints = module.view(id.constraints)?;
+        let signature = module.view(id.signature)?;
         Some(Symbol {
             name,
             params,
@@ -169,52 +122,22 @@ impl<'a> View<'a> for Symbol {
     }
 }
 
-impl<'a> View<'a> for Param {
-    type Id = model::Param<'a>;
-
-    fn view(module: &'a model::Module<'a>, param: &'a Self::Id) -> Option<Self> {
+impl<'a> View<'a, model::Param<'a>> for Param {
+    fn view(module: &'a model::Module<'a>, param: model::Param<'a>) -> Option<Self> {
         let name = VarName::new(param.name);
-        let r#type = module.view(&param.r#type)?;
+        let r#type = module.view(param.r#type)?;
         Some(Param { name, r#type })
     }
 }
 
-impl<'a> View<'a> for Region {
-    type Id = RegionId;
-
-    fn view(module: &'a model::Module<'a>, id: &'a Self::Id) -> Option<Self> {
-        let region = module.get_region(*id)?;
-
-        let sources = region
-            .sources
-            .iter()
-            .copied()
-            .map(LinkName::new_index)
-            .collect();
-
-        let targets = region
-            .targets
-            .iter()
-            .copied()
-            .map(LinkName::new_index)
-            .collect();
-
-        let meta = region
-            .meta
-            .iter()
-            .map(|t| module.view(t))
-            .collect::<Option<_>>()?;
-
-        let children = region
-            .children
-            .iter()
-            .map(|id| module.view(id))
-            .collect::<Option<_>>()?;
-
-        let signature = match region.signature {
-            Some(signature) => Some(module.view(&signature)?),
-            None => None,
-        };
+impl<'a> View<'a, model::RegionId> for Region {
+    fn view(module: &'a model::Module<'a>, id: model::RegionId) -> Option<Self> {
+        let region = module.get_region(id)?;
+        let sources = module.view(region.sources)?;
+        let targets = module.view(region.targets)?;
+        let meta = module.view(region.meta)?;
+        let children = module.view(region.children)?;
+        let signature = module.view(region.signature)?;
 
         let scope = match region.scope {
             Some(_) => ScopeClosure::Closed,
@@ -233,10 +156,8 @@ impl<'a> View<'a> for Region {
     }
 }
 
-impl<'a> View<'a> for VarName {
-    type Id = VarId;
-
-    fn view(module: &'a model::Module<'a>, id: &Self::Id) -> Option<Self> {
+impl<'a> View<'a, VarId> for VarName {
+    fn view(module: &'a model::Module<'a>, id: VarId) -> Option<Self> {
         let node = module.get_node(id.0)?;
 
         let symbol = match node.operation {
@@ -254,11 +175,9 @@ impl<'a> View<'a> for VarName {
     }
 }
 
-impl<'a> View<'a> for SymbolName {
-    type Id = NodeId;
-
-    fn view(module: &'a model::Module<'a>, id: &Self::Id) -> Option<Self> {
-        let node = module.get_node(*id)?;
+impl<'a> View<'a, NodeId> for SymbolName {
+    fn view(module: &'a model::Module<'a>, id: NodeId) -> Option<Self> {
+        let node = module.get_node(id)?;
         let name = node.operation.symbol()?;
         Some(Self(name.into()))
     }

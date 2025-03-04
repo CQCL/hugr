@@ -429,8 +429,8 @@ impl<'a> Module<'a> {
         id
     }
 
-    pub fn view<V: View<'a>>(&'a self, id: &'a V::Id) -> Option<V> {
-        V::view(self, id)
+    pub fn view<S, V: View<'a, S>>(&'a self, src: S) -> Option<V> {
+        V::view(self, src)
     }
 }
 
