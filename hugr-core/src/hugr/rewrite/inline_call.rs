@@ -295,7 +295,10 @@ mod test {
     #[test]
     fn test_polymorphic() -> Result<(), Box<dyn std::error::Error>> {
         let tuple_ty = Type::new_tuple(vec![usize_t(); 2]);
-        let mut fb = FunctionBuilder::new("mkpair", Signature::new(usize_t(), tuple_ty.clone()))?;
+        let mut fb = FunctionBuilder::new(
+            "mkpair",
+            Signature::new(usize_t(), tuple_ty.clone()).with_prelude(),
+        )?;
         let inner = fb.define_function(
             "id",
             PolyFuncType::new(
