@@ -281,6 +281,22 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 .as_basic_value_enum()])
         }),
         IntOpDef::ipow => emit_ipow(context, args),
+        // Type args are width of input, width of output
+        IntOpDef::iwiden_u => emit_custom_unary_op(context, args, |ctx, arg, outs| {
+            let [out] = outs.try_into()?;
+            Ok(vec![ctx
+                .builder()
+                .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), false, "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::iwiden_s => emit_custom_unary_op(context, args, |ctx, arg, outs| {
+            let [out] = outs.try_into()?;
+
+            Ok(vec![ctx
+                .builder()
+                .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), true, "")?
+                .as_basic_value_enum()])
+        }),
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
     }
 }
@@ -346,6 +362,7 @@ mod test {
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::bool_t,
+        ops::ExtensionOp,
         std_extensions::arithmetic::{
             int_ops,
             int_types::{ConstInt, INT_TYPES},
@@ -362,18 +379,25 @@ mod test {
         test::{exec_ctx, llvm_ctx, TestContext},
     };
 
-    fn test_binary_int_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
-        let ty = &INT_TYPES[log_width as usize];
-        test_int_op_with_results::<2>(name, log_width, None, ty.clone())
+    // Instantiate an extension op which takes one width argument
+    fn make_int_op(name: impl AsRef<str>, log_width: u8) -> ExtensionOp {
+        int_ops::EXTENSION
+            .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
+            .unwrap()
     }
 
-    fn test_binary_icmp_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
-        test_int_op_with_results::<2>(name, log_width, None, bool_t())
+    fn test_binary_int_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
+        let ty = &INT_TYPES[log_width as usize];
+        test_int_op_with_results::<2>(ext_op, log_width, None, ty.clone())
+    }
+
+    fn test_binary_icmp_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
+        test_int_op_with_results::<2>(ext_op, log_width, None, bool_t())
     }
 
     fn test_int_op_with_results<const N: usize>(
         // N is the number of inputs to the hugr
-        name: impl AsRef<str>,
+        ext_op: ExtensionOp,
         log_width: u8,
         inputs: Option<[ConstInt; N]>, // If inputs are provided, they'll be wired into the op, otherwise the inputs to the hugr will be wired into the op
         output_type: Type,
@@ -400,9 +424,6 @@ mod test {
                         input_wires
                     }
                 };
-                let ext_op = int_ops::EXTENSION
-                    .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
-                    .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, input_wires)
                     .unwrap()
@@ -415,7 +436,8 @@ mod test {
     fn test_neg_emission(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_int_extensions);
         let ty = INT_TYPES[2].clone();
-        let hugr = test_int_op_with_results::<1>("ineg", 2, None, ty.clone());
+        let ext_op = make_int_op("ineg", 2);
+        let hugr = test_int_op_with_results::<1>(ext_op, 2, None, ty.clone());
         check_emission!("ineg", hugr, llvm_ctx);
     }
 
@@ -425,16 +447,38 @@ mod test {
     #[case::ipow("ipow", 3)]
     fn test_binop_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_int_op(op.clone(), width);
+        let ext_op = make_int_op(op.clone(), width);
+        let hugr = test_binary_int_op(ext_op, width);
         check_emission!(op.clone(), hugr, llvm_ctx);
     }
 
+    #[rstest]
+    #[case::signed_2_3("iwiden_s", 2, 3)]
+    #[case::signed_1_6("iwiden_s", 1, 6)]
+    #[case::unsigned_2_3("iwiden_u", 2, 3)]
+    #[case::unsigned_1_6("iwiden_u", 1, 6)]
+    fn test_widen_emission(
+        mut llvm_ctx: TestContext,
+        #[case] op: String,
+        #[case] from: u8,
+        #[case] to: u8,
+    ) {
+        llvm_ctx.add_extensions(add_int_extensions);
+        let out_ty = INT_TYPES[to as usize].clone();
+        let ext_op = int_ops::EXTENSION
+            .instantiate_extension_op(&op, [(from as u64).into(), (to as u64).into()])
+            .unwrap();
+        let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty.into());
+
+        check_emission!(op.clone(), hugr, llvm_ctx);
+    }
     #[rstest]
     #[case::ieq("ieq", 1)]
     #[case::ilt_s("ilt_s", 0)]
     fn test_cmp_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_icmp_op(op.clone(), width);
+        let ext_op = make_int_op(op.clone(), width);
+        let hugr = test_binary_icmp_op(ext_op, width);
         check_emission!(op.clone(), hugr, llvm_ctx);
     }
 
@@ -473,7 +517,9 @@ mod test {
             ConstInt::new_u(6, lhs).unwrap(),
             ConstInt::new_u(6, rhs).unwrap(),
         ];
-        let hugr = test_int_op_with_results::<2>(op, 6, Some(inputs), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<2>(ext_op, 6, Some(inputs), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), result);
     }
 
@@ -506,7 +552,9 @@ mod test {
             ConstInt::new_s(6, lhs).unwrap(),
             ConstInt::new_s(6, rhs).unwrap(),
         ];
-        let hugr = test_int_op_with_results::<2>(op, 6, Some(inputs), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<2>(ext_op, 6, Some(inputs), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), result);
     }
 
@@ -522,7 +570,9 @@ mod test {
         exec_ctx.add_extensions(add_int_extensions);
         let input = ConstInt::new_s(6, arg).unwrap();
         let ty = INT_TYPES[6].clone();
-        let hugr = test_int_op_with_results::<1>(op, 6, Some([input]), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<1>(ext_op, 6, Some([input]), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), result);
     }
 
@@ -539,7 +589,9 @@ mod test {
         exec_ctx.add_extensions(add_int_extensions);
         let input = ConstInt::new_u(6, arg).unwrap();
         let ty = INT_TYPES[6].clone();
-        let hugr = test_int_op_with_results::<1>(op, 6, Some([input]), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<1>(ext_op, 6, Some([input]), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), result);
     }
 }
