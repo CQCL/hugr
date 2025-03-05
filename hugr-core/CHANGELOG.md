@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.4...hugr-core-v0.15.0) - 2025-03-05
+
+### New Features
+
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- Rewrite for inlining a single Call ([#1934](https://github.com/CQCL/hugr/pull/1934))
+
+### Refactor
+
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` ([#1870](https://github.com/CQCL/hugr/pull/1870))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.3...hugr-core-v0.14.4) - 2025-02-24
 
 ### Bug Fixes

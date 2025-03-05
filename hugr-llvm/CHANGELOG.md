@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.4...hugr-llvm-v0.15.0) - 2025-03-05
+
+### Bug Fixes
+
+- Rename widen insta tests ([#1949](https://github.com/CQCL/hugr/pull/1949))
+
+### New Features
+
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- Emit `widen` ops from the int ops extension ([#1946](https://github.com/CQCL/hugr/pull/1946))
+
+### Refactor
+
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.3...hugr-llvm-v0.14.4) - 2025-02-24
 
 ### New Features
