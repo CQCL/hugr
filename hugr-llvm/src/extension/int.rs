@@ -453,8 +453,10 @@ mod test {
     }
 
     #[rstest]
-    #[case::signed("iwiden_s", 2, 3)]
-    #[case::unsigned("iwiden_u", 1, 6)]
+    #[case::signed_2_3("iwiden_s", 2, 3)]
+    #[case::signed_1_6("iwiden_s", 1, 6)]
+    #[case::unsigned_2_3("iwiden_u", 2, 3)]
+    #[case::unsigned_1_6("iwiden_u", 1, 6)]
     fn test_widen_emission(
         mut llvm_ctx: TestContext,
         #[case] op: String,
