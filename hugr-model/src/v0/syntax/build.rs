@@ -2,8 +2,9 @@ use bumpalo::{collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
 use thiserror::Error;
 
-use super::{LinkName, Node, Region, SymbolName, Term, VarName};
-use crate::v0::{self as model, RegionId, TermId, VarId};
+use super::{LinkName, Node, Param, Region, Symbol, SymbolName, Term, VarName};
+use crate::v0::syntax::Operation;
+use crate::v0::{self as model, LinkId, LinkIndex, RegionId, TermId, VarId};
 use crate::v0::{
     scope::{LinkTable, SymbolTable, VarTable},
     NodeId,
@@ -13,7 +14,7 @@ struct Context<'a> {
     module: model::Module<'a>,
     bump: &'a Bump,
     vars: VarTable<'a>,
-    links: LinkTable<LinkName>,
+    links: LinkTable<&'a str>,
     symbols: SymbolTable<'a>,
     imports: FxHashMap<SymbolName, NodeId>,
 }
@@ -90,7 +91,75 @@ impl<'a> Context<'a> {
     }
 
     fn build_node(&mut self, node_id: NodeId, node: &'a Node) -> BuildResult<()> {
-        todo!()
+        let inputs = self.resolve_links(&node.inputs)?;
+        let outputs = self.resolve_links(&node.outputs)?;
+        let meta = self.build_terms(&node.meta)?;
+        let regions = self.build_regions(&node.regions)?;
+
+        let signature = match &node.signature {
+            Some(signature) => Some(self.build_term(&signature)?),
+            None => None,
+        };
+
+        let operation = match &node.operation {
+            Operation::Invalid => model::Operation::Invalid,
+            Operation::Dfg => model::Operation::Dfg,
+            Operation::Cfg => model::Operation::Cfg,
+            Operation::Block => model::Operation::Block,
+            Operation::TailLoop => model::Operation::TailLoop,
+            Operation::Conditional => model::Operation::Conditional,
+            Operation::DefineFunc(symbol) => {
+                let symbol = self.build_symbol(&symbol)?;
+                model::Operation::DefineFunc(symbol)
+            }
+            Operation::DeclareFunc(symbol) => {
+                let symbol = self.build_symbol(&symbol)?;
+                model::Operation::DeclareFunc(symbol)
+            }
+            Operation::DefineAlias(symbol, term) => todo!(),
+            Operation::DeclareAlias(symbol) => {
+                let symbol = self.build_symbol(&symbol)?;
+                model::Operation::DeclareAlias(symbol)
+            }
+            Operation::DeclareConstructor(symbol) => {
+                let symbol = self.build_symbol(&symbol)?;
+                model::Operation::DeclareConstructor(symbol)
+            }
+            Operation::DeclareOperation(symbol) => {
+                let symbol = self.build_symbol(&symbol)?;
+                model::Operation::DeclareOperation(symbol)
+            }
+            Operation::Import(symbol_name) => model::Operation::Import {
+                name: symbol_name.as_ref(),
+            },
+            Operation::Custom(term) => todo!(),
+        };
+
+        self.module.nodes[node_id.index()] = model::Node {
+            operation,
+            inputs,
+            outputs,
+            params: todo!(),
+            regions,
+            meta,
+            signature,
+        };
+
+        Ok(())
+    }
+
+    fn resolve_links(&mut self, links: &'a [LinkName]) -> BuildResult<&'a [LinkIndex]> {
+        let mut indices = BumpVec::with_capacity_in(links.len(), self.bump);
+
+        for link in links {
+            indices.push(self.resolve_link(link)?);
+        }
+
+        Ok(indices.into_bump_slice())
+    }
+
+    fn resolve_link(&mut self, link: &'a LinkName) -> BuildResult<LinkIndex> {
+        Ok(self.links.use_link(link.as_ref()))
     }
 
     fn build_regions(&mut self, regions: &'a [Region]) -> BuildResult<&'a [RegionId]> {
@@ -104,7 +173,55 @@ impl<'a> Context<'a> {
     }
 
     fn build_region(&mut self, region: &'a Region) -> BuildResult<RegionId> {
-        todo!()
+        let children = self.build_nodes(&region.children)?;
+        let sources = self.resolve_links(&region.sources)?;
+        let targets = self.resolve_links(&region.targets)?;
+        let meta = self.build_terms(&region.meta)?;
+
+        let signature = match &region.signature {
+            Some(signature) => Some(self.build_term(&signature)?),
+            None => None,
+        };
+
+        Ok(self.module.insert_region(model::Region {
+            kind: region.kind,
+            sources,
+            targets,
+            children,
+            meta,
+            signature,
+            scope: todo!(),
+        }))
+    }
+
+    fn build_symbol(&mut self, symbol: &'a Symbol) -> BuildResult<&'a model::Symbol<'a>> {
+        let name = symbol.name.as_ref();
+        let params = self.build_params(&symbol.params)?;
+        let constraints = self.build_terms(&symbol.constraints)?;
+        let signature = self.build_term(&symbol.signature)?;
+
+        Ok(self.bump.alloc(model::Symbol {
+            name,
+            params,
+            constraints,
+            signature,
+        }))
+    }
+
+    fn build_params(&mut self, params: &'a [Param]) -> BuildResult<&'a [model::Param<'a>]> {
+        let mut result = BumpVec::with_capacity_in(params.len(), self.bump);
+
+        for param in params {
+            result.push(self.build_param(param)?);
+        }
+
+        Ok(result.into_bump_slice())
+    }
+
+    fn build_param(&mut self, param: &'a Param) -> BuildResult<model::Param<'a>> {
+        let name = param.name.as_ref();
+        let r#type = self.build_term(&param.r#type)?;
+        Ok(model::Param { name, r#type })
     }
 
     fn resolve_var(&self, var_name: &'a VarName) -> BuildResult<VarId> {
@@ -114,6 +231,8 @@ impl<'a> Context<'a> {
     }
 
     fn resolve_symbol(&self, symbol_name: &'a SymbolName) -> BuildResult<NodeId> {
+        // TODO: Instead of an error, add the symbol to the implicit imports
+
         self.symbols
             .resolve(symbol_name.as_ref())
             .map_err(|_| BuildError::Symbol(symbol_name.clone()))

@@ -123,6 +123,12 @@ impl LinkName {
     }
 }
 
+impl AsRef<str> for LinkName {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SeqPart {
     Item(Term),
