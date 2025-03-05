@@ -283,14 +283,14 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
         IntOpDef::ipow => emit_ipow(context, args),
         // Type args are width of input, width of output
         IntOpDef::iwiden_u => emit_custom_unary_op(context, args, |ctx, arg, outs| {
-            let [out] = TryInto::<[_; 1]>::try_into(outs)?;
+            let [out] = outs.try_into()?;
             Ok(vec![ctx
                 .builder()
                 .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), false, "")?
                 .as_basic_value_enum()])
         }),
         IntOpDef::iwiden_s => emit_custom_unary_op(context, args, |ctx, arg, outs| {
-            let [out] = TryInto::<[_; 1]>::try_into(outs)?;
+            let [out] = outs.try_into()?;
 
             Ok(vec![ctx
                 .builder()
@@ -386,14 +386,12 @@ mod test {
             .unwrap()
     }
 
-    fn test_binary_int_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
+    fn test_binary_int_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
         let ty = &INT_TYPES[log_width as usize];
-        let ext_op = make_int_op(name, log_width);
         test_int_op_with_results::<2>(ext_op, log_width, None, ty.clone())
     }
 
-    fn test_binary_icmp_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
-        let ext_op = make_int_op(name, log_width);
+    fn test_binary_icmp_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
         test_int_op_with_results::<2>(ext_op, log_width, None, bool_t())
     }
 
@@ -449,7 +447,8 @@ mod test {
     #[case::ipow("ipow", 3)]
     fn test_binop_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_int_op(op.clone(), width);
+        let ext_op = make_int_op(op.clone(), width);
+        let hugr = test_binary_int_op(ext_op, width);
         check_emission!(op.clone(), hugr, llvm_ctx);
     }
 
@@ -476,7 +475,8 @@ mod test {
     #[case::ilt_s("ilt_s", 0)]
     fn test_cmp_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_icmp_op(op.clone(), width);
+        let ext_op = make_int_op(op.clone(), width);
+        let hugr = test_binary_icmp_op(ext_op, width);
         check_emission!(op.clone(), hugr, llvm_ctx);
     }
 
