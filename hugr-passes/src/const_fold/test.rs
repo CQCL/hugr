@@ -1445,7 +1445,7 @@ fn test_tail_loop_unknown() {
 fn test_tail_loop_never_iterates() {
     let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
     ConstantFoldPass::default()
-        .with_inputs([(0, Value::true_val())]) // true = 1 = break
+        .with_inputs(h.root(), [(0, Value::true_val())]) // true = 1 = break
         .run(&mut h)
         .unwrap();
     assert_fully_folded(&h, &ConstInt::new_u(4, 12).unwrap().into());
@@ -1516,8 +1516,10 @@ fn test_cfg(
 ) {
     let backup = cfg_hugr();
     let mut hugr = backup.clone();
-    let pass = ConstantFoldPass::default()
-        .with_inputs(inputs.iter().map(|(p, b)| (*p, Value::from_bool(*b))));
+    let pass = ConstantFoldPass::default().with_inputs(
+        hugr.root(),
+        inputs.iter().map(|(p, b)| (*p, Value::from_bool(*b))),
+    );
     pass.run(&mut hugr).unwrap();
     // CFG inside DFG retained
     let nested = hugr
