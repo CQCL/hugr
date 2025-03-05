@@ -967,9 +967,9 @@ mod extension_tests {
     use super::*;
     use crate::builder::handle::Outputs;
     use crate::builder::{BlockBuilder, BuildHandle, CFGBuilder, DFGWrapper, TailLoopBuilder};
-    use crate::extension::prelude::Lift;
     use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
+    use crate::hugr::test::{lift_op, LIFT_EXT_ID};
     use crate::macros::const_extension_ids;
     use crate::Wire;
     const_extension_ids! {
@@ -987,6 +987,7 @@ mod extension_tests {
     ) {
         // Child graph adds extension "XB", but the parent (in all cases)
         // declares a different delta, causing a mismatch.
+
         let parent = parent_f(
             Signature::new_endo(usize_t()).with_extension_delta(parent_extensions.clone()),
         );
@@ -1005,7 +1006,7 @@ mod extension_tests {
             },
         );
 
-        let lift = hugr.add_node_with_parent(hugr.root(), Lift::new(vec![usize_t()].into(), XB));
+        let lift = hugr.add_node_with_parent(hugr.root(), lift_op(usize_t(), XB));
 
         hugr.connect(input, 0, lift, 0);
         hugr.connect(lift, 0, output, 0);
@@ -1017,7 +1018,7 @@ mod extension_tests {
                 parent: hugr.root(),
                 parent_extensions,
                 child: lift,
-                child_extensions: ExtensionSet::from_iter([PRELUDE_ID, XB]),
+                child_extensions: ExtensionSet::from_iter([LIFT_EXT_ID, XB]),
             }))
         );
     }
@@ -1060,7 +1061,7 @@ mod extension_tests {
     #[rstest]
     #[case(XA.into(), false)]
     #[case(ExtensionSet::new(), false)]
-    #[case(ExtensionSet::from_iter([XA, XB, PRELUDE_ID]), true)]
+    #[case(ExtensionSet::from_iter([XA, XB, LIFT_EXT_ID]), true)]
     fn conditional_extension_mismatch(
         #[case] parent_extensions: ExtensionSet,
         #[case] success: bool,
@@ -1078,7 +1079,7 @@ mod extension_tests {
         // First case with no delta should be ok in all cases. Second one may not be.
         let [_, child] = [None, Some(XB)].map(|case_ext| {
             let case_exts = if let Some(ex) = &case_ext {
-                ExtensionSet::from_iter([ex.clone(), PRELUDE_ID])
+                ExtensionSet::from_iter([ex.clone(), LIFT_EXT_ID])
             } else {
                 ExtensionSet::new()
             };
@@ -1104,8 +1105,7 @@ mod extension_tests {
             let res = match case_ext {
                 None => input,
                 Some(new_ext) => {
-                    let lift =
-                        hugr.add_node_with_parent(case, Lift::new(vec![usize_t()].into(), new_ext));
+                    let lift = hugr.add_node_with_parent(case, lift_op(usize_t(), new_ext));
                     hugr.connect(input, 0, lift, 0);
                     lift
                 }
@@ -1122,7 +1122,7 @@ mod extension_tests {
                 parent: hugr.root(),
                 parent_extensions,
                 child,
-                child_extensions: ExtensionSet::from_iter([XB, PRELUDE_ID]),
+                child_extensions: ExtensionSet::from_iter([XB, LIFT_EXT_ID]),
             }))
         };
         assert_eq!(result, expected);
@@ -1134,16 +1134,20 @@ mod extension_tests {
     fn bb_extension_mismatch<T>(
         #[case] dfg_fn: impl Fn(Type, ExtensionSet) -> DFGWrapper<Hugr, T>,
         #[case] make_pred: impl Fn(&mut DFGWrapper<Hugr, T>, Outputs) -> Result<Wire, BuildError>,
-        #[values((ExtensionSet::from_iter([XA,PRELUDE_ID]), false), (PRELUDE_ID.into(), false), (ExtensionSet::from_iter([XA,XB,PRELUDE_ID]), true))]
+        // last one includes prelude because `MakeTuple` is in prelude
+        #[values((ExtensionSet::from_iter([XA,LIFT_EXT_ID]), false), (LIFT_EXT_ID.into(), false), (ExtensionSet::from_iter([XA,XB,LIFT_EXT_ID,PRELUDE_ID]), true))]
         parent_exts_success: (ExtensionSet, bool),
     ) -> Result<(), BuildError> {
         let (parent_extensions, success) = parent_exts_success;
         let mut dfg = dfg_fn(usize_t(), parent_extensions.clone());
-        let lift = dfg.add_dataflow_op(Lift::new(usize_t().into(), XB), dfg.input_wires())?;
+        let lift = dfg.add_dataflow_op(lift_op(usize_t(), XB), dfg.input_wires())?;
         let pred = make_pred(&mut dfg, lift.outputs())?;
         let root = dfg.hugr().root();
         let res = dfg.finish_hugr_with_outputs([pred]);
         if success {
+            if res.is_err() {
+                dbg!(&res);
+            }
             assert!(res.is_ok())
         } else {
             assert_eq!(
@@ -1153,7 +1157,7 @@ mod extension_tests {
                         parent: root,
                         parent_extensions,
                         child: lift.node(),
-                        child_extensions: ExtensionSet::from_iter([XB, PRELUDE_ID])
+                        child_extensions: ExtensionSet::from_iter([XB, LIFT_EXT_ID])
                     }
                 )))
             );

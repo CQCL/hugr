@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "prelude",
   "runtime_reqs": [],
   "types": {
@@ -46,15 +46,12 @@
   },
   "values": {},
   "operations": {
-    "Lift": {
+    "Barrier": {
       "extension": "prelude",
-      "name": "Lift",
-      "description": "Add extension requirements to a row of values",
+      "name": "Barrier",
+      "description": "Add a barrier to a row of values",
       "signature": {
         "params": [
-          {
-            "tp": "Extensions"
-          },
           {
             "tp": "List",
             "param": {
@@ -67,20 +64,18 @@
           "input": [
             {
               "t": "R",
-              "i": 1,
+              "i": 0,
               "b": "A"
             }
           ],
           "output": [
             {
               "t": "R",
-              "i": 1,
+              "i": 0,
               "b": "A"
             }
           ],
-          "runtime_reqs": [
-            "0"
-          ]
+          "runtime_reqs": []
         }
       },
       "binary": false

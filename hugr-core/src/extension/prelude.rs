@@ -38,7 +38,7 @@ pub mod generic;
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
 lazy_static! {
     /// Prelude extension, containing common types and operations.
     pub static ref PRELUDE: Arc<Extension> = {
@@ -112,7 +112,7 @@ lazy_static! {
 
             TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
             NoopDef.add_to_extension(prelude, extension_ref).unwrap();
-            LiftDef.add_to_extension(prelude, extension_ref).unwrap();
+            BarrierDef.add_to_extension(prelude, extension_ref).unwrap();
             generic::LoadNatDef.add_to_extension(prelude, extension_ref).unwrap();
         })
     };
@@ -827,20 +827,20 @@ impl MakeRegisteredOp for Noop {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-/// A lift operation definition.
-pub struct LiftDef;
+/// A barrier operation definition.
+pub struct BarrierDef;
 
-impl NamedOp for LiftDef {
+impl NamedOp for BarrierDef {
     fn name(&self) -> OpName {
-        "Lift".into()
+        "Barrier".into()
     }
 }
 
-impl std::str::FromStr for LiftDef {
+impl std::str::FromStr for BarrierDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == LiftDef.name() {
+        if s == BarrierDef.name() {
             Ok(Self)
         } else {
             Err(())
@@ -848,18 +848,17 @@ impl std::str::FromStr for LiftDef {
     }
 }
 
-impl MakeOpDef for LiftDef {
+impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
-            vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
-            FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))
-                .with_extension_delta(ExtensionSet::type_var(0)),
+            vec![TypeParam::new_list(TypeBound::Any)],
+            FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any)),
         )
         .into()
     }
 
     fn description(&self) -> String {
-        "Add extension requirements to a row of values".to_string()
+        "Add a barrier to a row of values".to_string()
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
@@ -875,42 +874,39 @@ impl MakeOpDef for LiftDef {
     }
 }
 
-/// A node which adds a extension req to the types of the wires it is passed
-/// It has no effect on the values passed along the edge
+/// A barrier across a row of values. This operation has no effect on the values,
+/// except to enforce some ordering between operations before and after the barrier.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 #[non_exhaustive]
-pub struct Lift {
+pub struct Barrier {
     /// The types of the edges
     pub type_row: TypeRow,
-    /// The extensions which we're adding to the inputs
-    pub new_extensions: ExtensionSet,
 }
 
-impl Lift {
-    /// Create a new Lift operation with the extensions to add.
-    pub fn new(type_row: TypeRow, set: impl Into<ExtensionSet>) -> Self {
+impl Barrier {
+    /// Create a new Barrier operation over the specified row.
+    pub fn new(type_row: impl Into<TypeRow>) -> Self {
         Self {
-            type_row,
-            new_extensions: set.into(),
+            type_row: type_row.into(),
         }
     }
 }
 
-impl NamedOp for Lift {
+impl NamedOp for Barrier {
     fn name(&self) -> OpName {
-        LiftDef.name()
+        BarrierDef.name()
     }
 }
 
-impl MakeExtensionOp for Lift {
+impl MakeExtensionOp for Barrier {
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
-        let _def = LiftDef::from_def(ext_op.def())?;
+        let _def = BarrierDef::from_def(ext_op.def())?;
 
-        let [TypeArg::Extensions { es }, TypeArg::Sequence { elems }] = ext_op.args() else {
+        let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
@@ -922,27 +918,21 @@ impl MakeExtensionOp for Lift {
             .collect();
         Ok(Self {
             type_row: tys?.into(),
-            new_extensions: es.clone(),
         })
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![
-            TypeArg::Extensions {
-                es: self.new_extensions.clone(),
-            },
-            TypeArg::Sequence {
-                elems: self
-                    .type_row
-                    .iter()
-                    .map(|t| TypeArg::Type { ty: t.clone() })
-                    .collect(),
-            },
-        ]
+        vec![TypeArg::Sequence {
+            elems: self
+                .type_row
+                .iter()
+                .map(|t| TypeArg::Type { ty: t.clone() })
+                .collect(),
+        }]
     }
 }
 
-impl MakeRegisteredOp for Lift {
+impl MakeRegisteredOp for Barrier {
     fn extension_id(&self) -> ExtensionId {
         PRELUDE_ID.to_owned()
     }
@@ -1015,17 +1005,14 @@ mod test {
 
     #[test]
     fn test_lift() {
-        const XA: ExtensionId = ExtensionId::new_unchecked("xa");
-        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(XA));
+        let op = Barrier::new(type_row![Type::UNIT]);
         let optype: OpType = op.clone().into();
         assert_eq!(
             optype.dataflow_signature().unwrap().as_ref(),
-            &Signature::new_endo(type_row![Type::UNIT])
-                .with_extension_delta(XA)
-                .with_prelude()
+            &Signature::new_endo(type_row![Type::UNIT]).with_prelude()
         );
 
-        let new_op = Lift::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        let new_op = Barrier::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
         assert_eq!(new_op, op);
     }
 

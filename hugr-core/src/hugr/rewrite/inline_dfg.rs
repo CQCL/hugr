@@ -143,7 +143,7 @@ mod test {
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
     use crate::std_extensions::arithmetic::float_types;
-    use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
+    use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension;
@@ -167,8 +167,6 @@ mod test {
     #[case(true)]
     #[case(false)]
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
-        use crate::extension::prelude::Lift;
-
         let int_ty = &int_types::INT_TYPES[6];
 
         let mut outer = DFGBuilder::new(inout_sig(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
@@ -176,16 +174,10 @@ mod test {
         fn make_const<T: AsMut<Hugr> + AsRef<Hugr>>(
             d: &mut DFGBuilder<T>,
         ) -> Result<Wire, Box<dyn std::error::Error>> {
-            let int_ty = &int_types::INT_TYPES[6];
             let cst = Value::extension(ConstInt::new_u(6, 15)?);
             let c1 = d.add_load_const(cst);
-            let [lifted] = d
-                .add_dataflow_op(
-                    Lift::new(vec![int_ty.clone()].into(), int_ops::EXTENSION_ID),
-                    [c1],
-                )?
-                .outputs_arr();
-            Ok(lifted)
+
+            Ok(c1)
         }
         let c1 = nonlocal.then(|| make_const(&mut outer));
         let inner = {
@@ -203,15 +195,15 @@ mod test {
         // Sanity checks
         assert_eq!(
             outer.children(inner.node()).count(),
-            if nonlocal { 3 } else { 6 }
-        ); // Input, Output, add; + const, load_const, lift
+            if nonlocal { 3 } else { 5 }
+        ); // Input, Output, add; + const, load_const
         assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
-        let [_lift, add, sub] = extension_ops(&outer).try_into().unwrap();
+        let [add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(
             outer.get_parent(outer.get_parent(add).unwrap()),
             outer.get_parent(sub)
         );
-        assert_eq!(outer.nodes().count(), 11); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
+        assert_eq!(outer.nodes().count(), 10); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
         {
             // Check we can't inline the outer DFG
             let mut h = outer.clone();
@@ -224,9 +216,9 @@ mod test {
 
         outer.apply_rewrite(InlineDFG(*inner.handle()))?;
         outer.validate()?;
-        assert_eq!(outer.nodes().count(), 8);
+        assert_eq!(outer.nodes().count(), 7);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
-        let [_lift, add, sub] = extension_ops(&outer).try_into().unwrap();
+        let [add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(outer.get_parent(add), Some(outer.root()));
         assert_eq!(outer.get_parent(sub), Some(outer.root()));
         assert_eq!(

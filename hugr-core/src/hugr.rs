@@ -402,19 +402,73 @@ pub enum LoadHugrError {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
     use std::{fs::File, io::BufReader};
 
     use super::internal::HugrMutInternals;
     #[cfg(feature = "extension_inference")]
     use super::ValidationError;
     use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
-    use crate::extension::prelude::Lift;
-    use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
-    use crate::types::{Signature, Type};
-    use crate::{const_extension_ids, ops, test_file, type_row};
+    use crate::ops::{ExtensionOp, OpName};
+    use crate::types::type_param::TypeParam;
+    use crate::types::{
+        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV, TypeRow,
+    };
+
+    use crate::{const_extension_ids, ops, test_file, type_row, Extension};
     use cool_asserts::assert_matches;
+    use lazy_static::lazy_static;
     use rstest::rstest;
+
+    const_extension_ids! {
+        pub(crate) const LIFT_EXT_ID: ExtensionId = "LIFT_EXT_ID";
+    }
+    lazy_static! {
+        /// Tests only extension holding an Op that can add arbitrary extensions to a row.
+        pub(crate) static ref LIFT_EXT: Arc<Extension> = {
+            Extension::new_arc(
+                LIFT_EXT_ID,
+                hugr::extension::Version::new(0, 0, 0),
+                |ext, extension_ref| {
+                    ext.add_op(
+                        OpName::new_inline("Lift"),
+                        "".into(),
+                        PolyFuncTypeRV::new(
+                            vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
+                            FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))
+                                .with_extension_delta(ExtensionSet::type_var(0)),
+                        ),
+                        extension_ref,
+                    )
+                    .unwrap();
+                },
+            )
+        };
+    }
+
+    pub(crate) fn lift_op(
+        type_row: impl Into<TypeRow>,
+        extensions: impl Into<ExtensionSet>,
+    ) -> ExtensionOp {
+        LIFT_EXT
+            .instantiate_extension_op(
+                "Lift",
+                [
+                    TypeArg::Extensions {
+                        es: extensions.into(),
+                    },
+                    TypeArg::Sequence {
+                        elems: type_row
+                            .into()
+                            .iter()
+                            .map(|t| TypeArg::Type { ty: t.clone() })
+                            .collect(),
+                    },
+                ],
+            )
+            .unwrap()
+    }
 
     #[test]
     fn impls_send_and_sync() {
@@ -496,12 +550,12 @@ mod test {
         let parent = ExtensionSet::from_iter(parent).union(TO_BE_INFERRED.into());
         let (mut h, _) = build_ext_dfg(parent);
         h.infer_extensions(remove).unwrap();
-        assert_eq!(h, build_ext_dfg(result.union(PRELUDE_ID.into())).0);
+        assert_eq!(h, build_ext_dfg(result.union(LIFT_EXT_ID.into())).0);
     }
 
     #[test]
     fn infer_removes_from_delta() {
-        let parent = ExtensionSet::from_iter([XA, XB, PRELUDE_ID]);
+        let parent = ExtensionSet::from_iter([XA, XB, LIFT_EXT_ID]);
         let mut h = build_ext_dfg(parent.clone()).0;
         let backup = h.clone();
         h.infer_extensions(false).unwrap();
@@ -509,7 +563,7 @@ mod test {
         h.infer_extensions(true).unwrap();
         assert_eq!(
             h,
-            build_ext_dfg(ExtensionSet::from_iter([XA, PRELUDE_ID])).0
+            build_ext_dfg(ExtensionSet::from_iter([XA, LIFT_EXT_ID])).0
         );
     }
 
@@ -524,7 +578,7 @@ mod test {
             parent: h.root(),
             parent_extensions: XB.into(),
             child: mid,
-            child_extensions: ExtensionSet::from_iter([XA, PRELUDE_ID]),
+            child_extensions: ExtensionSet::from_iter([XA, LIFT_EXT_ID]),
         };
         #[cfg(feature = "extension_inference")]
         assert_eq!(
@@ -561,7 +615,7 @@ mod test {
                 types: ty.clone().into(),
             },
         );
-        let mid = h.add_node_with_parent(p, Lift::new(ty.into(), XA));
+        let mid = h.add_node_with_parent(p, lift_op(ty, XA));
         h.connect(inp, 0, mid, 0);
         h.connect(mid, 0, out, 0);
         mid
@@ -591,9 +645,9 @@ mod test {
         #[case] result: impl IntoIterator<Item = ExtensionId>,
     ) {
         let ty = Type::new_function(Signature::new_endo(type_row![]));
-        let grandparent = ExtensionSet::from_iter(grandparent).union(PRELUDE_ID.into());
-        let parent = ExtensionSet::from_iter(parent).union(PRELUDE_ID.into());
-        let result = ExtensionSet::from_iter(result).union(PRELUDE_ID.into());
+        let grandparent = ExtensionSet::from_iter(grandparent).union(LIFT_EXT_ID.into());
+        let parent = ExtensionSet::from_iter(parent).union(LIFT_EXT_ID.into());
+        let result = ExtensionSet::from_iter(result).union(LIFT_EXT_ID.into());
         let root_ty = ops::Conditional {
             sum_rows: vec![type_row![]],
             other_inputs: ty.clone().into(),
