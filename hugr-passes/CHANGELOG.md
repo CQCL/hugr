@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.4...hugr-passes-v0.15.0) - 2025-03-05
+
+### New Features
+
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
+
 ## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.2...hugr-passes-v0.14.3) - 2025-02-05
 
 ### Bug Fixes

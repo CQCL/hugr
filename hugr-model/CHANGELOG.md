@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.18.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.17.1...hugr-model-v0.18.0) - 2025-03-05
+
+### Bug Fixes
+
+- Hugr-model using undeclared derive_more features ([#1940](https://github.com/CQCL/hugr/pull/1940))
+
+### New Features
+
+- *(hugr-model)* [**breaking**] Add `read_from_reader` and `write_to_writer` for streaming reads and writes. ([#1871](https://github.com/CQCL/hugr/pull/1871))
+
+### Refactor
+
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` ([#1870](https://github.com/CQCL/hugr/pull/1870))
+
 ## [0.17.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.17.0...hugr-model-v0.17.1) - 2025-02-05
 
 ### Bug Fixes

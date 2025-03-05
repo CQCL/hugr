@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-v0.14.4...hugr-v0.15.0) - 2025-03-05
+
+### New Features
+
+- add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- Rewrite for inlining a single Call ([#1934](https://github.com/CQCL/hugr/pull/1934))
+
+### Refactor
+
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` ([#1870](https://github.com/CQCL/hugr/pull/1870))
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-v0.14.3...hugr-v0.14.4) - 2025-02-24
 
 ### Bug Fixes
