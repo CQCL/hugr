@@ -213,6 +213,12 @@ jobs:
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose  --all-features
+      - name: Build hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+      - name: Tests hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -324,16 +330,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fail if required checks failed
-        # This condition should simply be `if: failure() || cancelled()`,
-        # but there seems to be a bug in the github workflow runner.
-        #
-        # See https://github.com/orgs/community/discussions/80788
-        if: |
-          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
-          needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
-          needs.tests-stable-no-features.result == 'failure' || needs.tests-stable-no-features.result == 'cancelled' ||
-          needs.tests-stable-all-features.result == 'failure' || needs.tests-stable-all-features.result == 'cancelled' ||
-          needs.std-extensions.result == 'failure' || needs.std-extensions.result == 'cancelled'
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "Required checks failed"
           echo "Please check the logs for more information"

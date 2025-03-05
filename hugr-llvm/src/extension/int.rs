@@ -468,7 +468,7 @@ mod test {
         let ext_op = int_ops::EXTENSION
             .instantiate_extension_op(&op, [(from as u64).into(), (to as u64).into()])
             .unwrap();
-        let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty.into());
+        let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty);
 
         check_emission!(format!("{}_{}_{}", op.clone(), from, to), hugr, llvm_ctx);
     }
