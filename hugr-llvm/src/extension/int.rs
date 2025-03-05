@@ -470,7 +470,7 @@ mod test {
             .unwrap();
         let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty.into());
 
-        check_emission!(op.clone(), hugr, llvm_ctx);
+        check_emission!(format!("{}_{}_{}", op.clone(), from, to), hugr, llvm_ctx);
     }
     #[rstest]
     #[case::ieq("ieq", 1)]
