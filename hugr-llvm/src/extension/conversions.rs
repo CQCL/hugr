@@ -213,7 +213,15 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
                 };
                 Ok(vec![res])
             })
-        }
+        },
+        ConvertOpDef::bytecast_int_float => emit_custom_unary_op(context, args, |ctx, arg, outs| {
+            let [out] = outs.try_into()?;
+            Ok(vec![ctx.builder().build_signed_int_to_float(arg.into_int_value(), out.into_float_type(), "")?.as_basic_value_enum()])
+        }),
+        ConvertOpDef::bytecast_float_int => emit_custom_unary_op(context, args, |ctx, arg, outs| {
+            let [out] = outs.try_into()?;
+            Ok(vec![ctx.builder().build_float_to_signed_int(arg.into_float_value(), out.into_int_type(), "")?.as_basic_value_enum()])
+        }),
         _ => Err(anyhow!(
             "Conversion op not implemented: {:?}",
             args.node().as_ref()
@@ -618,5 +626,29 @@ mod test {
                 .add_int_extensions()
         });
         assert_eq!(i, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    #[case(42)]
+    fn bytecast_roundtrip(mut exec_ctx: TestContext, #[case] i: i64) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(vec![INT_TYPES[0].clone()])
+            .with_extensions(STD_REG.to_owned())
+            .finish(|mut builder| {
+                let i = builder.add_load_value(ConstInt::new_s(6, i).unwrap());
+                let i2f = EXTENSION.instantiate_extension_op("bytecast_int_float", []).unwrap();
+                let [f] = builder.add_dataflow_op(i2f, [i]).unwrap().outputs_arr();
+                let f2i = EXTENSION.instantiate_extension_op("bytecast_float_int", []).unwrap();
+                let [i] = builder.add_dataflow_op(f2i, [f]).unwrap().outputs_arr();
+
+                builder.finish_with_outputs([i]).unwrap()
+            });
+        exec_ctx.add_extensions(|builder| {
+            builder
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+                .add_int_extensions()
+        });
+        assert_eq!(i, exec_ctx.exec_hugr_i64(hugr, "main"));
     }
 }

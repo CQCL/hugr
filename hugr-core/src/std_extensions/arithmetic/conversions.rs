@@ -40,6 +40,8 @@ pub enum ConvertOpDef {
     itostring_s,
     itousize,
     ifromusize,
+    bytecast_int_float,
+    bytecast_float_int,
 }
 
 impl MakeOpDef for ConvertOpDef {
@@ -69,6 +71,8 @@ impl MakeOpDef for ConvertOpDef {
             itostring_u | itostring_s => int_polytype(1, vec![int_tv(0)], vec![string_type()]),
             itousize => int_polytype(0, vec![int_type(6)], vec![usize_t()]),
             ifromusize => int_polytype(0, vec![usize_t()], vec![int_type(6)]),
+            bytecast_int_float => int_polytype(0, vec![int_type(6)], vec![float64_type()]),
+            bytecast_float_int => int_polytype(0, vec![float64_type()], vec![int_type(6)]),
         }
         .into()
     }
@@ -86,6 +90,8 @@ impl MakeOpDef for ConvertOpDef {
             itostring_u => "convert an unsigned integer to its string representation",
             itousize => "convert a 64b unsigned integer to its usize representation",
             ifromusize => "convert a usize to a 64b unsigned integer",
+            bytecast_int_float => "reinterpret an int as a float based on its bytes",
+            bytecast_float_int => "reinterpret an float as an int based on its bytes",
         }
         .to_string()
     }

@@ -32,6 +32,8 @@ pub(super) fn set_fold(op: &ConvertOpDef, def: &mut OpDef) {
         itostring_s => def.set_constant_folder(IToStringS),
         itousize => def.set_constant_folder(IToUsize),
         ifromusize => def.set_constant_folder(IFromUsize),
+        bytecast_float_int => panic!("Bytecasting not supported in constant folding"),
+        bytecast_int_float => panic!("Bytecasting not supported in constant folding"),
     }
 }
 
