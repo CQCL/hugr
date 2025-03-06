@@ -764,9 +764,9 @@ mod test {
 
     #[rstest]
     #[case("inarrow_s", 6, 2, 4)]
-    #[case("inarrow_s", 6, 5, 2^5 - 1)]
+    #[case("inarrow_s", 6, 5, (2^5) - 1)]
     #[case("inarrow_s", 6, 4, -1)]
-    #[case("inarrow_s", 6, 4, -(2^4 - 1))]
+    #[case("inarrow_s", 6, 4, -((2^4) - 1))]
     fn test_narrow_s(
         mut exec_ctx: TestContext,
         #[case] op: String,
