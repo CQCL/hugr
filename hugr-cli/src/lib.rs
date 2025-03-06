@@ -1,12 +1,13 @@
 //! Standard command line tools, used by the hugr binary.
 
-use clap::builder::TypedValueParser as _;
-use clap::{crate_version, Parser};
+use clap::builder::{TypedValueParser as _, ValueParser};
+use clap::{crate_version, FromArgMatches, Parser};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use clio::{Input, Output};
 use derive_more::{Display, Error, From};
 use hugr::extension::ExtensionRegistry;
-use hugr::package::{EnvelopeError, PackageEncodingError, PackageValidationError, PayloadDescriptor};
+use hugr::package::{PackageEncodingError, PackageValidationError};
+use hugr::envelope::{EnvelopeError, EnvelopeConfig, PayloadDescriptor};
 use hugr::Hugr;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::{ffi::OsString, path::PathBuf};
@@ -60,12 +61,6 @@ pub enum CliError {
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
 pub struct HugrArgs {
-    /// Input HUGR file, use '-' for stdin
-    #[clap(value_parser, default_value = "-")]
-    pub input: Input,
-
-    // #[command(flatten)]
-    // pub input_format: InputFormatArgs,
 
     /// Verbosity.
     #[command(flatten)]
@@ -90,8 +85,19 @@ pub struct HugrOutputArgs {
     #[arg(short, long, value_parser)]
     pub output: Option<Output>,
 
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new(["json","json-zstd","model","model-zstd"]).map(|s| PayloadDescriptor::from_str(&s).unwrap()))]
-    pub output_format: Option<PayloadDescriptor>,
+    // TODO clap stuff to make this work
+    // #[arg(long)]
+    // pub output_format: Option<EnvelopeConfig>,
+}
+
+
+#[derive(Debug, clap::Args)]
+pub struct HugrInputArgs {
+    #[arg(short, long, value_parser)]
+    pub input: Option<Input>,
+
+    #[clap(flatten)]
+    pub input_format: Option<InputFormatArgs>,
 }
 
 #[derive(clap::Args)]
@@ -101,12 +107,36 @@ pub struct PayloadTypeArg {
 }
 
 
+// TODO add clap annotations
+#[derive(Debug, Clone)]
 pub enum InputFormatArgs {
+    /// Auto detect
     Auto,
-    Envelope(hugr::package::PayloadDescriptor),
+    Envelope(PayloadDescriptor), // Fail if it's not an envelope with this descriptor
+    // TODO JSON package, JSON HUGR, model package, model HUGR
 }
 
-pub use PackageOrHugr;
+
+impl clap::FromArgMatches for InputFormatArgs {
+    fn from_arg_matches(matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
+        todo!()
+    }
+
+    fn update_from_arg_matches(&mut self, matches: &clap::ArgMatches) -> Result<(), clap::Error> {
+        todo!()
+    }
+}
+impl clap::Args for InputFormatArgs {
+    fn augment_args(cmd: clap::Command) -> clap::Command {
+        todo!()
+    }
+
+    fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
+        todo!()
+    }
+}
+
+pub use hugr::envelope::PackageOrHugr;
 
 impl HugrArgs {
     /// Read either a package or a single hugr from the input.
@@ -114,32 +144,18 @@ impl HugrArgs {
         &mut self,
         extensions: &ExtensionRegistry,
     ) -> Result<PackageOrHugr, CliError> {
+        // TODO Implement this function
+        todo!()
         // We need to read the input twice; once to try to load it as a HUGR, and if that fails, as a package.
         // If `input` is a file, we can reuse the reader by seeking back to the start.
         // Else, we need to read the file into a buffer.
-        match self.input.can_seek() {
-            true => get_package_or_hugr_seek(&mut self.input, extensions),
-            false => {
-                let mut buffer = Vec::new();
-                self.input.read_to_end(&mut buffer)?;
-                get_package_or_hugr_seek(Cursor::new(buffer), extensions)
-            }
-        }
+        // match self.input.can_seek() {
+        //     true => get_package_or_hugr_seek(&mut self.input, extensions),
+        //     false => {
+        //         let mut buffer = Vec::new();
+        //         self.input.read_to_end(&mut buffer)?;
+        //         get_package_or_hugr_seek(Cursor::new(buffer), extensions)
+        //     }
+        // }
     }
-}
-
-/// Load a package or hugr from a seekable input.
-fn get_package_or_hugr_seek<I: Seek + Read>(
-    mut input: I,
-    extensions: &ExtensionRegistry,
-) -> Result<PackageOrHugr, CliError> {
-    if let Ok(hugr) = Hugr::load_json(&mut input, extensions) {
-       return Ok(PackageOrHugr::Hugr(hugr));
-    }
-    input.seek(SeekFrom::Start(0))?;
-    if let Ok(pkg) = Package::from_json_reader(&mut input, extensions) {
-        return Ok(PackageOrHugr::Package(pkg));
-    }
-    input.seek(SeekFrom::Start(0))?;
-    return Ok(PackageOrHugr::Package(Package::from_envelope_reader(input, extensions)?));
 }

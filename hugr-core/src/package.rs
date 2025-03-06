@@ -1,7 +1,5 @@
 //! Bundles of hugr modules along with the extension required to load them.
 
-mod envelope;
-
 use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use std::path::Path;

@@ -31,11 +31,12 @@ impl ValArgs {
         if self.verbosity(Level::Info) {
             eprintln!("{}", VALID_PRINT);
         }
-        let output_format = self.output_args.output_format;
-        if let Some(output) = &mut self.output_args.output {
-            Package::new(result.clone()).unwrap().to_envelope_writer(output, output_format)?;
+        // TODO write to output if provided
+        // let output_format = self.output_args.output_format;
+        // if let Some(output) = &mut self.output_args.output {
+        //     // Package::new(result.clone()).unwrap().to_envelope_writer(output, output_format)?;
 
-        }
+        // }
         Ok(result)
     }
 
