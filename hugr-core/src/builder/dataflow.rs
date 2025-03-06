@@ -314,8 +314,8 @@ pub(crate) mod test {
     use crate::builder::{
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
+    use crate::extension::prelude::Noop;
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
-    use crate::extension::prelude::{Barrier, Noop};
     use crate::extension::SignatureError;
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, OpTag};
@@ -557,22 +557,22 @@ pub(crate) mod test {
         let mut dfg_b = parent.dfg_builder(endo_sig(bool_t()), [w])?;
         let [w] = dfg_b.input_wires_arr();
 
-        let barr0 = dfg_b.add_dataflow_op(Barrier::new(bool_t()), [w])?;
+        let barr0 = dfg_b.add_barrier([w])?;
         let [w] = barr0.outputs_arr();
 
-        let barr1 = dfg_b.add_dataflow_op(Barrier::new(bool_t()), [w])?;
+        let barr1 = dfg_b.add_barrier([w])?;
         let [w] = barr1.outputs_arr();
 
         let dfg = dfg_b.finish_with_outputs([w])?;
         let [w] = dfg.outputs_arr();
 
-        let mut dfg2_b = parent.dfg_builder(endo_sig(bool_t()), [w])?;
-        let [w] = dfg2_b.input_wires_arr();
-        let barr2 = dfg2_b.add_dataflow_op(Barrier::new(bool_t()), [w])?;
+        let mut dfg2_b = parent.dfg_builder(endo_sig(vec![bool_t(), bool_t()]), [w, w])?;
+        let [w1, w2] = dfg2_b.input_wires_arr();
+        let barr2 = dfg2_b.add_barrier([w1, w2])?;
         let wires: Vec<Wire> = barr2.outputs().collect();
 
         let dfg2 = dfg2_b.finish_with_outputs(wires)?;
-        let [w] = dfg2.outputs_arr();
+        let [w, _] = dfg2.outputs_arr();
         parent.finish_hugr_with_outputs([w])?;
 
         Ok(())
