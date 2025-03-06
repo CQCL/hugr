@@ -376,10 +376,7 @@ fn make_narrow<'c, H: HugrView<Node = Node>>(
         .get_field_type_at_index(2)
         .unwrap()
         .into_int_type();
-    let max = arg
-        .get_type()
-        .into_int_type()
-        .const_int(max_val, true);
+    let max = arg.get_type().into_int_type().const_int(max_val, true);
     let pred = if signed {
         IntPredicate::SGT
     } else {
