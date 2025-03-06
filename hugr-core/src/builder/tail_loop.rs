@@ -109,7 +109,7 @@ mod test {
     use crate::extension::prelude::bool_t;
     use crate::{
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{usize_t, ConstUsize, Lift, PRELUDE_ID},
+        extension::prelude::{usize_t, ConstUsize, PRELUDE_ID},
         hugr::ValidationError,
         ops::Value,
         type_row,
@@ -143,12 +143,7 @@ mod test {
                 Signature::new(vec![bool_t()], vec![usize_t()]).with_prelude(),
             )?;
             let _fdef = {
-                let [b1] = fbuild
-                    .add_dataflow_op(
-                        Lift::new(vec![bool_t()].into(), PRELUDE_ID),
-                        fbuild.input_wires(),
-                    )?
-                    .outputs_arr();
+                let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
                     let mut loop_b = fbuild.tail_loop_builder(
                         vec![(bool_t(), b1)],
@@ -156,13 +151,7 @@ mod test {
                         vec![usize_t()].into(),
                     )?;
                     let signature = loop_b.loop_signature()?.clone();
-                    let const_val = Value::true_val();
                     let const_wire = loop_b.add_load_const(Value::true_val());
-                    let lift_node = loop_b.add_dataflow_op(
-                        Lift::new(vec![const_val.get_type().clone()].into(), PRELUDE_ID),
-                        [const_wire],
-                    )?;
-                    let [const_wire] = lift_node.outputs_arr();
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
                         let output_row = loop_b.internal_output_row()?;

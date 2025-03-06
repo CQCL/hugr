@@ -314,9 +314,9 @@ pub(crate) mod test {
     use crate::builder::{
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
+    use crate::extension::prelude::Noop;
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
-    use crate::extension::prelude::{Lift, Noop};
-    use crate::extension::{ExtensionId, SignatureError};
+    use crate::extension::SignatureError;
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, OpTag};
     use crate::ops::{OpTrait, Value};
@@ -549,37 +549,30 @@ pub(crate) mod test {
     }
 
     #[test]
-    fn lift_node() -> Result<(), BuildError> {
-        let xa: ExtensionId = "A".try_into().unwrap();
-        let xb: ExtensionId = "B".try_into().unwrap();
-        let xc: ExtensionId = "C".try_into().unwrap();
-
+    fn barrier_node() -> Result<(), BuildError> {
         let mut parent = DFGBuilder::new(endo_sig(bool_t()))?;
 
         let [w] = parent.input_wires_arr();
 
-        // A box which adds extensions A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(endo_sig(bool_t()), [w])?;
-        let [w] = add_ab.input_wires_arr();
+        let mut dfg_b = parent.dfg_builder(endo_sig(bool_t()), [w])?;
+        let [w] = dfg_b.input_wires_arr();
 
-        let lift_a = add_ab.add_dataflow_op(Lift::new(vec![bool_t()].into(), xa.clone()), [w])?;
-        let [w] = lift_a.outputs_arr();
+        let barr0 = dfg_b.add_barrier([w])?;
+        let [w] = barr0.outputs_arr();
 
-        let lift_b = add_ab.add_dataflow_op(Lift::new(vec![bool_t()].into(), xb), [w])?;
-        let [w] = lift_b.outputs_arr();
+        let barr1 = dfg_b.add_barrier([w])?;
+        let [w] = barr1.outputs_arr();
 
-        let add_ab = add_ab.finish_with_outputs([w])?;
-        let [w] = add_ab.outputs_arr();
+        let dfg = dfg_b.finish_with_outputs([w])?;
+        let [w] = dfg.outputs_arr();
 
-        // Add another node (a sibling to add_ab) which adds extension C
-        // via a child lift node
-        let mut add_c = parent.dfg_builder(endo_sig(bool_t()), [w])?;
-        let [w] = add_c.input_wires_arr();
-        let lift_c = add_c.add_dataflow_op(Lift::new(vec![bool_t()].into(), xc), [w])?;
-        let wires: Vec<Wire> = lift_c.outputs().collect();
+        let mut dfg2_b = parent.dfg_builder(endo_sig(vec![bool_t(), bool_t()]), [w, w])?;
+        let [w1, w2] = dfg2_b.input_wires_arr();
+        let barr2 = dfg2_b.add_barrier([w1, w2])?;
+        let wires: Vec<Wire> = barr2.outputs().collect();
 
-        let add_c = add_c.finish_with_outputs(wires)?;
-        let [w] = add_c.outputs_arr();
+        let dfg2 = dfg2_b.finish_with_outputs(wires)?;
+        let [w, _] = dfg2.outputs_arr();
         parent.finish_hugr_with_outputs([w])?;
 
         Ok(())
