@@ -830,9 +830,11 @@ impl MakeRegisteredOp for Noop {
 /// A barrier operation definition.
 pub struct BarrierDef;
 
+/// Name of the barrier operation.
+pub const BARRIER_OP_ID: OpName = OpName::new_inline("Barrier");
 impl NamedOp for BarrierDef {
     fn name(&self) -> OpName {
-        "Barrier".into()
+        BARRIER_OP_ID
     }
 }
 
