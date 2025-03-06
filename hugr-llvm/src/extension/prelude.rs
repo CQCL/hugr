@@ -172,11 +172,11 @@ pub trait PreludeCodegen: Clone {
 
     fn emit_barrier<'c, H: HugrView<Node = Node>>(
         &self,
-        _ctx: &mut EmitFuncContext<'c, '_, H>,
-        _args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     ) -> Result<()> {
         // By default, treat barriers as no-ops.
-        Ok(())
+        args.outputs.finish(ctx.builder(), args.inputs)
     }
 }
 
@@ -366,12 +366,12 @@ mod test {
     use hugr_core::types::{Type, TypeArg};
     use hugr_core::{type_row, Hugr};
     use prelude::{bool_t, qb_t, usize_t, PANIC_OP_ID, PRINT_OP_ID};
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use crate::check_emission;
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::test::{llvm_ctx, TestContext};
+    use crate::test::{exec_ctx, llvm_ctx, TestContext};
     use crate::types::HugrType;
 
     use super::*;
@@ -553,17 +553,25 @@ mod test {
         check_emission!(hugr, prelude_llvm_ctx);
     }
 
-    #[rstest]
-    fn prelude_barrier(prelude_llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
-            .with_ins(vec![bool_t(), bool_t()])
-            .with_outs(vec![bool_t(), bool_t()])
+    #[fixture]
+    fn barrier_hugr() -> Hugr {
+        SimpleHugrConfig::new()
+            .with_outs(vec![usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
-                let [w1, w2] = builder.input_wires_arr();
-                let [w1, w2] = builder.add_barrier([w1, w2]).unwrap().outputs_arr();
-                builder.finish_with_outputs([w1, w2]).unwrap()
-            });
-        check_emission!(hugr, prelude_llvm_ctx);
+                let i = builder.add_load_value(ConstUsize::new(42));
+                let [w1, _w2] = builder.add_barrier([i, i]).unwrap().outputs_arr();
+                builder.finish_with_outputs([w1]).unwrap()
+            })
+    }
+
+    #[rstest]
+    fn prelude_barrier(prelude_llvm_ctx: TestContext, barrier_hugr: Hugr) {
+        check_emission!(barrier_hugr, prelude_llvm_ctx);
+    }
+    #[rstest]
+    fn prelude_barrier_exec(mut exec_ctx: TestContext, barrier_hugr: Hugr) {
+        exec_ctx.add_extensions(|cem| add_prelude_extensions(cem, TestPreludeCodegen));
+        assert_eq!(exec_ctx.exec_hugr_u64(barrier_hugr, "main"), 42);
     }
 }
