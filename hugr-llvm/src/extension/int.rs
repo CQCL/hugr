@@ -355,7 +355,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
     }
 }
 
-fn make_narrow<'c, 'hugr, H: HugrView<Node = Node>>(
+fn make_narrow<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     arg: BasicValueEnum<'c>,
     outs: &[BasicTypeEnum<'c>],
@@ -379,7 +379,7 @@ fn make_narrow<'c, 'hugr, H: HugrView<Node = Node>>(
     let max = arg
         .get_type()
         .into_int_type()
-        .const_int(max_val as u64, true);
+        .const_int(max_val, true);
     let pred = if signed {
         IntPredicate::SGT
     } else {
@@ -399,7 +399,7 @@ fn make_narrow<'c, 'hugr, H: HugrView<Node = Node>>(
             "lower_bounds_check",
         )?;
         ctx.builder()
-            .build_or(less_than_min, bigger_than_max.clone(), "oob")?
+            .build_or(less_than_min, bigger_than_max, "oob")?
     } else {
         bigger_than_max
     };
@@ -407,16 +407,16 @@ fn make_narrow<'c, 'hugr, H: HugrView<Node = Node>>(
         .builder()
         .build_int_cast_sign_flag(arg.into_int_value(), out_int_ty, signed, "")?
         .as_basic_value_enum();
-    Ok(val_or_error(
+    val_or_error(
         ctx,
         should_fail,
         narrowed_val,
         RuntimeError::Narrow,
         LLVMSumType::try_from_hugr_type(&ctx.typing_session(), sum_type).unwrap(),
-    )?)
+    )
 }
 
-fn val_or_error<'c, 'hugr, H: HugrView<Node = Node>>(
+fn val_or_error<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     should_fail: IntValue<'c>,
     val: BasicValueEnum<'c>,
