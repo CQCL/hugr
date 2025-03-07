@@ -107,23 +107,24 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
 
         // emit each child by delegating to the `impl EmitOp<_>` of self.
         for child_node in self.node.children() {
-            let (inputs, outputs) = (vec![], RowMailBox::new_empty().promise());
+            let (inputs, outputs) = (RowMailBox::new_empty(), RowMailBox::new_empty().promise());
             match child_node.as_ref() {
                 OpType::DataflowBlock(ref dfb) => self.emit_dataflow_block(
                     context,
-                    EmitOpArgs {
-                        node: child_node.into_ot(dfb),
-                        inputs,
+                    EmitOpArgs::try_new(context.builder(),
+                        child_node.into_ot(dfb),
+                        inputs ,
                         outputs,
-                    },
+                    )?,
                 ),
                 OpType::ExitBlock(ref eb) => self.emit_exit_block(
                     context,
-                    EmitOpArgs {
-                        node: child_node.into_ot(eb),
+                    EmitOpArgs::try_new(
+                        context.builder(),
+                        child_node.into_ot(eb),
                         inputs,
                         outputs,
-                    },
+                    )?,
                 ),
 
                 // Const is allowed, but requires no work here. FuncDecl is
@@ -147,36 +148,26 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
     fn emit_dataflow_block(
         &mut self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        EmitOpArgs {
-            node,
-            inputs: _,
-            outputs: _,
-        }: EmitOpArgs<'c, 'hugr, DataflowBlock, H>,
+        args: EmitOpArgs<'c, 'hugr, DataflowBlock, H>,
     ) -> Result<()> {
+        let node = args.node();
+
         // our entry basic block and our input RowMailBox
-        let (bb, inputs_rmb) = self.get_block_data(&node)?;
+        let (bb, inputs_rmb) = self.get_block_data(&args.node())?;
         // the basic block and mailbox of each of our successors
-        let successor_data = node
+        let successor_data = args.node()
             .output_neighbours()
             .map(|succ| self.get_block_data(&succ))
             .collect::<Result<Vec<_>>>()?;
 
         context.build_positioned(bb, |context| {
-            let (_, o) = node.get_io().unwrap();
+            let (_, o) = args.node().get_io().unwrap();
             // get the rowmailbox for our output node
             let outputs_rmb = context.node_ins_rmb(o)?;
-            // read the values from our input node
-            let inputs = inputs_rmb.read_vec(context.builder(), [])?;
 
             // emit all our children and read the values from the rowmailbox of our output node
-            emit_dataflow_parent(
-                context,
-                EmitOpArgs {
-                    node,
-                    inputs,
-                    outputs: outputs_rmb.promise(),
-                },
-            )?;
+            let args = EmitOpArgs::try_new(context.builder(), args.node, inputs_rmb, outputs_rmb.promise())?;
+            emit_dataflow_parent(context, args)?;
             let outputs = outputs_rmb.read_vec(context.builder(), [])?;
 
             // We create a helper block per-tag. We switch to the helper block,

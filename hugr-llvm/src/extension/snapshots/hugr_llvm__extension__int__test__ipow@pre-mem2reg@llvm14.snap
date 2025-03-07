@@ -8,20 +8,28 @@ source_filename = "test_context"
 define i8 @_hl.main.1(i8 %0, i8 %1) {
 alloca_block:
   %"0" = alloca i8, align 1
+  %"1" = alloca i8, align 1
+  %"01" = alloca i8, align 1
   %"2_0" = alloca i8, align 1
   %"2_1" = alloca i8, align 1
   %"4_0" = alloca i8, align 1
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i8 %0, i8* %"2_0", align 1
-  store i8 %1, i8* %"2_1", align 1
-  %"2_01" = load i8, i8* %"2_0", align 1
-  %"2_12" = load i8, i8* %"2_1", align 1
+  store i8 %0, i8* %"0", align 1
+  store i8 %1, i8* %"1", align 1
+  %"02" = load i8, i8* %"0", align 1
+  %"13" = load i8, i8* %"1", align 1
+  store i8 %"02", i8* %"2_0", align 1
+  store i8 %"13", i8* %"2_1", align 1
+  %"2_04" = load i8, i8* %"2_0", align 1
+  %"2_15" = load i8, i8* %"2_1", align 1
+  %"2_06" = load i8, i8* %"2_0", align 1
+  %"2_17" = load i8, i8* %"2_1", align 1
   %acc_ptr = alloca i8, align 1
   %exp_ptr = alloca i8, align 1
-  store i8 %"2_01", i8* %acc_ptr, align 1
-  store i8 %"2_12", i8* %exp_ptr, align 1
+  store i8 %"2_06", i8* %acc_ptr, align 1
+  store i8 %"2_17", i8* %exp_ptr, align 1
   br label %pow
 
 pow:                                              ; preds = %pow_body, %entry_block
@@ -37,7 +45,7 @@ power_of_zero:                                    ; preds = %pow
   br label %done
 
 pow_body:                                         ; preds = %pow
-  %new_acc = mul i8 %acc, %"2_01"
+  %new_acc = mul i8 %acc, %"2_06"
   %new_exp = sub i8 %exp, 1
   store i8 %new_acc, i8* %acc_ptr, align 1
   store i8 %new_exp, i8* %exp_ptr, align 1
@@ -46,8 +54,8 @@ pow_body:                                         ; preds = %pow
 done:                                             ; preds = %pow, %power_of_zero
   %result = load i8, i8* %acc_ptr, align 1
   store i8 %result, i8* %"4_0", align 1
-  %"4_03" = load i8, i8* %"4_0", align 1
-  store i8 %"4_03", i8* %"0", align 1
-  %"04" = load i8, i8* %"0", align 1
-  ret i8 %"04"
+  %"4_08" = load i8, i8* %"4_0", align 1
+  store i8 %"4_08", i8* %"01", align 1
+  %"09" = load i8, i8* %"01", align 1
+  ret i8 %"09"
 }

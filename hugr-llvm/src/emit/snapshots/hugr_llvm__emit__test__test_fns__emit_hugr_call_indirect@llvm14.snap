@@ -32,6 +32,6 @@ entry_block:                                      ; preds = %alloca_block
   %3 = extractvalue { i1, i1 } %2, 0
   %4 = extractvalue { i1, i1 } %2, 1
   %mrv = insertvalue { i1, i1 } undef, i1 %3, 0
-  %mrv8 = insertvalue { i1, i1 } %mrv, i1 %4, 1
-  ret { i1, i1 } %mrv8
+  %mrv15 = insertvalue { i1, i1 } %mrv, i1 %4, 1
+  ret { i1, i1 } %mrv15
 }

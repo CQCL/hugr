@@ -7,16 +7,18 @@ source_filename = "test_context"
 
 define i1 @_hl.main.1(i2 %0, i1 %1) {
 alloca_block:
-  %"0" = alloca i1, align 1
+  %"0" = alloca i2, align 1
+  %"1" = alloca i1, align 1
+  %"01" = alloca i1, align 1
   %"5_0" = alloca {}, align 8
   %"2_0" = alloca i2, align 1
   %"2_1" = alloca i1, align 1
   %"6_0" = alloca i1, align 1
   %"9_0" = alloca i2, align 1
   %"9_1" = alloca i1, align 1
-  %"03" = alloca i1, align 1
+  %"08" = alloca i1, align 1
   %"11_0" = alloca i1, align 1
-  %"06" = alloca i1, align 1
+  %"011" = alloca i1, align 1
   %"20_0" = alloca i1, align 1
   %"25_0" = alloca i1, align 1
   %"39_0" = alloca i1, align 1
@@ -24,65 +26,71 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
+  store i2 %0, i2* %"0", align 1
+  store i1 %1, i1* %"1", align 1
+  %"02" = load i2, i2* %"0", align 1
+  %"13" = load i1, i1* %"1", align 1
   store {} undef, {}* %"5_0", align 1
-  store i2 %0, i2* %"2_0", align 1
-  store i1 %1, i1* %"2_1", align 1
-  %"2_01" = load i2, i2* %"2_0", align 1
-  %"2_12" = load i1, i1* %"2_1", align 1
-  store i2 %"2_01", i2* %"9_0", align 1
-  store i1 %"2_12", i1* %"9_1", align 1
+  store i2 %"02", i2* %"2_0", align 1
+  store i1 %"13", i1* %"2_1", align 1
+  %"2_04" = load i2, i2* %"2_0", align 1
+  %"2_15" = load i1, i1* %"2_1", align 1
+  %"2_06" = load i2, i2* %"2_0", align 1
+  %"2_17" = load i1, i1* %"2_1", align 1
+  store i2 %"2_06", i2* %"9_0", align 1
+  store i1 %"2_17", i1* %"9_1", align 1
   br label %2
 
 2:                                                ; preds = %entry_block
-  %"9_04" = load i2, i2* %"9_0", align 1
-  %"9_15" = load i1, i1* %"9_1", align 1
-  store i2 %"9_04", i2* %"9_0", align 1
-  store i1 %"9_15", i1* %"9_1", align 1
+  %"9_09" = load i2, i2* %"9_0", align 1
+  %"9_110" = load i1, i1* %"9_1", align 1
+  store i2 %"9_09", i2* %"9_0", align 1
+  store i1 %"9_110", i1* %"9_1", align 1
   br label %8
 
 3:                                                ; preds = %19
   store i1 true, i1* %"39_0", align 1
-  %"5_025" = load {}, {}* %"5_0", align 1
-  %"39_026" = load i1, i1* %"39_0", align 1
-  store {} %"5_025", {}* %"5_0", align 1
-  store i1 %"39_026", i1* %"39_0", align 1
-  %"5_027" = load {}, {}* %"5_0", align 1
-  %"39_028" = load i1, i1* %"39_0", align 1
+  %"5_030" = load {}, {}* %"5_0", align 1
+  %"39_031" = load i1, i1* %"39_0", align 1
+  store {} %"5_030", {}* %"5_0", align 1
+  store i1 %"39_031", i1* %"39_0", align 1
+  %"5_032" = load {}, {}* %"5_0", align 1
+  %"39_033" = load i1, i1* %"39_0", align 1
   switch i1 false, label %4 [
   ]
 
 4:                                                ; preds = %3
-  store i1 %"39_028", i1* %"03", align 1
+  store i1 %"39_033", i1* %"08", align 1
   br label %7
 
 5:                                                ; preds = %20
   store i1 false, i1* %"44_0", align 1
-  %"5_029" = load {}, {}* %"5_0", align 1
-  %"44_030" = load i1, i1* %"44_0", align 1
-  store {} %"5_029", {}* %"5_0", align 1
-  store i1 %"44_030", i1* %"44_0", align 1
-  %"5_031" = load {}, {}* %"5_0", align 1
-  %"44_032" = load i1, i1* %"44_0", align 1
+  %"5_034" = load {}, {}* %"5_0", align 1
+  %"44_035" = load i1, i1* %"44_0", align 1
+  store {} %"5_034", {}* %"5_0", align 1
+  store i1 %"44_035", i1* %"44_0", align 1
+  %"5_036" = load {}, {}* %"5_0", align 1
+  %"44_037" = load i1, i1* %"44_0", align 1
   switch i1 false, label %6 [
   ]
 
 6:                                                ; preds = %5
-  store i1 %"44_032", i1* %"03", align 1
+  store i1 %"44_037", i1* %"08", align 1
   br label %7
 
 7:                                                ; preds = %6, %4
-  %"024" = load i1, i1* %"03", align 1
-  store i1 %"024", i1* %"6_0", align 1
-  %"6_033" = load i1, i1* %"6_0", align 1
-  store i1 %"6_033", i1* %"0", align 1
-  %"034" = load i1, i1* %"0", align 1
-  ret i1 %"034"
+  %"029" = load i1, i1* %"08", align 1
+  store i1 %"029", i1* %"6_0", align 1
+  %"6_038" = load i1, i1* %"6_0", align 1
+  store i1 %"6_038", i1* %"01", align 1
+  %"039" = load i1, i1* %"01", align 1
+  ret i1 %"039"
 
 8:                                                ; preds = %2
-  %"9_07" = load i2, i2* %"9_0", align 1
-  store i2 %"9_07", i2* %"9_0", align 1
-  %"9_08" = load i2, i2* %"9_0", align 1
-  switch i2 %"9_08", label %9 [
+  %"9_012" = load i2, i2* %"9_0", align 1
+  store i2 %"9_012", i2* %"9_0", align 1
+  %"9_013" = load i2, i2* %"9_0", align 1
+  switch i2 %"9_013", label %9 [
     i2 1, label %10
     i2 -2, label %11
   ]
@@ -98,55 +106,55 @@ entry_block:                                      ; preds = %alloca_block
 
 12:                                               ; preds = %9
   store i1 true, i1* %"20_0", align 1
-  %"5_010" = load {}, {}* %"5_0", align 1
-  %"20_011" = load i1, i1* %"20_0", align 1
-  store {} %"5_010", {}* %"5_0", align 1
-  store i1 %"20_011", i1* %"20_0", align 1
-  %"5_012" = load {}, {}* %"5_0", align 1
-  %"20_013" = load i1, i1* %"20_0", align 1
+  %"5_015" = load {}, {}* %"5_0", align 1
+  %"20_016" = load i1, i1* %"20_0", align 1
+  store {} %"5_015", {}* %"5_0", align 1
+  store i1 %"20_016", i1* %"20_0", align 1
+  %"5_017" = load {}, {}* %"5_0", align 1
+  %"20_018" = load i1, i1* %"20_0", align 1
   switch i1 false, label %13 [
   ]
 
 13:                                               ; preds = %12
-  store i1 %"20_013", i1* %"06", align 1
+  store i1 %"20_018", i1* %"011", align 1
   br label %18
 
 14:                                               ; preds = %10
   store i1 false, i1* %"25_0", align 1
-  %"5_014" = load {}, {}* %"5_0", align 1
-  %"25_015" = load i1, i1* %"25_0", align 1
-  store {} %"5_014", {}* %"5_0", align 1
-  store i1 %"25_015", i1* %"25_0", align 1
-  %"5_016" = load {}, {}* %"5_0", align 1
-  %"25_017" = load i1, i1* %"25_0", align 1
+  %"5_019" = load {}, {}* %"5_0", align 1
+  %"25_020" = load i1, i1* %"25_0", align 1
+  store {} %"5_019", {}* %"5_0", align 1
+  store i1 %"25_020", i1* %"25_0", align 1
+  %"5_021" = load {}, {}* %"5_0", align 1
+  %"25_022" = load i1, i1* %"25_0", align 1
   switch i1 false, label %15 [
   ]
 
 15:                                               ; preds = %14
-  store i1 %"25_017", i1* %"06", align 1
+  store i1 %"25_022", i1* %"011", align 1
   br label %18
 
 16:                                               ; preds = %11
-  %"5_018" = load {}, {}* %"5_0", align 1
-  %"9_119" = load i1, i1* %"9_1", align 1
-  store {} %"5_018", {}* %"5_0", align 1
-  store i1 %"9_119", i1* %"9_1", align 1
-  %"5_020" = load {}, {}* %"5_0", align 1
-  %"9_121" = load i1, i1* %"9_1", align 1
+  %"5_023" = load {}, {}* %"5_0", align 1
+  %"9_124" = load i1, i1* %"9_1", align 1
+  store {} %"5_023", {}* %"5_0", align 1
+  store i1 %"9_124", i1* %"9_1", align 1
+  %"5_025" = load {}, {}* %"5_0", align 1
+  %"9_126" = load i1, i1* %"9_1", align 1
   switch i1 false, label %17 [
   ]
 
 17:                                               ; preds = %16
-  store i1 %"9_121", i1* %"06", align 1
+  store i1 %"9_126", i1* %"011", align 1
   br label %18
 
 18:                                               ; preds = %17, %15, %13
-  %"09" = load i1, i1* %"06", align 1
-  store i1 %"09", i1* %"11_0", align 1
-  %"11_022" = load i1, i1* %"11_0", align 1
-  store i1 %"11_022", i1* %"11_0", align 1
-  %"11_023" = load i1, i1* %"11_0", align 1
-  switch i1 %"11_023", label %19 [
+  %"014" = load i1, i1* %"011", align 1
+  store i1 %"014", i1* %"11_0", align 1
+  %"11_027" = load i1, i1* %"11_0", align 1
+  store i1 %"11_027", i1* %"11_0", align 1
+  %"11_028" = load i1, i1* %"11_0", align 1
+  switch i1 %"11_028", label %19 [
     i1 true, label %20
   ]
 

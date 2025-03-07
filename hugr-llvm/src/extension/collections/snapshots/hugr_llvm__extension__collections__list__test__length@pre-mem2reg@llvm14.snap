@@ -8,6 +8,7 @@ source_filename = "test_context"
 define { i8*, i64 } @_hl.main.1(i8* %0) {
 alloca_block:
   %"0" = alloca i8*, align 8
+  %"01" = alloca i8*, align 8
   %"1" = alloca i64, align 8
   %"2_0" = alloca i8*, align 8
   %"4_0" = alloca i8*, align 8
@@ -15,20 +16,23 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i8* %0, i8** %"2_0", align 8
-  %"2_01" = load i8*, i8** %"2_0", align 8
-  %1 = call i64 @__rt__list__length(i8* %"2_01")
-  store i8* %"2_01", i8** %"4_0", align 8
+  store i8* %0, i8** %"0", align 8
+  %"02" = load i8*, i8** %"0", align 8
+  store i8* %"02", i8** %"2_0", align 8
+  %"2_03" = load i8*, i8** %"2_0", align 8
+  %"2_04" = load i8*, i8** %"2_0", align 8
+  %1 = call i64 @__rt__list__length(i8* %"2_04")
+  store i8* %"2_04", i8** %"4_0", align 8
   store i64 %1, i64* %"4_1", align 4
-  %"4_02" = load i8*, i8** %"4_0", align 8
-  %"4_13" = load i64, i64* %"4_1", align 4
-  store i8* %"4_02", i8** %"0", align 8
-  store i64 %"4_13", i64* %"1", align 4
-  %"04" = load i8*, i8** %"0", align 8
-  %"15" = load i64, i64* %"1", align 4
-  %mrv = insertvalue { i8*, i64 } undef, i8* %"04", 0
-  %mrv6 = insertvalue { i8*, i64 } %mrv, i64 %"15", 1
-  ret { i8*, i64 } %mrv6
+  %"4_05" = load i8*, i8** %"4_0", align 8
+  %"4_16" = load i64, i64* %"4_1", align 4
+  store i8* %"4_05", i8** %"01", align 8
+  store i64 %"4_16", i64* %"1", align 4
+  %"07" = load i8*, i8** %"01", align 8
+  %"18" = load i64, i64* %"1", align 4
+  %mrv = insertvalue { i8*, i64 } undef, i8* %"07", 0
+  %mrv9 = insertvalue { i8*, i64 } %mrv, i64 %"18", 1
+  ret { i8*, i64 } %mrv9
 }
 
 declare i64 @__rt__list__length(i8*)

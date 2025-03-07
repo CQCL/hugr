@@ -39,8 +39,8 @@ cond_4_case_2:                                    ; preds = %6
   br label %cond_exit_4
 
 cond_exit_4:                                      ; preds = %cond_4_case_2, %cond_4_case_1, %cond_4_case_0
-  %"03.0" = phi { i2, i2, i1 } [ { i2 -2, i2 poison, i1 poison }, %cond_4_case_0 ], [ %9, %cond_4_case_2 ], [ %8, %cond_4_case_1 ]
-  %mrv = insertvalue { { i2, i2, i1 }, {} } undef, { i2, i2, i1 } %"03.0", 0
-  %mrv32 = insertvalue { { i2, i2, i1 }, {} } %mrv, {} %1, 1
-  ret { { i2, i2, i1 }, {} } %mrv32
+  %"09.0" = phi { i2, i2, i1 } [ { i2 -2, i2 poison, i1 poison }, %cond_4_case_0 ], [ %9, %cond_4_case_2 ], [ %8, %cond_4_case_1 ]
+  %mrv = insertvalue { { i2, i2, i1 }, {} } undef, { i2, i2, i1 } %"09.0", 0
+  %mrv41 = insertvalue { { i2, i2, i1 }, {} } %mrv, {} %1, 1
+  ret { { i2, i2, i1 }, {} } %mrv41
 }

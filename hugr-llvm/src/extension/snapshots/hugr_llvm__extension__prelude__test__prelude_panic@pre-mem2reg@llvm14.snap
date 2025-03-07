@@ -1,5 +1,5 @@
 ---
-source: src/extension/prelude.rs
+source: hugr-llvm/src/extension/prelude.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
@@ -12,6 +12,8 @@ define { i16, i16 } @_hl.main.1(i16 %0, i16 %1) {
 alloca_block:
   %"0" = alloca i16, align 2
   %"1" = alloca i16, align 2
+  %"01" = alloca i16, align 2
+  %"12" = alloca i16, align 2
   %"5_0" = alloca { i32, i8* }, align 8
   %"2_0" = alloca i16, align 2
   %"2_1" = alloca i16, align 2
@@ -20,27 +22,34 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
+  store i16 %0, i16* %"0", align 2
+  store i16 %1, i16* %"1", align 2
+  %"03" = load i16, i16* %"0", align 2
+  %"14" = load i16, i16* %"1", align 2
   store { i32, i8* } { i32 42, i8* getelementptr inbounds ([6 x i8], [6 x i8]* @0, i32 0, i32 0) }, { i32, i8* }* %"5_0", align 8
-  store i16 %0, i16* %"2_0", align 2
-  store i16 %1, i16* %"2_1", align 2
-  %"5_01" = load { i32, i8* }, { i32, i8* }* %"5_0", align 8
-  %"2_02" = load i16, i16* %"2_0", align 2
-  %"2_13" = load i16, i16* %"2_1", align 2
-  %2 = extractvalue { i32, i8* } %"5_01", 0
-  %3 = extractvalue { i32, i8* } %"5_01", 1
+  store i16 %"03", i16* %"2_0", align 2
+  store i16 %"14", i16* %"2_1", align 2
+  %"5_05" = load { i32, i8* }, { i32, i8* }* %"5_0", align 8
+  %"2_06" = load i16, i16* %"2_0", align 2
+  %"2_17" = load i16, i16* %"2_1", align 2
+  %"5_08" = load { i32, i8* }, { i32, i8* }* %"5_0", align 8
+  %"2_09" = load i16, i16* %"2_0", align 2
+  %"2_110" = load i16, i16* %"2_1", align 2
+  %2 = extractvalue { i32, i8* } %"5_08", 0
+  %3 = extractvalue { i32, i8* } %"5_08", 1
   %4 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 %2, i8* %3)
   call void @abort()
   store i16 0, i16* %"6_0", align 2
   store i16 0, i16* %"6_1", align 2
-  %"6_04" = load i16, i16* %"6_0", align 2
-  %"6_15" = load i16, i16* %"6_1", align 2
-  store i16 %"6_04", i16* %"0", align 2
-  store i16 %"6_15", i16* %"1", align 2
-  %"06" = load i16, i16* %"0", align 2
-  %"17" = load i16, i16* %"1", align 2
-  %mrv = insertvalue { i16, i16 } undef, i16 %"06", 0
-  %mrv8 = insertvalue { i16, i16 } %mrv, i16 %"17", 1
-  ret { i16, i16 } %mrv8
+  %"6_011" = load i16, i16* %"6_0", align 2
+  %"6_112" = load i16, i16* %"6_1", align 2
+  store i16 %"6_011", i16* %"01", align 2
+  store i16 %"6_112", i16* %"12", align 2
+  %"013" = load i16, i16* %"01", align 2
+  %"114" = load i16, i16* %"12", align 2
+  %mrv = insertvalue { i16, i16 } undef, i16 %"013", 0
+  %mrv15 = insertvalue { i16, i16 } %mrv, i16 %"114", 1
+  ret { i16, i16 } %mrv15
 }
 
 declare i32 @printf(i8*, ...)

@@ -1,9 +1,10 @@
 use hugr_core::{ops::OpType, HugrView, Node};
-use inkwell::values::BasicValueEnum;
+use inkwell::{builder::Builder, values::{BasicValueEnum, PointerValue}};
+use anyhow::Result;
 
 use crate::utils::fat::FatNode;
 
-use super::func::RowPromise;
+use super::func::{RowMailBox, RowPromise};
 
 /// A type used whenever emission is delegated to a function, for example in
 /// [crate::custom::extension_op::ExtensionOpMap::emit_extension_op].
@@ -14,12 +15,37 @@ pub struct EmitOpArgs<'c, 'hugr, OT, H> {
     pub inputs: Vec<BasicValueEnum<'c>>,
     /// The results of the node should be put here
     pub outputs: RowPromise<'c>,
+
+    input_mailbox: RowMailBox<'c>,
 }
 
-impl<'hugr, OT, H> EmitOpArgs<'_, 'hugr, OT, H> {
+impl<'c, 'hugr, OT, H> EmitOpArgs<'c, 'hugr, OT, H> {
+    pub fn try_new(
+        builder: &Builder<'c>,
+        node: FatNode<'hugr, OT, H>,
+        input_mailbox: RowMailBox<'c>,
+        outputs: RowPromise<'c>,
+    ) -> Result<Self> {
+        let inputs = input_mailbox.read_vec(builder, [])?;
+        Ok(Self {
+            node,
+            inputs,
+            outputs,
+            input_mailbox
+        })
+    }
+
     /// Get the internal [FatNode]
     pub fn node(&self) -> FatNode<'hugr, OT, H> {
         self.node
+    }
+
+    pub fn input_alloca(&self, i: usize) -> PointerValue {
+        self.input_mailbox[i].alloca()
+    }
+
+    pub fn output_alloca(&self, i: usize) -> PointerValue {
+        self.outputs[i].alloca()
     }
 }
 
@@ -33,17 +59,20 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
             node,
             inputs,
             outputs,
+            input_mailbox
         } = self;
         match node.try_into_ot() {
             Some(new_node) => Ok(EmitOpArgs {
                 node: new_node,
                 inputs,
                 outputs,
+                input_mailbox
             }),
             None => Err(EmitOpArgs {
                 node,
                 inputs,
                 outputs,
+                input_mailbox
             }),
         }
     }
@@ -60,11 +89,13 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
             node,
             inputs,
             outputs,
+            input_mailbox
         } = self;
         EmitOpArgs {
             node: node.into_ot(ot),
             inputs,
             outputs,
+            input_mailbox
         }
     }
 }

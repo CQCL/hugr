@@ -1,4 +1,4 @@
-use std::{borrow::Cow, rc::Rc};
+use std::{borrow::Cow, ops, rc::Rc};
 
 use anyhow::{bail, Result};
 use delegate::delegate;
@@ -46,6 +46,10 @@ impl<'c> ValueMailBox<'c> {
 
     pub fn promise(&self) -> ValuePromise<'c> {
         ValuePromise(self.clone())
+    }
+
+    pub fn alloca(&self) -> PointerValue<'c> {
+        self.ptr
     }
 
     pub fn read<'a>(
@@ -175,6 +179,14 @@ impl<'c> FromIterator<ValueMailBox<'c>> for RowMailBox<'c> {
     }
 }
 
+impl<'c> ops::Index<usize> for RowMailBox<'c> {
+    type Output = ValueMailBox<'c>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
 /// A promise to write values into a `RowMailBox`
 #[must_use]
 #[allow(clippy::len_without_is_empty)]
@@ -197,5 +209,13 @@ impl<'c> RowPromise<'c> {
             /// Returns the number of values promised to be written.
             pub fn len(&self) -> usize;
         }
+    }
+}
+
+impl<'c> ops::Index<usize> for RowPromise<'c> {
+    type Output = ValueMailBox<'c>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
     }
 }

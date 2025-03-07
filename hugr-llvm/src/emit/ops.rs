@@ -78,7 +78,7 @@ where
             .map(|x| node.hugr().fat_optype(x))
             .try_for_each(|node| {
                 let inputs_rmb = context.node_ins_rmb(node)?;
-                let inputs = inputs_rmb.read(context.builder(), [])?;
+                let inputs = inputs_rmb.read_vec(context.builder(), [])?;
                 let outputs = context.node_outs_rmb(node)?.promise();
                 match node.as_ref() {
                     OpType::Input(_) => {
@@ -89,14 +89,10 @@ where
                         let o = self.take_output()?;
                         o.finish(context.builder(), inputs)
                     }
-                    _ => emit_optype(
-                        context,
-                        EmitOpArgs {
-                            node,
-                            inputs,
-                            outputs,
-                        },
-                    ),
+                    _ => {
+                        let args = EmitOpArgs::try_new(context.builder(), node, inputs_rmb, outputs)?;
+                        emit_optype(context, args)
+                    }
                 }
             })
     }
@@ -166,21 +162,18 @@ fn emit_tag<'c, H: HugrView<Node = Node>>(
 
 fn emit_conditional<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
-    EmitOpArgs {
-        node,
-        inputs,
-        outputs,
-    }: EmitOpArgs<'c, '_, Conditional, H>,
+    args: EmitOpArgs<'c, '_, Conditional, H>,
 ) -> Result<()> {
+    let node = args.node();
     let exit_rmb =
-        context.new_row_mail_box(node.dataflow_signature().unwrap().output.iter(), "exit_rmb")?;
+        context.new_row_mail_box(args.node().dataflow_signature().unwrap().output.iter(), "exit_rmb")?;
     let exit_block = context.build_positioned_new_block(
         format!("cond_exit_{}", node.node().index()),
         None,
         |context, bb| {
             let builder = context.builder();
-            outputs.finish(builder, exit_rmb.read_vec(builder, [])?)?;
-            Ok::<_, anyhow::Error>(bb)
+            args.outputs.finish(builder, exit_rmb.read_vec(builder, [])?)?;
+            anyhow::Ok(bb)
         },
     )?;
 
@@ -192,15 +185,8 @@ fn emit_conditional<'c, H: HugrView<Node = Node>>(
             let node = n.try_into_ot::<Case>().ok_or(anyhow!("not a case node"))?;
             let rmb = context.new_row_mail_box(node.get_io().unwrap().0.types.iter(), &label)?;
             context.build_positioned_new_block(&label, Some(exit_block), |context, bb| {
-                let inputs = rmb.read_vec(context.builder(), [])?;
-                emit_dataflow_parent(
-                    context,
-                    EmitOpArgs {
-                        node,
-                        inputs,
-                        outputs: exit_rmb.promise(),
-                    },
-                )?;
+                let args = EmitOpArgs::try_new(context.builder(), n, rmb.clone(), exit_rmb.promise())?;
+                emit_dataflow_parent(context, args)?;
                 context.builder().build_unconditional_branch(exit_block)?;
                 Ok((rmb, bb))
             })
@@ -208,11 +194,11 @@ fn emit_conditional<'c, H: HugrView<Node = Node>>(
         .collect::<Result<Vec<_>>>()?;
 
     let sum_type = get_exactly_one_sum_type(node.in_value_types().next().map(|x| x.1))?;
-    let sum_input = LLVMSumValue::try_new(inputs[0], context.llvm_sum_type(sum_type)?)?;
+    let sum_input = LLVMSumValue::try_new(args.inputs[0], context.llvm_sum_type(sum_type)?)?;
     let builder = context.builder();
     sum_input.build_destructure(builder, |builder, tag, mut vs| {
         let (rmb, bb) = &rmbs_blocks[tag];
-        vs.extend(&inputs[1..]);
+        vs.extend(&args.inputs[1..]);
         rmb.write(builder, vs)?;
         builder.build_unconditional_branch(*bb)?;
         Ok(())
@@ -330,15 +316,8 @@ fn emit_tail_loop<'c, H: HugrView<Node = Node>>(
     };
 
     context.build_positioned(body_bb, move |context| {
-        let inputs = body_i_rmb.read_vec(context.builder(), [])?;
-        emit_dataflow_parent(
-            context,
-            EmitOpArgs {
-                node,
-                inputs,
-                outputs: body_o_rmb.promise(),
-            },
-        )?;
+        let body_args = EmitOpArgs::try_new(context.builder(), node, body_i_rmb.clone(), body_o_rmb.promise())?;
+        emit_dataflow_parent(context, body_args)?;
         let dataflow_outputs = body_o_rmb.read_vec(context.builder(), [])?;
         let control_val = LLVMSumValue::try_new(dataflow_outputs[0], control_llvm_sum_type)?;
         let mut outputs = Some(args.outputs);
@@ -367,7 +346,6 @@ fn emit_optype<'c, H: HugrView<Node = Node>>(
     match node.as_ref() {
         OpType::Tag(ref tag) => emit_tag(context, args.into_ot(tag)),
         OpType::DFG(_) => emit_dataflow_parent(context, args),
-
         OpType::ExtensionOp(ref co) => context.emit_extension_op(args.into_ot(co)),
         OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
         OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
