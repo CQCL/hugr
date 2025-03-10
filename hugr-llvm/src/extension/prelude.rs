@@ -228,7 +228,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     }
 }
 
-/// Add a [PreludeCodegenExtension] to the given [CodegenExtsMap] using `pcg`
+/// Add a [PreludeCodegenExtension] to the given [CodegenExtsBuilder] using `pcg`
 /// as the implementation.
 pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
