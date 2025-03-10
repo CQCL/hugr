@@ -361,12 +361,12 @@ fn make_narrow<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     arg: BasicValueEnum<'c>,
     outs: &[BasicTypeEnum<'c>],
-    log_width: u64,
+    out_log_width: u64,
     signed: bool,
     sum_type: HugrSumType,
 ) -> Result<BasicValueEnum<'c>> {
     let [out] = TryInto::<[BasicTypeEnum; 1]>::try_into(outs)?;
-    let width = 1 << log_width;
+    let width = 1 << out_log_width;
     let arg_int_ty: IntType = arg.get_type().into_int_type();
     let (int_min_value_s, int_max_value_s, int_max_value_u) = int_type_bounds(width);
     let out_int_ty = out
@@ -762,11 +762,11 @@ mod test {
 
     #[rstest]
     #[case("inarrow_s", 6, 2, 4)]
-    #[case("inarrow_s", 6, 5, (2^5) - 1)]
+    #[case("inarrow_s", 6, 5, (1 << 5) - 1)]
     #[case("inarrow_s", 6, 4, -1)]
-    #[case("inarrow_s", 6, 4, -((2^4) - 1))]
-    #[case("inarrow_s", 6, 4, -(2^15))]
-    #[case("inarrow_s", 6, 5, 2 ^ (31 - 1))]
+    #[case("inarrow_s", 6, 4, -(1 << 4) - 1)]
+    #[case("inarrow_s", 6, 4, -(1 <<15))]
+    #[case("inarrow_s", 6, 5, (1 << 31) - 1)]
     fn test_narrow_s(
         mut exec_ctx: TestContext,
         #[case] op: String,
