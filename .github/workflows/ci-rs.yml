@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -96,7 +96,7 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM and Clang
@@ -124,7 +124,7 @@ jobs:
     name: tests (Rust stable, no features)
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -150,7 +150,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -194,7 +194,7 @@ jobs:
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -254,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install CapnProto
@@ -286,7 +286,7 @@ jobs:
     name: tests (Rust nightly, coverage)
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
