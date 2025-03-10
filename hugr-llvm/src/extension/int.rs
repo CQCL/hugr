@@ -29,6 +29,8 @@ use crate::{
 
 use anyhow::{anyhow, bail, Result};
 
+use super::conversions::int_type_bounds;
+
 enum RuntimeError {
     Narrow,
 }
@@ -365,48 +367,44 @@ fn make_narrow<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let [out] = TryInto::<[BasicTypeEnum; 1]>::try_into(outs)?;
     let width = 1 << log_width;
-    //arg.get_type().into_int_type().
-    let max_val = if signed {
-        (i64::MAX >> (64 - width)) as u64
-    } else {
-        u64::MAX >> (64 - width)
-    };
+    let arg_int_ty: IntType = arg.get_type().into_int_type();
+    let (int_min_value_s, int_max_value_s, int_max_value_u) = int_type_bounds(width);
     let out_int_ty = out
         .into_struct_type()
         .get_field_type_at_index(2)
         .unwrap()
         .into_int_type();
-    let max = arg.get_type().into_int_type().const_int(max_val, true);
-    let pred = if signed {
-        IntPredicate::SGT
-    } else {
-        IntPredicate::UGT
-    };
-    let bigger_than_max =
-        ctx.builder()
-            .build_int_compare(pred, arg.into_int_value(), max, "upper_bounds_check")?;
-
-    // Contains true if the input is out of bounds
-    let should_fail = if signed {
-        let min = ctx.builder().build_int_neg(max, "min")?;
-        let less_than_min = ctx.builder().build_int_compare(
+    let outside_range = if signed {
+        let too_big = ctx.builder().build_int_compare(
+            IntPredicate::SGT,
+            arg.into_int_value(),
+            arg_int_ty.const_int(int_max_value_s as u64, true),
+            "upper_bounds_check",
+        )?;
+        let too_small = ctx.builder().build_int_compare(
             IntPredicate::SLT,
             arg.into_int_value(),
-            min,
+            arg_int_ty.const_int(int_min_value_s as u64, true),
             "lower_bounds_check",
         )?;
         ctx.builder()
-            .build_or(less_than_min, bigger_than_max, "oob")?
+            .build_or(too_big, too_small, "outside_range")?
     } else {
-        bigger_than_max
+        ctx.builder().build_int_compare(
+            IntPredicate::UGT,
+            arg.into_int_value(),
+            arg_int_ty.const_int(int_max_value_u, false),
+            "upper_bounds_check",
+        )?
     };
+
     let narrowed_val = ctx
         .builder()
         .build_int_cast_sign_flag(arg.into_int_value(), out_int_ty, signed, "")?
         .as_basic_value_enum();
     val_or_error(
         ctx,
-        should_fail,
+        outside_range,
         narrowed_val,
         RuntimeError::Narrow,
         LLVMSumType::try_from_hugr_type(&ctx.typing_session(), sum_type).unwrap(),
@@ -767,6 +765,8 @@ mod test {
     #[case("inarrow_s", 6, 5, (2^5) - 1)]
     #[case("inarrow_s", 6, 4, -1)]
     #[case("inarrow_s", 6, 4, -((2^4) - 1))]
+    #[case("inarrow_s", 6, 4, -(2^15))]
+    #[case("inarrow_s", 6, 5, 2 ^ (31 - 1))]
     fn test_narrow_s(
         mut exec_ctx: TestContext,
         #[case] op: String,
