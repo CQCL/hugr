@@ -8,6 +8,76 @@
   "types": {},
   "values": {},
   "operations": {
+    "bytecast_float_int": {
+      "extension": "arithmetic.conversions",
+      "name": "bytecast_float_int",
+      "description": "reinterpret an float as an int based on its bytes",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "bytecast_int_float": {
+      "extension": "arithmetic.conversions",
+      "name": "bytecast_int_float",
+      "description": "reinterpret an int as a float based on its bytes",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
+    },
     "convert_s": {
       "extension": "arithmetic.conversions",
       "name": "convert_s",
