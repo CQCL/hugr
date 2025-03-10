@@ -43,11 +43,11 @@ impl<'c, 'hugr, OT, H> EmitOpArgs<'c, 'hugr, OT, H> {
         self.node
     }
 
-    pub fn input_alloca(&self, i: usize) -> PointerValue {
+    pub fn input_alloca(&self, i: usize) -> PointerValue<'c> {
         self.input_mailbox[i].alloca()
     }
 
-    pub fn output_alloca(&self, i: usize) -> PointerValue {
+    pub fn output_alloca(&self, i: usize) -> PointerValue<'c> {
         self.outputs[i].alloca()
     }
 }
