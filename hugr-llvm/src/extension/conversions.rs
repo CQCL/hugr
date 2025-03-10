@@ -217,9 +217,7 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
         ConvertOpDef::bytecast_int_float => {
             emit_custom_unary_op(context, args, |ctx, arg, outs| {
                 let [out] = outs.try_into()?;
-                Ok(vec![ctx
-                    .builder()
-                    .build_bit_cast(arg, out, "")?])
+                Ok(vec![ctx.builder().build_bit_cast(arg, out, "")?])
             })
         }
         ConvertOpDef::bytecast_float_int => {
