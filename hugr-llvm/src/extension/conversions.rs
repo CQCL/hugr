@@ -24,6 +24,22 @@ use crate::{
     types::HugrType,
 };
 
+/// Returns the largest and smallest values that can be represented by an
+/// integer of the given `width`.
+///
+/// The elements of the tuple are:
+///  - The most negative signed integer
+///  - The most positive signed integer
+///  - The largest unsigned integer
+pub fn int_type_bounds(width: u32) -> (i64, i64, u64) {
+    assert!(width <= 64);
+    (
+        i64::MIN >> (64 - width),
+        i64::MAX >> (64 - width),
+        u64::MAX >> (64 - width),
+    )
+}
+
 fn build_trunc_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     signed: bool,
@@ -46,18 +62,13 @@ fn build_trunc_op<'c, H: HugrView<Node = Node>>(
 
     let sum_ty = context.llvm_sum_type(hugr_sum_ty)?;
 
-    let (width, int_min_value_s, int_max_value_s, int_max_value_u) = {
+    let (width, (int_min_value_s, int_max_value_s, int_max_value_u)) = {
         ensure!(
             log_width <= 6,
             "Expected log_width of output to be <= 6, found: {log_width}"
         );
         let width = 1 << log_width;
-        (
-            width,
-            i64::MIN >> (64 - width),
-            i64::MAX >> (64 - width),
-            u64::MAX >> (64 - width),
-        )
+        (width, int_type_bounds(width))
     };
 
     emit_custom_unary_op(context, args, |ctx, arg, _| {
