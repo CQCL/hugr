@@ -28,9 +28,9 @@ pub use monomorphize::remove_polyfuncs;
 #[allow(deprecated)]
 pub use monomorphize::monomorphize;
 pub use monomorphize::{MonomorphizeError, MonomorphizePass};
+pub mod lower_types;
 pub mod nest_cfgs;
 pub mod non_local;
-pub mod lower_types;
 pub mod validation;
 pub use force_order::{force_order, force_order_by_key};
 pub use lower::{lower_ops, replace_many_ops};
