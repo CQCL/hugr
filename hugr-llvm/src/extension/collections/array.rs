@@ -183,18 +183,21 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
 /// Returns two pointers: The first one is a pointer to the first element of the
 /// array (i.e. it is of type `array.get_element_type().ptr_type()`) whereas the
 /// second one points to the whole array value, i.e. it is of type `array.ptr_type()`.
-fn build_array_alloca<'c, H: HugrView<Node=Node>>(
+fn build_array_alloca<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     array: ArrayValue<'c>,
 ) -> Result<(PointerValue<'c>, PointerValue<'c>), BuilderError> {
     let array_ty = array.get_type();
     let array_len: IntValue<'c> = {
-        ctx.iw_context().i32_type().const_int(array_ty.len() as u64, false)
+        ctx.iw_context()
+            .i32_type()
+            .const_int(array_ty.len() as u64, false)
     };
     let ptr = ctx.build_prologue(|builder| {
         builder.build_array_alloca(array_ty.get_element_type(), array_len, "")
     })?;
-    let array_ptr = ctx.builder()
+    let array_ptr = ctx
+        .builder()
         .build_bit_cast(ptr, array_ty.ptr_type(Default::default()), "")?
         .into_pointer_value();
     ctx.builder().build_store(array_ptr, array)?;
@@ -207,7 +210,8 @@ fn build_array_alloca<'c, H: HugrView<Node=Node>>(
 /// The pointer forwarded to the closure is a pointer to the first element of
 /// the array. I.e. it is of type `array.get_element_type().ptr_type()` not
 /// `array.ptr_type()`
-fn with_array_alloca<'c, T, H: HugrView<Node=Node>>(
+#[allow(unused)]
+fn with_array_alloca<'c, T, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     array: ArrayValue<'c>,
     go: impl FnOnce(PointerValue<'c>) -> Result<T>,
@@ -225,9 +229,9 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
     iters: IntValue<'c>,
     go: impl FnOnce(&mut EmitFuncContext<'c, '_, H>, IntValue<'c>) -> Result<T>,
 ) -> Result<T> {
-    let builder = ctx.builder();
     let idx_ty = ctx.iw_context().i32_type();
-    let idx_ptr = builder.build_alloca(idx_ty, "")?;
+    let idx_ptr = ctx.build_prologue(|builder| builder.build_alloca(idx_ty, ""))?;
+    let builder = ctx.builder();
     builder.build_store(idx_ptr, idx_ty.const_zero())?;
 
     let exit_block = ctx.new_basic_block("", None);
@@ -347,7 +351,8 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                     let (ptr, _) = build_array_alloca(ctx, array_v)?;
                     // inside `success_block` we know `index_v` to be in
                     // bounds.
-                    let elem_addr = unsafe { ctx.builder().build_in_bounds_gep(ptr, &[index_v], "")? };
+                    let elem_addr =
+                        unsafe { ctx.builder().build_in_bounds_gep(ptr, &[index_v], "")? };
                     let elem_v = ctx.builder().build_load(elem_addr, "")?;
                     let success_v = res_sum_ty.build_tag(ctx.builder(), 1, vec![elem_v])?;
                     exit_rmb.write(ctx.builder(), [success_v.into()])?;
@@ -408,16 +413,11 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                     let builder = ctx.builder();
                     // inside `success_block` we know `index_v` to be in
                     // bounds.
-                    let elem_addr =
-                        unsafe { builder.build_in_bounds_gep(ptr, &[index_v], "")? };
+                    let elem_addr = unsafe { builder.build_in_bounds_gep(ptr, &[index_v], "")? };
                     let elem_v = builder.build_load(elem_addr, "")?;
                     builder.build_store(elem_addr, value_v)?;
                     let ptr = builder
-                        .build_bit_cast(
-                            ptr,
-                            array_v.get_type().ptr_type(Default::default()),
-                            "",
-                        )?
+                        .build_bit_cast(ptr, array_v.get_type().ptr_type(Default::default()), "")?
                         .into_pointer_value();
                     let array_v = builder.build_load(ptr, "")?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v, array_v])?;
@@ -487,20 +487,14 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                     let builder = ctx.builder();
                     // inside `success_block` we know `index1_v` and `index2_v`
                     // to be in bounds.
-                    let elem1_addr =
-                        unsafe { builder.build_in_bounds_gep(ptr, &[index1_v], "")? };
+                    let elem1_addr = unsafe { builder.build_in_bounds_gep(ptr, &[index1_v], "")? };
                     let elem1_v = builder.build_load(elem1_addr, "")?;
-                    let elem2_addr =
-                        unsafe { builder.build_in_bounds_gep(ptr, &[index2_v], "")? };
+                    let elem2_addr = unsafe { builder.build_in_bounds_gep(ptr, &[index2_v], "")? };
                     let elem2_v = builder.build_load(elem2_addr, "")?;
                     builder.build_store(elem1_addr, elem2_v)?;
                     builder.build_store(elem2_addr, elem1_v)?;
                     let ptr = builder
-                        .build_bit_cast(
-                            ptr,
-                            array_v.get_type().ptr_type(Default::default()),
-                            "",
-                        )?
+                        .build_bit_cast(ptr, array_v.get_type().ptr_type(Default::default()), "")?
                         .into_pointer_value();
                     let array_v = builder.build_load(ptr, "")?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![array_v])?;
@@ -572,7 +566,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
 }
 
 /// Helper function to emit the pop operations.
-fn emit_pop_op<'c, H: HugrView<Node=Node>>(
+fn emit_pop_op<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ts: &TypingSession<'c, '_>,
     elem_ty: HugrType,
@@ -591,12 +585,15 @@ fn emit_pop_op<'c, H: HugrView<Node=Node>>(
     let (ptr, _) = build_array_alloca(ctx, array_v)?;
     let (elem_ptr, ptr) = {
         if pop_left {
-            let rest_ptr =
-                unsafe { ctx.builder().build_gep(ptr, &[iw_ctx.i32_type().const_int(1, false)], "") }?;
+            let rest_ptr = unsafe {
+                ctx.builder()
+                    .build_gep(ptr, &[iw_ctx.i32_type().const_int(1, false)], "")
+            }?;
             (ptr, rest_ptr)
         } else {
             let elem_ptr = unsafe {
-                ctx.builder().build_gep(ptr, &[iw_ctx.i32_type().const_int(size - 1, false)], "")
+                ctx.builder()
+                    .build_gep(ptr, &[iw_ctx.i32_type().const_int(size - 1, false)], "")
             }?;
             (elem_ptr, ptr)
         }
@@ -606,11 +603,14 @@ fn emit_pop_op<'c, H: HugrView<Node=Node>>(
         .get_type()
         .get_element_type()
         .array_type(size as u32 - 1);
-    let ptr = ctx.builder()
+    let ptr = ctx
+        .builder()
         .build_bit_cast(ptr, new_array_ty.ptr_type(Default::default()), "")?
         .into_pointer_value();
     let array_v = ctx.builder().build_load(ptr, "")?;
-    Ok(ret_ty.build_tag(ctx.builder(), 1, vec![elem_v, array_v])?.into())
+    Ok(ret_ty
+        .build_tag(ctx.builder(), 1, vec![elem_v, array_v])?
+        .into())
 }
 
 /// Emits an [ArrayRepeat] op.
@@ -657,13 +657,14 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     let (src_ptr, _) = build_array_alloca(ctx, src_array.into_array_value())?;
     let (tgt_ptr, tgt_array_ptr) = build_array_alloca(ctx, tgt_array_ty.get_undef())?;
 
-    let builder = ctx.builder();
-
     let acc_tys: Vec<_> = op.acc_tys.iter().map(|ty| ts.llvm_type(ty)).try_collect()?;
-    let acc_ptrs: Vec<_> = acc_tys
-        .iter()
-        .map(|ty| builder.build_alloca(*ty, ""))
-        .try_collect()?;
+    let acc_ptrs: Vec<_> = ctx.build_prologue(|builder| {
+        acc_tys
+            .iter()
+            .map(|ty| builder.build_alloca(*ty, ""))
+            .try_collect()
+    })?;
+    let builder = ctx.builder();
     for (ptr, initial_val) in acc_ptrs.iter().zip(initial_accs) {
         builder.build_store(*ptr, *initial_val)?;
     }

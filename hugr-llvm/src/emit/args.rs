@@ -1,6 +1,9 @@
-use hugr_core::{ops::OpType, HugrView, Node};
-use inkwell::{builder::Builder, values::{BasicValueEnum, PointerValue}};
 use anyhow::Result;
+use hugr_core::{ops::OpType, HugrView, Node};
+use inkwell::{
+    builder::Builder,
+    values::{BasicValueEnum, PointerValue},
+};
 
 use crate::utils::fat::FatNode;
 
@@ -31,7 +34,7 @@ impl<'c, 'hugr, OT, H> EmitOpArgs<'c, 'hugr, OT, H> {
             node,
             inputs,
             outputs,
-            input_mailbox
+            input_mailbox,
         })
     }
 
@@ -59,20 +62,20 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
             node,
             inputs,
             outputs,
-            input_mailbox
+            input_mailbox,
         } = self;
         match node.try_into_ot() {
             Some(new_node) => Ok(EmitOpArgs {
                 node: new_node,
                 inputs,
                 outputs,
-                input_mailbox
+                input_mailbox,
             }),
             None => Err(EmitOpArgs {
                 node,
                 inputs,
                 outputs,
-                input_mailbox
+                input_mailbox,
             }),
         }
     }
@@ -89,13 +92,13 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
             node,
             inputs,
             outputs,
-            input_mailbox
+            input_mailbox,
         } = self;
         EmitOpArgs {
             node: node.into_ot(ot),
             inputs,
             outputs,
-            input_mailbox
+            input_mailbox,
         }
     }
 }

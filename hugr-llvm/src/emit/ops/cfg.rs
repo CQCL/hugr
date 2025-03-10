@@ -111,9 +111,10 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
             match child_node.as_ref() {
                 OpType::DataflowBlock(ref dfb) => self.emit_dataflow_block(
                     context,
-                    EmitOpArgs::try_new(context.builder(),
+                    EmitOpArgs::try_new(
+                        context.builder(),
                         child_node.into_ot(dfb),
-                        inputs ,
+                        inputs,
                         outputs,
                     )?,
                 ),
@@ -155,7 +156,8 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
         // our entry basic block and our input RowMailBox
         let (bb, inputs_rmb) = self.get_block_data(&args.node())?;
         // the basic block and mailbox of each of our successors
-        let successor_data = args.node()
+        let successor_data = args
+            .node()
             .output_neighbours()
             .map(|succ| self.get_block_data(&succ))
             .collect::<Result<Vec<_>>>()?;
@@ -166,7 +168,12 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
             let outputs_rmb = context.node_ins_rmb(o)?;
 
             // emit all our children and read the values from the rowmailbox of our output node
-            let args = EmitOpArgs::try_new(context.builder(), args.node, inputs_rmb, outputs_rmb.promise())?;
+            let args = EmitOpArgs::try_new(
+                context.builder(),
+                args.node,
+                inputs_rmb,
+                outputs_rmb.promise(),
+            )?;
             emit_dataflow_parent(context, args)?;
             let outputs = outputs_rmb.read_vec(context.builder(), [])?;
 

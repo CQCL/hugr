@@ -60,6 +60,7 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         let return_one_bb = ctx.new_basic_block("power_of_zero", Some(pow_body_bb));
         let pow_bb = ctx.new_basic_block("pow", Some(return_one_bb));
 
+        // TODO: don't just build allocas, put them in prologue
         let acc_p = ctx.builder().build_alloca(lhs.get_type(), "acc_ptr")?;
         let exp_p = ctx.builder().build_alloca(rhs.get_type(), "exp_ptr")?;
         ctx.builder().build_store(acc_p, lhs)?;

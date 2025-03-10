@@ -90,7 +90,8 @@ where
                         o.finish(context.builder(), inputs)
                     }
                     _ => {
-                        let args = EmitOpArgs::try_new(context.builder(), node, inputs_rmb, outputs)?;
+                        let args =
+                            EmitOpArgs::try_new(context.builder(), node, inputs_rmb, outputs)?;
                         emit_optype(context, args)
                     }
                 }
@@ -165,14 +166,17 @@ fn emit_conditional<'c, H: HugrView<Node = Node>>(
     args: EmitOpArgs<'c, '_, Conditional, H>,
 ) -> Result<()> {
     let node = args.node();
-    let exit_rmb =
-        context.new_row_mail_box(args.node().dataflow_signature().unwrap().output.iter(), "exit_rmb")?;
+    let exit_rmb = context.new_row_mail_box(
+        args.node().dataflow_signature().unwrap().output.iter(),
+        "exit_rmb",
+    )?;
     let exit_block = context.build_positioned_new_block(
         format!("cond_exit_{}", node.node().index()),
         None,
         |context, bb| {
             let builder = context.builder();
-            args.outputs.finish(builder, exit_rmb.read_vec(builder, [])?)?;
+            args.outputs
+                .finish(builder, exit_rmb.read_vec(builder, [])?)?;
             anyhow::Ok(bb)
         },
     )?;
@@ -185,7 +189,8 @@ fn emit_conditional<'c, H: HugrView<Node = Node>>(
             let node = n.try_into_ot::<Case>().ok_or(anyhow!("not a case node"))?;
             let rmb = context.new_row_mail_box(node.get_io().unwrap().0.types.iter(), &label)?;
             context.build_positioned_new_block(&label, Some(exit_block), |context, bb| {
-                let args = EmitOpArgs::try_new(context.builder(), n, rmb.clone(), exit_rmb.promise())?;
+                let args =
+                    EmitOpArgs::try_new(context.builder(), n, rmb.clone(), exit_rmb.promise())?;
                 emit_dataflow_parent(context, args)?;
                 context.builder().build_unconditional_branch(exit_block)?;
                 Ok((rmb, bb))
@@ -316,7 +321,12 @@ fn emit_tail_loop<'c, H: HugrView<Node = Node>>(
     };
 
     context.build_positioned(body_bb, move |context| {
-        let body_args = EmitOpArgs::try_new(context.builder(), node, body_i_rmb.clone(), body_o_rmb.promise())?;
+        let body_args = EmitOpArgs::try_new(
+            context.builder(),
+            node,
+            body_i_rmb.clone(),
+            body_o_rmb.promise(),
+        )?;
         emit_dataflow_parent(context, body_args)?;
         let dataflow_outputs = body_o_rmb.read_vec(context.builder(), [])?;
         let control_val = LLVMSumValue::try_new(dataflow_outputs[0], control_llvm_sum_type)?;
