@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView};
 
 use crate::ops::handle::NodeHandle;
-use crate::ops::OpTrait;
+use crate::ops::{OpTag, OpTrait};
 use crate::{Direction, Hugr, Node};
 
 use super::hugrmut::{panic_invalid_node, panic_invalid_non_root};
@@ -309,6 +309,22 @@ pub trait HugrMutInternals: RootTagged<Node = Node> {
         }
         self.hugr_mut().replace_op(node, op)
     }
+
+    /// Gets a mutable reference to the optype.
+    ///
+    /// Changing this may invalidate the ports, which may need to be resized to
+    /// match the OpType signature.
+    ///
+    /// Will panic for the root node unless [Self::RootHandle] is [OpTag::Any],
+    /// as mutation could invalidate the bound.
+    fn optype_mut(&mut self, node: Node) -> &mut OpType {
+        if Self::RootHandle::TAG.is_superset(OpTag::Any) {
+            panic_invalid_node(self, node);
+        } else {
+            panic_invalid_non_root(self, node);
+        }
+        self.hugr_mut().op_types.get_mut(node.pg_index())
+    }
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -406,8 +422,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMutInterna
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
         // We know RootHandle=Node here so no need to check
-        let cur = self.hugr_mut().op_types.get_mut(node.pg_index());
-        Ok(std::mem::replace(cur, op.into()))
+        Ok(std::mem::replace(self.optype_mut(node), op.into()))
     }
 }
 
