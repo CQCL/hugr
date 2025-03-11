@@ -11,7 +11,9 @@ use std::num::NonZeroU64;
 use thiserror::Error;
 
 use super::row_var::MaybeRV;
-use super::{check_typevar_decl, NoRV, RowVariable, Substitution, Type, TypeBase, TypeBound};
+use super::{
+    check_typevar_decl, NoRV, RowVariable, Substitution, Type, TypeBase, TypeBound, TypeTransformer,
+};
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
@@ -365,6 +367,26 @@ impl TypeArg {
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
+        }
+    }
+
+    /// Applies a [TypeTransformer] to this instance. (Mutates in-place.)
+    ///
+    /// Returns true if the TypeArg (may have) changed, or false if it definitely didn't.
+    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match self {
+            TypeArg::Type { ty } => ty.transform(tr),
+            TypeArg::Sequence { elems } => {
+                let mut any_ch = false;
+                for e in elems.iter_mut() {
+                    any_ch |= e.transform(tr)?;
+                }
+                Ok(any_ch)
+            }
+            TypeArg::BoundedNat { .. }
+            | TypeArg::String { .. }
+            | TypeArg::Extensions { .. }
+            | TypeArg::Variable { .. } => Ok(false),
         }
     }
 }
