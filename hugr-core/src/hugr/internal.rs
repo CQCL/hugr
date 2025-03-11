@@ -309,6 +309,15 @@ pub trait HugrMutInternals: RootTagged<Node = Node> {
         }
         self.hugr_mut().replace_op(node, op)
     }
+
+    /// Gets a mutable reference to the optype.
+    ///
+    /// Changing this may invalidate the ports, which may need to be resized to
+    /// match the OpType signature.
+    fn optype_mut(&mut self, node: Node) -> &mut OpType {
+        panic_invalid_non_root(self, node);
+        self.hugr_mut().op_types.get_mut(node.pg_index())
+    }
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -406,8 +415,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMutInterna
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
         // We know RootHandle=Node here so no need to check
-        let cur = self.hugr_mut().op_types.get_mut(node.pg_index());
-        Ok(std::mem::replace(cur, op.into()))
+        Ok(std::mem::replace(self.optype_mut(node), op.into()))
     }
 }
 
