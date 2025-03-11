@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -88,23 +88,33 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
-    name: Build benchmarks 🏋️
+    name: Continuous benchmarking 🏋️
     needs: changes
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      - name: Build benchmarks with no features
-        run: cargo bench --verbose --no-run  --no-default-features
-      - name: Build benchmarks with all features
-        run: cargo bench --verbose --no-run  --all-features
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-codspeed
+        run: cargo binstall cargo-codspeed --force
+      - name: Override criterion with the CodSpeed harness
+        run: cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
+      - name: Build benchmarks
+        run: cargo codspeed build --profile bench --features extension_inference,declarative,model_unstable,llvm,llvm-test
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v3
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: "cargo codspeed run"
 
   # Run tests on Rust stable
   tests-stable-no-features:
@@ -114,7 +124,7 @@ jobs:
     name: tests (Rust stable, no features)
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -140,7 +150,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -184,7 +194,7 @@ jobs:
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -203,6 +213,12 @@ jobs:
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose  --all-features
+      - name: Build hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+      - name: Tests hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -238,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install CapnProto
@@ -270,7 +286,7 @@ jobs:
     name: tests (Rust nightly, coverage)
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
@@ -314,16 +330,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fail if required checks failed
-        # This condition should simply be `if: failure() || cancelled()`,
-        # but there seems to be a bug in the github workflow runner.
-        #
-        # See https://github.com/orgs/community/discussions/80788
-        if: |
-          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
-          needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
-          needs.tests-stable-no-features.result == 'failure' || needs.tests-stable-no-features.result == 'cancelled' ||
-          needs.tests-stable-all-features.result == 'failure' || needs.tests-stable-all-features.result == 'cancelled' ||
-          needs.std-extensions.result == 'failure' || needs.std-extensions.result == 'cancelled'
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "Required checks failed"
           echo "Please check the logs for more information"

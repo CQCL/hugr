@@ -3,7 +3,7 @@
 //! An (example) use of the [dataflow analysis framework](super::dataflow).
 
 pub mod value_handle;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
@@ -13,7 +13,7 @@ use hugr_core::{
     },
     ops::{
         constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-        OpType, Value,
+        Value,
     },
     types::{EdgeKind, TypeArg},
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
@@ -21,10 +21,12 @@ use hugr_core::{
 use value_handle::ValueHandle;
 
 use crate::dataflow::{
-    partial_from_const, AbstractValue, AnalysisResults, ConstLoader, ConstLocation, DFContext,
-    Machine, PartialValue, TailLoopTermination,
+    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
+    TailLoopTermination,
 };
+use crate::dead_code::PreserveNode;
 use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::{find_main, DeadCodeElimPass};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
@@ -88,22 +90,15 @@ impl ConstantFoldPass {
         });
 
         let results = Machine::new(&hugr).run(ConstFoldContext(hugr), inputs);
-        let keep_nodes = self.find_needed_nodes(&results);
         let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
-        let remove_nodes = hugr
+        let wires_to_break = hugr
             .nodes()
-            .filter(|n| !keep_nodes.contains(n))
-            .collect::<HashSet<_>>();
-        let wires_to_break = keep_nodes
-            .into_iter()
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
             .filter(|(n, ip)| {
                 *n != hugr.root()
                     && matches!(hugr.get_optype(*n).port_kind(*ip), Some(EdgeKind::Value(_)))
             })
-            // Note we COULD filter out (avoid breaking) wires from other nodes that we are keeping.
-            // This would insert fewer constants, but potentially expose less parallelism.
             .filter_map(|(n, ip)| {
                 let (src, outp) = hugr.single_linked_output(n, ip).unwrap();
                 // Avoid breaking edges from existing LoadConstant (we'd only add another)
@@ -118,20 +113,42 @@ impl ConstantFoldPass {
                 ))
             })
             .collect::<Vec<_>>();
+        // Sadly the results immutably borrow the hugr, so we must extract everything we need before mutation
+        let terminating_tail_loops = hugr
+            .nodes()
+            .filter(|n| {
+                results.tail_loop_terminates(*n) == Some(TailLoopTermination::NeverContinues)
+            })
+            .collect::<Vec<_>>();
 
-        for (n, import, v) in wires_to_break {
+        for (n, inport, v) in wires_to_break {
             let parent = hugr.get_parent(n).unwrap();
             let datatype = v.get_type();
             // We could try hash-consing identical Consts, but not ATM
             let cst = hugr.add_node_with_parent(parent, Const::new(v));
             let lcst = hugr.add_node_with_parent(parent, LoadConstant { datatype });
             hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
-            hugr.disconnect(n, import);
-            hugr.connect(lcst, OutgoingPort::from(0), n, import);
+            hugr.disconnect(n, inport);
+            hugr.connect(lcst, OutgoingPort::from(0), n, inport);
         }
-        for n in remove_nodes {
-            hugr.remove_node(n);
-        }
+        // Dataflow analysis applies our inputs to the 'main' function if this is a Module, so do the same here
+        DeadCodeElimPass::default()
+            .with_entry_points(hugr.get_optype(hugr.root()).is_module().then(
+                // No main => remove everything, so not much use
+                || find_main(hugr).unwrap(),
+            ))
+            .set_preserve_callback(if self.allow_increase_termination {
+                Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
+            } else {
+                Arc::new(move |h, n| {
+                    if terminating_tail_loops.contains(&n) {
+                        PreserveNode::DeferToChildren
+                    } else {
+                        PreserveNode::default_for(h, n)
+                    }
+                })
+            })
+            .run(hugr)?;
         Ok(())
     }
 
@@ -139,94 +156,6 @@ impl ConstantFoldPass {
     pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
         self.validation
             .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
-    }
-
-    fn find_needed_nodes<H: HugrView>(
-        &self,
-        results: &AnalysisResults<ValueHandle, H>,
-    ) -> HashSet<Node> {
-        let mut needed = HashSet::new();
-        let h = results.hugr();
-        let mut q = VecDeque::from_iter([h.root()]);
-        while let Some(n) = q.pop_front() {
-            if !needed.insert(n) {
-                continue;
-            };
-            if h.get_optype(n).is_module() {
-                for ch in h.children(n) {
-                    match h.get_optype(ch) {
-                        OpType::AliasDecl(_) | OpType::AliasDefn(_) => {
-                            // Use of these is done via names, rather than following edges.
-                            // We could track these as well but for now be conservative.
-                            q.push_back(ch);
-                        }
-                        OpType::FuncDefn(f) if f.name == "main" => {
-                            // Dataflow analysis will have applied any inputs the 'main' function, so assume reachable.
-                            q.push_back(ch);
-                        }
-                        _ => (),
-                    }
-                }
-            } else if h.get_optype(n).is_cfg() {
-                for bb in h.children(n) {
-                    //if results.bb_reachable(bb).unwrap() { // no, we'd need to patch up predicates
-                    q.push_back(bb);
-                }
-            } else if let Some(inout) = h.get_io(n) {
-                // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
-                q.extend(inout); // Input also necessary for legality even if unreachable
-
-                if !self.allow_increase_termination {
-                    // Also add on anything that might not terminate (even if results not required -
-                    // if its results are required we'll add it by following dataflow, below.)
-                    for ch in h.children(n) {
-                        if might_diverge(results, ch) {
-                            q.push_back(ch);
-                        }
-                    }
-                }
-            }
-            // Also follow dataflow demand
-            for (src, op) in h.all_linked_outputs(n) {
-                let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
-                    EdgeKind::Value(_) => {
-                        h.get_optype(src).is_load_constant()
-                            || results
-                                .try_read_wire_concrete::<Value, _, _>(Wire::new(src, op))
-                                .is_err()
-                    }
-                    EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
-                    EdgeKind::ControlFlow => false, // we always include all children of a CFG above
-                    _ => true, // needed as EdgeKind non-exhaustive; not knowing what it is, assume the worst
-                };
-                if needs_predecessor {
-                    q.push_back(src);
-                }
-            }
-        }
-        needed
-    }
-}
-
-// "Diverge" aka "never-terminate"
-// TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
-fn might_diverge<V: AbstractValue>(results: &AnalysisResults<V, impl HugrView>, n: Node) -> bool {
-    let op = results.hugr().get_optype(n);
-    if op.is_cfg() {
-        // TODO if the CFG has no cycles (that are possible given predicates)
-        // then we could say it definitely terminates (i.e. return false)
-        true
-    } else if op.is_tail_loop()
-        && results.tail_loop_terminates(n).unwrap() != TailLoopTermination::NeverContinues
-    {
-        // If we can even figure out the number of iterations is bounded that would allow returning false.
-        true
-    } else {
-        // Node does not introduce non-termination, but still non-terminates if any of its children does
-        results
-            .hugr()
-            .children(n)
-            .any(|ch| might_diverge(results, ch))
     }
 }
 
@@ -244,20 +173,30 @@ impl<H: HugrView> std::ops::Deref for ConstFoldContext<'_, H> {
     }
 }
 
-impl<H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'_, H> {
-    fn value_from_opaque(&self, loc: ConstLocation, val: &OpaqueValue) -> Option<ValueHandle> {
+impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+    type Node = H::Node;
+
+    fn value_from_opaque(
+        &self,
+        loc: ConstLocation<H::Node>,
+        val: &OpaqueValue,
+    ) -> Option<ValueHandle<H::Node>> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
 
     fn value_from_const_hugr(
         &self,
-        loc: ConstLocation,
+        loc: ConstLocation<H::Node>,
         h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle> {
+    ) -> Option<ValueHandle<H::Node>> {
         Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
     }
 
-    fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
+    fn value_from_function(
+        &self,
+        node: H::Node,
+        type_args: &[TypeArg],
+    ) -> Option<ValueHandle<H::Node>> {
         if !type_args.is_empty() {
             // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
             return None;
@@ -272,13 +211,13 @@ impl<H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'_, H> {
     }
 }
 
-impl<H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'_, H> {
+impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
     fn interpret_leaf_op(
         &mut self,
-        node: Node,
+        node: H::Node,
         op: &ExtensionOp,
-        ins: &[PartialValue<ValueHandle>],
-        outs: &mut [PartialValue<ValueHandle>],
+        ins: &[PartialValue<ValueHandle<H::Node>>],
+        outs: &mut [PartialValue<ValueHandle<H::Node>>],
     ) {
         let sig = op.signature();
         let known_ins = sig

@@ -817,6 +817,9 @@ pub(crate) mod test {
     #[case(const_tuple_serialized(), const_tuple())]
     #[case(const_array_bool(), const_array_bool())]
     #[case(const_array_options(), const_array_options())]
+    // Opaque constants don't get resolved into concrete types when running miri,
+    // as the `typetag` machinery is not available.
+    #[cfg_attr(miri, ignore)]
     fn const_serde_roundtrip(#[case] const_value: Value, #[case] expected_value: Value) {
         let serialized = serde_json::to_string(&const_value).unwrap();
         let deserialized: Value = serde_json::from_str(&serialized).unwrap();

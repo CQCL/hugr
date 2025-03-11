@@ -27,6 +27,8 @@ type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 #[derive(Clone)]
 pub struct DescendantsGraph<'g, Root = Node> {
     /// The chosen root node.
+    // TODO: this can only be made generic once the call to base_hugr is removed
+    // in try_new. See https://github.com/CQCL/hugr/issues/1926
     root: Node,
 
     /// The graph encoding the adjacency structure of the HUGR.
@@ -41,7 +43,7 @@ pub struct DescendantsGraph<'g, Root = Node> {
 impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.graph.contains_node(node.pg_index())
+        self.graph.contains_node(self.get_pg_index(node))
     }
 
     #[inline]
@@ -56,17 +58,21 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
 
     #[inline]
     fn nodes(&self) -> impl Iterator<Item = Node> + Clone {
-        self.graph.nodes_iter().map_into()
+        self.graph.nodes_iter().map(|index| self.get_node(index))
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
-        self.graph.port_offsets(node.pg_index(), dir).map_into()
+        self.graph
+            .port_offsets(self.get_pg_index(node), dir)
+            .map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
-        self.graph.all_port_offsets(node.pg_index()).map_into()
+        self.graph
+            .all_port_offsets(self.get_pg_index(node))
+            .map_into()
     }
 
     fn linked_ports(
@@ -76,19 +82,19 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
     ) -> impl Iterator<Item = (Node, Port)> + Clone {
         let port = self
             .graph
-            .port_index(node.pg_index(), port.into().pg_offset())
+            .port_index(self.get_pg_index(node), port.into().pg_offset())
             .unwrap();
         self.graph.port_links(port).map(|(_, link)| {
             let port: PortIndex = link.into();
             let node = self.graph.port_node(port).unwrap();
             let offset = self.graph.port_offset(port).unwrap();
-            (node.into(), offset.into())
+            (self.get_node(node), offset.into())
         })
     }
 
     fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
         self.graph
-            .get_connections(node.pg_index(), other.pg_index())
+            .get_connections(self.get_pg_index(node), self.get_pg_index(other))
             .map(|(p1, p2)| {
                 [p1, p2].map(|link| {
                     let offset = self.graph.port_offset(link).unwrap();
@@ -99,29 +105,30 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(node.pg_index(), dir)
+        self.graph.num_ports(self.get_pg_index(node), dir)
     }
 
     #[inline]
     fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
-        match self.graph.contains_node(node.pg_index()) {
-            true => self
-                .base_hugr()
-                .hierarchy
-                .children(node.pg_index())
-                .map_into(),
-            false => portgraph::hierarchy::Children::default().map_into(),
-        }
+        let children = match self.graph.contains_node(self.get_pg_index(node)) {
+            true => self.base_hugr().hierarchy.children(self.get_pg_index(node)),
+            false => portgraph::hierarchy::Children::default(),
+        };
+        children.map(|index| self.get_node(index))
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
-        self.graph.neighbours(node.pg_index(), dir).map_into()
+        self.graph
+            .neighbours(self.get_pg_index(node), dir)
+            .map(|index| self.get_node(index))
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
-        self.graph.all_neighbours(node.pg_index()).map_into()
+        self.graph
+            .all_neighbours(self.get_pg_index(node))
+            .map(|index| self.get_node(index))
     }
 }
 impl<Root: NodeHandle> RootTagged for DescendantsGraph<'_, Root> {
@@ -132,12 +139,12 @@ impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
 where
     Root: NodeHandle,
 {
-    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
-        check_tag::<Root>(hugr, root)?;
+    fn try_new(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Result<Self, HugrError> {
+        check_tag::<Root, Node>(hugr, root)?;
         let hugr = hugr.base_hugr();
         Ok(Self {
             root,
-            graph: RegionGraph::new(&hugr.graph, &hugr.hierarchy, root.pg_index()),
+            graph: RegionGraph::new(&hugr.graph, &hugr.hierarchy, hugr.get_pg_index(root)),
             hugr,
             _phantom: std::marker::PhantomData,
         })
@@ -155,6 +162,8 @@ where
     where
         Self: 'p;
 
+    type Node = Node;
+
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
         &self.graph
@@ -168,6 +177,16 @@ where
     #[inline]
     fn root_node(&self) -> Node {
         self.root
+    }
+
+    #[inline]
+    fn get_pg_index(&self, node: Node) -> portgraph::NodeIndex {
+        self.hugr.get_pg_index(node)
+    }
+
+    #[inline]
+    fn get_node(&self, index: portgraph::NodeIndex) -> Node {
+        self.hugr.get_node(index)
     }
 }
 
