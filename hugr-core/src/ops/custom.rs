@@ -85,6 +85,12 @@ impl ExtensionOp {
         self.def.as_ref()
     }
 
+    /// Gets an Arc to the [`OpDef`] of this instance, i.e. usable to create
+    /// new instances.
+    pub fn def_arc(&self) -> &Arc<OpDef> {
+        &self.def
+    }
+
     /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
     pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Value)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
