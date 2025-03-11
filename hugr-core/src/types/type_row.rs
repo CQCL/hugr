@@ -7,7 +7,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Type, TypeBase};
+use super::{
+    type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Type, TypeBase,
+    TypeTransformer,
+};
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
 use itertools::Itertools;
@@ -73,6 +76,17 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
             .flat_map(|ty| ty.substitute(s))
             .collect::<Vec<_>>()
             .into()
+    }
+
+    /// Applies a [TypeTransformer] to all the types in the row. (Mutates in-place.)
+    ///
+    /// Returns true if any type (may have) changed, or false if all were definitely unchanged.
+    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        let mut any_ch = false;
+        for t in self.iter_mut() {
+            any_ch |= t.transform(tr)?;
+        }
+        Ok(any_ch)
     }
 
     delegate! {

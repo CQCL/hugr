@@ -267,6 +267,23 @@ impl SumType {
             SumType::General { rows } => Either::Right(rows.iter()),
         }
     }
+
+    /// Applies a [TypeTransformer] to this instance. (Mutates in-place.)
+    ///
+    /// Returns true if any part of the sum type (may have) changed, or false
+    /// for definitely no change.
+    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        Ok(match self {
+            SumType::Unit { .. } => false,
+            SumType::General { rows } => {
+                let mut any_changed = false;
+                for r in rows.iter_mut() {
+                    any_changed |= r.transform(tr)?;
+                }
+                any_changed
+            }
+        })
+    }
 }
 
 impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
@@ -528,6 +545,34 @@ impl<RV: MaybeRV> TypeBase<RV> {
             }
         }
     }
+
+    /// Applies a [TypeTransformer] to this instance. (Mutates in-place.)
+    ///
+    /// Returns true if the Type (may have) changed, or false if it definitely didn't.
+    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match &mut self.0 {
+            TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
+            TypeEnum::Extension(custom_type) => {
+                Ok(if let Some(nt) = tr.apply_custom(custom_type)? {
+                    *self = nt.into_();
+                    true
+                } else {
+                    let mut args_changed = false;
+                    for a in custom_type.args_mut() {
+                        args_changed |= a.transform(tr)?
+                    }
+                    if args_changed {
+                        *custom_type = custom_type
+                            .get_type_def(&custom_type.get_extension()?)?
+                            .instantiate(custom_type.args())?;
+                    }
+                    args_changed
+                })
+            }
+            TypeEnum::Function(fty) => fty.transform(tr),
+            TypeEnum::Sum(sum_type) => sum_type.transform(tr),
+        }
+    }
 }
 
 impl Type {
@@ -664,6 +709,31 @@ impl<'a> Substitution<'a> {
             _ => panic!("Not a type or list of types - call validate() ?"),
         }
     }
+}
+
+/// A transformation that can be applied to a [Type] or [TypeArg].
+/// More general in some ways than a Substitution: can fail with a
+/// [Self::Err],  may change [TypeBound::Copyable] to [TypeBound::Any],
+/// and applies to arbitrary extension types rather than type variables.
+pub trait TypeTransformer {
+    /// Error returned when a [CustomType] cannot be transformed, or a type
+    /// containing it (e.g. if changing a [TypeArg::Type] from copyable to
+    /// linear invalidates a parameterized type).
+    type Err: std::error::Error + From<SignatureError>;
+
+    /// Applies the transformation to an extension type.
+    ///
+    /// Note that if the [CustomType] has type arguments, these will *not*
+    /// have been transformed first (this might not produce a valid type
+    /// due to changes in [TypeBound]).
+    ///
+    /// Returns a type to use instead, or None to indicate no change
+    ///   (in which case, the TypeArgs will be transformed instead.
+    ///    To prevent transforming the arguments, return `t.clone().into()`.)
+    fn apply_custom(&self, t: &CustomType) -> Result<Option<Type>, Self::Err>;
+
+    // Note: in future releases more methods may be added here to transform other types.
+    // By defaulting such trait methods to Ok(None), backwards compatibility will be preserved.
 }
 
 pub(crate) fn check_typevar_decl(
