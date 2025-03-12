@@ -346,6 +346,24 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         self[src.node]._num_outs = max(self[src.node]._num_outs, src.offset + 1)
         self[dst.node]._num_inps = max(self[dst.node]._num_inps, dst.offset + 1)
 
+    def add_order_link(self, src: ToNode, dst: ToNode) -> None:
+        """Add a state order link between two nodes.
+
+        Args:
+            src: Source node.
+            dst: Destination node.
+
+        Examples:
+            >>> df = dfg.Dfg()
+            >>> df.hugr.add_order_link(df.input_node, df.output_node)
+            >>> list(df.hugr.outgoing_order_links(df.input_node))
+            [Node(2)]
+        """
+        source = src.out(-1)
+        target = dst.inp(-1)
+        if not self.has_link(source, target):
+            self.add_link(source, target)
+
     def delete_link(self, src: OutPort, dst: InPort) -> None:
         """Delete a link (edge) between two nodes from the HUGR.
 
