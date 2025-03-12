@@ -1,6 +1,7 @@
+use hugr_core::extension::ExtensionId;
 use hugr_core::ops::constant::{CustomConst, Sum};
 use hugr_core::ops::OpTrait;
-use hugr_core::types::{Transformable, TypeEnum, TypeTransformer};
+use hugr_core::types::{Transformable, TypeArg, TypeEnum, TypeTransformer};
 use hugr_core::{Hugr, IncomingPort, OutgoingPort};
 use thiserror::Error;
 
@@ -20,6 +21,23 @@ use hugr_core::{
     types::{CustomType, Type, TypeBound},
     Node,
 };
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct OpHashWrapper {
+    ext_name: ExtensionId,
+    op_name: String, // Only because SmolStr not in hugr-passes yet
+    args: Vec<TypeArg>,
+}
+
+impl From<&ExtensionOp> for OpHashWrapper {
+    fn from(op: &ExtensionOp) -> Self {
+        Self {
+            ext_name: op.def().extension_id().clone(),
+            op_name: op.def().name().to_string(),
+            args: op.args().to_vec(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 enum OpReplacement {
@@ -61,7 +79,7 @@ pub struct LowerTypes {
     /// No support yet for mapping parametrically.
     type_map: HashMap<CustomType, Type>,
     copy_discard: HashMap<CustomType, (OpReplacement, OpReplacement)>, // TODO what about e.g. arrays that have gone from copyable to linear because their elements have?!
-    op_map: HashMap<ExtensionOp, OpReplacement>,
+    op_map: HashMap<OpHashWrapper, OpReplacement>,
     //        1. is input op always a single OpType, or a schema/predicate?
     //        2. output might not be an op - might be a node with children
     //        3. do we need checking BEFORE reparametrization as well as after? (after only if not reparametrized?)
@@ -102,6 +120,10 @@ impl LowerTypes {
     ) {
         self.type_map.insert(src.clone(), dest);
         self.copy_discard.insert(src, (copy, discard));
+    }
+
+    pub fn lower_op(&mut self, src: &ExtensionOp, tgt: OpReplacement) {
+        self.op_map.insert(OpHashWrapper::from(src), tgt);
     }
 
     pub fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
@@ -250,7 +272,7 @@ impl LowerTypes {
 
             OpType::Const(Const { value, .. }) => self.change_value(value),
             OpType::ExtensionOp(ext_op) => {
-                if let Some(replacement) = self.op_map.get(ext_op) {
+                if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
                     replacement.replace(hugr, n); // Copy/discard insertion done by caller
                     Ok(true)
                 } else {
