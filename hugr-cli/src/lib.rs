@@ -5,9 +5,9 @@ use clap::{crate_version, FromArgMatches, Parser};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use clio::{Input, Output};
 use derive_more::{Display, Error, From};
+use hugr::envelope::{EnvelopeConfig, EnvelopeError, PayloadDescriptor};
 use hugr::extension::ExtensionRegistry;
 use hugr::package::{PackageEncodingError, PackageValidationError};
-use hugr::envelope::{EnvelopeError, EnvelopeConfig, PayloadDescriptor};
 use hugr::Hugr;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::{ffi::OsString, path::PathBuf};
@@ -61,7 +61,6 @@ pub enum CliError {
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
 pub struct HugrArgs {
-
     /// Verbosity.
     #[command(flatten)]
     pub verbose: Verbosity<InfoLevel>,
@@ -84,12 +83,10 @@ pub struct HugrArgs {
 pub struct HugrOutputArgs {
     #[arg(short, long, value_parser)]
     pub output: Option<Output>,
-
     // TODO clap stuff to make this work
     // #[arg(long)]
     // pub output_format: Option<EnvelopeConfig>,
 }
-
 
 #[derive(Debug, clap::Args)]
 pub struct HugrInputArgs {
@@ -103,9 +100,8 @@ pub struct HugrInputArgs {
 #[derive(clap::Args)]
 pub struct PayloadTypeArg {
     pub json: bool,
-    pub zstd: bool
+    pub zstd: bool,
 }
-
 
 // TODO add clap annotations
 #[derive(Debug, Clone)]
@@ -113,9 +109,8 @@ pub enum InputFormatArgs {
     /// Auto detect
     Auto,
     Envelope(PayloadDescriptor), // Fail if it's not an envelope with this descriptor
-    // TODO JSON package, JSON HUGR, model package, model HUGR
+                                 // TODO JSON package, JSON HUGR, model package, model HUGR
 }
-
 
 impl clap::FromArgMatches for InputFormatArgs {
     fn from_arg_matches(matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
@@ -135,8 +130,6 @@ impl clap::Args for InputFormatArgs {
         todo!()
     }
 }
-
-pub use hugr::envelope::PackageOrHugr;
 
 impl HugrArgs {
     /// Read either a package or a single hugr from the input.

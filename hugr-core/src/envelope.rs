@@ -1,418 +1,307 @@
-use std::{io::{self, BufReader, Read, Write}, mem};
+//! Envelope format for HUGR packages.
+//!
+//! The binary format is designed to be extensible and backwards-compatible.
+//! It consists of a header declaring the format used to encode the HUGR, followed
+//! by the encoded HUGR itself.
+//!
+//! Use [`read_envelope`] and [`write_envelope`] for reading and writing envelopes
+//! from/to readers and writers.
+//!
+//! ## Envelope header
+//!
+//! The binary header format is 10 bytes, with the following fields:
+//!
+//! | Field  | Size (bytes) | Description |
+//! |--------|--------------|-------------|
+//! | Magic  | 8            | [MAGIC_NUMBER] constant identifying the envelope format, little-endian. |
+//! | Format | 1            | [PayloadFormat] describing the payload format. |
+//! | Flags  | 1            | Additional configuration flags. |
+//!
+//! Flags:
+//!
+//! - Bit 0: Whether the payload is compressed with zstd.
+//! - Bits 1-7: Reserved for future use.
+//!
 
-use itertools::Itertools as _;
+mod header;
+
+pub use header::{EnvelopeConfig, PayloadFormat, ZstdConfig, MAGIC_NUMBER};
 
 use crate::{
-    extension::ExtensionRegistry, hugr::LoadHugrError, package::{Package, PackageEncodingError, PackageError, PackageValidationError}, Hugr
+    extension::ExtensionRegistry,
+    package::{Package, PackageEncodingError, PackageError},
 };
+use header::EnvelopeHeader;
+use itertools::Itertools as _;
+use std::io::BufRead;
+use std::io::{BufReader, Write};
 
 #[cfg(feature = "model_unstable")]
 use crate::import::ImportError;
 
-use std::io::BufRead;
+/// Read a HUGR envelope from a reader.
+///
+/// Returns the deserialized package and the configuration used to encode it.
+///
+/// Parameters:
+/// - `reader`: The reader to read the envelope from.
+/// - `registry`: An extension registry with additional extensions to use when
+///     decoding the HUGR, if they are not already included in the package.
+pub fn read_envelope(
+    mut reader: impl BufRead,
+    registry: &ExtensionRegistry,
+) -> Result<(EnvelopeConfig, Package), EnvelopeError> {
+    let header = EnvelopeHeader::read(&mut reader)?;
 
+    let package = match header.zstd {
+        #[cfg(feature = "zstd")]
+        true => read_impl(
+            BufReader::new(zstd::Decoder::new(reader)?),
+            header,
+            registry,
+        ),
+        #[cfg(not(feature = "zstd"))]
+        true => Err(EnvelopeError::ZstdUnsupported),
+        false => read_impl(reader, header, registry),
+    }?;
+    Ok((header.config(), package))
+}
+
+/// Write a HUGR package into an envelope, using the specified configuration.
+///
+/// It is recommended to use a buffered writer for better performance.
+/// See [`std::io::BufWriter`] for more information.
+pub fn write_envelope(
+    mut writer: impl Write,
+    package: &Package,
+    config: EnvelopeConfig,
+) -> Result<(), EnvelopeError> {
+    let header = config.make_header();
+    header.write(&mut writer)?;
+
+    match config.zstd {
+        #[cfg(feature = "zstd")]
+        Some(zstd) => {
+            let writer = zstd::Encoder::new(writer, zstd.level())?;
+            write_impl(writer, package, config)?;
+        }
+        #[cfg(not(feature = "zstd"))]
+        Some(_) => return Err(EnvelopeError::ZstdUnsupported),
+        None => write_impl(writer, package, config)?,
+    }
+
+    Ok(())
+}
+
+/// Error type for envelope operations.
 #[derive(derive_more::Display, derive_more::Error, Debug, derive_more::From)]
+#[non_exhaustive]
 pub enum EnvelopeError {
-    SerdeError {
-        source: serde_json::Error,
-    },
-    #[display("Invalid Descriptor: {desc_bytes:?}")]
-    InvalidDescriptor {
-        desc_bytes: [u8;8],
-    },
-    TypeNotSupported(#[error(ignore)] PayloadDescriptor),
-    FormatUnsupported(#[error(ignore)] PayloadFormat),
-    IO {
-        source: std::io::Error,
-    },
-    Package {
-        source: PackageError,
-    },
-    PackageEncoding {
-        source: PackageEncodingError,
-    },
-    PackageValidation {
-        source: PackageValidationError,
-    },
-    #[cfg(feature = "model_unstable")]
-    Import {
-        source: ImportError,
-    },
-    #[cfg(feature = "model_unstable")]
-    ModelRead {
-        source: hugr_model::v0::binary::ReadError,
-    },
-    #[cfg(feature = "model_unstable")]
-    ModelWrite {
-        source: hugr_model::v0::binary::WriteError,
-    },
-    PackingError {
-        source: packed_struct::PackingError,
-    },
+    /// Bad magic number.
     #[display("Bad magic number. expected '{expected:X}' found '{found:X}'")]
+    #[from(ignore)]
     MagicNumber {
+        /// The expected magic number.
+        ///
+        /// See [`MAGIC_NUMBER`].
         expected: u64,
+        /// The magic number in the envelope.
         found: u64,
     },
-    LoadHugrError {
-        source: LoadHugrError,
+    /// The specified payload format is invalid.
+    #[display("Format descriptor {descriptor} is invalid.")]
+    #[from(ignore)]
+    InvalidFormatDescriptor {
+        /// The unsupported format.
+        descriptor: usize,
     },
-    ZstdUnsupported
+    /// The specified payload format is not supported.
+    #[display("Payload format {format} is not supported.{}",
+        match feature {
+            Some(f) => format!(" This requires the '{f}' feature for `hugr`."),
+            None => "".to_string()
+        },
+    )]
+    #[from(ignore)]
+    FormatUnsupported {
+        /// The unsupported format.
+        format: PayloadFormat,
+        /// Optionally, the feature required to support this format.
+        feature: Option<&'static str>,
+    },
+    /// Envelope encoding required zstd compression, but the feature is not enabled.
+    #[display("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
+    #[from(ignore)]
+    ZstdUnsupported,
+    /// Tried to encode a package with multiple HUGRs, when only 1 was expected.
+    #[display(
+        "Packages with multiple HUGRs are currently unsupported. Tried to encode {count} HUGRs, when 1 was expected."
+    )]
+    #[from(ignore)]
+    MultipleHugrs {
+        /// The number of HUGRs in the package.
+        count: usize,
+    },
+    /// JSON serialization error.
+    SerdeError {
+        /// The source error.
+        source: serde_json::Error,
+    },
+    /// IO read/write error.
+    IO {
+        /// The source error.
+        source: std::io::Error,
+    },
+    /// Error decoding a package from the payload.
+    Package {
+        /// The source error.
+        source: PackageError,
+    },
+    /// Error writing a json package to the payload.
+    PackageEncoding {
+        /// The source error.
+        source: PackageEncodingError,
+    },
+    /// Error importing a HUGR from a hugr-model payload.
+    #[cfg(feature = "model_unstable")]
+    ModelImport {
+        /// The source error.
+        source: ImportError,
+    },
+    /// Error reading a HUGR model payload.
+    #[cfg(feature = "model_unstable")]
+    ModelRead {
+        /// The source error.
+        source: hugr_model::v0::binary::ReadError,
+    },
+    /// Error writing a HUGR model payload.
+    #[cfg(feature = "model_unstable")]
+    ModelWrite {
+        /// The source error.
+        source: hugr_model::v0::binary::WriteError,
+    },
 }
 
-// TODO maybe we should kill this, just use PayloadDescriptor and check for magic number in read/write
-pub struct EnvelopeHeader {
-    magic: u64,
-    desc: PayloadDescriptor,
-}
-
-impl EnvelopeHeader {
-    pub fn validate(&self) -> Result<(), EnvelopeError> {
-        if self.magic != MAGIC_NUMBER {
-            return Err(EnvelopeError::MagicNumber {
-                expected: MAGIC_NUMBER,
-                found: self.magic,
-            });
-        }
-        Ok(())
-    }
-    pub fn write(&self, writer: &mut impl Write) -> Result<(), EnvelopeError> {
-        self.validate()?;
-        writer.write_all(&self.magic.to_le_bytes())?;
-        writer.write_all(&self.desc.into_bytes())?;
-        Ok(())
-    }
-
-    fn read(reader: &mut impl Read) -> Result<EnvelopeHeader, EnvelopeError> {
-        let mut magic_bytes = [0;8];
-        let mut desc_bytes = [0;8];
-        reader.read_exact(&mut magic_bytes)?;
-        reader.read_exact(&mut desc_bytes)?;
-        let header = Self { magic: u64::from_le_bytes(magic_bytes), desc: PayloadDescriptor::from_bytes(desc_bytes).ok_or(EnvelopeError::InvalidDescriptor { desc_bytes })? };
-        header.validate()?;
-        Ok(header)
-    }
-}
-
-pub const MAGIC_NUMBER: u64 = 0xAAAAAAAAAAAAAAAA;
-
-#[derive(Clone, Copy, Eq, PartialEq, Debug, derive_more::Display)]
-pub enum PayloadFormat {
-    // one day model will not require a json extension registry
-    Model { json_extension_reg: bool },
-    Json
-}
-
-impl PayloadFormat {
-    pub const DEFAULT: PayloadFormat = Self::Json;
-
-    pub fn into_bytes(self) -> [u8;4] {
-        // manual, but it doesn't seem worth bringing in a bunch of machinery for this
-        let version = 1;
-        let (discriminant, data) = match self {
-            PayloadFormat::Model { json_extension_reg } => {
-                (1, [0, json_extension_reg as u8])
-            },
-            PayloadFormat::Json =>
-
-            {
-                (2, [0;2])
-            }
-        };
-
-        [version, discriminant, data[0], data[1]]
-    }
-
-    pub fn from_bytes(bytes: [u8;4]) -> Option<Self> {
-        // manual, but it doesn't seem worth bringing in a bunch of machinery for this
-        let 1 = bytes[0] else {
-            None?
-        };
-        // TODO do we care to check for zeros?
-        match bytes[1] {
-            1 => Some(PayloadFormat::Model { json_extension_reg: (bytes[3] & 0x1) != 0 }),
-            3 => Some(PayloadFormat::Json),
-            _ => None
-        }
-    }
-
-    pub fn encode(
-        &self,
-        payload: &PackageOrHugr,
-        writer: impl Write,
-    ) -> Result<(), EnvelopeError> {
-        match self {
-            Self::Json => encode_json(writer, payload),
-            #[cfg(feature = "model_unstable")]
-            PayloadDescriptor::Model { json_extension_reg } => {
-                encode_model(writer, payload)
-            }
-            #[allow(unreachable_patterns)]
-            unsupported => Err(EnvelopeError::FormatUnsupported(*unsupported))
-        }
-    }
-
-    pub fn decode_package(
-        &self,
-        reader: impl Read,
-        registry: &ExtensionRegistry,
-    ) -> Result<Package, EnvelopeError> {
-        match self {
-            Self::Json => decode_json_package(reader, registry),
-            #[cfg(feature = "model_unstable")]
-            PayloadDescriptor::Model { json_extension_reg } => {
-                assert!(*json_extension_reg);
-                decode_model(reader, registry)
-            }
-            #[allow(unreachable_patterns)]
-            unsupported => Err(EnvelopeError::FormatUnsupported(*unsupported))
-        }
-    }
-
-    pub fn decode_hugr(
-        &self,
-        reader: impl Read,
-        registry: &ExtensionRegistry,
-    ) -> Result<Hugr, EnvelopeError> {
-        match self {
-            Self::Json => Ok(Hugr::load_json(reader, registry)?),
-            #[cfg(feature = "model_unstable")]
-            PayloadDescriptor::Model { json_extension_reg } => {
-                assert!(*json_extension_reg);
-                let bump = hugr_model::v0::bumpalo::Bump::default();
-                let module = hugr_model::v0::binary::read_from_freader(reader, &bump)?;
-                Ok(import_hugr(module, registry)?)
-            }
-            #[allow(unreachable_patterns)]
-            unsupported => Err(EnvelopeError::FormatUnsupported(*unsupported))
-        }
-    }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, Debug, derive_more::Display)]
-#[display("payload: {format} zstd: {zstd}")]
-pub struct PayloadDescriptor {
-    format: PayloadFormat,
-    package: bool,
-    zstd: bool
-}
-
-impl PayloadDescriptor {
-    pub const DEFAULT_PACKAGE: Self = Self { format: PayloadFormat::DEFAULT, zstd: if cfg!(feature = "zstd") { true } else { false }, package: true };
-    pub const DEFAULT_HUGR: Self = Self {
-        package: false,
-        ..Self::DEFAULT_PACKAGE
-    };
-    pub fn into_bytes(self) -> [u8;8] {
-        // manual, but it doesn't seem worth bringing in a bunch of machinery for this
-        let version = 1;
-        let data = [0,0,((self.package as u8) << 1) | self.zstd as u8];
-        let format = self.format.into_bytes();
-        [version, data[0],data[1],data[2], format[0], format[1], format[2], format[3]]
-    }
-
-    pub fn from_bytes(bytes: [u8;8]) -> Option<Self> {
-        // manual, but it doesn't seem worth bringing in a bunch of machinery for this
-        let 1 = bytes[0] else {
-            None?
-        };
-        Some(Self {
-            format: PayloadFormat::from_bytes([bytes[4], bytes[5], bytes[6], bytes[7]])?,
-            zstd: bytes[3] & 0x1 != 0,
-            package: bytes[3] & 0x2 != 0
-
-        })
-    }
-
-
-    // ignores self.zstd
-    fn decode_impl(&self, reader: impl Read, registry: &ExtensionRegistry) -> Result<PackageOrHugr, EnvelopeError> {
-        Ok(if self.package {
-            self.format.decode_package(reader, registry)?.into()
-        } else {
-            self.format.decode_hugr(reader, registry)?.into()
-        })
-    }
-
-    pub fn decode(
-        &self,
-        reader: impl Read,
-        registry: &ExtensionRegistry,
-    ) -> Result<PackageOrHugr, EnvelopeError> {
-        if self.zstd {
-            #[cfg(feature = "zstd")]
-            {
-                self.decode_impl(zstd::Decoder::new(reader)?, registry)
-            }
-            #[cfg(not(feature = "zstd"))]
-            {
-                Err(EnvelopeError::ZstdUnsupported)
-            }
-        } else {
-            self.decode_impl(reader, registry)
-        }
-    }
-}
-
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
-struct ZstdConfig {
-    level: i32,
-}
-
-impl Default for ZstdConfig {
-    fn default() -> Self {
-        Self { level: 0 } // 0 means use zstd's default
-    }
-}
-
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
-pub struct EnvelopeConfig {
-    zstd: Option<ZstdConfig>,
-    model: bool,
-}
-
-impl EnvelopeConfig {
-    pub fn descriptor(&self) -> PayloadDescriptor {
-        PayloadDescriptor {
-            format: if self.model { PayloadFormat::Model { json_extension_reg: true } } else { PayloadFormat::Json },
-            zstd: self.zstd.is_some(),
-            package: true
-        }
-    }
-
-    pub fn write(&self, payload: &PackageOrHugr, mut writer: impl Write) -> Result<(), EnvelopeError> {
-        let desc = self.descriptor();
-        let header = EnvelopeHeader {
-            magic: MAGIC_NUMBER,
-            desc
-        };
-        header.write(&mut writer)?;
-        if let Some(zstd) = self.zstd {
-            #[cfg(feature = "zstd")]
-            {
-                desc.format.encode(payload, zstd::Encoder::new(writer, zdtd.level))?
-            }
-            #[cfg(not(feature = "zstd"))]
-            {
-                Err(EnvelopeError::ZstdUnsupported)?
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Default for EnvelopeConfig {
-    fn default() -> Self {
-        Self {
-            zstd: None,
-            model: false,
-        }
-    }
-}
-
-
-// TODO put this on PackageOrHugr
-fn encode_json(writer: impl Write, payload: &PackageOrHugr) -> Result<(), EnvelopeError> {
-    match payload {
-        PackageOrHugr::Package(pkg) => serde_json::to_writer(writer, pkg)?,
-        PackageOrHugr::Hugr(hugr) => serde_json::to_writer(writer, hugr)?
-    }
-    Ok(())
-}
-
-fn decode_json_package(
-    stream: impl Read,
-    extension_registry: &ExtensionRegistry,
+/// Internal implementation of [`read_envelope`] to call with/without the zstd decompression wrapper.
+fn read_impl(
+    payload: impl BufRead,
+    header: EnvelopeHeader,
+    registry: &ExtensionRegistry,
 ) -> Result<Package, EnvelopeError> {
-    Ok(Package::from_json_reader(stream, extension_registry)?)
+    match header.format {
+        PayloadFormat::PackageJson => Ok(Package::from_json_reader(payload, registry)?),
+        #[cfg(feature = "model_unstable")]
+        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
+            decode_model(payload, registry, header.format)
+        }
+        #[cfg(not(feature = "model_unstable"))]
+        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
+            Err(EnvelopeError::FormatUnsupported {
+                format: unsupported,
+                feature: "model_unstable",
+            })
+        }
+    }
 }
 
-// pub fn decode_package(
-//     payload_type: PayloadFormat,
-//     payload: impl Read,
-//     extension_registry: &ExtensionRegistry,
-// ) -> Result<Package, EnvelopeError> {
-
-//     match payload_type {
-//         PayloadDesriptor::Json => decode_json(payload, extension_registry),
-//         #[cfg(feature = "zstd")]
-//         PayloadDesriptor::JsonZstd => decode_json(zstd::Decoder::new(payload)?, extension_registry),
-//         #[cfg(feature = "model_unstable")]
-//         PayloadDesriptor::Model =>decode_model(
-//                         BufReader::new(payload),
-//                         extension_registry,
-//                     ),
-//         #[cfg(all(feature = "model_unstable", feature = "zstd"))]
-//         PayloadDesriptor::ModelZstd => decode_model(
-//                         BufReader::new(zstd::Decoder::new(payload)?),
-//                         extension_registry,
-//                     ),
-//         #[allow(unreachable_patterns)]
-//         unsupported => Err(EnvelopeError::TypeNotSupported(unsupported))
-//     }
-// }
-
-#[cfg(feature = "model_unstable")]
-fn encode_model(mut writer: impl Write, package: &Package) -> Result<(), EnvelopeError> {
-    use crate::export::export_hugr_list;
-    use hugr_model::v0::{binary::write_module_list_to_writer, bumpalo::Bump};
-    let bump = Bump::default();
-    write_module_list_to_writer(&export_hugr_list(package.as_ref(), &bump), &mut writer)?;
-    serde_json::to_writer(writer, &package.extensions.iter().collect_vec())?;
-    Ok(())
-}
-
+/// Read a HUGR model payload from a reader.
+///
+/// Parameters:
+/// - `stream`: The reader to read the envelope from.
+/// - `extension_registry`: An extension registry with additional extensions to use when
+///   decoding the HUGR, if they are not already included in the package.
+/// - `format`: The format of the payload.
 #[cfg(feature = "model_unstable")]
 fn decode_model(
     mut stream: impl BufRead,
     extension_registry: &ExtensionRegistry,
+    format: PayloadFormat,
 ) -> Result<Package, EnvelopeError> {
-    // TODO we don't use extension_registry
-    use hugr_model::v0::{binary::read_module_list_from_reader, bumpalo::Bump};
+    use crate::{import::import_hugr, Extension};
+    use hugr_model::v0::bumpalo::Bump;
+
+    if format.model_version() != Some(0) {
+        return Err(EnvelopeError::FormatUnsupported {
+            format,
+            feature: None,
+        });
+    }
+
     let bump = Bump::default();
-    use crate::{import::import_hugr_list, Extension};
-    let module_list = read_module_list_from_reader(&mut stream, &bump)?;
-    let extensions = ExtensionRegistry::new(serde_json::from_reader::<_,Vec<Extension>>(stream)?.into_iter().map_into());
-    let modules = import_hugr_list(&module_list, &extensions)?;
-    let package = Package { modules, extensions  };
-    package.validate()?;
+    let module_list = hugr_model::v0::binary::read_from_reader(&mut stream, &bump)?;
+
+    let mut extension_registry = extension_registry.clone();
+    if format.append_extensions() {
+        let extra_extensions: Vec<Extension> =
+            serde_json::from_reader::<_, Vec<Extension>>(stream)?;
+        for ext in extra_extensions {
+            extension_registry.register_updated(ext);
+        }
+    }
+
+    // TODO: Import multiple hugrs from the model?
+    let hugr = import_hugr(&module_list, &extension_registry)?;
+    let mut package = Package::new([hugr])?;
+
+    // Ensure the package contains all extensions from the registry,
+    // even if they were not used in the hugr.
+    package.extensions = extension_registry;
+
     Ok(package)
 }
 
-/// A simple enum containing either a package or a single hugr.
-///
-/// This is required since `Package`s can only contain module-rooted hugrs.
-#[derive(Debug, Clone, PartialEq, derive_more::From)]
-pub enum PackageOrHugr {
-    /// A package with module-rooted HUGRs and some required extensions.
-    Package(Package),
-    /// An arbitrary HUGR.
-    Hugr(Hugr),
+/// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
+fn write_impl(
+    writer: impl Write,
+    package: &Package,
+    config: EnvelopeConfig,
+) -> Result<(), EnvelopeError> {
+    match config.format {
+        PayloadFormat::PackageJson => package.to_json_writer(writer)?,
+        #[cfg(feature = "model_unstable")]
+        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
+            encode_model(writer, package, config.format)?
+        }
+        #[cfg(not(feature = "model_unstable"))]
+        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
+            Err(EnvelopeError::FormatUnsupported {
+                format: unsupported,
+                feature: "model_unstable",
+            })
+        }
+    }
+    Ok(())
 }
 
-impl PackageOrHugr {
-    /// Returns the list of hugrs in the package.
-    pub fn into_hugrs(self) -> Vec<Hugr> {
-        match self {
-            PackageOrHugr::Package(pkg) => pkg.modules,
-            PackageOrHugr::Hugr(hugr) => vec![hugr],
-        }
+#[cfg(feature = "model_unstable")]
+fn encode_model(
+    mut writer: impl Write,
+    package: &Package,
+    format: PayloadFormat,
+) -> Result<(), EnvelopeError> {
+    use crate::export::export_hugr;
+    use hugr_model::v0::{binary::write_to_writer, bumpalo::Bump};
+
+    if format.model_version() != Some(0) {
+        return Err(EnvelopeError::FormatUnsupported {
+            format,
+            feature: None,
+        });
     }
 
-    /// Validates the package or hugr.
-    pub fn validate(&self) -> Result<(), PackageValidationError> {
-        match self {
-            PackageOrHugr::Package(pkg) => pkg.validate(),
-            PackageOrHugr::Hugr(hugr) => Ok(hugr.validate()?),
-        }
+    // TODO: Export multiple hugrs to the model?
+    if package.modules.len() != 1 {
+        return Err(EnvelopeError::MultipleHugrs {
+            count: package.modules.len(),
+        });
     }
-}
+    let bump = Bump::default();
+    let module = export_hugr(&package.modules[0], &bump);
+    write_to_writer(&module, &mut writer)?;
 
-impl AsRef<[Hugr]> for PackageOrHugr {
-    fn as_ref(&self) -> &[Hugr] {
-        match self {
-            PackageOrHugr::Package(pkg) => &pkg.modules,
-            PackageOrHugr::Hugr(hugr) => std::slice::from_ref(hugr),
-        }
+    if format.append_extensions() {
+        serde_json::to_writer(writer, &package.extensions.iter().collect_vec())?;
     }
+
+    Ok(())
 }
