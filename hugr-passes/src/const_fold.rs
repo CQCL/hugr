@@ -13,7 +13,7 @@ use hugr_core::{
     },
     ops::{
         constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-        Value,
+        OpType, Value,
     },
     types::{EdgeKind, TypeArg},
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
@@ -40,11 +40,17 @@ pub struct ConstantFoldPass {
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 /// Errors produced by [ConstantFoldPass].
 pub enum ConstFoldError {
     #[error(transparent)]
-    #[allow(missing_docs)]
     ValidationError(#[from] ValidatePassError),
+    #[error("Node {_0} is not a child of the Module root")]
+    EntryPointNotChildOfModule(Node),
+    #[error("Node {_0} must be the root for non-Module-rooted Hugr")]
+    EntryPointNotRoot(Node),
+    #[error("Node {_0} has OpType {_1} which cannot be an entry-point")]
+    InvalidEntryPoint(Node, OpType),
 }
 
 impl ConstantFoldPass {
@@ -70,7 +76,7 @@ impl ConstantFoldPass {
     ///
     /// Multiple calls for the same entry-point combine their values, with later
     /// values on the same in-port replacing earlier ones.
-    /// 
+    ///
     /// Note that if `inputs` is empty, this still marks the node as an entry-point, i.e.
     /// we must preserve nodes required to compute its result.
     pub fn with_inputs(
@@ -87,13 +93,21 @@ impl ConstantFoldPass {
 
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
+        let is_module_root = hugr.get_optype(hugr.root()).is_module();
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
         let mut m = Machine::new(&hugr);
-        for (n, in_vals) in self.inputs.iter() {
-            m.prepopulate_inputs(
-                *n,
+        for (&n, in_vals) in self.inputs.iter() {
+            if is_module_root {
+                if hugr.get_parent(n) != Some(hugr.root()) {
+                    return Err(ConstFoldError::EntryPointNotChildOfModule(n));
+                }
+            } else if n != hugr.root() {
+                return Err(ConstFoldError::EntryPointNotRoot(n));
+            }
+            if let Err(opty) = m.prepopulate_inputs(
+                n,
                 in_vals.iter().map(|(p, v)| {
                     let const_with_dummy_loc = partial_from_const(
                         &ConstFoldContext(hugr),
@@ -102,8 +116,9 @@ impl ConstantFoldPass {
                     );
                     (*p, const_with_dummy_loc)
                 }),
-            )
-            .unwrap(); // TODO return error?
+            ) {
+                return Err(ConstFoldError::InvalidEntryPoint(n, opty));
+            }
         }
 
         let results = m.run(ConstFoldContext(hugr), []);
