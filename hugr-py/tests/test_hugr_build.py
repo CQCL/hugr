@@ -310,6 +310,20 @@ def test_higher_order() -> None:
     validate(d.hugr)
 
 
+def test_state_order() -> None:
+    mod = Module()
+    f_id = mod.define_function("id", [tys.Bool])
+    f_id.set_outputs(f_id.input_node[0])
+
+    f_main = mod.define_main([tys.Bool])
+    b = f_main.input_node[0]
+    call1 = f_main.call(f_id, b)
+    f_main.add_state_order(call1, f_main.output_node)
+    # implicit discard of bool to test state order port logic
+    f_main.set_outputs()
+    validate(mod.hugr)
+
+
 def test_alias() -> None:
     mod = Module()
     _dfn = mod.add_alias_defn("my_int", INT_T)
