@@ -72,7 +72,10 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     }
 
     /// Check if the replacement can be applied to the given hugr.
-    pub fn is_valid_rewrite(&self, h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+    pub fn is_valid_rewrite(
+        &self,
+        h: &impl HugrView<Node = HostNode>,
+    ) -> Result<(), SimpleReplacementError> {
         let parent = self.subgraph.get_parent(h);
 
         // 1. Check the parent node exists and is a DataflowParent.
@@ -107,8 +110,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// `host` and the second is a port in `self.replacement`.
     pub fn incoming_boundary<'a>(
         &'a self,
-        host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (HostPort<OutgoingPort>, ReplacementPort<IncomingPort>)> + 'a {
+        host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            HostPort<HostNode, OutgoingPort>,
+            ReplacementPort<IncomingPort>,
+        ),
+    > + 'a {
         // For each p = self.nu_inp[q] such that q is not an Output port,
         // there will be an edge from the predecessor of p to (the new copy of) q.
         self.nu_inp
@@ -142,8 +150,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// This panics if self.replacement is not a DFG.
     pub fn outgoing_boundary<'a>(
         &'a self,
-        _host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (ReplacementPort<OutgoingPort>, HostPort<IncomingPort>)> + 'a {
+        _host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            ReplacementPort<OutgoingPort>,
+            HostPort<HostNode, IncomingPort>,
+        ),
+    > + 'a {
         let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
 
         // For each q = self.nu_out[p] such that the predecessor of q is not an Input port,
@@ -175,8 +188,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// This panics if self.replacement is not a DFG.
     pub fn host_to_host_boundary<'a>(
         &'a self,
-        host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (HostPort<OutgoingPort>, HostPort<IncomingPort>)> + 'a {
+        host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            HostPort<HostNode, OutgoingPort>,
+            HostPort<HostNode, IncomingPort>,
+        ),
+    > + 'a {
         let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
 
         // For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
@@ -204,7 +222,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// This panics if self.replacement is not a DFG.
     pub fn map_host_output(
         &self,
-        port: impl Into<HostPort<IncomingPort>>,
+        port: impl Into<HostPort<HostNode, IncomingPort>>,
     ) -> Option<ReplacementPort<IncomingPort>> {
         let HostPort(node, port) = port.into();
         let [_, rep_output] = self.get_replacement_io().expect("replacement is a DFG");
@@ -220,7 +238,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     pub fn map_replacement_input(
         &self,
         port: impl Into<ReplacementPort<IncomingPort>>,
-    ) -> Option<HostPort<IncomingPort>> {
+    ) -> Option<HostPort<HostNode, IncomingPort>> {
         let ReplacementPort(node, port) = port.into();
         self.nu_inp.get(&(node, port)).copied().map(Into::into)
     }
@@ -234,8 +252,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// This panics if self.replacement is not a DFG.
     pub fn all_boundary_edges<'a>(
         &'a self,
-        host: &'a impl HugrView,
-    ) -> impl Iterator<Item = (BoundaryPort<OutgoingPort>, BoundaryPort<IncomingPort>)> + 'a {
+        host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<
+        Item = (
+            BoundaryPort<HostNode, OutgoingPort>,
+            BoundaryPort<HostNode, IncomingPort>,
+        ),
+    > + 'a {
         let incoming_boundary = self
             .incoming_boundary(host)
             .map(|(src, tgt)| (src.into(), tgt.into()));

@@ -11,25 +11,25 @@ use derive_more::From;
 /// This is used to represent boundary edges that will be added between the host and
 /// replacement graphs when applying a rewrite.
 #[derive(Debug, Clone, Copy)]
-pub enum BoundaryPort<P> {
+pub enum BoundaryPort<HostNode, P> {
     /// A port in the host graph.
-    Host(Node, P),
+    Host(HostNode, P),
     /// A port in the replacement graph.
     Replacement(Node, P),
 }
 
 /// A port in the host graph.
 #[derive(Debug, Clone, Copy, From)]
-pub struct HostPort<P>(pub Node, pub P);
+pub struct HostPort<N, P>(pub N, pub P);
 
 /// A port in the replacement graph.
 #[derive(Debug, Clone, Copy, From)]
 pub struct ReplacementPort<P>(pub Node, pub P);
 
-impl<P> BoundaryPort<P> {
+impl<HostNode: Copy, P> BoundaryPort<HostNode, P> {
     /// Maps a boundary port according to the insertion mapping.
     /// Host ports are unchanged, while Replacement ports are mapped according to the index_map.
-    pub fn map_replacement(self, index_map: &HashMap<Node, Node>) -> (Node, P) {
+    pub fn map_replacement(self, index_map: &HashMap<Node, HostNode>) -> (HostNode, P) {
         match self {
             BoundaryPort::Host(node, port) => (node, port),
             BoundaryPort::Replacement(node, port) => (*index_map.get(&node).unwrap(), port),
@@ -37,41 +37,38 @@ impl<P> BoundaryPort<P> {
     }
 }
 
-impl<P> From<HostPort<P>> for BoundaryPort<P> {
-    fn from(HostPort(node, port): HostPort<P>) -> Self {
+impl<N, P> From<HostPort<N, P>> for BoundaryPort<N, P> {
+    fn from(HostPort(node, port): HostPort<N, P>) -> Self {
         BoundaryPort::Host(node, port)
     }
 }
 
-impl<P> From<ReplacementPort<P>> for BoundaryPort<P> {
+impl<N, P> From<ReplacementPort<P>> for BoundaryPort<N, P> {
     fn from(ReplacementPort(node, port): ReplacementPort<P>) -> Self {
         BoundaryPort::Replacement(node, port)
     }
 }
 
-macro_rules! impl_port_conversion {
-    ($from_type:ty, $to_type:ty, $wrapper:ident) => {
-        impl From<$from_type> for $to_type {
-            fn from($wrapper(node, port): $from_type) -> Self {
-                $wrapper(node, port.into())
-            }
-        }
-    };
+impl<HostNode> From<HostPort<HostNode, OutgoingPort>> for HostPort<HostNode, Port> {
+    fn from(HostPort(node, port): HostPort<HostNode, OutgoingPort>) -> Self {
+        HostPort(node, port.into())
+    }
 }
 
-// impl From<HostPort<OutgoingPort>> for HostPort<Port>
-impl_port_conversion!(HostPort<OutgoingPort>, HostPort<Port>, HostPort);
-// impl From<HostPort<IncomingPort>> for HostPort<Port>
-impl_port_conversion!(HostPort<IncomingPort>, HostPort<Port>, HostPort);
-// impl From<ReplacementPort<OutgoingPort>> for ReplacementPort<Port>
-impl_port_conversion!(
-    ReplacementPort<OutgoingPort>,
-    ReplacementPort<Port>,
-    ReplacementPort
-);
-// impl From<ReplacementPort<IncomingPort>> for ReplacementPort<Port>
-impl_port_conversion!(
-    ReplacementPort<IncomingPort>,
-    ReplacementPort<Port>,
-    ReplacementPort
-);
+impl<HostNode> From<HostPort<HostNode, IncomingPort>> for HostPort<HostNode, Port> {
+    fn from(HostPort(node, port): HostPort<HostNode, IncomingPort>) -> Self {
+        HostPort(node, port.into())
+    }
+}
+
+impl From<ReplacementPort<OutgoingPort>> for ReplacementPort<Port> {
+    fn from(ReplacementPort(node, port): ReplacementPort<OutgoingPort>) -> Self {
+        ReplacementPort(node, port.into())
+    }
+}
+
+impl From<ReplacementPort<IncomingPort>> for ReplacementPort<Port> {
+    fn from(ReplacementPort(node, port): ReplacementPort<IncomingPort>) -> Self {
+        ReplacementPort(node, port.into())
+    }
+}
