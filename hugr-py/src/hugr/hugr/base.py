@@ -174,6 +174,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         node = replace(node, _num_out_ports=num_outs, _metadata=node_data.metadata)
         if parent:
             self[parent].children.append(node)
+
+        self._update_node_outs(node, num_outs)
         return node
 
     def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
@@ -278,10 +280,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         parent = self[node].parent
         if parent:
             self[parent].children.remove(node)
-        for offset in range(self.num_in_ports(node)):
-            self._links.delete_right(_SubPort(node.inp(offset)))
-        for offset in range(self.num_out_ports(node)):
-            self._links.delete_left(_SubPort(node.out(offset)))
+        for inp, _ in self.incoming_links(node):
+            self._links.delete_right(_SubPort(inp))
+        for out, _ in self.outgoing_links(node):
+            self._links.delete_left(_SubPort(out))
 
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
 
