@@ -4,7 +4,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 ---
 (hugr 0)
 
-(import core.call_indirect)
+(import core.call)
 
 (import core.load_const)
 
@@ -34,7 +34,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
   (dfg [%0] [%1]
     (signature
       (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
-    ((core.call_indirect
+    ((core.call
         [arithmetic.int.types.int]
         [arithmetic.int.types.int]
         (ext)
