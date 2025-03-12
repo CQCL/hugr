@@ -22,6 +22,7 @@ capnp = { workspace = true }
 derive_more = { workspace = true, features = ["display", "error", "from"] }
 fxhash.workspace = true
 indexmap.workspace = true
+itertools.workspace = true
 ordered-float = { workspace = true }
 pest = { workspace = true }
 pest_derive = { workspace = true }

@@ -134,27 +134,22 @@ pub enum Operation {
 impl Operation {
     /// The name of the symbol introduced by this operation, if any.
     pub fn symbol_name(&self) -> Option<&SymbolName> {
-        match self {
-            Operation::DefineFunc(symbol) => Some(&symbol.name),
-            Operation::DeclareFunc(symbol) => Some(&symbol.name),
-            Operation::DefineAlias(symbol, _) => Some(&symbol.name),
-            Operation::DeclareAlias(symbol) => Some(&symbol.name),
-            Operation::DeclareConstructor(symbol) => Some(&symbol.name),
-            Operation::DeclareOperation(symbol) => Some(&symbol.name),
-            Operation::Import(symbol_name) => Some(symbol_name),
-            _ => None,
+        if let Operation::Import(symbol_name) = self {
+            Some(symbol_name)
+        } else {
+            Some(&self.symbol()?.name)
         }
     }
 
     /// The symbol declared or defined by this operation, if any.
     pub fn symbol(&self) -> Option<&Symbol> {
         match self {
-            Operation::DefineFunc(symbol) => Some(symbol),
-            Operation::DeclareFunc(symbol) => Some(symbol),
-            Operation::DefineAlias(symbol, _) => Some(symbol),
-            Operation::DeclareAlias(symbol) => Some(symbol),
-            Operation::DeclareConstructor(symbol) => Some(symbol),
-            Operation::DeclareOperation(symbol) => Some(symbol),
+            Operation::DefineFunc(symbol)
+            | Operation::DeclareFunc(symbol)
+            | Operation::DefineAlias(symbol, _)
+            | Operation::DeclareAlias(symbol)
+            | Operation::DeclareConstructor(symbol)
+            | Operation::DeclareOperation(symbol) => Some(symbol),
             _ => None,
         }
     }

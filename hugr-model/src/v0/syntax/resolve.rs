@@ -1,5 +1,6 @@
 use bumpalo::{collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
+use itertools::zip_eq;
 use thiserror::Error;
 
 use super::{
@@ -76,7 +77,7 @@ impl<'a> Context<'a> {
             Term::Wildcard => table::Term::Wildcard,
             Term::Var(var_name) => table::Term::Var(self.resolve_var(var_name)?),
             Term::Apply(symbol_name, terms) => {
-                let symbol_id = self.resolve_symbol_name(symbol_name)?;
+                let symbol_id = self.resolve_symbol_name(symbol_name);
                 let terms = self.resolve_terms(terms)?;
                 table::Term::Apply(symbol_id, terms)
             }
@@ -117,7 +118,7 @@ impl<'a> Context<'a> {
         // with the id of the node. This serves as a form of forward declaration
         // so that the symbol is visible in the current region regardless of the
         // order of the nodes.
-        for (id, node) in ids.iter().zip(nodes) {
+        for (id, node) in zip_eq(ids, nodes) {
             if let Some(symbol_name) = node.operation.symbol_name() {
                 self.symbols
                     .insert(symbol_name.as_ref(), *id)
@@ -126,7 +127,7 @@ impl<'a> Context<'a> {
         }
 
         // Finally we can build the actual nodes.
-        for (id, node) in ids.iter().zip(nodes) {
+        for (id, node) in zip_eq(ids, nodes) {
             self.resolve_node(*id, node)?;
         }
 
@@ -322,21 +323,21 @@ impl<'a> Context<'a> {
     /// node in the module and record that the symbol has been implicitly
     /// imported. At the end of the building process, these import nodes are
     /// inserted into the module's scope.
-    fn resolve_symbol_name(&mut self, symbol_name: &'a SymbolName) -> BuildResult<NodeId> {
+    fn resolve_symbol_name(&mut self, symbol_name: &'a SymbolName) -> NodeId {
         let resolved = self.symbols.resolve(symbol_name.as_ref());
 
         if let Ok(node) = resolved {
-            return Ok(node);
+            return node;
         }
 
-        Ok(*self.imports.entry(symbol_name.clone()).or_insert_with(|| {
+        *self.imports.entry(symbol_name.clone()).or_insert_with(|| {
             self.module.insert_node(table::Node {
                 operation: table::Operation::Import {
                     name: symbol_name.as_ref(),
                 },
                 ..Default::default()
             })
-        }))
+        })
     }
 
     pub fn finish(self) -> table::Module<'a> {

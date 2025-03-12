@@ -371,7 +371,7 @@ impl<'a> Context<'a> {
                 let outputs = self.export_type_row(&signature.output);
                 let ext = self.export_ext_set(&signature.runtime_reqs);
                 let operation =
-                    self.make_term_apply(model::CORE_CALL_INDIRECT, &[inputs, outputs, ext, func]);
+                    self.make_term_apply(model::CORE_CALL, &[inputs, outputs, ext, func]);
                 table::Operation::Custom(operation)
             }
 

@@ -1168,6 +1168,7 @@ dependencies = [
  "fxhash",
  "indexmap",
  "insta",
+ "itertools 0.14.0",
  "ordered-float",
  "pest",
  "pest_derive",

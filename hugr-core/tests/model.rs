@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use hugr::std_extensions::std_reg;
 use hugr_core::{export::export_hugr, import::import_hugr};
-use hugr_model::v0::{self as model};
+use hugr_model::v0 as model;
 
 fn roundtrip(source: &str) -> String {
     let bump = model::bumpalo::Bump::new();
