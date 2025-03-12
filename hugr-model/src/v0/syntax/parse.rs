@@ -26,7 +26,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::v0::syntax::{LinkName, Module, Operation, SeqPart};
-use crate::v0::{Literal, RegionKind, ScopeClosure};
+use crate::v0::{Literal, RegionKind};
 
 use super::{Node, Param, Region, Symbol, VarName};
 use super::{SymbolName, Term};
@@ -87,7 +87,7 @@ fn parse_term(pair: Pair<Rule>) -> ParseResult<Term> {
         }
         Rule::term_const_func => {
             let mut pairs = pair.into_inner();
-            let region = parse_region_with_scope(pairs.next().unwrap(), ScopeClosure::Closed)?;
+            let region = parse_region(pairs.next().unwrap())?;
             Term::Func(Arc::new(region))
         }
         _ => unreachable!(),
@@ -139,10 +139,6 @@ fn parse_module(pair: Pair<Rule>) -> ParseResult<Module> {
 }
 
 fn parse_region(pair: Pair<Rule>) -> ParseResult<Region> {
-    parse_region_with_scope(pair, ScopeClosure::Closed)
-}
-
-fn parse_region_with_scope(pair: Pair<Rule>, scope: ScopeClosure) -> ParseResult<Region> {
     debug_assert_eq!(pair.as_rule(), Rule::region);
     let mut pairs = pair.into_inner();
 
@@ -160,7 +156,6 @@ fn parse_region_with_scope(pair: Pair<Rule>, scope: ScopeClosure) -> ParseResult
         signature,
         meta,
         children,
-        scope,
     })
 }
 
@@ -186,8 +181,6 @@ fn parse_node(pair: Pair<Rule>) -> ParseResult<Node> {
     let rule = pair.as_rule();
     let mut pairs = pair.into_inner();
 
-    let mut scope_closure = ScopeClosure::Open;
-
     let operation = match rule {
         Rule::node_dfg => Operation::Dfg,
         Rule::node_cfg => Operation::Cfg,
@@ -202,13 +195,11 @@ fn parse_node(pair: Pair<Rule>) -> ParseResult<Node> {
 
         Rule::node_custom => {
             let term = parse_term(pairs.next().unwrap())?;
-            scope_closure = ScopeClosure::Closed;
             Operation::Custom(term)
         }
 
         Rule::node_define_func => {
             let symbol = parse_symbol(pairs.next().unwrap())?;
-            scope_closure = ScopeClosure::Closed;
             Operation::DefineFunc(Box::new(symbol))
         }
         Rule::node_declare_func => {
@@ -241,7 +232,7 @@ fn parse_node(pair: Pair<Rule>) -> ParseResult<Node> {
     let signature = parse_optional_signature(&mut pairs)?;
     let meta = parse_meta_items(&mut pairs)?;
     let regions = pairs
-        .map(|pair| parse_region_with_scope(pair, scope_closure))
+        .map(|pair| parse_region(pair))
         .collect::<ParseResult<_>>()?;
 
     Ok(Node {

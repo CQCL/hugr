@@ -85,7 +85,7 @@ impl<'a> Context<'a> {
             Term::Literal(literal) => table::Term::Literal(literal.clone()),
             Term::Tuple(parts) => table::Term::Tuple(self.resolve_seq_parts(parts)?),
             Term::Func(region) => {
-                let region = self.resolve_region(region)?;
+                let region = self.resolve_region(region, ScopeClosure::Closed)?;
                 table::Term::ConstFunc(region)
             }
             Term::ExtSet => table::Term::ExtSet(&[]),
@@ -143,6 +143,8 @@ impl<'a> Context<'a> {
             self.vars.enter(node_id);
         }
 
+        let mut scope_closure = ScopeClosure::Open;
+
         let operation = match &node.operation {
             Operation::Invalid => table::Operation::Invalid,
             Operation::Dfg => table::Operation::Dfg,
@@ -152,6 +154,7 @@ impl<'a> Context<'a> {
             Operation::Conditional => table::Operation::Conditional,
             Operation::DefineFunc(symbol) => {
                 let symbol = self.resolve_symbol(symbol)?;
+                scope_closure = ScopeClosure::Closed;
                 table::Operation::DefineFunc(symbol)
             }
             Operation::DeclareFunc(symbol) => {
@@ -185,7 +188,7 @@ impl<'a> Context<'a> {
         };
 
         let meta = self.resolve_terms(&node.meta)?;
-        let regions = self.resolve_regions(&node.regions)?;
+        let regions = self.resolve_regions(&node.regions, scope_closure)?;
 
         let signature = match &node.signature {
             Some(signature) => Some(self.resolve_term(signature)?),
@@ -217,14 +220,24 @@ impl<'a> Context<'a> {
         Ok(self.links.use_link(link.as_ref()))
     }
 
-    fn resolve_regions(&mut self, regions: &'a [Region]) -> BuildResult<&'a [RegionId]> {
+    fn resolve_regions(
+        &mut self,
+        regions: &'a [Region],
+        scope_closure: ScopeClosure,
+    ) -> BuildResult<&'a [RegionId]> {
         try_alloc_slice(
             self.bump,
-            regions.iter().map(|region| self.resolve_region(region)),
+            regions
+                .iter()
+                .map(|region| self.resolve_region(region, scope_closure)),
         )
     }
 
-    fn resolve_region(&mut self, region: &'a Region) -> BuildResult<RegionId> {
+    fn resolve_region(
+        &mut self,
+        region: &'a Region,
+        scope_closure: ScopeClosure,
+    ) -> BuildResult<RegionId> {
         let meta = self.resolve_terms(&region.meta)?;
         let signature = match &region.signature {
             Some(signature) => Some(self.resolve_term(signature)?),
@@ -239,7 +252,7 @@ impl<'a> Context<'a> {
         self.symbols.enter(region_id);
 
         // If the region is closed, it also defines a new scope for links.
-        if ScopeClosure::Closed == region.scope {
+        if ScopeClosure::Closed == scope_closure {
             self.links.enter(region_id);
         }
 
@@ -248,7 +261,7 @@ impl<'a> Context<'a> {
         let children = self.resolve_nodes(&region.children)?;
 
         // Close the region's scopes.
-        let scope = match region.scope {
+        let scope = match scope_closure {
             ScopeClosure::Open => None,
             ScopeClosure::Closed => {
                 let (links, ports) = self.links.exit();

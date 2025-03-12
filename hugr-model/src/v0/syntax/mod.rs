@@ -25,7 +25,7 @@ use std::sync::Arc;
 use bumpalo::Bump;
 
 use super::table::{self};
-use super::{LinkName, Literal, RegionKind, ScopeClosure, SymbolName, VarName};
+use super::{LinkName, Literal, RegionKind, SymbolName, VarName};
 
 mod parse;
 mod print;
@@ -204,8 +204,6 @@ pub struct Region {
     pub meta: Box<[Term]>,
     /// The source/target signature of the region.
     pub signature: Option<Term>,
-    /// Whether the region is open or closed.
-    pub scope: ScopeClosure,
 }
 
 /// A term in the hugr AST.

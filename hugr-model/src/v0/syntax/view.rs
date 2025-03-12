@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use super::{LinkName, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName};
 use crate::v0::table::{self, NodeId, TermId, VarId, View};
-use crate::v0::ScopeClosure;
 
 impl<'a> View<'a, TermId> for Term {
     fn view(module: &'a table::Module<'a>, id: TermId) -> Option<Self> {
@@ -123,11 +122,6 @@ impl<'a> View<'a, table::RegionId> for Region {
         let children = module.view(region.children)?;
         let signature = module.view(region.signature)?;
 
-        let scope = match region.scope {
-            Some(_) => ScopeClosure::Closed,
-            None => ScopeClosure::Open,
-        };
-
         Some(Region {
             kind: region.kind,
             sources,
@@ -135,7 +129,6 @@ impl<'a> View<'a, table::RegionId> for Region {
             children,
             meta,
             signature,
-            scope,
         })
     }
 }
