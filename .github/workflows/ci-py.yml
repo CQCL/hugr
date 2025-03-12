@@ -52,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.7
+        uses: mozilla-actions/sccache-action@v0.0.8
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -83,7 +83,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.8
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build HUGR binary
@@ -155,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.7
+        uses: mozilla-actions/sccache-action@v0.0.8
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5

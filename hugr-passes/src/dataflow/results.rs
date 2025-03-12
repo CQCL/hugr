@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use hugr_core::{HugrView, IncomingPort, Node, PortIndex, Wire};
+use hugr_core::{HugrView, IncomingPort, PortIndex, Wire};
 
 use super::{partial_value::ExtractValueError, AbstractValue, PartialValue, Sum};
 
@@ -8,10 +8,10 @@ use super::{partial_value::ExtractValueError, AbstractValue, PartialValue, Sum};
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
 pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
     pub(super) hugr: H,
-    pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
-    pub(super) case_reachable: Vec<(Node, Node)>,
-    pub(super) bb_reachable: Vec<(Node, Node)>,
-    pub(super) out_wire_values: HashMap<Wire, PartialValue<V>>,
+    pub(super) in_wire_value: Vec<(H::Node, IncomingPort, PartialValue<V>)>,
+    pub(super) case_reachable: Vec<(H::Node, H::Node)>,
+    pub(super) bb_reachable: Vec<(H::Node, H::Node)>,
+    pub(super) out_wire_values: HashMap<Wire<H::Node>, PartialValue<V>>,
 }
 
 impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
@@ -21,7 +21,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     }
 
     /// Gets the lattice value computed for the given wire
-    pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
+    pub fn read_out_wire(&self, w: Wire<H::Node>) -> Option<PartialValue<V>> {
         self.out_wire_values.get(&w).cloned()
     }
 
@@ -30,7 +30,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     /// Returns `None` if the specified `node` is not a [TailLoop].
     ///
     /// [TailLoop]: hugr_core::ops::TailLoop
-    pub fn tail_loop_terminates(&self, node: Node) -> Option<TailLoopTermination> {
+    pub fn tail_loop_terminates(&self, node: H::Node) -> Option<TailLoopTermination> {
         self.hugr.get_optype(node).as_tail_loop()?;
         let [_, out] = self.hugr.get_io(node).unwrap();
         Some(TailLoopTermination::from_control_value(
@@ -48,7 +48,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     ///
     /// [Case]: hugr_core::ops::Case
     /// [Conditional]: hugr_core::ops::Conditional
-    pub fn case_reachable(&self, case: Node) -> Option<bool> {
+    pub fn case_reachable(&self, case: H::Node) -> Option<bool> {
         self.hugr.get_optype(case).as_case()?;
         let cond = self.hugr.get_parent(case)?;
         self.hugr.get_optype(cond).as_conditional()?;
@@ -65,7 +65,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     /// [CFG]: hugr_core::ops::CFG
     /// [DataflowBlock]: hugr_core::ops::DataflowBlock
     /// [ExitBlock]: hugr_core::ops::ExitBlock
-    pub fn bb_reachable(&self, bb: Node) -> Option<bool> {
+    pub fn bb_reachable(&self, bb: H::Node) -> Option<bool> {
         let cfg = self.hugr.get_parent(bb)?; // Not really required...??
         self.hugr.get_optype(cfg).as_cfg()?;
         let t = self.hugr.get_optype(bb);
@@ -86,7 +86,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     /// `Some(e)` if [conversion to a concrete value](PartialValue::try_into_concrete) failed with error `e`
     pub fn try_read_wire_concrete<V2, VE, SE>(
         &self,
-        w: Wire,
+        w: Wire<H::Node>,
     ) -> Result<V2, Option<ExtractValueError<V, VE, SE>>>
     where
         V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>,

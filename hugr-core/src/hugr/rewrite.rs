@@ -1,6 +1,7 @@
 //! Rewrite operations on the HUGR - replacement, outlining, etc.
 
 pub mod consts;
+pub mod inline_call;
 pub mod inline_dfg;
 pub mod insert_identity;
 pub mod outline_cfg;
@@ -28,7 +29,7 @@ pub trait Rewrite {
     /// Checks whether the rewrite would succeed on the specified Hugr.
     /// If this call succeeds, [self.apply] should also succeed on the same `h`
     /// If this calls fails, [self.apply] would fail with the same error.
-    fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error>;
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error>;
 
     /// Mutate the specified Hugr, or fail with an error.
     /// Returns [`Self::ApplyResult`] if successful.
@@ -60,7 +61,7 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
     type ApplyResult = R::ApplyResult;
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
         self.underlying.verify(h)
     }
 

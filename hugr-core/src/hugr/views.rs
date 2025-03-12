@@ -26,14 +26,14 @@ use portgraph::{LinkView, PortView};
 
 use super::internal::HugrInternals;
 use super::{
-    Hugr, HugrError, HugrMut, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
+    Hugr, HugrError, HugrMut, Node, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
 };
 use crate::extension::ExtensionRegistry;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
-use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
+use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 use itertools::Either;
 
@@ -42,7 +42,7 @@ use itertools::Either;
 pub trait HugrView: HugrInternals {
     /// Return the root node of this view.
     #[inline]
-    fn root(&self) -> Node {
+    fn root(&self) -> Self::Node {
         self.root_node()
     }
 
@@ -56,11 +56,11 @@ pub trait HugrView: HugrInternals {
     }
 
     /// Returns whether the node exists.
-    fn contains_node(&self, node: Node) -> bool;
+    fn contains_node(&self, node: Self::Node) -> bool;
 
     /// Validates that a node is valid in the graph.
     #[inline]
-    fn valid_node(&self, node: Node) -> bool {
+    fn valid_node(&self, node: Self::Node) -> bool {
         self.contains_node(node)
     }
 
@@ -68,34 +68,34 @@ pub trait HugrView: HugrInternals {
     ///
     /// To include the root node use [`HugrView::valid_node`] instead.
     #[inline]
-    fn valid_non_root(&self, node: Node) -> bool {
+    fn valid_non_root(&self, node: Self::Node) -> bool {
         self.root() != node && self.valid_node(node)
     }
 
     /// Returns the parent of a node.
     #[inline]
-    fn get_parent(&self, node: Node) -> Option<Node> {
+    fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
         if !self.valid_non_root(node) {
             return None;
         };
         self.base_hugr()
             .hierarchy
-            .parent(node.pg_index())
-            .map(Into::into)
+            .parent(self.get_pg_index(node))
+            .map(|index| self.get_node(index))
     }
 
     /// Returns the operation type of a node.
     #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
+    fn get_optype(&self, node: Self::Node) -> &OpType {
         match self.contains_node(node) {
-            true => self.base_hugr().op_types.get(node.pg_index()),
+            true => self.base_hugr().op_types.get(self.get_pg_index(node)),
             false => &DEFAULT_OPTYPE,
         }
     }
 
     /// Returns the metadata associated with a node.
     #[inline]
-    fn get_metadata(&self, node: Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
+    fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
         match self.contains_node(node) {
             true => self.get_node_metadata(node)?.get(key.as_ref()),
             false => None,
@@ -103,11 +103,14 @@ pub trait HugrView: HugrInternals {
     }
 
     /// Retrieve the complete metadata map for a node.
-    fn get_node_metadata(&self, node: Node) -> Option<&NodeMetadataMap> {
+    fn get_node_metadata(&self, node: Self::Node) -> Option<&NodeMetadataMap> {
         if !self.valid_node(node) {
             return None;
         }
-        self.base_hugr().metadata.get(node.pg_index()).as_ref()
+        self.base_hugr()
+            .metadata
+            .get(self.get_pg_index(node))
+            .as_ref()
     }
 
     /// Returns the number of nodes in the hugr.
@@ -117,16 +120,16 @@ pub trait HugrView: HugrInternals {
     fn edge_count(&self) -> usize;
 
     /// Iterates over the nodes in the port graph.
-    fn nodes(&self) -> impl Iterator<Item = Node> + Clone;
+    fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Iterator over ports of node in a given direction.
-    fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone;
+    fn node_ports(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = Port> + Clone;
 
     /// Iterator over output ports of node.
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`
     /// but preserves knowledge that the ports are [OutgoingPort]s.
     #[inline]
-    fn node_outputs(&self, node: Node) -> impl Iterator<Item = OutgoingPort> + Clone {
+    fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = OutgoingPort> + Clone {
         self.node_ports(node, Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
     }
@@ -135,29 +138,29 @@ pub trait HugrView: HugrInternals {
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`
     /// but preserves knowledge that the ports are [IncomingPort]s.
     #[inline]
-    fn node_inputs(&self, node: Node) -> impl Iterator<Item = IncomingPort> + Clone {
+    fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = IncomingPort> + Clone {
         self.node_ports(node, Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
     }
 
     /// Iterator over both the input and output ports of node.
-    fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone;
+    fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = Port> + Clone;
 
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(
         &self,
-        node: Node,
+        node: Self::Node,
         port: impl Into<Port>,
-    ) -> impl Iterator<Item = (Node, Port)> + Clone;
+    ) -> impl Iterator<Item = (Self::Node, Port)> + Clone;
 
     /// Iterator over all the nodes and ports connected to a node in a given direction.
     fn all_linked_ports(
         &self,
-        node: Node,
+        node: Self::Node,
         dir: Direction,
     ) -> Either<
-        impl Iterator<Item = (Node, OutgoingPort)>,
-        impl Iterator<Item = (Node, IncomingPort)>,
+        impl Iterator<Item = (Self::Node, OutgoingPort)>,
+        impl Iterator<Item = (Self::Node, IncomingPort)>,
     > {
         match dir {
             Direction::Incoming => Either::Left(
@@ -172,14 +175,20 @@ pub trait HugrView: HugrInternals {
     }
 
     /// Iterator over all the nodes and ports connected to a node's inputs.
-    fn all_linked_outputs(&self, node: Node) -> impl Iterator<Item = (Node, OutgoingPort)> {
+    fn all_linked_outputs(
+        &self,
+        node: Self::Node,
+    ) -> impl Iterator<Item = (Self::Node, OutgoingPort)> {
         self.all_linked_ports(node, Direction::Incoming)
             .left()
             .unwrap()
     }
 
     /// Iterator over all the nodes and ports connected to a node's outputs.
-    fn all_linked_inputs(&self, node: Node) -> impl Iterator<Item = (Node, IncomingPort)> {
+    fn all_linked_inputs(
+        &self,
+        node: Self::Node,
+    ) -> impl Iterator<Item = (Self::Node, IncomingPort)> {
         self.all_linked_ports(node, Direction::Outgoing)
             .right()
             .unwrap()
@@ -187,7 +196,11 @@ pub trait HugrView: HugrInternals {
 
     /// If there is exactly one port connected to this port, return
     /// it and its node.
-    fn single_linked_port(&self, node: Node, port: impl Into<Port>) -> Option<(Node, Port)> {
+    fn single_linked_port(
+        &self,
+        node: Self::Node,
+        port: impl Into<Port>,
+    ) -> Option<(Self::Node, Port)> {
         self.linked_ports(node, port).exactly_one().ok()
     }
 
@@ -195,9 +208,9 @@ pub trait HugrView: HugrInternals {
     /// it and its node.
     fn single_linked_output(
         &self,
-        node: Node,
+        node: Self::Node,
         port: impl Into<IncomingPort>,
-    ) -> Option<(Node, OutgoingPort)> {
+    ) -> Option<(Self::Node, OutgoingPort)> {
         self.single_linked_port(node, port.into())
             .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
@@ -206,9 +219,9 @@ pub trait HugrView: HugrInternals {
     /// it and its node.
     fn single_linked_input(
         &self,
-        node: Node,
+        node: Self::Node,
         port: impl Into<OutgoingPort>,
-    ) -> Option<(Node, IncomingPort)> {
+    ) -> Option<(Self::Node, IncomingPort)> {
         self.single_linked_port(node, port.into())
             .map(|(n, p)| (n, p.as_incoming().unwrap()))
     }
@@ -217,9 +230,9 @@ pub trait HugrView: HugrInternals {
     /// that the linked ports are [OutgoingPort]s.
     fn linked_outputs(
         &self,
-        node: Node,
+        node: Self::Node,
         port: impl Into<IncomingPort>,
-    ) -> impl Iterator<Item = (Node, OutgoingPort)> {
+    ) -> impl Iterator<Item = (Self::Node, OutgoingPort)> {
         self.linked_ports(node, port.into())
             .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
@@ -229,72 +242,80 @@ pub trait HugrView: HugrInternals {
     /// that the linked ports are [IncomingPort]s.
     fn linked_inputs(
         &self,
-        node: Node,
+        node: Self::Node,
         port: impl Into<OutgoingPort>,
-    ) -> impl Iterator<Item = (Node, IncomingPort)> {
+    ) -> impl Iterator<Item = (Self::Node, IncomingPort)> {
         self.linked_ports(node, port.into())
             .map(|(n, p)| (n, p.as_incoming().unwrap()))
     }
 
     /// Iterator the links between two nodes.
-    fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone;
+    fn node_connections(
+        &self,
+        node: Self::Node,
+        other: Self::Node,
+    ) -> impl Iterator<Item = [Port; 2]> + Clone;
 
     /// Returns whether a port is connected.
-    fn is_linked(&self, node: Node, port: impl Into<Port>) -> bool {
+    fn is_linked(&self, node: Self::Node, port: impl Into<Port>) -> bool {
         self.linked_ports(node, port).next().is_some()
     }
 
     /// Number of ports in node for a given direction.
-    fn num_ports(&self, node: Node, dir: Direction) -> usize;
+    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize;
 
     /// Number of inputs to a node.
     /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Incoming)`.
     #[inline]
-    fn num_inputs(&self, node: Node) -> usize {
+    fn num_inputs(&self, node: Self::Node) -> usize {
         self.num_ports(node, Direction::Incoming)
     }
 
     /// Number of outputs from a node.
     /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Outgoing)`.
     #[inline]
-    fn num_outputs(&self, node: Node) -> usize {
+    fn num_outputs(&self, node: Self::Node) -> usize {
         self.num_ports(node, Direction::Outgoing)
     }
 
     /// Return iterator over the direct children of node.
-    fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone;
+    fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
 
     /// Returns the first child of the specified node (if it is a parent).
     /// Useful because `x.children().next()` leaves x borrowed.
-    fn first_child(&self, node: Node) -> Option<Node> {
+    fn first_child(&self, node: Self::Node) -> Option<Self::Node> {
         self.children(node).next()
     }
 
     /// Iterates over neighbour nodes in the given direction.
     /// May contain duplicates if the graph has multiple links between nodes.
-    fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone;
+    fn neighbours(
+        &self,
+        node: Self::Node,
+        dir: Direction,
+    ) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Iterates over the input neighbours of the `node`.
     /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Incoming)`.
     #[inline]
-    fn input_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
+    fn input_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
         self.neighbours(node, Direction::Incoming)
     }
 
     /// Iterates over the output neighbours of the `node`.
     /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Outgoing)`.
     #[inline]
-    fn output_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
+    fn output_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
         self.neighbours(node, Direction::Outgoing)
     }
 
     /// Iterates over the input and output neighbours of the `node` in sequence.
-    fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone;
+    fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Get the input and output child nodes of a dataflow parent.
     /// If the node isn't a dataflow parent, then return None
     #[inline]
-    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+    fn get_io(&self, node: Self::Node) -> Option<[Self::Node; 2]> {
         let op = self.get_optype(node);
         // Nodes outside the view have no children (and a non-DataflowParent OpType::default())
         if OpTag::DataflowParent.is_superset(op.tag()) {
@@ -397,26 +418,29 @@ pub trait HugrView: HugrInternals {
     }
 
     /// If a node has a static input, return the source node.
-    fn static_source(&self, node: Node) -> Option<Node> {
+    fn static_source(&self, node: Self::Node) -> Option<Self::Node> {
         self.linked_outputs(node, self.get_optype(node).static_input_port()?)
             .next()
             .map(|(n, _)| n)
     }
 
     /// If a node has a static output, return the targets.
-    fn static_targets(&self, node: Node) -> Option<impl Iterator<Item = (Node, IncomingPort)>> {
+    fn static_targets(
+        &self,
+        node: Self::Node,
+    ) -> Option<impl Iterator<Item = (Self::Node, IncomingPort)>> {
         Some(self.linked_inputs(node, self.get_optype(node).static_output_port()?))
     }
 
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
     /// kind ports will be missing.
-    fn signature(&self, node: Node) -> Option<Cow<'_, Signature>> {
+    fn signature(&self, node: Self::Node) -> Option<Cow<'_, Signature>> {
         self.get_optype(node).dataflow_signature()
     }
 
     /// Iterator over all outgoing ports that have Value type, along
     /// with corresponding types.
-    fn value_types(&self, node: Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
+    fn value_types(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
         let sig = self.signature(node).unwrap_or_default();
         self.node_ports(node, dir)
             .flat_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
@@ -424,14 +448,14 @@ pub trait HugrView: HugrInternals {
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    fn in_value_types(&self, node: Node) -> impl Iterator<Item = (IncomingPort, Type)> {
+    fn in_value_types(&self, node: Self::Node) -> impl Iterator<Item = (IncomingPort, Type)> {
         self.value_types(node, Direction::Incoming)
             .map(|(p, t)| (p.as_incoming().unwrap(), t))
     }
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    fn out_value_types(&self, node: Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
+    fn out_value_types(&self, node: Self::Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
         self.value_types(node, Direction::Outgoing)
             .map(|(p, t)| (p.as_outgoing().unwrap(), t))
     }
@@ -478,7 +502,10 @@ pub trait HierarchyView<'a>: RootTagged + Sized {
     ///
     /// # Errors
     /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [OpTag]
-    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
+    fn try_new(
+        hugr: &'a impl HugrView<Node = Self::Node>,
+        root: Self::Node,
+    ) -> Result<Self, HugrError>;
 }
 
 /// A trait for [`HugrView`]s that can be extracted into a valid HUGR containing
@@ -496,7 +523,10 @@ pub trait ExtractHugr: HugrView + Sized {
     }
 }
 
-fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(), HugrError> {
+fn check_tag<Required: NodeHandle, N>(
+    hugr: &impl HugrView<Node = N>,
+    node: N,
+) -> Result<(), HugrError> {
     let actual = hugr.get_optype(node).tag();
     let required = Required::TAG;
     if !required.is_superset(actual) {
@@ -625,7 +655,10 @@ where
 {
     /// Filter an iterator of node-ports to only dataflow dependency specifying
     /// ports (Value and StateOrder)
-    fn dataflow_ports_only(self, hugr: &impl HugrView) -> impl Iterator<Item = (Node, P)> {
+    fn dataflow_ports_only(
+        self,
+        hugr: &impl HugrView<Node = Node>,
+    ) -> impl Iterator<Item = (Node, P)> {
         self.filter_edge_kind(
             |kind| matches!(kind, Some(EdgeKind::Value(..) | EdgeKind::StateOrder)),
             hugr,
@@ -636,7 +669,7 @@ where
     fn filter_edge_kind(
         self,
         predicate: impl Fn(Option<EdgeKind>) -> bool,
-        hugr: &impl HugrView,
+        hugr: &impl HugrView<Node = Node>,
     ) -> impl Iterator<Item = (Node, P)> {
         self.filter(move |(n, p)| {
             let kind = hugr.get_optype(*n).port_kind(*p);

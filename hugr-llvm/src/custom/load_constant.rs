@@ -1,7 +1,7 @@
 //! Provides the implementation for a collection of [CustomConst] callbacks.
 use std::{any::TypeId, collections::HashMap};
 
-use hugr_core::{ops::constant::CustomConst, HugrView};
+use hugr_core::{ops::constant::CustomConst, HugrView, Node};
 use inkwell::values::BasicValueEnum;
 
 use anyhow::{anyhow, bail, ensure, Result};
@@ -41,7 +41,7 @@ pub struct LoadConstantsMap<'a, H>(
     HashMap<TypeId, Box<dyn LoadConstantFn<'a, H, dyn CustomConst>>>,
 );
 
-impl<'a, H: HugrView> LoadConstantsMap<'a, H> {
+impl<'a, H: HugrView<Node = Node>> LoadConstantsMap<'a, H> {
     /// Register a callback to emit a `CC` value.
     ///
     /// If a callback is already registered for that type, we will replace it.

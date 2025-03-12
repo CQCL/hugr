@@ -1,11 +1,11 @@
 use anyhow::Result;
-use hugr_core::HugrView;
+use hugr_core::{HugrView, Node};
 use inkwell::{values::BasicMetadataValueEnum, AddressSpace};
 
 use crate::emit::func::EmitFuncContext;
 
 /// Emits a call to the libc `void abort()` function.
-pub fn emit_libc_abort<H: HugrView>(context: &mut EmitFuncContext<H>) -> Result<()> {
+pub fn emit_libc_abort<H: HugrView<Node = Node>>(context: &mut EmitFuncContext<H>) -> Result<()> {
     let iw_ctx = context.typing_session().iw_context();
     let abort_sig = iw_ctx.void_type().fn_type(&[], false);
     let abort = context.get_extern_func("abort", abort_sig)?;
@@ -14,7 +14,7 @@ pub fn emit_libc_abort<H: HugrView>(context: &mut EmitFuncContext<H>) -> Result<
 }
 
 /// Emits a call to the libc `int printf(char*, ...)` function.
-pub fn emit_libc_printf<H: HugrView>(
+pub fn emit_libc_printf<H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<H>,
     args: &[BasicMetadataValueEnum],
 ) -> Result<()> {

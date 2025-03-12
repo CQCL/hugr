@@ -9,7 +9,7 @@ use crate::{
     hugr::{NodeMetadata, NodeMetadataMap, ValidationError},
     ops::OpType,
     types::{PolyFuncType, Signature, Type},
-    Direction, Hugr, IncomingPort, Node, OutgoingPort, Port,
+    Direction, Hugr, IncomingPort, OutgoingPort, Port,
 };
 
 macro_rules! hugr_view_methods {
@@ -17,54 +17,54 @@ macro_rules! hugr_view_methods {
     ($arg:ident, $e:expr) => {
         delegate! {
             to ({let $arg=self; $e}) {
-                fn root(&self) -> Node;
+                fn root(&self) -> Self::Node;
                 fn root_type(&self) -> &OpType;
-                fn contains_node(&self, node: Node) -> bool;
-                fn valid_node(&self, node: Node) -> bool;
-                fn valid_non_root(&self, node: Node) -> bool;
-                fn get_parent(&self, node: Node) -> Option<Node>;
-                fn get_optype(&self, node: Node) -> &OpType;
-                fn get_metadata(&self, node: Node, key: impl AsRef<str>) -> Option<&NodeMetadata>;
-                fn get_node_metadata(&self, node: Node) -> Option<&NodeMetadataMap>;
+                fn contains_node(&self, node: Self::Node) -> bool;
+                fn valid_node(&self, node: Self::Node) -> bool;
+                fn valid_non_root(&self, node: Self::Node) -> bool;
+                fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
+                fn get_optype(&self, node: Self::Node) -> &OpType;
+                fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&NodeMetadata>;
+                fn get_node_metadata(&self, node: Self::Node) -> Option<&NodeMetadataMap>;
                 fn node_count(&self) -> usize;
                 fn edge_count(&self) -> usize;
-                fn nodes(&self) -> impl Iterator<Item = Node> + Clone;
-                fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone;
-                fn node_outputs(&self, node: Node) -> impl Iterator<Item = OutgoingPort> + Clone;
-                fn node_inputs(&self, node: Node) -> impl Iterator<Item = IncomingPort> + Clone;
-                fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone;
+                fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
+                fn node_ports(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = Port> + Clone;
+                fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = OutgoingPort> + Clone;
+                fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = IncomingPort> + Clone;
+                fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = Port> + Clone;
                 fn linked_ports(
                     &self,
-                    node: Node,
+                    node: Self::Node,
                     port: impl Into<Port>,
-                ) -> impl Iterator<Item = (Node, Port)> + Clone;
+                ) -> impl Iterator<Item = (Self::Node, Port)> + Clone;
                 fn all_linked_ports(
                     &self,
-                    node: Node,
+                    node: Self::Node,
                     dir: Direction,
                 ) -> Either<
-                    impl Iterator<Item = (Node, OutgoingPort)>,
-                    impl Iterator<Item = (Node, IncomingPort)>,
+                    impl Iterator<Item = (Self::Node, OutgoingPort)>,
+                    impl Iterator<Item = (Self::Node, IncomingPort)>,
                 >;
-                fn all_linked_outputs(&self, node: Node) -> impl Iterator<Item = (Node, OutgoingPort)>;
-                fn all_linked_inputs(&self, node: Node) -> impl Iterator<Item = (Node, IncomingPort)>;
-                fn single_linked_port(&self, node: Node, port: impl Into<Port>) -> Option<(Node, Port)>;
-                fn single_linked_output(&self, node: Node, port: impl Into<IncomingPort>) -> Option<(Node, OutgoingPort)>;
-                fn single_linked_input(&self, node: Node, port: impl Into<OutgoingPort>) -> Option<(Node, IncomingPort)>;
-                fn linked_outputs(&self, node: Node, port: impl Into<IncomingPort>) -> impl Iterator<Item = (Node, OutgoingPort)>;
-                fn linked_inputs(&self, node: Node, port: impl Into<OutgoingPort>) -> impl Iterator<Item = (Node, IncomingPort)>;
-                fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone;
-                fn is_linked(&self, node: Node, port: impl Into<Port>) -> bool;
-                fn num_ports(&self, node: Node, dir: Direction) -> usize;
-                fn num_inputs(&self, node: Node) -> usize;
-                fn num_outputs(&self, node: Node) -> usize;
-                fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone;
-                fn first_child(&self, node: Node) -> Option<Node>;
-                fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone;
-                fn input_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone;
-                fn output_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone;
-                fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone;
-                fn get_io(&self, node: Node) -> Option<[Node; 2]>;
+                fn all_linked_outputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, OutgoingPort)>;
+                fn all_linked_inputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, IncomingPort)>;
+                fn single_linked_port(&self, node: Self::Node, port: impl Into<Port>) -> Option<(Self::Node, Port)>;
+                fn single_linked_output(&self, node: Self::Node, port: impl Into<IncomingPort>) -> Option<(Self::Node, OutgoingPort)>;
+                fn single_linked_input(&self, node: Self::Node, port: impl Into<OutgoingPort>) -> Option<(Self::Node, IncomingPort)>;
+                fn linked_outputs(&self, node: Self::Node, port: impl Into<IncomingPort>) -> impl Iterator<Item = (Self::Node, OutgoingPort)>;
+                fn linked_inputs(&self, node: Self::Node, port: impl Into<OutgoingPort>) -> impl Iterator<Item = (Self::Node, IncomingPort)>;
+                fn node_connections(&self, node: Self::Node, other: Self::Node) -> impl Iterator<Item = [Port; 2]> + Clone;
+                fn is_linked(&self, node: Self::Node, port: impl Into<Port>) -> bool;
+                fn num_ports(&self, node: Self::Node, dir: Direction) -> usize;
+                fn num_inputs(&self, node: Self::Node) -> usize;
+                fn num_outputs(&self, node: Self::Node) -> usize;
+                fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
+                fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
+                fn neighbours(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = Self::Node> + Clone;
+                fn input_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                fn output_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                fn get_io(&self, node: Self::Node) -> Option<[Self::Node; 2]>;
                 fn inner_function_type(&self) -> Option<Cow<'_, Signature>>;
                 fn poly_func_type(&self) -> Option<PolyFuncType>;
                 // TODO: cannot use delegate here. `PetgraphWrapper` is a thin
@@ -74,12 +74,12 @@ macro_rules! hugr_view_methods {
                 fn mermaid_string(&self) -> String;
                 fn mermaid_string_with_config(&self, config: RenderConfig) -> String;
                 fn dot_string(&self) -> String;
-                fn static_source(&self, node: Node) -> Option<Node>;
-                fn static_targets(&self, node: Node) -> Option<impl Iterator<Item = (Node, IncomingPort)>>;
-                fn signature(&self, node: Node) -> Option<Cow<'_, Signature>>;
-                fn value_types(&self, node: Node, dir: Direction) -> impl Iterator<Item = (Port, Type)>;
-                fn in_value_types(&self, node: Node) -> impl Iterator<Item = (IncomingPort, Type)>;
-                fn out_value_types(&self, node: Node) -> impl Iterator<Item = (OutgoingPort, Type)>;
+                fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
+                fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, IncomingPort)>>;
+                fn signature(&self, node: Self::Node) -> Option<Cow<'_, Signature>>;
+                fn value_types(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = (Port, Type)>;
+                fn in_value_types(&self, node: Self::Node) -> impl Iterator<Item = (IncomingPort, Type)>;
+                fn out_value_types(&self, node: Self::Node) -> impl Iterator<Item = (OutgoingPort, Type)>;
                 fn extensions(&self) -> &ExtensionRegistry;
                 fn validate(&self) -> Result<(), ValidationError>;
                 fn validate_no_extensions(&self) -> Result<(), ValidationError>;
@@ -125,7 +125,7 @@ mod test {
 
     struct ViewWrapper<H>(H);
     impl<H: HugrView> ViewWrapper<H> {
-        fn nodes(&self) -> impl Iterator<Item = Node> + '_ {
+        fn nodes(&self) -> impl Iterator<Item = H::Node> + '_ {
             self.0.nodes()
         }
     }
