@@ -510,10 +510,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             [Node(2)]
         """
         # adds edge to the right of all existing edges
-        source = src.out(-1)
-        target = dst.inp(-1)
-        if not self.hugr.has_link(source, target):
-            self.hugr.add_link(source, target)
+        self.hugr.add_order_link(src, dst)
 
     def load(
         self, const: ToNode | val.Value, const_parent: ToNode | None = None
