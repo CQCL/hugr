@@ -40,15 +40,14 @@ pub struct ConstantFoldPass {
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
-#[allow(missing_docs)]
 /// Errors produced by [ConstantFoldPass].
 pub enum ConstFoldError {
     #[error(transparent)]
+    #[allow(missing_docs)]
     ValidationError(#[from] ValidatePassError),
-    #[error("Node {_0} is not a child of the Module root")]
-    EntryPointNotChildOfModule(Node),
-    #[error("Node {_0} must be the root for non-Module-rooted Hugr")]
-    EntryPointNotRoot(Node),
+    /// Error raised when a Node is specified as an entry-point but
+    /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
+    /// a [Conditional](OpType::Conditional).
     #[error("Node {_0} has OpType {_1} which cannot be an entry-point")]
     InvalidEntryPoint(Node, OpType),
 }
@@ -71,8 +70,9 @@ impl ConstantFoldPass {
     }
 
     /// Specifies a number of external inputs to an entry point of the Hugr.
-    /// For Module-rooted Hugrs, `node` should be a FuncDefn child of the root.
-    /// For non-Module-rooted Hugrs, `node` should be the root of the Hugr.
+    /// In normal use, for Module-rooted Hugrs, `node` is a FuncDefn child of the root;
+    /// or for non-Module-rooted Hugrs, `node` is the root of the Hugr. (This is not
+    /// enforced, but it must be a container and not a module itself.)
     ///
     /// Multiple calls for the same entry-point combine their values, with later
     /// values on the same in-port replacing earlier ones.
@@ -93,19 +93,11 @@ impl ConstantFoldPass {
 
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
-        let is_module_root = hugr.get_optype(hugr.root()).is_module();
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
         let mut m = Machine::new(&hugr);
         for (&n, in_vals) in self.inputs.iter() {
-            if is_module_root {
-                if hugr.get_parent(n) != Some(hugr.root()) {
-                    return Err(ConstFoldError::EntryPointNotChildOfModule(n));
-                }
-            } else if n != hugr.root() {
-                return Err(ConstFoldError::EntryPointNotRoot(n));
-            }
             m.prepopulate_inputs(
                 n,
                 in_vals.iter().map(|(p, v)| {
@@ -180,7 +172,15 @@ impl ConstantFoldPass {
         Ok(())
     }
 
-    /// Run the pass using this configuration
+    /// Run the pass using this configuration.
+    /// 
+    /// # Errors
+    /// 
+    /// [ConstFoldError::ValidationError] if the Hugr does not validate before/afnerwards
+    /// (if [Self::validation_level] is set, or in tests)
+    /// 
+    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
+    /// was of an invalid OpType
     pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
         self.validation
             .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
