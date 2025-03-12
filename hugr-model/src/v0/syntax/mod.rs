@@ -6,18 +6,18 @@
 //! writing hugr modules by hand. For a more performant serialization format, see
 //! [binary] instead.
 //!
-//! The data types in this module logically mirror those of the [tabled]
+//! The data types in this module logically mirror those of the [table]
 //! representation, but are encoded differently. Instead of using ids, the AST
 //! data structure is recursive and uses names for symbols, variables and links.
 //! [`Term`]s, [`Node`]s and [`Region`]s can be referred to individually in this
-//! form, whereas the tabled form requires them to be seen in the context of a
-//! module. An AST module can be translated into a tabled module via [`Module::resolve`].
-//! This representation makes different efficiency tradeoffs than the tabled
+//! form, whereas the table form requires them to be seen in the context of a
+//! module. An AST module can be translated into a table module via [`Module::resolve`].
+//! This representation makes different efficiency tradeoffs than the table
 //! form by using standard heap based data structures instead of a bump
 //! allocated arena. This is slower but considerably more ergonomic.
 //!
 //! [binary]: crate::v0::binary
-//! [tabled]: crate::v0::table
+//! [table]: crate::v0::table
 //! [`Display`]: std::fmt::Display
 //! [`FromStr`]: std::str::FromStr
 use std::sync::Arc;

@@ -8,11 +8,15 @@
 //! to be as independent of implementation details as feasible. It can be used
 //! by the core compiler, alternative implementations or tooling that does not
 //! need the power/complexity of the full compiler. We provide the following
-//! representations, including conversions between them:
+//! in-memory representations:
 //!
 //! - [Table]: Efficient intermediate data structure to facilitate conversions.
-//! - [Binary]: Binary serialisation format optimised for performance.
-//! - [AST]: Abstract syntax tree that is more ergonomic than the table form.
+//! - [AST]: Abstract syntax tree that uses direct references rather than table indices.
+//!
+//! The table and AST format are interconvertible and can be serialised to
+//! a binary and text format, respectively:
+//!
+//! - [Binary]: Binary serialisation format optimised for performance and size.
 //! - [Text]: Human readable s-expression based text format.
 //!
 //! # Logical Format
