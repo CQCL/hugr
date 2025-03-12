@@ -68,7 +68,11 @@ impl ConstantFoldPass {
     /// For Module-rooted Hugrs, `node` should be a FuncDefn child of the root.
     /// For non-Module-rooted Hugrs, `node` should be the root of the Hugr.
     ///
-    /// Each value supersedes any previous value on the same in-port.
+    /// Multiple calls for the same entry-point combine their values, with later
+    /// values on the same in-port replacing earlier ones.
+    /// 
+    /// Note that if `inputs` is empty, this still marks the node as an entry-point, i.e.
+    /// we must preserve nodes required to compute its result.
     pub fn with_inputs(
         mut self,
         node: Node,
@@ -144,7 +148,7 @@ impl ConstantFoldPass {
             hugr.disconnect(n, inport);
             hugr.connect(lcst, OutgoingPort::from(0), n, inport);
         }
-        // Dataflow analysis applies our inputs to the 'main' function if this is a Module, so do the same here
+        // Eliminate dead code not required for the same entry points.
         DeadCodeElimPass::default()
             .with_entry_points(self.inputs.keys().cloned())
             .set_preserve_callback(if self.allow_increase_termination {
