@@ -106,7 +106,7 @@ impl ConstantFoldPass {
             } else if n != hugr.root() {
                 return Err(ConstFoldError::EntryPointNotRoot(n));
             }
-            if let Err(opty) = m.prepopulate_inputs(
+            m.prepopulate_inputs(
                 n,
                 in_vals.iter().map(|(p, v)| {
                     let const_with_dummy_loc = partial_from_const(
@@ -116,9 +116,8 @@ impl ConstantFoldPass {
                     );
                     (*p, const_with_dummy_loc)
                 }),
-            ) {
-                return Err(ConstFoldError::InvalidEntryPoint(n, opty));
-            }
+            )
+            .map_err(|opty| ConstFoldError::InvalidEntryPoint(n, opty))?;
         }
 
         let results = m.run(ConstFoldContext(hugr), []);
