@@ -7,7 +7,9 @@ use std::fmt::{self, Display};
 
 use super::type_param::TypeParam;
 use super::type_row::TypeRowBase;
-use super::{MaybeRV, NoRV, RowVariable, Substitution, Type, TypeRow, TypeTransformer};
+use super::{
+    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeRow, TypeTransformer,
+};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
@@ -70,14 +72,6 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
             output: self.output.substitute(tr),
             runtime_reqs: self.runtime_reqs.substitute(tr),
         }
-    }
-
-    /// Applies a [TypeTransformer] to this instance. (Mutates in-place.)
-    ///
-    /// Returns true if the function type (may have) changed, or false if it definitely didn't.
-    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        // TODO handle extension sets?
-        Ok(self.input.transform(tr)? | self.output.transform(tr)?)
     }
 
     /// Create a new signature with specified inputs and outputs.
@@ -147,6 +141,13 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         } else {
             Err(ExtensionCollectionError::dropped_signature(self, missing))
         }
+    }
+}
+
+impl<RV: MaybeRV> Transformable for FuncTypeBase<RV> {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        // TODO handle extension sets?
+        Ok(self.input.transform(tr)? | self.output.transform(tr)?)
     }
 }
 

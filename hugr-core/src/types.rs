@@ -267,22 +267,14 @@ impl SumType {
             SumType::General { rows } => Either::Right(rows.iter()),
         }
     }
+}
 
-    /// Applies a [TypeTransformer] to this instance. (Mutates in-place.)
-    ///
-    /// Returns true if any part of the sum type (may have) changed, or false
-    /// for definitely no change.
-    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        Ok(match self {
-            SumType::Unit { .. } => false,
-            SumType::General { rows } => {
-                let mut any_changed = false;
-                for r in rows.iter_mut() {
-                    any_changed |= r.transform(tr)?;
-                }
-                any_changed
-            }
-        })
+impl Transformable for SumType {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match self {
+            SumType::Unit { .. } => Ok(false),
+            SumType::General { rows } => rows.iter_mut().transform(tr),
+        }
     }
 }
 
@@ -545,11 +537,10 @@ impl<RV: MaybeRV> TypeBase<RV> {
             }
         }
     }
+}
 
-    /// Applies a [TypeTransformer] to this instance. (Mutates in-place.)
-    ///
-    /// Returns true if the Type (may have) changed, or false if it definitely didn't.
-    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+impl<RV: MaybeRV> Transformable for TypeBase<RV> {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match &mut self.0 {
             TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
             TypeEnum::Extension(custom_type) => {
@@ -557,10 +548,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
                     *self = nt.into_();
                     true
                 } else {
-                    let mut args_changed = false;
-                    for a in custom_type.args_mut() {
-                        args_changed |= a.transform(tr)?
-                    }
+                    let args_changed = custom_type.args_mut().into_iter().transform(tr)?;
                     if args_changed {
                         *custom_type = custom_type
                             .get_type_def(&custom_type.get_extension()?)?
@@ -734,6 +722,28 @@ pub trait TypeTransformer {
 
     // Note: in future releases more methods may be added here to transform other types.
     // By defaulting such trait methods to Ok(None), backwards compatibility will be preserved.
+}
+
+/// Trait for things that can be transformed by applying a [TypeTransformer].
+/// (A destructive / in-place mutation.)
+pub trait Transformable {
+    /// Applies a [TypeTransformer] to this instance.
+    ///
+    /// Returns true if any part may have changed, or false for definitely no change.
+    ///
+    /// If an Err occurs, `self` may be left in an inconsistent state (e.g. partially
+    /// transformed).
+    fn transform<T: TypeTransformer>(&mut self, t: &T) -> Result<bool, T::Err>;
+}
+
+impl<'a, E: Transformable + 'a, I: Iterator<Item = &'a mut E>> Transformable for I {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        let mut any_change = false;
+        for item in self {
+            any_change |= item.transform(tr)?;
+        }
+        Ok(any_change)
+    }
 }
 
 pub(crate) fn check_typevar_decl(
