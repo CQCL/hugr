@@ -1,5 +1,5 @@
 use hugr_core::ops::constant::{CustomConst, Sum};
-use hugr_core::types::TypeTransformer;
+use hugr_core::types::{Transformable, TypeTransformer};
 use thiserror::Error;
 
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use hugr_core::{
         ExtensionOp, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, Output, Tag,
         TailLoop, Value, CFG, DFG,
     },
-    types::{CustomType, Type, TypeArg, TypeBound},
+    types::{CustomType, Type, TypeBound},
     Node,
 };
 
@@ -94,7 +94,7 @@ impl LowerTypes {
                 instantiation,
             }) => {
                 let change =
-                    func_sig.body_mut().transform(self)? | self.change_type_args(type_args)?;
+                    func_sig.body_mut().transform(self)? | type_args.iter_mut().transform(self)?;
                 if change {
                     let new_inst = func_sig
                         .instantiate(&type_args)
@@ -107,13 +107,7 @@ impl LowerTypes {
             | OpType::CFG(CFG { signature })
             | OpType::DFG(DFG { signature })
             | OpType::CallIndirect(CallIndirect { signature }) => signature.transform(self),
-            OpType::Tag(Tag { variants, .. }) => {
-                let mut ch = false;
-                for v in variants.iter_mut() {
-                    ch |= v.transform(self)?;
-                }
-                Ok(ch)
-            }
+            OpType::Tag(Tag { variants, .. }) => variants.iter_mut().transform(self),
             OpType::Conditional(Conditional {
                 other_inputs: row1,
                 outputs: row2,
@@ -125,13 +119,9 @@ impl LowerTypes {
                 other_outputs: row2,
                 sum_rows,
                 ..
-            }) => {
-                let mut ch = row1.transform(self)? | row2.transform(self)?;
-                for r in sum_rows.iter_mut() {
-                    ch |= r.transform(self)?;
-                }
-                Ok(ch)
-            }
+            }) => Ok(row1.transform(self)?
+                | row2.transform(self)?
+                | sum_rows.iter_mut().transform(self)?),
             OpType::TailLoop(TailLoop {
                 just_inputs,
                 just_outputs,
@@ -145,7 +135,7 @@ impl LowerTypes {
             OpType::ExtensionOp(ext_op) => {
                 let def = ext_op.def_arc();
                 let mut args = ext_op.args().to_vec();
-                if self.change_type_args(args.as_mut_slice())? {
+                if args.as_mut_slice().into_iter().transform(self)? {
                     *ext_op = ExtensionOp::new(def.clone(), args)?;
                 }
                 // let params = ext_op_params[node].to_owned();
@@ -184,13 +174,5 @@ impl LowerTypes {
 
     fn subst_custom_const(&self, _cst: &dyn CustomConst) -> Result<Option<Value>, ChangeTypeError> {
         todo!()
-    }
-
-    fn change_type_args(&self, tas: &mut [TypeArg]) -> Result<bool, ChangeTypeError> {
-        let mut ch = false;
-        for ta in tas.iter_mut() {
-            ch |= ta.transform(self)?;
-        }
-        Ok(ch)
     }
 }

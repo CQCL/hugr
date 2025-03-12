@@ -8,7 +8,7 @@ use std::{
 };
 
 use super::{
-    type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Type, TypeBase,
+    type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase,
     TypeTransformer,
 };
 use crate::{extension::SignatureError, utils::display_list};
@@ -78,17 +78,6 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
             .into()
     }
 
-    /// Applies a [TypeTransformer] to all the types in the row. (Mutates in-place.)
-    ///
-    /// Returns true if any type (may have) changed, or false if all were definitely unchanged.
-    pub fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        let mut any_ch = false;
-        for t in self.iter_mut() {
-            any_ch |= t.transform(tr)?;
-        }
-        Ok(any_ch)
-    }
-
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
@@ -107,6 +96,12 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
 
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.iter().try_for_each(|t| t.validate(var_decls))
+    }
+}
+
+impl<RV: MaybeRV> Transformable for TypeRowBase<RV> {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        self.iter_mut().transform(tr)
     }
 }
 
