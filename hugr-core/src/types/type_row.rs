@@ -101,7 +101,7 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
 
 impl<RV: MaybeRV> Transformable for TypeRowBase<RV> {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        self.iter_mut().transform(tr)
+        self.to_mut().transform(tr)
     }
 }
 

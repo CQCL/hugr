@@ -93,8 +93,7 @@ impl LowerTypes {
                 type_args,
                 instantiation,
             }) => {
-                let change =
-                    func_sig.body_mut().transform(self)? | type_args.iter_mut().transform(self)?;
+                let change = func_sig.body_mut().transform(self)? | type_args.transform(self)?;
                 if change {
                     let new_inst = func_sig
                         .instantiate(&type_args)
@@ -107,7 +106,7 @@ impl LowerTypes {
             | OpType::CFG(CFG { signature })
             | OpType::DFG(DFG { signature })
             | OpType::CallIndirect(CallIndirect { signature }) => signature.transform(self),
-            OpType::Tag(Tag { variants, .. }) => variants.iter_mut().transform(self),
+            OpType::Tag(Tag { variants, .. }) => variants.transform(self),
             OpType::Conditional(Conditional {
                 other_inputs: row1,
                 outputs: row2,
@@ -119,9 +118,7 @@ impl LowerTypes {
                 other_outputs: row2,
                 sum_rows,
                 ..
-            }) => Ok(row1.transform(self)?
-                | row2.transform(self)?
-                | sum_rows.iter_mut().transform(self)?),
+            }) => Ok(row1.transform(self)? | row2.transform(self)? | sum_rows.transform(self)?),
             OpType::TailLoop(TailLoop {
                 just_inputs,
                 just_outputs,
@@ -135,7 +132,7 @@ impl LowerTypes {
             OpType::ExtensionOp(ext_op) => {
                 let def = ext_op.def_arc();
                 let mut args = ext_op.args().to_vec();
-                if args.as_mut_slice().into_iter().transform(self)? {
+                if args.transform(self)? {
                     *ext_op = ExtensionOp::new(def.clone(), args)?;
                 }
                 // let params = ext_op_params[node].to_owned();
