@@ -273,7 +273,7 @@ impl Transformable for SumType {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
             SumType::Unit { .. } => Ok(false),
-            SumType::General { rows } => rows.iter_mut().transform(tr),
+            SumType::General { rows } => rows.transform(tr),
         }
     }
 }
@@ -548,7 +548,7 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
                     *self = nt.into_();
                     true
                 } else {
-                    let args_changed = custom_type.args_mut().into_iter().transform(tr)?;
+                    let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
                         *custom_type = custom_type
                             .get_type_def(&custom_type.get_extension()?)?
@@ -736,10 +736,10 @@ pub trait Transformable {
     fn transform<T: TypeTransformer>(&mut self, t: &T) -> Result<bool, T::Err>;
 }
 
-impl<'a, E: Transformable + 'a, I: Iterator<Item = &'a mut E>> Transformable for I {
+impl<E: Transformable> Transformable for [E] {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         let mut any_change = false;
-        for item in self {
+        for item in self.into_iter() {
             any_change |= item.transform(tr)?;
         }
         Ok(any_change)

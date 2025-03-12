@@ -376,7 +376,7 @@ impl Transformable for TypeArg {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
             TypeArg::Type { ty } => ty.transform(tr),
-            TypeArg::Sequence { elems } => elems.iter_mut().transform(tr),
+            TypeArg::Sequence { elems } => elems.transform(tr),
             TypeArg::BoundedNat { .. }
             | TypeArg::String { .. }
             | TypeArg::Extensions { .. }
