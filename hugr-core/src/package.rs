@@ -13,7 +13,6 @@ use crate::hugr::{ExtensionError, HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
 use crate::{Extension, Hugr};
 
-
 #[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Package of module HUGRs.
 pub struct Package {
@@ -180,12 +179,6 @@ impl Package {
         Err(PackageEncodingError::JsonEncoding(pkg_load_err))
     }
 
-    // pub fn from_model_reader(
-    //     reader: impl io::Read,
-    //     extension_registry: &ExtensionRegistry,
-    // ) -> Result<Self, PackageEncodingError> {
-    // }
-
     /// Read a Package from a json string.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
@@ -224,27 +217,14 @@ impl Package {
 
     /// Write the Package into a json file.
     pub fn to_json_file(&self, path: impl AsRef<Path>) -> Result<(), PackageEncodingError> {
-        let file = fs::OpenOptions::new().write(true).truncate(true).create(true).open(path)?;
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(path)?;
         let writer = io::BufWriter::new(file);
         self.to_json_writer(writer)
     }
-
-    // pub fn from_envelope_reader(reader: impl io::Read, extension_registry: &ExtensionRegistry) -> Result<Self, EnvelopeError> {
-    //     crate::envelope::read_envelope(reader, extension_registry)
-    // }
-
-    // pub fn from_envelope_file(path: impl AsRef<Path>, extension_registry: &ExtensionRegistry) -> Result<Self, EnvelopeError> {
-    //     crate::envelope::read_envelope(io::BufReader::new(fs::File::open(path)?), extension_registry)
-    // }
-
-    // pub fn to_envelope_writer(&self, writer: impl io::Write, encoding: Option<PayloadDescriptor>) -> Result<(), EnvelopeError> {
-    //     crate::envelope::write_envelope(self, writer, encoding)
-    // }
-
-    // pub fn to_envelope_file(&self, path: impl AsRef<Path>, encoding: Option<PayloadDescriptor>) -> Result<(), EnvelopeError> {
-    //     let file = fs::OpenOptions::new().write(true).truncate(true).create(true).open(path)?;
-    //     crate::envelope::write_envelope(self, io::BufWriter::new(file), encoding)
-    // }
 }
 
 impl AsRef<[Hugr]> for Package {

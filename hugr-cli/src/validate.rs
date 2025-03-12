@@ -4,7 +4,8 @@ use clap::Parser;
 use clap_verbosity_flag::log::Level;
 use hugr::{extension::ExtensionRegistry, package::Package, Extension, Hugr};
 
-use crate::{CliError, HugrArgs, HugrOutputArgs};
+use crate::hugr_io::HugrInputArgs;
+use crate::{CliError, HugrArgs, HugrOutputArgs, OtherArgs};
 
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
@@ -13,12 +14,16 @@ use crate::{CliError, HugrArgs, HugrOutputArgs};
 #[group(id = "hugr")]
 #[non_exhaustive]
 pub struct ValArgs {
+    /// Hugr input.
     #[command(flatten)]
-    /// common arguments
-    pub hugr_args: HugrArgs,
+    pub input_args: HugrInputArgs,
 
     #[command(flatten)]
     pub output_args: HugrOutputArgs,
+
+    /// Additional arguments
+    #[command(flatten)]
+    pub other_args: OtherArgs,
 }
 
 /// String to print when validation is successful.
@@ -42,7 +47,7 @@ impl ValArgs {
 
     /// Test whether a `level` message should be output.
     pub fn verbosity(&self, level: Level) -> bool {
-        self.hugr_args.verbosity(level)
+        self.other_args.verbosity(level)
     }
 }
 
