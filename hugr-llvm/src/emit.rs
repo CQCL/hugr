@@ -333,15 +333,11 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         }
         let func = self.module_context.get_func_defn(node)?;
         let mut func_ctx = EmitFuncContext::new(self.module_context, func)?;
+        let params_rmb = func_ctx.new_row_mail_box(node.signature.body().input.iter(), "params")?;
+        params_rmb.write(func_ctx.builder(), func.get_params())?;
         let ret_rmb = func_ctx.new_row_mail_box(node.signature.body().output.iter(), "ret")?;
-        ops::emit_dataflow_parent(
-            &mut func_ctx,
-            EmitOpArgs {
-                node,
-                inputs: func.get_params(),
-                outputs: ret_rmb.promise(),
-            },
-        )?;
+        let args = EmitOpArgs::try_new(func_ctx.builder(), node, params_rmb, ret_rmb.promise())?;
+        self::ops::emit_dataflow_parent(&mut func_ctx, args)?;
         let builder = func_ctx.builder();
         match &ret_rmb.read::<Vec<_>>(builder, [])?[..] {
             [] => builder.build_return(None)?,

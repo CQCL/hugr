@@ -8,19 +8,23 @@ source_filename = "test_context"
 define {} @_hl.main.1({} %0) {
 alloca_block:
   %"0" = alloca {}, align 8
+  %"01" = alloca {}, align 8
   %"2_0" = alloca {}, align 8
   %"4_0" = alloca {}, align 8
   %"5_0" = alloca {}, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store {} %0, {}* %"2_0", align 1
-  %"2_01" = load {}, {}* %"2_0", align 1
-  store {} %"2_01", {}* %"5_0", align 1
-  %"5_02" = load {}, {}* %"5_0", align 1
-  store {} %"5_02", {}* %"4_0", align 1
-  %"4_03" = load {}, {}* %"4_0", align 1
-  store {} %"4_03", {}* %"0", align 1
-  %"04" = load {}, {}* %"0", align 1
-  ret {} %"04"
+  store {} %0, {}* %"0", align 1
+  %"02" = load {}, {}* %"0", align 1
+  store {} %"02", {}* %"2_0", align 1
+  %"2_03" = load {}, {}* %"2_0", align 1
+  %"2_04" = load {}, {}* %"2_0", align 1
+  store {} %"2_04", {}* %"5_0", align 1
+  %"5_05" = load {}, {}* %"5_0", align 1
+  store {} %"5_05", {}* %"4_0", align 1
+  %"4_06" = load {}, {}* %"4_0", align 1
+  store {} %"4_06", {}* %"01", align 1
+  %"07" = load {}, {}* %"01", align 1
+  ret {} %"07"
 }

@@ -104,6 +104,9 @@ impl<'c> LLVMSumType<'c> {
             /// The LLVM types representing the fields in the `tag` variant of the represented [HugrSumType].
             /// Panics if `tag` is out of bounds.
             pub fn fields_for_variant(&self, tag: usize) -> &[BasicTypeEnum<'c>];
+
+            /// TODO docs
+            pub fn gep_indices(&self, index_ty: IntType<'c>, tag: usize, field: usize) -> Result<(BasicTypeEnum<'c>, Vec<IntValue<'c>>)>;
         }
     }
 
@@ -402,6 +405,21 @@ impl<'c> LLVMSumTypeEnum<'c> {
         Ok(value)
     }
 
+    pub fn gep_indices(&self, index_ty: IntType<'c>, tag: usize, field: usize) -> Result<(BasicTypeEnum<'c>, Vec<IntValue<'c>>)> {
+        ensure!(tag < self.num_variants());
+        ensure!(field == self.num_fields_for_variant(tag));
+        if let Self::SingleVariantSingleField { field_types, field_index, .. } = self {
+            // This is a valid question to ask, but the representation is not a
+            // struct, so no indices.
+            return Ok((field_types[*field_index], vec![]))
+        }
+        let Some(field_index) = self.field_index(tag, field) else {
+            bail!("Bad field index {field} in {tag} of {self}")
+        };
+        let field_type = self.value_type().into_struct_type().get_field_type_at_index(field_index as u32).unwrap();
+        Ok((field_type, vec![index_ty.const_int(field_index as u64, false)]))
+    }
+
     /// Get the type of the value that would be returned by `build_get_tag`.
     pub fn tag_type(&self) -> IntType<'c> {
         match self {
@@ -464,6 +482,17 @@ impl<'c> LLVMSumTypeEnum<'c> {
             Self::MultiVariant { variant_types, .. } | Self::NoFields { variant_types, .. } => {
                 &variant_types[tag]
             }
+        }
+    }
+
+    fn field_index(&self, tag: usize, field: usize) -> Option<usize> {
+        assert!(tag < self.num_variants());
+        assert!(field < self.num_fields_for_variant(tag));
+        match self {
+            Self::Void { .. } | Self::Unit { .. } | LLVMSumTypeEnum::NoFields {..} => unreachable!("Variant has no fields"),
+            LLVMSumTypeEnum::SingleVariantSingleField { .. } => None, // not a struct so no field
+            LLVMSumTypeEnum::SingleVariantMultiField { field_indices, .. } => field_indices[field],
+            LLVMSumTypeEnum::MultiVariant { field_indices, ..} => field_indices[tag][field],
         }
     }
 }
