@@ -66,8 +66,17 @@ impl IdentList {
     /// validate names themselves. In tests, instead the [crate::const_extension_ids]
     /// macro is strongly encouraged as this ensures the name validity check
     /// is done properly.
+    ///
+    /// Panics if the string is longer than 23 characters.
     pub const fn new_unchecked(n: &str) -> Self {
         IdentList(SmolStr::new_inline(n))
+    }
+
+    /// Create a new [IdentList] *without* doing the well-formedness check.
+    /// The same caveats apply as for [Self::new_unchecked], except that strings
+    /// are not constrained in length.
+    pub const fn new_static_unchecked(n: &'static str) -> Self {
+        IdentList(SmolStr::new_static(n))
     }
 }
 
