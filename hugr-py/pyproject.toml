@@ -46,4 +46,5 @@ build-backend = "maturin"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+python-source = "src/"
 module-name = "hugr._hugr"
