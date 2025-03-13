@@ -223,7 +223,7 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
         ConvertOpDef::bytecast_float_int => {
             emit_custom_unary_op(context, args, |ctx, arg, outs| {
                 let [out] = outs.try_into()?;
-                Ok(vec![ctx .builder().build_bit_cast(arg, out, "")?])
+                Ok(vec![ctx.builder().build_bit_cast(arg, out, "")?])
             })
         }
         _ => Err(anyhow!(
@@ -662,7 +662,6 @@ mod test {
         let hugr_f = exec_ctx.exec_hugr_f64(hugr, "main");
         assert!((f.is_nan() && hugr_f.is_nan()) || f == hugr_f);
     }
-
 
     #[rstest]
     #[case(42.0)]
