@@ -8,6 +8,76 @@
   "types": {},
   "values": {},
   "operations": {
+    "bytecast_float64_to_int64": {
+      "extension": "arithmetic.conversions",
+      "name": "bytecast_float64_to_int64",
+      "description": "reinterpret an float64 as an int based on its bytes, with the same endianness",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "bytecast_int64_to_float64": {
+      "extension": "arithmetic.conversions",
+      "name": "bytecast_int64_to_float64",
+      "description": "reinterpret an int64 as a float64 based on its bytes, with the same endianness",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
+    },
     "convert_s": {
       "extension": "arithmetic.conversions",
       "name": "convert_s",
