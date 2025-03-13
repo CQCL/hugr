@@ -21,6 +21,7 @@ from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
 from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
 from hugr.val import Value
+import hugr.model as model
 
 from .node_port import (
     Direction,
@@ -725,6 +726,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def to_json(self) -> str:
         """Serialize the HUGR to a JSON string."""
         return self._to_serial().to_json()
+
+    def to_model(self) -> model.Module:
+        ...
 
     @classmethod
     def load_json(cls, json_str: str) -> Hugr:

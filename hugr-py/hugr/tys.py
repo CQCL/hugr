@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import hugr._serialization.tys as stys
 from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
+import hugr.model as model
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -46,6 +47,10 @@ class TypeArg(Protocol):
         """Resolve types in the argument using the given registry."""
         return self
 
+    def to_model(self) -> model.Term:
+        """Convert the type argument to a model Term."""
+        ...
+
 
 @runtime_checkable
 class Type(Protocol):
@@ -81,6 +86,10 @@ class Type(Protocol):
     def resolve(self, registry: ext.ExtensionRegistry) -> Type:
         """Resolve types in the type using the given registry."""
         return self
+
+    def to_model(self) -> model.Term:
+        """Convert the type to a model Term."""
+        ...
 
 
 #: Row of types.
@@ -187,6 +196,9 @@ class TypeTypeArg(TypeArg):
     def __str__(self) -> str:
         return f"Type({self.ty!s})"
 
+    def to_model(self) -> model.Term:
+        return self.ty.to_model()
+
 
 @dataclass(frozen=True)
 class BoundedNatArg(TypeArg):
@@ -200,6 +212,9 @@ class BoundedNatArg(TypeArg):
     def __str__(self) -> str:
         return str(self.n)
 
+    def to_model(self) -> model.Term:
+        return model.Literal(self.n)
+
 
 @dataclass(frozen=True)
 class StringArg(TypeArg):
@@ -212,6 +227,9 @@ class StringArg(TypeArg):
 
     def __str__(self) -> str:
         return f'"{self.value}"'
+
+    def to_model(self) -> model.Term:
+        return model.Literal(self.value)
 
 
 @dataclass(frozen=True)
@@ -228,6 +246,10 @@ class SequenceArg(TypeArg):
 
     def __str__(self) -> str:
         return f"({comma_sep_str(self.elems)})"
+
+    def to_model(self) -> model.Term:
+        # TODO: Should this be a tuple or a list?
+        ...
 
 
 @dataclass(frozen=True)
@@ -293,6 +315,12 @@ class Sum(Type):
         """Resolve types in the sum type using the given registry."""
         return Sum([[ty.resolve(registry) for ty in row] for row in self.variant_rows])
 
+    def to_model(self) -> model.Term:
+        variants = model.List([
+            model.List([typ.to_model() for typ in row])
+            for row in self.variant_rows]
+        )
+        return model.Apply("core.adt", [variants])
 
 @dataclass(eq=False)
 class UnitSum(Sum):
@@ -508,6 +536,12 @@ class FunctionType(Type):
     def __str__(self) -> str:
         return f"{comma_sep_str(self.input)} -> {comma_sep_str(self.output)}"
 
+    def to_model(self) -> model.Term:
+        inputs = model.List([input.to_model() for input in self.input])
+        outputs = model.List([output.to_model() for output in self.output])
+        exts = model.ExtSet()
+        return model.Apply("core.fn", [inputs, outputs, exts])
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -556,6 +590,9 @@ class PolyFuncType(Type):
         """
         return PolyFuncType(params=[], body=FunctionType.empty())
 
+    def to_model(self) -> model.Term:
+        # TODO: a `PolyFuncType` should not be a `Type`!
+        ...
 
 @dataclass
 class ExtType(Type):
@@ -599,6 +636,10 @@ class ExtType(Type):
         if isinstance(value, ExtType):
             return self.type_def == value.type_def and self.args == value.args
         return super().__eq__(value)
+
+    def to_model(self) -> model.Term:
+        args = [arg.to_model() for arg in self.args]
+        return model.Apply(self.type_def.name, args)
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
@@ -644,6 +685,10 @@ class Opaque(Type):
     def __str__(self) -> str:
         return _type_str(self.id, self.args)
 
+    def to_model(self) -> model.Term:
+        args = [arg.to_model() for arg in self.args]
+        return model.Apply(self.id, args)
+
 
 @dataclass
 class _QubitDef(Type):
@@ -655,6 +700,10 @@ class _QubitDef(Type):
 
     def __repr__(self) -> str:
         return "Qubit"
+
+    def to_model(self) -> model.Term:
+        # TODO: Is this the correct name?
+        return model.Apply("prelude.Qubit", [])
 
 
 #: Qubit type.
