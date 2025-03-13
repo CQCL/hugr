@@ -34,7 +34,7 @@ debug_assert_with_mut_call = "warn"
 portgraph = { version = "0.13.3" }
 insta = { version = "1.42.2" }
 bitvec = "1.0.1"
-capnp = "0.20.4"
+capnp = "0.20.6"
 cgmath = "0.18.0"
 cool_asserts = "2.0.3"
 delegate = "0.13.0"
@@ -60,7 +60,7 @@ smol_str = "0.3.1"
 strum = "0.27.0"
 thiserror = "2.0.12"
 typetag = "0.2.20"
-clap = { version = "4.5.4" }
+clap = { version = "4.5.32" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.1"
 assert_cmd = "2.0.14"
