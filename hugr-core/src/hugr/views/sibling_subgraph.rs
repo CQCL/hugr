@@ -831,6 +831,7 @@ mod tests {
     use cool_asserts::assert_matches;
 
     use crate::builder::inout_sig;
+    use crate::extension::prelude::Noop;
     use crate::hugr::Rewrite;
     use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
@@ -1238,5 +1239,24 @@ mod tests {
         };
         let rep = subg.create_simple_replacement(&h, replacement).unwrap();
         rep.apply(&mut h).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn order_edge() {
+        let (hugr, nop) = {
+            let mut b = DFGBuilder::new(
+                Signature::new_endo(Type::UNIT).with_prelude()
+            ).unwrap();
+            let input = b.input();
+            let nop = b.add_dataflow_op(Noop(Type::UNIT), [input.out_wire(0)]).unwrap();
+            let output = b.output();
+            b.add_other_wire(input.node(), nop.node());
+            b.add_other_wire(nop.node(), output.node());
+            (b.finish_hugr_with_outputs([nop.out_wire(0)]).unwrap(), nop.node())
+        };
+
+        let view = SiblingSubgraph::from_node(nop, &hugr);
+        assert_eq!(view.signature(&hugr), Signature::new_endo(Type::UNIT).with_prelude());
     }
 }
