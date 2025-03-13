@@ -4,13 +4,25 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 ---
 (hugr 0)
 
-(declare-func array.replicate
+(import collections.array.array)
+
+(import core.nat)
+
+(import core.type)
+
+(import core.nonlinear)
+
+(import core.fn)
+
+(declare-func
+  array.replicate
   (param ?0 core.nat)
   (param ?1 core.type)
   (where (core.nonlinear ?1))
   (core.fn [?1] [(collections.array.array ?0 ?1)] (ext)))
 
-(declare-func array.copy
+(declare-func
+  array.copy
   (param ?0 core.nat)
   (param ?1 core.type)
   (where (core.nonlinear ?1))
@@ -19,7 +31,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
     [(collections.array.array ?0 ?1) (collections.array.array ?0 ?1)]
     (ext)))
 
-(define-func util.copy
+(define-func
+  util.copy
   (param ?0 core.type)
   (where (core.nonlinear ?0))
   (core.fn [?0] [?0 ?0] (ext))

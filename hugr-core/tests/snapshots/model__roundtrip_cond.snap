@@ -4,34 +4,39 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cond
 ---
 (hugr 0)
 
-(define-func example.cond
+(import core.fn)
+
+(import core.adt)
+
+(import arithmetic.int.types.int)
+
+(import arithmetic.int.ineg)
+
+(define-func
+  example.cond
   (core.fn
     [(core.adt [[] []]) arithmetic.int.types.int]
     [arithmetic.int.types.int]
     (ext))
-  (dfg
-    [%0 %1] [%2]
+  (dfg [%0 %1] [%2]
     (signature
       (core.fn
         [(core.adt [[] []]) arithmetic.int.types.int]
         [arithmetic.int.types.int]
         (ext)))
-    (cond
-      [%0 %1] [%2]
+    (cond [%0 %1] [%2]
       (signature
         (core.fn
           [(core.adt [[] []]) arithmetic.int.types.int]
           [arithmetic.int.types.int]
           (ext)))
-      (dfg
-        [%3] [%3]
+      (dfg [%3] [%3]
         (signature
           (core.fn
             [arithmetic.int.types.int]
             [arithmetic.int.types.int]
             (ext))))
-      (dfg
-        [%4] [%5]
+      (dfg [%4] [%5]
         (signature
           (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
         (arithmetic.int.ineg [%4] [%5]
@@ -39,4 +44,4 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cond
             (core.fn
               [arithmetic.int.types.int]
               [arithmetic.int.types.int]
-              (ext arithmetic.int))))))))
+              (ext))))))))
