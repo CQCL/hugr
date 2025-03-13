@@ -500,11 +500,16 @@ fn test_module() {
     let [inp] = main.input_wires_arr();
     let cst_false = main.add_load_value(Value::false_val());
     let main_call = main.call(leaf_fn.handle(), &[], [inp, cst_false]).unwrap();
-    main.finish_with_outputs(main_call.outputs()).unwrap();
+    let main = main.finish_with_outputs(main_call.outputs()).unwrap();
     let hugr = modb.finish_hugr().unwrap();
     let [f2_inp, _] = hugr.get_io(f2.node()).unwrap();
 
-    let results_just_main = Machine::new(&hugr).run(TestContext, [(0.into(), pv_true())]);
+    let results_just_main = {
+        let mut mach = Machine::new(&hugr);
+        mach.prepopulate_inputs(main.node(), [(0.into(), pv_true())])
+            .unwrap();
+        mach.run(TestContext, [])
+    };
     assert_eq!(
         results_just_main.read_out_wire(Wire::new(f2_inp, 0)),
         Some(PartialValue::Bottom)
@@ -524,8 +529,11 @@ fn test_module() {
 
     let results_two_calls = {
         let mut m = Machine::new(&hugr);
-        m.prepopulate_df_inputs(f2.node(), [(0.into(), pv_true())]);
-        m.run(TestContext, [(0.into(), pv_false())])
+        m.prepopulate_inputs(f2.node(), [(0.into(), pv_true())])
+            .unwrap();
+        m.prepopulate_inputs(main.node(), [(0.into(), pv_false())])
+            .unwrap();
+        m.run(TestContext, [])
     };
 
     for call in [f2_call, main_call] {

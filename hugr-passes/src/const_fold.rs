@@ -13,7 +13,7 @@ use hugr_core::{
     },
     ops::{
         constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-        Value,
+        OpType, Value,
     },
     types::{EdgeKind, TypeArg},
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
@@ -24,16 +24,18 @@ use crate::dataflow::{
     partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
     TailLoopTermination,
 };
-use crate::dead_code::PreserveNode;
+use crate::dead_code::{DeadCodeElimPass, PreserveNode};
 use crate::validation::{ValidatePassError, ValidationLevel};
-use crate::{find_main, DeadCodeElimPass};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
     validation: ValidationLevel,
     allow_increase_termination: bool,
-    inputs: HashMap<IncomingPort, Value>,
+    /// Each outer key Node must be either:
+    ///   - a FuncDefn child of the root, if the root is a module; or
+    ///   - the root, if the root is not a Module
+    inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
 #[derive(Debug, Error)]
@@ -43,6 +45,11 @@ pub enum ConstFoldError {
     #[error(transparent)]
     #[allow(missing_docs)]
     ValidationError(#[from] ValidatePassError),
+    /// Error raised when a Node is specified as an entry-point but
+    /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
+    /// a [Conditional](OpType::Conditional).
+    #[error("Node {_0} has OpType {_1} which cannot be an entry-point")]
+    InvalidEntryPoint(Node, OpType),
 }
 
 impl ConstantFoldPass {
@@ -62,13 +69,24 @@ impl ConstantFoldPass {
         self
     }
 
-    /// Specifies any number of external inputs to provide to the Hugr (on root-node
-    /// in-ports). Each supersedes any previous value on the same in-port.
+    /// Specifies a number of external inputs to an entry point of the Hugr.
+    /// In normal use, for Module-rooted Hugrs, `node` is a FuncDefn child of the root;
+    /// or for non-Module-rooted Hugrs, `node` is the root of the Hugr. (This is not
+    /// enforced, but it must be a container and not a module itself.)
+    ///
+    /// Multiple calls for the same entry-point combine their values, with later
+    /// values on the same in-port replacing earlier ones.
+    ///
+    /// Note that if `inputs` is empty, this still marks the node as an entry-point, i.e.
+    /// we must preserve nodes required to compute its result.
     pub fn with_inputs(
         mut self,
+        node: Node,
         inputs: impl IntoIterator<Item = (impl Into<IncomingPort>, Value)>,
     ) -> Self {
         self.inputs
+            .entry(node)
+            .or_default()
             .extend(inputs.into_iter().map(|(p, v)| (p.into(), v)));
         self
     }
@@ -78,18 +96,23 @@ impl ConstantFoldPass {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
-        let inputs = self.inputs.iter().map(|(p, v)| {
-            (
-                *p,
-                partial_from_const(
-                    &ConstFoldContext(hugr),
-                    ConstLocation::Field(p.index(), &fresh_node.into()),
-                    v,
-                ),
+        let mut m = Machine::new(&hugr);
+        for (&n, in_vals) in self.inputs.iter() {
+            m.prepopulate_inputs(
+                n,
+                in_vals.iter().map(|(p, v)| {
+                    let const_with_dummy_loc = partial_from_const(
+                        &ConstFoldContext(hugr),
+                        ConstLocation::Field(p.index(), &fresh_node.into()),
+                        v,
+                    );
+                    (*p, const_with_dummy_loc)
+                }),
             )
-        });
+            .map_err(|opty| ConstFoldError::InvalidEntryPoint(n, opty))?;
+        }
 
-        let results = Machine::new(&hugr).run(ConstFoldContext(hugr), inputs);
+        let results = m.run(ConstFoldContext(hugr), []);
         let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
         let wires_to_break = hugr
@@ -131,12 +154,9 @@ impl ConstantFoldPass {
             hugr.disconnect(n, inport);
             hugr.connect(lcst, OutgoingPort::from(0), n, inport);
         }
-        // Dataflow analysis applies our inputs to the 'main' function if this is a Module, so do the same here
+        // Eliminate dead code not required for the same entry points.
         DeadCodeElimPass::default()
-            .with_entry_points(hugr.get_optype(hugr.root()).is_module().then(
-                // No main => remove everything, so not much use
-                || find_main(hugr).unwrap(),
-            ))
+            .with_entry_points(self.inputs.keys().cloned())
             .set_preserve_callback(if self.allow_increase_termination {
                 Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
             } else {
@@ -152,7 +172,15 @@ impl ConstantFoldPass {
         Ok(())
     }
 
-    /// Run the pass using this configuration
+    /// Run the pass using this configuration.
+    ///
+    /// # Errors
+    ///
+    /// [ConstFoldError::ValidationError] if the Hugr does not validate before/afnerwards
+    /// (if [Self::validation_level] is set, or in tests)
+    ///
+    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
+    /// was of an invalid OpType
     pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
         self.validation
             .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
@@ -160,8 +188,21 @@ impl ConstantFoldPass {
 }
 
 /// Exhaustively apply constant folding to a HUGR.
+/// If the Hugr is [Module]-rooted, assumes all [FuncDefn] children are reachable.
+///
+/// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
+/// [Module]: hugr_core::ops::OpType::Module
 pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
-    ConstantFoldPass::default().run(h).unwrap()
+    let c = ConstantFoldPass::default();
+    let c = if h.get_optype(h.root()).is_module() {
+        let no_inputs: [(IncomingPort, _); 0] = [];
+        h.children(h.root())
+            .filter(|n| h.get_optype(*n).is_func_defn())
+            .fold(c, |c, n| c.with_inputs(n, no_inputs.iter().cloned()))
+    } else {
+        c
+    };
+    c.run(h).unwrap()
 }
 
 struct ConstFoldContext<'a, H>(&'a H);
