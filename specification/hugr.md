@@ -1842,6 +1842,8 @@ Conversions between integers and floats:
 | `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to signed int, rounding towards zero. Returns an error when the float is non-finite. |
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
+| `bytecast_int64_to_float64` | `int<6>`  | `float64`   | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
+| `bytecast_float64_to_int64` | `float64` | `int64`     | reinterpret an float64 as an int based on its bytes, with the same endianness. |
 
 ## Glossary
 

@@ -225,13 +225,13 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
                 Ok(vec![res])
             })
         }
-        ConvertOpDef::bytecast_int_float => {
+        ConvertOpDef::bytecast_int64_to_float64 => {
             emit_custom_unary_op(context, args, |ctx, arg, outs| {
                 let [out] = outs.try_into()?;
                 Ok(vec![ctx.builder().build_bit_cast(arg, out, "")?])
             })
         }
-        ConvertOpDef::bytecast_float_int => {
+        ConvertOpDef::bytecast_float64_to_int64 => {
             emit_custom_unary_op(context, args, |ctx, arg, outs| {
                 let [out] = outs.try_into()?;
                 Ok(vec![ctx.builder().build_bit_cast(arg, out, "")?])
@@ -651,14 +651,14 @@ mod test {
     #[case(f64::NAN)]
     #[case(-0.0f64)]
     #[case(0.0f64)]
-    fn bytecast_int_to_float(mut exec_ctx: TestContext, #[case] f: f64) {
+    fn bytecast_int64_to_float64(mut exec_ctx: TestContext, #[case] f: f64) {
         let hugr = SimpleHugrConfig::new()
             .with_outs(float64_type())
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(6, f.to_bits()).unwrap());
                 let i2f = EXTENSION
-                    .instantiate_extension_op("bytecast_int_float", [])
+                    .instantiate_extension_op("bytecast_int64_to_float64", [])
                     .unwrap();
                 let [f] = builder.add_dataflow_op(i2f, [i]).unwrap().outputs_arr();
                 builder.finish_with_outputs([f]).unwrap()
@@ -678,14 +678,14 @@ mod test {
     #[case(42.0)]
     #[case(-0.0f64)]
     #[case(0.0f64)]
-    fn bytecast_float_to_int(mut exec_ctx: TestContext, #[case] f: f64) {
+    fn bytecast_float64_to_int64(mut exec_ctx: TestContext, #[case] f: f64) {
         let hugr = SimpleHugrConfig::new()
             .with_outs(INT_TYPES[6].clone())
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let f = builder.add_load_value(ConstF64::new(f));
                 let f2i = EXTENSION
-                    .instantiate_extension_op("bytecast_float_int", [])
+                    .instantiate_extension_op("bytecast_float64_to_int64", [])
                     .unwrap();
                 let [i] = builder.add_dataflow_op(f2i, [f]).unwrap().outputs_arr();
                 builder.finish_with_outputs([i]).unwrap()

@@ -8,10 +8,10 @@
   "types": {},
   "values": {},
   "operations": {
-    "bytecast_float_int": {
+    "bytecast_float64_to_int64": {
       "extension": "arithmetic.conversions",
-      "name": "bytecast_float_int",
-      "description": "reinterpret an float as an int based on its bytes",
+      "name": "bytecast_float64_to_int64",
+      "description": "reinterpret an float64 as an int based on its bytes, with the same endianness",
       "signature": {
         "params": [],
         "body": {
@@ -43,10 +43,10 @@
       },
       "binary": false
     },
-    "bytecast_int_float": {
+    "bytecast_int64_to_float64": {
       "extension": "arithmetic.conversions",
-      "name": "bytecast_int_float",
-      "description": "reinterpret an int as a float based on its bytes",
+      "name": "bytecast_int64_to_float64",
+      "description": "reinterpret an int64 as a float64 based on its bytes, with the same endianness",
       "signature": {
         "params": [],
         "body": {
