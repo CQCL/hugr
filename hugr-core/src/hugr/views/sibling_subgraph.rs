@@ -276,25 +276,24 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ///
     /// The subgraph signature will be given by signature of the node.
     pub fn from_node(node: N, hugr: &impl HugrView<Node = N>) -> Self {
+        let is_value_port = |p: Port| -> bool {
+            hugr.get_optype(node)
+                .port_kind(p)
+                .is_some_and(|k| k.is_value())
+        };
+
         let nodes = vec![node];
         let inputs = hugr
             .node_inputs(node)
-            .filter(|&p| hugr.is_linked(node, p))
-            .map(|p| vec![(node, p)])
+            // accept linked value inputs
+            .filter_map(|p| {
+                (hugr.is_linked(node, p) && is_value_port(p.into())).then_some(vec![(node, p)])
+            })
             .collect_vec();
         let outputs = hugr
             .node_outputs(node)
-            .filter_map(|p| {
-                // accept linked outputs or unlinked value outputs
-                {
-                    hugr.is_linked(node, p)
-                        || hugr
-                            .get_optype(node)
-                            .port_kind(p)
-                            .is_some_and(|k| k.is_value())
-                }
-                .then_some((node, p))
-            })
+            // accept linked or unlinked value outputs
+            .filter_map(|p| is_value_port(p.into()).then_some((node, p)))
             .collect_vec();
 
         Self {
@@ -1242,21 +1241,27 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    // #[should_panic]
     fn order_edge() {
         let (hugr, nop) = {
-            let mut b = DFGBuilder::new(
-                Signature::new_endo(Type::UNIT).with_prelude()
-            ).unwrap();
+            let mut b = DFGBuilder::new(Signature::new_endo(Type::UNIT).with_prelude()).unwrap();
             let input = b.input();
-            let nop = b.add_dataflow_op(Noop(Type::UNIT), [input.out_wire(0)]).unwrap();
+            let nop = b
+                .add_dataflow_op(Noop(Type::UNIT), [input.out_wire(0)])
+                .unwrap();
             let output = b.output();
             b.add_other_wire(input.node(), nop.node());
             b.add_other_wire(nop.node(), output.node());
-            (b.finish_hugr_with_outputs([nop.out_wire(0)]).unwrap(), nop.node())
+            (
+                b.finish_hugr_with_outputs([nop.out_wire(0)]).unwrap(),
+                nop.node(),
+            )
         };
-
+        println!("{}", hugr.mermaid_string());
         let view = SiblingSubgraph::from_node(nop, &hugr);
-        assert_eq!(view.signature(&hugr), Signature::new_endo(Type::UNIT).with_prelude());
+        assert_eq!(
+            view.signature(&hugr),
+            Signature::new_endo(Type::UNIT).with_prelude()
+        );
     }
 }
