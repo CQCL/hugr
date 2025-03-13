@@ -3,7 +3,7 @@ use indexmap::IndexSet;
 use std::hash::BuildHasherDefault;
 use thiserror::Error;
 
-use crate::v0::{NodeId, VarId};
+use crate::v0::table::{NodeId, VarId};
 
 type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 
@@ -19,7 +19,7 @@ type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 /// # Examples
 ///
 /// ```
-/// # pub use hugr_model::v0::{NodeId, VarId};
+/// # pub use hugr_model::v0::table::{NodeId, VarId};
 /// # pub use hugr_model::v0::scope::VarTable;
 /// let mut vars = VarTable::new();
 /// vars.enter(NodeId(0));

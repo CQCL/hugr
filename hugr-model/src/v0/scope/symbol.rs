@@ -4,7 +4,7 @@ use fxhash::FxHasher;
 use indexmap::IndexMap;
 use thiserror::Error;
 
-use crate::v0::{NodeId, RegionId};
+use crate::v0::table::{NodeId, RegionId};
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -23,7 +23,7 @@ type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 /// # Examples
 ///
 /// ```
-/// # pub use hugr_model::v0::{NodeId, RegionId};
+/// # pub use hugr_model::v0::table::{NodeId, RegionId};
 /// # pub use hugr_model::v0::scope::SymbolTable;
 /// let mut symbols = SymbolTable::new();
 /// symbols.enter(RegionId(0));
