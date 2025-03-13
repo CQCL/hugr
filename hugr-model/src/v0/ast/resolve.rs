@@ -337,9 +337,7 @@ impl<'a> Context<'a> {
     /// imported. At the end of the building process, these import nodes are
     /// inserted into the module's scope.
     fn resolve_symbol_name(&mut self, symbol_name: &'a SymbolName) -> NodeId {
-        let resolved = self.symbols.resolve(symbol_name.as_ref());
-
-        if let Ok(node) = resolved {
+        if let Ok(node) = self.symbols.resolve(symbol_name.as_ref()) {
             return node;
         }
 
