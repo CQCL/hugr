@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 
-use hugr_model::v0::syntax;
+use hugr_model::v0::ast;
 use std::str::FromStr as _;
 
 fn roundtrip(source: &str) -> String {
-    let module = syntax::Module::from_str(source).unwrap();
+    let module = ast::Module::from_str(source).unwrap();
     module.to_string()
 }
 

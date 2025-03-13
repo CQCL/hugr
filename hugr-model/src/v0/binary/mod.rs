@@ -6,7 +6,7 @@
 //! written or read by humans, the [text] format can be used instead.
 //!
 //! [table]: crate::v0::table
-//! [text]: crate::v0::syntax
+//! [text]: crate::v0::ast
 mod read;
 mod write;
 

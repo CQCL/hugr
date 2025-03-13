@@ -8,7 +8,7 @@ use hugr_model::v0 as model;
 
 fn roundtrip(source: &str) -> String {
     let bump = model::bumpalo::Bump::new();
-    let module_ast = model::syntax::Module::from_str(source).unwrap();
+    let module_ast = model::ast::Module::from_str(source).unwrap();
     let module_table = module_ast.resolve(&bump).unwrap();
     let hugr = import_hugr(&module_table, &std_reg()).unwrap();
     let exported_table = export_hugr(&hugr, &bump);

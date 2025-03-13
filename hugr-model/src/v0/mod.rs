@@ -78,10 +78,10 @@
 //! [#1556]: https://github.com/CQCL/hugr/discussions/1556
 //! [#1553]: https://github.com/CQCL/hugr/issues/1553
 //! [#1554]: https://github.com/CQCL/hugr/issues/1554
-//! [Text]: crate::v0::syntax
+//! [Text]: crate::v0::ast
 //! [Binary]: crate::v0::binary
 //! [Table]: crate::v0::table
-//! [AST]: crate::v0::syntax
+//! [AST]: crate::v0::ast
 use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 use std::sync::Arc;
@@ -273,9 +273,9 @@ pub const COMPAT_META_JSON: &str = "compat.meta_json";
 /// - **Result:** `(core.const ?type ?ext)`
 pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 
+pub mod ast;
 pub mod binary;
 pub mod scope;
-pub mod syntax;
 pub mod table;
 
 pub use bumpalo;

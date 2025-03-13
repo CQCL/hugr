@@ -23,20 +23,20 @@
 //! a lifetime parameter that indicates the lifetime of the arena.
 //!
 //! [binary format]: crate::v0::binary
-//! [text format]: crate::v0::syntax
+//! [text format]: crate::v0::ast
 
 use smol_str::SmolStr;
 use thiserror::Error;
 
 mod view;
-use super::{syntax, Literal, RegionKind};
+use super::{ast, Literal, RegionKind};
 pub use view::View;
 
 /// A module consisting of a hugr graph together with terms.
 ///
-/// See [`syntax::Module`] for the AST representation.
+/// See [`ast::Module`] for the AST representation.
 ///
-/// [`syntax::Module`]: crate::v0::syntax::Module
+/// [`ast::Module`]: crate::v0::ast::Module
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Module<'a> {
     /// The id of the root region.
@@ -114,18 +114,18 @@ impl<'a> Module<'a> {
 
     /// Convert the module to the [ast] representation.
     ///
-    /// [ast]: crate::v0::syntax
-    pub fn as_ast(&self) -> Option<syntax::Module> {
+    /// [ast]: crate::v0::ast
+    pub fn as_ast(&self) -> Option<ast::Module> {
         let root = self.view(self.root)?;
-        Some(syntax::Module { root })
+        Some(ast::Module { root })
     }
 }
 
 /// Nodes in the hugr graph.
 ///
-/// See [`syntax::Node`] for the AST representation.
+/// See [`ast::Node`] for the AST representation.
 ///
-/// [`syntax::Node`]: crate::v0::syntax::Node
+/// [`ast::Node`]: crate::v0::ast::Node
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Node<'a> {
     /// The operation that the node performs.
@@ -147,9 +147,9 @@ pub struct Node<'a> {
 
 /// Operations that nodes can perform.
 ///
-/// See [`syntax::Operation`] for the AST representation.
+/// See [`ast::Operation`] for the AST representation.
 ///
-/// [`syntax::Operation`]: crate::v0::syntax::Operation
+/// [`ast::Operation`]: crate::v0::ast::Operation
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Operation<'a> {
     /// Invalid operation to be used as a placeholder.
@@ -229,9 +229,9 @@ impl<'a> Operation<'a> {
 
 /// A region in the hugr.
 ///
-/// See [`syntax::Region`] for the AST representation.
+/// See [`ast::Region`] for the AST representation.
 ///
-/// [`syntax::Region`]: crate::v0::syntax::Region
+/// [`ast::Region`]: crate::v0::ast::Region
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Region<'a> {
     /// The kind of the region. See [`RegionKind`] for details.
@@ -261,9 +261,9 @@ pub struct RegionScope {
 
 /// A symbol.
 ///
-/// See [`syntax::Symbol`] for the AST representation.
+/// See [`ast::Symbol`] for the AST representation.
 ///
-/// [`syntax::Symbol`]: crate::v0::syntax::Symbol
+/// [`ast::Symbol`]: crate::v0::ast::Symbol
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Symbol<'a> {
     /// The name of the symbol.
@@ -281,9 +281,9 @@ pub type VarIndex = u16;
 
 /// A term in the compile time meta language.
 ///
-/// See [`syntax::Term`] for the AST representation.
+/// See [`ast::Term`] for the AST representation.
 ///
-/// [`syntax::Term`]: crate::v0::syntax::Term
+/// [`ast::Term`]: crate::v0::ast::Term
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Term<'a> {
     /// Standin for any term.
@@ -336,9 +336,9 @@ impl From<Literal> for Term<'_> {
 
 /// A part of a list/tuple term.
 ///
-/// See [`syntax::SeqPart`] for the AST representation.
+/// See [`ast::SeqPart`] for the AST representation.
 ///
-/// [`syntax::SeqPart`]: crate::v0::syntax::SeqPart
+/// [`ast::SeqPart`]: crate::v0::ast::SeqPart
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SeqPart {
     /// A single item.
@@ -360,9 +360,9 @@ pub enum ExtSetPart<'a> {
 ///
 /// Parameter names must be unique within a parameter list.
 ///
-/// See [`syntax::Param`] for the AST representation.
+/// See [`ast::Param`] for the AST representation.
 ///
-/// [`syntax::Param`]: crate::v0::syntax::Param
+/// [`ast::Param`]: crate::v0::ast::Param
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Param<'a> {
     /// The name of the parameter.

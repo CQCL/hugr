@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use hugr_model::v0 as model;
-use hugr_model::v0::syntax;
+use hugr_model::v0::ast;
 use model::bumpalo::Bump;
 use pretty_assertions::assert_eq;
 
@@ -11,7 +11,7 @@ use pretty_assertions::assert_eq;
 /// The original and deserialized modules are compared for equality.
 pub fn binary_roundtrip(input: &str) {
     let bump = Bump::new();
-    let module = syntax::Module::from_str(input).unwrap();
+    let module = ast::Module::from_str(input).unwrap();
     let module = module.resolve(&bump).unwrap();
     let bytes = model::binary::write_to_vec(&module);
     let deserialized_module = model::binary::read_from_slice(&bytes, &bump).unwrap();

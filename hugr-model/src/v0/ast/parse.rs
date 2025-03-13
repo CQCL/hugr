@@ -25,7 +25,7 @@ use pest_parser::{HugrParser, Rule};
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::v0::syntax::{LinkName, Module, Operation, SeqPart};
+use crate::v0::ast::{LinkName, Module, Operation, SeqPart};
 use crate::v0::{Literal, RegionKind};
 
 use super::{Node, Param, Region, Symbol, VarName};
@@ -38,7 +38,7 @@ mod pest_parser {
     // part of the public API, and so we hide it within this private module.
 
     #[derive(Parser)]
-    #[grammar = "v0/syntax/hugr.pest"]
+    #[grammar = "v0/ast/hugr.pest"]
     pub struct HugrParser;
 }
 
