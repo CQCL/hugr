@@ -223,10 +223,7 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
         ConvertOpDef::bytecast_float_int => {
             emit_custom_unary_op(context, args, |ctx, arg, outs| {
                 let [out] = outs.try_into()?;
-                Ok(vec![ctx
-                    .builder()
-                    .build_bit_cast(arg, out, "")?
-                    .as_basic_value_enum()])
+                Ok(vec![ctx .builder().build_bit_cast(arg, out, "")?])
             })
         }
         _ => Err(anyhow!(
@@ -266,6 +263,7 @@ mod test {
     use crate::emit::test::{SimpleHugrConfig, DFGW};
     use crate::test::{exec_ctx, llvm_ctx, TestContext};
     use hugr_core::builder::SubContainer;
+    use hugr_core::std_extensions::arithmetic::float_types::ConstF64;
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
@@ -636,27 +634,50 @@ mod test {
     }
 
     #[rstest]
-    #[case(42)]
-    #[case(f64::INFINITY.to_bits())]
-    #[case(f64::NEG_INFINITY.to_bits())]
-    #[case(f64::NAN.to_bits())]
-    #[case((-0.0f64).to_bits())]
-    #[case(0.0f64.to_bits())]
-    fn bytecast_roundtrip(mut exec_ctx: TestContext, #[case] i: u64) {
+    #[case(42.0)]
+    #[case(f64::INFINITY)]
+    #[case(f64::NEG_INFINITY)]
+    #[case(f64::NAN)]
+    #[case(-0.0f64)]
+    #[case(0.0f64)]
+    fn bytecast_int_to_float(mut exec_ctx: TestContext, #[case] f: f64) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(vec![INT_TYPES[6].clone()])
+            .with_outs(float64_type())
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
-                let i = builder.add_load_value(ConstInt::new_u(6, i).unwrap());
+                let i = builder.add_load_value(ConstInt::new_u(6, f.to_bits()).unwrap());
                 let i2f = EXTENSION
                     .instantiate_extension_op("bytecast_int_float", [])
                     .unwrap();
                 let [f] = builder.add_dataflow_op(i2f, [i]).unwrap().outputs_arr();
+                builder.finish_with_outputs([f]).unwrap()
+            });
+        exec_ctx.add_extensions(|builder| {
+            builder
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+                .add_int_extensions()
+                .add_float_extensions()
+        });
+        let hugr_f = exec_ctx.exec_hugr_f64(hugr, "main");
+        assert!((f.is_nan() && hugr_f.is_nan()) || f == hugr_f);
+    }
+
+
+    #[rstest]
+    #[case(42.0)]
+    #[case(-0.0f64)]
+    #[case(0.0f64)]
+    fn bytecast_float_to_int(mut exec_ctx: TestContext, #[case] f: f64) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(INT_TYPES[6].clone())
+            .with_extensions(STD_REG.to_owned())
+            .finish(|mut builder| {
+                let f = builder.add_load_value(ConstF64::new(f));
                 let f2i = EXTENSION
                     .instantiate_extension_op("bytecast_float_int", [])
                     .unwrap();
                 let [i] = builder.add_dataflow_op(f2i, [f]).unwrap().outputs_arr();
-
                 builder.finish_with_outputs([i]).unwrap()
             });
         exec_ctx.add_extensions(|builder| {
@@ -666,6 +687,6 @@ mod test {
                 .add_int_extensions()
                 .add_float_extensions()
         });
-        assert_eq!(i, exec_ctx.exec_hugr_u64(hugr, "main"));
+        assert_eq!(f.to_bits(), exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 }
