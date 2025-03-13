@@ -8,7 +8,7 @@ use std::{fs, io, mem};
 use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
 use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::ExtensionResolutionError;
-use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{ExtensionError, HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
@@ -126,9 +126,10 @@ impl Package {
     /// Read a Package from a HUGR envelope.
     pub fn load(
         reader: impl io::BufRead,
-        extension_registry: &ExtensionRegistry,
+        extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, EnvelopeError> {
-        let (_, pkg) = read_envelope(reader, extension_registry)?;
+        let extensions = extensions.unwrap_or(&PRELUDE_REGISTRY);
+        let (_, pkg) = read_envelope(reader, extensions)?;
         Ok(pkg)
     }
 
@@ -138,9 +139,9 @@ impl Package {
     /// it is recommended to use `Package::load` with a bytearray instead.
     pub fn load_str(
         envelope: impl AsRef<str>,
-        extension_registry: &ExtensionRegistry,
+        extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, EnvelopeError> {
-        Self::load(envelope.as_ref().as_bytes(), extension_registry)
+        Self::load(envelope.as_ref().as_bytes(), extensions)
     }
 
     /// Store the Package in a HUGR envelope.
@@ -443,26 +444,8 @@ mod test {
     use rstest::{fixture, rstest};
 
     #[fixture]
-    fn simple_package() -> Package {
-        let hugr0 = simple_module_hugr();
-        let hugr1 = simple_module_hugr();
-        Package::new([hugr0, hugr1]).unwrap()
-    }
-
-    #[fixture]
     fn simple_input_node() -> Hugr {
         Hugr::new(Input::new(vec![]))
-    }
-
-    #[rstest]
-    #[case::empty(Package::default())]
-    #[case::simple(simple_package())]
-    fn package_roundtrip(#[case] package: Package) {
-        use crate::extension::PRELUDE_REGISTRY;
-
-        let envelope = package.store_str(EnvelopeConfig::text()).unwrap();
-        let new_package = Package::load_str(&envelope, &PRELUDE_REGISTRY).unwrap();
-        assert_eq!(package, new_package);
     }
 
     #[rstest]

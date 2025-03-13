@@ -95,7 +95,7 @@ pub fn write_envelope(
     match config.zstd {
         #[cfg(feature = "zstd")]
         Some(zstd) => {
-            let writer = zstd::Encoder::new(writer, zstd.level())?;
+            let writer = zstd::Encoder::new(writer, zstd.level())?.auto_finish();
             write_impl(writer, package, config)?;
         }
         #[cfg(not(feature = "zstd"))]
@@ -268,13 +268,7 @@ fn decode_model(
 
     // TODO: Import multiple hugrs from the model?
     let hugr = import_hugr(&module_list, &extension_registry)?;
-    let mut package = Package::new([hugr])?;
-
-    // Ensure the package contains all extensions from the registry,
-    // even if they were not used in the hugr.
-    package.extensions = extension_registry;
-
-    Ok(package)
+    Ok(Package::new([hugr])?)
 }
 
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
@@ -332,4 +326,112 @@ fn encode_model(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cool_asserts::assert_matches;
+    use rstest::rstest;
+    use std::io::BufReader;
+    use zerocopy::AsBytes;
+
+    use crate::builder::test::{multi_module_package, simple_package};
+    use crate::extension::PRELUDE_REGISTRY;
+
+    #[rstest]
+    fn errors() {
+        let package = simple_package();
+        assert_matches!(
+            package.store_str(EnvelopeConfig::binary()),
+            Err(EnvelopeError::NonASCIIFormat { .. })
+        );
+    }
+
+    #[rstest]
+    #[case::empty(Package::default())]
+    #[case::simple(simple_package())]
+    #[case::multi(multi_module_package())]
+    fn text_roundtrip(#[case] package: Package) {
+        let envelope = package.store_str(EnvelopeConfig::text()).unwrap();
+        let new_package = Package::load_str(&envelope, None).unwrap();
+        assert_eq!(package, new_package);
+    }
+
+    #[rstest]
+    #[case::empty(Package::default())]
+    #[case::simple(simple_package())]
+    #[case::multi(multi_module_package())]
+    fn compressed_roundtrip(#[case] package: Package) {
+        let mut buffer = Vec::new();
+        let config = EnvelopeConfig {
+            format: EnvelopeFormat::PackageJson,
+            zstd: Some(ZstdConfig::default()),
+        };
+        let res = package.store(&mut buffer, config);
+
+        match cfg!(feature = "zstd") {
+            true => res.unwrap(),
+            false => {
+                assert_matches!(res, Err(EnvelopeError::ZstdUnsupported));
+                return;
+            }
+        }
+
+        let (decoded_config, new_package) =
+            read_envelope(BufReader::new(buffer.as_bytes()), &PRELUDE_REGISTRY).unwrap();
+
+        assert_eq!(config.format, decoded_config.format);
+        assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
+        assert_eq!(package, new_package);
+    }
+
+    #[rstest]
+    //#[case::empty(Package::default())] // Not currently supported
+    #[case::simple(simple_package())]
+    //#[case::multi(multi_module_package())] // Not currently supported
+    #[cfg(feature = "model_unstable")]
+    fn module_exts_roundtrip(#[case] package: Package) {
+        let mut buffer = Vec::new();
+        let config = EnvelopeConfig {
+            format: EnvelopeFormat::ModelWithExtensions,
+            ..Default::default()
+        };
+        package.store(&mut buffer, config).unwrap();
+        let (decoded_config, new_package) =
+            read_envelope(BufReader::new(buffer.as_bytes()), &PRELUDE_REGISTRY).unwrap();
+
+        assert_eq!(config.format, decoded_config.format);
+        assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
+        assert_eq!(package, new_package);
+    }
+
+    #[rstest]
+    //#[case::empty(Package::default())] // Not currently supported
+    #[case::simple(simple_package())]
+    //#[case::multi(multi_module_package())] // Not currently supported
+    fn module_roundtrip(#[case] package: Package) {
+        let mut buffer = Vec::new();
+        let config = EnvelopeConfig {
+            format: EnvelopeFormat::Model,
+            ..Default::default()
+        };
+        let res = package.store(&mut buffer, config);
+
+        match cfg!(feature = "model_unstable") {
+            true => res.unwrap(),
+            false => {
+                assert_matches!(res, Err(EnvelopeError::FormatUnsupported { .. }));
+                return;
+            }
+        }
+
+        let (decoded_config, new_package) =
+            read_envelope(BufReader::new(buffer.as_bytes()), &PRELUDE_REGISTRY).unwrap();
+
+        assert_eq!(config.format, decoded_config.format);
+        assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
+
+        assert_eq!(package, new_package);
+    }
 }

@@ -215,3 +215,34 @@ impl EnvelopeHeader {
         Ok(Self { format, zstd })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(EnvelopeFormat::Model)]
+    #[case(EnvelopeFormat::ModelWithExtensions)]
+    #[case(EnvelopeFormat::PackageJson)]
+    fn header_round_trip(#[case] format: EnvelopeFormat) {
+        // With zstd compression
+        let header = EnvelopeHeader { format, zstd: true };
+
+        let mut buffer = Vec::new();
+        header.write(&mut buffer).unwrap();
+        let read_header = EnvelopeHeader::read(&mut buffer.as_slice()).unwrap();
+        assert_eq!(header, read_header);
+
+        // Without zstd compression
+        let header = EnvelopeHeader {
+            format,
+            zstd: false,
+        };
+
+        let mut buffer = Vec::new();
+        header.write(&mut buffer).unwrap();
+        let read_header = EnvelopeHeader::read(&mut buffer.as_slice()).unwrap();
+        assert_eq!(header, read_header);
+    }
+}
