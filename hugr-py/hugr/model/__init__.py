@@ -26,7 +26,7 @@ class Var(Term):
 class Apply(Term):
     """Symbol application."""
     symbol: str
-    args: list[Term]
+    args: list[Term] = field(default_factory = list)
 
 @dataclass(frozen = True)
 class Splice:

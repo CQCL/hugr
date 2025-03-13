@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable, cast
 
 import hugr._serialization.tys as stys
 from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
@@ -31,6 +31,10 @@ class TypeParam(Protocol):
     def _to_serial_root(self) -> stys.TypeParam:
         return stys.TypeParam(root=self._to_serial())  # type: ignore[arg-type]
 
+    def to_model(self) -> model.Term:
+        """Convert the type parameter to a model Term."""
+        ...
+
 
 @runtime_checkable
 class TypeArg(Protocol):
@@ -47,7 +51,7 @@ class TypeArg(Protocol):
         """Resolve types in the argument using the given registry."""
         return self
 
-    def to_model(self) -> model.Term:
+    def to_model(self) -> model.Term | model.Splice:
         """Convert the type argument to a model Term."""
         ...
 
@@ -87,7 +91,7 @@ class Type(Protocol):
         """Resolve types in the type using the given registry."""
         return self
 
-    def to_model(self) -> model.Term:
+    def to_model(self) -> model.Term | model.Splice:
         """Convert the type to a model Term."""
         ...
 
@@ -112,6 +116,10 @@ class TypeTypeParam(TypeParam):
     def __str__(self) -> str:
         return str(self.bound)
 
+    def to_model(self) -> model.Term:
+        # Note that we drop the bound.
+        return model.Apply("core.type")
+
 
 @dataclass(frozen=True)
 class BoundedNatParam(TypeParam):
@@ -127,6 +135,10 @@ class BoundedNatParam(TypeParam):
             return "Nat"
         return f"Nat({self.upper_bound})"
 
+    def to_model(self) -> model.Term:
+        # Note that we drop the bound.
+        return model.Apply("core.nat")
+
 
 @dataclass(frozen=True)
 class StringParam(TypeParam):
@@ -137,6 +149,9 @@ class StringParam(TypeParam):
 
     def __str__(self) -> str:
         return "String"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("core.str")
 
 
 @dataclass(frozen=True)
@@ -151,6 +166,10 @@ class ListParam(TypeParam):
     def __str__(self) -> str:
         return f"[{self.param}]"
 
+    def to_model(self) -> model.Term:
+        item_type = self.param.to_model()
+        return model.Apply("core.list", [item_type])
+
 
 @dataclass(frozen=True)
 class TupleParam(TypeParam):
@@ -164,6 +183,10 @@ class TupleParam(TypeParam):
     def __str__(self) -> str:
         return f"({comma_sep_str(self.params)})"
 
+    def to_model(self) -> model.Term:
+        item_types = model.List([param.to_model() for param in self.params])
+        return model.Apply("core.tuple", [item_types])
+
 
 @dataclass(frozen=True)
 class ExtensionsParam(TypeParam):
@@ -174,6 +197,9 @@ class ExtensionsParam(TypeParam):
 
     def __str__(self) -> str:
         return "Extensions"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("core.ext_set")
 
 
 # ------------------------------------------
@@ -196,7 +222,7 @@ class TypeTypeArg(TypeArg):
     def __str__(self) -> str:
         return f"Type({self.ty!s})"
 
-    def to_model(self) -> model.Term:
+    def to_model(self) -> model.Term | model.Splice:
         return self.ty.to_model()
 
 
@@ -264,6 +290,10 @@ class ExtensionsArg(TypeArg):
     def __str__(self) -> str:
         return f"Extensions({comma_sep_str(self.extensions)})"
 
+    def to_model(self) -> model.Term:
+        # Since extension sets will be deprecated, this is just a placeholder.
+        return model.ExtSet()
+
 
 @dataclass(frozen=True)
 class VariableArg(TypeArg):
@@ -278,6 +308,8 @@ class VariableArg(TypeArg):
     def __str__(self) -> str:
         return f"${self.idx}"
 
+    def to_model(self) -> model.Term:
+        return model.Var(str(self.idx))
 
 # ----------------------------------------------
 # --------------- Type -------------------------
@@ -414,6 +446,9 @@ class Variable(Type):
     def __repr__(self) -> str:
         return f"${self.idx}"
 
+    def to_model(self) -> model.Term:
+        return model.Var(str(self.idx))
+
 
 @dataclass(frozen=True)
 class RowVariable(Type):
@@ -430,6 +465,9 @@ class RowVariable(Type):
 
     def __repr__(self) -> str:
         return f"${self.idx}"
+
+    def to_model(self):
+        return model.Splice(model.Var(str(self.idx)))
 
 
 @dataclass(frozen=True)
@@ -461,6 +499,9 @@ class Alias(Type):
 
     def __repr__(self) -> str:
         return self.name
+
+    def to_model(self) -> model.Term:
+        return model.Apply(self.name)
 
 
 @dataclass(frozen=True)
@@ -639,6 +680,11 @@ class ExtType(Type):
 
     def to_model(self) -> model.Term:
         args = [arg.to_model() for arg in self.args]
+
+        # TODO: This cast is only neccessary because `Type` can both be an
+        # actual type or a row variable.
+        args = cast(list[model.Term], args)
+
         return model.Apply(self.type_def.name, args)
 
 
@@ -687,6 +733,11 @@ class Opaque(Type):
 
     def to_model(self) -> model.Term:
         args = [arg.to_model() for arg in self.args]
+
+        # TODO: This cast is only neccessary because `Type` can both be an
+        # actual type or a row variable.
+        args = cast(list[model.Term], args)
+
         return model.Apply(self.id, args)
 
 
