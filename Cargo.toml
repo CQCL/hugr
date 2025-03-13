@@ -22,7 +22,12 @@ license = "Apache-2.0"
 # authors
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ci_run)'] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    # Set by our CI
+    'cfg(ci_run)',
+    # Set by codecov
+    'cfg(coverage,coverage_nightly)',
+] }
 
 missing_docs = "warn"
 [workspace.lints.clippy]

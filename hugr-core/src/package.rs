@@ -179,6 +179,7 @@ impl Package {
         since = "0.14.5",
         note = "Json encoding of packages is deprecated. Use `Package::load` instead"
     )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn from_json_reader(
         reader: impl io::Read,
         extension_registry: &ExtensionRegistry,
@@ -240,6 +241,7 @@ impl Package {
         since = "0.14.5",
         note = "Json encoding of packages is deprecated. Use `Package::load_str` instead"
     )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn from_json(
         json: impl AsRef<str>,
         extension_registry: &ExtensionRegistry,
@@ -255,6 +257,7 @@ impl Package {
         since = "0.14.5",
         note = "Json encoding of packages is deprecated. Use `Package::load` instead"
     )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn from_json_file(
         path: impl AsRef<Path>,
         extension_registry: &ExtensionRegistry,
@@ -270,6 +273,7 @@ impl Package {
         since = "0.14.5",
         note = "Json encoding of packages is deprecated. Use `Package::store` instead"
     )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn to_json_writer(&self, writer: impl io::Write) -> Result<(), PackageEncodingError> {
         serde_json::to_writer(writer, self)?;
         Ok(())
@@ -282,6 +286,7 @@ impl Package {
         since = "0.14.5",
         note = "Json encoding of packages is deprecated. Use `Package::store_str` instead"
     )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn to_json(&self) -> Result<String, PackageEncodingError> {
         let json = serde_json::to_string(self)?;
         Ok(json)
@@ -292,6 +297,7 @@ impl Package {
         since = "0.14.5",
         note = "Json encoding of packages is deprecated. Use `Package::store` instead"
     )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn to_json_file(&self, path: impl AsRef<Path>) -> Result<(), PackageEncodingError> {
         let file = fs::OpenOptions::new()
             .write(true)

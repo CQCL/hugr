@@ -7,6 +7,8 @@
 // https://github.com/rust-lang/rust/issues/120363
 // https://github.com/proptest-rs/proptest/issues/447
 #![cfg_attr(test, allow(non_local_definitions))]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 pub mod builder;
 pub mod core;
 pub mod envelope;
