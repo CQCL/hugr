@@ -76,14 +76,14 @@ term = {
   | term_apply
 }
 
-term_wildcard   = { "_" }
-term_var        = { "?" ~ identifier }
-term_apply      = { symbol_name | ("(" ~ symbol_name ~ term* ~ ")") }
-term_list       = { "[" ~ part* ~ "]" }
-term_tuple      = { "(" ~ "tuple" ~ part* ~ ")" }
-term_list_type  = { "(" ~ "list" ~ term ~ ")" }
-term_ext_set    = { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
-term_const_func = { "(" ~ "fn" ~ term ~ ")" }
+term_wildcard   = @{ "_" ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
+term_var        =  { "?" ~ identifier }
+term_apply      =  { symbol_name | ("(" ~ symbol_name ~ term* ~ ")") }
+term_list       =  { "[" ~ part* ~ "]" }
+term_tuple      =  { "(" ~ "tuple" ~ part* ~ ")" }
+term_list_type  =  { "(" ~ "list" ~ term ~ ")" }
+term_ext_set    =  { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
+term_const_func =  { "(" ~ "fn" ~ term ~ ")" }
 
 part         = { spliced_term | term }
 spliced_term = { term ~ "..." }

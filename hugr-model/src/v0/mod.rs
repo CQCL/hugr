@@ -379,7 +379,7 @@ pub enum Literal {
 #[cfg(test)]
 mod test {
     use super::*;
-    use proptest::prelude::*;
+    use proptest::{prelude::*, string::string_regex};
 
     impl Arbitrary for Literal {
         type Parameters = ();
@@ -393,6 +393,30 @@ mod test {
                 any::<f64>().prop_map(|f| Literal::Float(OrderedFloat(f)))
             ]
             .boxed()
+        }
+    }
+
+    impl Arbitrary for SymbolName {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            string_regex(r"[a-zA-Z\-_][0-9a-zA-Z\-_](\.[a-zA-Z\-_][0-9a-zA-Z\-_])*")
+                .unwrap()
+                .prop_map(Self::new)
+                .boxed()
+        }
+    }
+
+    impl Arbitrary for VarName {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            string_regex(r"[a-zA-Z\-_][0-9a-zA-Z\-_]")
+                .unwrap()
+                .prop_map(Self::new)
+                .boxed()
         }
     }
 
