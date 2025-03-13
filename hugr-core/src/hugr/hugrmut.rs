@@ -1,7 +1,7 @@
 //! Low-level interface for modifying a HUGR.
 
 use core::panic;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
@@ -11,6 +11,8 @@ use crate::extension::ExtensionRegistry;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
+use crate::ops::OpTrait;
+use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
@@ -144,6 +146,29 @@ pub trait HugrMut: HugrMutInternals {
             self.remove_subtree(ch)
         }
         self.hugr_mut().remove_node(node);
+    }
+
+    /// Copies the strict descendants of `root` to under the `new_parent`, optionally applying a
+    /// [Substitution] to the [OpType]s of the copied nodes.
+    ///
+    /// That is, the immediate children of root, are copied to make children of `new_parent`.
+    ///
+    /// Note this may invalidate the Hugr in two ways:
+    /// * Adding children of `root` may make the children-list of `new_parent` invalid e.g.
+    ///   leading to multiple [Input](OpType::Input), [Output](OpType::Output) or
+    ///   [ExitBlock](OpType::ExitBlock) nodes or Input/Output in the wrong positions
+    /// * Nonlocal edges incoming to the subtree of `root` will be copied to target the subtree under `new_parent`
+    ///   which may be invalid if `new_parent` is not a child of `root`s parent (for `Ext` edges - or
+    ///   correspondingly for `Dom` edges)
+    fn copy_descendants(
+        &mut self,
+        root: Node,
+        new_parent: Node,
+        subst: Option<Substitution>,
+    ) -> BTreeMap<Node, Node> {
+        panic_invalid_node(self, root);
+        panic_invalid_node(self, new_parent);
+        self.hugr_mut().copy_descendants(root, new_parent, subst)
     }
 
     /// Connect two nodes at the given ports.
@@ -294,8 +319,8 @@ pub struct InsertionResult {
 
 fn translate_indices(
     node_map: HashMap<portgraph::NodeIndex, portgraph::NodeIndex>,
-) -> HashMap<Node, Node> {
-    HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into())))
+) -> impl Iterator<Item = (Node, Node)> {
+    node_map.into_iter().map(|(k, v)| (k.into(), v.into()))
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -398,7 +423,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(node_map),
+            node_map: translate_indices(node_map).collect(),
         }
     }
 
@@ -419,7 +444,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(node_map),
+            node_map: translate_indices(node_map).collect(),
         }
     }
 
@@ -448,7 +473,44 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
                 self.use_extensions(exts);
             }
         }
-        translate_indices(node_map)
+        translate_indices(node_map).collect()
+    }
+
+    fn copy_descendants(
+        &mut self,
+        root: Node,
+        new_parent: Node,
+        subst: Option<Substitution>,
+    ) -> BTreeMap<Node, Node> {
+        let mut descendants = self.base_hugr().hierarchy.descendants(root.pg_index());
+        let root2 = descendants.next();
+        debug_assert_eq!(root2, Some(root.pg_index()));
+        let nodes = Vec::from_iter(descendants);
+        let node_map = translate_indices(
+            portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
+                .copy_in_parent()
+                .expect("Is a MultiPortGraph"),
+        )
+        .collect::<BTreeMap<_, _>>();
+
+        for node in self.children(root).collect::<Vec<_>>() {
+            self.set_parent(*node_map.get(&node).unwrap(), new_parent);
+        }
+
+        // Copy the optypes, metadata, and hierarchy
+        for (&node, &new_node) in node_map.iter() {
+            for ch in self.children(node).collect::<Vec<_>>() {
+                self.set_parent(*node_map.get(&ch).unwrap(), new_node);
+            }
+            let new_optype = match (&subst, self.get_optype(node)) {
+                (None, op) => op.clone(),
+                (Some(subst), op) => op.substitute(subst),
+            };
+            self.as_mut().op_types.set(new_node.pg_index(), new_optype);
+            let meta = self.base_hugr().metadata.get(node.pg_index()).clone();
+            self.as_mut().metadata.set(new_node.pg_index(), meta);
+        }
+        node_map
     }
 }
 

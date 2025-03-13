@@ -1,4 +1,5 @@
 use hugr_core::{
+    extension::prelude::ConstError,
     ops::{constant::CustomConst, ExtensionOp, NamedOp, Value},
     std_extensions::arithmetic::{
         int_ops::IntOpDef,
@@ -9,19 +10,38 @@ use hugr_core::{
 };
 use inkwell::{
     types::{BasicType, BasicTypeEnum, IntType},
-    values::{BasicValue, BasicValueEnum},
+    values::{BasicValue, BasicValueEnum, IntValue},
+    IntPredicate,
 };
 
 use crate::{
     custom::CodegenExtsBuilder,
     emit::{
-        emit_value, func::EmitFuncContext, get_intrinsic, ops::emit_custom_binary_op,
-        ops::emit_custom_unary_op, EmitOpArgs,
+        emit_value,
+        func::EmitFuncContext,
+        get_intrinsic,
+        ops::{emit_custom_binary_op, emit_custom_unary_op},
+        EmitOpArgs,
     },
-    types::TypingSession,
+    sum::LLVMSumType,
+    types::{HugrSumType, TypingSession},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
+
+use super::conversions::int_type_bounds;
+
+enum RuntimeError {
+    Narrow,
+}
+
+impl RuntimeError {
+    fn show(&self) -> &str {
+        match self {
+            RuntimeError::Narrow => "Can't narrow into bounds",
+        }
+    }
+}
 
 /// Emit an integer comparison operation.
 fn emit_icmp<'c, H: HugrView<Node = Node>>(
@@ -281,8 +301,132 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 .as_basic_value_enum()])
         }),
         IntOpDef::ipow => emit_ipow(context, args),
+        // Type args are width of input, width of output
+        IntOpDef::iwiden_u => emit_custom_unary_op(context, args, |ctx, arg, outs| {
+            let [out] = outs.try_into()?;
+            Ok(vec![ctx
+                .builder()
+                .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), false, "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::iwiden_s => emit_custom_unary_op(context, args, |ctx, arg, outs| {
+            let [out] = outs.try_into()?;
+
+            Ok(vec![ctx
+                .builder()
+                .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), true, "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::inarrow_s => {
+            let Some(TypeArg::BoundedNat { n: out_log_width }) = args.node().args().last().cloned()
+            else {
+                bail!("Type arg to inarrow_s wasn't a Nat");
+            };
+            let (_, out_ty) = args.node.out_value_types().next().unwrap();
+            emit_custom_unary_op(context, args, |ctx, arg, outs| {
+                let result = make_narrow(
+                    ctx,
+                    arg,
+                    outs,
+                    out_log_width,
+                    true,
+                    out_ty.as_sum().unwrap().clone(),
+                )?;
+                Ok(vec![result])
+            })
+        }
+        IntOpDef::inarrow_u => {
+            let Some(TypeArg::BoundedNat { n: out_log_width }) = args.node().args().last().cloned()
+            else {
+                bail!("Type arg to inarrow_u wasn't a Nat");
+            };
+            let (_, out_ty) = args.node.out_value_types().next().unwrap();
+            emit_custom_unary_op(context, args, |ctx, arg, outs| {
+                let result = make_narrow(
+                    ctx,
+                    arg,
+                    outs,
+                    out_log_width,
+                    false,
+                    out_ty.as_sum().unwrap().clone(),
+                )?;
+                Ok(vec![result])
+            })
+        }
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
     }
+}
+
+fn make_narrow<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    arg: BasicValueEnum<'c>,
+    outs: &[BasicTypeEnum<'c>],
+    out_log_width: u64,
+    signed: bool,
+    sum_type: HugrSumType,
+) -> Result<BasicValueEnum<'c>> {
+    let [out] = TryInto::<[BasicTypeEnum; 1]>::try_into(outs)?;
+    let width = 1 << out_log_width;
+    let arg_int_ty: IntType = arg.get_type().into_int_type();
+    let (int_min_value_s, int_max_value_s, int_max_value_u) = int_type_bounds(width);
+    let out_int_ty = out
+        .into_struct_type()
+        .get_field_type_at_index(2)
+        .unwrap()
+        .into_int_type();
+    let outside_range = if signed {
+        let too_big = ctx.builder().build_int_compare(
+            IntPredicate::SGT,
+            arg.into_int_value(),
+            arg_int_ty.const_int(int_max_value_s as u64, true),
+            "upper_bounds_check",
+        )?;
+        let too_small = ctx.builder().build_int_compare(
+            IntPredicate::SLT,
+            arg.into_int_value(),
+            arg_int_ty.const_int(int_min_value_s as u64, true),
+            "lower_bounds_check",
+        )?;
+        ctx.builder()
+            .build_or(too_big, too_small, "outside_range")?
+    } else {
+        ctx.builder().build_int_compare(
+            IntPredicate::UGT,
+            arg.into_int_value(),
+            arg_int_ty.const_int(int_max_value_u, false),
+            "upper_bounds_check",
+        )?
+    };
+
+    let narrowed_val = ctx
+        .builder()
+        .build_int_cast_sign_flag(arg.into_int_value(), out_int_ty, signed, "")?
+        .as_basic_value_enum();
+    val_or_error(
+        ctx,
+        outside_range,
+        narrowed_val,
+        RuntimeError::Narrow,
+        LLVMSumType::try_from_hugr_type(&ctx.typing_session(), sum_type).unwrap(),
+    )
+}
+
+fn val_or_error<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    should_fail: IntValue<'c>,
+    val: BasicValueEnum<'c>,
+    msg: RuntimeError,
+    ty: LLVMSumType<'c>,
+) -> Result<BasicValueEnum<'c>> {
+    let err_msg = Value::extension(ConstError::new(2, msg.show()));
+    let err_val = emit_value(ctx, &err_msg)?;
+
+    let err_variant = ty.build_tag(ctx.builder(), 0, vec![err_val])?;
+    let ok_variant = ty.build_tag(ctx.builder(), 1, vec![val])?;
+
+    Ok(ctx
+        .builder()
+        .build_select(should_fail, err_variant, ok_variant, "")?)
 }
 
 fn llvm_type<'c>(
@@ -342,47 +486,70 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 
 #[cfg(test)]
 mod test {
+    use anyhow::Result;
+    use hugr_core::extension::prelude::{error_type, ConstError, UnwrapBuilder};
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
-        builder::{Dataflow, DataflowSubContainer},
+        builder::{handle::Outputs, Dataflow, DataflowSubContainer, SubContainer},
         extension::prelude::bool_t,
+        ops::{DataflowOpTrait, ExtensionOp},
         std_extensions::arithmetic::{
             int_ops,
             int_types::{ConstInt, INT_TYPES},
         },
-        types::Type,
+        types::{SumType, Type, TypeRow},
         Hugr,
     };
     use rstest::rstest;
 
+    use crate::extension::DefaultPreludeCodegen;
     use crate::{
         check_emission,
-        emit::test::SimpleHugrConfig,
-        extension::int::add_int_extensions,
+        emit::test::{SimpleHugrConfig, DFGW},
+        extension::{int::add_int_extensions, prelude::add_prelude_extensions},
         test::{exec_ctx, llvm_ctx, TestContext},
     };
 
-    fn test_binary_int_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
-        let ty = &INT_TYPES[log_width as usize];
-        test_int_op_with_results::<2>(name, log_width, None, ty.clone())
+    // Instantiate an extension op which takes one width argument
+    fn make_int_op(name: impl AsRef<str>, log_width: u8) -> ExtensionOp {
+        int_ops::EXTENSION
+            .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
+            .unwrap()
     }
 
-    fn test_binary_icmp_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
-        test_int_op_with_results::<2>(name, log_width, None, bool_t())
+    fn test_binary_int_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
+        let ty = &INT_TYPES[log_width as usize];
+        test_int_op_with_results::<2>(ext_op, log_width, None, ty.clone())
+    }
+
+    fn test_binary_icmp_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
+        test_int_op_with_results::<2>(ext_op, log_width, None, bool_t())
     }
 
     fn test_int_op_with_results<const N: usize>(
+        ext_op: ExtensionOp,
+        log_width: u8,
+        inputs: Option<[ConstInt; N]>,
+        output_type: Type,
+    ) -> Hugr {
+        test_int_op_with_results_processing(ext_op, log_width, inputs, output_type, |_, a| Ok(a))
+    }
+
+    fn test_int_op_with_results_processing<const N: usize>(
         // N is the number of inputs to the hugr
-        name: impl AsRef<str>,
+        ext_op: ExtensionOp,
         log_width: u8,
         inputs: Option<[ConstInt; N]>, // If inputs are provided, they'll be wired into the op, otherwise the inputs to the hugr will be wired into the op
         output_type: Type,
+        process: impl Fn(&mut DFGW, Outputs) -> Result<Outputs>,
     ) -> Hugr {
         let ty = &INT_TYPES[log_width as usize];
         let input_tys = if inputs.is_some() {
             vec![]
         } else {
-            itertools::repeat_n(ty.clone(), N).collect()
+            let input_tys = itertools::repeat_n(ty.clone(), N).collect();
+            assert_eq!(input_tys, ext_op.signature().input.to_vec());
+            input_tys
         };
         SimpleHugrConfig::new()
             .with_ins(input_tys)
@@ -400,14 +567,12 @@ mod test {
                         input_wires
                     }
                 };
-                let ext_op = int_ops::EXTENSION
-                    .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
-                    .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, input_wires)
                     .unwrap()
                     .outputs();
-                hugr_builder.finish_with_outputs(outputs).unwrap()
+                let processed_outputs = process(&mut hugr_builder, outputs).unwrap();
+                hugr_builder.finish_with_outputs(processed_outputs).unwrap()
             })
     }
 
@@ -415,7 +580,8 @@ mod test {
     fn test_neg_emission(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_int_extensions);
         let ty = INT_TYPES[2].clone();
-        let hugr = test_int_op_with_results::<1>("ineg", 2, None, ty.clone());
+        let ext_op = make_int_op("ineg", 2);
+        let hugr = test_int_op_with_results::<1>(ext_op, 2, None, ty.clone());
         check_emission!("ineg", hugr, llvm_ctx);
     }
 
@@ -425,8 +591,50 @@ mod test {
     #[case::ipow("ipow", 3)]
     fn test_binop_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_int_op(op.clone(), width);
+        let ext_op = make_int_op(op.clone(), width);
+        let hugr = test_binary_int_op(ext_op, width);
         check_emission!(op.clone(), hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    #[case::signed_2_3("iwiden_s", 2, 3)]
+    #[case::signed_1_6("iwiden_s", 1, 6)]
+    #[case::unsigned_2_3("iwiden_u", 2, 3)]
+    #[case::unsigned_1_6("iwiden_u", 1, 6)]
+    fn test_widen_emission(
+        mut llvm_ctx: TestContext,
+        #[case] op: String,
+        #[case] from: u8,
+        #[case] to: u8,
+    ) {
+        llvm_ctx.add_extensions(add_int_extensions);
+        let out_ty = INT_TYPES[to as usize].clone();
+        let ext_op = int_ops::EXTENSION
+            .instantiate_extension_op(&op, [(from as u64).into(), (to as u64).into()])
+            .unwrap();
+        let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty);
+
+        check_emission!(format!("{}_{}_{}", op.clone(), from, to), hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    #[case::signed("inarrow_s", 3, 2)]
+    #[case::unsigned("inarrow_u", 6, 4)]
+    fn test_narrow_emission(
+        mut llvm_ctx: TestContext,
+        #[case] op: String,
+        #[case] from: u8,
+        #[case] to: u8,
+    ) {
+        llvm_ctx.add_extensions(add_int_extensions);
+        llvm_ctx.add_extensions(|cem| add_prelude_extensions(cem, DefaultPreludeCodegen));
+        let out_ty = SumType::new([vec![error_type()], vec![INT_TYPES[to as usize].clone()]]);
+        let ext_op = int_ops::EXTENSION
+            .instantiate_extension_op(&op, [(from as u64).into(), (to as u64).into()])
+            .unwrap();
+        let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty.into());
+
+        check_emission!(format!("{}_{}_{}", op.clone(), from, to), hugr, llvm_ctx);
     }
 
     #[rstest]
@@ -434,7 +642,8 @@ mod test {
     #[case::ilt_s("ilt_s", 0)]
     fn test_cmp_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_icmp_op(op.clone(), width);
+        let ext_op = make_int_op(op.clone(), width);
+        let hugr = test_binary_icmp_op(ext_op, width);
         check_emission!(op.clone(), hugr, llvm_ctx);
     }
 
@@ -473,7 +682,9 @@ mod test {
             ConstInt::new_u(6, lhs).unwrap(),
             ConstInt::new_u(6, rhs).unwrap(),
         ];
-        let hugr = test_int_op_with_results::<2>(op, 6, Some(inputs), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<2>(ext_op, 6, Some(inputs), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), result);
     }
 
@@ -506,7 +717,9 @@ mod test {
             ConstInt::new_s(6, lhs).unwrap(),
             ConstInt::new_s(6, rhs).unwrap(),
         ];
-        let hugr = test_int_op_with_results::<2>(op, 6, Some(inputs), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<2>(ext_op, 6, Some(inputs), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), result);
     }
 
@@ -522,7 +735,9 @@ mod test {
         exec_ctx.add_extensions(add_int_extensions);
         let input = ConstInt::new_s(6, arg).unwrap();
         let ty = INT_TYPES[6].clone();
-        let hugr = test_int_op_with_results::<1>(op, 6, Some([input]), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<1>(ext_op, 6, Some([input]), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), result);
     }
 
@@ -539,7 +754,70 @@ mod test {
         exec_ctx.add_extensions(add_int_extensions);
         let input = ConstInt::new_u(6, arg).unwrap();
         let ty = INT_TYPES[6].clone();
-        let hugr = test_int_op_with_results::<1>(op, 6, Some([input]), ty.clone());
+        let ext_op = make_int_op(&op, 6);
+
+        let hugr = test_int_op_with_results::<1>(ext_op, 6, Some([input]), ty.clone());
         assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), result);
+    }
+
+    #[rstest]
+    #[case("inarrow_s", 6, 2, 4)]
+    #[case("inarrow_s", 6, 5, (1 << 5) - 1)]
+    #[case("inarrow_s", 6, 4, -1)]
+    #[case("inarrow_s", 6, 4, -(1 << 4) - 1)]
+    #[case("inarrow_s", 6, 4, -(1 <<15))]
+    #[case("inarrow_s", 6, 5, (1 << 31) - 1)]
+    fn test_narrow_s(
+        mut exec_ctx: TestContext,
+        #[case] op: String,
+        #[case] from: u8,
+        #[case] to: u8,
+        #[case] arg: i64,
+    ) {
+        exec_ctx.add_extensions(add_int_extensions);
+        exec_ctx.add_extensions(|cem| add_prelude_extensions(cem, DefaultPreludeCodegen));
+        let input = ConstInt::new_s(from, arg).unwrap();
+        let to_ty = INT_TYPES[to as usize].clone();
+        let ext_op = int_ops::EXTENSION
+            .instantiate_extension_op(op.as_ref(), [(from as u64).into(), (to as u64).into()])
+            .unwrap();
+
+        let hugr = test_int_op_with_results_processing::<1>(
+            ext_op,
+            to,
+            Some([input]),
+            to_ty.clone(),
+            |builder, outs| {
+                let [out] = outs.to_array();
+
+                let err_row = TypeRow::from(vec![error_type()]);
+                let ty_row = TypeRow::from(vec![to_ty.clone()]);
+                // Handle the sum type returned by narrow by building a conditional.
+                // We're only testing the happy path here, so insert a panic in the
+                // "error" branch, knowing that it wont come up.
+                //
+                // Negative results can be tested manually, but we lack the testing
+                // infrastructure to detect execution crashes without crashing the
+                // test process.
+                let mut cond_b = builder.conditional_builder(
+                    ([err_row, ty_row], out),
+                    [],
+                    vec![to_ty.clone()].into(),
+                )?;
+                let mut sad_b = cond_b.case_builder(0)?;
+                let err = ConstError::new(2, "This shouldn't happen");
+                let w = sad_b.add_load_value(ConstInt::new_s(to, 0)?);
+                sad_b.add_panic(err, vec![to_ty.clone()], [(w, to_ty.clone())])?;
+                sad_b.finish_with_outputs([w])?;
+
+                let happy_b = cond_b.case_builder(1)?;
+                let [w] = happy_b.input_wires_arr();
+                happy_b.finish_with_outputs([w])?;
+
+                let handle = cond_b.finish_sub_container()?;
+                Ok(handle.outputs())
+            },
+        );
+        assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), arg);
     }
 }

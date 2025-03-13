@@ -5,6 +5,7 @@ use hugr_core::extension::prelude::{
     TupleOpDef, UnpackTuple,
 };
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
+use hugr_core::ops::ExtensionOp;
 use hugr_core::types::TypeArg;
 use hugr_core::Node;
 use hugr_core::{
@@ -18,6 +19,7 @@ use inkwell::{
 };
 use itertools::Itertools;
 
+use crate::emit::EmitOpArgs;
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
     emit::{
@@ -163,9 +165,18 @@ pub trait PreludeCodegen: Clone {
             .ptr_type(AddressSpace::default())
             .as_basic_type_enum();
         let str_type = ctx.llvm_type(&str.get_type())?.as_basic_type_enum();
-        ensure!(str_type == default_str_type, "The default implementation of PreludeCodegen::string_type was overriden, but the default implementation of emit_const_string was not. String type is: {str_type}");
+        ensure!(str_type == default_str_type, "The default implementation of PreludeCodegen::string_type was overridden, but the default implementation of emit_const_string was not. String type is: {str_type}");
         let s = ctx.builder().build_global_string_ptr(str.value(), "")?;
         Ok(s.as_basic_value_enum())
+    }
+
+    fn emit_barrier<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    ) -> Result<()> {
+        // By default, treat barriers as no-ops.
+        args.outputs.finish(ctx.builder(), args.inputs)
     }
 }
 
@@ -217,9 +228,9 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     }
 }
 
-/// Add a [PreludeCodegenExtension] to the given [CodegenExtsMap] using `pcg`
+/// Add a [PreludeCodegenExtension] to the given [CodegenExtsBuilder] using `pcg`
 /// as the implementation.
-fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
+pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
     pcg: impl PreludeCodegen + 'a,
 ) -> CodegenExtsBuilder<'a, H> {
@@ -342,6 +353,10 @@ fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
             args.outputs.finish(context.builder(), vec![v.into()])
         }
     })
+    .extension_op(prelude::PRELUDE_ID, prelude::BARRIER_OP_ID, {
+        let pcg = pcg.clone();
+        move |context, args| pcg.emit_barrier(context, args)
+    })
 }
 
 #[cfg(test)]
@@ -351,12 +366,12 @@ mod test {
     use hugr_core::types::{Type, TypeArg};
     use hugr_core::{type_row, Hugr};
     use prelude::{bool_t, qb_t, usize_t, PANIC_OP_ID, PRINT_OP_ID};
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use crate::check_emission;
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::test::{llvm_ctx, TestContext};
+    use crate::test::{exec_ctx, llvm_ctx, TestContext};
     use crate::types::HugrType;
 
     use super::*;
@@ -536,5 +551,27 @@ mod test {
                 builder.finish_with_outputs([v]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[fixture]
+    fn barrier_hugr() -> Hugr {
+        SimpleHugrConfig::new()
+            .with_outs(vec![usize_t()])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let i = builder.add_load_value(ConstUsize::new(42));
+                let [w1, _w2] = builder.add_barrier([i, i]).unwrap().outputs_arr();
+                builder.finish_with_outputs([w1]).unwrap()
+            })
+    }
+
+    #[rstest]
+    fn prelude_barrier(prelude_llvm_ctx: TestContext, barrier_hugr: Hugr) {
+        check_emission!(barrier_hugr, prelude_llvm_ctx);
+    }
+    #[rstest]
+    fn prelude_barrier_exec(mut exec_ctx: TestContext, barrier_hugr: Hugr) {
+        exec_ctx.add_extensions(|cem| add_prelude_extensions(cem, TestPreludeCodegen));
+        assert_eq!(exec_ctx.exec_hugr_u64(barrier_hugr, "main"), 42);
     }
 }
