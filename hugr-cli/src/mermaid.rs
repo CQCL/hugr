@@ -4,6 +4,7 @@ use std::io::Write;
 use clap::Parser;
 use clap_verbosity_flag::log::Level;
 use clio::Output;
+use hugr::package::PackageValidationError;
 use hugr::HugrView;
 
 use crate::hugr_io::HugrInputArgs;
@@ -39,8 +40,8 @@ impl MermaidArgs {
     /// Write the mermaid diagram to the output.
     pub fn run_print(&mut self) -> Result<(), crate::CliError> {
         match self.input_args.hugr_json {
-            true => self.run_print_envelope(),
-            false => self.run_print_hugr(),
+            true => self.run_print_hugr(),
+            false => self.run_print_envelope(),
         }
     }
 
@@ -63,7 +64,8 @@ impl MermaidArgs {
         let hugr = self.input_args.get_hugr()?;
 
         if self.validate {
-            hugr.validate()?;
+            hugr.validate()
+                .map_err(PackageValidationError::Validation)?;
         }
 
         writeln!(self.output, "{}", hugr.mermaid_string())?;

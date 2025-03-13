@@ -24,6 +24,17 @@ __all__ = [
 ]
 
 
+# This is a hard-coded HUGR envelope header for json-encoded packages with no
+# compression.
+#
+# In the future, we will have a more general way to encode HUGR envelopes.
+_ENVELOPE_HEADER = (
+    "HUGRiHJv"  # Magic number
+    + "?"  # Package JSON format
+    + "@"  # Default header flags (non-compressed)
+)
+
+
 @dataclass(frozen=True)
 class Package:
     """A package of HUGR modules and extensions.
@@ -44,7 +55,8 @@ class Package:
         )
 
     def to_json(self) -> str:
-        return self._to_serial().model_dump_json()
+        """Serialize the package to a printable HUGR envelope string."""
+        return _ENVELOPE_HEADER + self._to_serial().model_dump_json()
 
     @classmethod
     def from_json(cls, json_str: str) -> Package:
@@ -56,6 +68,14 @@ class Package:
         Returns:
             The deserialized Package object.
         """
+        # It must start with the envelope header.
+        if json_str.startswith(_ENVELOPE_HEADER):
+            json_str = json_str[len(_ENVELOPE_HEADER) :]
+        else:
+            # For now, load packages without a header anyway.
+            # This will be removed in the future.
+            pass
+
         return ext_s.Package.model_validate_json(json_str).deserialize()
 
 

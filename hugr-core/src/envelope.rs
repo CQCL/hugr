@@ -1,11 +1,21 @@
 //! Envelope format for HUGR packages.
 //!
-//! The binary format is designed to be extensible and backwards-compatible.
-//! It consists of a header declaring the format used to encode the HUGR, followed
+//! The format is designed to be extensible and backwards-compatible. It
+//! consists of a header declaring the format used to encode the HUGR, followed
 //! by the encoded HUGR itself.
 //!
-//! Use [`read_envelope`] and [`write_envelope`] for reading and writing envelopes
-//! from/to readers and writers.
+//! Use [`read_envelope`] and [`write_envelope`] for reading and writing
+//! envelopes from/to readers and writers, or call [Package::load] and
+//! [Package::store] directly.
+//!
+//! ## Payload formats
+//!
+//! The envelope may encode the HUGR in different formats, listed in
+//! [`EnvelopeFormat`]. The payload may also be compressed with zstd.
+//!
+//! Some formats can be represented as ASCII, as indicated by the
+//! [`EnvelopeFormat::ascii_printable`] method. When this is the case, the
+//! whole envelope can be stored in a string.
 //!
 //! ## Envelope header
 //!
@@ -13,28 +23,31 @@
 //!
 //! | Field  | Size (bytes) | Description |
 //! |--------|--------------|-------------|
-//! | Magic  | 8            | [MAGIC_NUMBER] constant identifying the envelope format, little-endian. |
-//! | Format | 1            | [PayloadFormat] describing the payload format. |
+//! | Magic  | 8            | [MAGIC_NUMBERS] constant identifying the envelope format. |
+//! | Format | 1            | [EnvelopeFormat] describing the payload format. |
 //! | Flags  | 1            | Additional configuration flags. |
 //!
 //! Flags:
 //!
 //! - Bit 0: Whether the payload is compressed with zstd.
-//! - Bits 1-7: Reserved for future use.
+//! - Bits 1-5: Reserved for future use.
+//! - Bit 7,6: Constant "01" to make some headers ascii-printable.
 //!
 
 mod header;
 
-pub use header::{EnvelopeConfig, PayloadFormat, ZstdConfig, MAGIC_NUMBER};
+pub use header::{EnvelopeConfig, EnvelopeFormat, ZstdConfig, MAGIC_NUMBERS};
 
 use crate::{
     extension::ExtensionRegistry,
     package::{Package, PackageEncodingError, PackageError},
 };
 use header::EnvelopeHeader;
-use itertools::Itertools as _;
 use std::io::BufRead;
-use std::io::{BufReader, Write};
+use std::io::Write;
+
+#[allow(unused_imports)]
+use itertools::Itertools as _;
 
 #[cfg(feature = "model_unstable")]
 use crate::import::ImportError;
@@ -56,7 +69,7 @@ pub fn read_envelope(
     let package = match header.zstd {
         #[cfg(feature = "zstd")]
         true => read_impl(
-            BufReader::new(zstd::Decoder::new(reader)?),
+            std::io::BufReader::new(zstd::Decoder::new(reader)?),
             header,
             registry,
         ),
@@ -98,15 +111,19 @@ pub fn write_envelope(
 #[non_exhaustive]
 pub enum EnvelopeError {
     /// Bad magic number.
-    #[display("Bad magic number. expected '{expected:X}' found '{found:X}'")]
+    #[display(
+        "Bad magic number. expected '{:X}' found '{:X}'",
+        u64::from_be_bytes(*expected),
+        u64::from_be_bytes(*found)
+    )]
     #[from(ignore)]
     MagicNumber {
         /// The expected magic number.
         ///
-        /// See [`MAGIC_NUMBER`].
-        expected: u64,
+        /// See [`MAGIC_NUMBERS`].
+        expected: [u8; 8],
         /// The magic number in the envelope.
-        found: u64,
+        found: [u8; 8],
     },
     /// The specified payload format is invalid.
     #[display("Format descriptor {descriptor} is invalid.")]
@@ -125,9 +142,18 @@ pub enum EnvelopeError {
     #[from(ignore)]
     FormatUnsupported {
         /// The unsupported format.
-        format: PayloadFormat,
+        format: EnvelopeFormat,
         /// Optionally, the feature required to support this format.
         feature: Option<&'static str>,
+    },
+    /// Not all envelope formats can be represented as ASCII.
+    ///
+    /// This error is used when trying to store the envelope into a string.
+    #[display("Envelope format {format} cannot be represented as ASCII.")]
+    #[from(ignore)]
+    NonASCIIFormat {
+        /// The unsupported format.
+        format: EnvelopeFormat,
     },
     /// Envelope encoding required zstd compression, but the feature is not enabled.
     #[display("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
@@ -189,16 +215,17 @@ fn read_impl(
     registry: &ExtensionRegistry,
 ) -> Result<Package, EnvelopeError> {
     match header.format {
-        PayloadFormat::PackageJson => Ok(Package::from_json_reader(payload, registry)?),
+        #[allow(deprecated)]
+        EnvelopeFormat::PackageJson => Ok(Package::from_json_reader(payload, registry)?),
         #[cfg(feature = "model_unstable")]
-        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
+        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             decode_model(payload, registry, header.format)
         }
         #[cfg(not(feature = "model_unstable"))]
-        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
+        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             Err(EnvelopeError::FormatUnsupported {
-                format: unsupported,
-                feature: "model_unstable",
+                format: header.format,
+                feature: Some("model_unstable"),
             })
         }
     }
@@ -215,7 +242,7 @@ fn read_impl(
 fn decode_model(
     mut stream: impl BufRead,
     extension_registry: &ExtensionRegistry,
-    format: PayloadFormat,
+    format: EnvelopeFormat,
 ) -> Result<Package, EnvelopeError> {
     use crate::{import::import_hugr, Extension};
     use hugr_model::v0::bumpalo::Bump;
@@ -257,16 +284,17 @@ fn write_impl(
     config: EnvelopeConfig,
 ) -> Result<(), EnvelopeError> {
     match config.format {
-        PayloadFormat::PackageJson => package.to_json_writer(writer)?,
+        #[allow(deprecated)]
+        EnvelopeFormat::PackageJson => package.to_json_writer(writer)?,
         #[cfg(feature = "model_unstable")]
-        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
+        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             encode_model(writer, package, config.format)?
         }
         #[cfg(not(feature = "model_unstable"))]
-        PayloadFormat::Model | PayloadFormat::ModelWithExtensions => {
-            Err(EnvelopeError::FormatUnsupported {
-                format: unsupported,
-                feature: "model_unstable",
+        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
+            return Err(EnvelopeError::FormatUnsupported {
+                format: config.format,
+                feature: Some("model_unstable"),
             })
         }
     }
@@ -277,7 +305,7 @@ fn write_impl(
 fn encode_model(
     mut writer: impl Write,
     package: &Package,
-    format: PayloadFormat,
+    format: EnvelopeFormat,
 ) -> Result<(), EnvelopeError> {
     use crate::export::export_hugr;
     use hugr_model::v0::{binary::write_to_writer, bumpalo::Bump};

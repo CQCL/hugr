@@ -147,7 +147,12 @@ def validate(
         snapshot: A hugr render snapshot. If not None, it will be compared against the
         rendered HUGR. Pass `--snapshot-update` to pytest to update the snapshot file.
     """
+    # TODO: Use envelopes instead of legacy hugr-json
     cmd = [*_base_command(), "validate", "-"]
+
+    if isinstance(h, Hugr):
+        cmd += ["--hugr-json"]
+
     serial = h.to_json()
     _run_hugr_cmd(serial, cmd)
 

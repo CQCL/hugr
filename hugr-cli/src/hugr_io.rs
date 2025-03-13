@@ -43,7 +43,7 @@ impl HugrInputArgs {
     /// Read a hugr envelope from the input and return the package encoded
     /// within.
     ///
-    /// If [HugrInputArgs::hugr_json] is `true`, [get_hugr] should be called instead as
+    /// If [HugrInputArgs::hugr_json] is `true`, [HugrInputArgs::get_hugr] should be called instead as
     /// reading the input as a package will fail.
     pub fn get_package(&mut self) -> Result<Package, CliError> {
         let extensions = self.load_extensions()?;
@@ -54,7 +54,7 @@ impl HugrInputArgs {
 
     /// Read a hugr JSON file from the input.
     ///
-    /// If [HugrInputArgs::hugr_json] is `false`, [get_package] should be called instead as
+    /// If [HugrInputArgs::hugr_json] is `false`, [HugrInputArgs::get_package] should be called instead as
     /// reading an input envelope as a HUGR json will fail.
     pub fn get_hugr(&mut self) -> Result<Hugr, CliError> {
         let extensions = self.load_extensions()?;

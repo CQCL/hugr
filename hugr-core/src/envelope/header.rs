@@ -6,7 +6,10 @@ use std::num::NonZeroU8;
 use super::EnvelopeError;
 
 /// Magic number identifying the start of an envelope.
-pub const MAGIC_NUMBER: u64 = 0x411612_DB01D8D52B;
+///
+/// In ascii, this is "HUGRiHJv". The second half is a randomly generated string
+/// to avoid accidental collisions with other file formats.
+pub const MAGIC_NUMBERS: &[u8] = "HUGRiHJv".as_bytes();
 
 /// Header at the start of a binary envelope file.
 ///
@@ -17,7 +20,7 @@ pub const MAGIC_NUMBER: u64 = 0x411612_DB01D8D52B;
 )]
 pub(super) struct EnvelopeHeader {
     /// The format used for the payload.
-    pub format: PayloadFormat,
+    pub format: EnvelopeFormat,
     /// Whether the payload is compressed with zstd.
     pub zstd: bool,
 }
@@ -27,23 +30,26 @@ pub(super) struct EnvelopeHeader {
     Clone, Copy, Eq, PartialEq, Debug, Default, Hash, derive_more::Display, strum::FromRepr,
 )]
 #[non_exhaustive]
-pub enum PayloadFormat {
+pub enum EnvelopeFormat {
     /// `hugr-model` v0 binary capnproto message.
-    Model = 2,
-    /// `hugr-model` v0 binary capnproto message followed by a json-encoded [ExtensionRegistry].
+    Model = 1,
+    /// `hugr-model` v0 binary capnproto message followed by a json-encoded [crate::extension::ExtensionRegistry].
     //
     // This is a temporary format required until the model adds support for extensions.
-    ModelWithExtensions = 3,
-    /// Json-encoded [Package]
+    ModelWithExtensions = 2,
+    /// Json-encoded [crate::package::Package]
+    ///
+    /// Uses a printable ascii value as the discriminant so the envelope can be
+    /// read as text.
     #[default]
-    PackageJson = 1,
+    PackageJson = 63,
 }
 
-// We use a u8 to represent PayloadFormat in the binary format, so we should not
+// We use a u8 to represent EnvelopeFormat in the binary format, so we should not
 // add any non-unit variants or ones with discriminants > 255.
-static_assertions::assert_eq_size!(PayloadFormat, u8);
+static_assertions::assert_eq_size!(EnvelopeFormat, u8);
 
-impl PayloadFormat {
+impl EnvelopeFormat {
     /// Returns whether to encode the extensions as json after the hugr payload.
     pub fn append_extensions(self) -> bool {
         matches!(self, Self::ModelWithExtensions)
@@ -56,6 +62,13 @@ impl PayloadFormat {
             _ => None,
         }
     }
+
+    /// Returns whether the encoding format is ASCII-printable.
+    ///
+    /// If true, the encoded envelope can be read as text.
+    pub fn ascii_printable(self) -> bool {
+        matches!(self, Self::PackageJson)
+    }
 }
 
 /// Configuration for encoding an envelope.
@@ -63,7 +76,7 @@ impl PayloadFormat {
 #[non_exhaustive]
 pub struct EnvelopeConfig {
     /// The format to use for the payload.
-    pub format: PayloadFormat,
+    pub format: EnvelopeFormat,
     /// Whether to compress the payload with zstd, and the compression level to
     /// use.
     pub zstd: Option<ZstdConfig>,
@@ -87,6 +100,24 @@ impl EnvelopeConfig {
         EnvelopeHeader {
             format: self.format,
             zstd: self.zstd.is_some(),
+        }
+    }
+
+    /// Default configuration for a plain-text envelope.
+    pub const fn text() -> Self {
+        Self {
+            format: EnvelopeFormat::PackageJson,
+            zstd: None,
+        }
+    }
+
+    /// Default configuration for a binary envelope.
+    ///
+    /// If the `zstd` feature is enabled, this will use zstd compression.
+    pub const fn binary() -> Self {
+        Self {
+            format: EnvelopeFormat::Model,
+            zstd: Some(ZstdConfig { level: None }),
         }
     }
 }
@@ -139,12 +170,12 @@ impl EnvelopeHeader {
     /// See the [crate::envelope] module documentation for the binary format.
     pub fn write(&self, writer: &mut impl Write) -> Result<(), EnvelopeError> {
         // The first 8 bytes are the magic number in little-endian.
-        writer.write_all(&MAGIC_NUMBER.to_le_bytes())?;
+        writer.write_all(MAGIC_NUMBERS)?;
         // Next is the format descriptor.
         let format_bytes = [self.format as u8];
         writer.write_all(&format_bytes)?;
         // Next is the flags byte.
-        let mut flags = 0u8;
+        let mut flags = 0b01000000u8;
         flags |= self.zstd as u8;
         writer.write_all(&[flags])?;
 
@@ -157,12 +188,11 @@ impl EnvelopeHeader {
     /// See the [crate::envelope] module documentation for the binary format.
     pub fn read(reader: &mut impl Read) -> Result<EnvelopeHeader, EnvelopeError> {
         // The first 8 bytes are the magic number in little-endian.
-        let mut magic_bytes = [0; 8];
-        reader.read_exact(&mut magic_bytes)?;
-        let magic = u64::from_le_bytes(magic_bytes);
-        if magic != MAGIC_NUMBER {
+        let mut magic = [0; 8];
+        reader.read_exact(&mut magic)?;
+        if magic != MAGIC_NUMBERS {
             return Err(EnvelopeError::MagicNumber {
-                expected: MAGIC_NUMBER,
+                expected: MAGIC_NUMBERS.try_into().unwrap(),
                 found: magic,
             });
         }
@@ -171,7 +201,7 @@ impl EnvelopeHeader {
         let mut format_bytes = [0; 1];
         reader.read_exact(&mut format_bytes)?;
         let format_discriminant = format_bytes[0] as usize;
-        let Some(format) = PayloadFormat::from_repr(format_discriminant) else {
+        let Some(format) = EnvelopeFormat::from_repr(format_discriminant) else {
             return Err(EnvelopeError::InvalidFormatDescriptor {
                 descriptor: format_discriminant,
             });
