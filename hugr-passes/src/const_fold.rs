@@ -173,12 +173,12 @@ impl ConstantFoldPass {
     }
 
     /// Run the pass using this configuration.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// [ConstFoldError::ValidationError] if the Hugr does not validate before/afnerwards
     /// (if [Self::validation_level] is set, or in tests)
-    /// 
+    ///
     /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
     /// was of an invalid OpType
     pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
