@@ -19,6 +19,7 @@ from hugr._serialization.tys import (
     TypeTypeParam,
     Variable,
 )
+from hugr.envelope import EnvelopeConfig
 
 EXAMPLE = r"""
 {
@@ -136,4 +137,7 @@ def test_package():
     assert package == package_load
 
     hugr_package = package.deserialize()
-    assert hugr_package.from_json(hugr_package.to_json()) == hugr_package
+    assert (
+        hugr_package.from_bytes(hugr_package.to_bytes(EnvelopeConfig.TEXT()))
+        == hugr_package
+    )

@@ -12,6 +12,7 @@ from typing_extensions import Self
 
 from hugr import ext, tys
 from hugr._serialization.serial_hugr import SerialHugr
+from hugr.envelope import EnvelopeConfig
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
 from hugr.std.float import FLOAT_T
@@ -152,9 +153,11 @@ def validate(
 
     if isinstance(h, Hugr):
         cmd += ["--hugr-json"]
-
-    serial = h.to_json()
-    _run_hugr_cmd(serial, cmd)
+        serial = h.to_json()
+        _run_hugr_cmd(serial, cmd)
+    else:
+        serial = h.to_str(EnvelopeConfig.TEXT())
+        _run_hugr_cmd(serial, cmd)
 
     if not roundtrip:
         return

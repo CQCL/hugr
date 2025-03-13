@@ -42,7 +42,7 @@ pub enum EnvelopeFormat {
     /// Uses a printable ascii value as the discriminant so the envelope can be
     /// read as text.
     #[default]
-    PackageJson = 63,
+    PackageJson = 63, // '?' in ascii
 }
 
 // We use a u8 to represent EnvelopeFormat in the binary format, so we should not

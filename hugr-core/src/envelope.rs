@@ -112,7 +112,7 @@ pub fn write_envelope(
 pub enum EnvelopeError {
     /// Bad magic number.
     #[display(
-        "Bad magic number. expected '{:X}' found '{:X}'",
+        "Bad magic number. expected 0x{:X} found 0x{:X}",
         u64::from_be_bytes(*expected),
         u64::from_be_bytes(*found)
     )]
