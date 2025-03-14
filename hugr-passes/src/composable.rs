@@ -55,7 +55,6 @@ impl<E: Error, P1: ComposablePass<Err = E>, P2: ComposablePass<Err = E>> Composa
 }
 
 #[derive(thiserror::Error, Debug)]
-#[allow(missing_docs)]
 pub enum ValidatePassError<E> {
     #[error("Failed to validate input HUGR: {err}\n{pretty_hugr}")]
     Input {
