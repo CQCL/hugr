@@ -2,10 +2,16 @@
 
 ## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-v0.14.4...hugr-v0.15.0) - 2025-03-14
 
+This release adds a new `Node` parameter to the `HugrView` trait, so it is now possible to have more complex structures behave like hugrs.
+
+We also added a new text/binary serialization format for hugrs that will let us keep interoperability between different versions.
+
+Finally, we added multiple new operations and improvements to the rewrites and passes.
+
 ### New Features
 
-- add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
-- [**breaking**] don't assume "main"-function in dataflow + constant folding ([#1896](https://github.com/CQCL/hugr/pull/1896))
+- Add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
+- [**breaking**] Don't assume "main"-function in dataflow + constant folding ([#1896](https://github.com/CQCL/hugr/pull/1896))
 - [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
 - Rewrite for inlining a single Call ([#1934](https://github.com/CQCL/hugr/pull/1934))
 - [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))

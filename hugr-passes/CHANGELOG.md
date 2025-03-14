@@ -5,7 +5,6 @@
 
 ### New Features
 
-- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
 - add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
 - [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))
 - [**breaking**] don't assume "main"-function in dataflow + constant folding ([#1896](https://github.com/CQCL/hugr/pull/1896))
