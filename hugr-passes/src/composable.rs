@@ -6,18 +6,23 @@ use hugr_core::hugr::{hugrmut::HugrMut, ValidationError};
 use hugr_core::HugrView;
 use itertools::Either;
 
+/// An optimization pass that can be sequenced with another and/or wrapped
+/// e.g. by [ValidatingPass]
 pub trait ComposablePass: Sized {
     type Err: Error;
     fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err>;
+
     fn map_err<E2: Error>(self, f: impl Fn(Self::Err) -> E2) -> impl ComposablePass<Err = E2> {
         ErrMapper::new(self, f)
     }
+
     fn sequence(
         self,
         other: impl ComposablePass<Err = Self::Err>,
     ) -> impl ComposablePass<Err = Self::Err> {
         (self, other) // SequencePass::new(self, other) ?
     }
+
     fn sequence_either<P: ComposablePass>(
         self,
         other: P,
@@ -54,6 +59,7 @@ impl<E: Error, P1: ComposablePass<Err = E>, P2: ComposablePass<Err = E>> Composa
     }
 }
 
+/// Error from a [ValidatingPass]
 #[derive(thiserror::Error, Debug)]
 pub enum ValidatePassError<E> {
     #[error("Failed to validate input HUGR: {err}\n{pretty_hugr}")]
@@ -69,10 +75,10 @@ pub enum ValidatePassError<E> {
         pretty_hugr: String,
     },
     #[error(transparent)]
-    Underlying(E),
+    Underlying(#[from] E),
 }
 
-/// Runs another, underlying, pass, with validation of the Hugr
+/// Runs an underlying pass, but with validation of the Hugr
 /// both before and afterwards.
 pub struct ValidatingPass<P>(P, bool);
 
@@ -120,7 +126,7 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
     }
 }
 
-pub fn validate_if_test<P: ComposablePass>(
+pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
     hugr: &mut impl HugrMut,
 ) -> Result<(), ValidatePassError<P::Err>> {
@@ -140,9 +146,8 @@ mod test {
     };
     use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize};
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::ops::{Input, Output, DEFAULT_OPTYPE, DFG};
-    use hugr_core::{ops::handle::NodeHandle, types::Signature};
-    use hugr_core::{Hugr, HugrView, IncomingPort};
+    use hugr_core::ops::{Input, Output, DEFAULT_OPTYPE, DFG, handle::NodeHandle};
+    use hugr_core::{Hugr, HugrView, IncomingPort, types::Signature};
     use itertools::Either;
 
     use crate::composable::{ValidatePassError, ValidatingPass};
