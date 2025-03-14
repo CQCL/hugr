@@ -334,7 +334,6 @@ mod tests {
     use cool_asserts::assert_matches;
     use rstest::rstest;
     use std::io::BufReader;
-    use zerocopy::AsBytes;
 
     use crate::builder::test::{multi_module_package, simple_package};
     use crate::extension::PRELUDE_REGISTRY;
@@ -379,7 +378,7 @@ mod tests {
         }
 
         let (decoded_config, new_package) =
-            read_envelope(BufReader::new(buffer.as_bytes()), &PRELUDE_REGISTRY).unwrap();
+            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
 
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
@@ -399,7 +398,7 @@ mod tests {
         };
         package.store(&mut buffer, config).unwrap();
         let (decoded_config, new_package) =
-            read_envelope(BufReader::new(buffer.as_bytes()), &PRELUDE_REGISTRY).unwrap();
+            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
 
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
@@ -427,7 +426,7 @@ mod tests {
         }
 
         let (decoded_config, new_package) =
-            read_envelope(BufReader::new(buffer.as_bytes()), &PRELUDE_REGISTRY).unwrap();
+            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
 
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
