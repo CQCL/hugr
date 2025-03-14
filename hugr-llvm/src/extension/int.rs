@@ -457,7 +457,7 @@ fn make_narrow<'c, H: HugrView<Node = Node>>(
     )
 }
 
-fn val_or_panic<'c, 'hugr, H: HugrView<Node = Node>>(
+fn val_or_panic<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     dont_panic: IntValue<'c>,
     err_msg_str: &str,
