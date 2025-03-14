@@ -16,20 +16,28 @@ pub trait ComposablePass: Sized {
         ErrMapper::new(self, f)
     }
 
-    fn sequence(
-        self,
-        other: impl ComposablePass<Err = Self::Err>,
-    ) -> impl ComposablePass<Err = Self::Err> {
-        (self, other) // SequencePass::new(self, other) ?
+    /// Returns a [ComposablePass] that does "`self` then `other`", so long as
+    /// `other::Err` maps into ours.
+    fn then<P: ComposablePass>(self, other: P) -> impl ComposablePass<Err = Self::Err>
+    where
+        P::Err: Into<Self::Err>,
+    {
+        (self, other.map_err(Into::into))
     }
 
-    fn sequence_either<P: ComposablePass>(
+    /// Returns a [ComposablePass] that does "`self` then `other`", combining
+    /// the two error types via `Either`
+    fn then_either<P: ComposablePass>(
         self,
         other: P,
     ) -> impl ComposablePass<Err = Either<Self::Err, P::Err>> {
-        self.map_err(Either::Left)
-            .sequence(other.map_err(Either::Right))
+        (self.map_err(Either::Left), other.map_err(Either::Right))
     }
+
+    // Note: in the short term another variant could be useful:
+    // fn then_inf(self, other: impl ComposablePass<Err=Infallible>) -> impl ComposablePass<Err = Self::Err>
+    // however this will become redundant when Infallible is replaced by ! (never_type)
+    // as (unlike Infallible) ! converts Into anything
 }
 
 struct ErrMapper<P, E, F>(P, F, PhantomData<E>);
@@ -180,13 +188,13 @@ mod test {
         let exp_err = ConstFoldError::InvalidEntryPoint(id2.node(), DEFAULT_OPTYPE);
         let r: Result<(), Either<Infallible, ConstFoldError>> = dce
             .clone()
-            .sequence_either(cfold.clone())
+            .then_either(cfold.clone())
             .run(&mut hugr.clone());
         assert_eq!(r, Err(Either::Right(exp_err.clone())));
 
         let r: Result<(), ConstFoldError> = dce
             .map_err(|inf| match inf {})
-            .sequence(cfold)
+            .then(cfold)
             .run(&mut hugr.clone());
         assert_eq!(r, Err(exp_err));
     }
