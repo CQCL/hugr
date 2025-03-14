@@ -27,7 +27,7 @@ pub use type_row::{TypeRow, TypeRowRV};
 pub(crate) use poly_func::PolyFuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
-use itertools::{repeat_n, Itertools};
+use itertools::{Either, Itertools as _};
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -189,7 +189,7 @@ impl std::fmt::Display for SumType {
             SumType::Unit { size: 1 } => write!(f, "Unit"),
             SumType::Unit { size: 2 } => write!(f, "Bool"),
             SumType::Unit { size } => {
-                display_list_with_separator(repeat_n("[]", *size as usize), f, "+")
+                display_list_with_separator(itertools::repeat_n("[]", *size as usize), f, "+")
             }
             SumType::General { rows } => match rows.len() {
                 1 if rows[0].is_empty() => write!(f, "Unit"),
@@ -216,17 +216,17 @@ impl SumType {
         }
     }
 
-    /// New UnitSum with empty Tuple variants
+    /// New UnitSum with empty Tuple variants.
     pub const fn new_unary(size: u8) -> Self {
         Self::Unit { size }
     }
 
-    /// New tuple (single row of variants)
+    /// New tuple (single row of variants).
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
         Self::new([types.into()])
     }
 
-    /// New option type (either an empty option, or a row of types)
+    /// New option type (either an empty option, or a row of types).
     pub fn new_option(types: impl Into<TypeRow>) -> Self {
         Self::new([vec![].into(), types.into()])
     }
@@ -248,12 +248,23 @@ impl SumType {
         }
     }
 
-    /// Returns variant row if there is only one variant
+    /// Returns variant row if there is only one variant.
     pub fn as_tuple(&self) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if *size == 1 => Some(TypeRV::EMPTY_TYPEROW_REF),
             SumType::General { rows } if rows.len() == 1 => Some(&rows[0]),
             _ => None,
+        }
+    }
+
+    /// Returns an iterator over the variants.
+    pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
+        match self {
+            SumType::Unit { size } => Either::Left(itertools::repeat_n(
+                TypeRV::EMPTY_TYPEROW_REF,
+                *size as usize,
+            )),
+            SumType::General { rows } => Either::Right(rows.iter()),
         }
     }
 }
@@ -451,6 +462,14 @@ impl<RV: MaybeRV> TypeBase<RV> {
     #[inline(always)]
     pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
         &mut self.0
+    }
+
+    /// Returns the inner [SumType] if the type is a sum.
+    pub fn as_sum(&self) -> Option<&SumType> {
+        match &self.0 {
+            TypeEnum::Sum(s) => Some(s),
+            _ => None,
+        }
     }
 
     /// Report if the type is copyable - i.e.the least upper bound of the type
@@ -713,13 +732,37 @@ pub(crate) mod test {
         assert_eq!(pred1, Type::from(pred_direct));
     }
 
+    #[test]
+    fn as_sum() {
+        let t = Type::new_unit_sum(0);
+        assert!(t.as_sum().is_some());
+    }
+
+    #[test]
+    fn sum_variants() {
+        {
+            let variants: Vec<TypeRowRV> = vec![
+                TypeRV::UNIT.into(),
+                vec![TypeRV::new_row_var_use(0, TypeBound::Any)].into(),
+            ];
+            let t = SumType::new(variants.clone());
+            assert_eq!(variants, t.variants().cloned().collect_vec());
+        }
+        {
+            assert_eq!(
+                vec![&TypeRV::EMPTY_TYPEROW; 3],
+                SumType::new_unary(3).variants().collect_vec()
+            );
+        }
+    }
+
     mod proptest {
 
         use crate::proptest::RecursionDepth;
 
         use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
         use crate::types::{CustomType, FuncValueType, SumType, TypeRowRV};
-        use ::proptest::prelude::*;
+        use proptest::prelude::*;
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;

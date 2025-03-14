@@ -203,7 +203,7 @@ impl<T: MakeOpDef> MakeExtensionOp for T {
 }
 
 /// Load an [MakeOpDef] from its name.
-/// See [strum_macros::EnumString].
+/// See [strum::EnumString].
 pub fn try_from_name<T>(name: &OpNameRef, def_extension: &ExtensionId) -> Result<T, OpLoadError>
 where
     T: std::str::FromStr + MakeOpDef,
@@ -302,7 +302,7 @@ mod test {
 
     use super::*;
     use lazy_static::lazy_static;
-    use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+    use strum::{EnumIter, EnumString, IntoStaticStr};
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
     enum DummyEnum {

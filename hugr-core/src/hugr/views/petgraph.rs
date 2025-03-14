@@ -1,10 +1,10 @@
 //! Implementations of petgraph's traits for Hugr Region views.
 
+use crate::core::HugrNode;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
 use crate::types::EdgeKind;
-use crate::NodeIndex;
-use crate::{Node, Port};
+use crate::Port;
 
 use petgraph::visit as pv;
 
@@ -37,8 +37,8 @@ impl<T> pv::GraphBase for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
-    type NodeId = Node;
-    type EdgeId = ((Node, Port), (Node, Port));
+    type NodeId = T::Node;
+    type EdgeId = ((T::Node, Port), (T::Node, Port));
 }
 
 impl<T> pv::GraphProp for PetgraphWrapper<'_, T>
@@ -68,11 +68,11 @@ where
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
-        ix.index()
+        self.hugr.get_pg_index(ix).into()
     }
 
     fn from_index(&self, ix: usize) -> Self::NodeId {
-        portgraph::NodeIndex::new(ix).into()
+        self.hugr.get_node(portgraph::NodeIndex::new(ix))
     }
 }
 
@@ -97,8 +97,8 @@ impl<'a, T> pv::IntoNodeReferences for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NodeRef = HugrNodeRef<'a>;
-    type NodeReferences = Box<dyn Iterator<Item = HugrNodeRef<'a>> + 'a>;
+    type NodeRef = HugrNodeRef<'a, T::Node>;
+    type NodeReferences = Box<dyn Iterator<Item = HugrNodeRef<'a, T::Node>> + 'a>;
 
     fn node_references(self) -> Self::NodeReferences {
         Box::new(
@@ -113,7 +113,7 @@ impl<'a, T> pv::IntoNodeIdentifiers for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NodeIdentifiers = Box<dyn Iterator<Item = Node> + 'a>;
+    type NodeIdentifiers = Box<dyn Iterator<Item = T::Node> + 'a>;
 
     fn node_identifiers(self) -> Self::NodeIdentifiers {
         Box::new(self.hugr.nodes())
@@ -124,7 +124,7 @@ impl<'a, T> pv::IntoNeighbors for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type Neighbors = Box<dyn Iterator<Item = Node> + 'a>;
+    type Neighbors = Box<dyn Iterator<Item = T::Node> + 'a>;
 
     fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
         Box::new(self.hugr.output_neighbours(n))
@@ -135,7 +135,7 @@ impl<'a, T> pv::IntoNeighborsDirected for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NeighborsDirected = Box<dyn Iterator<Item = Node> + 'a>;
+    type NeighborsDirected = Box<dyn Iterator<Item = T::Node> + 'a>;
 
     fn neighbors_directed(
         self,
@@ -184,13 +184,13 @@ where
 
 /// Reference to a Hugr node and its associated OpType.
 #[derive(Debug, Clone, Copy)]
-pub struct HugrNodeRef<'a> {
-    node: Node,
+pub struct HugrNodeRef<'a, N> {
+    node: N,
     op: &'a OpType,
 }
 
-impl<'a> HugrNodeRef<'a> {
-    pub(self) fn from_node(node: Node, hugr: &'a impl HugrView) -> Self {
+impl<'a, N: HugrNode> HugrNodeRef<'a, N> {
+    pub(self) fn from_node(node: N, hugr: &'a impl HugrView<Node = N>) -> Self {
         Self {
             node,
             op: hugr.get_optype(node),
@@ -198,8 +198,8 @@ impl<'a> HugrNodeRef<'a> {
     }
 }
 
-impl pv::NodeRef for HugrNodeRef<'_> {
-    type NodeId = Node;
+impl<N: HugrNode> pv::NodeRef for HugrNodeRef<'_, N> {
+    type NodeId = N;
 
     type Weight = OpType;
 

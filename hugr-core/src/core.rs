@@ -49,6 +49,11 @@ pub trait NodeIndex {
     fn index(self) -> usize;
 }
 
+/// A trait for nodes in the Hugr.
+pub trait HugrNode: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash {}
+
+impl<T: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash> HugrNode for T {}
+
 /// A port in the incoming direction.
 #[derive(
     Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, serde::Serialize, serde::Deserialize,
@@ -73,7 +78,7 @@ pub type Direction = portgraph::Direction;
 )]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
-pub struct Wire(Node, OutgoingPort);
+pub struct Wire<N = Node>(N, OutgoingPort);
 
 impl Node {
     /// Returns the node as a portgraph `NodeIndex`.
@@ -204,16 +209,16 @@ impl NodeIndex for Node {
     }
 }
 
-impl Wire {
+impl<N: HugrNode> Wire<N> {
     /// Create a new wire from a node and a port.
     #[inline]
-    pub fn new(node: Node, port: impl Into<OutgoingPort>) -> Self {
+    pub fn new(node: N, port: impl Into<OutgoingPort>) -> Self {
         Self(node, port.into())
     }
 
     /// The node that this wire is connected to.
     #[inline]
-    pub fn node(&self) -> Node {
+    pub fn node(&self) -> N {
         self.0
     }
 
@@ -224,9 +229,9 @@ impl Wire {
     }
 }
 
-impl std::fmt::Display for Wire {
+impl<N: HugrNode> std::fmt::Display for Wire<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Wire({}, {})", self.0.index(), self.1.index)
+        write!(f, "Wire({}, {})", self.0, self.1.index)
     }
 }
 
@@ -238,9 +243,9 @@ impl std::fmt::Display for Wire {
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-pub enum CircuitUnit {
+pub enum CircuitUnit<N = Node> {
     /// Arbitrary input wire.
-    Wire(Wire),
+    Wire(Wire<N>),
     /// Index to region input.
     Linear(usize),
 }

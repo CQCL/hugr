@@ -624,7 +624,7 @@ pub trait Dataflow: Container {
         let make_op = self.add_dataflow_op(
             Tag {
                 tag,
-                variants: variants.into_iter().map(Into::into).collect_vec(),
+                variants: variants.into_iter().collect_vec(),
             },
             values.into_iter().collect_vec(),
         )?;
@@ -713,6 +713,27 @@ pub trait Dataflow: Container {
     /// added using indices in to the vector.
     fn as_circuit(&mut self, wires: impl IntoIterator<Item = Wire>) -> CircuitBuilder<Self> {
         CircuitBuilder::new(wires, self)
+    }
+
+    /// Add a [Barrier] to a set of wires and return them in the same order.
+    ///
+    /// [Barrier]: crate::extension::prelude::Barrier
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the Barrier node
+    /// or retrieving the type of the incoming wires.
+    fn add_barrier(
+        &mut self,
+        wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let wires = wires.into_iter().collect_vec();
+        let types: Result<Vec<Type>, _> =
+            wires.iter().map(|&wire| self.get_wire_type(wire)).collect();
+        let types = types?;
+        let barrier_op =
+            self.add_dataflow_op(crate::extension::prelude::Barrier::new(types), wires)?;
+        Ok(barrier_op)
     }
 }
 

@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::sum_with_error;
 use crate::extension::prelude::{bool_t, string_type, usize_t};
@@ -40,6 +40,8 @@ pub enum ConvertOpDef {
     itostring_s,
     itousize,
     ifromusize,
+    bytecast_int64_to_float64,
+    bytecast_float64_to_int64,
 }
 
 impl MakeOpDef for ConvertOpDef {
@@ -69,6 +71,8 @@ impl MakeOpDef for ConvertOpDef {
             itostring_u | itostring_s => int_polytype(1, vec![int_tv(0)], vec![string_type()]),
             itousize => int_polytype(0, vec![int_type(6)], vec![usize_t()]),
             ifromusize => int_polytype(0, vec![usize_t()], vec![int_type(6)]),
+            bytecast_int64_to_float64 => int_polytype(0, vec![int_type(6)], vec![float64_type()]),
+            bytecast_float64_to_int64 => int_polytype(0, vec![float64_type()], vec![int_type(6)]),
         }
         .into()
     }
@@ -86,6 +90,12 @@ impl MakeOpDef for ConvertOpDef {
             itostring_u => "convert an unsigned integer to its string representation",
             itousize => "convert a 64b unsigned integer to its usize representation",
             ifromusize => "convert a usize to a 64b unsigned integer",
+            bytecast_int64_to_float64 => {
+                "reinterpret an int64 as a float64 based on its bytes, with the same endianness"
+            }
+            bytecast_float64_to_int64 => {
+                "reinterpret an float64 as an int based on its bytes, with the same endianness"
+            }
         }
         .to_string()
     }

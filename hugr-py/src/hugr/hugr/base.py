@@ -174,6 +174,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         node = replace(node, _num_out_ports=num_outs, _metadata=node_data.metadata)
         if parent:
             self[parent].children.append(node)
+
+        self._update_node_outs(node, num_outs)
         return node
 
     def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
@@ -278,10 +280,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         parent = self[node].parent
         if parent:
             self[parent].children.remove(node)
-        for offset in range(self.num_in_ports(node)):
-            self._links.delete_right(_SubPort(node.inp(offset)))
-        for offset in range(self.num_out_ports(node)):
-            self._links.delete_left(_SubPort(node.out(offset)))
+        for inp, _ in self.incoming_links(node):
+            self._links.delete_right(_SubPort(inp))
+        for out, _ in self.outgoing_links(node):
+            self._links.delete_left(_SubPort(out))
 
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
 
@@ -343,6 +345,24 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         self[src.node]._num_outs = max(self[src.node]._num_outs, src.offset + 1)
         self[dst.node]._num_inps = max(self[dst.node]._num_inps, dst.offset + 1)
+
+    def add_order_link(self, src: ToNode, dst: ToNode) -> None:
+        """Add a state order link between two nodes.
+
+        Args:
+            src: Source node.
+            dst: Destination node.
+
+        Examples:
+            >>> df = dfg.Dfg()
+            >>> df.hugr.add_order_link(df.input_node, df.output_node)
+            >>> list(df.hugr.outgoing_order_links(df.input_node))
+            [Node(2)]
+        """
+        source = src.out(-1)
+        target = dst.inp(-1)
+        if not self.has_link(source, target):
+            self.add_link(source, target)
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
         """Delete a link (edge) between two nodes from the HUGR.

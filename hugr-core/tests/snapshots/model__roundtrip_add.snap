@@ -4,24 +4,27 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-add.
 ---
 (hugr 0)
 
+(import core.fn)
+
 (import arithmetic.int.iadd)
 
 (import arithmetic.int.types.int)
 
-(define-func example.add
-  [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)]
-  [(@ arithmetic.int.types.int)]
-  (ext)
-  (dfg
-    [%0 %1] [%2]
+(define-func
+  example.add
+  (core.fn
+    [arithmetic.int.types.int arithmetic.int.types.int]
+    [arithmetic.int.types.int]
+    (ext))
+  (dfg [%0 %1] [%2]
     (signature
-      (->
-        [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)]
-        [(@ arithmetic.int.types.int)]
+      (core.fn
+        [arithmetic.int.types.int arithmetic.int.types.int]
+        [arithmetic.int.types.int]
         (ext)))
-    ((@ arithmetic.int.iadd) [%0 %1] [%2]
+    (arithmetic.int.iadd [%0 %1] [%2]
       (signature
-        (->
-          [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)]
-          [(@ arithmetic.int.types.int)]
-          (ext arithmetic.int))))))
+        (core.fn
+          [arithmetic.int.types.int arithmetic.int.types.int]
+          [arithmetic.int.types.int]
+          (ext))))))

@@ -4,10 +4,14 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-alia
 ---
 (hugr 0)
 
+(import core.fn)
+
 (import arithmetic.int.types.int)
 
-(declare-alias local.float type)
+(import core.type)
 
-(define-alias local.int type (@ arithmetic.int.types.int))
+(declare-alias local.float core.type)
 
-(define-alias local.endo type (-> [] [] (ext)))
+(define-alias local.int core.type arithmetic.int.types.int)
+
+(define-alias local.endo core.type (core.fn [] [] (ext)))

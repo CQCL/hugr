@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
@@ -55,9 +55,15 @@ impl ConstFold for LogicOp {
                 (!res || inps.len() as u64 == 1)
                     .then_some(vec![(0.into(), ops::Value::from_bool(res))])
             }
+            Self::Xor => {
+                let inps = read_inputs(consts)?;
+                let res = inps.iter().fold(false, |acc, x| acc ^ *x);
+                (inps.len() as u64 == 2).then_some(vec![(0.into(), ops::Value::from_bool(res))])
+            }
         }
     }
 }
+
 /// Logic extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
@@ -67,12 +73,13 @@ pub enum LogicOp {
     Or,
     Eq,
     Not,
+    Xor,
 }
 
 impl MakeOpDef for LogicOp {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
-            LogicOp::And | LogicOp::Or | LogicOp::Eq => {
+            LogicOp::And | LogicOp::Or | LogicOp::Eq | LogicOp::Xor => {
                 Signature::new(vec![bool_t(); 2], vec![bool_t()])
             }
             LogicOp::Not => Signature::new_endo(vec![bool_t()]),
@@ -90,6 +97,7 @@ impl MakeOpDef for LogicOp {
             LogicOp::Or => "logical 'or'",
             LogicOp::Eq => "test if bools are equal",
             LogicOp::Not => "logical 'not'",
+            LogicOp::Xor => "logical 'xor'",
         }
         .to_string()
     }
@@ -181,7 +189,7 @@ pub(crate) mod test {
     fn test_logic_extension() {
         let r: Arc<Extension> = extension();
         assert_eq!(r.name() as &str, "logic");
-        assert_eq!(r.operations().count(), 4);
+        assert_eq!(r.operations().count(), 5);
 
         for op in LogicOp::iter() {
             assert_eq!(
@@ -230,6 +238,8 @@ pub(crate) mod test {
     #[case(LogicOp::Eq, [false, false], true)]
     #[case(LogicOp::Not, [false], true)]
     #[case(LogicOp::Not, [true], false)]
+    #[case(LogicOp::Xor, [true, false], true)]
+    #[case(LogicOp::Xor, [true, true], false)]
     fn const_fold(
         #[case] op: LogicOp,
         #[case] ins: impl IntoIterator<Item = bool>,
@@ -256,6 +266,7 @@ pub(crate) mod test {
     #[case(LogicOp::Or, [None, Some(true)], Some(true))]
     #[case(LogicOp::Eq, [None, Some(true)], None)]
     #[case(LogicOp::Not, [None], None)]
+    #[case(LogicOp::Xor, [None, Some(true)], None)]
     fn partial_const_fold(
         #[case] op: LogicOp,
         #[case] ins: impl IntoIterator<Item = Option<bool>>,

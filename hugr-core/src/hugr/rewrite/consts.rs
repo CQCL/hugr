@@ -10,7 +10,7 @@ use super::Rewrite;
 
 /// Remove a [`crate::ops::LoadConstant`] node with no consumers.
 #[derive(Debug, Clone)]
-pub struct RemoveLoadConstant(pub Node);
+pub struct RemoveLoadConstant<N = Node>(pub N);
 
 /// Error from an [`RemoveConst`] or [`RemoveLoadConstant`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
@@ -32,7 +32,7 @@ impl Rewrite for RemoveLoadConstant {
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
         let node = self.0;
 
         if (!h.contains_node(node)) || (!h.get_optype(node).is_load_constant()) {
@@ -80,7 +80,7 @@ impl Rewrite for RemoveConst {
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
         let node = self.0;
 
         if (!h.contains_node(node)) || (!h.get_optype(node).is_const()) {

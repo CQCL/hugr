@@ -1,14 +1,13 @@
 //! [ascent] datalog implementation of analysis.
 
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet; // Moves to std::hash in Rust 1.76
+use std::collections::HashMap;
 
 use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::ops::{OpTrait, OpType, TailLoop};
-use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
+use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
 use super::{
@@ -21,12 +20,15 @@ type PV<V> = PartialValue<V>;
 /// Basic structure for performing an analysis. Usage:
 /// 1. Make a new instance via [Self::new()]
 /// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] and/or
-///    [Self::prepopulate_df_inputs] with initial values.
-///    For example, to analyse a [Module](OpType::Module)-rooted Hugr as a library,
-///    [Self::prepopulate_df_inputs] can be used on each externally-callable
+///    [Self::prepopulate_inputs] with initial values.
+///    For example, to analyse a [Module](OpType::Module)-rooted Hugr,
+///    [Self::prepopulate_inputs] can be used on each externally-callable
 ///    [FuncDefn](OpType::FuncDefn) to set all inputs to [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
-pub struct Machine<H: HugrView, V: AbstractValue>(H, Vec<(Node, IncomingPort, PartialValue<V>)>);
+pub struct Machine<H: HugrView, V: AbstractValue>(
+    H,
+    HashMap<H::Node, Vec<(IncomingPort, PartialValue<V>)>>,
+);
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Create a new Machine to analyse the given Hugr(View)
@@ -36,100 +38,107 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
 }
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
-    /// Provide initial values for a wire - these will be `join`d with any computed.
-    pub fn prepopulate_wire(&mut self, w: Wire, v: PartialValue<V>) {
-        self.1.extend(
-            self.0
-                .linked_inputs(w.node(), w.source())
-                .map(|(n, inp)| (n, inp, v.clone())),
-        );
+    /// Provide initial values for a wire - these will be `join`d with any computed
+    /// or any value previously prepopulated for the same Wire.
+    pub fn prepopulate_wire(&mut self, w: Wire<H::Node>, v: PartialValue<V>) {
+        for (n, inp) in self.0.linked_inputs(w.node(), w.source()) {
+            self.1.entry(n).or_default().push((inp, v.clone()));
+        }
     }
 
-    /// Provide initial values for the inputs to a [DataflowParent](hugr_core::ops::OpTag::DataflowParent)
-    /// (that is, values on the wires leaving the [Input](OpType::Input) child thereof).
-    /// Any out-ports of said same `Input` node, not given values by `in_values`, are set to [PartialValue::Top].
-    pub fn prepopulate_df_inputs(
+    /// Provide initial values for the inputs to a container node
+    /// (a [DataflowParent](hugr_core::ops::OpTag::DataflowParent), [CFG](hugr_core::ops::CFG)
+    /// or [Conditional](hugr_core::ops::Conditional)).
+    /// Any inputs not given values by `in_values`, are set to [PartialValue::Top].
+    /// Multiple calls for the same `parent` will `join` values for corresponding ports.
+    pub fn prepopulate_inputs(
         &mut self,
-        parent: Node,
-        in_values: impl IntoIterator<Item = (OutgoingPort, PartialValue<V>)>,
-    ) {
-        // Put values onto out-wires of Input node
-        let [inp, _] = self.0.get_io(parent).unwrap();
-        let mut vals = vec![PartialValue::Top; self.0.signature(inp).unwrap().output_types().len()];
-        for (ip, v) in in_values {
-            vals[ip.index()] = v;
+        parent: H::Node,
+        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
+    ) -> Result<(), OpType> {
+        match self.0.get_optype(parent) {
+            OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => {
+                // Put values onto out-wires of Input node
+                let [inp, _] = self.0.get_io(parent).unwrap();
+                let mut vals =
+                    vec![PartialValue::Top; self.0.signature(inp).unwrap().output_types().len()];
+                for (ip, v) in in_values {
+                    vals[ip.index()] = v;
+                }
+                for (i, v) in vals.into_iter().enumerate() {
+                    self.prepopulate_wire(Wire::new(inp, i), v);
+                }
+            }
+            OpType::DFG(_) | OpType::TailLoop(_) | OpType::CFG(_) | OpType::Conditional(_) => {
+                // dataflow will handle this and propagate to the correct Input node(s)
+                let mut vals =
+                    vec![PartialValue::Top; self.0.signature(parent).unwrap().input_types().len()];
+                for (ip, v) in in_values {
+                    vals[ip.index()] = v;
+                }
+                self.1
+                    .entry(parent)
+                    .or_default()
+                    .extend(vals.into_iter().enumerate().map(|(i, v)| (i.into(), v)));
+            }
+            op => return Err(op.clone()),
         }
-        for (i, v) in vals.into_iter().enumerate() {
-            self.prepopulate_wire(Wire::new(inp, i), v);
-        }
+        Ok(())
     }
 
-    /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// given initial values for some of the root node inputs. For a
-    /// [Module](OpType::Module)-rooted Hugr, these are input to the function `"main"`.
+    /// Run the analysis (iterate until a lattice fixpoint is reached).
+    /// As a shortcut, for Hugrs whose root is a [FuncDefn](OpType::FuncDefn),
+    /// [CFG](OpType::CFG), [DFG](OpType::DFG), [Conditional](OpType::Conditional)
+    /// or [TailLoop] only (that is: *not* [Module](OpType::Module),
+    /// [DataflowBlock](OpType::DataflowBlock) or [Case](OpType::Case)),
+    /// `in_values` may provide initial values for the root-node inputs,
+    ///  equivalent to calling `prepopulate_inputs` with the root node.
+    ///
     /// The context passed in allows interpretation of leaf operations.
     ///
     /// # Panics
     /// May panic in various ways if the Hugr is invalid;
-    /// or if any `in_values` are provided for a module-rooted Hugr without a function `"main"`.
+    /// or if any `in_values` are provided for a module-rooted Hugr.
     pub fn run(
         mut self,
-        context: impl DFContext<V>,
+        context: impl DFContext<V, Node = H::Node>,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
     ) -> AnalysisResults<V, H> {
-        let mut in_values = in_values.into_iter();
         let root = self.0.root();
-        // Some nodes do not accept values as dataflow inputs - for these
-        // we must find the corresponding Input node.
-        let input_node_parent = match self.0.get_optype(root) {
-            OpType::Module(_) => {
-                let main = self.0.children(root).find(|n| {
-                    self.0
-                        .get_optype(*n)
-                        .as_func_defn()
-                        .is_some_and(|f| f.name == "main")
-                });
-                if main.is_none() && in_values.next().is_some() {
-                    panic!("Cannot give inputs to module with no 'main'");
-                }
-                main
-            }
-            OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => Some(root),
-            // Could also do Dfg above, but ok here too:
-            _ => None, // Just feed into node inputs
-        };
-        // Any inputs we don't have values for, we must assume `Top` to ensure safety of analysis
-        // (Consider: for a conditional that selects *either* the unknown input *or* value V,
-        // analysis must produce Top == we-know-nothing, not `V` !)
-        if let Some(p) = input_node_parent {
-            self.prepopulate_df_inputs(
-                p,
-                in_values.map(|(p, v)| (OutgoingPort::from(p.index()), v)),
-            );
+        if self.0.get_optype(root).is_module() {
+            assert!(
+                in_values.into_iter().next().is_none(),
+                "No inputs possible for Module"
+            )
         } else {
-            // Put values onto in-wires of root node, datalog will do the rest
-            self.1.extend(in_values.map(|(p, v)| (root, p, v)));
-            let got_inputs: HashSet<_, RandomState> = self
-                .1
-                .iter()
-                .filter_map(|(n, p, _)| (n == &root).then_some(*p))
-                .collect();
-            for p in self.0.signature(root).unwrap_or_default().input_ports() {
-                if !got_inputs.contains(&p) {
-                    self.1.push((root, p, PartialValue::Top));
-                }
+            let mut p = in_values.into_iter().peekable();
+            // We must provide some inputs to the root so that they are Top rather than Bottom.
+            // (However, this test will fail for DataflowBlock or Case roots, i.e. if no
+            // inputs have been provided they will still see Bottom. We could store the "input"
+            // values for even these nodes in self.1 and then convert to actual Wire values
+            // (outputs from the Input node) before we run_datalog, but we would need to have
+            // a separate store of output-wire values in self to keep prepopulate_wire working.)
+            if p.peek().is_some() || !self.1.contains_key(&root) {
+                self.prepopulate_inputs(root, p).unwrap()
             }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
         // for any nonlocal edges providing values from outside the region.
-        run_datalog(context, self.0, self.1)
+        run_datalog(
+            context,
+            self.0,
+            self.1
+                .into_iter()
+                .flat_map(|(n, vals)| vals.into_iter().map(move |(ip, v)| (n, ip, v)))
+                .collect(),
+        )
     }
 }
 
 pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
-    mut ctx: impl DFContext<V>,
+    mut ctx: impl DFContext<V, Node = H::Node>,
     hugr: H,
-    in_wire_value_proto: Vec<(Node, IncomingPort, PV<V>)>,
+    in_wire_value_proto: Vec<(H::Node, IncomingPort, PV<V>)>,
 ) -> AnalysisResults<V, H> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.
@@ -139,16 +148,16 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         clippy::collapsible_if
     )]
     let all_results = ascent::ascent_run! {
-        pub(super) struct AscentProgram<V: AbstractValue>;
-        relation node(Node); // <Node> exists in the hugr
-        relation in_wire(Node, IncomingPort); // <Node> has an <IncomingPort> of `EdgeKind::Value`
-        relation out_wire(Node, OutgoingPort); // <Node> has an <OutgoingPort> of `EdgeKind::Value`
-        relation parent_of_node(Node, Node); // <Node> is parent of <Node>
-        relation input_child(Node, Node); // <Node> has 1st child <Node> that is its `Input`
-        relation output_child(Node, Node); // <Node> has 2nd child <Node> that is its `Output`
-        lattice out_wire_value(Node, OutgoingPort, PV<V>); // <Node> produces, on <OutgoingPort>, the value <PV>
-        lattice in_wire_value(Node, IncomingPort, PV<V>); // <Node> receives, on <IncomingPort>, the value <PV>
-        lattice node_in_value_row(Node, ValueRow<V>); // <Node>'s inputs are <ValueRow>
+        pub(super) struct AscentProgram<V: AbstractValue, H: HugrView>;
+        relation node(H::Node); // <Node> exists in the hugr
+        relation in_wire(H::Node, IncomingPort); // <Node> has an <IncomingPort> of `EdgeKind::Value`
+        relation out_wire(H::Node, OutgoingPort); // <Node> has an <OutgoingPort> of `EdgeKind::Value`
+        relation parent_of_node(H::Node, H::Node); // <Node> is parent of <Node>
+        relation input_child(H::Node, H::Node); // <Node> has 1st child <Node> that is its `Input`
+        relation output_child(H::Node, H::Node); // <Node> has 2nd child <Node> that is its `Output`
+        lattice out_wire_value(H::Node, OutgoingPort, PV<V>); // <Node> produces, on <OutgoingPort>, the value <PV>
+        lattice in_wire_value(H::Node, IncomingPort, PV<V>); // <Node> receives, on <IncomingPort>, the value <PV>
+        lattice node_in_value_row(H::Node, ValueRow<V>); // <Node>'s inputs are <ValueRow>
 
         node(n) <-- for n in hugr.nodes();
 
@@ -191,7 +200,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
         // DFG --------------------
-        relation dfg_node(Node); // <Node> is a `DFG`
+        relation dfg_node(H::Node); // <Node> is a `DFG`
         dfg_node(n) <-- node(n), if hugr.get_optype(*n).is_dfg();
 
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
@@ -228,7 +237,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Conditional --------------------
         // <Node> is a `Conditional` and its <usize>'th child (a `Case`) is <Node>:
-        relation case_node(Node, usize, Node);
+        relation case_node(H::Node, usize, H::Node);
         case_node(cond, i, case) <-- node(cond),
           if hugr.get_optype(*cond).is_conditional(),
           for (i, case) in hugr.children(*cond).enumerate(),
@@ -251,17 +260,17 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
           in_wire_value(o, o_p, v);
 
         // In `Conditional` <Node>, child `Case` <Node> is reachable given our knowledge of predicate:
-        relation case_reachable(Node, Node);
+        relation case_reachable(H::Node, H::Node);
         case_reachable(cond, case) <-- case_node(cond, i, case),
             in_wire_value(cond, IncomingPort::from(0), v),
             if v.supports_tag(*i);
 
         // CFG --------------------
-        relation cfg_node(Node); // <Node> is a `CFG`
+        relation cfg_node(H::Node); // <Node> is a `CFG`
         cfg_node(n) <-- node(n), if hugr.get_optype(*n).is_cfg();
 
         // In `CFG` <Node>, basic block <Node> is reachable given our knowledge of predicates:
-        relation bb_reachable(Node, Node);
+        relation bb_reachable(H::Node, H::Node);
         bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = hugr.children(*cfg).next();
         bb_reachable(cfg, bb) <-- cfg_node(cfg),
             bb_reachable(cfg, pred),
@@ -279,7 +288,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // In `CFG` <Node>, values fed along a control-flow edge to <Node>
         //     come out of Value outports of <Node>:
-        relation _cfg_succ_dest(Node, Node, Node);
+        relation _cfg_succ_dest(H::Node, H::Node, H::Node);
         _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = hugr.children(*cfg).nth(1);
         _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
             for blk in hugr.children(*cfg),
@@ -298,7 +307,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             for (out_p, v) in fields.enumerate();
 
         // Call --------------------
-        relation func_call(Node, Node); // <Node> is a `Call` to `FuncDefn` <Node>
+        relation func_call(H::Node, H::Node); // <Node> is a `Call` to `FuncDefn` <Node>
         func_call(call, func_defn) <--
             node(call),
             if hugr.get_optype(*call).is_call(),
@@ -328,10 +337,10 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
     }
 }
 
-fn propagate_leaf_op<V: AbstractValue>(
-    ctx: &mut impl DFContext<V>,
-    hugr: &impl HugrView,
-    n: Node,
+fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
+    ctx: &mut impl DFContext<V, Node = H::Node>,
+    hugr: &H,
+    n: H::Node,
     ins: &[PV<V>],
     num_outs: usize,
 ) -> Option<ValueRow<V>> {

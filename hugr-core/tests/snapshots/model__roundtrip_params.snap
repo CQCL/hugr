@@ -4,8 +4,13 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
 ---
 (hugr 0)
 
-(define-func example.swap
-  (forall ?0 type)
-  (forall ?1 type)
-  [?0 ?1] [?1 ?0] (ext)
-  (dfg [%0 %1] [%1 %0] (signature (-> [?0 ?1] [?1 ?0] (ext)))))
+(import core.fn)
+
+(import core.type)
+
+(define-func
+  example.swap
+  (param ?0 core.type)
+  (param ?1 core.type)
+  (core.fn [?0 ?1] [?1 ?0] (ext))
+  (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0] (ext)))))

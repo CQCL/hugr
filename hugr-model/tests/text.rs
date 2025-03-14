@@ -1,11 +1,11 @@
 #![allow(missing_docs)]
 
-use hugr_model::v0 as model;
+use hugr_model::v0::ast;
+use std::str::FromStr as _;
 
 fn roundtrip(source: &str) -> String {
-    let bump = bumpalo::Bump::new();
-    let parsed_model = model::text::parse(source, &bump).unwrap();
-    model::text::print_to_string(&parsed_model.module, 80).unwrap()
+    let module = ast::Module::from_str(source).unwrap();
+    module.to_string()
 }
 
 #[test]

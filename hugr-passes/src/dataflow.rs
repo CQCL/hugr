@@ -14,7 +14,7 @@ pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::types::TypeArg;
-use hugr_core::{Hugr, Node};
+use hugr_core::Hugr;
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).
@@ -29,7 +29,7 @@ pub trait DFContext<V>: ConstLoader<V> {
     /// [UnpackTuple]: hugr_core::extension::prelude::UnpackTuple
     fn interpret_leaf_op(
         &mut self,
-        _node: Node,
+        _node: Self::Node,
         _e: &ExtensionOp,
         _ins: &[PartialValue<V>],
         _outs: &mut [PartialValue<V>],
@@ -38,18 +38,18 @@ pub trait DFContext<V>: ConstLoader<V> {
 }
 
 /// A location where a [Value] could be find in a Hugr. That is,
-/// (perhaps deeply nested within [Value::Sum]s) within a [Node]
+/// (perhaps deeply nested within [Value::Sum]s) within a node `N`
 /// that is a [Const](hugr_core::ops::Const).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ConstLocation<'a> {
+pub enum ConstLocation<'a, N> {
     /// The specified-index'th field of the [Value::Sum] constant identified by the RHS
-    Field(usize, &'a ConstLocation<'a>),
+    Field(usize, &'a ConstLocation<'a, N>),
     /// The entire ([Const::value](hugr_core::ops::Const::value)) of the node.
-    Node(Node),
+    Node(N),
 }
 
-impl From<Node> for ConstLocation<'_> {
-    fn from(value: Node) -> Self {
+impl<N> From<N> for ConstLocation<'_, N> {
+    fn from(value: N) -> Self {
         ConstLocation::Node(value)
     }
 }
@@ -59,15 +59,18 @@ impl From<Node> for ConstLocation<'_> {
 /// [Self::value_from_const_hugr], and [Self::value_from_function]: the defaults
 /// are "correct" but maximally conservative (minimally informative).
 pub trait ConstLoader<V> {
+    /// The type of nodes in the Hugr.
+    type Node;
+
     /// Produces an abstract value from an [OpaqueValue], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
-    fn value_from_opaque(&self, _loc: ConstLocation, _val: &OpaqueValue) -> Option<V> {
+    fn value_from_opaque(&self, _loc: ConstLocation<Self::Node>, _val: &OpaqueValue) -> Option<V> {
         None
     }
 
     /// Produces an abstract value from a Hugr in a [Value::Function], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
-    fn value_from_const_hugr(&self, _loc: ConstLocation, _h: &Hugr) -> Option<V> {
+    fn value_from_const_hugr(&self, _loc: ConstLocation<Self::Node>, _h: &Hugr) -> Option<V> {
         None
     }
 
@@ -78,7 +81,7 @@ pub trait ConstLoader<V> {
     /// [FuncDefn]: hugr_core::ops::FuncDefn
     /// [FuncDecl]: hugr_core::ops::FuncDecl
     /// [LoadFunction]: hugr_core::ops::LoadFunction
-    fn value_from_function(&self, _node: Node, _type_args: &[TypeArg]) -> Option<V> {
+    fn value_from_function(&self, _node: Self::Node, _type_args: &[TypeArg]) -> Option<V> {
         None
     }
 }
@@ -87,11 +90,14 @@ pub trait ConstLoader<V> {
 /// to their leaves ([Value::Extension] and [Value::Function]),
 /// converts these using [ConstLoader::value_from_opaque] and [ConstLoader::value_from_const_hugr],
 /// and builds nested [PartialValue::new_variant] to represent the structure.
-pub fn partial_from_const<'a, V>(
-    cl: &impl ConstLoader<V>,
-    loc: impl Into<ConstLocation<'a>>,
+pub fn partial_from_const<'a, V, CL: ConstLoader<V>>(
+    cl: &CL,
+    loc: impl Into<ConstLocation<'a, CL::Node>>,
     cst: &Value,
-) -> PartialValue<V> {
+) -> PartialValue<V>
+where
+    CL::Node: 'a,
+{
     let loc = loc.into();
     match cst {
         Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) => {

@@ -20,22 +20,22 @@ use super::call_graph::{CallGraph, CallGraphNode};
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 /// Errors produced by [RemoveDeadFuncsPass].
-pub enum RemoveDeadFuncsError {
+pub enum RemoveDeadFuncsError<N = Node> {
     /// The specified entry point is not a FuncDefn node or is not a child of the root.
     #[error(
         "Entrypoint for RemoveDeadFuncsPass {node} was not a function definition in the root module"
     )]
     InvalidEntryPoint {
         /// The invalid node.
-        node: Node,
+        node: N,
     },
 }
 
-fn reachable_funcs<'a>(
-    cg: &'a CallGraph,
-    h: &'a impl HugrView,
-    entry_points: impl IntoIterator<Item = Node>,
-) -> Result<impl Iterator<Item = Node> + 'a, RemoveDeadFuncsError> {
+fn reachable_funcs<'a, H: HugrView>(
+    cg: &'a CallGraph<H::Node>,
+    h: &'a H,
+    entry_points: impl IntoIterator<Item = H::Node>,
+) -> Result<impl Iterator<Item = H::Node> + 'a, RemoveDeadFuncsError<H::Node>> {
     let g = cg.graph();
     let mut entry_points = entry_points.into_iter();
     let searcher = if h.get_optype(h.root()).is_module() {

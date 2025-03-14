@@ -150,6 +150,37 @@
         }
       },
       "binary": false
+    },
+    "Xor": {
+      "extension": "logic",
+      "name": "Xor",
+      "description": "logical 'xor'",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
     }
   }
 }

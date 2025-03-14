@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.3...hugr-core-v0.14.4) - 2025-02-24
+
+### Bug Fixes
+
+- delegate default impls in HugrView (#1921)
+
+### New Features
+
+- add xor to logic extension (#1911)
+- Add `Type::as_sum` and `SumType::variants`. (#1914)
+- Add `HugrMutInternals::insert_ports` (#1915)
+
+## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.2...hugr-core-v0.14.3) - 2025-02-05
+
+### Bug Fixes
+
+- determine correct bounds of custom types (#1888)
+- Exporting converging control flow edges (#1890)
+
+### Documentation
+
+- Explain why `ConstF64` is not PartialEq (#1829)
+
+### New Features
+
+- Special cased array, float and int constants in hugr-model export (#1857)
+- Simplify hugr-model (#1893)
+
 ## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.1...hugr-core-v0.14.2) - 2025-01-20
 
 ### Bug Fixes

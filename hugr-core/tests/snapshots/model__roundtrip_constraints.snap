@@ -6,22 +6,34 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 
 (import collections.array.array)
 
-(declare-func array.replicate
-  (forall ?0 nat)
-  (forall ?1 type)
-  (where (nonlinear ?1))
-  [?1] [(@ collections.array.array ?0 ?1)] (ext))
+(import core.nat)
 
-(declare-func array.copy
-  (forall ?0 nat)
-  (forall ?1 type)
-  (where (nonlinear ?1))
-  [(@ collections.array.array ?0 ?1)]
-  [(@ collections.array.array ?0 ?1) (@ collections.array.array ?0 ?1)]
-  (ext))
+(import core.type)
 
-(define-func util.copy
-  (forall ?0 type)
-  (where (nonlinear ?0))
-  [?0] [?0 ?0] (ext)
-  (dfg [%0] [%0 %0] (signature (-> [?0] [?0 ?0] (ext)))))
+(import core.nonlinear)
+
+(import core.fn)
+
+(declare-func
+  array.replicate
+  (param ?0 core.nat)
+  (param ?1 core.type)
+  (where (core.nonlinear ?1))
+  (core.fn [?1] [(collections.array.array ?0 ?1)] (ext)))
+
+(declare-func
+  array.copy
+  (param ?0 core.nat)
+  (param ?1 core.type)
+  (where (core.nonlinear ?1))
+  (core.fn
+    [(collections.array.array ?0 ?1)]
+    [(collections.array.array ?0 ?1) (collections.array.array ?0 ?1)]
+    (ext)))
+
+(define-func
+  util.copy
+  (param ?0 core.type)
+  (where (core.nonlinear ?0))
+  (core.fn [?0] [?0 ?0] (ext))
+  (dfg [%0] [%0 %0] (signature (core.fn [?0] [?0 ?0] (ext)))))

@@ -1,17 +1,21 @@
 #![allow(missing_docs)]
 
-use bumpalo::Bump;
+use std::str::FromStr;
+
 use hugr_model::v0 as model;
+use hugr_model::v0::ast;
+use model::bumpalo::Bump;
 use pretty_assertions::assert_eq;
 
 /// Reads a module from a string, serializes it to binary, and then deserializes it back to a module.
 /// The original and deserialized modules are compared for equality.
 pub fn binary_roundtrip(input: &str) {
     let bump = Bump::new();
-    let parsed_module = model::text::parse(input, &bump).unwrap();
-    let bytes = model::binary::write_to_vec(&parsed_module.module);
+    let module = ast::Module::from_str(input).unwrap();
+    let module = module.resolve(&bump).unwrap();
+    let bytes = model::binary::write_to_vec(&module);
     let deserialized_module = model::binary::read_from_slice(&bytes, &bump).unwrap();
-    assert_eq!(parsed_module.module, deserialized_module);
+    assert_eq!(module, deserialized_module);
 }
 
 #[test]

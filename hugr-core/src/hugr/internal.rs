@@ -6,7 +6,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use delegate::delegate;
-use portgraph::{LinkView, MultiPortGraph, PortMut, PortView};
+use itertools::Itertools;
+use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
@@ -25,6 +26,9 @@ pub trait HugrInternals {
     where
         Self: 'p;
 
+    /// The type of nodes in the Hugr.
+    type Node: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash;
+
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
 
@@ -32,7 +36,13 @@ pub trait HugrInternals {
     fn base_hugr(&self) -> &Hugr;
 
     /// Return the root node of this view.
-    fn root_node(&self) -> Node;
+    fn root_node(&self) -> Self::Node;
+
+    /// Convert a node to a portgraph node index.
+    fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+
+    /// Convert a portgraph node index to a node.
+    fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
 }
 
 impl HugrInternals for Hugr {
@@ -40,6 +50,8 @@ impl HugrInternals for Hugr {
         = &'p MultiPortGraph
     where
         Self: 'p;
+
+    type Node = Node;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -52,8 +64,16 @@ impl HugrInternals for Hugr {
     }
 
     #[inline]
-    fn root_node(&self) -> Node {
+    fn root_node(&self) -> Self::Node {
         self.root.into()
+    }
+
+    fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex {
+        node.pg_index()
+    }
+
+    fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node {
+        index.into()
     }
 }
 
@@ -62,11 +82,15 @@ impl<T: HugrInternals> HugrInternals for &T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -76,11 +100,15 @@ impl<T: HugrInternals> HugrInternals for &mut T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -90,11 +118,15 @@ impl<T: HugrInternals> HugrInternals for Rc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -104,11 +136,15 @@ impl<T: HugrInternals> HugrInternals for Arc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -118,11 +154,15 @@ impl<T: HugrInternals> HugrInternals for Box<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -132,11 +172,15 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+    type Node = T::Node;
+
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
             fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
+            fn root_node(&self) -> Self::Node;
+            fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
+            fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
         }
     }
 }
@@ -144,7 +188,7 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
 /// invalidate the HUGR.
-pub trait HugrMutInternals: RootTagged {
+pub trait HugrMutInternals: RootTagged<Node = Node> {
     /// Returns the Hugr at the base of a chain of views.
     fn hugr_mut(&mut self) -> &mut Hugr;
 
@@ -172,6 +216,26 @@ pub trait HugrMutInternals: RootTagged {
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
         panic_invalid_node(self, node);
         self.hugr_mut().add_ports(node, direction, amount)
+    }
+
+    /// Insert `amount` new ports for a node, starting at `index`.  The
+    /// `direction` parameter specifies whether to add ports to the incoming or
+    /// outgoing list. Links from this node are preserved, even when ports are
+    /// renumbered by the insertion.
+    ///
+    /// Returns the range of newly created ports.
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
+    fn insert_ports(
+        &mut self,
+        node: Node,
+        direction: Direction,
+        index: usize,
+        amount: usize,
+    ) -> Range<usize> {
+        panic_invalid_node(self, node);
+        self.hugr_mut().insert_ports(node, direction, index, amount)
     }
 
     /// Sets the parent of a node.
@@ -248,7 +312,7 @@ pub trait HugrMutInternals: RootTagged {
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
+impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMutInternals for T {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.as_mut()
     }
@@ -258,6 +322,43 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
         self.hugr_mut()
             .graph
             .set_num_ports(node.pg_index(), incoming, outgoing, |_, _| {})
+    }
+
+    fn insert_ports(
+        &mut self,
+        node: Node,
+        direction: Direction,
+        index: usize,
+        amount: usize,
+    ) -> Range<usize> {
+        let old_num_ports = self.base_hugr().graph.num_ports(node.pg_index(), direction);
+
+        self.add_ports(node, direction, amount as isize);
+
+        for swap_from_port in (index..old_num_ports).rev() {
+            let swap_to_port = swap_from_port + amount;
+            let [from_port_index, to_port_index] = [swap_from_port, swap_to_port].map(|p| {
+                self.base_hugr()
+                    .graph
+                    .port_index(node.pg_index(), PortOffset::new(direction, p))
+                    .unwrap()
+            });
+            let linked_ports = self
+                .base_hugr()
+                .graph
+                .port_links(from_port_index)
+                .map(|(_, to_subport)| to_subport.port())
+                .collect_vec();
+            self.hugr_mut().graph.unlink_port(from_port_index);
+            for linked_port_index in linked_ports {
+                let _ = self
+                    .hugr_mut()
+                    .graph
+                    .link_ports(to_port_index, linked_port_index)
+                    .expect("Ports exist");
+            }
+        }
+        index..index + amount
     }
 
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
@@ -307,5 +408,42 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
         // We know RootHandle=Node here so no need to check
         let cur = self.hugr_mut().op_types.get_mut(node.pg_index());
         Ok(std::mem::replace(cur, op.into()))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        builder::{Container, DFGBuilder, Dataflow, DataflowHugr},
+        extension::prelude::Noop,
+        hugr::internal::HugrMutInternals as _,
+        ops::handle::NodeHandle,
+        types::{Signature, Type},
+        Direction, HugrView as _,
+    };
+
+    #[test]
+    fn insert_ports() {
+        let (nop, mut hugr) = {
+            let mut builder =
+                DFGBuilder::new(Signature::new_endo(Type::UNIT).with_prelude()).unwrap();
+            let [nop_in] = builder.input_wires_arr();
+            let nop = builder
+                .add_dataflow_op(Noop::new(Type::UNIT), [nop_in])
+                .unwrap();
+            builder.add_other_wire(nop.node(), builder.output().node());
+            let [nop_out] = nop.outputs_arr();
+            (
+                nop.node(),
+                builder.finish_hugr_with_outputs([nop_out]).unwrap(),
+            )
+        };
+        let [i, o] = hugr.get_io(hugr.root()).unwrap();
+        assert_eq!(0..2, hugr.insert_ports(nop, Direction::Incoming, 0, 2));
+        assert_eq!(1..3, hugr.insert_ports(nop, Direction::Outgoing, 1, 2));
+
+        assert_eq!(hugr.single_linked_input(i, 0), Some((nop, 2.into())));
+        assert_eq!(hugr.single_linked_output(o, 0), Some((nop, 0.into())));
+        assert_eq!(hugr.single_linked_output(o, 1), Some((nop, 3.into())));
     }
 }
