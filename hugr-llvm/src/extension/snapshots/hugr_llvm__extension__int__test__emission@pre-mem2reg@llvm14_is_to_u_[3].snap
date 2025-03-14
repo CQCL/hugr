@@ -5,7 +5,7 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-@0 = private unnamed_addr constant [33 x i8] c"is_to_u called on negative value\00", align 1
+@err_msg = private unnamed_addr constant [33 x i8] c"is_to_u called on negative value\00", align 1
 
 define i8 @_hl.main.1(i8 %0) {
 alloca_block:
@@ -26,7 +26,7 @@ panic_if_0:                                       ; preds = %entry_block
   ]
 
 panic:                                            ; preds = %panic_if_0
-  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0))
+  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @err_msg, i32 0, i32 0))
   call void @abort()
   br label %exit
 
