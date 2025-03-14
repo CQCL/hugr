@@ -42,7 +42,6 @@ html-escape = { workspace = true }
 indexmap.workspace = true
 itertools = { workspace = true }
 lazy_static = { workspace = true }
-packed_struct = { workspace = true, features = ["byte_types_64"] }
 paste = { workspace = true }
 petgraph = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
@@ -57,7 +56,6 @@ strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 typetag = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
-zerocopy.workspace = true
 zstd = { workspace = true, optional = true }
 
 [dev-dependencies]
