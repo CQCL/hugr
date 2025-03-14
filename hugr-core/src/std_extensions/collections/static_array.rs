@@ -1,4 +1,18 @@
 //! An extension for working with static arrays.
+//!
+//! The extension `collections.static_arrays` models globally available constant
+//! arrays of [TypeBound::Copyable] values.
+//!
+//! The type `static_array<T>` is parameterised by its element type. Note that
+//! unlike `collections.array.array` the length of a static array is not tracked
+//! in type args.
+//!
+//! The [CustomConst] [StaticArrayValue] is the only manner by which a value of
+//! `static_array` type can be obtained.
+//!
+//! Operations provided:
+//!  * `get<T: Copyable>: [static_array<T>, prelude.usize] -> [[] + [T]]`
+//!  * `len<T: Copyable>: [static_array<T>] -> [prelude.usize]`
 use std::{
     hash, iter,
     sync::{self, Arc},
@@ -21,7 +35,8 @@ use crate::{
     },
     types::{
         type_param::{TypeArgError, TypeParam},
-        CustomType, PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeName,
+        ConstTypeError, CustomCheckFailure, CustomType, PolyFuncType, Signature, Type, TypeArg,
+        TypeBound, TypeName,
     },
     Extension, Wire,
 };
@@ -39,7 +54,8 @@ pub const STATIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("static_array")
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, derive_more::From)]
-/// Statically sized array of values, all of the same type.
+/// Statically sized array of values, all of the same [TypeBound::Copyable]
+/// type.
 pub struct StaticArrayValue {
     /// The contents of the `StaticArrayValue`.
     pub value: ArrayValue,
@@ -53,21 +69,30 @@ impl StaticArrayValue {
             /// Returns the type of values inside the `[StaticArrayValue]`.
             pub fn get_element_type(&self) -> &Type;
         }
-
     }
 
     /// Create a new [CustomConst] for an array of values of type `typ`.
     /// That all values are of type `typ` is not checked here.
-    pub fn new(name: impl ToString, typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
-        Self {
+    pub fn try_new(
+        name: impl ToString,
+        typ: Type,
+        contents: impl IntoIterator<Item = Value>,
+    ) -> Result<Self, ConstTypeError> {
+        if !TypeBound::Copyable.contains(typ.least_upper_bound()) {
+            return Err(CustomCheckFailure::Message(format!(
+                "Failed to construct a StaticArrayValue with non-Copyable type: {typ}"
+            ))
+            .into());
+        }
+        Ok(Self {
             value: ArrayValue::new(typ, contents),
             name: name.to_string(),
-        }
+        })
     }
 
     /// Create a new [CustomConst] for an empty array of values of type `typ`.
-    pub fn new_empty(name: impl ToString, typ: Type) -> Self {
-        Self::new(name, typ, iter::empty())
+    pub fn try_new_empty(name: impl ToString, typ: Type) -> Result<Self, ConstTypeError> {
+        Self::try_new(name, typ, iter::empty())
     }
 
     /// Returns the type of the `[StaticArrayValue]` as a `[CustomType]`.`
@@ -97,14 +122,17 @@ impl CustomConst for StaticArrayValue {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::union_over(self.value.get_contents().iter().map(Value::extension_reqs))
+            .union(EXTENSION_ID.into())
+    }
+
     delegate! {
         to self.value {
             fn update_extensions(
                 &mut self,
                 extensions: &WeakExtensionRegistry,
             ) -> Result<(), ExtensionResolutionError>;
-
-            fn extension_reqs(&self) -> ExtensionSet;
         }
     }
 }
@@ -133,7 +161,7 @@ fn instantiate_const_static_array_custom_type(
     element_ty: impl Into<TypeArg>,
 ) -> CustomType {
     def.instantiate([element_ty.into()])
-        .expect("const array parameters are valid")
+        .unwrap_or_else(|e| panic!("{e}"))
 }
 
 /// Instantiate a new `static_array` [CustomType] given an element type.
@@ -210,14 +238,15 @@ impl MakeOpDef for StaticArrayOpDef {
 
     fn description(&self) -> String {
         match self {
-            Self::get => "TODO",
-            Self::len => "TODO",
+            Self::get => "Get an element from a static array",
+            Self::len => "Get the length of a static array",
         }
         .into()
     }
 
-    // This method is re-defined here since we need to pass the static array type def while computing the signature,
-    // to avoid recursive loops initializing the extension.
+    // This method is re-defined here since we need to pass the static array
+    // type def while computing the signature, to avoid recursive loops
+    // initializing the extension.
     fn add_to_extension(
         &self,
         extension: &mut Extension,
@@ -272,14 +301,19 @@ impl HasConcrete for StaticArrayOpDef {
     type Concrete = StaticArrayOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+        use TypeBound::Copyable;
         match type_args {
             [arg] => {
-                let elem_ty = arg.as_type().ok_or(SignatureError::TypeArgMismatch(
-                    TypeArgError::TypeMismatch {
-                        param: TypeBound::Copyable.into(),
-                        arg: arg.clone(),
-                    },
-                ))?;
+                let elem_ty = arg
+                    .as_type()
+                    .filter(|t| Copyable.contains(t.least_upper_bound()))
+                    .ok_or(SignatureError::TypeArgMismatch(
+                        TypeArgError::TypeMismatch {
+                            param: Copyable.into(),
+                            arg: arg.clone(),
+                        },
+                    ))?;
+
                 Ok(StaticArrayOp {
                     def: *self,
                     elem_ty,
@@ -366,25 +400,34 @@ impl<T: Dataflow> StaticArrayOpBuilder for T {}
 mod test {
     use crate::{
         builder::{DFGBuilder, DataflowHugr as _},
-        extension::prelude::ConstUsize,
+        extension::prelude::{qb_t, ConstUsize, PRELUDE_ID},
         type_row,
     };
 
     use super::*;
 
     #[test]
+    fn const_static_array_copyable() {
+        let _good = StaticArrayValue::try_new_empty("good", Type::UNIT).unwrap();
+        let _bad = StaticArrayValue::try_new_empty("good", qb_t()).unwrap_err();
+    }
+
+    #[test]
     fn all_ops() {
         let _ = {
-            let mut builder = DFGBuilder::new(Signature::new(
-                type_row![],
-                Type::from(option_type(usize_t())),
-            ))
+            let mut builder = DFGBuilder::new(
+                Signature::new(type_row![], Type::from(option_type(usize_t())))
+                    .with_extension_delta(ExtensionSet::from_iter([PRELUDE_ID, EXTENSION_ID])),
+            )
             .unwrap();
-            let array = builder.add_load_value(StaticArrayValue::new(
-                "t",
-                usize_t(),
-                (1..999).map(|x| ConstUsize::new(x).into()),
-            ));
+            let array = builder.add_load_value(
+                StaticArrayValue::try_new(
+                    "t",
+                    usize_t(),
+                    (1..999).map(|x| ConstUsize::new(x).into()),
+                )
+                .unwrap(),
+            );
             let _ = builder.add_static_array_len(usize_t(), array).unwrap();
             let index = builder.add_load_value(ConstUsize::new(777));
             let x = builder
