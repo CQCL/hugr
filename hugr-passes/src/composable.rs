@@ -131,3 +131,56 @@ pub fn validate_if_test<P: ComposablePass>(
         pass.run(hugr).map_err(ValidatePassError::Underlying)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::convert::Infallible;
+
+    use hugr_core::builder::{
+        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    };
+    use hugr_core::extension::prelude::{usize_t, ConstUsize};
+    use hugr_core::ops::DEFAULT_OPTYPE;
+    use hugr_core::{ops::handle::NodeHandle, types::Signature};
+    use itertools::Either;
+
+    use crate::const_fold::{ConstFoldError, ConstantFoldPass};
+    use crate::DeadCodeElimPass;
+
+    use super::ComposablePass;
+
+    #[test]
+    fn test_sequence() {
+        let mut mb = ModuleBuilder::new();
+        let id1 = mb
+            .define_function("id1", Signature::new_endo(usize_t()))
+            .unwrap();
+        let inps = id1.input_wires();
+        let id1 = id1.finish_with_outputs(inps).unwrap();
+        let id2 = mb
+            .define_function("id2", Signature::new_endo(usize_t()))
+            .unwrap();
+        let inps = id2.input_wires();
+        let id2 = id2.finish_with_outputs(inps).unwrap();
+        let hugr = mb.finish_hugr().unwrap();
+
+        let dce = DeadCodeElimPass::default().with_entry_points([id1.node()]);
+        let cfold =
+            ConstantFoldPass::default().with_inputs(id2.node(), [(0, ConstUsize::new(2).into())]);
+
+        cfold.run(&mut hugr.clone()).unwrap();
+
+        let exp_err = ConstFoldError::InvalidEntryPoint(id2.node(), DEFAULT_OPTYPE);
+        let r: Result<(), Either<Infallible, ConstFoldError>> = dce
+            .clone()
+            .sequence_either(cfold.clone())
+            .run(&mut hugr.clone());
+        assert_eq!(r, Err(Either::Right(exp_err.clone())));
+
+        let r: Result<(), ConstFoldError> = dce
+            .map_err(|inf| match inf {})
+            .sequence(cfold)
+            .run(&mut hugr.clone());
+        assert_eq!(r, Err(exp_err));
+    }
+}

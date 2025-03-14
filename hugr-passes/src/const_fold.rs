@@ -40,7 +40,7 @@ pub struct ConstantFoldPass {
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 /// Errors produced by [ConstantFoldPass].
 pub enum ConstFoldError {
