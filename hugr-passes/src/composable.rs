@@ -146,8 +146,8 @@ mod test {
     };
     use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize};
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::ops::{Input, Output, DEFAULT_OPTYPE, DFG, handle::NodeHandle};
-    use hugr_core::{Hugr, HugrView, IncomingPort, types::Signature};
+    use hugr_core::ops::{handle::NodeHandle, Input, Output, DEFAULT_OPTYPE, DFG};
+    use hugr_core::{types::Signature, Hugr, HugrView, IncomingPort};
     use itertools::Either;
 
     use crate::composable::{ValidatePassError, ValidatingPass};
