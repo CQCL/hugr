@@ -139,11 +139,14 @@ mod test {
     use hugr_core::builder::{
         Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{usize_t, ConstUsize};
-    use hugr_core::ops::DEFAULT_OPTYPE;
+    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize};
+    use hugr_core::hugr::hugrmut::HugrMut;
+    use hugr_core::ops::{Input, Output, DEFAULT_OPTYPE, DFG};
     use hugr_core::{ops::handle::NodeHandle, types::Signature};
+    use hugr_core::{Hugr, HugrView, IncomingPort};
     use itertools::Either;
 
+    use crate::composable::{ValidatePassError, ValidatingPass};
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
     use crate::DeadCodeElimPass;
 
@@ -182,5 +185,35 @@ mod test {
             .sequence(cfold)
             .run(&mut hugr.clone());
         assert_eq!(r, Err(exp_err));
+    }
+
+    #[test]
+    fn test_validation() {
+        let mut h = Hugr::new(DFG {
+            signature: Signature::new(usize_t(), bool_t()),
+        });
+        let inp = h.add_node_with_parent(
+            h.root(),
+            Input {
+                types: usize_t().into(),
+            },
+        );
+        let outp = h.add_node_with_parent(
+            h.root(),
+            Output {
+                types: bool_t().into(),
+            },
+        );
+        h.connect(inp, 0, outp, 0);
+        let backup = h.clone();
+        let err = backup.validate().unwrap_err();
+
+        let no_inputs: [(IncomingPort, _); 0] = [];
+        let cfold = ConstantFoldPass::default().with_inputs(backup.root(), no_inputs);
+        cfold.run(&mut h).unwrap();
+        assert_eq!(h, backup); // Did nothing
+
+        let r = ValidatingPass(cfold, false).run(&mut h);
+        assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if e == err));
     }
 }
