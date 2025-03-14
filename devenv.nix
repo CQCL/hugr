@@ -12,7 +12,7 @@ in
 
     llvmVersion = lib.mkOption {
       type = lib.types.str;
-      default = "16";
+      default = "14";
     };
   };
 
