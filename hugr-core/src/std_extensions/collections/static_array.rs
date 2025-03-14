@@ -216,7 +216,7 @@ impl MakeOpDef for StaticArrayOpDef {
         .into()
     }
 
-    // This method is re-defined here since we need to pass the list type def while computing the signature,
+    // This method is re-defined here since we need to pass the static array type def while computing the signature,
     // to avoid recursive loops initializing the extension.
     fn add_to_extension(
         &self,
