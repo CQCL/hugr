@@ -90,19 +90,22 @@ class Package:
         """
         return read_envelope_str(envelope)
 
-    def to_bytes(self, config: EnvelopeConfig) -> bytes:
+    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
         """Serialize the package to a HUGR envelope byte string.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
         """
+        # TODO: Default to a compressed binary format once that is supported.
+        config = config or EnvelopeConfig.TEXT
         return make_envelope(self, config)
 
-    def to_str(self, config: EnvelopeConfig) -> str:
+    def to_str(self, config: EnvelopeConfig | None = None) -> str:
         """Serialize the package to a HUGR envelope string.
 
         Not all envelope formats can be encoded into a string.
         See :meth:`to_bytes` for a more general method.
         """
+        config = config or EnvelopeConfig.TEXT
         return make_envelope_str(self, config)
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
