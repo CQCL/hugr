@@ -156,7 +156,7 @@ def validate(
         serial = h.to_json()
         _run_hugr_cmd(serial, cmd)
     else:
-        serial = h.to_str(EnvelopeConfig.TEXT())
+        serial = h.to_str(EnvelopeConfig.TEXT)
         _run_hugr_cmd(serial, cmd)
 
     if not roundtrip:

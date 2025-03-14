@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import hugr._serialization.extension as ext_s
 
@@ -173,10 +173,12 @@ class EnvelopeConfig:
     format: EnvelopeFormat = EnvelopeFormat.JSON
     zstd: int | None = None
 
+    TEXT: ClassVar[EnvelopeConfig]
+
     def _make_header(self) -> EnvelopeHeader:
         return EnvelopeHeader(format=self.format, zstd=self.zstd is not None)
 
-    @staticmethod
-    def TEXT() -> EnvelopeConfig:
-        """Default configuration for text-based HUGR envelopes."""
-        return EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
+
+# Set EnvelopeConfig's class variables.
+# This can only be done _after_ the class is defined.
+EnvelopeConfig.TEXT = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
