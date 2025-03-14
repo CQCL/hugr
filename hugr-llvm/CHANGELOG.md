@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.4...hugr-llvm-v0.15.0) - 2025-03-14
+
+### Bug Fixes
+
+- Rename widen insta tests ([#1949](https://github.com/CQCL/hugr/pull/1949))
+
+### New Features
+
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- Emit `widen` ops from the int ops extension ([#1946](https://github.com/CQCL/hugr/pull/1946))
+- [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))
+- *(hugr-llvm)* Emit narrow ops ([#1955](https://github.com/CQCL/hugr/pull/1955))
+- Add float <--> int bytecasting ops to conversions extension ([#1956](https://github.com/CQCL/hugr/pull/1956))
+- *(hugr-llvm)* Emit iu_to_s and is_to_u ([#1978](https://github.com/CQCL/hugr/pull/1978))
+
+### Refactor
+
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.3...hugr-llvm-v0.14.4) - 2025-02-24
 
 ### New Features

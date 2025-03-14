@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-v0.14.4...hugr-v0.15.0) - 2025-03-14
+
+### New Features
+
+- add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
+- [**breaking**] don't assume "main"-function in dataflow + constant folding ([#1896](https://github.com/CQCL/hugr/pull/1896))
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- Rewrite for inlining a single Call ([#1934](https://github.com/CQCL/hugr/pull/1934))
+- [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))
+- `hugr-model` AST ([#1953](https://github.com/CQCL/hugr/pull/1953))
+- Add float <--> int bytecasting ops to conversions extension ([#1956](https://github.com/CQCL/hugr/pull/1956))
+- Add collections.static_array extension. ([#1964](https://github.com/CQCL/hugr/pull/1964))
+- [**breaking**] Generic HUGR serialization with envelopes ([#1958](https://github.com/CQCL/hugr/pull/1958))
+
+### Refactor
+
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` ([#1870](https://github.com/CQCL/hugr/pull/1870))
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-v0.14.3...hugr-v0.14.4) - 2025-02-24
 
 ### Bug Fixes

@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.14.4...hugr-cli-v0.15.0) - 2025-03-14
+
+### New Features
+
+- [**breaking**] Generic HUGR serialization with envelopes ([#1958](https://github.com/CQCL/hugr/pull/1958))
+
 ## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.14.0...hugr-cli-v0.14.1) - 2024-12-18
 
 ### New Features
