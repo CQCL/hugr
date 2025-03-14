@@ -358,7 +358,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             let [TypeArg::BoundedNat { n: log_width }] =
                 TryInto::<[TypeArg; 1]>::try_into(args.node.args().to_vec()).unwrap()
             else {
-                panic!("Type argument to iu_to_s wasn't a number");
+                bail!("Type argument to iu_to_s wasn't a number");
             };
             emit_custom_unary_op(context, args, |ctx, arg, _| {
                 let (_, max_val, _) = int_type_bounds(u32::pow(2, log_width as u32));
