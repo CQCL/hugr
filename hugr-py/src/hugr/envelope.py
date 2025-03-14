@@ -36,8 +36,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
 
-import hugr._serialization.extension as ext_s
-
 if TYPE_CHECKING:
     from hugr.package import Package
 
@@ -78,6 +76,8 @@ def make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
 
 def read_envelope(envelope: bytes) -> Package:
     """Decode a HUGR package from an envelope."""
+    import hugr._serialization.extension as ext_s
+
     header = EnvelopeHeader.from_bytes(envelope)
     payload = envelope[10:]
 
