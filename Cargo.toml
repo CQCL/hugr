@@ -22,7 +22,12 @@ license = "Apache-2.0"
 # authors
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ci_run)'] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    # Set by our CI
+    'cfg(ci_run)',
+    # Set by codecov
+    'cfg(coverage,coverage_nightly)',
+] }
 
 missing_docs = "warn"
 [workspace.lints.clippy]
@@ -53,10 +58,12 @@ proptest-derive = "0.5.0"
 regex = "1.9.5"
 regex-syntax = "0.8.3"
 rstest = "0.24.0"
+semver = "1.0.26"
 serde = "1.0"
 serde_json = "1.0.140"
 serde_yaml = "0.9.19"
 smol_str = "0.3.1"
+static_assertions = "1.1.0"
 strum = "0.27.0"
 thiserror = "2.0.12"
 typetag = "0.2.20"
@@ -68,7 +75,7 @@ assert_fs = "1.1.1"
 predicates = "3.1.0"
 indexmap = "2.3.0"
 fxhash = "0.2.1"
-bumpalo = { version = "3.16.0" }
+bumpalo = "3.16.0"
 pathsearch = "0.2.0"
 base64 = "0.22.1"
 ordered-float = "5.0.0"
@@ -76,6 +83,7 @@ pest = "2.7.12"
 pest_derive = "2.7.12"
 pretty = "0.12.3"
 pretty_assertions = "1.4.1"
+zstd = "0.13.2"
 
 [profile.dev.package]
 insta.opt-level = 3

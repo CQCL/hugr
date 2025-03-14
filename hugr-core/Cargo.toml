@@ -20,6 +20,7 @@ workspace = true
 extension_inference = []
 declarative = ["serde_yaml"]
 model_unstable = ["hugr-model"]
+zstd = ["dep:zstd"]
 
 [lib]
 bench = false
@@ -29,30 +30,33 @@ name = "model"
 required-features = ["model_unstable"]
 
 [dependencies]
-portgraph = { workspace = true, features = ["serde", "petgraph"] }
-thiserror = { workspace = true }
-regex = { workspace = true }
+hugr-model = { version = "0.17.1", path = "../hugr-model", optional = true }
+
 cgmath = { workspace = true, features = ["serde"] }
+delegate = { workspace = true }
+derive_more = { workspace = true, features = ["display", "error", "from"] }
 downcast-rs = { workspace = true }
+enum_dispatch = { workspace = true }
+fxhash.workspace = true
+html-escape = { workspace = true }
+indexmap.workspace = true
+itertools = { workspace = true }
+lazy_static = { workspace = true }
+paste = { workspace = true }
+petgraph = { workspace = true }
+portgraph = { workspace = true, features = ["serde", "petgraph"] }
+regex = { workspace = true }
 # Rc used here for Extension, but unfortunately we must turn the feature on globally
 serde = { workspace = true, features = ["derive", "rc"] }
-serde_yaml = { workspace = true, optional = true }
-typetag = { workspace = true }
-smol_str = { workspace = true, features = ["serde"] }
-derive_more = { workspace = true, features = ["display", "error", "from"] }
-itertools = { workspace = true }
-html-escape = { workspace = true }
-enum_dispatch = { workspace = true }
-lazy_static = { workspace = true }
-petgraph = { workspace = true }
 serde_json = { workspace = true }
-delegate = { workspace = true }
-paste = { workspace = true }
-strum = { workspace = true , features = ["derive"]}
-semver = { version = "1.0.26", features = ["serde"] }
-hugr-model = { version = "0.17.1", path = "../hugr-model", optional = true }
-indexmap.workspace = true
-fxhash.workspace = true
+serde_yaml = { workspace = true, optional = true }
+smol_str = { workspace = true, features = ["serde"] }
+static_assertions = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+typetag = { workspace = true }
+semver = { workspace = true, features = ["serde"] }
+zstd = { workspace = true, optional = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
