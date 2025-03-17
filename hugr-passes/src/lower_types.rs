@@ -1,26 +1,20 @@
-use hugr_core::extension::ExtensionId;
-use hugr_core::ops::constant::{CustomConst, Sum};
-use hugr_core::ops::OpTrait;
-use hugr_core::types::{Transformable, TypeArg, TypeEnum, TypeTransformer};
-use hugr_core::{Hugr, IncomingPort, OutgoingPort};
-use thiserror::Error;
-
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr_core::{
-    extension::SignatureError,
-    hugr::hugrmut::HugrMut,
-    ops::{
-        AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock, ExitBlock,
-        ExtensionOp, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, Output, Tag,
-        TailLoop, Value, CFG, DFG,
-    },
-    types::{CustomType, Type, TypeBound},
-    Node,
+use thiserror::Error;
+
+use hugr_core::extension::{ExtensionId, SignatureError, TypeDef};
+use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::ops::constant::{CustomConst, Sum};
+use hugr_core::ops::{
+    AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock, ExitBlock, ExtensionOp,
+    FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
+    Value, CFG, DFG,
 };
+use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
+use hugr_core::{Hugr, IncomingPort, Node, OutgoingPort};
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
@@ -40,7 +34,7 @@ impl From<&ExtensionOp> for OpHashWrapper {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum OpReplacement {
+pub enum OpReplacement {
     SingleOp(OpType),
     CompoundOp(Box<Hugr>),
 }
@@ -76,9 +70,26 @@ pub struct LowerTypes {
     /// Handles simple cases like T1 -> T2.
     /// If T1 is Copyable and T2 Linear, then error will be raised if we find e.g.
     /// ArrayOfCopyables(T1). This would require an additional entry for that.
-    /// No support yet for mapping parametrically.
     type_map: HashMap<CustomType, Type>,
-    copy_discard: HashMap<CustomType, (OpReplacement, OpReplacement)>, // TODO what about e.g. arrays that have gone from copyable to linear because their elements have?!
+    /// Parametric types are handled by a function which receives the lowered typeargs.
+    param_types: HashMap<(ExtensionId, String), Arc<dyn Fn(&[TypeArg]) -> Type>>,
+    // Keyed by lowered type, as only needed when there is an op outputting such
+    copy_discard: HashMap<Type, (OpReplacement, OpReplacement)>,
+    // Copy/discard of parametric types handled by a function that receives the new/lowered type.
+    // We do not allow linearization to "parametrized" non-extension types, at least not
+    // in one step. We could do that using a trait, but it seems enough of a corner case.
+    // Instead that can be achieved by *firstly* lowering to a custom linear type, with copy/dup
+    // inserted; *secondly* by lowering that to the desired non-extension linear type,
+    // including lowering of the copy/dup operations to...whatever.
+    copy_discard_parametric: HashMap<
+        (ExtensionId, String),
+        // TODO should pass &LowerTypes, or at least some way to call copy_op / discard_op, to these
+        (
+            Arc<dyn Fn(&[TypeArg]) -> OpReplacement>,
+            Arc<dyn Fn(&[TypeArg]) -> OpReplacement>,
+        ),
+    >,
+    // Handles simple cases Op1 -> Op2. TODO handle parametric ops
     op_map: HashMap<OpHashWrapper, OpReplacement>,
     //        1. is input op always a single OpType, or a schema/predicate?
     //        2. output might not be an op - might be a node with children
@@ -91,7 +102,22 @@ impl TypeTransformer for LowerTypes {
     type Err = ChangeTypeError;
 
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
-        Ok(self.type_map.get(ct).cloned())
+        Ok(if let Some(res) = self.type_map.get(ct) {
+            Some(res.clone())
+        } else if let Some(dest_fn) = self
+            .param_types
+            .get(&(ct.extension().clone(), ct.name().to_string()))
+        {
+            // `ct` has not had args transformed
+            let mut nargs = ct.args().to_vec();
+            // We don't care if `nargs` are changed, we're just calling `dest_fn`
+            nargs
+                .iter_mut()
+                .try_for_each(|ta| ta.transform(self).map(|_ch| ()))?;
+            Some(dest_fn(&nargs))
+        } else {
+            None
+        })
     }
 }
 
@@ -104,22 +130,40 @@ pub enum ChangeTypeError {
 
 impl LowerTypes {
     pub fn lower_type(&mut self, src: CustomType, dest: Type) {
-        if src.bound() == TypeBound::Copyable && !dest.copyable() {
-            // Of course we could try, and fail only if we encounter outports that are not singly-used!
-            panic!("Cannot lower copyable type to linear without copy/dup - use lower_type_linearize instead");
-        }
         self.type_map.insert(src, dest);
     }
 
-    pub fn lower_type_linearize(
+    pub fn lower_parametric_type(
         &mut self,
-        src: CustomType,
-        dest: Type,
-        copy: OpReplacement,
-        discard: OpReplacement,
+        src: TypeDef,
+        dest_fn: Box<dyn Fn(&[TypeArg]) -> Type>,
     ) {
-        self.type_map.insert(src.clone(), dest);
+        // No way to check that dest_fn never produces a linear type.
+        // We could require copy/discard-generators if src is Copyable, or *might be*
+        // (depending on arguments - i.e. if src's TypeDefBound is anything other than
+        // `TypeDefBound::Explicit(TypeBound::Copyable)`) but that seems an annoying
+        // overapproximation. We could just require copy/discard-generators in *all cases*
+        // (e.g. funcs that just panic!)...
+        self.param_types.insert(
+            (src.extension_id().clone(), src.name().to_string()),
+            Arc::from(dest_fn),
+        );
+    }
+
+    pub fn linearize(&mut self, src: Type, copy: OpReplacement, discard: OpReplacement) {
         self.copy_discard.insert(src, (copy, discard));
+    }
+
+    pub fn linearize_parametric(
+        &mut self,
+        src: TypeDef,
+        copy_fn: Box<dyn Fn(&[TypeArg]) -> OpReplacement>,
+        discard_fn: Box<dyn Fn(&[TypeArg]) -> OpReplacement>,
+    ) {
+        self.copy_discard_parametric.insert(
+            (src.extension_id().clone(), src.name().to_string()),
+            (Arc::from(copy_fn), Arc::from(discard_fn)),
+        );
     }
 
     pub fn lower_op(&mut self, src: &ExtensionOp, tgt: OpReplacement) {
@@ -129,13 +173,15 @@ impl LowerTypes {
     pub fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
         let mut changed = false;
         for n in hugr.nodes().collect::<Vec<_>>() {
-            let expected_sig = self.check_sig.then(|| {
+            let expected_sig = if self.check_sig {
                 let mut dfsig = hugr.get_optype(n).dataflow_signature().map(Cow::into_owned);
                 if let Some(sig) = dfsig.as_mut() {
-                    sig.transform(self);
+                    sig.transform(self)?;
                 }
-                dfsig
-            });
+                Some(dfsig)
+            } else {
+                None
+            };
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             // (If check_sig) then verify that the Signature still has the same arity/wires,
@@ -156,10 +202,19 @@ impl LowerTypes {
                     continue;
                 };
                 hugr.disconnect(n, outp);
+                let sig = hugr.get_optype(n).dataflow_signature().unwrap();
+                let typ = sig.out_port_type(outp).unwrap();
                 if targets.len() == 0 {
-                    self.do_discard(hugr, n, outp)
+                    let discard = self
+                        .discard_op(typ)
+                        .expect("Don't know how to discard {typ:?}"); // TODO return error
+
+                    let disc = discard.add(hugr, hugr.get_parent(n).unwrap());
+                    hugr.connect(n, outp, disc, 0);
                 } else {
-                    self.do_copy_chain(hugr, n, outp, &targets)
+                    // TODO return error
+                    let copy = self.copy_op(typ).expect("Don't know how to copy {typ:?}");
+                    self.do_copy_chain(hugr, n, outp, copy, &targets)
                 }
             }
         }
@@ -171,48 +226,43 @@ impl LowerTypes {
         hugr: &mut impl HugrMut,
         mut src_node: Node,
         mut src_port: OutgoingPort,
+        copy: OpReplacement,
         inps: &[(Node, IncomingPort)],
     ) {
         assert!(inps.len() > 1);
+        // Could sanity-check signature here?
         for (tgt_node, tgt_port) in &inps[..inps.len() - 1] {
-            (src_node, src_port) = self.do_copy(hugr, src_node, src_port, *tgt_node, *tgt_port);
+            let n = copy.add(hugr, hugr.get_parent(src_node).unwrap());
+            hugr.connect(src_node, src_port, n, 0);
+            hugr.connect(n, 0, *tgt_node, *tgt_port);
+            (src_node, src_port) = (n, 1.into());
         }
         let (tgt_node, tgt_port) = inps.last().unwrap();
         hugr.connect(src_node, src_port, *tgt_node, *tgt_port)
     }
 
-    fn do_copy(
-        &self,
-        hugr: &mut impl HugrMut,
-        src_node: Node,
-        src_port: OutgoingPort,
-        tgt_node: Node,
-        tgt_port: IncomingPort,
-    ) -> (Node, OutgoingPort) {
-        let sig = hugr.get_optype(src_node).dataflow_signature().unwrap();
-        let typ = sig.out_port_type(src_port).unwrap();
-        if let TypeEnum::Extension(exty) = typ.as_type_enum() {
-            if let Some((copy, _)) = self.copy_discard.get(exty) {
-                let n = copy.add(hugr, hugr.get_parent(src_node).unwrap());
-                hugr.connect(src_node, src_port, n, 0);
-                hugr.connect(n, 0, tgt_node, tgt_port);
-                return (n, 1.into());
-            }
+    pub fn copy_op(&self, typ: &Type) -> Option<OpReplacement> {
+        if let Some((copy, _)) = self.copy_discard.get(typ) {
+            return Some(copy.clone());
         }
-        todo!("Containers/arrays/etc.")
+        let TypeEnum::Extension(exty) = typ.as_type_enum() else {
+            return None;
+        };
+        self.copy_discard_parametric
+            .get(&(exty.extension().clone(), exty.name().to_string()))
+            .map(|(copy_fn, _)| copy_fn(exty.args()))
     }
 
-    fn do_discard(&self, hugr: &mut impl HugrMut, src_node: Node, src_port: OutgoingPort) {
-        let sig = hugr.get_optype(src_node).dataflow_signature().unwrap();
-        let typ = sig.out_port_type(src_port).unwrap();
-        if let TypeEnum::Extension(exty) = typ.as_type_enum() {
-            if let Some((_, discard)) = self.copy_discard.get(exty) {
-                let n = discard.add(hugr, hugr.get_parent(src_node).unwrap());
-                hugr.connect(src_node, src_port, n, 0);
-                return;
-            }
+    pub fn discard_op(&self, typ: &Type) -> Option<OpReplacement> {
+        if let Some((_, discard)) = self.copy_discard.get(typ) {
+            return Some(discard.clone());
         }
-        todo!("Containers/arrays/etc.")
+        let TypeEnum::Extension(exty) = typ.as_type_enum() else {
+            return None;
+        };
+        self.copy_discard_parametric
+            .get(&(exty.extension().clone(), exty.name().to_string()))
+            .map(|(_, discard_fn)| discard_fn(exty.args()))
     }
 
     fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ChangeTypeError> {
