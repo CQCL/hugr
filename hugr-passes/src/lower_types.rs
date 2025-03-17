@@ -34,7 +34,7 @@ impl From<&ExtensionOp> for OpHashWrapper {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct ParametricType(ExtensionId, String); // SmolStr not in hugr-passes
+struct ParametricType(ExtensionId, String);
 
 impl From<&TypeDef> for ParametricType {
     fn from(value: &TypeDef) -> Self {
@@ -91,9 +91,9 @@ pub struct LowerTypes {
     type_map: HashMap<CustomType, Type>,
     /// Parametric types are handled by a function which receives the lowered typeargs.
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Type>>,
-    // Handles simple cases Op1 -> Op2. TODO handle parametric ops
+    // Handles simple cases Op1 -> Op2.
     op_map: HashMap<OpHashWrapper, OpReplacement>,
-    // Called after lowering typeargs; None means to use original OpDef
+    // Called after lowering typeargs; return None to use original OpDef
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
     const_fn: Arc<dyn Fn(&dyn CustomConst) -> Option<Value>>,
     check_sig: bool,
@@ -161,7 +161,7 @@ impl LowerTypes {
     pub fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
         let mut changed = false;
         for n in hugr.nodes().collect::<Vec<_>>() {
-            let expected_sig = if self.check_sig {
+            let expected_dfsig = if self.check_sig {
                 let mut dfsig = hugr.get_optype(n).dataflow_signature().map(Cow::into_owned);
                 if let Some(sig) = dfsig.as_mut() {
                     sig.transform(self)?;
@@ -174,8 +174,8 @@ impl LowerTypes {
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             // (If check_sig) then verify that the Signature still has the same arity/wires,
             // with only the expected changes to types within.
-            if let Some(dfsig) = expected_sig {
-                assert_eq!(new_dfsig.as_ref().map(Cow::deref), dfsig.as_ref());
+            if let Some(expected_sig) = expected_dfsig {
+                assert_eq!(new_dfsig.as_ref().map(Cow::deref), expected_sig.as_ref());
             }
         }
         Ok(changed)
@@ -281,7 +281,7 @@ impl LowerTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => {
-                if let Some(new_const) = self.subst_custom_const(e.value())? {
+                if let Some(new_const) = (self.const_fn)(e.value()) {
                     *value = new_const;
                     Ok(true)
                 } else {
@@ -290,9 +290,5 @@ impl LowerTypes {
             }
             Value::Function { hugr } => self.run_no_validate(&mut **hugr),
         }
-    }
-
-    fn subst_custom_const(&self, _cst: &dyn CustomConst) -> Result<Option<Value>, ChangeTypeError> {
-        todo!()
     }
 }
