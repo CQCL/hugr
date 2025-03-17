@@ -191,3 +191,6 @@ def test_static_array():
     ar_val = StaticArrayVal([val.TRUE, val.FALSE], Bool, name)
     assert ar_val.v == [val.TRUE, val.FALSE]
     assert ar_val.ty == StaticArray(Bool)
+
+    with pytest.raises(ValueError, match="Static array elements must be copyable"):
+        StaticArray(Qubit)

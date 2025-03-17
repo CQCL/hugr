@@ -17,6 +17,12 @@ class StaticArray(tys.ExtType):
 
     def __init__(self, ty: tys.Type) -> None:
         self.type_def = EXTENSION.types["static_array"]
+        if (
+            tys.TypeBound.join(ty.type_bound(), tys.TypeBound.Copyable)
+            != tys.TypeBound.Copyable
+        ):
+            msg = "Static array elements must be copyable"
+            raise ValueError(msg)
         self.args = [tys.TypeTypeArg(ty)]
 
     @property
