@@ -560,7 +560,11 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
                 })
             }
             TypeEnum::Function(fty) => fty.transform(tr),
-            TypeEnum::Sum(sum_type) => sum_type.transform(tr),
+            TypeEnum::Sum(sum_type) => {
+                let ch = sum_type.transform(tr)?;
+                self.1 = self.0.least_upper_bound();
+                Ok(ch)
+            }
         }
     }
 }
@@ -778,7 +782,9 @@ pub(crate) mod test {
     use std::sync::Weak;
 
     use super::*;
-    use crate::extension::{prelude::usize_t, TypeDefBound};
+    use crate::extension::prelude::{qb_t, usize_t};
+    use crate::extension::TypeDefBound;
+    use crate::types::type_param::TypeArgError;
     use crate::{hugr::IdentList, type_row, Extension};
 
     #[test]
@@ -875,6 +881,88 @@ pub(crate) mod test {
         let expected = Type::new_extension(coln.instantiate([usize_t().into()]).unwrap());
         assert_eq!(t, expected);
         assert_eq!(t.transform(&lin_to_usize), Ok(false));
+    }
+
+    #[test]
+    fn transform_copyable_to_linear() {
+        const CPY: SmolStr = SmolStr::new_inline("MyCopyable");
+        const COLN: SmolStr = SmolStr::new_inline("ColnOfCopyableElems");
+        let e = Extension::new_test_arc(IdentList::new("TestExt").unwrap(), |e, w| {
+            e.add_type(CPY, vec![], String::new(), TypeDefBound::copyable(), w)
+                .unwrap();
+            e.add_type(
+                COLN,
+                vec![TypeParam::new_list(TypeBound::Copyable)],
+                String::new(),
+                TypeDefBound::copyable(),
+                w,
+            )
+            .unwrap();
+        });
+
+        let cpy = e.get_type(&CPY).unwrap().instantiate([]).unwrap();
+        let mk_opt = |t: Type| Type::new_sum([type_row![], TypeRow::from(t)]);
+
+        let cpy_to_qb = FnTransformer(|ct: &CustomType| (ct == &cpy).then_some(qb_t()));
+
+        let mut t = mk_opt(cpy.clone().into());
+        assert_eq!(t.transform(&cpy_to_qb), Ok(true));
+        assert_eq!(t, mk_opt(qb_t()));
+
+        let coln = e.get_type(&COLN).unwrap();
+        let c_of_cpy = coln
+            .instantiate([TypeArg::Sequence {
+                elems: vec![Type::from(cpy.clone()).into()],
+            }])
+            .unwrap();
+
+        let mut t = Type::new_extension(c_of_cpy.clone());
+        assert_eq!(
+            t.transform(&cpy_to_qb),
+            Err(SignatureError::from(TypeArgError::TypeMismatch {
+                param: TypeBound::Copyable.into(),
+                arg: qb_t().into()
+            }))
+        );
+
+        let mut t = Type::new_extension(
+            coln.instantiate([TypeArg::Sequence {
+                elems: vec![mk_opt(Type::from(cpy.clone())).into()],
+            }])
+            .unwrap(),
+        );
+        assert_eq!(
+            t.transform(&cpy_to_qb),
+            Err(SignatureError::from(TypeArgError::TypeMismatch {
+                param: TypeBound::Copyable.into(),
+                arg: mk_opt(qb_t()).into()
+            }))
+        );
+
+        // Finally, check handling Coln<Cpy> overrides handling of Cpy
+        let cpy_to_qb2 = FnTransformer(|ct: &CustomType| {
+            if ct == &cpy {
+                Some(qb_t())
+            } else {
+                (ct == &c_of_cpy).then_some(usize_t())
+            }
+        });
+        let mut t = Type::new_extension(
+            coln.instantiate([TypeArg::Sequence {
+                elems: vec![Type::from(c_of_cpy.clone()).into(); 2],
+            }])
+            .unwrap(),
+        );
+        assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
+        assert_eq!(
+            t,
+            Type::new_extension(
+                coln.instantiate([TypeArg::Sequence {
+                    elems: vec![usize_t().into(); 2]
+                }])
+                .unwrap()
+            )
+        );
     }
 
     mod proptest {
