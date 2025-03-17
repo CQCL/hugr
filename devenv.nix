@@ -1,6 +1,5 @@
 { pkgs, lib, inputs, config, ... }:
 let
-  pkgs-stable = import inputs.nixpkgs-stable { system = pkgs.stdenv.system; };
   cfg = config.hugr;
 in
 {
@@ -18,8 +17,6 @@ in
     packages = [
       pkgs.just
       pkgs.llvmPackages_16.libllvm
-      # cargo-llvm-cov is currently marked broken on nixpkgs unstable
-      pkgs-stable.cargo-llvm-cov
       pkgs.graphviz
       pkgs.cargo-insta
       pkgs.capnproto
@@ -43,8 +40,6 @@ in
 
     enterShell = ''
       cargo --version
-      export LLVM_COV="${pkgs.llvmPackages_16.libllvm}/bin/llvm-cov"
-      export LLVM_PROFDATA="${pkgs.llvmPackages_16.libllvm}/bin/llvm-profdata"
     '';
 
     languages.python = {
