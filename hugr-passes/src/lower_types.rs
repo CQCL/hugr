@@ -40,18 +40,18 @@ pub enum OpReplacement {
 }
 
 impl OpReplacement {
-    // n must be non-root. I mean, it's an ExtensionOp...
     fn replace(&self, hugr: &mut impl HugrMut, n: Node) {
+        assert_eq!(hugr.children(n).count(), 0);
         let new_optype = match self.clone() {
             OpReplacement::SingleOp(op_type) => op_type,
             OpReplacement::CompoundOp(new_h) => {
-                let new_root = hugr
-                    .insert_hugr(hugr.get_parent(n).unwrap(), *new_h)
-                    .new_root;
-                for ch in hugr.children(new_root).collect::<Vec<_>>() {
+                let new_root = hugr.insert_hugr(n, *new_h).new_root;
+                let children = hugr.children(new_root).collect::<Vec<_>>();
+                let root_opty = hugr.remove_node(new_root);
+                for ch in children {
                     hugr.set_parent(ch, n);
                 }
-                hugr.remove_node(new_root)
+                root_opty
             }
         };
         *hugr.optype_mut(n) = new_optype;
