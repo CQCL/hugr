@@ -745,7 +745,7 @@ pub trait Transformable {
 impl<E: Transformable> Transformable for [E] {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         let mut any_change = false;
-        for item in self.into_iter() {
+        for item in self {
             any_change |= item.transform(tr)?;
         }
         Ok(any_change)
