@@ -550,9 +550,11 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
                 } else {
                     let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
-                        *custom_type = custom_type
-                            .get_type_def(&custom_type.get_extension()?)?
-                            .instantiate(custom_type.args())?;
+                        *self = Self::new_extension(
+                            custom_type
+                                .get_type_def(&custom_type.get_extension()?)?
+                                .instantiate(custom_type.args())?,
+                        );
                     }
                     args_changed
                 })
@@ -773,12 +775,11 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
-
     use std::sync::Weak;
 
     use super::*;
-    use crate::extension::prelude::usize_t;
-    use crate::type_row;
+    use crate::extension::{prelude::usize_t, TypeDefBound};
+    use crate::{hugr::IdentList, type_row, Extension};
 
     #[test]
     fn construct() {
@@ -834,6 +835,46 @@ pub(crate) mod test {
                 SumType::new_unary(3).variants().collect_vec()
             );
         }
+    }
+
+    struct FnTransformer<T>(T);
+    impl<T: Fn(&CustomType) -> Option<Type>> TypeTransformer for FnTransformer<T> {
+        type Err = SignatureError;
+
+        fn apply_custom(&self, t: &CustomType) -> Result<Option<Type>, Self::Err> {
+            Ok((self.0)(t))
+        }
+    }
+    #[test]
+    fn transform() {
+        const LIN: SmolStr = SmolStr::new_inline("MyLinear");
+        const COLN: SmolStr = SmolStr::new_inline("ColnOfAny");
+
+        let e = Extension::new_test_arc(IdentList::new("TestExt").unwrap(), |e, w| {
+            e.add_type(LIN, vec![], String::new(), TypeDefBound::any(), w)
+                .unwrap();
+            e.add_type(
+                COLN,
+                vec![TypeBound::Any.into()],
+                String::new(),
+                TypeDefBound::from_params(vec![0]),
+                w,
+            )
+            .unwrap();
+        });
+        let lin = e.get_type(&LIN).unwrap().instantiate([]).unwrap();
+        let coln = e.get_type(&COLN).unwrap();
+
+        let lin_to_usize = FnTransformer(|ct: &CustomType| (*ct == lin).then_some(usize_t()));
+        let mut t = Type::new_extension(lin.clone());
+        assert_eq!(t.transform(&lin_to_usize), Ok(true));
+        assert_eq!(t, usize_t());
+        let mut t =
+            Type::new_extension(coln.instantiate([Type::from(lin.clone()).into()]).unwrap());
+        assert_eq!(t.transform(&lin_to_usize), Ok(true));
+        let expected = Type::new_extension(coln.instantiate([usize_t().into()]).unwrap());
+        assert_eq!(t, expected);
+        assert_eq!(t.transform(&lin_to_usize), Ok(false));
     }
 
     mod proptest {
