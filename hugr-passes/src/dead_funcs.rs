@@ -83,7 +83,7 @@ impl RemoveDeadFuncsPass {
 }
 
 impl ComposablePass for RemoveDeadFuncsPass {
-    type Err = RemoveDeadFuncsError;
+    type Error = RemoveDeadFuncsError;
     fn run(&self, hugr: &mut impl HugrMut) -> Result<(), RemoveDeadFuncsError> {
         let reachable = reachable_funcs(
             &CallGraph::new(hugr),

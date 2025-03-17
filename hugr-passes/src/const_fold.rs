@@ -86,7 +86,7 @@ impl ConstantFoldPass {
 }
 
 impl ComposablePass for ConstantFoldPass {
-    type Err = ConstFoldError;
+    type Error = ConstFoldError;
 
     /// Run the Constant Folding pass.
     ///

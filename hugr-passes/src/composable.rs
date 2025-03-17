@@ -9,18 +9,18 @@ use itertools::Either;
 /// An optimization pass that can be sequenced with another and/or wrapped
 /// e.g. by [ValidatingPass]
 pub trait ComposablePass: Sized {
-    type Err: Error;
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err>;
+    type Error: Error;
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error>;
 
-    fn map_err<E2: Error>(self, f: impl Fn(Self::Err) -> E2) -> impl ComposablePass<Err = E2> {
+    fn map_err<E2: Error>(self, f: impl Fn(Self::Error) -> E2) -> impl ComposablePass<Error = E2> {
         ErrMapper::new(self, f)
     }
 
     /// Returns a [ComposablePass] that does "`self` then `other`", so long as
     /// `other::Err` maps into ours.
-    fn then<P: ComposablePass>(self, other: P) -> impl ComposablePass<Err = Self::Err>
+    fn then<P: ComposablePass>(self, other: P) -> impl ComposablePass<Error = Self::Error>
     where
-        P::Err: Into<Self::Err>,
+        P::Error: Into<Self::Error>,
     {
         (self, other.map_err(Into::into))
     }
@@ -30,7 +30,7 @@ pub trait ComposablePass: Sized {
     fn then_either<P: ComposablePass>(
         self,
         other: P,
-    ) -> impl ComposablePass<Err = Either<Self::Err, P::Err>> {
+    ) -> impl ComposablePass<Error = Either<Self::Error, P::Error>> {
         (self.map_err(Either::Left), other.map_err(Either::Right))
     }
 
@@ -42,26 +42,26 @@ pub trait ComposablePass: Sized {
 
 struct ErrMapper<P, E, F>(P, F, PhantomData<E>);
 
-impl<P: ComposablePass, E: Error, F: Fn(P::Err) -> E> ErrMapper<P, E, F> {
+impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ErrMapper<P, E, F> {
     fn new(pass: P, err_fn: F) -> Self {
         Self(pass, err_fn, PhantomData)
     }
 }
 
-impl<P: ComposablePass, E: Error, F: Fn(P::Err) -> E> ComposablePass for ErrMapper<P, E, F> {
-    type Err = E;
+impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMapper<P, E, F> {
+    type Error = E;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err> {
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.0.run(hugr).map_err(&self.1)
     }
 }
 
-impl<E: Error, P1: ComposablePass<Err = E>, P2: ComposablePass<Err = E>> ComposablePass
+impl<E: Error, P1: ComposablePass<Error = E>, P2: ComposablePass<Error = E>> ComposablePass
     for (P1, P2)
 {
-    type Err = E;
+    type Error = E;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err> {
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.0.run(hugr)?;
         self.1.run(hugr)
     }
@@ -119,9 +119,9 @@ impl<P: ComposablePass> ValidatingPass<P> {
 }
 
 impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
-    type Err = ValidatePassError<P::Err>;
+    type Error = ValidatePassError<P::Error>;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Err> {
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Input {
             err,
             pretty_hugr,
@@ -137,7 +137,7 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
 pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
     hugr: &mut impl HugrMut,
-) -> Result<(), ValidatePassError<P::Err>> {
+) -> Result<(), ValidatePassError<P::Error>> {
     if cfg!(test) {
         ValidatingPass::new_default(pass).run(hugr)
     } else {
