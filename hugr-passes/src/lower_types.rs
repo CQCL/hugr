@@ -95,6 +95,9 @@ pub struct LowerTypes {
     op_map: HashMap<OpHashWrapper, OpReplacement>,
     // Called after lowering typeargs; return None to use original OpDef
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
+    // TODO should probably have a map, or two, here - from CustomType and from ParametricType.
+    // Whereupon the closure should be given a callback to self.change_value, too, in case of nested
+    // values for collections.
     const_fn: Arc<dyn Fn(&dyn CustomConst) -> Option<Value>>,
     check_sig: bool,
 }
