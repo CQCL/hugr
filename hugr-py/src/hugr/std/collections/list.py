@@ -1,4 +1,4 @@
-"""Collection types and operations."""
+"""List types and operations."""
 
 from __future__ import annotations
 

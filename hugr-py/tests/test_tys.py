@@ -5,6 +5,7 @@ import pytest
 from hugr import val
 from hugr.std.collections.array import Array, ArrayVal
 from hugr.std.collections.list import List, ListVal
+from hugr.std.collections.static_array import StaticArray, StaticArrayVal
 from hugr.std.float import FLOAT_T
 from hugr.std.int import INT_T, _int_tv
 from hugr.tys import (
@@ -174,3 +175,18 @@ def test_array():
     ar_val = ArrayVal([val.TRUE, val.FALSE], Bool)
     assert ar_val.v == [val.TRUE, val.FALSE]
     assert ar_val.ty == Array(Bool, 2)
+
+
+def test_static_array():
+    ty_var = Variable(0, TypeBound.Copyable)
+
+    sa = StaticArray(ty_var)
+    assert sa.ty == ty_var
+
+    ar_val = StaticArrayVal([val.TRUE, val.FALSE], Bool, "foo")
+    assert ar_val.v == [val.TRUE, val.FALSE]
+    assert ar_val.ty == StaticArray(Bool)
+    assert ar_val.name == "foo"
+
+    with pytest.raises(ValueError, match=".*copyable.*"):
+        StaticArray(Variable(0, TypeBound.Any))
