@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use hugr_core::extension::{ExtensionId, SignatureError, TypeDef};
+use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{CustomConst, Sum};
 use hugr_core::ops::{
@@ -30,6 +30,31 @@ impl From<&ExtensionOp> for OpHashWrapper {
             op_name: op.def().name().to_string(),
             args: op.args().to_vec(),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct ParametricType(ExtensionId, String); // SmolStr not in hugr-passes
+
+impl From<&TypeDef> for ParametricType {
+    fn from(value: &TypeDef) -> Self {
+        Self(value.extension_id().clone(), value.name().to_string())
+    }
+}
+
+impl From<&CustomType> for ParametricType {
+    fn from(value: &CustomType) -> Self {
+        Self(value.extension().clone(), value.name().to_string())
+    }
+}
+
+// Separate from above for clarity
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct ParametricOp(ExtensionId, String);
+
+impl From<&OpDef> for ParametricOp {
+    fn from(value: &OpDef) -> Self {
+        Self(value.extension_id().clone(), value.name().to_string())
     }
 }
 
@@ -65,12 +90,11 @@ pub struct LowerTypes {
     /// ArrayOfCopyables(T1). This would require an additional entry for that.
     type_map: HashMap<CustomType, Type>,
     /// Parametric types are handled by a function which receives the lowered typeargs.
-    param_types: HashMap<(ExtensionId, String), Arc<dyn Fn(&[TypeArg]) -> Type>>,
+    param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Type>>,
     // Handles simple cases Op1 -> Op2. TODO handle parametric ops
     op_map: HashMap<OpHashWrapper, OpReplacement>,
-    //        1. is input op always a single OpType, or a schema/predicate?
-    //        2. output might not be an op - might be a node with children
-    //        3. do we need checking BEFORE reparametrization as well as after? (after only if not reparametrized?)
+    // Called after lowering typeargs; None means to use original OpDef
+    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
     const_fn: Arc<dyn Fn(&dyn CustomConst) -> Option<Value>>,
     check_sig: bool,
 }
@@ -81,10 +105,7 @@ impl TypeTransformer for LowerTypes {
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
         Ok(if let Some(res) = self.type_map.get(ct) {
             Some(res.clone())
-        } else if let Some(dest_fn) = self
-            .param_types
-            .get(&(ct.extension().clone(), ct.name().to_string()))
-        {
+        } else if let Some(dest_fn) = self.param_types.get(&ct.into()) {
             // `ct` has not had args transformed
             let mut nargs = ct.args().to_vec();
             // We don't care if `nargs` are changed, we're just calling `dest_fn`
@@ -107,12 +128,14 @@ pub enum ChangeTypeError {
 
 impl LowerTypes {
     pub fn lower_type(&mut self, src: CustomType, dest: Type) {
+        // We could check that 'dest' is copyable or 'src' is linear, but since we can't
+        // check that for parametric types, we'll be consistent and not check here either.
         self.type_map.insert(src, dest);
     }
 
     pub fn lower_parametric_type(
         &mut self,
-        src: TypeDef,
+        src: &TypeDef,
         dest_fn: Box<dyn Fn(&[TypeArg]) -> Type>,
     ) {
         // No way to check that dest_fn never produces a linear type.
@@ -120,14 +143,19 @@ impl LowerTypes {
         // (depending on arguments - i.e. if src's TypeDefBound is anything other than
         // `TypeDefBound::Explicit(TypeBound::Copyable)`) but that seems an annoying
         // overapproximation.
-        self.param_types.insert(
-            (src.extension_id().clone(), src.name().to_string()),
-            Arc::from(dest_fn),
-        );
+        self.param_types.insert(src.into(), Arc::from(dest_fn));
     }
 
     pub fn lower_op(&mut self, src: &ExtensionOp, tgt: OpReplacement) {
         self.op_map.insert(OpHashWrapper::from(src), tgt);
+    }
+
+    pub fn lower_parametric_op(
+        &mut self,
+        src: &OpDef,
+        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>,
+    ) {
+        self.param_ops.insert(src.into(), Arc::from(dest_fn));
     }
 
     pub fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
@@ -209,19 +237,30 @@ impl LowerTypes {
                 | rest.transform(self)?),
 
             OpType::Const(Const { value, .. }) => self.change_value(value),
-            OpType::ExtensionOp(ext_op) => {
+            OpType::ExtensionOp(ext_op) => Ok(
                 if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
                     replacement.replace(hugr, n); // Copy/discard insertion done by caller
-                    Ok(true)
+                    true
                 } else {
                     let def = ext_op.def_arc();
                     let mut args = ext_op.args().to_vec();
-                    Ok(args.transform(self)? && {
-                        *ext_op = ExtensionOp::new(def.clone(), args)?;
+                    let ch = args.transform(self)?;
+                    if let Some(replacement) = self
+                        .param_ops
+                        .get(&def.as_ref().into())
+                        .and_then(|rep_fn| rep_fn(&args))
+                    {
+                        replacement.replace(hugr, n);
                         true
-                    })
-                }
-            }
+                    } else {
+                        if ch {
+                            *ext_op = ExtensionOp::new(def.clone(), args)?;
+                        }
+                        ch
+                    }
+                },
+            ),
+
             OpType::OpaqueOp(_) => panic!("OpaqueOp should not be in a Hugr"),
 
             OpType::AliasDecl(_) | OpType::Module(_) => Ok(false),
