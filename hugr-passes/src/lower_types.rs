@@ -135,7 +135,7 @@ impl TypeTransformer for LowerTypes {
     }
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ChangeTypeError {
     #[error(transparent)]
@@ -311,27 +311,26 @@ impl LowerTypes {
 
 #[cfg(test)]
 mod test {
-    use hugr_core::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::{
-            prelude::{bool_t, option_type, UnwrapBuilder},
-            TypeDefBound, Version,
-        },
-        hugr::IdentList,
-        ops::ExtensionOp,
-        std_extensions::{
-            arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
-            collections::array::{array_type, ArrayOpDef},
-        },
-        types::{PolyFuncType, Signature, Type, TypeArg, TypeBound},
-        Extension,
+    use std::{collections::HashMap, sync::Arc};
+
+    use hugr_core::builder::{
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        ModuleBuilder, SubContainer,
     };
+    use hugr_core::extension::prelude::{bool_t, option_type, UnwrapBuilder};
+    use hugr_core::extension::{TypeDefBound, Version};
+    use hugr_core::ops::{ExtensionOp, OpType, Tag};
+    use hugr_core::std_extensions::{
+        arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
+        collections::array::{array_type, ArrayOpDef},
+    };
+    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
+    use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
 
     use super::{LowerTypes, OpReplacement};
 
-    #[test]
-    fn lower() {
-        let ext = Extension::new_arc(
+    fn ext() -> Arc<Extension> {
+        Extension::new_arc(
             IdentList::new("TestExt").unwrap(),
             Version::new(0, 0, 1),
             |ext, w| {
@@ -367,7 +366,10 @@ mod test {
                 )
                 .unwrap();
             },
-        );
+        )
+    }
+
+    fn lower_types(ext: &Extension) -> LowerTypes {
         fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
             let [TypeArg::Type { ty }] = args else {
                 panic!("Illegal TypeArgs")
@@ -418,5 +420,78 @@ mod test {
             ),
         );
         lw.lower_parametric_op(read.as_ref(), Box::new(lowered_read));
+        lw
+    }
+
+    #[test]
+    fn module_func_dfg_cfg() {
+        let ext = ext();
+        let coln = ext.get_type("PackedVec").unwrap();
+        let read = ext.get_op("read").unwrap();
+        let i64 = || INT_TYPES[6].to_owned();
+        let c_int = Type::from(coln.instantiate([INT_TYPES[6].to_owned().into()]).unwrap());
+        let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
+        let mut mb = ModuleBuilder::new();
+        let mut fb = mb
+            .define_function(
+                "foo",
+                Signature::new(vec![i64(), c_int.clone(), c_bool.clone()], bool_t()),
+            )
+            .unwrap();
+        let [idx, indices, bools] = fb.input_wires_arr();
+        let mut dfb = fb
+            .dfg_builder(Signature::new(vec![i64(), c_int], i64()), [idx, indices])
+            .unwrap();
+        let [idx, indices] = dfb.input_wires_arr();
+        let int_read_op = dfb
+            .add_dataflow_op(
+                ExtensionOp::new(read.clone(), [i64().into()]).unwrap(),
+                [indices, idx],
+            )
+            .unwrap();
+        let [idx2] = dfb
+            .finish_with_outputs(int_read_op.outputs())
+            .unwrap()
+            .outputs_arr();
+        let mut cfg = fb
+            .cfg_builder([(i64(), idx2), (c_bool, bools)], bool_t().into())
+            .unwrap();
+        let mut entry = cfg.entry_builder([bool_t().into()], type_row![]).unwrap();
+        let [idx2, bools] = entry.input_wires_arr();
+        let bool_read_op = entry
+            .add_dataflow_op(
+                ExtensionOp::new(read.clone(), [bool_t().into()]).unwrap(),
+                [bools, idx2],
+            )
+            .unwrap();
+        let [tagged] = entry
+            .add_dataflow_op(
+                OpType::Tag(Tag::new(0, vec![bool_t().into()])),
+                bool_read_op.outputs(),
+            )
+            .unwrap()
+            .outputs_arr();
+        let entry = entry.finish_with_outputs(tagged, []).unwrap();
+        cfg.branch(&entry, 0, &cfg.exit_block()).unwrap();
+        let cfg = cfg.finish_sub_container().unwrap();
+        fb.finish_with_outputs(cfg.outputs()).unwrap();
+        let mut h = mb.finish_hugr().unwrap();
+
+        assert!(lower_types(&ext).run_no_validate(&mut h).unwrap());
+
+        h.validate().unwrap();
+        let mut counts: HashMap<_, usize> = HashMap::new();
+        for ext_op in h.nodes().filter_map(|n| h.get_optype(n).as_extension_op()) {
+            *(counts.entry(ext_op.def().name().as_str()).or_default()) += 1;
+        }
+        assert_eq!(
+            counts,
+            HashMap::from([
+                ("lowered_read_bool", 1),
+                ("itousize", 1),
+                ("get", 1),
+                ("panic", 1)
+            ])
+        );
     }
 }
