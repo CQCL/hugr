@@ -1,6 +1,6 @@
+#![allow(clippy::type_complexity)]
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use itertools::Either;
@@ -203,7 +203,7 @@ impl LowerTypes {
             // (If check_sig) then verify that the Signature still has the same arity/wires,
             // with only the expected changes to types within.
             if let Some(expected_sig) = expected_dfsig {
-                assert_eq!(new_dfsig.as_ref().map(Cow::deref), expected_sig.as_ref());
+                assert_eq!(new_dfsig.as_deref(), expected_sig.as_ref());
             }
         }
         Ok(changed)
@@ -232,7 +232,7 @@ impl LowerTypes {
                 let change = func_sig.body_mut().transform(self)? | type_args.transform(self)?;
                 if change {
                     let new_inst = func_sig
-                        .instantiate(&type_args)
+                        .instantiate(type_args)
                         .map_err(ChangeTypeError::SignatureError)?;
                     *instantiation = new_inst;
                 }
