@@ -336,8 +336,6 @@ mod test {
     use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
 
-    use crate::{MonomorphizePass, RemoveDeadFuncsPass};
-
     use super::{LowerTypes, OpReplacement};
 
     fn ext() -> Arc<Extension> {
@@ -438,34 +436,22 @@ mod test {
     fn module_func_dfg_cfg_call() {
         let ext = ext();
         let coln = ext.get_type("PackedVec").unwrap();
-
+        let read = ext.get_op("read").unwrap();
         let i64 = || INT_TYPES[6].to_owned();
         let c_int = Type::from(coln.instantiate([INT_TYPES[6].to_owned().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
-        let read = {
-            let read_op = ext.get_op("read").unwrap();
-            let tv = Type::new_var_use(0, TypeBound::Copyable);
-            let mut read_fn = mb
-                .define_function(
-                    "reader",
-                    PolyFuncType::new(
-                        [TypeBound::Copyable.into()],
-                        Signature::new(
-                            vec![coln.instantiate([tv.clone().into()]).unwrap().into(), i64()],
-                            tv.clone(),
-                        ),
-                    ),
-                )
-                .unwrap();
-            let res = read_fn
-                .add_dataflow_op(
-                    ExtensionOp::new(read_op.clone(), [tv.into()]).unwrap(),
-                    read_fn.input_wires(),
-                )
-                .unwrap();
-            read_fn.finish_with_outputs(res.outputs()).unwrap()
-        };
+        let fb = mb
+            .define_function(
+                "id",
+                PolyFuncType::new(
+                    [TypeBound::Any.into()],
+                    Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
+                ),
+            )
+            .unwrap();
+        let inps = fb.input_wires();
+        let id = fb.finish_with_outputs(inps).unwrap();
         let mut fb = mb
             .define_function(
                 "main",
@@ -474,23 +460,40 @@ mod test {
             .unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
         let mut dfb = fb
-            .dfg_builder(Signature::new(vec![i64(), c_int], i64()), [idx, indices])
+            .dfg_builder(
+                Signature::new(vec![i64(), c_int.clone()], i64()),
+                [idx, indices],
+            )
             .unwrap();
         let [idx, indices] = dfb.input_wires_arr();
+        let [indices] = dfb
+            .call(id.handle(), &[c_int.into()], [indices])
+            .unwrap()
+            .outputs_arr();
         let int_read_op = dfb
-            .call(read.handle(), &[i64().into()], [indices, idx])
+            .add_dataflow_op(
+                ExtensionOp::new(read.clone(), [i64().into()]).unwrap(),
+                [indices, idx],
+            )
             .unwrap();
         let [idx2] = dfb
             .finish_with_outputs(int_read_op.outputs())
             .unwrap()
             .outputs_arr();
         let mut cfg = fb
-            .cfg_builder([(i64(), idx2), (c_bool, bools)], bool_t().into())
+            .cfg_builder([(i64(), idx2), (c_bool.clone(), bools)], bool_t().into())
             .unwrap();
         let mut entry = cfg.entry_builder([bool_t().into()], type_row![]).unwrap();
         let [idx2, bools] = entry.input_wires_arr();
+        let [bools] = entry
+            .call(id.handle(), &[c_bool.into()], [bools])
+            .unwrap()
+            .outputs_arr();
         let bool_read_op = entry
-            .call(read.handle(), &[bool_t().into()], [bools, idx2])
+            .add_dataflow_op(
+                ExtensionOp::new(read.clone(), [bool_t().into()]).unwrap(),
+                [bools, idx2],
+            )
             .unwrap();
         let [tagged] = entry
             .add_dataflow_op(
@@ -504,22 +507,6 @@ mod test {
         let cfg = cfg.finish_sub_container().unwrap();
         fb.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = mb.finish_hugr().unwrap();
-        // Since we treat collection<bool> differently, we must monomorphize to catch all instantiations
-        MonomorphizePass::default().run(&mut h).unwrap();
-        RemoveDeadFuncsPass::default()
-            .with_module_entry_points(h.children(h.root()).filter(|n| {
-                h.get_optype(*n)
-                    .as_func_defn()
-                    .is_some_and(|fd| fd.name == "main")
-            }))
-            .run(&mut h)
-            .unwrap();
-        assert_eq!(
-            h.nodes()
-                .filter(|n| h.get_optype(*n).is_func_defn())
-                .count(),
-            3
-        );
 
         assert!(lower_types(&ext).run_no_validate(&mut h).unwrap());
         h.validate().unwrap();
