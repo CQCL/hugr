@@ -843,7 +843,7 @@ pub(crate) mod test {
         }
     }
 
-    struct FnTransformer<T>(T);
+    pub(super) struct FnTransformer<T>(pub(super) T);
     impl<T: Fn(&CustomType) -> Option<Type>> TypeTransformer for FnTransformer<T> {
         type Err = SignatureError;
 
