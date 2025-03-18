@@ -143,37 +143,6 @@ just coverage
 and open it with your favourite coverage viewer. In VSCode, you can use
 [`coverage-gutters`](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters).
 
-## Serialization
-
-If you want to make a change that modifies the serialization schema, you must
-ensure backwards-compatibility by writing a method to convert from the existing
-format to the new one. We suggest the following process. (For concreteness we
-assume that you are upgrading from v5 to v6.)
-
-1.  Add a test case in `hugr-core/src/hugr/serialize/upgrade/test.rs` that
-    exercises the part of the schema that will change in v6.
-2.  Run the tests. This will create a new JSON file in the `testcases`
-    subdirectory. Commit this to the repo.
-3.  Implement the schema-breaking change. Expect the test you added in step 1
-    (and possibly others) to fail.
-4.  In `hugr/hugr-core/src/hugr/serialize.rs`:
-    - Add a new line `V6(SerHugr),` in `enum Versioned`, and change the previous
-      line to `V5(serde_json::Value),`.
-    - In `Versioned::upgrade()` insert the line
-      `Self::V5(json) => self = Self::V6(upgrade::v5_to_v6(json).and_then(go)?),`
-      and change `V5` to `V6` in the line
-      `Self::V5(ser_hugr) => return Ok(ser_hugr),`.
-    - Change `new_latest()` to return `Self::V6(t)`.
-5.  In `hugr-core/src/hugr/serialize/upgrade.rs` add a stub implementation of
-    `v5_to_v6()`.
-6.  In `hugr-py/src/hugr/__init__.py` update `get_serialisation_version()` to
-    return `"v6"`.
-7.  Run `just update-schema` to generate new v6 schema files. Commit these to
-    the repo.
-8.  In `hugr-core/src/hugr/serialize/test.rs`, in the `include_schema` macro
-    change `v5` to `v6`.
-9.  Implement `v5_to_v6()`.
-10. Ensure all tests are passing.
 
 ## 🌐 Contributing to HUGR
 
