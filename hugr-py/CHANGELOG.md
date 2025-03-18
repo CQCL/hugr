@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.11.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.0...hugr-py-v0.11.1) (2025-03-17)
+
+
+### Features
+
+* Add default envelope config to `Package.to_str`/`to_bytes` ([#1980](https://github.com/CQCL/hugr/issues/1980)) ([44deda1](https://github.com/CQCL/hugr/commit/44deda11e9c335f7ff705eaf1b8bcc01b6c2e202))
+
+
+### Bug Fixes
+
+* Cyclic import in hugr.envelope ([#1981](https://github.com/CQCL/hugr/issues/1981)) ([cff0dba](https://github.com/CQCL/hugr/commit/cff0dba67c241f6a817eb029f73e7c9634b2d441))
+
+## [0.11.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.3...hugr-py-v0.11.0) (2025-03-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* Lift op in prelude replaced with a Barrier that behaves similarly except does not add any extensions.
+
+### Features
+
+* Add collections.static_array extension. ([#1964](https://github.com/CQCL/hugr/issues/1964)) ([fdcd48a](https://github.com/CQCL/hugr/commit/fdcd48af26c10ec92b63287681fd201dff0f281c))
+* Add float &lt;--&gt; int bytecasting ops to conversions extension ([#1956](https://github.com/CQCL/hugr/issues/1956)) ([fa1bf86](https://github.com/CQCL/hugr/commit/fa1bf867289bbfce10316a7101ea123419d1893f))
+* Generic HUGR serialization with envelopes ([6710e5f](https://github.com/CQCL/hugr/commit/6710e5fe3939a71b38018fca547c4d9cc421cbac))
+* replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/issues/1952)) ([4e6b6d8](https://github.com/CQCL/hugr/commit/4e6b6d8df576f43bd5ced51b2eb4f1ed4d5c3b82))
+
+
+### Bug Fixes
+
+* **hugr-py:** output and delete node issues ([#1971](https://github.com/CQCL/hugr/issues/1971)) ([408517d](https://github.com/CQCL/hugr/commit/408517d620711c5573ea013e4d062499a62f55dd))
+
 ## [0.10.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.2...hugr-py-v0.10.3) (2025-02-17)
 
 

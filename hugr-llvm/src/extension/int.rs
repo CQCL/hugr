@@ -20,6 +20,7 @@ use crate::{
         emit_value,
         func::EmitFuncContext,
         get_intrinsic,
+        libc::{emit_libc_abort, emit_libc_printf},
         ops::{emit_custom_binary_op, emit_custom_unary_op},
         EmitOpArgs,
     },
@@ -353,6 +354,51 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 Ok(vec![result])
             })
         }
+        IntOpDef::iu_to_s => {
+            let [TypeArg::BoundedNat { n: log_width }] =
+                TryInto::<[TypeArg; 1]>::try_into(args.node.args().to_vec()).unwrap()
+            else {
+                bail!("Type argument to iu_to_s wasn't a number");
+            };
+            emit_custom_unary_op(context, args, |ctx, arg, _| {
+                let (_, max_val, _) = int_type_bounds(u32::pow(2, log_width as u32));
+                let max = arg
+                    .get_type()
+                    .into_int_type()
+                    .const_int(max_val as u64, false);
+
+                let within_bounds = ctx.builder().build_int_compare(
+                    IntPredicate::ULE,
+                    arg.into_int_value(),
+                    max,
+                    "bounds_check",
+                )?;
+
+                Ok(vec![val_or_panic(
+                    ctx,
+                    within_bounds,
+                    "iu_to_s argument out of bounds",
+                    arg,
+                )?])
+            })
+        }
+        IntOpDef::is_to_u => emit_custom_unary_op(context, args, |ctx, arg, _| {
+            let zero = arg.get_type().into_int_type().const_zero();
+
+            let within_bounds = ctx.builder().build_int_compare(
+                IntPredicate::SGE,
+                arg.into_int_value(),
+                zero,
+                "bounds_check",
+            )?;
+
+            Ok(vec![val_or_panic(
+                ctx,
+                within_bounds,
+                "is_to_u called on negative value",
+                arg,
+            )?])
+        }),
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
     }
 }
@@ -409,6 +455,42 @@ fn make_narrow<'c, H: HugrView<Node = Node>>(
         RuntimeError::Narrow,
         LLVMSumType::try_from_hugr_type(&ctx.typing_session(), sum_type).unwrap(),
     )
+}
+
+fn val_or_panic<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    dont_panic: IntValue<'c>,
+    err_msg_str: &str,
+    val: BasicValueEnum<'c>, // Must be same int type as `dont_panic`
+) -> Result<BasicValueEnum<'c>> {
+    let done_bb = ctx.new_basic_block("done", None);
+    let exit_bb = ctx.new_basic_block("exit", Some(done_bb));
+    let go_bb = ctx.new_basic_block("panic_if_0", Some(exit_bb));
+    let panic_bb = ctx.new_basic_block("panic", Some(exit_bb));
+    ctx.builder().build_unconditional_branch(go_bb)?;
+
+    ctx.builder().position_at_end(exit_bb);
+    ctx.builder().build_return(Some(&val))?;
+
+    ctx.builder().position_at_end(panic_bb);
+    let err_msg = ctx
+        .builder()
+        .build_global_string_ptr(err_msg_str, "err_msg")?
+        .as_basic_value_enum();
+    emit_libc_printf(ctx, &[err_msg.into()])?;
+    emit_libc_abort(ctx)?;
+    ctx.builder().build_unconditional_branch(exit_bb)?;
+
+    ctx.builder().position_at_end(go_bb);
+    ctx.builder().build_switch(
+        dont_panic,
+        panic_bb,
+        &[(dont_panic.get_type().const_int(1, false), exit_bb)],
+    )?;
+
+    ctx.builder().position_at_end(done_bb);
+
+    Ok(val) // Returning val should be nonsense if we panic
 }
 
 fn val_or_error<'c, H: HugrView<Node = Node>>(
@@ -492,9 +574,9 @@ mod test {
     use hugr_core::{
         builder::{handle::Outputs, Dataflow, DataflowSubContainer, SubContainer},
         extension::prelude::bool_t,
-        ops::{DataflowOpTrait, ExtensionOp},
+        ops::{DataflowOpTrait, ExtensionOp, NamedOp},
         std_extensions::arithmetic::{
-            int_ops,
+            int_ops::{self, IntOpDef},
             int_types::{ConstInt, INT_TYPES},
         },
         types::{SumType, Type, TypeRow},
@@ -507,7 +589,7 @@ mod test {
         check_emission,
         emit::test::{SimpleHugrConfig, DFGW},
         extension::{int::add_int_extensions, prelude::add_prelude_extensions},
-        test::{exec_ctx, llvm_ctx, TestContext},
+        test::{exec_ctx, llvm_ctx, single_op_hugr, TestContext},
     };
 
     // Instantiate an extension op which takes one width argument
@@ -577,12 +659,28 @@ mod test {
     }
 
     #[rstest]
-    fn test_neg_emission(mut llvm_ctx: TestContext) {
+    #[case(IntOpDef::iu_to_s, &[3])]
+    #[case(IntOpDef::is_to_u, &[3])]
+    #[case(IntOpDef::ineg, &[2])]
+    fn test_emission(mut llvm_ctx: TestContext, #[case] op: IntOpDef, #[case] args: &[u8]) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let ty = INT_TYPES[2].clone();
-        let ext_op = make_int_op("ineg", 2);
-        let hugr = test_int_op_with_results::<1>(ext_op, 2, None, ty.clone());
-        check_emission!("ineg", hugr, llvm_ctx);
+        let mut insta = insta::Settings::clone_current();
+        insta.set_snapshot_suffix(format!(
+            "{}_{}_{:?}",
+            insta.snapshot_suffix().unwrap_or(""),
+            op.name(),
+            args,
+        ));
+        let concrete = match *args {
+            [] => op.without_log_width(),
+            [log_width] => op.with_log_width(log_width),
+            [lw1, lw2] => op.with_two_log_widths(lw1, lw2),
+            _ => panic!("unexpected number of args to the op!"),
+        };
+        insta.bind(|| {
+            let hugr = single_op_hugr(concrete.into());
+            check_emission!(hugr, llvm_ctx);
+        })
     }
 
     #[rstest]
@@ -819,5 +917,52 @@ mod test {
             },
         );
         assert_eq!(exec_ctx.exec_hugr_i64(hugr, "main"), arg);
+    }
+
+    #[rstest]
+    #[case(6, 42)]
+    #[case(4, 7)]
+    //#[case(4, 256)] -- crashes because a panic is emitted (good)
+    fn test_u_to_s(mut exec_ctx: TestContext, #[case] log_width: u8, #[case] val: u64) {
+        exec_ctx.add_extensions(add_int_extensions);
+        let ty = &INT_TYPES[log_width as usize].clone();
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(vec![ty.clone()])
+            .with_extensions(STD_REG.clone())
+            .finish(|mut hugr_builder| {
+                let unsigned =
+                    hugr_builder.add_load_value(ConstInt::new_u(log_width, val).unwrap());
+                let iu_to_s = make_int_op("iu_to_s", log_width);
+                let [signed] = hugr_builder
+                    .add_dataflow_op(iu_to_s, [unsigned])
+                    .unwrap()
+                    .outputs_arr();
+                hugr_builder.finish_with_outputs([signed]).unwrap()
+            });
+        let act = exec_ctx.exec_hugr_i64(hugr, "main");
+        assert_eq!(act, val as i64);
+    }
+
+    #[rstest]
+    #[case(3, 0)]
+    #[case(4, 255)]
+    // #[case(3, -1)] -- crashes because a panic is emitted (good)
+    fn test_s_to_u(mut exec_ctx: TestContext, #[case] log_width: u8, #[case] val: i64) {
+        exec_ctx.add_extensions(add_int_extensions);
+        let ty = &INT_TYPES[log_width as usize].clone();
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(vec![ty.clone()])
+            .with_extensions(STD_REG.clone())
+            .finish(|mut hugr_builder| {
+                let signed = hugr_builder.add_load_value(ConstInt::new_s(log_width, val).unwrap());
+                let is_to_u = make_int_op("is_to_u", log_width);
+                let [unsigned] = hugr_builder
+                    .add_dataflow_op(is_to_u, [signed])
+                    .unwrap()
+                    .outputs_arr();
+                hugr_builder.finish_with_outputs([unsigned]).unwrap()
+            });
+        let act = exec_ctx.exec_hugr_u64(hugr, "main");
+        assert_eq!(act, val as u64);
     }
 }

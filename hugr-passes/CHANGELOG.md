@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.4...hugr-passes-v0.15.0) - 2025-03-14
+
+### New Features
+
+- add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
+- [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))
+- [**breaking**] don't assume "main"-function in dataflow + constant folding ([#1896](https://github.com/CQCL/hugr/pull/1896))
+
 ## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.2...hugr-passes-v0.14.3) - 2025-02-05
 
 ### Bug Fixes

@@ -6,8 +6,9 @@ use std::path::Path;
 use std::{fs, io, mem};
 
 use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
+use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::ExtensionResolutionError;
-use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{ExtensionError, HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
@@ -122,9 +123,63 @@ impl Package {
         Ok(())
     }
 
+    /// Read a Package from a HUGR envelope.
+    pub fn load(
+        reader: impl io::BufRead,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<Self, EnvelopeError> {
+        let extensions = extensions.unwrap_or(&PRELUDE_REGISTRY);
+        let (_, pkg) = read_envelope(reader, extensions)?;
+        Ok(pkg)
+    }
+
+    /// Read a Package from a HUGR envelope encoded in a string.
+    ///
+    /// Note that not all envelopes are valid strings. In the general case,
+    /// it is recommended to use `Package::load` with a bytearray instead.
+    pub fn load_str(
+        envelope: impl AsRef<str>,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<Self, EnvelopeError> {
+        Self::load(envelope.as_ref().as_bytes(), extensions)
+    }
+
+    /// Store the Package in a HUGR envelope.
+    pub fn store(
+        &self,
+        writer: impl io::Write,
+        config: EnvelopeConfig,
+    ) -> Result<(), EnvelopeError> {
+        write_envelope(writer, self, config)
+    }
+
+    /// Store the Package in a HUGR envelope encoded in a string.
+    ///
+    /// Note that not all envelopes are valid strings. In the general case,
+    /// it is recommended to use `Package::store` with a bytearray instead.
+    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
+        if !config.format.ascii_printable() {
+            return Err(EnvelopeError::NonASCIIFormat {
+                format: config.format,
+            });
+        }
+
+        let mut buf = Vec::new();
+        self.store(&mut buf, config)?;
+        Ok(String::from_utf8(buf).expect("Envelope is valid utf8"))
+    }
+
     /// Read a Package in json format from an io reader.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
+    //
+    // TODO: Make this a private method only used by the envelope reader, and remove the automatic HUGR fallback.
+    #[deprecated(
+        since = "0.14.5",
+        note = "Json encoding of packages is deprecated. Use `Package::load` instead"
+    )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn from_json_reader(
         reader: impl io::Read,
         extension_registry: &ExtensionRegistry,
@@ -182,26 +237,43 @@ impl Package {
     /// Read a Package from a json string.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
+    #[deprecated(
+        since = "0.14.5",
+        note = "Json encoding of packages is deprecated. Use `Package::load_str` instead"
+    )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn from_json(
         json: impl AsRef<str>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Self, PackageEncodingError> {
+        #[allow(deprecated)]
         Self::from_json_reader(json.as_ref().as_bytes(), extension_registry)
     }
 
     /// Read a Package from a json file.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
+    #[deprecated(
+        since = "0.14.5",
+        note = "Json encoding of packages is deprecated. Use `Package::load` instead"
+    )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn from_json_file(
         path: impl AsRef<Path>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Self, PackageEncodingError> {
         let file = fs::File::open(path)?;
         let reader = io::BufReader::new(file);
+        #[allow(deprecated)]
         Self::from_json_reader(reader, extension_registry)
     }
 
     /// Write the Package in json format into an io writer.
+    #[deprecated(
+        since = "0.14.5",
+        note = "Json encoding of packages is deprecated. Use `Package::store` instead"
+    )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn to_json_writer(&self, writer: impl io::Write) -> Result<(), PackageEncodingError> {
         serde_json::to_writer(writer, self)?;
         Ok(())
@@ -210,15 +282,30 @@ impl Package {
     /// Write the Package into a json string.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
+    #[deprecated(
+        since = "0.14.5",
+        note = "Json encoding of packages is deprecated. Use `Package::store_str` instead"
+    )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn to_json(&self) -> Result<String, PackageEncodingError> {
         let json = serde_json::to_string(self)?;
         Ok(json)
     }
 
     /// Write the Package into a json file.
+    #[deprecated(
+        since = "0.14.5",
+        note = "Json encoding of packages is deprecated. Use `Package::store` instead"
+    )]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn to_json_file(&self, path: impl AsRef<Path>) -> Result<(), PackageEncodingError> {
-        let file = fs::File::open(path)?;
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(path)?;
         let writer = io::BufWriter::new(file);
+        #[allow(deprecated)]
         self.to_json_writer(writer)
     }
 }
@@ -363,26 +450,8 @@ mod test {
     use rstest::{fixture, rstest};
 
     #[fixture]
-    fn simple_package() -> Package {
-        let hugr0 = simple_module_hugr();
-        let hugr1 = simple_module_hugr();
-        Package::new([hugr0, hugr1]).unwrap()
-    }
-
-    #[fixture]
     fn simple_input_node() -> Hugr {
         Hugr::new(Input::new(vec![]))
-    }
-
-    #[rstest]
-    #[case::empty(Package::default())]
-    #[case::simple(simple_package())]
-    fn package_roundtrip(#[case] package: Package) {
-        use crate::extension::PRELUDE_REGISTRY;
-
-        let json = package.to_json().unwrap();
-        let new_package = Package::from_json(&json, &PRELUDE_REGISTRY).unwrap();
-        assert_eq!(package, new_package);
     }
 
     #[rstest]

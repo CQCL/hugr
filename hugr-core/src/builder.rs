@@ -241,6 +241,7 @@ pub(crate) mod test {
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
+    use crate::package::Package;
     use crate::types::{PolyFuncType, Signature};
     use crate::Hugr;
 
@@ -300,6 +301,19 @@ pub(crate) mod test {
             CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
         super::cfg::test::build_basic_cfg(&mut cfg_builder).unwrap();
         cfg_builder.finish_hugr().unwrap()
+    }
+
+    #[fixture]
+    pub(crate) fn simple_package() -> Package {
+        let hugr = simple_module_hugr();
+        Package::new([hugr]).unwrap()
+    }
+
+    #[fixture]
+    pub(crate) fn multi_module_package() -> Package {
+        let hugr0 = simple_module_hugr();
+        let hugr1 = simple_module_hugr();
+        Package::new([hugr0, hugr1]).unwrap()
     }
 
     /// A helper method which creates a DFG rooted hugr with Input and Output node
