@@ -102,6 +102,19 @@ pub struct LowerTypes {
     check_sig: bool,
 }
 
+impl Default for LowerTypes {
+    fn default() -> Self {
+        Self {
+            type_map: Default::default(),
+            param_types: Default::default(),
+            op_map: Default::default(),
+            param_ops: Default::default(),
+            const_fn: Arc::new(|_| None),
+            check_sig: false,
+        }
+    }
+}
+
 impl TypeTransformer for LowerTypes {
     type Err = ChangeTypeError;
 
@@ -293,5 +306,117 @@ impl LowerTypes {
             }
             Value::Function { hugr } => self.run_no_validate(&mut **hugr),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use hugr_core::{
+        builder::{DFGBuilder, Dataflow, DataflowHugr},
+        extension::{
+            prelude::{bool_t, option_type, UnwrapBuilder},
+            TypeDefBound, Version,
+        },
+        hugr::IdentList,
+        ops::ExtensionOp,
+        std_extensions::{
+            arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
+            collections::array::{array_type, ArrayOpDef},
+        },
+        types::{PolyFuncType, Signature, Type, TypeArg, TypeBound},
+        Extension,
+    };
+
+    use super::{LowerTypes, OpReplacement};
+
+    #[test]
+    fn lower() {
+        let ext = Extension::new_arc(
+            IdentList::new("TestExt").unwrap(),
+            Version::new(0, 0, 1),
+            |ext, w| {
+                let pv_of_var = ext
+                    .add_type(
+                        "PackedVec".into(),
+                        vec![TypeBound::Any.into()],
+                        String::new(),
+                        TypeDefBound::from_params(vec![0]),
+                        w,
+                    )
+                    .unwrap()
+                    .instantiate(vec![Type::new_var_use(0, TypeBound::Any).into()])
+                    .unwrap();
+                ext.add_op(
+                    "read".into(),
+                    "".into(),
+                    PolyFuncType::new(
+                        vec![TypeBound::Any.into()],
+                        Signature::new(
+                            vec![pv_of_var.into(), INT_TYPES[6].to_owned()],
+                            Type::new_var_use(0, TypeBound::Any),
+                        ),
+                    ),
+                    w,
+                )
+                .unwrap();
+                ext.add_op(
+                    "lowered_read_bool".into(),
+                    "".into(),
+                    Signature::new(vec![INT_TYPES[6].to_owned(); 2], bool_t()),
+                    w,
+                )
+                .unwrap();
+            },
+        );
+        fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
+            let [TypeArg::Type { ty }] = args else {
+                panic!("Illegal TypeArgs")
+            };
+            let mut dfb = DFGBuilder::new(Signature::new(
+                vec![array_type(64, ty.clone()), INT_TYPES[6].to_owned()],
+                ty.clone(),
+            ))
+            .unwrap();
+            let [val, idx] = dfb.input_wires_arr();
+            let [idx] = dfb
+                .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
+                .unwrap()
+                .outputs_arr();
+            let [opt] = dfb
+                .add_dataflow_op(ArrayOpDef::get.to_concrete(ty.clone(), 64), [val, idx])
+                .unwrap()
+                .outputs_arr();
+            let [res] = dfb
+                .build_unwrap_sum(1, option_type(Type::from(ty.clone())), opt)
+                .unwrap();
+            Some(OpReplacement::CompoundOp(Box::new(
+                dfb.finish_hugr_with_outputs([res]).unwrap(),
+            )))
+        }
+        let pv = ext.get_type("PackedVec").unwrap();
+        let read = ext.get_op("read").unwrap();
+        let mut lw = LowerTypes::default();
+        lw.lower_type(
+            pv.instantiate([bool_t().into()]).unwrap(),
+            INT_TYPES[6].to_owned(),
+        );
+        lw.lower_parametric_type(
+            pv,
+            Box::new(|args: &[TypeArg]| {
+                let [TypeArg::Type { ty }] = args else {
+                    panic!("Illegal TypeArgs")
+                };
+                array_type(64, ty.clone())
+            }),
+        );
+        lw.lower_op(
+            &ExtensionOp::new(read.clone(), [bool_t().into()]).unwrap(),
+            OpReplacement::SingleOp(
+                ExtensionOp::new(ext.get_op("lowered_read_bool").unwrap().clone(), [])
+                    .unwrap()
+                    .into(),
+            ),
+        );
+        lw.lower_parametric_op(read.as_ref(), Box::new(lowered_read));
     }
 }
