@@ -3,17 +3,18 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use itertools::Either;
 use thiserror::Error;
 
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::ops::constant::{CustomConst, Sum};
+use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::{
     AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock, ExitBlock, ExtensionOp,
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
     Value, CFG, DFG,
 };
-use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeTransformer};
+use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
 use hugr_core::{Hugr, Node};
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -88,7 +89,7 @@ impl OpReplacement {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct LowerTypes {
     /// Handles simple cases like T1 -> T2.
     /// If T1 is Copyable and T2 Linear, then error will be raised if we find e.g.
@@ -100,24 +101,8 @@ pub struct LowerTypes {
     op_map: HashMap<OpHashWrapper, OpReplacement>,
     // Called after lowering typeargs; return None to use original OpDef
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
-    // TODO should probably have a map, or two, here - from CustomType and from ParametricType.
-    // Whereupon the closure should be given a callback to self.change_value, too, in case of nested
-    // values for collections.
-    const_fn: Arc<dyn Fn(&dyn CustomConst) -> Option<Value>>,
+    consts: HashMap<Either<CustomType, ParametricType>, Arc<dyn Fn(&OpaqueValue) -> Option<Value>>>,
     check_sig: bool,
-}
-
-impl Default for LowerTypes {
-    fn default() -> Self {
-        Self {
-            type_map: Default::default(),
-            param_types: Default::default(),
-            op_map: Default::default(),
-            param_ops: Default::default(),
-            const_fn: Arc::new(|_| None),
-            check_sig: false,
-        }
-    }
 }
 
 impl TypeTransformer for LowerTypes {
@@ -181,6 +166,24 @@ impl LowerTypes {
         dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>,
     ) {
         self.param_ops.insert(src.into(), Arc::from(dest_fn));
+    }
+
+    pub fn lower_consts(
+        &mut self,
+        src_ty: &CustomType,
+        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
+    ) {
+        self.consts
+            .insert(Either::Left(src_ty.clone()), Arc::from(const_fn));
+    }
+
+    pub fn lower_consts_parametric(
+        &mut self,
+        src_ty: &TypeDef,
+        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
+    ) {
+        self.consts
+            .insert(Either::Right(src_ty.into()), Arc::from(const_fn));
     }
 
     pub fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
@@ -305,14 +308,21 @@ impl LowerTypes {
                 any_change |= sum_type.transform(self)?;
                 Ok(any_change)
             }
-            Value::Extension { e } => {
-                if let Some(new_const) = (self.const_fn)(e.value()) {
-                    *value = new_const;
-                    Ok(true)
-                } else {
-                    Ok(false)
+            Value::Extension { e } => Ok('changed: {
+                if let TypeEnum::Extension(exty) = e.get_type().as_type_enum() {
+                    if let Some(const_fn) = self
+                        .consts
+                        .get(&Either::Left(exty.clone()))
+                        .or(self.consts.get(&Either::Right(exty.into())))
+                    {
+                        if let Some(new_const) = const_fn(e) {
+                            *value = new_const;
+                            break 'changed true;
+                        }
+                    }
                 }
-            }
+                false
+            }),
             Value::Function { hugr } => self.run_no_validate(&mut **hugr),
         }
     }
@@ -324,16 +334,15 @@ mod test {
 
     use hugr_core::builder::{
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder, SubContainer,
+        ModuleBuilder, SubContainer, TailLoopBuilder,
     };
-    use hugr_core::extension::prelude::{bool_t, option_type, UnwrapBuilder};
+    use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
     use hugr_core::extension::{TypeDefBound, Version};
-    use hugr_core::ops::{ExtensionOp, OpType, Tag};
-    use hugr_core::std_extensions::{
-        arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
-        collections::array::{array_type, ArrayOpDef},
-    };
-    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
+    use hugr_core::ops::{ExtensionOp, OpType, Tag, Value};
+    use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
+    use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef, ArrayValue};
+    use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
+    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
 
     use super::{LowerTypes, OpReplacement};
@@ -438,7 +447,7 @@ mod test {
         let coln = ext.get_type("PackedVec").unwrap();
         let read = ext.get_op("read").unwrap();
         let i64 = || INT_TYPES[6].to_owned();
-        let c_int = Type::from(coln.instantiate([INT_TYPES[6].to_owned().into()]).unwrap());
+        let c_int = Type::from(coln.instantiate([i64().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
         let fb = mb
@@ -523,6 +532,65 @@ mod test {
                 ("get", 1),
                 ("panic", 1)
             ])
+        );
+    }
+
+    #[test]
+    fn loop_const() {
+        let cu = |u| ConstUsize::new(u).into();
+        let mut tl = TailLoopBuilder::new(
+            list_type(usize_t()),
+            list_type(bool_t()),
+            list_type(usize_t()),
+        )
+        .unwrap();
+        let [_, bools] = tl.input_wires_arr();
+        let st = SumType::new(vec![list_type(usize_t()); 2]);
+        let pred = tl.add_load_value(
+            Value::sum(
+                0,
+                [ListValue::new(usize_t(), [cu(1), cu(3), cu(3), cu(7)]).into()],
+                st,
+            )
+            .unwrap(),
+        );
+        tl.set_outputs(pred, [bools]).unwrap();
+        let mut h = tl.finish_hugr().unwrap();
+
+        // Lower List<T> to Array<4,T> so we can use List's handy CustomConst
+        let mut lowerer = LowerTypes::default();
+        lowerer.lower_parametric_type(
+            list_type_def(),
+            Box::new(|args: &[TypeArg]| {
+                let [TypeArg::Type { ty }] = args else {
+                    panic!("Expected elem type")
+                };
+                array_type(4, ty.clone())
+            }),
+        );
+        lowerer.lower_consts_parametric(
+            list_type_def(),
+            Box::new(|opaq| {
+                let lv = opaq
+                    .value()
+                    .downcast_ref::<ListValue>()
+                    .expect("Only one constant in test");
+                Some(
+                    ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec())
+                        .into(),
+                )
+            }),
+        );
+        lowerer.run_no_validate(&mut h).unwrap();
+        h.validate().unwrap();
+        assert_eq!(
+            h.get_optype(pred.node())
+                .as_load_constant()
+                .map(|lc| lc.constant_type()),
+            Some(&Type::new_sum(vec![
+                Type::from(array_type(4, usize_t()));
+                2
+            ]))
         );
     }
 }
