@@ -379,7 +379,7 @@ mod test {
         let row_with = || TypeRow::from(vec![usize_t(), qb_t(), bool_t()]);
         let row_after = || TypeRow::from(vec![bool_t(), qb_t(), bool_t()]);
         let mut sig = Signature::new(row_with(), row_after());
-        let mut exp = Signature::new(row_after(), row_after());
+        let exp = Signature::new(row_after(), row_after());
         assert_eq!(sig.transform(&tr), Ok(true));
         assert_eq!(sig, exp);
         assert_eq!(sig.transform(&tr), Ok(false));
