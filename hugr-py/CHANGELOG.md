@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.1...hugr-py-v0.11.2) (2025-03-18)
+
+
+### Features
+
+* **hugr-py:** Add `StaticArray` to standard extensions ([#1985](https://github.com/CQCL/hugr/issues/1985)) ([cf860f3](https://github.com/CQCL/hugr/commit/cf860f34b132a26411787f80668d621b7273f2c9)), closes [#1984](https://github.com/CQCL/hugr/issues/1984)
+
 ## [0.11.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.0...hugr-py-v0.11.1) (2025-03-17)
 
 
