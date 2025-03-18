@@ -61,6 +61,11 @@ impl From<&OpDef> for ParametricOp {
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpReplacement {
     SingleOp(OpType),
+    /// Defines a sub-Hugr to splice in place of the op.
+    /// Note this will be of limited use before [monomorphization](super::monomorphize) because
+    /// the sub-Hugrwill not be able to use type variables present in the op.
+    // TODO: store also a vec<TypeParam>, and update Hugr::validate to take &[TypeParam]s
+    // (defaulting to empty list) - see https://github.com/CQCL/hugr/issues/709
     CompoundOp(Box<Hugr>),
 }
 
@@ -143,6 +148,10 @@ pub enum ChangeTypeError {
 }
 
 impl LowerTypes {
+    /// Configures this instance to change occurrences of `src` to `dest`.
+    /// Note that if `src` is an instance of a *parametrized* Type, this should only
+    /// be used on *[monomorphize](super::monomorphize)d* Hugrs, because substitution
+    /// (parametric polymorphism) happening later will not respect the lowering(s).
     pub fn lower_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable or 'src' is linear, but since we can't
         // check that for parametric types, we'll be consistent and not check here either.
@@ -327,6 +336,8 @@ mod test {
     use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
 
+    use crate::{MonomorphizePass, RemoveDeadFuncsPass};
+
     use super::{LowerTypes, OpReplacement};
 
     fn ext() -> Arc<Extension> {
@@ -424,17 +435,40 @@ mod test {
     }
 
     #[test]
-    fn module_func_dfg_cfg() {
+    fn module_func_dfg_cfg_call() {
         let ext = ext();
         let coln = ext.get_type("PackedVec").unwrap();
-        let read = ext.get_op("read").unwrap();
+
         let i64 = || INT_TYPES[6].to_owned();
         let c_int = Type::from(coln.instantiate([INT_TYPES[6].to_owned().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
+        let read = {
+            let read_op = ext.get_op("read").unwrap();
+            let tv = Type::new_var_use(0, TypeBound::Copyable);
+            let mut read_fn = mb
+                .define_function(
+                    "reader",
+                    PolyFuncType::new(
+                        [TypeBound::Copyable.into()],
+                        Signature::new(
+                            vec![coln.instantiate([tv.clone().into()]).unwrap().into(), i64()],
+                            tv.clone(),
+                        ),
+                    ),
+                )
+                .unwrap();
+            let res = read_fn
+                .add_dataflow_op(
+                    ExtensionOp::new(read_op.clone(), [tv.into()]).unwrap(),
+                    read_fn.input_wires(),
+                )
+                .unwrap();
+            read_fn.finish_with_outputs(res.outputs()).unwrap()
+        };
         let mut fb = mb
             .define_function(
-                "foo",
+                "main",
                 Signature::new(vec![i64(), c_int.clone(), c_bool.clone()], bool_t()),
             )
             .unwrap();
@@ -444,10 +478,7 @@ mod test {
             .unwrap();
         let [idx, indices] = dfb.input_wires_arr();
         let int_read_op = dfb
-            .add_dataflow_op(
-                ExtensionOp::new(read.clone(), [i64().into()]).unwrap(),
-                [indices, idx],
-            )
+            .call(read.handle(), &[i64().into()], [indices, idx])
             .unwrap();
         let [idx2] = dfb
             .finish_with_outputs(int_read_op.outputs())
@@ -459,10 +490,7 @@ mod test {
         let mut entry = cfg.entry_builder([bool_t().into()], type_row![]).unwrap();
         let [idx2, bools] = entry.input_wires_arr();
         let bool_read_op = entry
-            .add_dataflow_op(
-                ExtensionOp::new(read.clone(), [bool_t().into()]).unwrap(),
-                [bools, idx2],
-            )
+            .call(read.handle(), &[bool_t().into()], [bools, idx2])
             .unwrap();
         let [tagged] = entry
             .add_dataflow_op(
@@ -476,10 +504,26 @@ mod test {
         let cfg = cfg.finish_sub_container().unwrap();
         fb.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = mb.finish_hugr().unwrap();
+        // Since we treat collection<bool> differently, we must monomorphize to catch all instantiations
+        MonomorphizePass::default().run(&mut h).unwrap();
+        RemoveDeadFuncsPass::default()
+            .with_module_entry_points(h.children(h.root()).filter(|n| {
+                h.get_optype(*n)
+                    .as_func_defn()
+                    .is_some_and(|fd| fd.name == "main")
+            }))
+            .run(&mut h)
+            .unwrap();
+        assert_eq!(
+            h.nodes()
+                .filter(|n| h.get_optype(*n).is_func_defn())
+                .count(),
+            3
+        );
 
         assert!(lower_types(&ext).run_no_validate(&mut h).unwrap());
-
         h.validate().unwrap();
+
         let mut counts: HashMap<_, usize> = HashMap::new();
         for ext_op in h.nodes().filter_map(|n| h.get_optype(n).as_extension_op()) {
             *(counts.entry(ext_op.def().name().as_str()).or_default()) += 1;
