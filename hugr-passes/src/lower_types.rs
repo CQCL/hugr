@@ -343,13 +343,13 @@ mod test {
                         w,
                     )
                     .unwrap()
-                    .instantiate(vec![Type::new_var_use(0, TypeBound::Any).into()])
+                    .instantiate(vec![Type::new_var_use(0, TypeBound::Copyable).into()])
                     .unwrap();
                 ext.add_op(
                     "read".into(),
                     "".into(),
                     PolyFuncType::new(
-                        vec![TypeBound::Any.into()],
+                        vec![TypeBound::Copyable.into()],
                         Signature::new(
                             vec![pv_of_var.into(), INT_TYPES[6].to_owned()],
                             Type::new_var_use(0, TypeBound::Any),
