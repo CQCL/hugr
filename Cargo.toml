@@ -81,7 +81,7 @@ base64 = "0.22.1"
 ordered-float = "5.0.0"
 pest = "2.7.12"
 pest_derive = "2.7.12"
-pretty = "0.12.3"
+pretty = "0.12.4"
 pretty_assertions = "1.4.1"
 zstd = "0.13.2"
 
