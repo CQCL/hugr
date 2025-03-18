@@ -95,8 +95,7 @@ class Package:
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
         """
-        # TODO: Default to a compressed binary format once that is supported.
-        config = config or EnvelopeConfig.TEXT
+        config = config or EnvelopeConfig.BINARY
         return make_envelope(self, config)
 
     def to_str(self, config: EnvelopeConfig | None = None) -> str:

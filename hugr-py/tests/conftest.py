@@ -15,13 +15,13 @@ from hugr._serialization.serial_hugr import SerialHugr
 from hugr.envelope import EnvelopeConfig
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
+from hugr.package import Package
 from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
     from syrupy.assertion import SnapshotAssertion
 
     from hugr.ops import ComWire
-    from hugr.package import Package
 
 QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
 QUANTUM_EXT.add_op_def(
@@ -131,7 +131,7 @@ def _base_command() -> list[str]:
 def mermaid(h: Hugr):
     """Render the Hugr as a mermaid diagram for debugging."""
     cmd = [*_base_command(), "mermaid", "-"]
-    _run_hugr_cmd(h._to_serial().to_json(), cmd)
+    _run_hugr_cmd(h.to_json().encode(), cmd)
 
 
 def validate(
@@ -153,33 +153,41 @@ def validate(
 
     if isinstance(h, Hugr):
         cmd += ["--hugr-json"]
-        serial = h.to_json()
-        _run_hugr_cmd(serial, cmd)
+        _run_hugr_cmd(h.to_json().encode(), cmd)
     else:
-        serial = h.to_str(EnvelopeConfig.TEXT)
+        serial = h.to_bytes(EnvelopeConfig.BINARY)
         _run_hugr_cmd(serial, cmd)
 
     if not roundtrip:
         return
-    hugrs = [h] if isinstance(h, Hugr) else h.modules
-    for h in hugrs:
-        serial = h.to_json()
 
-        starting_json = json.loads(serial)
+    # Roundtrip checks
+    if isinstance(h, Hugr):
+        starting_json = json.loads(h.to_json())
         h2 = Hugr._from_serial(SerialHugr.load_json(starting_json))
         roundtrip_json = json.loads(h2._to_serial().to_json())
         assert roundtrip_json == starting_json
 
-    if snap is not None and isinstance(h, Hugr):
-        dot = h.render_dot()
-        assert snap == dot.source
-        if os.environ.get("HUGR_RENDER_DOT"):
-            dot.pipe("svg")
+        if snap is not None:
+            dot = h.render_dot()
+            assert snap == dot.source
+            if os.environ.get("HUGR_RENDER_DOT"):
+                dot.pipe("svg")
+    else:
+        # Package
+        encoded = h.to_str(EnvelopeConfig.TEXT)
+        loaded = Package.from_str(encoded)
+        roundtrip_encoded = loaded.to_str(EnvelopeConfig.TEXT)
+        assert encoded == roundtrip_encoded
 
 
-def _run_hugr_cmd(serial: str, cmd: list[str]):
+def _run_hugr_cmd(serial: bytes, cmd: list[str]):
+    """Run a HUGR command.
+
+    The `serial` argument is the serialized HUGR to pass to the command via stdin.
+    """
     try:
-        subprocess.run(cmd, check=True, input=serial.encode(), capture_output=True)  # noqa: S603
+        subprocess.run(cmd, check=True, input=serial, capture_output=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
         error = e.stderr.decode()
         raise RuntimeError(error) from e
