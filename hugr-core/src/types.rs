@@ -941,11 +941,8 @@ pub(crate) mod test {
 
         // Finally, check handling Coln<Cpy> overrides handling of Cpy
         let cpy_to_qb2 = FnTransformer(|ct: &CustomType| {
-            if ct == &cpy {
-                Some(qb_t())
-            } else {
-                (ct == &c_of_cpy).then_some(usize_t())
-            }
+            assert_ne!(ct, &cpy);
+            (ct == &c_of_cpy).then_some(usize_t())
         });
         let mut t = Type::new_extension(
             coln.instantiate([TypeArg::Sequence {
