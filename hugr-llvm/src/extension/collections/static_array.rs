@@ -108,7 +108,6 @@ fn const_array<'c>(
     }
 }
 
-
 fn static_array_struct_type<'c>(
     context: &'c Context,
     index_type: impl BasicType<'c>,
