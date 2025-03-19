@@ -86,7 +86,10 @@ impl CustomType {
         def.check_custom(self)
     }
 
-    fn get_type_def<'a>(&self, ext: &'a Arc<Extension>) -> Result<&'a TypeDef, SignatureError> {
+    pub(super) fn get_type_def<'a>(
+        &self,
+        ext: &'a Arc<Extension>,
+    ) -> Result<&'a TypeDef, SignatureError> {
         ext.get_type(&self.id)
             .ok_or(SignatureError::ExtensionTypeNotFound {
                 exn: self.extension.clone(),
@@ -94,7 +97,7 @@ impl CustomType {
             })
     }
 
-    fn get_extension(&self) -> Result<Arc<Extension>, SignatureError> {
+    pub(super) fn get_extension(&self) -> Result<Arc<Extension>, SignatureError> {
         self.extension_ref
             .upgrade()
             .ok_or(SignatureError::MissingTypeExtension {

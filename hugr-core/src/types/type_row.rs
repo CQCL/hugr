@@ -7,7 +7,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Type, TypeBase};
+use super::{
+    type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase,
+    TypeTransformer,
+};
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
 use itertools::Itertools;
@@ -93,6 +96,12 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
 
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.iter().try_for_each(|t| t.validate(var_decls))
+    }
+}
+
+impl<RV: MaybeRV> Transformable for TypeRowBase<RV> {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        self.to_mut().transform(tr)
     }
 }
 
