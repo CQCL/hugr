@@ -29,6 +29,7 @@ pub use monomorphize::remove_polyfuncs;
 pub use monomorphize::monomorphize;
 pub use monomorphize::{MonomorphizeError, MonomorphizePass};
 pub mod lower_types;
+pub use lower_types::LowerTypes;
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod validation;
