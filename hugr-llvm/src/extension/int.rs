@@ -598,7 +598,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated in favor of [add_default_int_extensions].
+    /// This method is deprecated in favor of [Self::add_default_int_extensions].
     #[deprecated]
     pub fn add_int_extensions(self) -> Self {
         self.add_default_int_extensions()
