@@ -784,6 +784,8 @@ pub(crate) mod test {
     use super::*;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::TypeDefBound;
+    use crate::std_extensions::collections::array::{array_type, array_type_parametric};
+    use crate::std_extensions::collections::list::list_type;
     use crate::types::type_param::TypeArgError;
     use crate::{hugr::IdentList, type_row, Extension};
 
@@ -854,33 +856,35 @@ pub(crate) mod test {
     #[test]
     fn transform() {
         const LIN: SmolStr = SmolStr::new_inline("MyLinear");
-        const COLN: SmolStr = SmolStr::new_inline("ColnOfAny");
-
         let e = Extension::new_test_arc(IdentList::new("TestExt").unwrap(), |e, w| {
             e.add_type(LIN, vec![], String::new(), TypeDefBound::any(), w)
                 .unwrap();
-            e.add_type(
-                COLN,
-                vec![TypeBound::Any.into()],
-                String::new(),
-                TypeDefBound::from_params(vec![0]),
-                w,
-            )
-            .unwrap();
         });
         let lin = e.get_type(&LIN).unwrap().instantiate([]).unwrap();
-        let coln = e.get_type(&COLN).unwrap();
 
         let lin_to_usize = FnTransformer(|ct: &CustomType| (*ct == lin).then_some(usize_t()));
         let mut t = Type::new_extension(lin.clone());
         assert_eq!(t.transform(&lin_to_usize), Ok(true));
         assert_eq!(t, usize_t());
-        let mut t =
-            Type::new_extension(coln.instantiate([Type::from(lin.clone()).into()]).unwrap());
-        assert_eq!(t.transform(&lin_to_usize), Ok(true));
-        let expected = Type::new_extension(coln.instantiate([usize_t().into()]).unwrap());
-        assert_eq!(t, expected);
-        assert_eq!(t.transform(&lin_to_usize), Ok(false));
+
+        for coln in [
+            list_type,
+            |t| array_type(10, t),
+            |t| {
+                array_type_parametric(
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat(3.try_into().unwrap())),
+                    t,
+                )
+                .unwrap()
+            },
+        ] {
+            let mut t = coln(lin.clone().into());
+            assert_eq!(t.transform(&lin_to_usize), Ok(true));
+            let expected = coln(usize_t());
+            assert_eq!(t, expected);
+            assert_eq!(t.transform(&lin_to_usize), Ok(false));
+            assert_eq!(t, expected);
+        }
     }
 
     #[test]
