@@ -208,6 +208,7 @@ mod test {
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::Value;
+    use hugr_core::package::Package;
     use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, Type};
@@ -324,6 +325,26 @@ mod test {
             builder.finish_hugr_with_outputs([unit]).unwrap()
         };
         let root = hugr.root();
+        force_order(&mut hugr, root, |_, _| 0).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg_attr(miri, ignore)] // File::open is not supported in miri
+    fn call_indirect_bug() {
+        let file = std::io::BufReader::new(
+            std::fs::File::open(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/resources/test/force_order_call_indirect.hugr",
+            ))
+            .unwrap(),
+        );
+        let mut hugr = Package::load(file, Some(&hugr_core::std_extensions::STD_REG))
+            .unwrap()
+            .modules
+            .remove(0);
+        let root = hugr.root();
+
         force_order(&mut hugr, root, |_, _| 0).unwrap();
     }
 }
