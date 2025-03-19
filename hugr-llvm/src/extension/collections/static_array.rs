@@ -1,4 +1,4 @@
-use std::hash::{Hasher as _};
+use std::hash::Hasher as _;
 
 use hugr_core::{
     extension::{
@@ -29,6 +29,10 @@ use crate::{
 use anyhow::{bail, Result};
 
 #[derive(Debug, Clone, derive_more::From)]
+/// A [CodegenExtension] that lowers the
+/// [hugr_core::std_extensions::collections::static_array].
+///
+/// All behaviour is delegated to `SACG`.
 pub struct StaticArrayCodegenExtension<SACG>(SACG);
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
@@ -134,15 +138,28 @@ fn build_read_len<'c>(
         ptr = builder.build_pointer_cast(ptr, canonical_ptr_ty, "")?;
     }
     let i32_ty = context.i32_type();
-    dbg!(struct_ty, ptr);
     let indices = [i32_ty.const_zero(), i32_ty.const_zero()];
-    dbg!(&indices);
     let len_ptr = unsafe { builder.build_in_bounds_gep(ptr, &indices, "") }?;
-    dbg!(len_ptr);
     Ok(builder.build_load(len_ptr, "")?.into_int_value())
 }
 
+/// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::static_array]
+/// types, [hugr_core::ops::constant::CustomConst]s, and ops.
 pub trait StaticArrayCodegen: Clone {
+    /// Return the llvm type of
+    /// [hugr_core::std_extensions::collections::static_array::STATIC_ARRAY_TYPENAME].
+    ///
+    /// By default a static array of llvm type `t` and length `l` is stored in a
+    /// global of type `struct { i64, [t * l] }``
+    ///
+    /// The `i64` stores the length of the array.
+    ///
+    /// However a `static_array` `HugrType` is represented by a llvm pointer type
+    /// `struct {i64, [t * 0]}`.  i.e. the array is zero length. This gives all
+    /// static arrays of the same element type a uniform llvm type.
+    ///
+    /// It is legal to index past the end of an array (it is only undefined behaviour
+    /// to index past the allocation).
     fn static_array_type<'c>(
         &self,
         session: TypingSession<'c, '_>,
@@ -157,6 +174,13 @@ pub trait StaticArrayCodegen: Clone {
         )
     }
 
+    /// Emit a
+    /// [hugr_core::std_extensions::collections::static_array::StaticArrayValue].
+    ///
+    /// Note that the type of the return value must match the type returned by
+    /// [Self::static_array_type].
+    ///
+    /// By default a global is created and we return a pointer to it.
     fn static_array_value<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
@@ -220,6 +244,7 @@ pub trait StaticArrayCodegen: Clone {
         Ok(gv.as_pointer_value().const_cast(canonical_type).into())
     }
 
+    /// Emit a [hugr_core::std_extensions::collections::static_array::StaticArrayOp].
     fn static_array_op<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
@@ -228,7 +253,6 @@ pub trait StaticArrayCodegen: Clone {
     ) -> Result<()> {
         match op.def {
             StaticArrayOpDef::get => {
-                println!("dougrulz1");
                 let ptr = args.inputs[0].into_pointer_value();
                 let index = args.inputs[1].into_int_value();
                 let index_ty = index.get_type();
@@ -236,10 +260,8 @@ pub trait StaticArrayCodegen: Clone {
                 let struct_ty =
                     static_array_struct_type(context.iw_context(), index_ty, element_llvm_ty, 0);
 
-                println!("dougrulz4");
                 let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
 
-                println!("dougrulz2");
                 let result_sum_ty = option_type(op.elem_ty);
                 let rmb = context.new_row_mail_box([&result_sum_ty.clone().into()], "")?;
                 let result_llvm_sum_ty = context.llvm_sum_type(result_sum_ty)?;
@@ -315,6 +337,8 @@ pub trait StaticArrayCodegen: Clone {
 }
 
 #[derive(Debug, Clone)]
+/// An implementation of [StaticArrayCodegen] that uses all default
+/// implementations.
 pub struct DefaultStaticArrayCodegen;
 
 impl StaticArrayCodegen for DefaultStaticArrayCodegen {}
