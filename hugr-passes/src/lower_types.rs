@@ -14,7 +14,9 @@ use hugr_core::ops::{
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
     Value, CFG, DFG,
 };
-use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
+use hugr_core::types::{
+    CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
+};
 use hugr_core::{Hugr, Node};
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -125,11 +127,18 @@ impl TypeTransformer for LowerTypes {
     }
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum ChangeTypeError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
+    #[error("Lowering op {op} with original signature {old:?}\nExpected signature: {expected:?}\nBut got: {actual:?}")]
+    SignatureMismatch {
+        op: OpType,
+        old: Option<Signature>,
+        expected: Option<Signature>,
+        actual: Option<Signature>,
+    },
 }
 
 impl LowerTypes {
@@ -186,15 +195,29 @@ impl LowerTypes {
             .insert(Either::Right(src_ty.into()), Arc::from(const_fn));
     }
 
+    /// Configures this instance to check signatures of ops lowered following [Self::lower_op]
+    /// and [Self::lower_parametric_op] are as expected, i.e. match the signatures of the
+    /// original op modulo the required type substitutions. (If signatures are incorrect,
+    /// it is likely that the wires in the Hugr will be invalid, so this gives an early warning
+    /// by instead raising [ChangeTypeError::SignatureMismatch].)
+    pub fn check_signatures(&mut self, check_sig: bool) {
+        self.check_sig = check_sig;
+    }
+
     pub fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
         let mut changed = false;
         for n in hugr.nodes().collect::<Vec<_>>() {
-            let expected_dfsig = if self.check_sig {
-                let mut dfsig = hugr.get_optype(n).dataflow_signature().map(Cow::into_owned);
-                if let Some(sig) = dfsig.as_mut() {
-                    sig.transform(self)?;
-                }
-                Some(dfsig)
+            let maybe_check_sig = if self.check_sig {
+                Some(
+                    if let Some(old_sig) = hugr.get_optype(n).dataflow_signature() {
+                        let old_sig = old_sig.into_owned();
+                        let mut expected_sig = old_sig.clone();
+                        expected_sig.transform(self)?;
+                        (Some(old_sig), Some(expected_sig))
+                    } else {
+                        (None, None)
+                    },
+                )
             } else {
                 None
             };
@@ -202,8 +225,23 @@ impl LowerTypes {
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             // (If check_sig) then verify that the Signature still has the same arity/wires,
             // with only the expected changes to types within.
-            if let Some(expected_sig) = expected_dfsig {
-                assert_eq!(new_dfsig.as_deref(), expected_sig.as_ref());
+            if let Some((old, expected)) = maybe_check_sig {
+                match (&expected, &new_dfsig) {
+                    (None, None) => (),
+                    (Some(exp), Some(act))
+                        if exp.input == act.input && exp.output == act.output =>
+                    {
+                        ()
+                    }
+                    _ => {
+                        return Err(ChangeTypeError::SignatureMismatch {
+                            op: hugr.get_optype(n).clone(),
+                            old,
+                            expected,
+                            actual: new_dfsig.map(Cow::into_owned),
+                        })
+                    }
+                };
             }
         }
         Ok(changed)
