@@ -414,13 +414,14 @@ mod test {
     use std::{collections::HashMap, sync::Arc};
 
     use hugr_core::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder, SubContainer, TailLoopBuilder,
+        inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
     use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
     use hugr_core::extension::{TypeDefBound, Version};
     use hugr_core::hugr::internal::HugrMutInternals;
     use hugr_core::ops::{ExtensionOp, OpType, Tag, TailLoop, Value};
+
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::{self, array_type, ArrayOpDef, ArrayValue};
     use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
@@ -474,7 +475,7 @@ mod test {
             let [TypeArg::Type { ty }] = args else {
                 panic!("Illegal TypeArgs")
             };
-            let mut dfb = DFGBuilder::new(Signature::new(
+            let mut dfb = DFGBuilder::new(inout_sig(
                 vec![array_type(64, ty.clone()), INT_TYPES[6].to_owned()],
                 ty.clone(),
             ))
@@ -546,15 +547,13 @@ mod test {
         let mut fb = mb
             .define_function(
                 "main",
-                Signature::new(vec![i64(), c_int.clone(), c_bool.clone()], bool_t()),
+                Signature::new(vec![i64(), c_int.clone(), c_bool.clone()], bool_t())
+                    .with_extension_delta(ext.name.clone()),
             )
             .unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
         let mut dfb = fb
-            .dfg_builder(
-                Signature::new(vec![i64(), c_int.clone()], i64()),
-                [idx, indices],
-            )
+            .dfg_builder(inout_sig(vec![i64(), c_int.clone()], i64()), [idx, indices])
             .unwrap();
         let [idx, indices] = dfb.input_wires_arr();
         let [indices] = dfb
@@ -600,7 +599,8 @@ mod test {
         let mut h = mb.finish_hugr().unwrap();
 
         assert!(lower_types(&ext).run(&mut h).unwrap());
-        h.validate().unwrap();
+        // We do not update the extension delta
+        h.validate_no_extensions().unwrap();
 
         let mut counts: HashMap<_, usize> = HashMap::new();
         for ext_op in h.nodes().filter_map(|n| h.get_optype(n).as_extension_op()) {
