@@ -419,9 +419,10 @@ mod test {
     };
     use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
     use hugr_core::extension::{TypeDefBound, Version};
-    use hugr_core::ops::{ExtensionOp, OpType, Tag, Value};
+    use hugr_core::hugr::internal::HugrMutInternals;
+    use hugr_core::ops::{ExtensionOp, OpType, Tag, TailLoop, Value};
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
-    use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef, ArrayValue};
+    use hugr_core::std_extensions::collections::array::{self, array_type, ArrayOpDef, ArrayValue};
     use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
@@ -663,6 +664,14 @@ mod test {
             }),
         );
         lowerer.run(&mut h).unwrap();
+        if cfg!(feature = "extension_inference") {
+            match h.optype_mut(h.root()) {
+                OpType::TailLoop(TailLoop {
+                    extension_delta, ..
+                }) => extension_delta.insert(array::EXTENSION_ID),
+                _ => panic!(),
+            }
+        }
         h.validate().unwrap();
         assert_eq!(
             h.get_optype(pred.node())
