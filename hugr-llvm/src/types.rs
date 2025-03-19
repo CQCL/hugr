@@ -109,7 +109,7 @@ pub mod test {
     use insta::assert_snapshot;
     use rstest::rstest;
 
-    use crate::{extension::int::add_int_extensions, test::*, types::HugrFuncType};
+    use crate::{test::*, types::HugrFuncType};
 
     #[rstest]
     #[case(0,HugrFuncType::new(type_row!(Type::new_unit_sum(2)), type_row!()))]
@@ -149,7 +149,9 @@ pub mod test {
     #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)], vec![Type::new_unit_sum(2), INT_TYPES[2].clone()]]))]
     #[case(7, Type::new_function(HugrFuncType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
     fn ext_types(#[case] _id: i32, #[with(_id)] mut llvm_ctx: TestContext, #[case] t: Type) {
-        llvm_ctx.add_extensions(add_int_extensions);
+        use crate::CodegenExtsBuilder;
+
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         assert_snapshot!(
             "type_to_llvm",
             llvm_ctx.get_typing_session().llvm_type(&t).unwrap(),

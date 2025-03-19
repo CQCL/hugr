@@ -229,7 +229,6 @@ mod test {
 
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::extension::int::add_int_extensions;
     use crate::test::{llvm_ctx, TestContext};
 
     use crate::check_emission;
@@ -237,7 +236,7 @@ mod test {
 
     #[rstest]
     fn diverse_outputs(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_int_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         let t1 = INT_TYPES[0].clone();
         let t2 = INT_TYPES[1].clone();
         let es = ExtensionSet::from_iter([int_types::EXTENSION_ID, prelude::PRELUDE_ID]);

@@ -269,6 +269,15 @@ impl SumType {
     }
 }
 
+impl Transformable for SumType {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match self {
+            SumType::Unit { .. } => Ok(false),
+            SumType::General { rows } => rows.transform(tr),
+        }
+    }
+}
+
 impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
     fn from(sum: SumType) -> Self {
         match sum {
@@ -530,6 +539,36 @@ impl<RV: MaybeRV> TypeBase<RV> {
     }
 }
 
+impl<RV: MaybeRV> Transformable for TypeBase<RV> {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match &mut self.0 {
+            TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
+            TypeEnum::Extension(custom_type) => {
+                Ok(if let Some(nt) = tr.apply_custom(custom_type)? {
+                    *self = nt.into_();
+                    true
+                } else {
+                    let args_changed = custom_type.args_mut().transform(tr)?;
+                    if args_changed {
+                        *self = Self::new_extension(
+                            custom_type
+                                .get_type_def(&custom_type.get_extension()?)?
+                                .instantiate(custom_type.args())?,
+                        );
+                    }
+                    args_changed
+                })
+            }
+            TypeEnum::Function(fty) => fty.transform(tr),
+            TypeEnum::Sum(sum_type) => {
+                let ch = sum_type.transform(tr)?;
+                self.1 = self.0.least_upper_bound();
+                Ok(ch)
+            }
+        }
+    }
+}
+
 impl Type {
     fn substitute1(&self, s: &Substitution) -> Self {
         let v = self.substitute(s);
@@ -666,6 +705,53 @@ impl<'a> Substitution<'a> {
     }
 }
 
+/// A transformation that can be applied to a [Type] or [TypeArg].
+/// More general in some ways than a Substitution: can fail with a
+/// [Self::Err],  may change [TypeBound::Copyable] to [TypeBound::Any],
+/// and applies to arbitrary extension types rather than type variables.
+pub trait TypeTransformer {
+    /// Error returned when a [CustomType] cannot be transformed, or a type
+    /// containing it (e.g. if changing a [TypeArg::Type] from copyable to
+    /// linear invalidates a parameterized type).
+    type Err: std::error::Error + From<SignatureError>;
+
+    /// Applies the transformation to an extension type.
+    ///
+    /// Note that if the [CustomType] has type arguments, these will *not*
+    /// have been transformed first (this might not produce a valid type
+    /// due to changes in [TypeBound]).
+    ///
+    /// Returns a type to use instead, or None to indicate no change
+    ///   (in which case, the TypeArgs will be transformed instead.
+    ///    To prevent transforming the arguments, return `t.clone().into()`.)
+    fn apply_custom(&self, t: &CustomType) -> Result<Option<Type>, Self::Err>;
+
+    // Note: in future releases more methods may be added here to transform other types.
+    // By defaulting such trait methods to Ok(None), backwards compatibility will be preserved.
+}
+
+/// Trait for things that can be transformed by applying a [TypeTransformer].
+/// (A destructive / in-place mutation.)
+pub trait Transformable {
+    /// Applies a [TypeTransformer] to this instance.
+    ///
+    /// Returns true if any part may have changed, or false for definitely no change.
+    ///
+    /// If an Err occurs, `self` may be left in an inconsistent state (e.g. partially
+    /// transformed).
+    fn transform<T: TypeTransformer>(&mut self, t: &T) -> Result<bool, T::Err>;
+}
+
+impl<E: Transformable> Transformable for [E] {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        let mut any_change = false;
+        for item in self {
+            any_change |= item.transform(tr)?;
+        }
+        Ok(any_change)
+    }
+}
+
 pub(crate) fn check_typevar_decl(
     decls: &[TypeParam],
     idx: usize,
@@ -693,12 +779,15 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
-
     use std::sync::Weak;
 
     use super::*;
-    use crate::extension::prelude::usize_t;
-    use crate::type_row;
+    use crate::extension::prelude::{qb_t, usize_t};
+    use crate::extension::TypeDefBound;
+    use crate::std_extensions::collections::array::{array_type, array_type_parametric};
+    use crate::std_extensions::collections::list::list_type;
+    use crate::types::type_param::TypeArgError;
+    use crate::{hugr::IdentList, type_row, Extension};
 
     #[test]
     fn construct() {
@@ -754,6 +843,127 @@ pub(crate) mod test {
                 SumType::new_unary(3).variants().collect_vec()
             );
         }
+    }
+
+    pub(super) struct FnTransformer<T>(pub(super) T);
+    impl<T: Fn(&CustomType) -> Option<Type>> TypeTransformer for FnTransformer<T> {
+        type Err = SignatureError;
+
+        fn apply_custom(&self, t: &CustomType) -> Result<Option<Type>, Self::Err> {
+            Ok((self.0)(t))
+        }
+    }
+    #[test]
+    fn transform() {
+        const LIN: SmolStr = SmolStr::new_inline("MyLinear");
+        let e = Extension::new_test_arc(IdentList::new("TestExt").unwrap(), |e, w| {
+            e.add_type(LIN, vec![], String::new(), TypeDefBound::any(), w)
+                .unwrap();
+        });
+        let lin = e.get_type(&LIN).unwrap().instantiate([]).unwrap();
+
+        let lin_to_usize = FnTransformer(|ct: &CustomType| (*ct == lin).then_some(usize_t()));
+        let mut t = Type::new_extension(lin.clone());
+        assert_eq!(t.transform(&lin_to_usize), Ok(true));
+        assert_eq!(t, usize_t());
+
+        for coln in [
+            list_type,
+            |t| array_type(10, t),
+            |t| {
+                array_type_parametric(
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat(3.try_into().unwrap())),
+                    t,
+                )
+                .unwrap()
+            },
+        ] {
+            let mut t = coln(lin.clone().into());
+            assert_eq!(t.transform(&lin_to_usize), Ok(true));
+            let expected = coln(usize_t());
+            assert_eq!(t, expected);
+            assert_eq!(t.transform(&lin_to_usize), Ok(false));
+            assert_eq!(t, expected);
+        }
+    }
+
+    #[test]
+    fn transform_copyable_to_linear() {
+        const CPY: SmolStr = SmolStr::new_inline("MyCopyable");
+        const COLN: SmolStr = SmolStr::new_inline("ColnOfCopyableElems");
+        let e = Extension::new_test_arc(IdentList::new("TestExt").unwrap(), |e, w| {
+            e.add_type(CPY, vec![], String::new(), TypeDefBound::copyable(), w)
+                .unwrap();
+            e.add_type(
+                COLN,
+                vec![TypeParam::new_list(TypeBound::Copyable)],
+                String::new(),
+                TypeDefBound::copyable(),
+                w,
+            )
+            .unwrap();
+        });
+
+        let cpy = e.get_type(&CPY).unwrap().instantiate([]).unwrap();
+        let mk_opt = |t: Type| Type::new_sum([type_row![], TypeRow::from(t)]);
+
+        let cpy_to_qb = FnTransformer(|ct: &CustomType| (ct == &cpy).then_some(qb_t()));
+
+        let mut t = mk_opt(cpy.clone().into());
+        assert_eq!(t.transform(&cpy_to_qb), Ok(true));
+        assert_eq!(t, mk_opt(qb_t()));
+
+        let coln = e.get_type(&COLN).unwrap();
+        let c_of_cpy = coln
+            .instantiate([TypeArg::Sequence {
+                elems: vec![Type::from(cpy.clone()).into()],
+            }])
+            .unwrap();
+
+        let mut t = Type::new_extension(c_of_cpy.clone());
+        assert_eq!(
+            t.transform(&cpy_to_qb),
+            Err(SignatureError::from(TypeArgError::TypeMismatch {
+                param: TypeBound::Copyable.into(),
+                arg: qb_t().into()
+            }))
+        );
+
+        let mut t = Type::new_extension(
+            coln.instantiate([TypeArg::Sequence {
+                elems: vec![mk_opt(Type::from(cpy.clone())).into()],
+            }])
+            .unwrap(),
+        );
+        assert_eq!(
+            t.transform(&cpy_to_qb),
+            Err(SignatureError::from(TypeArgError::TypeMismatch {
+                param: TypeBound::Copyable.into(),
+                arg: mk_opt(qb_t()).into()
+            }))
+        );
+
+        // Finally, check handling Coln<Cpy> overrides handling of Cpy
+        let cpy_to_qb2 = FnTransformer(|ct: &CustomType| {
+            assert_ne!(ct, &cpy);
+            (ct == &c_of_cpy).then_some(usize_t())
+        });
+        let mut t = Type::new_extension(
+            coln.instantiate([TypeArg::Sequence {
+                elems: vec![Type::from(c_of_cpy.clone()).into(); 2],
+            }])
+            .unwrap(),
+        );
+        assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
+        assert_eq!(
+            t,
+            Type::new_extension(
+                coln.instantiate([TypeArg::Sequence {
+                    elems: vec![usize_t().into(); 2]
+                }])
+                .unwrap()
+            )
+        );
     }
 
     mod proptest {
