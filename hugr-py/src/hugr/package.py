@@ -5,7 +5,25 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
+try:
+    from warnings import deprecated  # type: ignore[attr-defined]
+except ImportError:
+    # Python < 3.13
+    def deprecated(_msg):  # type: ignore[no-redef]
+        def _deprecated(func):
+            return func
+
+        return _deprecated
+
+
 import hugr._serialization.extension as ext_s
+from hugr.envelope import (
+    EnvelopeConfig,
+    make_envelope,
+    make_envelope_str,
+    read_envelope,
+    read_envelope_str,
+)
 from hugr.ops import FuncDecl, FuncDefn, Op
 
 if TYPE_CHECKING:
@@ -43,10 +61,61 @@ class Package:
             extensions=[e._to_serial() for e in self.extensions],
         )
 
+    @staticmethod
+    def from_bytes(envelope: bytes) -> Package:
+        """Deserialize a byte string to a Package object.
+
+        Some envelope formats can be read from a string. See :meth:`from_str`.
+
+        Args:
+            envelope: The byte string representing a Package.
+
+        Returns:
+            The deserialized Package object.
+        """
+        return read_envelope(envelope)
+
+    @staticmethod
+    def from_str(envelope: str) -> Package:
+        """Deserialize a string to a Package object.
+
+        Not all envelope formats can be read from a string.
+        See :meth:`from_bytes` for a more general method.
+
+        Args:
+            envelope: The string representing a Package.
+
+        Returns:
+            The deserialized Package object.
+        """
+        return read_envelope_str(envelope)
+
+    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+        """Serialize the package to a HUGR envelope byte string.
+
+        Some envelope formats can be encoded into a string. See :meth:`to_str`.
+        """
+        config = config or EnvelopeConfig.BINARY
+        return make_envelope(self, config)
+
+    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+        """Serialize the package to a HUGR envelope string.
+
+        Not all envelope formats can be encoded into a string.
+        See :meth:`to_bytes` for a more general method.
+        """
+        config = config or EnvelopeConfig.TEXT
+        return make_envelope_str(self, config)
+
+    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:
+        """Serialize the package to a printable HUGR envelope string."""
         return self._to_serial().model_dump_json()
 
     @classmethod
+    @deprecated(
+        "Use HUGR envelopes instead. See the `from_bytes` and `from_str` methods."
+    )
     def from_json(cls, json_str: str) -> Package:
         """Deserialize a JSON string to a Package object.
 

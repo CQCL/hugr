@@ -723,12 +723,20 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return hugr
 
     def to_json(self) -> str:
-        """Serialize the HUGR to a JSON string."""
+        """Serialize the HUGR to a JSON string.
+
+        For most use cases, it is recommended to store a HUGR package instead.
+        See :meth:`hugr.package.Package.to_bytes`.
+        """
         return self._to_serial().to_json()
 
     @classmethod
     def load_json(cls, json_str: str) -> Hugr:
-        """Deserialize a JSON string into a HUGR."""
+        """Deserialize a JSON string into a HUGR.
+
+        For most use cases, it is recommended to use package serialization instead.
+        See :meth:`hugr.package.Package.from_bytes`.
+        """
         json_dict = json.loads(json_str)
         serial = SerialHugr.load_json(json_dict)
         return cls._from_serial(serial)

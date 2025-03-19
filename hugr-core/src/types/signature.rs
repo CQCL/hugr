@@ -339,7 +339,9 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTy
 
 #[cfg(test)]
 mod test {
-    use crate::{extension::prelude::usize_t, type_row};
+    use crate::extension::prelude::{bool_t, qb_t, usize_t};
+    use crate::type_row;
+    use crate::types::{test::FnTransformer, CustomType, TypeEnum};
 
     use super::*;
     #[test]
@@ -366,5 +368,32 @@ mod test {
             f_type.io(),
             (&type_row![Type::UNIT], &vec![usize_t()].into())
         );
+    }
+
+    #[test]
+    fn test_transform() {
+        let TypeEnum::Extension(usz_t) = usize_t().as_type_enum().clone() else {
+            panic!()
+        };
+        let tr = FnTransformer(|ct: &CustomType| (ct == &usz_t).then_some(bool_t()));
+        let row_with = || TypeRow::from(vec![usize_t(), qb_t(), bool_t()]);
+        let row_after = || TypeRow::from(vec![bool_t(), qb_t(), bool_t()]);
+        let mut sig = Signature::new(row_with(), row_after());
+        let exp = Signature::new(row_after(), row_after());
+        assert_eq!(sig.transform(&tr), Ok(true));
+        assert_eq!(sig, exp);
+        assert_eq!(sig.transform(&tr), Ok(false));
+        assert_eq!(sig, exp);
+        let exp = Type::new_function(exp);
+        for fty in [
+            FuncValueType::new(row_after(), row_with()),
+            FuncValueType::new(row_with(), row_with()),
+        ] {
+            let mut t = Type::new_function(fty);
+            assert_eq!(t.transform(&tr), Ok(true));
+            assert_eq!(t, exp);
+            assert_eq!(t.transform(&tr), Ok(false));
+            assert_eq!(t, exp);
+        }
     }
 }
