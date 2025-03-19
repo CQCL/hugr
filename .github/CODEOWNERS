@@ -8,4 +8,4 @@
 
 # The release PRs that trigger publication to crates.io or PyPI always modify the changelog.
 # We require those PRs to be approved by someone with release permissions.
-**/CHANGELOG.md @aborgna-q @cqc-alec @ss2165
+**/CHANGELOG.md @aborgna-q @cqc-alec @ss2165 @doug-q
