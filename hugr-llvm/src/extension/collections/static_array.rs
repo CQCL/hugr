@@ -29,22 +29,23 @@ use crate::{
 use anyhow::{bail, Result};
 
 #[derive(Debug, Clone, derive_more::From)]
-struct StaticArrayCodegenExtension<SACG>(SACG);
+pub struct StaticArrayCodegenExtension<SACG>(SACG);
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
+    /// Add a [StaticArrayCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
     /// as the implementation.
     pub fn add_static_array_extensions(self, ccg: impl StaticArrayCodegen + 'static) -> Self {
         self.add_extension(StaticArrayCodegenExtension::from(ccg))
     }
 
-    /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using
-    /// [DefaultArrayCodegen] as the implementation.
+    /// Add a [StaticArrayCodegenExtension] to the given [CodegenExtsBuilder] using
+    /// [DefaultStaticArrayCodegen] as the implementation.
     pub fn add_default_static_array_extensions(self) -> Self {
         self.add_static_array_extensions(DefaultStaticArrayCodegen)
     }
 }
 
+// This is not provided by inkwell, it seems like it should be
 fn value_is_const<'c>(value: impl BasicValue<'c>) -> bool {
     match value.as_basic_value_enum() {
         BasicValueEnum::ArrayValue(v) => v.is_const(),
@@ -56,6 +57,7 @@ fn value_is_const<'c>(value: impl BasicValue<'c>) -> bool {
     }
 }
 
+// This is not provided by inkwell, it seems like it should be
 fn const_array<'c>(
     ty: impl BasicType<'c>,
     values: impl IntoIterator<Item = impl BasicValue<'c>>,
@@ -106,22 +108,6 @@ fn const_array<'c>(
     }
 }
 
-// fn static_array_global<'c>(array: &StaticArrayValue, module: &Module<'c>) -> GlobalValue<'c> {
-//     let hash = {
-//         let mut hasher = hash::DefaultHasher::new();
-//         array.hash(&mut hasher);
-//         hasher.finish() as u32 // a bit shorter than u64
-//     };
-//     let prefix = format!("sa.{}.{hash:x}.", array.name());
-//     for i in 0.. {
-//         let sym = format!("{prefix}{i}");
-//         if let Some(global) = module.get_global(&sym) {
-
-//         }
-
-//     }
-//     format!("static_array_{}", array.value.get_contents().len())
-// }
 
 fn static_array_struct_type<'c>(
     context: &'c Context,
