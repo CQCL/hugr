@@ -27,9 +27,6 @@ panic:                                            ; preds = %panic_if_0
 
 exit:                                             ; preds = %panic_if_0, %panic
   ret i8 %0
-
-done:                                             ; No predecessors!
-  ret i8 %0
 }
 
 declare i32 @printf(i8*, ...)

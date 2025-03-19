@@ -463,14 +463,10 @@ fn val_or_panic<'c, H: HugrView<Node = Node>>(
     err_msg_str: &str,
     val: BasicValueEnum<'c>, // Must be same int type as `dont_panic`
 ) -> Result<BasicValueEnum<'c>> {
-    let done_bb = ctx.new_basic_block("done", None);
-    let exit_bb = ctx.new_basic_block("exit", Some(done_bb));
+    let exit_bb = ctx.new_basic_block("exit", None);
     let go_bb = ctx.new_basic_block("panic_if_0", Some(exit_bb));
     let panic_bb = ctx.new_basic_block("panic", Some(exit_bb));
     ctx.builder().build_unconditional_branch(go_bb)?;
-
-    ctx.builder().position_at_end(exit_bb);
-    ctx.builder().build_return(Some(&val))?;
 
     ctx.builder().position_at_end(panic_bb);
     let err_msg = ctx
@@ -488,7 +484,7 @@ fn val_or_panic<'c, H: HugrView<Node = Node>>(
         &[(dont_panic.get_type().const_int(1, false), exit_bb)],
     )?;
 
-    ctx.builder().position_at_end(done_bb);
+    ctx.builder().position_at_end(exit_bb);
 
     Ok(val) // Returning val should be nonsense if we panic
 }
@@ -960,9 +956,14 @@ mod test {
                     .add_dataflow_op(is_to_u, [signed])
                     .unwrap()
                     .outputs_arr();
-                hugr_builder.finish_with_outputs([unsigned]).unwrap()
+                let num = hugr_builder.add_load_value(ConstInt::new_u(log_width, 42).unwrap());
+                let [res] = hugr_builder
+                    .add_dataflow_op(make_int_op("iadd", log_width), [unsigned, num])
+                    .unwrap()
+                    .outputs_arr();
+                hugr_builder.finish_with_outputs([res]).unwrap()
             });
         let act = exec_ctx.exec_hugr_u64(hugr, "main");
-        assert_eq!(act, val as u64);
+        assert_eq!(act, (val as u64) + 42);
     }
 }
