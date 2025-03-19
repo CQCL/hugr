@@ -53,7 +53,7 @@ pub const STATIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("static_array")
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, derive_more::From)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, derive_more::From)]
 /// Statically sized array of values, all of the same [TypeBound::Copyable]
 /// type.
 pub struct StaticArrayValue {
