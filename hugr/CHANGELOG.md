@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-v0.15.0...hugr-v0.15.1) - 2025-03-19
+
+### New Features
+
+- *(hugr-py)* Support envelope compression ([#1994](https://github.com/CQCL/hugr/pull/1994))
+
 ## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-v0.14.4...hugr-v0.15.0) - 2025-03-14
 
 This release adds a new `Node` parameter to the `HugrView` trait, so it is now possible to have more complex structures behave like hugrs.
