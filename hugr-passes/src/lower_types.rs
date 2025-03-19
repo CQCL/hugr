@@ -67,7 +67,7 @@ impl From<&OpDef> for ParametricOp {
 pub enum OpReplacement {
     SingleOp(OpType),
     /// Defines a sub-Hugr to splice in place of the op.
-    /// Note this will be of limited use before [monomorphization](super::monomorphize) because
+    /// Note this will be of limited use before [monomorphization](super::monomorphize()) because
     /// the sub-Hugr will not be able to use type variables present in the op.
     // TODO: store also a vec<TypeParam>, and update Hugr::validate to take &[TypeParam]s
     // (defaulting to empty list) - see https://github.com/CQCL/hugr/issues/709
@@ -159,7 +159,7 @@ impl LowerTypes {
 
     /// Configures this instance to change occurrences of `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* Type, this should only
-    /// be used on already-*[monomorphize](super::monomorphize)d* Hugrs, as substitution
+    /// be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as substitution
     /// (parametric polymorphism) happening later will not respect the lowering(s).
     ///
     /// This takes precedence over [Self::lower_parametric_type] where the `src`s overlap.
@@ -188,7 +188,7 @@ impl LowerTypes {
 
     /// Configures this instance to change occurrences of `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* [OpDef], this should only
-    /// be used on already-*[monomorphize](super::monomorphize)d* Hugrs, as substitution
+    /// be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as substitution
     /// (parametric polymorphism) happening later will not respect the lowering(s).
     ///
     /// This takes precedence over [Self::lower_parametric_op] where the `src`s overlap.

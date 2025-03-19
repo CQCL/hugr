@@ -315,8 +315,8 @@ pub trait HugrMutInternals: RootTagged<Node = Node> {
     /// Changing this may invalidate the ports, which may need to be resized to
     /// match the OpType signature.
     ///
-    /// Will panic for the root node unless [Self::RootHandle] is [OpTag::Any],
-    /// as mutation could invalidate the bound.
+    /// Will panic for the root node unless [`Self::RootHandle`](RootTagged::RootHandle)
+    /// is [OpTag::Any], as mutation could invalidate the bound.
     fn optype_mut(&mut self, node: Node) -> &mut OpType {
         if Self::RootHandle::TAG.is_superset(OpTag::Any) {
             panic_invalid_node(self, node);
