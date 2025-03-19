@@ -631,8 +631,6 @@ mod test {
     };
     use rstest::rstest;
 
-    
-    
     use crate::{
         check_emission,
         emit::test::{SimpleHugrConfig, DFGW},
