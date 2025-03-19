@@ -1,4 +1,4 @@
-use std::hash::{self, Hasher as _};
+use std::hash::{Hasher as _};
 
 use hugr_core::{
     extension::{
@@ -187,7 +187,7 @@ pub trait StaticArrayCodegen: Clone {
         let gv = {
             let module = context.get_current_module();
             let hash = {
-                let mut hasher = hash::DefaultHasher::new();
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
                 let _ = value.try_hash(&mut hasher);
                 hasher.finish() as u32 // a bit shorter than u64
             };
