@@ -197,6 +197,10 @@ pub trait StaticArrayCodegen: Clone {
                 .find_map(|i| {
                     let sym = format!("{prefix}{i}");
                     if let Some(global) = module.get_global(&sym) {
+                        // Note this comparison may be expensive for large
+                        // values.  We could avoid it(and therefore avoid
+                        // creating array_value in this branch) if we had
+                        // https://github.com/CQCL/hugr/issues/2004
                         if global.get_initializer().is_some_and(|x| x == array_value) {
                             Some(global)
                         } else {
