@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.0...hugr-py-v0.11.1) (2025-03-17)
+
+
+### Features
+
+* Add default envelope config to `Package.to_str`/`to_bytes` ([#1980](https://github.com/CQCL/hugr/issues/1980)) ([44deda1](https://github.com/CQCL/hugr/commit/44deda11e9c335f7ff705eaf1b8bcc01b6c2e202))
+
+
+### Bug Fixes
+
+* Cyclic import in hugr.envelope ([#1981](https://github.com/CQCL/hugr/issues/1981)) ([cff0dba](https://github.com/CQCL/hugr/commit/cff0dba67c241f6a817eb029f73e7c9634b2d441))
+
 ## [0.11.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.3...hugr-py-v0.11.0) (2025-03-14)
 
 
