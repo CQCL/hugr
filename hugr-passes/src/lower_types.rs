@@ -19,6 +19,8 @@ use hugr_core::types::{
 };
 use hugr_core::{Hugr, Node};
 
+use crate::validation::{ValidatePassError, ValidationLevel};
+
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
     ext_name: ExtensionId,
@@ -106,6 +108,7 @@ pub struct LowerTypes {
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
     consts: HashMap<Either<CustomType, ParametricType>, Arc<dyn Fn(&OpaqueValue) -> Option<Value>>>,
     check_sig: bool,
+    validation: ValidationLevel,
 }
 
 impl TypeTransformer for LowerTypes {
@@ -128,7 +131,7 @@ impl TypeTransformer for LowerTypes {
     }
 }
 
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum ChangeTypeError {
     #[error(transparent)]
@@ -140,9 +143,20 @@ pub enum ChangeTypeError {
         expected: Option<Signature>,
         actual: Option<Signature>,
     },
+    #[error(transparent)]
+    #[allow(missing_docs)]
+    ValidationError(#[from] ValidatePassError),
 }
 
 impl LowerTypes {
+    /// Sets the validation level used before and after the pass is run.
+    // Note the self -> Self style is consistent with other passes, but not the other methods here.
+    // TODO change the others? But we are planning to drop validation_level in https://github.com/CQCL/hugr/pull/1895
+    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
+        self.validation = level;
+        self
+    }
+
     /// Configures this instance to change occurrences of `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* Type, this should only
     /// be used on already-*[monomorphize](super::monomorphize)d* Hugrs, as substitution
@@ -230,7 +244,13 @@ impl LowerTypes {
         self.check_sig = check_sig;
     }
 
-    pub fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
+    /// Run the pass using specified configuration.
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<bool, ChangeTypeError> {
+        self.validation
+            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
+    }
+
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
         let mut changed = false;
         for n in hugr.nodes().collect::<Vec<_>>() {
             let maybe_check_sig = if self.check_sig {
@@ -581,7 +601,7 @@ mod test {
         fb.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = mb.finish_hugr().unwrap();
 
-        assert!(lower_types(&ext).run_no_validate(&mut h).unwrap());
+        assert!(lower_types(&ext).run(&mut h).unwrap());
         h.validate().unwrap();
 
         let mut counts: HashMap<_, usize> = HashMap::new();
@@ -645,7 +665,7 @@ mod test {
                 )
             }),
         );
-        lowerer.run_no_validate(&mut h).unwrap();
+        lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
         assert_eq!(
             h.get_optype(pred.node())
