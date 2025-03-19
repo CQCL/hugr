@@ -5,7 +5,8 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-@err_msg = private unnamed_addr constant [33 x i8] c"is_to_u called on negative value\00", align 1
+@0 = private unnamed_addr constant [33 x i8] c"is_to_u called on negative value\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
 
 define i8 @_hl.main.1(i8 %0) {
 alloca_block:
@@ -26,14 +27,11 @@ panic_if_0:                                       ; preds = %entry_block
   ]
 
 panic:                                            ; preds = %panic_if_0
-  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @err_msg, i32 0, i32 0))
+  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0))
   call void @abort()
   br label %exit
 
 exit:                                             ; preds = %panic_if_0, %panic
-  ret i8 %"2_01"
-
-done:                                             ; No predecessors!
   store i8 %"2_01", i8* %"4_0", align 1
   %"4_02" = load i8, i8* %"4_0", align 1
   store i8 %"4_02", i8* %"0", align 1
