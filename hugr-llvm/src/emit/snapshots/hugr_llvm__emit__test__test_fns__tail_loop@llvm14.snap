@@ -40,14 +40,14 @@ cond_17_case_1:                                   ; preds = %4
   br label %cond_exit_17
 
 cond_exit_17:                                     ; preds = %cond_17_case_1, %cond_17_case_0
-  %"011.0" = phi { i1, i64 } [ %6, %cond_17_case_0 ], [ { i1 true, i64 poison }, %cond_17_case_1 ]
-  %7 = extractvalue { i1, i64 } %"011.0", 0
+  %"019.0" = phi { i1, i64 } [ %6, %cond_17_case_0 ], [ { i1 true, i64 poison }, %cond_17_case_1 ]
+  %7 = extractvalue { i1, i64 } %"019.0", 0
   switch i1 %7, label %8 [
     i1 true, label %10
   ]
 
 8:                                                ; preds = %cond_exit_17
-  %9 = extractvalue { i1, i64 } %"011.0", 1
+  %9 = extractvalue { i1, i64 } %"019.0", 1
   br label %loop_body
 
 10:                                               ; preds = %cond_exit_17

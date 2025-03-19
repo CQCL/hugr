@@ -1,5 +1,5 @@
 ---
-source: src/extension/prelude.rs
+source: hugr-llvm/src/extension/prelude.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
@@ -18,8 +18,8 @@ entry_block:                                      ; preds = %alloca_block
   %4 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 %2, i8* %3)
   call void @abort()
   %mrv = insertvalue { i16, i16 } undef, i16 0, 0
-  %mrv8 = insertvalue { i16, i16 } %mrv, i16 0, 1
-  ret { i16, i16 } %mrv8
+  %mrv15 = insertvalue { i16, i16 } %mrv, i16 0, 1
+  ret { i16, i16 } %mrv15
 }
 
 declare i32 @printf(i8*, ...)

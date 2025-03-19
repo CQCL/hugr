@@ -196,7 +196,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         ))
     }
 
-    fn build_prologue<T>(&mut self, f: impl FnOnce(&Builder<'c>) -> T) -> T {
+    pub(crate) fn build_prologue<T>(&mut self, f: impl FnOnce(&Builder<'c>) -> T) -> T {
         let b = self.prologue_block();
         self.build_positioned(b, |x| f(&x.builder))
     }

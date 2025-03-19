@@ -1,5 +1,5 @@
 ---
-source: src/extension/int.rs
+source: hugr-llvm/src/extension/int.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
@@ -8,20 +8,28 @@ source_filename = "test_context"
 define i64 @_hl.main.1(i64 %0, i64 %1) {
 alloca_block:
   %"0" = alloca i64, align 8
+  %"1" = alloca i64, align 8
+  %"01" = alloca i64, align 8
   %"2_0" = alloca i64, align 8
   %"2_1" = alloca i64, align 8
   %"4_0" = alloca i64, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i64 %0, i64* %"2_0", align 4
-  store i64 %1, i64* %"2_1", align 4
-  %"2_01" = load i64, i64* %"2_0", align 4
-  %"2_12" = load i64, i64* %"2_1", align 4
-  %2 = sub i64 %"2_01", %"2_12"
+  store i64 %0, i64* %"0", align 4
+  store i64 %1, i64* %"1", align 4
+  %"02" = load i64, i64* %"0", align 4
+  %"13" = load i64, i64* %"1", align 4
+  store i64 %"02", i64* %"2_0", align 4
+  store i64 %"13", i64* %"2_1", align 4
+  %"2_04" = load i64, i64* %"2_0", align 4
+  %"2_15" = load i64, i64* %"2_1", align 4
+  %"2_06" = load i64, i64* %"2_0", align 4
+  %"2_17" = load i64, i64* %"2_1", align 4
+  %2 = sub i64 %"2_06", %"2_17"
   store i64 %2, i64* %"4_0", align 4
-  %"4_03" = load i64, i64* %"4_0", align 4
-  store i64 %"4_03", i64* %"0", align 4
-  %"04" = load i64, i64* %"0", align 4
-  ret i64 %"04"
+  %"4_08" = load i64, i64* %"4_0", align 4
+  store i64 %"4_08", i64* %"01", align 4
+  %"09" = load i64, i64* %"01", align 4
+  ret i64 %"09"
 }

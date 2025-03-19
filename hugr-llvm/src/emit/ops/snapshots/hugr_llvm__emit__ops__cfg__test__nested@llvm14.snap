@@ -30,8 +30,8 @@ entry_block:                                      ; preds = %alloca_block
   br label %7
 
 7:                                                ; preds = %6, %4
-  %"03.0" = phi i1 [ true, %4 ], [ false, %6 ]
-  ret i1 %"03.0"
+  %"08.0" = phi i1 [ true, %4 ], [ false, %6 ]
+  ret i1 %"08.0"
 
 8:                                                ; preds = %2
   switch i2 %0, label %9 [
@@ -70,8 +70,8 @@ entry_block:                                      ; preds = %alloca_block
   br label %18
 
 18:                                               ; preds = %17, %15, %13
-  %"06.0" = phi i1 [ true, %13 ], [ %1, %17 ], [ false, %15 ]
-  switch i1 %"06.0", label %19 [
+  %"011.0" = phi i1 [ true, %13 ], [ %1, %17 ], [ false, %15 ]
+  switch i1 %"011.0", label %19 [
     i1 true, label %20
   ]
 

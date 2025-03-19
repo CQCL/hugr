@@ -17,25 +17,31 @@ entry_block:                                      ; preds = %alloca_block
 define i1 @_hl.main_unary.5(i1 %0) {
 alloca_block:
   %"0" = alloca i1, align 1
+  %"01" = alloca i1, align 1
   %"6_0" = alloca i1, align 1
   %"8_0" = alloca i1, align 1
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i1 %0, i1* %"6_0", align 1
-  %"6_01" = load i1, i1* %"6_0", align 1
-  %1 = call i1 @_hl.main_unary.5(i1 %"6_01")
+  store i1 %0, i1* %"0", align 1
+  %"02" = load i1, i1* %"0", align 1
+  store i1 %"02", i1* %"6_0", align 1
+  %"6_03" = load i1, i1* %"6_0", align 1
+  %"6_04" = load i1, i1* %"6_0", align 1
+  %1 = call i1 @_hl.main_unary.5(i1 %"6_04")
   store i1 %1, i1* %"8_0", align 1
-  %"8_02" = load i1, i1* %"8_0", align 1
-  store i1 %"8_02", i1* %"0", align 1
-  %"03" = load i1, i1* %"0", align 1
-  ret i1 %"03"
+  %"8_05" = load i1, i1* %"8_0", align 1
+  store i1 %"8_05", i1* %"01", align 1
+  %"06" = load i1, i1* %"01", align 1
+  ret i1 %"06"
 }
 
 define { i1, i1 } @_hl.main_binary.9(i1 %0, i1 %1) {
 alloca_block:
   %"0" = alloca i1, align 1
   %"1" = alloca i1, align 1
+  %"01" = alloca i1, align 1
+  %"12" = alloca i1, align 1
   %"10_0" = alloca i1, align 1
   %"10_1" = alloca i1, align 1
   %"12_0" = alloca i1, align 1
@@ -43,22 +49,28 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i1 %0, i1* %"10_0", align 1
-  store i1 %1, i1* %"10_1", align 1
-  %"10_01" = load i1, i1* %"10_0", align 1
-  %"10_12" = load i1, i1* %"10_1", align 1
-  %2 = call { i1, i1 } @_hl.main_binary.9(i1 %"10_01", i1 %"10_12")
+  store i1 %0, i1* %"0", align 1
+  store i1 %1, i1* %"1", align 1
+  %"03" = load i1, i1* %"0", align 1
+  %"14" = load i1, i1* %"1", align 1
+  store i1 %"03", i1* %"10_0", align 1
+  store i1 %"14", i1* %"10_1", align 1
+  %"10_05" = load i1, i1* %"10_0", align 1
+  %"10_16" = load i1, i1* %"10_1", align 1
+  %"10_07" = load i1, i1* %"10_0", align 1
+  %"10_18" = load i1, i1* %"10_1", align 1
+  %2 = call { i1, i1 } @_hl.main_binary.9(i1 %"10_07", i1 %"10_18")
   %3 = extractvalue { i1, i1 } %2, 0
   %4 = extractvalue { i1, i1 } %2, 1
   store i1 %3, i1* %"12_0", align 1
   store i1 %4, i1* %"12_1", align 1
-  %"12_03" = load i1, i1* %"12_0", align 1
-  %"12_14" = load i1, i1* %"12_1", align 1
-  store i1 %"12_03", i1* %"0", align 1
-  store i1 %"12_14", i1* %"1", align 1
-  %"05" = load i1, i1* %"0", align 1
-  %"16" = load i1, i1* %"1", align 1
-  %mrv = insertvalue { i1, i1 } undef, i1 %"05", 0
-  %mrv7 = insertvalue { i1, i1 } %mrv, i1 %"16", 1
-  ret { i1, i1 } %mrv7
+  %"12_09" = load i1, i1* %"12_0", align 1
+  %"12_110" = load i1, i1* %"12_1", align 1
+  store i1 %"12_09", i1* %"01", align 1
+  store i1 %"12_110", i1* %"12", align 1
+  %"011" = load i1, i1* %"01", align 1
+  %"112" = load i1, i1* %"12", align 1
+  %mrv = insertvalue { i1, i1 } undef, i1 %"011", 0
+  %mrv13 = insertvalue { i1, i1 } %mrv, i1 %"112", 1
+  ret { i1, i1 } %mrv13
 }

@@ -18,8 +18,8 @@ entry_block:                                      ; preds = %alloca_block
   %6 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %5, 1
   %7 = select i1 %3, { i1, i16 } %6, { i1, i16 } { i1 false, i16 poison }
   %mrv = insertvalue { i8*, { i1, i16 } } undef, i8* %0, 0
-  %mrv6 = insertvalue { i8*, { i1, i16 } } %mrv, { i1, i16 } %7, 1
-  ret { i8*, { i1, i16 } } %mrv6
+  %mrv9 = insertvalue { i8*, { i1, i16 } } %mrv, { i1, i16 } %7, 1
+  ret { i8*, { i1, i16 } } %mrv9
 }
 
 declare i1 @__rt__list__pop(i8*, i8*)

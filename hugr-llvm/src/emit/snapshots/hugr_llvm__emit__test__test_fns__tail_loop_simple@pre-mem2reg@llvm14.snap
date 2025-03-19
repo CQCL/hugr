@@ -7,7 +7,8 @@ source_filename = "test_context"
 
 define {} @_hl.main.1(i64 %0) {
 alloca_block:
-  %"0" = alloca {}, align 8
+  %"0" = alloca i64, align 8
+  %"01" = alloca {}, align 8
   %"2_0" = alloca i64, align 8
   %"4_0" = alloca {}, align 8
   %"5_0" = alloca i64, align 8
@@ -15,27 +16,31 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i64 %0, i64* %"2_0", align 4
-  %"2_01" = load i64, i64* %"2_0", align 4
-  store i64 %"2_01", i64* %"5_0", align 4
+  store i64 %0, i64* %"0", align 4
+  %"02" = load i64, i64* %"0", align 4
+  store i64 %"02", i64* %"2_0", align 4
+  %"2_03" = load i64, i64* %"2_0", align 4
+  %"2_04" = load i64, i64* %"2_0", align 4
+  store i64 %"2_04", i64* %"5_0", align 4
   br label %loop_body
 
 loop_body:                                        ; preds = %3, %entry_block
-  %"5_02" = load i64, i64* %"5_0", align 4
-  store i64 %"5_02", i64* %"5_0", align 4
-  %"5_03" = load i64, i64* %"5_0", align 4
-  %1 = insertvalue { i1, i64 } { i1 false, i64 poison }, i64 %"5_03", 1
+  %"5_05" = load i64, i64* %"5_0", align 4
+  store i64 %"5_05", i64* %"5_0", align 4
+  %"5_06" = load i64, i64* %"5_0", align 4
+  %"5_07" = load i64, i64* %"5_0", align 4
+  %1 = insertvalue { i1, i64 } { i1 false, i64 poison }, i64 %"5_07", 1
   store { i1, i64 } %1, { i1, i64 }* %"7_0", align 4
-  %"7_04" = load { i1, i64 }, { i1, i64 }* %"7_0", align 4
-  store { i1, i64 } %"7_04", { i1, i64 }* %"7_0", align 4
-  %"7_05" = load { i1, i64 }, { i1, i64 }* %"7_0", align 4
-  %2 = extractvalue { i1, i64 } %"7_05", 0
+  %"7_08" = load { i1, i64 }, { i1, i64 }* %"7_0", align 4
+  store { i1, i64 } %"7_08", { i1, i64 }* %"7_0", align 4
+  %"7_09" = load { i1, i64 }, { i1, i64 }* %"7_0", align 4
+  %2 = extractvalue { i1, i64 } %"7_09", 0
   switch i1 %2, label %3 [
     i1 true, label %5
   ]
 
 3:                                                ; preds = %loop_body
-  %4 = extractvalue { i1, i64 } %"7_05", 1
+  %4 = extractvalue { i1, i64 } %"7_09", 1
   store i64 %4, i64* %"5_0", align 4
   br label %loop_body
 
@@ -44,8 +49,8 @@ loop_body:                                        ; preds = %3, %entry_block
   br label %loop_out
 
 loop_out:                                         ; preds = %5
-  %"4_06" = load {}, {}* %"4_0", align 1
-  store {} %"4_06", {}* %"0", align 1
-  %"07" = load {}, {}* %"0", align 1
-  ret {} %"07"
+  %"4_010" = load {}, {}* %"4_0", align 1
+  store {} %"4_010", {}* %"01", align 1
+  %"011" = load {}, {}* %"01", align 1
+  ret {} %"011"
 }

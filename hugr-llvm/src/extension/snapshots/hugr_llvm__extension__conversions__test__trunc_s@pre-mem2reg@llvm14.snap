@@ -9,23 +9,27 @@ source_filename = "test_context"
 
 define { i1, { i32, i8* }, i32 } @_hl.main.1(double %0) {
 alloca_block:
-  %"0" = alloca { i1, { i32, i8* }, i32 }, align 8
+  %"0" = alloca double, align 8
+  %"01" = alloca { i1, { i32, i8* }, i32 }, align 8
   %"2_0" = alloca double, align 8
   %"4_0" = alloca { i1, { i32, i8* }, i32 }, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store double %0, double* %"2_0", align 8
-  %"2_01" = load double, double* %"2_0", align 8
-  %within_upper_bound = fcmp olt double %"2_01", 0x41DFFFFFFFC00000
-  %within_lower_bound = fcmp ole double 0xC1E0000000000000, %"2_01"
+  store double %0, double* %"0", align 8
+  %"02" = load double, double* %"0", align 8
+  store double %"02", double* %"2_0", align 8
+  %"2_03" = load double, double* %"2_0", align 8
+  %"2_04" = load double, double* %"2_0", align 8
+  %within_upper_bound = fcmp olt double %"2_04", 0x41DFFFFFFFC00000
+  %within_lower_bound = fcmp ole double 0xC1E0000000000000, %"2_04"
   %success = and i1 %within_upper_bound, %within_lower_bound
-  %trunc_result = fptosi double %"2_01" to i32
+  %trunc_result = fptosi double %"2_04" to i32
   %1 = insertvalue { i1, { i32, i8* }, i32 } { i1 true, { i32, i8* } poison, i32 poison }, i32 %trunc_result, 2
   %2 = select i1 %success, { i1, { i32, i8* }, i32 } %1, { i1, { i32, i8* }, i32 } { i1 false, { i32, i8* } { i32 2, i8* getelementptr inbounds ([58 x i8], [58 x i8]* @0, i32 0, i32 0) }, i32 poison }
   store { i1, { i32, i8* }, i32 } %2, { i1, { i32, i8* }, i32 }* %"4_0", align 8
-  %"4_02" = load { i1, { i32, i8* }, i32 }, { i1, { i32, i8* }, i32 }* %"4_0", align 8
-  store { i1, { i32, i8* }, i32 } %"4_02", { i1, { i32, i8* }, i32 }* %"0", align 8
-  %"03" = load { i1, { i32, i8* }, i32 }, { i1, { i32, i8* }, i32 }* %"0", align 8
-  ret { i1, { i32, i8* }, i32 } %"03"
+  %"4_05" = load { i1, { i32, i8* }, i32 }, { i1, { i32, i8* }, i32 }* %"4_0", align 8
+  store { i1, { i32, i8* }, i32 } %"4_05", { i1, { i32, i8* }, i32 }* %"01", align 8
+  %"06" = load { i1, { i32, i8* }, i32 }, { i1, { i32, i8* }, i32 }* %"01", align 8
+  ret { i1, { i32, i8* }, i32 } %"06"
 }
