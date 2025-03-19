@@ -66,10 +66,11 @@ pub enum OpReplacement {
     SingleOp(OpType),
     /// Defines a sub-Hugr to splice in place of the op.
     /// Note this will be of limited use before [monomorphization](super::monomorphize) because
-    /// the sub-Hugrwill not be able to use type variables present in the op.
+    /// the sub-Hugr will not be able to use type variables present in the op.
     // TODO: store also a vec<TypeParam>, and update Hugr::validate to take &[TypeParam]s
     // (defaulting to empty list) - see https://github.com/CQCL/hugr/issues/709
     CompoundOp(Box<Hugr>),
+    // TODO add Call to...a Node in the existing Hugr (?)
 }
 
 impl OpReplacement {
@@ -144,18 +145,24 @@ pub enum ChangeTypeError {
 impl LowerTypes {
     /// Configures this instance to change occurrences of `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* Type, this should only
-    /// be used on *[monomorphize](super::monomorphize)d* Hugrs, because substitution
+    /// be used on already-*[monomorphize](super::monomorphize)d* Hugrs, as substitution
     /// (parametric polymorphism) happening later will not respect the lowering(s).
+    ///
+    /// This takes precedence over [Self::lower_parametric_type] where the `src`s overlap.
     pub fn lower_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable or 'src' is linear, but since we can't
         // check that for parametric types, we'll be consistent and not check here either.
         self.type_map.insert(src, dest);
     }
 
+    /// Configures this instance to change occurrences of a parametrized type `src`
+    /// via a callback that builds the replacement type given the [TypeArg]s.
+    /// Note that the TypeArgs will already have been lowered (e.g. they may not
+    /// fit the bounds of the original type).
     pub fn lower_parametric_type(
         &mut self,
         src: &TypeDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Type>,
+        dest_fn: Box<dyn Fn(&[TypeArg]) -> Type>, // TODO should we return Option<Type> ?
     ) {
         // No way to check that dest_fn never produces a linear type.
         // We could require copy/discard-generators if src is Copyable, or *might be*
@@ -165,27 +172,46 @@ impl LowerTypes {
         self.param_types.insert(src.into(), Arc::from(dest_fn));
     }
 
-    pub fn lower_op(&mut self, src: &ExtensionOp, tgt: OpReplacement) {
-        self.op_map.insert(OpHashWrapper::from(src), tgt);
+    /// Configures this instance to change occurrences of `src` to `dest`.
+    /// Note that if `src` is an instance of a *parametrized* [OpDef], this should only
+    /// be used on already-*[monomorphize](super::monomorphize)d* Hugrs, as substitution
+    /// (parametric polymorphism) happening later will not respect the lowering(s).
+    ///
+    /// This takes precedence over [Self::lower_parametric_op] where the `src`s overlap.
+    pub fn lower_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
+        self.op_map.insert(OpHashWrapper::from(src), dest);
     }
 
+    /// Configures this instance to change occurrences of a parametrized op `src`
+    /// via a callback that builds the replacement type given the [TypeArg]s.
+    /// Note that the TypeArgs will already have been lowered (e.g. they may not
+    /// fit the bounds of the original op).
+    ///
+    /// If the Callback returns None, the new typeargs will be applied to the original op.
     pub fn lower_parametric_op(
         &mut self,
         src: &OpDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>,
+        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>, // TODO or just OpReplacement?
     ) {
         self.param_ops.insert(src.into(), Arc::from(dest_fn));
     }
 
+    /// Configures this instance to change occurrences consts of type `src_ty`, using
+    /// a callback given the value of the constant (of that type).
+    /// Note that if `src_ty` is an instance of a *parametrized* [TypeDef], this
+    /// takes precedence over [Self::lower_consts_parametric] where the `src_ty`s overlap.
     pub fn lower_consts(
         &mut self,
         src_ty: &CustomType,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
+        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>, // TODO should we return Value??
     ) {
         self.consts
             .insert(Either::Left(src_ty.clone()), Arc::from(const_fn));
     }
 
+    /// Configures this instance to change occurrences consts of all types that
+    /// are instances of a parametric typedef `src_ty`, using a callback given
+    /// the value of the constant (the [OpaqueValue] contains the [TypeArg]s).
     pub fn lower_consts_parametric(
         &mut self,
         src_ty: &TypeDef,
