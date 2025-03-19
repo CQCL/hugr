@@ -275,10 +275,7 @@ impl LowerTypes {
                 match (&expected, &new_dfsig) {
                     (None, None) => (),
                     (Some(exp), Some(act))
-                        if exp.input == act.input && exp.output == act.output =>
-                    {
-                        ()
-                    }
+                        if exp.input == act.input && exp.output == act.output => {}
                     _ => {
                         return Err(ChangeTypeError::SignatureMismatch {
                             op: hugr.get_optype(n).clone(),
