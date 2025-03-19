@@ -254,7 +254,6 @@ macro_rules! check_emission {
 mod test_fns {
     use super::*;
     use crate::custom::CodegenExtsBuilder;
-    use crate::extension::int::add_int_extensions;
     use crate::types::{HugrFuncType, HugrSumType};
 
     use hugr_core::builder::DataflowSubContainer;
@@ -357,7 +356,8 @@ mod test_fns {
 
     #[rstest]
     fn emit_hugr_load_constant(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_int_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+
         let v = Value::tuple([
             Value::unit_sum(2, 4).unwrap(),
             ConstInt::new_s(4, -24).unwrap().into(),
@@ -416,7 +416,7 @@ mod test_fns {
 
     #[rstest]
     fn emit_hugr_custom_op(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_int_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         let v1 = ConstInt::new_s(4, -24).unwrap();
         let v2 = ConstInt::new_s(4, 24).unwrap();
 
@@ -723,8 +723,7 @@ mod test_fns {
 
     #[rstest]
     fn tail_loop(mut llvm_ctx: TestContext, #[with(3, 7)] terminal_loop: Hugr) {
-        llvm_ctx.add_extensions(add_int_extensions);
-
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         check_emission!(terminal_loop, llvm_ctx);
     }
 
@@ -738,7 +737,7 @@ mod test_fns {
         #[case] input: u64,
         #[with(iters, input)] terminal_loop: Hugr,
     ) {
-        exec_ctx.add_extensions(add_int_extensions);
+        exec_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         assert_eq!(
             input << (iters + 1),
             exec_ctx.exec_hugr_u64(terminal_loop, "main")

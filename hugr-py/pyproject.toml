@@ -31,6 +31,7 @@ dependencies = [
     "pydantic-extra-types>=2.9.0",
     "semver>=3.0.2",
     "graphviz>=0.20.3",
+    "zstd>=1.5.6.6",
 ]
 
 [project.optional-dependencies]

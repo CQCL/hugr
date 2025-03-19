@@ -39,6 +39,7 @@ insta = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 portgraph = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["debug"] }
+lazy_static.workspace = true
 
 [dev-dependencies]
 hugr-llvm = { "path" = ".", features = ["test-utils"] }

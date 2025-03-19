@@ -36,6 +36,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
 
+import zstd
+
 if TYPE_CHECKING:
     from hugr.package import Package
 
@@ -47,21 +49,22 @@ def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
     """Encode a HUGR package into an envelope, using the given configuration."""
     envelope = bytearray(config._make_header().to_bytes())
 
-    if config.zstd is not None:
-        msg = "Zstd compression is not supported yet."
-        raise ValueError(msg)
-
     # Currently only uncompressed JSON is supported.
+    payload: bytes
     match config.format:
         case EnvelopeFormat.JSON:
             json = package._to_serial().model_dump_json()
             # This introduces an extra encode/decode roundtrip when calling
             # `make_envelope_str`, but we prioritize speed for binary formats.
-            envelope += json.encode("utf-8")
-        case _:
-            msg = f"Unsupported envelope format: {config.format}"
+            payload = json.encode("utf-8")
+        case EnvelopeFormat.MODULE | EnvelopeFormat.MODULE_WITH_EXTS:
+            msg = "MODULE encoding of HUGR envelopes is not supported yet."
             raise ValueError(msg)
 
+    if config.zstd is not None:
+        payload = zstd.compress(payload, config.zstd)
+
+    envelope += payload
     return bytes(envelope)
 
 
@@ -82,14 +85,13 @@ def read_envelope(envelope: bytes) -> Package:
     payload = envelope[10:]
 
     if header.zstd:
-        msg = "Zstd compression is not supported yet."
-        raise ValueError(msg)
+        payload = zstd.uncompress(payload)
 
     match header.format:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
-        case _:
-            msg = f"Unsupported envelope format: {header.format}"
+        case EnvelopeFormat.MODULE | EnvelopeFormat.MODULE_WITH_EXTS:
+            msg = "Decoding HUGR envelopes in MODULE format is not supported yet."
             raise ValueError(msg)
 
 
@@ -174,11 +176,13 @@ class EnvelopeConfig:
     zstd: int | None = None
 
     TEXT: ClassVar[EnvelopeConfig]
+    BINARY: ClassVar[EnvelopeConfig]
 
     def _make_header(self) -> EnvelopeHeader:
         return EnvelopeHeader(format=self.format, zstd=self.zstd is not None)
 
 
 # Set EnvelopeConfig's class variables.
-# This can only be done _after_ the class is defined.
+# These can only be initialized _after_ the class is defined.
 EnvelopeConfig.TEXT = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
+EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=0)
