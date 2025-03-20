@@ -14,7 +14,8 @@
 //!  * `get<T: Copyable>: [static_array<T>, prelude.usize] -> [[] + [T]]`
 //!  * `len<T: Copyable>: [static_array<T>] -> [prelude.usize]`
 use std::{
-    hash::{self, Hash as _}, iter,
+    hash::{self, Hash as _},
+    iter,
     sync::{self, Arc},
 };
 
@@ -22,7 +23,10 @@ use crate::{
     builder::{BuildError, Dataflow},
     extension::{
         prelude::{option_type, usize_t},
-        resolution::{resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError, WeakExtensionRegistry},
+        resolution::{
+            resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
+            WeakExtensionRegistry,
+        },
         simple_op::{
             try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
             OpLoadError,
