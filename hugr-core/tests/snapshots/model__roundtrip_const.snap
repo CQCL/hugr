@@ -12,6 +12,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 
 (import arithmetic.int.const)
 
+(import arithmetic.float.const_f64)
+
 (import core.const.adt)
 
 (import arithmetic.int.types.int)
@@ -23,8 +25,6 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 (import core.fn)
 
 (import core.adt)
-
-(import arithmetic.float.const-f64)
 
 (define-func
   example.bools
@@ -69,7 +69,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
               (arithmetic.int.const 6 3)
               (arithmetic.int.const 6 4)
               (arithmetic.int.const 6 5)])
-           (arithmetic.float.const-f64 -3.0)]))
+           (arithmetic.float.const_f64 -3.0)]))
       [] [%0]
       (signature
         (core.fn
@@ -88,7 +88,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
         []
         [arithmetic.float.types.float64 arithmetic.float.types.float64]
         (ext)))
-    ((core.load_const _ _ (arithmetic.float.const-f64 1.0)) [] [%0]
+    ((core.load_const _ _ (arithmetic.float.const_f64 1.0)) [] [%0]
       (signature (core.fn [] [arithmetic.float.types.float64] (ext))))
     ((core.load_const
         _
