@@ -11,7 +11,7 @@ path = "rust/lib.rs"
 
 [dependencies]
 bumpalo = { workspace = true, features = ["collections"] }
-hugr-model = { version = "0.17.1", path = "../hugr-model", features = ["pyo3"] }
+hugr-model = { version = "0.18", path = "../hugr-model", features = ["pyo3"] }
 paste.workspace = true
 pyo3 = { workspace = true }
 smol_str.workspace = true
