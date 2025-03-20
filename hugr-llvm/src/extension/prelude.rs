@@ -149,6 +149,23 @@ pub trait PreludeCodegen: Clone {
         emit_libc_abort(ctx)
     }
 
+    /// Emit instructions to halt execution with the error `err`.
+    ///
+    /// The type of `err` must match that returned from [Self::error_type].
+    ///
+    /// The default implementation emits calls to libc's `printf` and `abort`,
+    /// matching the default implementation of [Self::emit_panic].
+    ///
+    /// Note that implementations of `emit_panic` must not emit `unreachable`
+    /// terminators, that, if appropriate, is the responsibility of the caller.
+    fn emit_exit<H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<H>,
+        err: BasicValueEnum,
+    ) -> Result<()> {
+        self.emit_panic(ctx, err)
+    }
+
     /// Emit instructions to materialise an LLVM value representing `str`.
     ///
     /// The type of the returned value must match [Self::string_type].
@@ -351,7 +368,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
                         .error_type(&context.typing_session())?
                         .as_basic_type_enum()
             );
-            pcg.emit_panic(context, err)?;
+            pcg.emit_exit(context, err)?;
             let returns = args
                 .outputs
                 .get_types()
