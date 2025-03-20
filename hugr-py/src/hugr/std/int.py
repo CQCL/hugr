@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import Self
 
+import hugr.model as model
 from hugr import ext, tys, val
 from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
 from hugr.std import _load_extension
-import hugr.model as model
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
@@ -73,10 +73,10 @@ class IntVal(val.ExtensionValue):
         return f"{self.v}"
 
     def to_model(self) -> model.Term:
-        return model.Apply("arithmetic.int.const", [
-            model.Literal(self.width),
-            model.Literal(self.v)
-        ])
+        return model.Apply(
+            "arithmetic.int.const", [model.Literal(self.width), model.Literal(self.v)]
+        )
+
 
 INT_OPS_EXTENSION = _load_extension("arithmetic.int")
 

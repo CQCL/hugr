@@ -1,18 +1,45 @@
-from typing_extensions import Optional
+"""Helpers to export hugr graphs from their python representation to hugr model."""
+
+from collections.abc import Sequence
+from typing import Generic, TypeVar, cast
+
 import hugr.model as model
 from hugr.hugr.base import Hugr, Node
-from hugr.ops import DFG, Input, Output, Custom, AsExtOp, Conditional, TailLoop, FuncDefn, FuncDecl, Call, CallIndirect, LoadFunc, AliasDecl, AliasDefn, LoadConst, Const, CFG, ExitBlock, DataflowBlock, Tag
 from hugr.hugr.node_port import InPort, OutPort
-from hugr.tys import FunctionKind, ConstKind, TypeParam, Type, TypeTypeParam, TypeBound
-from typing import cast, Sequence, TypeVar, Generic
+from hugr.ops import (
+    CFG,
+    DFG,
+    AliasDecl,
+    AliasDefn,
+    AsExtOp,
+    Call,
+    CallIndirect,
+    Conditional,
+    Const,
+    Custom,
+    DataflowBlock,
+    ExitBlock,
+    FuncDecl,
+    FuncDefn,
+    Input,
+    LoadConst,
+    LoadFunc,
+    Output,
+    Tag,
+    TailLoop,
+)
+from hugr.tys import ConstKind, FunctionKind, Type, TypeBound, TypeParam, TypeTypeParam
+
 
 class ModelExport:
+    """Helper to export a Hugr."""
+
     def __init__(self, hugr: Hugr):
         self.hugr = hugr
-        self.link_ports: UnionFind[InPort | OutPort] = UnionFind()
+        self.link_ports: _UnionFind[InPort | OutPort] = _UnionFind()
         self.link_names: dict[InPort | OutPort, str] = {}
 
-        for (a, b) in self.hugr.links():
+        for a, b in self.hugr.links():
             self.link_ports.union(a, b)
 
     def link_name(self, port):
@@ -25,7 +52,7 @@ class ModelExport:
             self.link_names[root] = index
             return index
 
-    def export_node(self, node: Node) -> Optional[model.Node]:
+    def export_node(self, node: Node) -> model.Node | None:
         node_data = self.hugr[node]
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
@@ -36,11 +63,11 @@ class ModelExport:
                 region = self.export_region_dfg(node)
 
                 return model.Node(
-                    operation = model.Dfg(),
-                    regions = [region],
-                    signature = op.outer_signature().to_model(),
-                    inputs = inputs,
-                    outputs = outputs
+                    operation=model.Dfg(),
+                    regions=[region],
+                    signature=op.outer_signature().to_model(),
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case Custom() as op:
@@ -49,179 +76,192 @@ class ModelExport:
                 signature = op.signature.to_model()
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply(name, args)),
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs
+                    operation=model.CustomOp(model.Apply(name, args)),
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case AsExtOp() as op:
                 name = op.op_def().qualified_name()
-                args = cast(list[model.Term], [arg.to_model() for arg in op.type_args()])
+                args = cast(
+                    list[model.Term], [arg.to_model() for arg in op.type_args()]
+                )
                 signature = op.outer_signature().to_model()
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply(name, args)),
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs
+                    operation=model.CustomOp(model.Apply(name, args)),
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case Conditional() as op:
                 regions = [
-                    self.export_region_dfg(child)
-                    for child in node_data.children
+                    self.export_region_dfg(child) for child in node_data.children
                 ]
 
                 signature = op.outer_signature().to_model()
 
                 return model.Node(
-                    operation = model.Conditional(),
-                    regions = regions,
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs
+                    operation=model.Conditional(),
+                    regions=regions,
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case TailLoop() as op:
                 region = self.export_region_dfg(node)
                 signature = op.outer_signature().to_model()
                 return model.Node(
-                    operation = model.TailLoop(),
-                    regions = [region],
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs
+                    operation=model.TailLoop(),
+                    regions=[region],
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case FuncDefn() as op:
                 name = _mangle_name(node, op.f_name)
-                symbol = self.export_symbol(name, op.signature.params, op.signature.body)
+                symbol = self.export_symbol(
+                    name, op.signature.params, op.signature.body
+                )
                 region = self.export_region_dfg(node)
 
                 return model.Node(
-                    operation = model.DefineFunc(symbol),
-                    regions = [region],
+                    operation=model.DefineFunc(symbol),
+                    regions=[region],
                 )
 
             case FuncDecl() as op:
                 name = _mangle_name(node, op.f_name)
-                symbol = self.export_symbol(name, op.signature.params, op.signature.body)
+                symbol = self.export_symbol(
+                    name, op.signature.params, op.signature.body
+                )
                 return model.Node(
-                    operation = model.DeclareFunc(symbol),
+                    operation=model.DeclareFunc(symbol),
                 )
 
             case AliasDecl() as op:
-                symbol = model.Symbol(
-                    name = op.alias,
-                    signature = model.Apply("core.type")
-                )
+                symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
 
-                return model.Node(
-                    operation = model.DeclareAlias(symbol)
-                )
+                return model.Node(operation=model.DeclareAlias(symbol))
 
             case AliasDefn() as op:
-                symbol = model.Symbol(
-                    name = op.alias,
-                    signature = model.Apply("core.type")
-                )
+                symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
 
                 alias_value = cast(model.Term, op.definition.to_model())
 
-                return model.Node(
-                    operation = model.DefineAlias(symbol, alias_value)
-                )
+                return model.Node(operation=model.DefineAlias(symbol, alias_value))
 
             case Call() as op:
-                input_types = [type.to_model() for type in op.instantiation.input ]
-                output_types = [type.to_model() for type in op.instantiation.output ]
+                input_types = [type.to_model() for type in op.instantiation.input]
+                output_types = [type.to_model() for type in op.instantiation.output]
                 signature = op.instantiation.to_model()
-                func_args = cast(list[model.Term], [type.to_model() for type in op.type_args])
+                func_args = cast(
+                    list[model.Term], [type.to_model() for type in op.type_args]
+                )
                 func_name = self.find_func_input(node)
 
-                if func_name == None:
-                    raise ValueError(f"Call node {node} is not connected to a function.")
+                if func_name is None:
+                    error = f"Call node {node} is not connected to a function."
+                    raise ValueError(error)
 
                 func = model.Apply(func_name, func_args)
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply("core.call", [
-                        model.List(input_types),
-                        model.List(output_types),
-                        model.ExtSet(),
-                        func
-                    ])),
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs,
+                    operation=model.CustomOp(
+                        model.Apply(
+                            "core.call",
+                            [
+                                model.List(input_types),
+                                model.List(output_types),
+                                model.ExtSet(),
+                                func,
+                            ],
+                        )
+                    ),
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case LoadFunc() as op:
                 signature = op.instantiation.to_model()
-                func_args = cast(list[model.Term], [type.to_model() for type in op.type_args])
+                func_args = cast(
+                    list[model.Term], [type.to_model() for type in op.type_args]
+                )
                 func_name = self.find_func_input(node)
 
-                if func_name == None:
-                    raise ValueError(f"LoadFunc node {node} is not connected to a function.")
+                if func_name is None:
+                    error = f"LoadFunc node {node} is not connected to a function."
+                    raise ValueError(error)
 
                 func = model.Apply(func_name, func_args)
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply(
-                        "core.load_const",
-                        [signature, model.ExtSet(), func]
-                    )),
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs,
+                    operation=model.CustomOp(
+                        model.Apply(
+                            "core.load_const", [signature, model.ExtSet(), func]
+                        )
+                    ),
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case CallIndirect() as op:
                 input_types = [type.to_model() for type in op.signature.input]
                 output_types = [type.to_model() for type in op.signature.output]
 
-                func = model.Apply("core.fn", [
-                    model.List(input_types),
-                    model.List(output_types),
-                    model.ExtSet()
-                ])
+                func = model.Apply(
+                    "core.fn",
+                    [model.List(input_types), model.List(output_types), model.ExtSet()],
+                )
 
-                signature = model.Apply("core.fn", [
-                    model.List([func, *input_types]),
-                    model.List(output_types),
-                    model.ExtSet()
-                ])
+                signature = model.Apply(
+                    "core.fn",
+                    [
+                        model.List([func, *input_types]),
+                        model.List(output_types),
+                        model.ExtSet(),
+                    ],
+                )
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply("core.call_indirect", [
-                        model.List(input_types),
-                        model.List(output_types),
-                        model.ExtSet()
-                    ])),
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs,
+                    operation=model.CustomOp(
+                        model.Apply(
+                            "core.call_indirect",
+                            [
+                                model.List(input_types),
+                                model.List(output_types),
+                                model.ExtSet(),
+                            ],
+                        )
+                    ),
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case LoadConst() as op:
                 value = self.find_const_input(node)
 
-                if value == None:
-                    raise ValueError(f"LoadConst node {node} is not connected to a constant.")
+                if value is None:
+                    error = f"LoadConst node {node} is not connected to a constant."
+                    raise ValueError(error)
 
                 type = cast(model.Term, op.type_.to_model())
                 signature = op.outer_signature().to_model()
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply("core.load_const", [
-                        type,
-                        model.ExtSet(),
-                        value
-                    ])),
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs,
+                    operation=model.CustomOp(
+                        model.Apply("core.load_const", [type, model.ExtSet(), value])
+                    ),
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
                 )
 
             case Const() as op:
@@ -233,72 +273,79 @@ class ModelExport:
 
                 # TODO: Export CFGs
                 return model.Node(
-                    operation = model.Cfg(),
-                    signature = signature,
-                    inputs = inputs,
-                    outputs = outputs,
-                    regions = [region]
+                    operation=model.Cfg(),
+                    signature=signature,
+                    inputs=inputs,
+                    outputs=outputs,
+                    regions=[region],
                 )
 
             case DataflowBlock() as op:
                 region = self.export_region_dfg(node)
 
                 input_types = [
-                    model.Apply("core.ctrl", [
-                        model.List([ type.to_model() for type in op.inputs ])
-                    ])
+                    model.Apply(
+                        "core.ctrl",
+                        [model.List([type.to_model() for type in op.inputs])],
+                    )
                 ]
 
-                other_output_types = [ type.to_model() for type in op.other_outputs ]
+                other_output_types = [type.to_model() for type in op.other_outputs]
                 output_types = [
-                    model.Apply("core.ctrl", [model.List([
-                        *[type.to_model() for type in row],
-                        *other_output_types
-                    ])])
+                    model.Apply(
+                        "core.ctrl",
+                        [
+                            model.List(
+                                [
+                                    *[type.to_model() for type in row],
+                                    *other_output_types,
+                                ]
+                            )
+                        ],
+                    )
                     for row in op.sum_ty.variant_rows
                 ]
 
-                signature = model.Apply("core.fn", [
-                    model.List(input_types),
-                    model.List(output_types),
-                    model.ExtSet()
-                ])
+                signature = model.Apply(
+                    "core.fn",
+                    [model.List(input_types), model.List(output_types), model.ExtSet()],
+                )
 
                 return model.Node(
-                    operation = model.Block(),
-                    inputs = inputs,
-                    outputs = outputs,
-                    regions = [region],
-                    signature = signature
+                    operation=model.Block(),
+                    inputs=inputs,
+                    outputs=outputs,
+                    regions=[region],
+                    signature=signature,
                 )
 
             case Tag() as op:
-                variants = model.List([
-                    model.List([type.to_model() for type in row])
-                    for row in op.sum_ty.variant_rows
-                ])
+                variants = model.List(
+                    [
+                        model.List([type.to_model() for type in row])
+                        for row in op.sum_ty.variant_rows
+                    ]
+                )
 
-                types = model.List([
-                    type.to_model()
-                    for type in op.sum_ty.variant_rows[op.tag]
-                ])
+                types = model.List(
+                    [type.to_model() for type in op.sum_ty.variant_rows[op.tag]]
+                )
 
                 tag = model.Literal(op.tag)
                 signature = op.outer_signature().to_model()
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply("core.make_adt", [
-                        variants,
-                        types,
-                        tag
-                    ])),
-                    inputs = inputs,
-                    outputs = outputs,
-                    signature = signature
+                    operation=model.CustomOp(
+                        model.Apply("core.make_adt", [variants, types, tag])
+                    ),
+                    inputs=inputs,
+                    outputs=outputs,
+                    signature=signature,
                 )
 
             case op:
-                raise ValueError(f"Unknown operation: {op}")
+                error = f"Unknown operation: {op}"
+                raise ValueError(error)
 
     def export_region_module(self, node: Node) -> model.Region:
         node_data = self.hugr[node]
@@ -307,13 +354,10 @@ class ModelExport:
         for child in node_data.children:
             child_node = self.export_node(child)
 
-            if child_node != None:
+            if child_node is not None:
                 children.append(child_node)
 
-        return model.Region(
-            kind = model.RegionKind.MODULE,
-            children = children
-        )
+        return model.Region(kind=model.RegionKind.MODULE, children=children)
 
     def export_region_dfg(self, node: Node) -> model.Region:
         node_data = self.hugr[node]
@@ -329,26 +373,32 @@ class ModelExport:
             match child_data.op:
                 case Input() as op:
                     source_types = model.List([type.to_model() for type in op.types])
-                    sources = [self.link_name(OutPort(child, i)) for i in range(child_data._num_outs)]
+                    sources = [
+                        self.link_name(OutPort(child, i))
+                        for i in range(child_data._num_outs)
+                    ]
 
                 case Output() as op:
                     target_types = model.List([type.to_model() for type in op.types])
-                    targets = [self.link_name(InPort(child, i)) for i in range(child_data._num_inps)]
+                    targets = [
+                        self.link_name(InPort(child, i))
+                        for i in range(child_data._num_inps)
+                    ]
 
                 case _:
                     child_node = self.export_node(child)
 
-                    if child_node != None:
+                    if child_node is not None:
                         children.append(child_node)
 
         signature = model.Apply("core.fn", [source_types, target_types, model.ExtSet()])
 
         return model.Region(
-            kind = model.RegionKind.DATA_FLOW,
-            signature = signature,
-            children = children,
-            sources = sources,
-            targets = targets
+            kind=model.RegionKind.DATA_FLOW,
+            signature=signature,
+            children=children,
+            sources=sources,
+            targets=targets,
         )
 
     def export_region_cfg(self, node: Node) -> model.Region:
@@ -365,38 +415,44 @@ class ModelExport:
 
             match child_data.op:
                 case ExitBlock() as op:
-                    target_types = model.List([type.to_model() for type in op.cfg_outputs])
-                    targets = [self.link_name(InPort(child, i)) for i in range(child_data._num_inps)]
+                    target_types = model.List(
+                        [type.to_model() for type in op.cfg_outputs]
+                    )
+                    targets = [
+                        self.link_name(InPort(child, i))
+                        for i in range(child_data._num_inps)
+                    ]
                 case DataflowBlock() as op:
-                    if source == None:
-                        source_types = model.List([type.to_model() for type in op.inputs])
+                    if source is None:
+                        source_types = model.List(
+                            [type.to_model() for type in op.inputs]
+                        )
                         source = self.link_name(OutPort(child, 0))
 
                     child_node = self.export_node(child)
 
-                    if child_node != None:
+                    if child_node is not None:
                         children.append(child_node)
                 case _:
-                    raise ValueError(f"Unexpected operation in CFG {node}")
+                    error = f"Unexpected operation in CFG {node}"
+                    raise ValueError(error)
 
-        if source == None:
-            raise ValueError(f"CFG {node} has no entry block.")
+        if source is None:
+            error = f"CFG {node} has no entry block."
+            raise ValueError(error)
 
         signature = model.Apply("core.fn", [source_types, target_types, model.ExtSet()])
 
         return model.Region(
-            kind = model.RegionKind.CONTROL_FLOW,
-            targets = targets,
-            sources = [source],
-            signature = signature,
-            children = children,
+            kind=model.RegionKind.CONTROL_FLOW,
+            targets=targets,
+            sources=[source],
+            signature=signature,
+            children=children,
         )
 
     def export_symbol(
-        self,
-        name: str,
-        param_types: Sequence[TypeParam],
-        body: Type
+        self, name: str, param_types: Sequence[TypeParam], body: Type
     ) -> model.Symbol:
         constraints = []
         params = []
@@ -404,25 +460,24 @@ class ModelExport:
         for i, param_type in enumerate(param_types):
             param_name = str(i)
 
-            params.append(model.Param(
-                name = param_name,
-                type = param_type.to_model()
-            ))
+            params.append(model.Param(name=param_name, type=param_type.to_model()))
 
             match param_type:
-                case TypeTypeParam(bound = TypeBound.Copyable):
-                    constraints.append(model.Apply("core.nonlinear", [model.Var(param_name)]))
+                case TypeTypeParam(bound=TypeBound.Copyable):
+                    constraints.append(
+                        model.Apply("core.nonlinear", [model.Var(param_name)])
+                    )
                 case _:
                     pass
 
         return model.Symbol(
-            name = name,
-            params = params,
-            constraints = constraints,
-            signature = cast(model.Term, body.to_model())
+            name=name,
+            params=params,
+            constraints=constraints,
+            signature=cast(model.Term, body.to_model()),
         )
 
-    def find_func_input(self, node: Node) -> Optional[str]:
+    def find_func_input(self, node: Node) -> str | None:
         try:
             func_node = next(
                 out_port.node
@@ -443,7 +498,7 @@ class ModelExport:
 
         return _mangle_name(node, name)
 
-    def find_const_input(self, node: Node) -> Optional[model.Term]:
+    def find_const_input(self, node: Node) -> model.Term | None:
         try:
             const_node = next(
                 out_port.node
@@ -460,20 +515,23 @@ class ModelExport:
             case op:
                 return None
 
+
 def _mangle_name(node: Node, name: str) -> str:
     # Until we come to an agreement on the uniqueness of names, we mangle the names
     # by adding the node id.
     return f"_{name}_{node.idx}"
 
-T = TypeVar('T')
 
-class UnionFind(Generic[T]):
+T = TypeVar("T")
+
+
+class _UnionFind(Generic[T]):
     def __init__(self) -> None:
         self.parents: dict[T, T] = {}
         self.sizes: dict[T, int] = {}
 
     def __getitem__(self, item: T) -> T:
-        if not item in self.parents:
+        if item not in self.parents:
             self.parents[item] = item
             self.sizes[item] = 1
             return item

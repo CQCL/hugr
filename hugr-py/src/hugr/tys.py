@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, runtime_checkable, cast
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 import hugr._serialization.tys as stys
-from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 import hugr.model as model
+from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -274,7 +274,8 @@ class SequenceArg(TypeArg):
         return f"({comma_sep_str(self.elems)})"
 
     def to_model(self) -> model.Term:
-        # TODO: We should separate lists and tuples. For now we assume that this is a list.
+        # TODO: We should separate lists and tuples.
+        # For now we assume that this is a list.
         return model.List([elem.to_model() for elem in self.elems])
 
 
@@ -310,6 +311,7 @@ class VariableArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Var(str(self.idx))
+
 
 # ----------------------------------------------
 # --------------- Type -------------------------
@@ -348,11 +350,11 @@ class Sum(Type):
         return Sum([[ty.resolve(registry) for ty in row] for row in self.variant_rows])
 
     def to_model(self) -> model.Term:
-        variants = model.List([
-            model.List([typ.to_model() for typ in row])
-            for row in self.variant_rows]
+        variants = model.List(
+            [model.List([typ.to_model() for typ in row]) for row in self.variant_rows]
         )
         return model.Apply("core.adt", [variants])
+
 
 @dataclass(eq=False)
 class UnitSum(Sum):
@@ -485,6 +487,7 @@ class USize(Type):
 
     def to_model(self) -> model.Term:
         return model.Apply("prelude.usize")
+
 
 @dataclass(frozen=True)
 class Alias(Type):
@@ -635,7 +638,8 @@ class PolyFuncType(Type):
 
     def to_model(self) -> model.Term:
         # A `PolyFuncType` should not be a `Type`.
-        raise TypeError("PolyFuncType used as a Type")
+        error = "PolyFuncType used as a Type"
+        raise TypeError(error)
 
 
 @dataclass
@@ -684,10 +688,7 @@ class ExtType(Type):
     def to_model(self) -> model.Term:
         # This cast is only neccessary because `Type` can both be an
         # actual type or a row variable.
-        args = [
-            cast(model.Term, arg.to_model())
-            for arg in self.args
-        ]
+        args = [cast(model.Term, arg.to_model()) for arg in self.args]
 
         extension_name = self.type_def.get_extension().name
         type_name = self.type_def.name
@@ -742,10 +743,7 @@ class Opaque(Type):
     def to_model(self) -> model.Term:
         # This cast is only neccessary because `Type` can both be an
         # actual type or a row variable.
-        args = [
-            cast(model.Term, arg.to_model())
-            for arg in self.args
-        ]
+        args = [cast(model.Term, arg.to_model()) for arg in self.args]
 
         return model.Apply(self.id, args)
 

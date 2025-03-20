@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import hugr.model as model
 from hugr import val
 from hugr.std import _load_extension
-import hugr.model as model
 
 FLOAT_TYPES_EXTENSION = _load_extension("arithmetic.float.types")
 

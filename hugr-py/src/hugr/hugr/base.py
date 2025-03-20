@@ -14,6 +14,7 @@ from typing import (
     overload,
 )
 
+import hugr.model as model
 from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
 from hugr.exceptions import ParentBeforeChild
@@ -21,7 +22,6 @@ from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
 from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
 from hugr.val import Value
-import hugr.model as model
 
 from .node_port import (
     Direction,
@@ -736,6 +736,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
     def to_model_region(self) -> model.Region:
         from hugr.model.export import ModelExport
+
         export = ModelExport(self)
         return export.export_region_module(self.root)
 

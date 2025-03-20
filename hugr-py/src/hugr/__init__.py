@@ -2,9 +2,9 @@
 representation.
 """
 
+from . import model
 from .hugr.base import Hugr
 from .hugr.node_port import Direction, InPort, Node, OutPort, Wire
-from . import model
 
 __all__ = [
     "Hugr",

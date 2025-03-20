@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import hugr._serialization.ops as sops
 import hugr._serialization.tys as stys
+import hugr.model as model
 from hugr import tys
 from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
-import hugr.model as model
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -37,8 +37,7 @@ class Value(Protocol):
         """
         ...  # pragma: no cover
 
-    def to_model(self) -> model.Term:
-        ...
+    def to_model(self) -> model.Term: ...
 
 
 @dataclass
@@ -80,20 +79,26 @@ class Sum(Value):
         )
 
     def to_model(self) -> model.Term:
-        variants = [model.List([type.to_model() for type in row]) for row in self.typ.variant_rows]
+        variants = [
+            model.List([type.to_model() for type in row])
+            for row in self.typ.variant_rows
+        ]
         types = [
             model.Apply("core.const", [cast(model.Term, type)])
             for type in variants[self.tag].parts
         ]
         values = [value.to_model() for value in self.vals]
 
-        return model.Apply("core.const.adt", [
-            model.List(variants),
-            model.ExtSet(),
-            model.List(types),
-            model.Literal(self.tag),
-            model.Tuple(values)
-        ])
+        return model.Apply(
+            "core.const.adt",
+            [
+                model.List(variants),
+                model.ExtSet(),
+                model.List(types),
+                model.Literal(self.tag),
+                model.Tuple(values),
+            ],
+        )
 
 
 class UnitSum(Sum):
@@ -326,8 +331,10 @@ class Extension(Value):
 
     def to_model(self) -> model.Term:
         type = cast(model.Term, self.typ.to_model())
-        json = sops.CustomConst(c = self.name, v = self.val).model_dump_json()
-        return model.Apply("compat.const_json", [type, model.ExtSet(), model.Literal(json)])
+        json = sops.CustomConst(c=self.name, v=self.val).model_dump_json()
+        return model.Apply(
+            "compat.const_json", [type, model.ExtSet(), model.Literal(json)]
+        )
 
 
 class ExtensionValue(Value, Protocol):
