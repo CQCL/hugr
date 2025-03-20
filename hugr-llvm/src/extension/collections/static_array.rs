@@ -189,7 +189,7 @@ pub trait StaticArrayCodegen: Clone {
         let element_type = value.get_element_type();
         let llvm_element_type = context.llvm_type(element_type)?;
         let index_type = context.llvm_type(&usize_t())?.into_int_type();
-        let array_elements = value.value.get_contents().iter().map(|v| {
+        let array_elements = value.get_contents().iter().map(|v| {
             let value = emit_value(context, v)?;
             if !value_is_const(value) {
                 anyhow::bail!("Static array value must be constant. HUGR value '{v:?}' was codegened as non-const");
@@ -394,6 +394,8 @@ mod test {
 
     use hugr_core::extension::simple_op::MakeRegisteredOp;
     use hugr_core::extension::{prelude::bool_t, ExtensionRegistry};
+    use hugr_core::{builder::SubContainer as _, type_row};
+    use static_array::StaticArrayOpBuilder as _;
 
     use crate::check_emission;
     use crate::test::single_op_hugr;
@@ -456,16 +458,13 @@ mod test {
     #[rstest]
     #[case(0, 0, 999)]
     #[case(1, 1, 998)]
-    #[case(1, 1000, u64::MAX)]
+    #[case(2, 1000, u64::MAX)]
     fn static_array_exec(
         #[case] _i: i32,
         #[with(_i)] mut exec_ctx: TestContext,
         #[case] index: u64,
         #[case] expected: u64,
     ) {
-        use hugr_core::{builder::SubContainer as _, type_row};
-        use static_array::StaticArrayOpBuilder as _;
-
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(ExtensionRegistry::new(vec![
@@ -513,5 +512,61 @@ mod test {
                 .add_float_extensions()
         });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    fn len_0_array(mut exec_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(usize_t())
+            .with_extensions(ExtensionRegistry::new(vec![
+                static_array::EXTENSION.to_owned()
+            ]))
+            .finish(|mut builder| {
+                let arr = builder
+                    .add_load_value(StaticArrayValue::try_new("empty", usize_t(), vec![]).unwrap());
+                let len = builder.add_static_array_len(usize_t(), arr).unwrap();
+                builder.finish_with_outputs([len]).unwrap()
+            });
+
+        exec_ctx.add_extensions(|ceb| {
+            ceb.add_default_static_array_extensions()
+                .add_default_prelude_extensions()
+        });
+        assert_eq!(0, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    fn emit_static_array_of_static_array(mut llvm_ctx: TestContext) {
+        llvm_ctx.add_extensions(|ceb| {
+            ceb.add_default_static_array_extensions()
+                .add_default_prelude_extensions()
+        });
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(usize_t())
+            .with_extensions(ExtensionRegistry::new(vec![
+                static_array::EXTENSION.to_owned()
+            ]))
+            .finish(|mut builder| {
+                let inner_arrs: Vec<Value> = (0..10)
+                    .map(|i| {
+                        StaticArrayValue::try_new(
+                            "inner",
+                            usize_t(),
+                            vec![Value::from(ConstUsize::new(i)); i as usize],
+                        )
+                        .unwrap()
+                        .into()
+                    })
+                    .collect_vec();
+                let inner_arr_ty = inner_arrs[0].get_type();
+                let outer_arr = builder.add_load_value(
+                    StaticArrayValue::try_new("outer", inner_arr_ty.clone(), inner_arrs).unwrap(),
+                );
+                let len = builder
+                    .add_static_array_len(inner_arr_ty, outer_arr)
+                    .unwrap();
+                builder.finish_with_outputs([len]).unwrap()
+            });
+        check_emission!(hugr, llvm_ctx);
     }
 }
