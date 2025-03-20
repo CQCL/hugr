@@ -8,6 +8,7 @@ use portgraph::{LinkView, MultiPortGraph, PortView};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
+use crate::ops::OpTag;
 use crate::{Direction, Hugr, Node, Port};
 
 use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView, RootTagged};
@@ -29,20 +30,20 @@ type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 ///
 /// [`DescendantsGraph`]: super::DescendantsGraph
 #[derive(Clone)]
-pub struct SiblingGraph<'g, Root = Node> {
+pub struct SiblingGraph<'g, T: HugrView, const TAG: usize = { OpTag::Any as usize }> {
     /// The chosen root node.
     // TODO: this can only be made generic once the call to base_hugr is removed
     // in try_new. See https://github.com/CQCL/hugr/issues/1926
-    root: Node,
+    root: T::Node,
 
     /// The filtered portgraph encoding the adjacency structure of the HUGR.
     graph: FlatRegionGraph<'g>,
 
     /// The underlying Hugr onto which this view is a filter
-    hugr: &'g Hugr,
+    hugr: &'g T,
 
     /// The operation type of the root node.
-    _phantom: std::marker::PhantomData<Root>,
+    _phantom: std::marker::PhantomData<OpTag>,
 }
 
 /// HugrView trait members common to both [SiblingGraph] and [SiblingMut],
@@ -90,23 +91,23 @@ macro_rules! impl_base_members {
     };
 }
 
-impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
+impl<T: HugrView, const TAG: usize> HugrView for SiblingGraph<'_, T, TAG> {
     impl_base_members! {}
 
     #[inline]
-    fn contains_node(&self, node: Node) -> bool {
+    fn contains_node(&self, node: T::Node) -> bool {
         self.graph.contains_node(self.get_pg_index(node))
     }
 
     #[inline]
-    fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
+    fn node_ports(&self, node: T::Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
         self.graph
             .port_offsets(self.get_pg_index(node), dir)
             .map_into()
     }
 
     #[inline]
-    fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
+    fn all_node_ports(&self, node: T::Node) -> impl Iterator<Item = Port> + Clone {
         self.graph
             .all_port_offsets(self.get_pg_index(node))
             .map_into()
@@ -153,11 +154,11 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
             .map(|n| self.get_node(n))
     }
 }
-impl<Root: NodeHandle> RootTagged for SiblingGraph<'_, Root> {
+impl<T: HugrView, const TAG: usize> RootTagged for SiblingGraph<'_, Root> {
     type RootHandle = Root;
 }
 
-impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
+impl<'a, Root> SiblingGraph<'a, Root> {
     fn new_unchecked(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Self {
         let hugr = hugr.base_hugr();
         Self {
@@ -169,10 +170,7 @@ impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
     }
 }
 
-impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
-where
-    Root: NodeHandle,
-{
+impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root> {
     fn try_new(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Result<Self, HugrError> {
         assert!(
             hugr.valid_node(root),
@@ -184,12 +182,9 @@ where
     }
 }
 
-impl<Root: NodeHandle> ExtractHugr for SiblingGraph<'_, Root> {}
+impl<Root> ExtractHugr for SiblingGraph<'_, Root> {}
 
-impl<'g, Root: NodeHandle> HugrInternals for SiblingGraph<'g, Root>
-where
-    Root: NodeHandle,
-{
+impl<'g, Root> HugrInternals for SiblingGraph<'g, Root> {
     type Portgraph<'p>
         = &'p FlatRegionGraph<'g>
     where
