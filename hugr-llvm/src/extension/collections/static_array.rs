@@ -189,7 +189,7 @@ pub trait StaticArrayCodegen: Clone {
         let element_type = value.get_element_type();
         let llvm_element_type = context.llvm_type(element_type)?;
         let index_type = context.llvm_type(&usize_t())?.into_int_type();
-        let array_elements = value.value.get_contents().iter().map(|v| {
+        let array_elements = value.get_contents().iter().map(|v| {
             let value = emit_value(context, v)?;
             if !value_is_const(value) {
                 anyhow::bail!("Static array value must be constant. HUGR value '{v:?}' was codegened as non-const");
