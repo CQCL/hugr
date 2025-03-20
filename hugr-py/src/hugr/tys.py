@@ -682,11 +682,12 @@ class ExtType(Type):
         return super().__eq__(value)
 
     def to_model(self) -> model.Term:
-        args = [arg.to_model() for arg in self.args]
-
-        # TODO: This cast is only neccessary because `Type` can both be an
+        # This cast is only neccessary because `Type` can both be an
         # actual type or a row variable.
-        args = cast(list[model.Term], args)
+        args = [
+            cast(model.Term, arg.to_model())
+            for arg in self.args
+        ]
 
         extension_name = self.type_def.get_extension().name
         type_name = self.type_def.name
@@ -739,11 +740,12 @@ class Opaque(Type):
         return _type_str(self.id, self.args)
 
     def to_model(self) -> model.Term:
-        args = [arg.to_model() for arg in self.args]
-
-        # TODO: This cast is only neccessary because `Type` can both be an
+        # This cast is only neccessary because `Type` can both be an
         # actual type or a row variable.
-        args = cast(list[model.Term], args)
+        args = [
+            cast(model.Term, arg.to_model())
+            for arg in self.args
+        ]
 
         return model.Apply(self.id, args)
 

@@ -4,7 +4,7 @@ from hugr.hugr.base import Hugr, Node
 from hugr.ops import DFG, Input, Output, Custom, AsExtOp, Conditional, TailLoop, FuncDefn, FuncDecl, Call, CallIndirect, LoadFunc, AliasDecl, AliasDefn, LoadConst, Const, CFG, ExitBlock, DataflowBlock, Tag
 from hugr.hugr.node_port import InPort, OutPort
 from hugr.tys import FunctionKind, ConstKind, TypeParam, Type, TypeTypeParam, TypeBound
-from typing import cast, Sequence
+from typing import cast, Sequence, TypeVar, Generic
 
 class ModelExport:
     def __init__(self, hugr: Hugr):
@@ -127,15 +127,15 @@ class ModelExport:
                     signature = model.Apply("core.type")
                 )
 
-                value = cast(model.Term, op.definition.to_model())
+                alias_value = cast(model.Term, op.definition.to_model())
 
                 return model.Node(
-                    operation = model.DefineAlias(symbol, value)
+                    operation = model.DefineAlias(symbol, alias_value)
                 )
 
             case Call() as op:
-                input_types = model.List([type.to_model() for type in op.instantiation.input ])
-                output_types = model.List([type.to_model() for type in op.instantiation.output ])
+                input_types = [type.to_model() for type in op.instantiation.input ]
+                output_types = [type.to_model() for type in op.instantiation.output ]
                 signature = op.instantiation.to_model()
                 func_args = cast(list[model.Term], [type.to_model() for type in op.type_args])
                 func_name = self.find_func_input(node)
@@ -146,15 +146,12 @@ class ModelExport:
                 func = model.Apply(func_name, func_args)
 
                 return model.Node(
-                    operation = model.CustomOp(model.Apply(
-                        "core.call",
-                        [
-                            input_types,
-                            output_types,
-                            model.ExtSet(),
-                            func
-                        ]
-                    )),
+                    operation = model.CustomOp(model.Apply("core.call", [
+                        model.List(input_types),
+                        model.List(output_types),
+                        model.ExtSet(),
+                        func
+                    ])),
                     signature = signature,
                     inputs = inputs,
                     outputs = outputs,
@@ -246,22 +243,26 @@ class ModelExport:
             case DataflowBlock() as op:
                 region = self.export_region_dfg(node)
 
-                input_types = model.List([
+                input_types = [
                     model.Apply("core.ctrl", [
                         model.List([ type.to_model() for type in op.inputs ])
                     ])
-                ])
+                ]
 
                 other_output_types = [ type.to_model() for type in op.other_outputs ]
-                output_types = model.List([
+                output_types = [
                     model.Apply("core.ctrl", [model.List([
                         *[type.to_model() for type in row],
                         *other_output_types
                     ])])
                     for row in op.sum_ty.variant_rows
-                ])
+                ]
 
-                signature = model.Apply("core.fn", [input_types, output_types, model.ExtSet()])
+                signature = model.Apply("core.fn", [
+                    model.List(input_types),
+                    model.List(output_types),
+                    model.ExtSet()
+                ])
 
                 return model.Node(
                     operation = model.Block(),
@@ -317,8 +318,8 @@ class ModelExport:
     def export_region_dfg(self, node: Node) -> model.Region:
         node_data = self.hugr[node]
         children: list[model.Node] = []
-        source_types = model.Wildcard()
-        target_types = model.Wildcard()
+        source_types: model.Term = model.Wildcard()
+        target_types: model.Term = model.Wildcard()
         sources = []
         targets = []
 
@@ -355,8 +356,8 @@ class ModelExport:
 
         source = None
         targets = []
-        source_types = model.Wildcard()
-        target_types = model.Wildcard()
+        source_types: model.Term = model.Wildcard()
+        target_types: model.Term = model.Wildcard()
         children = []
 
         for child in node_data.children:
@@ -464,8 +465,10 @@ def _mangle_name(node: Node, name: str) -> str:
     # by adding the node id.
     return f"_{name}_{node.idx}"
 
-class UnionFind[T]:
-    def __init__(self):
+T = TypeVar('T')
+
+class UnionFind(Generic[T]):
+    def __init__(self) -> None:
         self.parents: dict[T, T] = {}
         self.sizes: dict[T, int] = {}
 

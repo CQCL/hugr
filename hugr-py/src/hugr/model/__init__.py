@@ -76,8 +76,8 @@ class Param:
 @dataclass
 class Symbol:
     name: str
-    params: list[Param] = field(default_factory = list)
-    constraints: list[Term] = field(default_factory = list)
+    params: Sequence[Param] = field(default_factory = list)
+    constraints: Sequence[Term] = field(default_factory = list)
     signature: Term = field(default_factory = Wildcard)
 
     def __str__(self):
@@ -150,10 +150,10 @@ class Import(Op):
 @dataclass
 class Node:
     operation: Op = field(default_factory=lambda: InvalidOp())
-    inputs: list[str] = field(default_factory=list)
-    outputs: list[str] = field(default_factory=list)
-    regions: list["Region"] = field(default_factory=list)
-    meta: list[Term] = field(default_factory=list)
+    inputs: Sequence[str] = field(default_factory=list)
+    outputs: Sequence[str] = field(default_factory=list)
+    regions: Sequence["Region"] = field(default_factory=list)
+    meta: Sequence[Term] = field(default_factory=list)
     signature: Optional[Term] = None
 
     def __str__(self) -> str:
@@ -171,10 +171,10 @@ class ScopeClosure(Enum):
 @dataclass
 class Region:
     kind: RegionKind = RegionKind.DATA_FLOW
-    sources: list[str] = field(default_factory=list)
-    targets: list[str] = field(default_factory=list)
-    children: list[Node] = field(default_factory=list)
-    meta: list[Term] = field(default_factory=list)
+    sources: Sequence[str] = field(default_factory=list)
+    targets: Sequence[str] = field(default_factory=list)
+    children: Sequence[Node] = field(default_factory=list)
+    meta: Sequence[Term] = field(default_factory=list)
     signature: Optional[Term] = None
 
     def __str__(self):
