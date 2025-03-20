@@ -155,7 +155,7 @@ pub trait StaticArrayCodegen: Clone {
     /// The `i64` stores the length of the array.
     ///
     /// However a `static_array` `HugrType` is represented by an llvm pointer type
-    /// `struct {i64, [t * 0]}`.  i.e. the array is zero length. This gives all
+    /// `struct {i64, [t * 0]}`;  i.e. the array is zero length. This gives all
     /// static arrays of the same element type a uniform llvm type.
     ///
     /// It is legal to index past the end of an array (it is only undefined behaviour
