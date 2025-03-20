@@ -498,7 +498,7 @@ impl<'py> pyo3::FromPyObject<'py> for Literal {
             Ok(Literal::Str(value.into()))
         } else if pyo3::types::PyInt::is_type_of(ob) {
             let value: u64 = ob.extract()?;
-            Ok(Literal::Nat(value.into()))
+            Ok(Literal::Nat(value))
         } else if pyo3::types::PyFloat::is_type_of(ob) {
             let value: f64 = ob.extract()?;
             Ok(Literal::Float(value.into()))
@@ -523,7 +523,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &Literal {
         Ok(match self {
             Literal::Str(s) => s.as_str().into_pyobject(py)?.into_any(),
             Literal::Nat(n) => n.into_pyobject(py)?.into_any(),
-            Literal::Bytes(b) => pyo3::types::PyBytes::new(py, &b)
+            Literal::Bytes(b) => pyo3::types::PyBytes::new(py, b)
                 .into_pyobject(py)?
                 .into_any(),
             Literal::Float(f) => f.0.into_pyobject(py)?.into_any(),
