@@ -189,7 +189,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 
-        if !subpg.is_convex_with_checker(checker) {
+        if nodes.len() > 1 && !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);
         }
 
@@ -238,12 +238,9 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ) -> Result<Self, InvalidSubgraph<N>> {
         let nodes = nodes.into();
 
-        // If there's one or less nodes, we don't need to check convexity.
-        match nodes.as_slice() {
-            [] => return Err(InvalidSubgraph::EmptySubgraph),
-            [node] => return Ok(Self::from_node(*node, hugr)),
-            _ => {}
-        };
+        if nodes.is_empty() {
+            return Err(InvalidSubgraph::EmptySubgraph);
+        }
 
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
         let incoming_edges = nodes
@@ -1238,5 +1235,38 @@ mod tests {
         };
         let rep = subg.create_simple_replacement(&h, replacement).unwrap();
         rep.apply(&mut h).unwrap();
+    }
+
+    /// Test the behaviour of the sibling subgraph when built from a single node.
+    #[test]
+    fn single_node_subgraph() {
+        // A hugr with a single NOT operation, with disconnected output.
+        let mut b = DFGBuilder::new(
+            Signature::new(bool_t(), type_row![])
+                .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
+        )
+        .unwrap();
+        let inw = b.input_wires().exactly_one().unwrap();
+        let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
+        // Unconnected output, discarded
+        let h = b.finish_hugr_with_outputs([]).unwrap();
+
+        // When built with `from_node`, the subgraph's signature is the same as the node's.
+        // (bool input, bool output)
+        let subg = SiblingSubgraph::from_node(not_n.node(), &h);
+        assert_eq!(subg.nodes().len(), 1);
+        assert_eq!(
+            subg.signature(&h).io(),
+            Signature::new(vec![bool_t()], vec![bool_t()]).io()
+        );
+
+        // `from_nodes` is different, is it only uses incoming and outgoing edges to compute the signature.
+        // In this case, the output is disconnected, so it is not part of the subgraph signature.
+        let subg = SiblingSubgraph::try_from_nodes([not_n.node()], &h).unwrap();
+        assert_eq!(subg.nodes().len(), 1);
+        assert_eq!(
+            subg.signature(&h).io(),
+            Signature::new(vec![bool_t()], vec![]).io()
+        );
     }
 }
