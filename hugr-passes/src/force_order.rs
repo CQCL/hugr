@@ -329,8 +329,8 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
     #[cfg_attr(miri, ignore)] // File::open is not supported in miri
+    /// test for https://github.com/CQCL/hugr/issues/2005
     fn call_indirect_bug() {
         let file = std::io::BufReader::new(
             std::fs::File::open(concat!(
