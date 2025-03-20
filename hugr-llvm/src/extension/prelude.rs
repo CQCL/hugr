@@ -149,6 +149,23 @@ pub trait PreludeCodegen: Clone {
         emit_libc_abort(ctx)
     }
 
+    /// Emit instructions to halt execution with the error `err`.
+    ///
+    /// The type of `err` must match that returned from [Self::error_type].
+    ///
+    /// The default implementation emits calls to libc's `printf` and `abort`,
+    /// matching the default implementation of [Self::emit_panic].
+    ///
+    /// Note that implementations of `emit_panic` must not emit `unreachable`
+    /// terminators, that, if appropriate, is the responsibility of the caller.
+    fn emit_exit<H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<H>,
+        err: BasicValueEnum,
+    ) -> Result<()> {
+        self.emit_panic(ctx, err)
+    }
+
     /// Emit instructions to materialise an LLVM value representing `str`.
     ///
     /// The type of the returned value must match [Self::string_type].
@@ -340,6 +357,26 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
             args.outputs.finish(context.builder(), returns)
         }
     })
+    .extension_op(prelude::PRELUDE_ID, prelude::EXIT_OP_ID, {
+        // by default treat an exit like a panic
+        let pcg = pcg.clone();
+        move |context, args| {
+            let err = args.inputs[0];
+            ensure!(
+                err.get_type()
+                    == pcg
+                        .error_type(&context.typing_session())?
+                        .as_basic_type_enum()
+            );
+            pcg.emit_exit(context, err)?;
+            let returns = args
+                .outputs
+                .get_types()
+                .map(|ty| ty.const_zero())
+                .collect_vec();
+            args.outputs.finish(context.builder(), returns)
+        }
+    })
     .extension_op(prelude::PRELUDE_ID, generic::LOAD_NAT_OP_ID, {
         let pcg = pcg.clone();
         move |context, args| {
@@ -362,6 +399,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
+    use hugr_core::extension::prelude::EXIT_OP_ID;
     use hugr_core::extension::PRELUDE;
     use hugr_core::types::{Type, TypeArg};
     use hugr_core::{type_row, Hugr};
@@ -514,6 +552,34 @@ mod test {
                 let err = builder.add_load_value(error_val);
                 let [q0, q1] = builder
                     .add_dataflow_op(panic_op, [err, q0, q1])
+                    .unwrap()
+                    .outputs_arr();
+                builder.finish_with_outputs([q0, q1]).unwrap()
+            });
+
+        check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[rstest]
+    fn prelude_exit(prelude_llvm_ctx: TestContext) {
+        let error_val = ConstError::new(42, "EXIT");
+        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
+        let type_arg_2q: TypeArg = TypeArg::Sequence {
+            elems: vec![type_arg_q.clone(), type_arg_q],
+        };
+        let exit_op = PRELUDE
+            .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
+            .unwrap();
+
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(vec![qb_t(), qb_t()])
+            .with_outs(vec![qb_t(), qb_t()])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let [q0, q1] = builder.input_wires_arr();
+                let err = builder.add_load_value(error_val);
+                let [q0, q1] = builder
+                    .add_dataflow_op(exit_op, [err, q0, q1])
                     .unwrap()
                     .outputs_arr();
                 builder.finish_with_outputs([q0, q1]).unwrap()

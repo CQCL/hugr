@@ -207,7 +207,7 @@ mod test {
     use hugr_core::builder::{endo_sig, BuildHandle, Dataflow, DataflowHugr};
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
-    use hugr_core::ops::Value;
+    use hugr_core::ops::{self, Value};
     use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, Type};
@@ -324,6 +324,32 @@ mod test {
             builder.finish_hugr_with_outputs([unit]).unwrap()
         };
         let root = hugr.root();
+        force_order(&mut hugr, root, |_, _| 0).unwrap();
+    }
+
+    #[test]
+    /// test for https://github.com/CQCL/hugr/issues/2005
+    fn call_indirect_bug() {
+        let fn_type = Signature::new(Type::UNIT, vec![Type::UNIT]);
+        let mut hugr = {
+            let mut builder = DFGBuilder::new(Signature::new(
+                vec![Type::new_function(fn_type.clone()), Type::UNIT],
+                vec![Type::UNIT, Type::UNIT],
+            ))
+            .unwrap();
+            let out = builder
+                .add_dataflow_op(
+                    ops::CallIndirect { signature: fn_type },
+                    builder.input_wires(),
+                )
+                .unwrap()
+                .out_wire(0);
+            // requires another op to induce an order edge
+            let other_unit = builder.add_load_value(Value::unary_unit_sum());
+            builder.finish_hugr_with_outputs([out, other_unit]).unwrap()
+        };
+        let root = hugr.root();
+
         force_order(&mut hugr, root, |_, _| 0).unwrap();
     }
 }

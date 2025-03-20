@@ -300,7 +300,7 @@ pub struct CallIndirect {
 impl_op_name!(CallIndirect);
 
 impl DataflowOpTrait for CallIndirect {
-    const TAG: OpTag = OpTag::FnCall;
+    const TAG: OpTag = OpTag::DataflowChild;
 
     fn description(&self) -> &str {
         "Call a function indirectly"
