@@ -1191,6 +1191,7 @@ name = "hugr-passes"
 version = "0.15.2"
 dependencies = [
  "ascent",
+ "derive_more",
  "hugr-core",
  "itertools 0.14.0",
  "lazy_static",
