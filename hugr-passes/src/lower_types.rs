@@ -259,9 +259,9 @@ impl LowerTypes {
                         let old_sig = old_sig.into_owned();
                         let mut expected_sig = old_sig.clone();
                         expected_sig.transform(self)?;
-                        (Some(old_sig), Some(expected_sig))
+                        Some((old_sig, expected_sig))
                     } else {
-                        (None, None)
+                        None
                     },
                 )
             } else {
@@ -271,18 +271,19 @@ impl LowerTypes {
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             // (If check_sig) then verify that the Signature still has the same arity/wires,
             // with only the expected changes to types within.
-            if let Some((old, expected)) = maybe_check_sig {
-                match (&expected, &new_dfsig) {
+            if let Some(old_and_expected) = maybe_check_sig {
+                match (&old_and_expected, &new_dfsig) {
                     (None, None) => (),
-                    (Some(exp), Some(act))
+                    (Some((_, exp)), Some(act))
                         if exp.input == act.input && exp.output == act.output => {}
                     _ => {
+                        let (old, expected) = old_and_expected.unzip();
                         return Err(ChangeTypeError::SignatureMismatch {
                             op: hugr.get_optype(n).clone(),
                             old,
                             expected,
                             actual: new_dfsig.map(Cow::into_owned),
-                        })
+                        });
                     }
                 };
             }
