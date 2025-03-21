@@ -418,17 +418,26 @@ mod test {
         HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
     use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
+    use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{TypeDefBound, Version};
     use hugr_core::hugr::internal::HugrMutInternals;
     use hugr_core::ops::{ExtensionOp, OpType, Tag, TailLoop, Value};
 
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
-    use hugr_core::std_extensions::collections::array::{self, array_type, ArrayOpDef, ArrayValue};
+    use hugr_core::std_extensions::collections::array::{
+        self, array_type, ArrayOp, ArrayOpDef, ArrayValue,
+    };
     use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
+    use itertools::Itertools;
 
     use super::{LowerTypes, OpReplacement};
+
+    const PACKED_VEC: &str = "PackedVec";
+    fn i64_t() -> Type {
+        INT_TYPES[6].clone()
+    }
 
     fn ext() -> Arc<Extension> {
         Extension::new_arc(
@@ -437,7 +446,7 @@ mod test {
             |ext, w| {
                 let pv_of_var = ext
                     .add_type(
-                        "PackedVec".into(),
+                        PACKED_VEC.into(),
                         vec![TypeBound::Any.into()],
                         String::new(),
                         TypeDefBound::from_params(vec![0]),
@@ -452,7 +461,7 @@ mod test {
                     PolyFuncType::new(
                         vec![TypeBound::Copyable.into()],
                         Signature::new(
-                            vec![pv_of_var.into(), INT_TYPES[6].to_owned()],
+                            vec![pv_of_var.into(), i64_t()],
                             Type::new_var_use(0, TypeBound::Any),
                         ),
                     ),
@@ -462,7 +471,7 @@ mod test {
                 ext.add_op(
                     "lowered_read_bool".into(),
                     "".into(),
-                    Signature::new(vec![INT_TYPES[6].to_owned(); 2], bool_t()),
+                    Signature::new(vec![i64_t(); 2], bool_t()),
                     w,
                 )
                 .unwrap();
@@ -476,7 +485,7 @@ mod test {
                 panic!("Illegal TypeArgs")
             };
             let mut dfb = DFGBuilder::new(inout_sig(
-                vec![array_type(64, ty.clone()), INT_TYPES[6].to_owned()],
+                vec![array_type(64, ty.clone()), i64_t()],
                 ty.clone(),
             ))
             .unwrap();
@@ -496,13 +505,10 @@ mod test {
                 dfb.finish_hugr_with_outputs([res]).unwrap(),
             )))
         }
-        let pv = ext.get_type("PackedVec").unwrap();
+        let pv = ext.get_type(PACKED_VEC).unwrap();
         let read = ext.get_op("read").unwrap();
         let mut lw = LowerTypes::default();
-        lw.lower_type(
-            pv.instantiate([bool_t().into()]).unwrap(),
-            INT_TYPES[6].to_owned(),
-        );
+        lw.lower_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.lower_parametric_type(
             pv,
             Box::new(|args: &[TypeArg]| {
@@ -525,12 +531,11 @@ mod test {
     }
 
     #[test]
-    fn module_func_dfg_cfg_call() {
+    fn module_func_cfg_call() {
         let ext = ext();
-        let coln = ext.get_type("PackedVec").unwrap();
+        let coln = ext.get_type(PACKED_VEC).unwrap();
         let read = ext.get_op("read").unwrap();
-        let i64 = || INT_TYPES[6].to_owned();
-        let c_int = Type::from(coln.instantiate([i64().into()]).unwrap());
+        let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
         let fb = mb
@@ -547,31 +552,24 @@ mod test {
         let mut fb = mb
             .define_function(
                 "main",
-                Signature::new(vec![i64(), c_int.clone(), c_bool.clone()], bool_t())
+                Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t())
                     .with_extension_delta(ext.name.clone()),
             )
             .unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
-        let mut dfb = fb
-            .dfg_builder(inout_sig(vec![i64(), c_int.clone()], i64()), [idx, indices])
-            .unwrap();
-        let [idx, indices] = dfb.input_wires_arr();
-        let [indices] = dfb
+        let [indices] = fb
             .call(id.handle(), &[c_int.into()], [indices])
             .unwrap()
             .outputs_arr();
-        let int_read_op = dfb
+        let int_read_op = fb
             .add_dataflow_op(
-                ExtensionOp::new(read.clone(), [i64().into()]).unwrap(),
+                ExtensionOp::new(read.clone(), [i64_t().into()]).unwrap(),
                 [indices, idx],
             )
             .unwrap();
-        let [idx2] = dfb
-            .finish_with_outputs(int_read_op.outputs())
-            .unwrap()
-            .outputs_arr();
+        let [idx2] = int_read_op.outputs_arr();
         let mut cfg = fb
-            .cfg_builder([(i64(), idx2), (c_bool.clone(), bools)], bool_t().into())
+            .cfg_builder([(i64_t(), idx2), (c_bool.clone(), bools)], bool_t().into())
             .unwrap();
         let mut entry = cfg.entry_builder([bool_t().into()], type_row![]).unwrap();
         let [idx2, bools] = entry.input_wires_arr();
@@ -615,6 +613,66 @@ mod test {
                 ("panic", 1)
             ])
         );
+    }
+
+    #[test]
+    fn dfg_conditional_case() {
+        let ext = ext();
+        let coln = ext.get_type(PACKED_VEC).unwrap();
+        let read = ext.get_op("read").unwrap();
+        let pv = |t: Type| Type::new_extension(coln.instantiate([t.into()]).unwrap());
+        let sum_rows = [vec![pv(pv(bool_t())), i64_t()].into(), pv(i64_t()).into()];
+        let mut dfb = DFGBuilder::new(inout_sig(
+            vec![Type::new_sum(sum_rows.clone()), pv(bool_t()), pv(i64_t())],
+            vec![pv(bool_t()), pv(i64_t())],
+        ))
+        .unwrap();
+        let [sum, vb, vi] = dfb.input_wires_arr();
+        let mut cb = dfb
+            .conditional_builder(
+                (sum_rows, sum),
+                [(pv(bool_t()), vb), (pv(i64_t()), vi)],
+                vec![pv(bool_t()), pv(i64_t())].into(),
+            )
+            .unwrap();
+        let mut case0 = cb.case_builder(0).unwrap();
+        let [vvb, i, _, vi0] = case0.input_wires_arr();
+        let [vb0] = case0
+            .add_dataflow_op(
+                ExtensionOp::new(read.clone(), [pv(bool_t()).into()]).unwrap(),
+                [vvb, i],
+            )
+            .unwrap()
+            .outputs_arr();
+        case0.finish_with_outputs([vb0, vi0]).unwrap();
+
+        let case1 = cb.case_builder(1).unwrap();
+        let [vi, vb1, _vi1] = case1.input_wires_arr();
+        case1.finish_with_outputs([vb1, vi]).unwrap();
+        let cond = cb.finish_sub_container().unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(cond.outputs()).unwrap();
+
+        lower_types(&ext).run(&mut h).unwrap();
+        h.validate_no_extensions().unwrap();
+        let ext_ops = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_extension_op())
+            .collect_vec();
+        assert_eq!(
+            ext_ops
+                .iter()
+                .map(|e| e.def().name())
+                .sorted()
+                .collect_vec(),
+            ["get", "itousize", "panic"]
+        );
+        // The PackedVec<PackedVec<bool>> becomes an array<i64>
+        let [array_get] = ext_ops
+            .into_iter()
+            .filter_map(|e| ArrayOp::from_extension_op(e).ok())
+            .collect_array()
+            .unwrap();
+        assert_eq!(array_get, ArrayOpDef::get.to_concrete(i64_t(), 64));
     }
 
     #[test]
