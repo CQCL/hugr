@@ -21,58 +21,23 @@ use hugr_core::{Hugr, Node};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
 
-#[derive(Clone, Hash, PartialEq, Eq)]
-struct OpHashWrapper {
-    ext_name: ExtensionId,
-    op_name: String, // Only because SmolStr not in hugr-passes yet
-    args: Vec<TypeArg>,
-}
-
-impl From<&ExtensionOp> for OpHashWrapper {
-    fn from(op: &ExtensionOp) -> Self {
-        Self {
-            ext_name: op.def().extension_id().clone(),
-            op_name: op.def().name().to_string(),
-            args: op.args().to_vec(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct ParametricType(ExtensionId, String);
-
-impl From<&TypeDef> for ParametricType {
-    fn from(value: &TypeDef) -> Self {
-        Self(value.extension_id().clone(), value.name().to_string())
-    }
-}
-
-impl From<&CustomType> for ParametricType {
-    fn from(value: &CustomType) -> Self {
-        Self(value.extension().clone(), value.name().to_string())
-    }
-}
-
-// Separate from above for clarity
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct ParametricOp(ExtensionId, String);
-
-impl From<&OpDef> for ParametricOp {
-    fn from(value: &OpDef) -> Self {
-        Self(value.extension_id().clone(), value.name().to_string())
-    }
-}
-
+/// A thing to which an Op can be lowered, i.e. with which a node can be replaced.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpReplacement {
+    /// Keep the same node (inputs/outputs, modulo lowering of types therein), change only the op
     SingleOp(OpType),
-    /// Defines a sub-Hugr to splice in place of the op.
+    /// Defines a sub-Hugr to splice in place of the op - a [CFG](OpType::CFG),
+    /// [Conditional](OpType::Conditional) or [DFG](OpType::DFG), which must have
+    /// the same (lowered) inputs and outputs as the original op.
+    // Not a FuncDefn, nor Case/DataflowBlock
     /// Note this will be of limited use before [monomorphization](super::monomorphize()) because
     /// the sub-Hugr will not be able to use type variables present in the op.
     // TODO: store also a vec<TypeParam>, and update Hugr::validate to take &[TypeParam]s
     // (defaulting to empty list) - see https://github.com/CQCL/hugr/issues/709
     CompoundOp(Box<Hugr>),
-    // TODO add Call to...a Node in the existing Hugr (?)
+    // TODO allow also Call to a Node in the existing Hugr
+    // (can't see any other way to achieve multiple calls to the same decl.
+    // So client should add the functions before lowering, then remove unused ones afterwards.)
 }
 
 impl OpReplacement {
@@ -182,7 +147,7 @@ impl LowerTypes {
         // We could require copy/discard-generators if src is Copyable, or *might be*
         // (depending on arguments - i.e. if src's TypeDefBound is anything other than
         // `TypeDefBound::Explicit(TypeBound::Copyable)`) but that seems an annoying
-        // overapproximation.
+        // overapproximation. Moreover, these depend upon the *return type* of the Fn.
         self.param_types.insert(src.into(), Arc::from(dest_fn));
     }
 
@@ -407,6 +372,48 @@ impl LowerTypes {
             }),
             Value::Function { hugr } => self.run_no_validate(&mut **hugr),
         }
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct OpHashWrapper {
+    ext_name: ExtensionId,
+    op_name: String, // Only because SmolStr not in hugr-passes yet
+    args: Vec<TypeArg>,
+}
+
+impl From<&ExtensionOp> for OpHashWrapper {
+    fn from(op: &ExtensionOp) -> Self {
+        Self {
+            ext_name: op.def().extension_id().clone(),
+            op_name: op.def().name().to_string(),
+            args: op.args().to_vec(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct ParametricType(ExtensionId, String);
+
+impl From<&TypeDef> for ParametricType {
+    fn from(value: &TypeDef) -> Self {
+        Self(value.extension_id().clone(), value.name().to_string())
+    }
+}
+
+impl From<&CustomType> for ParametricType {
+    fn from(value: &CustomType) -> Self {
+        Self(value.extension().clone(), value.name().to_string())
+    }
+}
+
+// Separate from above for clarity
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct ParametricOp(ExtensionId, String);
+
+impl From<&OpDef> for ParametricOp {
+    fn from(value: &OpDef) -> Self {
+        Self(value.extension_id().clone(), value.name().to_string())
     }
 }
 
