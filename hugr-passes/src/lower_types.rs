@@ -170,8 +170,8 @@ impl LowerTypes {
     pub fn linearize_parametric(
         &mut self,
         src: TypeDef,
-        copy_fn: Box<dyn Fn(&[TypeArg]) -> OpReplacement>,
-        discard_fn: Box<dyn Fn(&[TypeArg]) -> OpReplacement>,
+        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
+        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
     ) {
         self.linearize.register_parametric(src, copy_fn, discard_fn)
     }
