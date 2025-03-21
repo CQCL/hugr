@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.15.0...hugr-cli-v0.16.0) - 2025-03-21
+
+### New Features
+
+- *(hugr-cli)* Nicer error when passing a non-envelope file ([#2007](https://github.com/CQCL/hugr/pull/2007))
+
 ## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.14.4...hugr-cli-v0.15.0) - 2025-03-14
 
 This release changes the format expected by `hugr-cli`'s input to the new generic HUGR envelopes. A new flag `--hugr-json` provides compatibility with the old format.

@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.0...hugr-llvm-v0.16.0) - 2025-03-21
+
+### Bug Fixes
+
+- Remove return from val_or_panic ([#1999](https://github.com/CQCL/hugr/pull/1999))
+
+### New Features
+
+- add exit operation to prelude ([#2008](https://github.com/CQCL/hugr/pull/2008))
+- Add llvm codegen for collections.static_array ([#2003](https://github.com/CQCL/hugr/pull/2003))
+
 ## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.4...hugr-llvm-v0.15.0) - 2025-03-14
 
 ### Bug Fixes

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-v0.15.0...hugr-v0.16.0) - 2025-03-21
+
+### Bug Fixes
+
+- correct `CallIndirect` tag from `FnCall` to `DataflowChild` ([#2006](https://github.com/CQCL/hugr/pull/2006))
+- StaticArrayValue serialisation ([#2009](https://github.com/CQCL/hugr/pull/2009))
+
+### New Features
+
+- traits for transforming Types/TypeArgs/etc. ([#1991](https://github.com/CQCL/hugr/pull/1991))
+- add exit operation to prelude ([#2008](https://github.com/CQCL/hugr/pull/2008))
+- Add llvm codegen for collections.static_array ([#2003](https://github.com/CQCL/hugr/pull/2003))
+- *(hugr-py)* Support envelope compression ([#1994](https://github.com/CQCL/hugr/pull/1994))
+
 ## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-v0.14.4...hugr-v0.15.0) - 2025-03-14
 
 This release adds a new `Node` parameter to the `HugrView` trait, so it is now possible to have more complex structures behave like hugrs.
