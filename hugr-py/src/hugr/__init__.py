@@ -16,4 +16,4 @@ __all__ = [
 
 # This is updated by our release-please workflow, triggered by this
 # annotation: x-release-please-version
-__version__ = "0.11.2"
+__version__ = "0.11.3"

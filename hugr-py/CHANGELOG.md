@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.2...hugr-py-v0.11.3) (2025-03-21)
+
+
+### Bug Fixes
+
+* Don't enable envelope compression by default (yet) ([#2014](https://github.com/CQCL/hugr/issues/2014)) ([c5423ed](https://github.com/CQCL/hugr/commit/c5423edf6a4650a6222df08b5c5fb13529b5ef9f))
+
 ## [0.11.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.1...hugr-py-v0.11.2) (2025-03-21)
 
 
