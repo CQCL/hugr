@@ -296,50 +296,49 @@ impl LowerTypes {
                 continue;
             };
             for outp in new_sig.output_ports() {
-                if new_sig.out_port_type(outp).unwrap().copyable() {
-                    continue;
-                };
-                let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
-                if targets.len() == 1 {
-                    continue;
-                };
-                hugr.disconnect(n, outp);
-                let typ = new_sig.out_port_type(outp).unwrap();
-                if targets.len() == 0 {
-                    let discard = self
-                        .discard_op(typ)
-                        .expect("Don't know how to discard {typ:?}"); // TODO return error
-
-                    let disc = discard.add(hugr, hugr.get_parent(n).unwrap());
-                    hugr.connect(n, outp, disc, 0);
-                } else {
-                    // TODO return error
-                    let copy = self.copy_op(typ).expect("Don't know how to copy {typ:?}");
-                    self.do_copy_chain(hugr, n, outp, copy, &targets)
+                if !new_sig.out_port_type(outp).unwrap().copyable() {
+                    let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
+                    if targets.len() != 1 {
+                        hugr.disconnect(n, outp);
+                        let typ = new_sig.out_port_type(outp).unwrap();
+                        self.insert_copy_discard(hugr, n, outp, typ, &targets)
+                    }
                 }
             }
         }
         Ok(changed)
     }
 
-    fn do_copy_chain(
+    fn insert_copy_discard(
         &self,
         hugr: &mut impl HugrMut,
         mut src_node: Node,
         mut src_port: OutgoingPort,
-        copy: OpReplacement,
-        inps: &[(Node, IncomingPort)],
+        typ: &Type,
+        targets: &[(Node, IncomingPort)],
     ) {
-        assert!(inps.len() > 1);
-        // Could sanity-check signature here?
-        for (tgt_node, tgt_port) in &inps[..inps.len() - 1] {
-            let n = copy.add(hugr, hugr.get_parent(src_node).unwrap());
-            hugr.connect(src_node, src_port, n, 0);
-            hugr.connect(n, 0, *tgt_node, *tgt_port);
-            (src_node, src_port) = (n, 1.into());
+        let (last_node, last_inport) = match targets.last() {
+            None => {
+                let discard = self
+                    .discard_op(typ)
+                    .expect("Don't know how to discard {typ:?}"); // TODO return error
+
+                let disc = discard.add(hugr, hugr.get_parent(src_node).unwrap());
+                (disc, 0.into())
+            }
+            Some(last) => *last,
+        };
+        if targets.len() > 1 {
+            let copy = self.copy_op(typ).expect("Don't know how copy {typ:?"); // TODO return error
+                                                                               // Could sanity-check signature here?
+            for (tgt_node, tgt_port) in &targets[..targets.len() - 1] {
+                let n = copy.add(hugr, hugr.get_parent(src_node).unwrap());
+                hugr.connect(src_node, src_port, n, 0);
+                hugr.connect(n, 0, *tgt_node, *tgt_port);
+                (src_node, src_port) = (n, 1.into());
+            }
         }
-        let (tgt_node, tgt_port) = inps.last().unwrap();
-        hugr.connect(src_node, src_port, *tgt_node, *tgt_port)
+        hugr.connect(src_node, src_port, last_node, last_inport);
     }
 
     pub fn copy_op(&self, typ: &Type) -> Option<OpReplacement> {
