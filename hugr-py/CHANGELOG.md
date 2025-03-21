@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.11.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.1...hugr-py-v0.11.2) (2025-03-21)
+
+
+### Features
+
+* add exit operation to prelude ([#2008](https://github.com/CQCL/hugr/issues/2008)) ([6bd7665](https://github.com/CQCL/hugr/commit/6bd76659d1f3f3b100cef46f0d5f7ceec79699a9))
+* Add llvm codegen for collections.static_array ([#2003](https://github.com/CQCL/hugr/issues/2003)) ([f3dd145](https://github.com/CQCL/hugr/commit/f3dd145963ce23152f29d2d46be7eaa9a78ef2c5))
+* **hugr-py:** Add `StaticArray` to standard extensions ([#1985](https://github.com/CQCL/hugr/issues/1985)) ([cf860f3](https://github.com/CQCL/hugr/commit/cf860f34b132a26411787f80668d621b7273f2c9)), closes [#1984](https://github.com/CQCL/hugr/issues/1984)
+* **hugr-py:** Support envelope compression ([#1994](https://github.com/CQCL/hugr/issues/1994)) ([434c563](https://github.com/CQCL/hugr/commit/434c563ae4134b34070c45dfd8d13865b613c49d))
+
+
+### Bug Fixes
+
+* StaticArrayValue serialisation ([#2009](https://github.com/CQCL/hugr/issues/2009)) ([3fe6bf8](https://github.com/CQCL/hugr/commit/3fe6bf82ad3ebed5689e3304e7df88f43b9128b1))
+
+
+### Reverts
+
+* Revert breaking change to StaticArrayValue ([33a2b49](https://github.com/CQCL/hugr/commit/33a2b49d2d343265415dab3c52631845b5cd53ce))
+
 ## [0.11.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.0...hugr-py-v0.11.1) (2025-03-17)
 
 
