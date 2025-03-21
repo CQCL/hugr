@@ -439,6 +439,10 @@ mod test {
         INT_TYPES[6].clone()
     }
 
+    fn read_op(ext: &Arc<Extension>, t: Type) -> ExtensionOp {
+        ExtensionOp::new(ext.get_op("read").unwrap().clone(), [t.into()]).unwrap()
+    }
+
     fn ext() -> Arc<Extension> {
         Extension::new_arc(
             IdentList::new("TestExt").unwrap(),
@@ -479,7 +483,7 @@ mod test {
         )
     }
 
-    fn lower_types(ext: &Extension) -> LowerTypes {
+    fn lower_types(ext: &Arc<Extension>) -> LowerTypes {
         fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
             let [TypeArg::Type { ty }] = args else {
                 panic!("Illegal TypeArgs")
@@ -506,7 +510,6 @@ mod test {
             )))
         }
         let pv = ext.get_type(PACKED_VEC).unwrap();
-        let read = ext.get_op("read").unwrap();
         let mut lw = LowerTypes::default();
         lw.lower_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.lower_parametric_type(
@@ -519,14 +522,14 @@ mod test {
             }),
         );
         lw.lower_op(
-            &ExtensionOp::new(read.clone(), [bool_t().into()]).unwrap(),
+            &read_op(ext, bool_t()),
             OpReplacement::SingleOp(
                 ExtensionOp::new(ext.get_op("lowered_read_bool").unwrap().clone(), [])
                     .unwrap()
                     .into(),
             ),
         );
-        lw.lower_parametric_op(read.as_ref(), Box::new(lowered_read));
+        lw.lower_parametric_op(ext.get_op("read").unwrap().as_ref(), Box::new(lowered_read));
         lw
     }
 
@@ -534,7 +537,6 @@ mod test {
     fn module_func_cfg_call() {
         let ext = ext();
         let coln = ext.get_type(PACKED_VEC).unwrap();
-        let read = ext.get_op("read").unwrap();
         let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
@@ -562,10 +564,7 @@ mod test {
             .unwrap()
             .outputs_arr();
         let int_read_op = fb
-            .add_dataflow_op(
-                ExtensionOp::new(read.clone(), [i64_t().into()]).unwrap(),
-                [indices, idx],
-            )
+            .add_dataflow_op(read_op(&ext, i64_t()), [indices, idx])
             .unwrap();
         let [idx2] = int_read_op.outputs_arr();
         let mut cfg = fb
@@ -578,10 +577,7 @@ mod test {
             .unwrap()
             .outputs_arr();
         let bool_read_op = entry
-            .add_dataflow_op(
-                ExtensionOp::new(read.clone(), [bool_t().into()]).unwrap(),
-                [bools, idx2],
-            )
+            .add_dataflow_op(read_op(&ext, bool_t()), [bools, idx2])
             .unwrap();
         let [tagged] = entry
             .add_dataflow_op(
@@ -619,7 +615,6 @@ mod test {
     fn dfg_conditional_case() {
         let ext = ext();
         let coln = ext.get_type(PACKED_VEC).unwrap();
-        let read = ext.get_op("read").unwrap();
         let pv = |t: Type| Type::new_extension(coln.instantiate([t.into()]).unwrap());
         let sum_rows = [vec![pv(pv(bool_t())), i64_t()].into(), pv(i64_t()).into()];
         let mut dfb = DFGBuilder::new(inout_sig(
@@ -638,10 +633,7 @@ mod test {
         let mut case0 = cb.case_builder(0).unwrap();
         let [vvb, i, _, vi0] = case0.input_wires_arr();
         let [vb0] = case0
-            .add_dataflow_op(
-                ExtensionOp::new(read.clone(), [pv(bool_t()).into()]).unwrap(),
-                [vvb, i],
-            )
+            .add_dataflow_op(read_op(&ext, pv(bool_t())), [vvb, i])
             .unwrap()
             .outputs_arr();
         case0.finish_with_outputs([vb0, vi0]).unwrap();
