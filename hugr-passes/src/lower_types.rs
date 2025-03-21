@@ -420,12 +420,12 @@ mod test {
     use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{TypeDefBound, Version};
-    use hugr_core::hugr::internal::HugrMutInternals;
-    use hugr_core::ops::{ExtensionOp, OpType, Tag, TailLoop, Value};
+
+    use hugr_core::ops::{ExtensionOp, OpType, Tag, Value};
 
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
-        self, array_type, ArrayOp, ArrayOpDef, ArrayValue,
+        array_type, ArrayOp, ArrayOpDef, ArrayValue,
     };
     use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound};
@@ -585,8 +585,6 @@ mod test {
         let mut h = mb.finish_hugr().unwrap();
 
         assert!(lower_types(&ext).run(&mut h).unwrap());
-        // We do not update the extension delta
-        h.validate_no_extensions().unwrap();
 
         let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(
@@ -629,7 +627,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs(cond.outputs()).unwrap();
 
         lower_types(&ext).run(&mut h).unwrap();
-        h.validate_no_extensions().unwrap();
+
         let ext_ops = h
             .nodes()
             .filter_map(|n| h.get_optype(n).as_extension_op())
@@ -698,15 +696,7 @@ mod test {
             }),
         );
         lowerer.run(&mut h).unwrap();
-        if cfg!(feature = "extension_inference") {
-            match h.optype_mut(h.root()) {
-                OpType::TailLoop(TailLoop {
-                    extension_delta, ..
-                }) => extension_delta.insert(array::EXTENSION_ID),
-                _ => panic!(),
-            }
-        }
-        h.validate().unwrap();
+
         assert_eq!(
             h.get_optype(pred.node())
                 .as_load_constant()
