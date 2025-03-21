@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from hugr import tys
+from hugr.build import dfg
 from hugr.val import (
     FALSE,
     TRUE,
@@ -16,7 +17,7 @@ from hugr.val import (
     Value,
     bool_value,
 )
-from hugr.build import dfg
+
 from .conftest import validate
 
 
