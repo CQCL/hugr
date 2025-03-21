@@ -411,7 +411,7 @@ impl LowerTypes {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, sync::Arc};
+    use std::sync::Arc;
 
     use hugr_core::builder::{
         inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -540,33 +540,25 @@ mod test {
         let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
+        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Any));
         let fb = mb
-            .define_function(
-                "id",
-                PolyFuncType::new(
-                    [TypeBound::Any.into()],
-                    Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
-                ),
-            )
+            .define_function("id", PolyFuncType::new([TypeBound::Any.into()], sig))
             .unwrap();
         let inps = fb.input_wires();
         let id = fb.finish_with_outputs(inps).unwrap();
-        let mut fb = mb
-            .define_function(
-                "main",
-                Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t())
-                    .with_extension_delta(ext.name.clone()),
-            )
-            .unwrap();
+
+        let sig = Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t())
+            .with_extension_delta(ext.name.clone());
+        let mut fb = mb.define_function("main", sig).unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
         let [indices] = fb
             .call(id.handle(), &[c_int.into()], [indices])
             .unwrap()
             .outputs_arr();
-        let int_read_op = fb
+        let [idx2] = fb
             .add_dataflow_op(read_op(&ext, i64_t()), [indices, idx])
-            .unwrap();
-        let [idx2] = int_read_op.outputs_arr();
+            .unwrap()
+            .outputs_arr();
         let mut cfg = fb
             .cfg_builder([(i64_t(), idx2), (c_bool.clone(), bools)], bool_t().into())
             .unwrap();
@@ -596,18 +588,10 @@ mod test {
         // We do not update the extension delta
         h.validate_no_extensions().unwrap();
 
-        let mut counts: HashMap<_, usize> = HashMap::new();
-        for ext_op in h.nodes().filter_map(|n| h.get_optype(n).as_extension_op()) {
-            *(counts.entry(ext_op.def().name().as_str()).or_default()) += 1;
-        }
+        let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(
-            counts,
-            HashMap::from([
-                ("lowered_read_bool", 1),
-                ("itousize", 1),
-                ("get", 1),
-                ("panic", 1)
-            ])
+            ext_ops.map(|e| e.def().name()).sorted().collect_vec(),
+            ["get", "itousize", "lowered_read_bool", "panic",]
         );
     }
 
