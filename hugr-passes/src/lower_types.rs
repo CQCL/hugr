@@ -22,7 +22,7 @@ use hugr_core::{Hugr, Node};
 use crate::validation::{ValidatePassError, ValidationLevel};
 
 mod linearize;
-pub use linearize::Linearizer;
+pub use linearize::{LinearizeError, Linearizer};
 
 /// A thing to which an Op can be lowered, i.e. with which a node can be replaced.
 #[derive(Clone, Debug, PartialEq)]
@@ -120,8 +120,9 @@ pub enum ChangeTypeError {
         actual: Option<Signature>,
     },
     #[error(transparent)]
-    #[allow(missing_docs)]
     ValidationError(#[from] ValidatePassError),
+    #[error(transparent)]
+    LinearizeError(#[from] LinearizeError),
 }
 
 impl LowerTypes {
@@ -288,7 +289,8 @@ impl LowerTypes {
                     if targets.len() != 1 {
                         hugr.disconnect(n, outp);
                         let typ = new_sig.out_port_type(outp).unwrap();
-                        self.linearize.insert_copy_discard(hugr, n, outp, typ, &targets)
+                        self.linearize
+                            .insert_copy_discard(hugr, n, outp, typ, &targets)?;
                     }
                 }
             }
