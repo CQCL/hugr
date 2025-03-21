@@ -50,11 +50,13 @@ class StaticArrayVal(val.ExtensionValue):
         self.name = name
 
     def to_value(self) -> val.Extension:
-        # The value list must be serialized at this point, otherwise the
-        # `Extension` value would not be serializable.
-        vs = [v._to_serial_root() for v in self.v]
-        element_ty = self.ty.ty._to_serial_root()
-        serial_val = {"values": vs, "name": self.name, "typ": element_ty}
+        serial_val = {
+            "value": {
+                "values": [v._to_serial_root() for v in self.v],
+                "typ": self.ty.ty._to_serial_root(),
+            },
+            "name": self.name,
+        }
         return val.Extension(
             "StaticArrayValue", typ=self.ty, val=serial_val, extensions=[EXTENSION.name]
         )

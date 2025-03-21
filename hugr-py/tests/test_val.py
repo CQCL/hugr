@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 
 from hugr import tys
-from hugr.val import FALSE, TRUE, Left, None_, Right, Some, Sum, Tuple, UnitSum, Value
+from hugr.val import FALSE, TRUE, Left, None_, Right, Some, Sum, Tuple, UnitSum, Value, bool_value
+from hugr.build import dfg
+from .conftest import validate
 
 
 def test_sums():
@@ -55,3 +57,10 @@ def test_sums():
 def test_val_sum_str(value: Value, string: str, repr_str: str):
     assert str(value) == string
     assert repr(value) == repr_str
+
+def test_val_static_array():
+    from hugr.std.collections.static_array import StaticArrayVal
+    h = dfg.Dfg()
+    load = h.load(StaticArrayVal([bool_value(x) for x in [True, False]], tys.Bool, "arr"))
+    h.set_outputs(load)
+    validate(h.hugr)

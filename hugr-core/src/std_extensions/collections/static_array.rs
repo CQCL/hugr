@@ -23,10 +23,7 @@ use crate::{
     builder::{BuildError, Dataflow},
     extension::{
         prelude::{option_type, usize_t},
-        resolution::{
-            resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
-            WeakExtensionRegistry,
-        },
+        resolution::{ExtensionResolutionError, WeakExtensionRegistry},
         simple_op::{
             try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
             OpLoadError,
@@ -47,6 +44,8 @@ use crate::{
 
 use lazy_static::lazy_static;
 
+use super::array::ArrayValue;
+
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_static_unchecked("collections.static_array");
 /// Reported unique name of the array type.
@@ -58,8 +57,8 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 /// Statically sized array of values, all of the same [TypeBound::Copyable]
 /// type.
 pub struct StaticArrayValue {
-    values: Vec<Value>,
-    typ: Type,
+    /// The contents of the `StaticArrayValue`.
+    pub value: ArrayValue,
     /// The name of the `StaticArrayValue`.
     pub name: String,
 }
@@ -67,12 +66,12 @@ pub struct StaticArrayValue {
 impl StaticArrayValue {
     /// Returns the type of values inside the `[StaticArrayValue]`.
     pub fn get_element_type(&self) -> &Type {
-        &self.typ
+        self.value.get_element_type()
     }
 
     /// Returns the values contained inside the `[StaticArrayValue]`.
     pub fn get_contents(&self) -> &[Value] {
-        &self.values
+        self.value.get_contents()
     }
 
     /// Create a new [CustomConst] for an array of values of type `typ`.
@@ -89,8 +88,7 @@ impl StaticArrayValue {
             .into());
         }
         Ok(Self {
-            typ,
-            values: contents.into_iter().collect(),
+            value: ArrayValue::new(typ, contents),
             name: name.to_string(),
         })
     }
@@ -108,9 +106,9 @@ impl StaticArrayValue {
 
 impl TryHash for StaticArrayValue {
     fn try_hash(&self, mut st: &mut dyn hash::Hasher) -> bool {
-        maybe_hash_values(&self.values, &mut st) && {
+        maybe_hash_values(self.get_contents(), &mut st) && {
             self.name.hash(&mut st);
-            self.typ.hash(&mut st);
+            self.get_element_type().hash(&mut st);
             true
         }
     }
@@ -131,7 +129,7 @@ impl CustomConst for StaticArrayValue {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.values.iter().map(Value::extension_reqs))
+        ExtensionSet::union_over(self.get_contents().iter().map(Value::extension_reqs))
             .union(EXTENSION_ID.into())
     }
 
@@ -139,10 +137,7 @@ impl CustomConst for StaticArrayValue {
         &mut self,
         extensions: &WeakExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
-        for val in &mut self.values {
-            resolve_value_extensions(val, extensions)?;
-        }
-        resolve_type_extensions(&mut self.typ, extensions)
+        self.value.update_extensions(extensions)
     }
 }
 
