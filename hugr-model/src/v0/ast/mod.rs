@@ -29,6 +29,8 @@ use super::{LinkName, Literal, RegionKind, SymbolName, VarName};
 
 mod parse;
 mod print;
+#[cfg(feature = "pyo3")]
+mod python;
 mod resolve;
 mod view;
 

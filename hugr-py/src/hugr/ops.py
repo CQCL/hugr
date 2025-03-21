@@ -183,7 +183,7 @@ class Input(DataflowOp):
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=self.types)
 
-    def __call__(self) -> Command:
+    def __call__(self, *args) -> Command:
         return super().__call__()
 
     def name(self) -> str:
