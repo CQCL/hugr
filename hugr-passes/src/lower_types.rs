@@ -306,7 +306,11 @@ impl LowerTypes {
                     }
                 };
             }
-            let Some(new_sig) = changed.then_some(new_dfsig).flatten().map(Cow::into_owned) else {
+            let Some(new_sig) = (changed && n != hugr.root())
+                .then_some(new_dfsig)
+                .flatten()
+                .map(Cow::into_owned)
+            else {
                 continue;
             };
             for outp in new_sig.output_ports() {
