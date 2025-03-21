@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.0...hugr-core-v0.16.0) - 2025-03-21
+## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.0...hugr-core-v0.15.1) - 2025-03-21
 
 ### Bug Fixes
 
