@@ -117,7 +117,7 @@ impl EnvelopeConfig {
     pub const fn binary() -> Self {
         Self {
             format: EnvelopeFormat::Model,
-            zstd: Some(ZstdConfig { level: None }),
+            zstd: None,
         }
     }
 }
