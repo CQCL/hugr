@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.1...hugr-core-v0.15.2) - 2025-03-21
+
+### Bug Fixes
+
+- Don't enable envelope compression by default (yet) ([#2014](https://github.com/CQCL/hugr/pull/2014))
+- Inconsistent behaviour in `SiblingSubgraph::from_nodes` ([#2011](https://github.com/CQCL/hugr/pull/2011))
+
 ## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.0...hugr-core-v0.15.1) - 2025-03-21
 
 ### Bug Fixes
