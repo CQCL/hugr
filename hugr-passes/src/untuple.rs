@@ -219,8 +219,6 @@ fn remove_pack_unpack<'h, T: HugrView>(
     let subcirc = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
     let subcirc_signature = subcirc.signature(hugr);
 
-    println!("Subgraph signature: {subcirc_signature}");
-
     // The output port order in `SiblingSubgraph::try_from_nodes` is not too well defined.
     // Check that the outputs are in the expected order.
     debug_assert!(
