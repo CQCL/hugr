@@ -21,10 +21,9 @@ pub struct Linearizer {
     // including lowering of the copy/dup operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        // TODO should pass &LowerTypes, or at least some way to call copy_op / discard_op, to these
         (
-            Arc<dyn Fn(&[TypeArg]) -> OpReplacement>,
-            Arc<dyn Fn(&[TypeArg]) -> OpReplacement>,
+            Arc<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
+            Arc<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
         ),
     >,
 }
@@ -45,8 +44,8 @@ impl Linearizer {
     pub fn register_parametric(
         &mut self,
         src: TypeDef,
-        copy_fn: Box<dyn Fn(&[TypeArg]) -> OpReplacement>,
-        discard_fn: Box<dyn Fn(&[TypeArg]) -> OpReplacement>,
+        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
+        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
     ) {
         self.copy_discard_parametric
             .insert((&src).into(), (Arc::from(copy_fn), Arc::from(discard_fn)));
@@ -92,7 +91,7 @@ impl Linearizer {
             .copy_discard_parametric
             .get(&exty.into())
             .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
-        Ok(copy_fn(exty.args()))
+        Ok(copy_fn(exty.args(), self))
     }
 
     fn discard_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
@@ -106,6 +105,6 @@ impl Linearizer {
             .copy_discard_parametric
             .get(&exty.into())
             .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
-        Ok(discard_fn(exty.args()))
+        Ok(discard_fn(exty.args(), self))
     }
 }
