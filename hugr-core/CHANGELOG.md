@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.2...hugr-core-v0.15.3) - 2025-03-22
+
+### New Features
+
+- Expand SimpleReplacement API ([#1920](https://github.com/CQCL/hugr/pull/1920))
+
 ## [0.15.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.1...hugr-core-v0.15.2) - 2025-03-21
 
 ### Bug Fixes
