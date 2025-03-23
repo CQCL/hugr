@@ -195,8 +195,8 @@ impl LowerTypes {
     pub fn linearize_parametric(
         &mut self,
         src: TypeDef,
-        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
-        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
+        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
+        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
     ) {
         // We could raise an error if src's TypeDefBound is explicit Copyable ?
         self.linearize.register_parametric(src, copy_fn, discard_fn)

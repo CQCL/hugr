@@ -22,8 +22,8 @@ pub struct Linearizer {
     copy_discard_parametric: HashMap<
         ParametricType,
         (
-            Arc<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>, // TODO return Result<...,LinearizeError> ?
-            Arc<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
+            Arc<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
+            Arc<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
         ),
     >,
 }
@@ -51,8 +51,8 @@ impl Linearizer {
     pub fn register_parametric(
         &mut self,
         src: TypeDef,
-        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
-        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
+        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
+        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
     ) {
         self.copy_discard_parametric
             .insert((&src).into(), (Arc::from(copy_fn), Arc::from(discard_fn)));
@@ -123,7 +123,7 @@ impl Linearizer {
             .copy_discard_parametric
             .get(&exty.into())
             .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
-        Ok(copy_fn(exty.args(), self))
+        copy_fn(exty.args(), self)
     }
 
     fn discard_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
@@ -137,7 +137,7 @@ impl Linearizer {
             .copy_discard_parametric
             .get(&exty.into())
             .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
-        Ok(discard_fn(exty.args(), self))
+        discard_fn(exty.args(), self)
     }
 }
 
