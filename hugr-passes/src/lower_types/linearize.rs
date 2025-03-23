@@ -50,12 +50,12 @@ impl Linearizer {
 
     pub fn register_parametric(
         &mut self,
-        src: TypeDef,
+        src: &TypeDef,
         copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
         discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
     ) {
         self.copy_discard_parametric
-            .insert((&src).into(), (Arc::from(copy_fn), Arc::from(discard_fn)));
+            .insert(src.into(), (Arc::from(copy_fn), Arc::from(discard_fn)));
     }
 
     /// Insert copy or discard operations (as appropriate) enough to wire `src_port` of `src_node`

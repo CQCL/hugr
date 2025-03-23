@@ -194,7 +194,7 @@ impl LowerTypes {
     /// as part of an [OpReplacement::CompoundOp].
     pub fn linearize_parametric(
         &mut self,
-        src: TypeDef,
+        src: &TypeDef,
         copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
         discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
     ) {
