@@ -213,28 +213,29 @@ impl Linearizer {
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+    use std::sync::Arc;
 
-    use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
-    use hugr_core::extension::{TypeDefBound, Version};
-    use hugr_core::hugr::IdentList;
+    use hugr_core::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr};
+
+    use hugr_core::extension::{prelude::usize_t, TypeDefBound, Version};
     use hugr_core::ops::{ExtensionOp, NamedOp, OpName};
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
-    use hugr_core::types::{Type, TypeEnum};
-    use hugr_core::{extension::prelude::usize_t, types::Signature};
-    use hugr_core::{Extension, HugrView};
+    use hugr_core::types::{Signature, Type, TypeEnum};
+    use hugr_core::{hugr::IdentList, Extension, HugrView};
 
     use crate::lower_types::OpReplacement;
     use crate::LowerTypes;
 
-    #[test]
-    fn single_values() {
+    const LIN_T: &str = "Lin";
+
+    fn ext_lowerer() -> (Arc<Extension>, LowerTypes) {
         // Extension with a linear type, a copy and discard op
         let e = Extension::new_arc(
             IdentList::new_unchecked("TestExt"),
             Version::new(0, 0, 0),
             |e, w| {
                 let lin = Type::new_extension(
-                    e.add_type("Lin".into(), vec![], String::new(), TypeDefBound::any(), w)
+                    e.add_type(LIN_T.into(), vec![], String::new(), TypeDefBound::any(), w)
                         .unwrap()
                         .instantiate([])
                         .unwrap(),
@@ -255,7 +256,8 @@ mod test {
                 .unwrap();
             },
         );
-        let lin_t = Type::new_extension(e.get_type("Lin").unwrap().instantiate([]).unwrap());
+
+        let lin_t = Type::new_extension(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
 
         // Configure to lower usize_t to the linear type above
         let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), []).unwrap();
@@ -270,9 +272,14 @@ mod test {
             OpReplacement::SingleOp(copy_op.into()),
             OpReplacement::SingleOp(discard_op.into()),
         );
+        (e, lowerer)
+    }
 
+    #[test]
+    fn single_values() {
+        let (_e, lowerer) = ext_lowerer();
         // Build Hugr - uses first input three times, discards second input (both usize)
-        let mut outer = DFGBuilder::new(Signature::new(
+        let mut outer = DFGBuilder::new(inout_sig(
             vec![usize_t(); 2],
             vec![usize_t(), array_type(2, usize_t())],
         ))
