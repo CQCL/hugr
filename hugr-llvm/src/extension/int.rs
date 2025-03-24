@@ -483,13 +483,14 @@ fn make_narrow<'c, H: HugrView<Node = Node>>(
         )?
     };
 
+    let inbounds = ctx.builder().build_not(outside_range, "inbounds")?;
     let narrowed_val = ctx
         .builder()
         .build_int_cast_sign_flag(arg.into_int_value(), out_int_ty, signed, "")?
         .as_basic_value_enum();
     val_or_error(
         ctx,
-        outside_range,
+        inbounds,
         narrowed_val,
         &ERR_NARROW,
         LLVMSumType::try_from_hugr_type(&ctx.typing_session(), sum_type).unwrap(),
@@ -527,7 +528,7 @@ fn val_or_panic<'c, H: HugrView<Node = Node>>(
 
 fn val_or_error<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    should_fail: IntValue<'c>,
+    should_succeed: IntValue<'c>,
     val: BasicValueEnum<'c>,
     err: &ConstError,
     ty: LLVMSumType<'c>,
@@ -539,7 +540,7 @@ fn val_or_error<'c, H: HugrView<Node = Node>>(
 
     Ok(ctx
         .builder()
-        .build_select(should_fail, err_variant, ok_variant, "")?)
+        .build_select(should_succeed, ok_variant, err_variant, "")?)
 }
 
 fn llvm_type<'c>(
