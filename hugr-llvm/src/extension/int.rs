@@ -1,11 +1,11 @@
 use hugr_core::{
-    extension::prelude::ConstError,
+    extension::prelude::{sum_with_error, ConstError},
     ops::{constant::CustomConst, ExtensionOp, NamedOp, Value},
     std_extensions::arithmetic::{
         int_ops::IntOpDef,
         int_types::{self, ConstInt},
     },
-    types::{CustomType, TypeArg},
+    types::{CustomType, Type, TypeArg},
     HugrView, Node,
 };
 use inkwell::{
@@ -24,7 +24,7 @@ use crate::{
         ops::{emit_custom_binary_op, emit_custom_unary_op},
         EmitOpArgs,
     },
-    sum::LLVMSumType,
+    sum::{LLVMSumType, LLVMSumValue},
     types::{HugrSumType, TypingSession},
     CodegenExtension,
 };
@@ -78,6 +78,106 @@ lazy_static! {
         signal: 2,
         message: "is_to_u called on negative value".to_string(),
     };
+    static ref ERR_DIV_0: ConstError = ConstError {
+        signal: 2,
+        message: "Attempted division by 0".to_string(),
+    };
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum DivOrMod {
+    Div,
+    Mod,
+    DivMod,
+}
+
+struct DivModOp {
+    op: DivOrMod,
+    signed: bool,
+    panic: bool,
+}
+
+impl DivModOp {
+    fn emit<'c, H: HugrView<Node = Node>>(
+        self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        pcg: &impl PreludeCodegen,
+        log_width: u64,
+        numerator: IntValue<'c>,
+        denominator: IntValue<'c>,
+    ) -> Result<Vec<BasicValueEnum<'c>>> {
+        // Hugr semantics say that div and mod are equivalent to doing a divmod,
+        // then projecting out an element from the pair, so that's what we do.
+        let quotrem = make_divmod(
+            ctx,
+            pcg,
+            log_width,
+            numerator,
+            denominator,
+            self.panic,
+            self.signed,
+        )?;
+
+        if self.op == DivOrMod::DivMod {
+            if self.panic {
+                // Unpack the tuple into two values.
+                Ok(quotrem.build_untag(ctx.builder(), 0).unwrap())
+            } else {
+                Ok(vec![quotrem.as_basic_value_enum()])
+            }
+        } else {
+            // Which field we should project out from the result of divmod.
+            let index = match self.op {
+                DivOrMod::Div => 0,
+                DivOrMod::Mod => 1,
+                _ => unreachable!(),
+            };
+            // If we emitted a panicking divmod, the result is just a tuple type.
+            if self.panic {
+                Ok(vec![quotrem
+                        .build_untag(ctx.builder(), 0)?
+                        .into_iter()
+                        .nth(index as usize)
+                        .unwrap()
+                ]
+                )
+            }
+            // Otherwise, we have a sum type `err + [int,int]`, which we need to
+            // turn into a `err + int`.
+            else {
+                // Get the data out the the divmod result.
+                let int_ty = numerator.get_type().as_basic_type_enum();
+                let tuple_ty = LLVMSumType::try_new(ctx.iw_context(), vec![vec![int_ty, int_ty]]).unwrap();
+                let tuple = quotrem
+                    .build_untag(ctx.builder(), 1)?
+                    .into_iter()
+                    .next()
+                    .unwrap();
+                let tuple_val = LLVMSumValue::try_new(tuple, tuple_ty)?;
+                let data_val = tuple_val
+                    .build_untag(ctx.builder(), 0)?
+                    .into_iter()
+                    .nth(index)
+                    .unwrap();
+                let err_val = quotrem.build_untag(ctx.builder(), 0)?.into_iter().next().unwrap();
+
+                let tag_val = quotrem.build_get_tag(ctx.builder())?;
+                tag_val.set_name("tag");
+
+                // Build a new struct with the old tag and error data.
+                let int_ty = int_types::INT_TYPES[log_width as usize].clone();
+                let out_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), sum_with_error(vec![int_ty.clone()])).unwrap();
+
+                let data_variant = out_ty.build_tag(ctx.builder(), 1, vec![data_val])?;
+                data_variant.set_name("data_variant");
+                let err_variant = out_ty.build_tag(ctx.builder(), 0, vec![err_val])?;
+                err_variant.set_name("err_variant");
+
+                let result = ctx.builder().build_select(tag_val, data_variant, err_variant, "")?;
+                Ok(vec![result])
+            }
+        }
+    }
 }
 
 /// ConstError an integer comparison operation.
@@ -186,24 +286,211 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
                 .as_basic_value_enum()])
         }),
-        IntOpDef::idiv_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
-        }),
-        IntOpDef::idiv_u => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
-        }),
-        IntOpDef::imod_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
-        }),
+        IntOpDef::idiv_s => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Div,
+                    signed: true,
+                    panic: true,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::idiv_u => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Div,
+                    signed: false,
+                    panic: true,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::imod_s => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Mod,
+                    signed: true,
+                    panic: true,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::imod_u => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Mod,
+                    signed: false,
+                    panic: true,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::idivmod_u => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::DivMod,
+                    signed: false,
+                    panic: true,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::idivmod_s => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::DivMod,
+                    signed: true,
+                    panic: true,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::idiv_checked_s => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Div,
+                    signed: true,
+                    panic: false,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::idiv_checked_u => {
+            let log_width = get_width_arg(&args);
+
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Div,
+                    signed: false,
+                    panic: false,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::imod_checked_s => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Mod,
+                    signed: true,
+                    panic: false,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::imod_checked_u => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::Mod,
+                    signed: false,
+                    panic: false,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::idivmod_checked_u => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::DivMod,
+                    signed: false,
+                    panic: false,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
+        IntOpDef::idivmod_checked_s => {
+            let log_width = get_width_arg(&args);
+            emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+                let op = DivModOp {
+                    op: DivOrMod::DivMod,
+                    signed: true,
+                    panic: false,
+                };
+                op.emit(
+                    ctx,
+                    pcg,
+                    log_width,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                )
+            })
+        }
         IntOpDef::ineg => emit_custom_unary_op(context, args, |ctx, arg, _| {
             Ok(vec![ctx
                 .builder()
@@ -439,6 +726,94 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             )?])
         }),
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
+    }
+}
+
+// Helper to get the log width arg to an int op when it's the only argument
+// panic if there's not exactly one nat arg
+fn get_width_arg<'c, H: HugrView<Node = Node>>(args: &EmitOpArgs<'c, '_, ExtensionOp, H>) -> u64 {
+    let [arg] = args
+        .node
+        .args()
+        .to_owned()
+        .try_into()
+        .expect("Exactly one type argument to int op");
+    let TypeArg::BoundedNat { n: log_width } = arg else {
+        panic!("Unexpected non-nat arg to int op");
+    };
+    log_width
+}
+
+fn make_divmod<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    pcg: &impl PreludeCodegen,
+    log_width: u64,
+    numerator: IntValue<'c>,
+    denominator: IntValue<'c>,
+    panic: bool,
+    signed: bool,
+) -> Result<LLVMSumValue<'c>> {
+    let int_ty = numerator.get_type();
+    let zero = int_ty.const_zero();
+    let lower_bounds_check = if signed {
+        ctx.builder()
+            .build_int_compare(IntPredicate::SGT, denominator, zero, "valid_div")
+    } else {
+        ctx.builder()
+            .build_int_compare(IntPredicate::NE, denominator, zero, "valid_div")
+    }?;
+
+    let (quot, rem) = if signed {
+        let quot = ctx
+            .builder()
+            .build_int_signed_div(numerator, denominator, "quotient")?;
+        let rem = ctx
+            .builder()
+            .build_int_signed_rem(numerator, denominator, "remainder")?;
+        (quot, rem)
+    } else {
+        let quot = ctx
+            .builder()
+            .build_int_unsigned_div(numerator, denominator, "quotient")?;
+        let rem = ctx
+            .builder()
+            .build_int_unsigned_rem(numerator, denominator, "remainder")?;
+        (quot, rem)
+    };
+
+    let int_arg_ty = int_types::INT_TYPES[log_width as usize].clone();
+    let tuple_sum_ty = HugrSumType::new_tuple(vec![int_arg_ty.clone(), int_arg_ty.clone()]);
+
+    let pair_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), tuple_sum_ty.clone())?;
+    let pair_val = pair_ty
+        .build_tag(
+            ctx.builder(),
+            0,
+            vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
+        )?
+        .as_basic_value_enum();
+
+    let sum_ty = LLVMSumType::try_from_hugr_type(
+        &ctx.typing_session(),
+        sum_with_error(vec![Type::from(tuple_sum_ty)]),
+    )?;
+
+    if panic {
+        LLVMSumValue::try_new(
+            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, pair_val)?,
+            pair_ty,
+        )
+    } else {
+        LLVMSumValue::try_new(
+            val_or_error(
+                ctx,
+                lower_bounds_check,
+                pair_val,
+                &ERR_DIV_0,
+                sum_ty.clone(),
+            )?,
+            sum_ty,
+        )
     }
 }
 
@@ -726,6 +1101,14 @@ mod test {
     #[case(IntOpDef::iu_to_s, &[3])]
     #[case(IntOpDef::is_to_u, &[3])]
     #[case(IntOpDef::ineg, &[2])]
+    #[case::idiv_checked_u("idiv_checked_u", &[3])]
+    #[case::idiv_checked_s("idiv_checked_s", &[3])]
+    #[case::imod_checked_u("imod_checked_u", &[6])]
+    #[case::imod_checked_s("imod_checked_s", &[6])]
+    #[case::idivmod_u("idivmod_u", &[3])]
+    #[case::idivmod_s("idivmod_s", &[3])]
+    #[case::idivmod_checked_u("idivmod_checked_u", &[6])]
+    #[case::idivmod_checked_s("idivmod_checked_s", &[6])]
     fn test_emission(int_llvm_ctx: TestContext, #[case] op: IntOpDef, #[case] args: &[u8]) {
         let mut insta = insta::Settings::clone_current();
         insta.set_snapshot_suffix(format!(
@@ -750,6 +1133,10 @@ mod test {
     #[case::iadd("iadd", 3)]
     #[case::isub("isub", 6)]
     #[case::ipow("ipow", 3)]
+    #[case::idiv_u("idiv_u", 3)]
+    #[case::idiv_s("idiv_s", 3)]
+    #[case::imod_u("imod_u", 3)]
+    #[case::imod_s("imod_s", 3)]
     fn test_binop_emission(int_llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         let ext_op = make_int_op(op.clone(), width);
         let hugr = test_binary_int_op(ext_op, width);
@@ -833,6 +1220,10 @@ mod test {
     #[case::ipow("ipow", 2, 3, 8)]
     #[case::ipow("ipow", 42, 1, 42)]
     #[case::ipow("ipow", 42, 0, 1)]
+    #[case::idiv("idiv_u", 42, 2, 21)]
+    #[case::idiv("idiv_u", 42, 5, 8)]
+    #[case::imod("imod_u", 42, 2, 0)]
+    #[case::imod("imod_u", 42, 5, 2)]
     fn test_exec_unsigned_bin_op(
         int_exec_ctx: TestContext,
         #[case] op: String,
