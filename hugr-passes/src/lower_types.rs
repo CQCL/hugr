@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
+use hugr_core::ops::handle::DataflowOpID;
 use itertools::Either;
 use thiserror::Error;
 
@@ -17,7 +19,7 @@ use hugr_core::ops::{
 use hugr_core::types::{
     CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
 };
-use hugr_core::{Hugr, Node};
+use hugr_core::{Hugr, Node, Wire};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
 
@@ -48,6 +50,17 @@ impl OpReplacement {
         match self {
             OpReplacement::SingleOp(op_type) => hugr.add_node_with_parent(parent, op_type),
             OpReplacement::CompoundOp(new_h) => hugr.insert_hugr(parent, *new_h).new_root,
+        }
+    }
+
+    fn add(
+        self,
+        dfb: &mut impl Dataflow,
+        inputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        match self {
+            OpReplacement::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
+            OpReplacement::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
         }
     }
 
