@@ -66,7 +66,7 @@ pub struct LowerTypes {
     /// ArrayOfCopyables(T1). This would require an additional entry for that.
     type_map: HashMap<CustomType, Type>,
     /// Parametric types are handled by a function which receives the lowered typeargs.
-    param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Type>>,
+    param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     // Handles simple cases Op1 -> Op2.
     op_map: HashMap<OpHashWrapper, OpReplacement>,
     // Called after lowering typeargs; return None to use original OpDef
@@ -89,7 +89,7 @@ impl TypeTransformer for LowerTypes {
             nargs
                 .iter_mut()
                 .try_for_each(|ta| ta.transform(self).map(|_ch| ()))?;
-            Some(dest_fn(&nargs))
+            dest_fn(&nargs)
         } else {
             None
         })
@@ -141,7 +141,7 @@ impl LowerTypes {
     pub fn lower_parametric_type(
         &mut self,
         src: &TypeDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Type>, // TODO should we return Option<Type> ?
+        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<Type>>,
     ) {
         // No way to check that dest_fn never produces a linear type.
         // We could require copy/discard-generators if src is Copyable, or *might be*
@@ -170,19 +170,22 @@ impl LowerTypes {
     pub fn lower_parametric_op(
         &mut self,
         src: &OpDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>, // TODO or just OpReplacement?
+        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>,
     ) {
         self.param_ops.insert(src.into(), Arc::from(dest_fn));
     }
 
     /// Configures this instance to change occurrences consts of type `src_ty`, using
-    /// a callback given the value of the constant (of that type).
+    /// a callback given the value of the constant (of that type). (The callback may
+    /// return `None` to indicate nothing has changed; we assume `Some` means something
+    /// has changed when evaluating the `bool` result of [Self::run].)
+    ///
     /// Note that if `src_ty` is an instance of a *parametrized* [TypeDef], this
     /// takes precedence over [Self::lower_consts_parametric] where the `src_ty`s overlap.
     pub fn lower_consts(
         &mut self,
         src_ty: &CustomType,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>, // TODO should we return Value??
+        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
     ) {
         self.consts
             .insert(Either::Left(src_ty.clone()), Arc::from(const_fn));
@@ -526,7 +529,7 @@ mod test {
                 let [TypeArg::Type { ty }] = args else {
                     panic!("Illegal TypeArgs")
                 };
-                array_type(64, ty.clone())
+                Some(array_type(64, ty.clone()))
             }),
         );
         lw.lower_op(
@@ -687,7 +690,7 @@ mod test {
                 let [TypeArg::Type { ty }] = args else {
                     panic!("Expected elem type")
                 };
-                array_type(4, ty.clone())
+                Some(array_type(4, ty.clone()))
             }),
         );
         lowerer.lower_consts_parametric(
