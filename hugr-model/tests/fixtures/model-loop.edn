@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (define-func example.loop
   (param ?a core.type)
   (core.fn [?a] [?a])

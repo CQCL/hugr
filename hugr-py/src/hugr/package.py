@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar, cast
 from typing_extensions import deprecated
 
 import hugr._serialization.extension as ext_s
+import hugr.model as model
 from hugr.envelope import (
     EnvelopeConfig,
     make_envelope,
@@ -117,6 +118,13 @@ class Package:
             The deserialized Package object.
         """
         return ext_s.Package.model_validate_json(json_str).deserialize()
+
+    def to_model(self) -> model.Package:
+        """Export the package as its hugr model representation.
+
+        At the moment this does not yet contain the extensions.
+        """
+        return model.Package([module.to_model() for module in self.modules])
 
 
 @dataclass(frozen=True)

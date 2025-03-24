@@ -28,7 +28,7 @@ use petgraph::unionfind::UnionFind;
 use std::fmt::Write;
 
 /// Export a [`Hugr`] graph to its representation in the model.
-pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> table::Module<'a> {
+pub(crate) fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> table::Module<'a> {
     let mut ctx = Context::new(hugr, bump);
     ctx.export_root();
     ctx.module

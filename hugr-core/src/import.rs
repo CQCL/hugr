@@ -80,7 +80,7 @@ macro_rules! error_uninferred {
 }
 
 /// Import a `hugr` module from its model representation.
-pub fn import_hugr(
+pub(crate) fn import_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
 ) -> Result<Hugr, ImportError> {

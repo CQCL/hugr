@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (declare-operation core.call-indirect
                    (param ?inputs (core.list core.type))
                    (param ?outputs (core.list core.type))

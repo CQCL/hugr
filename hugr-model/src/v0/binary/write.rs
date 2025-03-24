@@ -22,24 +22,28 @@ macro_rules! write_list {
     };
 }
 
-/// Writes a module to an impl of [Write].
-pub fn write_to_writer(module: &table::Module, writer: impl Write) -> Result<(), WriteError> {
+/// Writes a package to an impl of [Write].
+pub fn write_to_writer(package: &table::Package, writer: impl Write) -> Result<(), WriteError> {
     let mut message = capnp::message::Builder::new_default();
     let builder = message.init_root();
-    write_module(builder, module);
+    write_package(builder, package);
 
     Ok(capnp::serialize_packed::write_message(writer, &message)?)
 }
 
-/// Writes a module to a byte vector.
-pub fn write_to_vec(module: &table::Module) -> Vec<u8> {
+/// Writes a package to a byte vector.
+pub fn write_to_vec(package: &table::Package) -> Vec<u8> {
     let mut message = capnp::message::Builder::new_default();
     let builder = message.init_root();
-    write_module(builder, module);
+    write_package(builder, package);
 
     let mut output = Vec::new();
     let _ = capnp::serialize_packed::write_message(&mut output, &message);
     output
+}
+
+fn write_package(mut builder: hugr_capnp::package::Builder, package: &table::Package) {
+    write_list!(builder, init_modules, write_module, package.modules);
 }
 
 fn write_module(mut builder: hugr_capnp::module::Builder, module: &table::Module) {

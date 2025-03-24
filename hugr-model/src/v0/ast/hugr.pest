@@ -18,7 +18,8 @@ literal_float = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ ("e" ~ ("+
 
 base64_string = { "\"" ~ (ASCII_ALPHANUMERIC | "+" | "/")* ~ "="* ~ "\"" }
 
-module = { "(" ~ "hugr" ~ "0" ~ ")" ~ meta* ~ node* ~ EOI }
+package = { "(" ~ "hugr" ~ "0" ~ ")" ~ module* ~ EOI }
+module  = { "(" ~ "mod" ~ ")" ~ meta* ~ node* }
 
 meta = { "(" ~ "meta" ~ term ~ ")" }
 
