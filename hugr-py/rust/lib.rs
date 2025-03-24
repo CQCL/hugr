@@ -27,11 +27,12 @@ syntax_to_and_from_string!(region, Region);
 syntax_to_and_from_string!(module, Module);
 syntax_to_and_from_string!(param, Param);
 syntax_to_and_from_string!(symbol, Symbol);
+syntax_to_and_from_string!(package, Package);
 
 #[pyfunction]
-fn module_to_bytes(module: ast::Module) -> PyResult<Vec<u8>> {
+fn package_to_bytes(package: ast::Package) -> PyResult<Vec<u8>> {
     let bump = bumpalo::Bump::new();
-    let resolved = module
+    let resolved = package
         .resolve(&bump)
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
     let bytes = hugr_model::v0::binary::write_to_vec(&resolved);
@@ -39,14 +40,14 @@ fn module_to_bytes(module: ast::Module) -> PyResult<Vec<u8>> {
 }
 
 #[pyfunction]
-fn bytes_to_module(bytes: &[u8]) -> PyResult<ast::Module> {
+fn bytes_to_package(bytes: &[u8]) -> PyResult<ast::Package> {
     let bump = bumpalo::Bump::new();
     let table = hugr_model::v0::binary::read_from_slice(bytes, &bump)
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
-    let module = table
+    let package = table
         .as_ast()
-        .ok_or_else(|| PyValueError::new_err("Malformed module"))?;
-    Ok(module)
+        .ok_or_else(|| PyValueError::new_err("Malformed package"))?;
+    Ok(package)
 }
 
 #[pymodule]
@@ -58,9 +59,11 @@ fn _hugr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(region_to_string, m)?)?;
     m.add_function(wrap_pyfunction!(string_to_region, m)?)?;
     m.add_function(wrap_pyfunction!(module_to_string, m)?)?;
-    m.add_function(wrap_pyfunction!(module_to_bytes, m)?)?;
     m.add_function(wrap_pyfunction!(string_to_module, m)?)?;
-    m.add_function(wrap_pyfunction!(bytes_to_module, m)?)?;
+    m.add_function(wrap_pyfunction!(package_to_string, m)?)?;
+    m.add_function(wrap_pyfunction!(package_to_bytes, m)?)?;
+    m.add_function(wrap_pyfunction!(string_to_package, m)?)?;
+    m.add_function(wrap_pyfunction!(bytes_to_package, m)?)?;
     m.add_function(wrap_pyfunction!(param_to_string, m)?)?;
     m.add_function(wrap_pyfunction!(string_to_param, m)?)?;
     m.add_function(wrap_pyfunction!(symbol_to_string, m)?)?;

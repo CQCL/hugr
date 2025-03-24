@@ -6,7 +6,8 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 use crate::v0::{Literal, RegionKind};
 
 use super::{
-    LinkName, Module, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName,
+    LinkName, Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolName, Term,
+    VarName,
 };
 
 struct Printer<'a> {
@@ -251,12 +252,22 @@ fn print_port_lists<'a>(
     printer.group_exit();
 }
 
-fn print_module<'a>(printer: &mut Printer<'a>, module: &'a Module) {
+fn print_package<'a>(printer: &mut Printer<'a>, package: &'a Package) {
     printer.parens_enter();
     printer.text("hugr");
     printer.text("0");
     printer.parens_exit();
 
+    for module in package.modules.iter() {
+        printer.parens_enter();
+        printer.text("mod");
+        printer.parens_exit();
+
+        print_module(printer, module);
+    }
+}
+
+fn print_module<'a>(printer: &mut Printer<'a>, module: &'a Module) {
     for meta in module.root.meta.iter() {
         print_meta_item(printer, meta);
     }
@@ -414,6 +425,7 @@ macro_rules! impl_display {
     };
 }
 
+impl_display!(Package, print_package);
 impl_display!(Module, print_module);
 impl_display!(Node, print_node);
 impl_display!(Region, print_region);

@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (declare-ctr array.Array
              (param ?t core.type)
              (param ?n core.nat)
