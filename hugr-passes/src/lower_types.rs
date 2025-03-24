@@ -44,8 +44,8 @@ pub enum OpReplacement {
 }
 
 impl OpReplacement {
-    fn add(&self, hugr: &mut impl HugrMut, parent: Node) -> Node {
-        match self.clone() {
+    fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Node {
+        match self {
             OpReplacement::SingleOp(op_type) => hugr.add_node_with_parent(parent, op_type),
             OpReplacement::CompoundOp(new_h) => hugr.insert_hugr(parent, *new_h).new_root,
         }

@@ -75,7 +75,7 @@ impl Linearizer {
         let (last_node, last_inport) = match targets.last() {
             None => {
                 let parent = hugr.get_parent(src_node).unwrap();
-                (self.discard_op(typ)?.add(hugr, parent), 0.into())
+                (self.discard_op(typ)?.add_hugr(hugr, parent), 0.into())
             }
             Some(last) => *last,
         };
@@ -102,7 +102,9 @@ impl Linearizer {
             let copy_op = self.copy_op(typ)?;
 
             for (tgt_node, tgt_port) in &targets[..targets.len() - 1] {
-                let n = copy_op.add(hugr, hugr.get_parent(src_node).unwrap());
+                let n = copy_op
+                    .clone()
+                    .add_hugr(hugr, hugr.get_parent(src_node).unwrap());
                 hugr.connect(src_node, src_port, n, 0);
                 hugr.connect(n, 0, *tgt_node, *tgt_port);
                 (src_node, src_port) = (n, 1.into());
