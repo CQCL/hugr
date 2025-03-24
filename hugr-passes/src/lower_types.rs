@@ -160,19 +160,45 @@ impl LowerTypes {
         // (depending on arguments - i.e. if src's TypeDefBound is anything other than
         // `TypeDefBound::Explicit(TypeBound::Copyable)`) but that seems an annoying
         // overapproximation. Moreover, these depend upon the *return type* of the Fn.
+        // We could take an
+        // `dyn Fn(&TypeArg) -> (Type, Fn(&Linearizer) -> OpReplacement, Fn(&Linearizer) -> OpReplacement))`
+        // but that seems too awkward.
         self.param_types.insert(src.into(), Arc::from(dest_fn));
     }
 
+    /// Configures this instance that, when an outport of type `src` has other than one connected
+    /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
+    /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
+    /// `discard` should have exactly one inport, of type 'src', and no outports.)
+    ///
+    /// To clarify, these are used if `src` is not [Copyable], but is (perhaps contained in) the
+    /// result of lonering a type that was either copied or discarded in the input Hugr.
+    ///
+    /// [Copyable]: hugr_core::types::TypeBound::Copyable
     pub fn linearize(&mut self, src: Type, copy: OpReplacement, discard: OpReplacement) {
+        // We could raise an error if src's bound is Copyable?
         self.linearize.register(src, copy, discard)
     }
 
+    /// Configures this instance that when lowering produces an outport which
+    /// * has type an instantiation of the parametric type `src`, and
+    /// * is not [Copyable](hugr_core::types::TypeBound::Copyable), and
+    /// * has other than one connected inport,
+    ///
+    /// ...then these functions should be used to generate `copy` or `discard` ops.
+    ///
+    /// (That is, this is the equivalent of [Self::linearize] but for parametric types.)
+    ///
+    /// The [Linearizer] is passed so that the callbacks can use this to generate
+    /// `copy/`discard` ops for other types (e.g. the elements of a collection),
+    /// as part of an [OpReplacement::CompoundOp].
     pub fn linearize_parametric(
         &mut self,
         src: TypeDef,
         copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
         discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> OpReplacement>,
     ) {
+        // We could raise an error if src's TypeDefBound is explicit Copyable ?
         self.linearize.register_parametric(src, copy_fn, discard_fn)
     }
 
