@@ -215,13 +215,19 @@ mod test {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    use hugr_core::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr};
+    use hugr_core::builder::{
+        endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    };
 
+    use hugr_core::extension::prelude::option_type;
     use hugr_core::extension::{prelude::usize_t, TypeDefBound, Version};
+    use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{ExtensionOp, NamedOp, OpName};
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
-    use hugr_core::types::{Signature, Type, TypeEnum};
+    use hugr_core::type_row;
+    use hugr_core::types::{Signature, Type, TypeEnum, TypeRow};
     use hugr_core::{hugr::IdentList, Extension, HugrView};
+    use itertools::Itertools;
 
     use crate::lower_types::OpReplacement;
     use crate::LowerTypes;
@@ -306,5 +312,58 @@ mod test {
                 ("collections.array.new_array".into(), 1)
             ])
         );
+    }
+
+    #[test]
+    fn sums() {
+        let (e, lowerer) = ext_lowerer();
+        let sum_ty = Type::from(option_type(vec![usize_t(), usize_t()]));
+        let mut outer = DFGBuilder::new(endo_sig(sum_ty.clone())).unwrap();
+        let [inp] = outer.input_wires_arr();
+        let inner = outer
+            .dfg_builder(inout_sig(sum_ty, vec![]), [inp])
+            .unwrap()
+            .finish_with_outputs([])
+            .unwrap();
+        let mut h = outer.finish_hugr_with_outputs([inp]).unwrap();
+
+        assert!(lowerer.run(&mut h).unwrap());
+
+        let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
+        let option_ty = Type::from(option_type(vec![lin_t.clone(); 2]));
+        let copy_out: TypeRow = vec![option_ty.clone(); 2].into();
+        let count_tags = |n| h.children(n).filter(|n| h.get_optype(*n).is_tag()).count();
+
+        // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
+        for (dfg, num_tags, out_row, ext_op_name) in [
+            (inner.node(), 0, type_row![], "TestExt.discard"),
+            (h.root(), 2, copy_out, "TestExt.copy"),
+        ] {
+            let [cond] = h
+                .children(dfg)
+                .filter(|n| h.get_optype(*n).is_conditional())
+                .collect_array()
+                .unwrap();
+            let [case0, case1] = h.children(cond).collect_array().unwrap();
+            // first is for empty
+            assert_eq!(h.children(case0).count(), 2 + num_tags); // Input, Output
+            assert_eq!(count_tags(case0), num_tags);
+            let case0 = h.get_optype(case0).as_case().unwrap();
+            assert_eq!(case0.signature.io(), (&vec![].into(), &out_row));
+
+            // second is for two elements
+            assert_eq!(h.children(case1).count(), 4 + num_tags); // Input, Output, two leaf copies/discards:
+            assert_eq!(count_tags(case1), num_tags);
+            assert_eq!(
+                h.children(case1)
+                    .filter_map(|n| h.get_optype(n).as_extension_op().map(ExtensionOp::name))
+                    .collect_vec(),
+                vec![ext_op_name; 2]
+            );
+            assert_eq!(
+                h.get_optype(case1).as_case().unwrap().signature.io(),
+                (&vec![lin_t.clone(); 2].into(), &out_row)
+            );
+        }
     }
 }
