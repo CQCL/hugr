@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::{
     extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
-    hugr::HugrMut,
+    hugr::{HugrMut, IdentList, NodeMetadata},
     ops::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
         AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock,
@@ -180,11 +180,27 @@ impl<'a> Context<'a> {
         self.record_links(node, Direction::Incoming, node_data.inputs);
         self.record_links(node, Direction::Outgoing, node_data.outputs);
 
+        // Import the JSON metadata
         for meta_item in node_data.meta {
-            // TODO: For now we expect all metadata to be JSON since this is how
-            // it is handled in `hugr-core`.
-            let (name, value) = self.import_json_meta(*meta_item)?;
-            self.hugr.set_metadata(node, name, value);
+            let Some([name_arg, json_arg]) =
+                self.match_symbol(*meta_item, model::COMPAT_META_JSON)?
+            else {
+                continue;
+            };
+
+            let table::Term::Literal(model::Literal::Str(name)) = self.get_term(name_arg)? else {
+                return Err(table::ModelError::TypeError(*meta_item).into());
+            };
+
+            let table::Term::Literal(model::Literal::Str(json_str)) = self.get_term(json_arg)?
+            else {
+                return Err(table::ModelError::TypeError(*meta_item).into());
+            };
+
+            let json_value: NodeMetadata = serde_json::from_str(json_str)
+                .map_err(|_| table::ModelError::TypeError(*meta_item))?;
+
+            self.hugr.set_metadata(node, name, json_value);
         }
 
         Ok(node)
@@ -600,7 +616,80 @@ impl<'a> Context<'a> {
             self.import_node(*child, node)?;
         }
 
+        self.create_order_edges(region)?;
+
         self.region_scope = prev_region;
+
+        Ok(())
+    }
+
+    /// Create order edges between nodes of a dataflow region based on order hint metadata.
+    ///
+    /// This method assumes that the nodes for the children of the region have already been imported.
+    fn create_order_edges(&mut self, region_id: table::RegionId) -> Result<(), ImportError> {
+        let region_data = self.get_region(region_id)?;
+        debug_assert_eq!(region_data.kind, model::RegionKind::DataFlow);
+
+        // Collect order hint keys
+        // PERFORMANCE: It might be worthwhile to reuse the map to avoid allocations.
+        let mut order_keys = FxHashMap::<u64, table::NodeId>::default();
+
+        for child_id in region_data.children {
+            let child_data = self.get_node(*child_id)?;
+
+            for meta_id in child_data.meta {
+                let Some([key]) = self.match_symbol(*meta_id, model::ORDER_HINT_KEY)? else {
+                    continue;
+                };
+
+                let table::Term::Literal(model::Literal::Nat(key)) = self.get_term(key)? else {
+                    continue;
+                };
+
+                // TODO: Error on duplicate key
+                order_keys.insert(*key, *child_id);
+            }
+        }
+
+        // Insert order edges
+        for meta_id in region_data.meta {
+            let Some([a, b]) = self.match_symbol(*meta_id, model::ORDER_HINT_ORDER)? else {
+                continue;
+            };
+
+            let table::Term::Literal(model::Literal::Nat(a)) = self.get_term(a)? else {
+                continue;
+            };
+
+            let table::Term::Literal(model::Literal::Nat(b)) = self.get_term(b)? else {
+                continue;
+            };
+
+            // TODO: Proper error on non-existing key
+            let a = order_keys.get(a).expect("unknown order key");
+            let b = order_keys.get(b).expect("unknown order key");
+
+            // NOTE: The lookups here are expected to succeed since we only
+            // process the order metadata after we have imported the nodes.
+            let a_node = self.nodes[a];
+            let b_node = self.nodes[b];
+
+            // Find the order ports
+            // TODO: Proper error on non-existing order port
+            let a_port = self
+                .hugr
+                .get_optype(a_node)
+                .other_output_port()
+                .expect("order hint on node without order port");
+
+            let b_port = self
+                .hugr
+                .get_optype(b_node)
+                .other_input_port()
+                .expect("order hint on node without order port");
+
+            self.hugr.connect(a_node, a_port, b_node, b_port);
+        }
 
         Ok(())
     }
@@ -1339,28 +1428,6 @@ impl<'a> Context<'a> {
                 Ok((extension, id))
             }
         }
-    }
-
-    fn import_json_meta(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<(&'a str, serde_json::Value), ImportError> {
-        let [name_arg, json_arg] = self
-            .match_symbol(term_id, model::COMPAT_META_JSON)?
-            .ok_or(table::ModelError::TypeError(term_id))?;
-
-        let table::Term::Literal(model::Literal::Str(name)) = self.get_term(name_arg)? else {
-            return Err(table::ModelError::TypeError(term_id).into());
-        };
-
-        let table::Term::Literal(model::Literal::Str(json_str)) = self.get_term(json_arg)? else {
-            return Err(table::ModelError::TypeError(term_id).into());
-        };
-
-        let json_value =
-            serde_json::from_str(json_str).map_err(|_| table::ModelError::TypeError(term_id))?;
-
-        Ok((name, json_value))
     }
 
     fn import_value(
