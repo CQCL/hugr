@@ -414,22 +414,33 @@ mod test {
         inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
-    use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
+    use hugr_core::extension::prelude::{
+        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
+    };
     use hugr_core::extension::simple_op::MakeExtensionOp;
-    use hugr_core::extension::{TypeDefBound, Version};
-
+    use hugr_core::extension::{SignatureError, TypeDefBound, Version};
+    use hugr_core::hugr::ValidationError;
+    use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{ExtensionOp, OpType, Tag, Value};
-
-    use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
+    use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
+    use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::{
         array_type, ArrayOp, ArrayOpDef, ArrayValue,
     };
-    use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
-    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
+    use hugr_core::std_extensions::collections::list::{
+        self, list_type, list_type_def, ListOp, ListValue,
+    };
+    use hugr_core::types::TypeEnum;
+    use hugr_core::types::{
+        type_param::TypeArgError, PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound,
+        TypeRow,
+    };
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
-    use super::{LowerTypes, OpReplacement};
+    use crate::validation::ValidatePassError;
+
+    use super::{ChangeTypeError, LowerTypes, OpReplacement};
 
     const PACKED_VEC: &str = "PackedVec";
     fn i64_t() -> Type {
@@ -741,6 +752,110 @@ mod test {
                 Type::from(array_type(4, usize_t()));
                 2
             ]))
+        );
+    }
+
+    #[test]
+    fn copyable_used_linearly() {
+        const READ: &str = "read";
+        let e = Extension::new_arc(
+            IdentList::new_unchecked("CopyableReader"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                let params = vec![TypeBound::Copyable.into()];
+                let tv = Type::new_var_use(0, TypeBound::Copyable);
+                let list_of_var = list_type(tv.clone());
+                e.add_op(
+                    READ.into(),
+                    String::new(),
+                    PolyFuncType::new(params, Signature::new(vec![list_of_var, usize_t()], tv)),
+                    w,
+                )
+                .unwrap();
+            },
+        );
+        let read = e.get_op(READ).unwrap();
+        let i32_t = || INT_TYPES[5].to_owned();
+        let TypeEnum::Extension(i32_custom_t) = i32_t().as_type_enum().clone() else {
+            panic!()
+        };
+        let mut dfb = DFGBuilder::new(inout_sig(list_type(i32_t()), i32_t())).unwrap();
+        let [c_in] = dfb.input_wires_arr();
+        let idx = dfb.add_load_value(ConstUsize::new(2));
+        let read_op = dfb
+            .add_dataflow_op(
+                ExtensionOp::new(read.clone(), [i32_t().into()]).unwrap(),
+                [c_in, idx],
+            )
+            .unwrap();
+        let backup = dfb.finish_hugr_with_outputs(read_op.outputs()).unwrap();
+
+        let mut lowerer = LowerTypes::default();
+        lowerer.lower_type(
+            i32_custom_t,
+            qb_t(),
+            Box::new(|_| panic!("There are no constants")),
+        );
+        // That tries to create a read<QB>, which is not a legal instantiation
+        assert_eq!(
+            lowerer.run(&mut backup.clone()),
+            Err(ChangeTypeError::SignatureError(
+                SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
+                    param: TypeBound::Copyable.into(),
+                    arg: qb_t().into()
+                })
+            ))
+        );
+        // So lower read to the normal list get...(which returns an option<QB> not QB)
+        fn make_list_get(args: &[TypeArg]) -> Option<OpReplacement> {
+            let [TypeArg::Type { ty }] = args else {
+                panic!("Expected just element type")
+            };
+            Some(OpReplacement::SingleOp(
+                ListOp::get
+                    .with_type(ty.clone())
+                    .to_extension_op()
+                    .unwrap()
+                    .into(),
+            ))
+        }
+        lowerer.lower_parametric_op(read.as_ref(), Box::new(make_list_get));
+
+        let res = lowerer.run(&mut backup.clone());
+        assert!(
+            matches!(res, Err(ChangeTypeError::ValidationError(ValidatePassError::OutputError {
+            err: ValidationError::IncompatiblePorts {
+                from, ..
+            }, ..
+        })) if from == read_op.node())
+        );
+
+        lowerer.check_signatures(true);
+        let res = lowerer.run(&mut backup.clone());
+        assert_eq!(
+            res,
+            Err(ChangeTypeError::SignatureMismatch {
+                op: ListOp::get
+                    .with_type(qb_t())
+                    .to_extension_op()
+                    .unwrap()
+                    .into(),
+                old: Some(
+                    Signature::new(vec![list_type(i32_t()), usize_t()], i32_t())
+                        .with_extension_delta(e.name.clone())
+                ),
+                expected: Some(
+                    Signature::new(vec![list_type(qb_t()), usize_t()], qb_t())
+                        .with_extension_delta(e.name.clone())
+                ),
+                actual: Some(
+                    Signature::new(
+                        vec![list_type(qb_t()), usize_t()],
+                        Type::from(option_type(qb_t()))
+                    )
+                    .with_extension_delta(list::EXTENSION_ID)
+                )
+            })
         );
     }
 }
