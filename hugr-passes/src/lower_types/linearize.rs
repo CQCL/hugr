@@ -1,9 +1,17 @@
 use std::{collections::HashMap, sync::Arc};
 
-use hugr_core::builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder};
+use hugr_core::builder::{
+    ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+};
 use hugr_core::extension::{SignatureError, TypeDef};
-use hugr_core::types::{Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node, OutgoingPort};
+use hugr_core::ops::{ExtensionOp, Value};
+use hugr_core::std_extensions::collections::array::{
+    self, array_type_parametric, ARRAY_SCAN_OP_ID,
+};
+use hugr_core::types::{Signature, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::{
+    hugr::hugrmut::HugrMut, ops::Tag, type_row, HugrView, IncomingPort, Node, OutgoingPort,
+};
 use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
@@ -204,6 +212,54 @@ impl Linearizer {
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
     }
+}
+
+pub fn discard_array(args: &[TypeArg], lin: &Linearizer) -> Result<OpReplacement, LinearizeError> {
+    // sz or ty could either both be variables; Type variables are still Types hence:
+    let [sz, TypeArg::Type { ty }] = args else {
+        panic!("Illegal TypeArgs to array: {:?}", args)
+    };
+    // Make a function that maps the linear element to unit
+    let map_fn = {
+        let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), Type::UNIT)).unwrap();
+        let [to_discard] = dfb.input_wires_arr();
+        lin.discard_op(ty)?.add(&mut dfb, [to_discard]).unwrap();
+        let ret = dfb.add_load_value(Value::unary_unit_sum());
+        dfb.finish_hugr_with_outputs([ret]).unwrap()
+    };
+    let es = map_fn
+        .signature(map_fn.root())
+        .unwrap()
+        .runtime_reqs
+        .clone();
+    // Now array.scan that over the input array to get an array of unit (which can be discarded)
+    // The ArrayScan "concrete" class supports only usize length (not type variable) so don't use that.
+    let array_scan = ExtensionOp::new(
+        array::EXTENSION
+            .get_op(ARRAY_SCAN_OP_ID.as_str())
+            .unwrap()
+            .clone(),
+        [
+            sz.clone(),
+            ty.clone().into(),
+            Type::UNIT.into(),
+            TypeArg::Sequence { elems: vec![] },
+            TypeArg::Extensions { es },
+        ],
+    )
+    .unwrap();
+    let in_type =
+        array_type_parametric(sz.clone(), ty.clone()).expect("this is input array for discarding");
+    Ok(OpReplacement::CompoundOp(Box::new({
+        let mut dfb = DFGBuilder::new(Signature::new(in_type, type_row![])).unwrap();
+        let [in_array] = dfb.input_wires_arr();
+        let map_fn = dfb.add_load_value(Value::Function {
+            hugr: Box::new(map_fn),
+        });
+        // scan has one output, an array of unit, so just ignore/discard that
+        dfb.add_dataflow_op(array_scan, [in_array, map_fn]).unwrap();
+        dfb.finish_hugr_with_outputs([]).unwrap()
+    })))
 }
 
 #[cfg(test)]
