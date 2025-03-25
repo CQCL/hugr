@@ -12,9 +12,7 @@ use hugr_core::ops::{
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, Output, Tag, TailLoop, Value,
     CFG, DFG,
 };
-use hugr_core::types::{
-    CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
-};
+use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
 use hugr_core::{Hugr, Node};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
@@ -99,13 +97,6 @@ impl TypeTransformer for LowerTypes {
 pub enum ChangeTypeError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
-    #[error("Lowering op {op} with original signature {old:?}\nExpected signature: {expected:?}\nBut got: {actual:?}")]
-    SignatureMismatch {
-        op: OpType,
-        old: Option<Signature>,
-        expected: Option<Signature>,
-        actual: Option<Signature>,
-    },
     #[error(transparent)]
     ValidationError(#[from] ValidatePassError),
 }
