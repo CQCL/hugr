@@ -29,22 +29,24 @@ pub enum ArrayOpDef {
     /// `new_array<SIZE><elemty>: (elemty)^SIZE -> array<SIZE, elemty>`
     /// where `SIZE` must be statically known (not a variable)
     new_array,
-    /// copies an element out of the array ([TypeBound::Copyable] elements only): `get<size,elemty>: array<size,elemty>, index -> option<elemty>`
+    /// copies an element out of the array ([TypeBound::Copyable] elements only):
+    /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>`
     get,
     /// exchanges an element of the array with an external value:
-    /// `set<size,elemty>: array<size,elemty>, index, elemty -> either(elemty, array | elemty, array)`
+    /// `set<size, elemty>: array<size, elemty>, index, elemty -> either(elemty, array | elemty, array)`
     /// tagged for failure/success respectively
     set,
-    /// exchanges two indices within the array: `swap<size,elemty>: array<size, elemty>, index index -> either(array, array)`
+    /// exchanges two indices within the array:
+    /// `swap<size, elemty>: array<size, elemty>, index, index -> either(array, array)`
     /// tagged for failure/success respectively
     swap,
-    /// separates leftmost element from the rest of the array.
-    /// `pop_left<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1,elemty>>`
-    /// where `SIZE` must be known statically (not a variable)
+    /// separates leftmost element from the rest of the array:
+    /// `pop_left<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
+    /// where `SIZE` must be known statically (not a variable).
     pop_left,
     /// separates rightmost element from the rest of the array.
-    /// `pop_right<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1,elemty>>`
-    /// where `SIZE` must be known statically (not a variable)
+    /// `pop_right<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
+    /// where `SIZE` must be known statically (not a variable).
     pop_right,
     /// Allows discarding a 0-element array of linear type.
     /// `discard_empty<elemty>: array<0, elemty> -> ` (no outputs)
