@@ -306,21 +306,20 @@ impl LowerTypes {
                     }
                 };
             }
-            let Some(new_sig) = (changed && n != hugr.root())
+            if let Some(new_sig) = (changed && n != hugr.root())
                 .then_some(new_dfsig)
                 .flatten()
                 .map(Cow::into_owned)
-            else {
-                continue;
-            };
-            for outp in new_sig.output_ports() {
-                if !new_sig.out_port_type(outp).unwrap().copyable() {
-                    let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
-                    if targets.len() != 1 {
-                        hugr.disconnect(n, outp);
-                        let typ = new_sig.out_port_type(outp).unwrap();
-                        self.linearize
-                            .insert_copy_discard(hugr, n, outp, typ, &targets)?;
+            {
+                for outp in new_sig.output_ports() {
+                    if !new_sig.out_port_type(outp).unwrap().copyable() {
+                        let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
+                        if targets.len() != 1 {
+                            hugr.disconnect(n, outp);
+                            let typ = new_sig.out_port_type(outp).unwrap();
+                            self.linearize
+                                .insert_copy_discard(hugr, n, outp, typ, &targets)?;
+                        }
                     }
                 }
             }
