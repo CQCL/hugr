@@ -4,14 +4,10 @@ use hugr_core::builder::{
     ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
-use hugr_core::ops::{ExtensionOp, Value};
-use hugr_core::std_extensions::collections::array::{
-    self, array_type_parametric, ARRAY_SCAN_OP_ID,
-};
+use hugr_core::ops::{Tag, Value};
+use hugr_core::std_extensions::collections::array::{array_type, ArrayScan};
 use hugr_core::types::{Signature, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{
-    hugr::hugrmut::HugrMut, ops::Tag, type_row, HugrView, IncomingPort, Node, OutgoingPort,
-};
+use hugr_core::{hugr::hugrmut::HugrMut, type_row, HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
@@ -215,8 +211,9 @@ impl Linearizer {
 }
 
 pub fn discard_array(args: &[TypeArg], lin: &Linearizer) -> Result<OpReplacement, LinearizeError> {
-    // sz or ty could either both be variables; Type variables are still Types hence:
-    let [sz, TypeArg::Type { ty }] = args else {
+    // Require known length i.e. usable only after monomorphization, due to no-variables limitation
+    // restriction on OpReplacement::CompoundOp
+    let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
         panic!("Illegal TypeArgs to array: {:?}", args)
     };
     // Make a function that maps the linear element to unit
@@ -233,23 +230,8 @@ pub fn discard_array(args: &[TypeArg], lin: &Linearizer) -> Result<OpReplacement
         .runtime_reqs
         .clone();
     // Now array.scan that over the input array to get an array of unit (which can be discarded)
-    // The ArrayScan "concrete" class supports only usize length (not type variable) so don't use that.
-    let array_scan = ExtensionOp::new(
-        array::EXTENSION
-            .get_op(ARRAY_SCAN_OP_ID.as_str())
-            .unwrap()
-            .clone(),
-        [
-            sz.clone(),
-            ty.clone().into(),
-            Type::UNIT.into(),
-            TypeArg::Sequence { elems: vec![] },
-            TypeArg::Extensions { es },
-        ],
-    )
-    .unwrap();
-    let in_type =
-        array_type_parametric(sz.clone(), ty.clone()).expect("this is input array for discarding");
+    let array_scan = ArrayScan::new(ty.clone(), Type::UNIT, vec![], *n, es);
+    let in_type = array_type(*n, ty.clone());
     Ok(OpReplacement::CompoundOp(Box::new({
         let mut dfb = DFGBuilder::new(Signature::new(in_type, type_row![])).unwrap();
         let [in_array] = dfb.input_wires_arr();
