@@ -135,19 +135,18 @@ impl DivModOp {
             // If we emitted a panicking divmod, the result is just a tuple type.
             if self.panic {
                 Ok(vec![quotrem
-                        .build_untag(ctx.builder(), 0)?
-                        .into_iter()
-                        .nth(index as usize)
-                        .unwrap()
-                ]
-                )
+                    .build_untag(ctx.builder(), 0)?
+                    .into_iter()
+                    .nth(index as usize)
+                    .unwrap()])
             }
             // Otherwise, we have a sum type `err + [int,int]`, which we need to
             // turn into a `err + int`.
             else {
                 // Get the data out the the divmod result.
                 let int_ty = numerator.get_type().as_basic_type_enum();
-                let tuple_ty = LLVMSumType::try_new(ctx.iw_context(), vec![vec![int_ty, int_ty]]).unwrap();
+                let tuple_ty =
+                    LLVMSumType::try_new(ctx.iw_context(), vec![vec![int_ty, int_ty]]).unwrap();
                 let tuple = quotrem
                     .build_untag(ctx.builder(), 1)?
                     .into_iter()
@@ -159,21 +158,31 @@ impl DivModOp {
                     .into_iter()
                     .nth(index)
                     .unwrap();
-                let err_val = quotrem.build_untag(ctx.builder(), 0)?.into_iter().next().unwrap();
+                let err_val = quotrem
+                    .build_untag(ctx.builder(), 0)?
+                    .into_iter()
+                    .next()
+                    .unwrap();
 
                 let tag_val = quotrem.build_get_tag(ctx.builder())?;
                 tag_val.set_name("tag");
 
                 // Build a new struct with the old tag and error data.
                 let int_ty = int_types::INT_TYPES[log_width as usize].clone();
-                let out_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), sum_with_error(vec![int_ty.clone()])).unwrap();
+                let out_ty = LLVMSumType::try_from_hugr_type(
+                    &ctx.typing_session(),
+                    sum_with_error(vec![int_ty.clone()]),
+                )
+                .unwrap();
 
                 let data_variant = out_ty.build_tag(ctx.builder(), 1, vec![data_val])?;
                 data_variant.set_name("data_variant");
                 let err_variant = out_ty.build_tag(ctx.builder(), 0, vec![err_val])?;
                 err_variant.set_name("err_variant");
 
-                let result = ctx.builder().build_select(tag_val, data_variant, err_variant, "")?;
+                let result = ctx
+                    .builder()
+                    .build_select(tag_val, data_variant, err_variant, "")?;
                 Ok(vec![result])
             }
         }
