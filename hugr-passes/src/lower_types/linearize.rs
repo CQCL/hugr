@@ -1,13 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::builder::{
-    ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    inout_sig, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    HugrBuilder,
 };
-use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::extension::{ExtensionSet, SignatureError, TypeDef};
 use hugr_core::ops::{Tag, Value};
 use hugr_core::std_extensions::collections::array::{array_type, ArrayScan};
-use hugr_core::types::{Signature, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, type_row, HugrView, IncomingPort, Node, OutgoingPort};
+use hugr_core::types::{Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::{
+    hugr::hugrmut::HugrMut, type_row, Hugr, HugrView, IncomingPort, Node, OutgoingPort,
+};
 use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
@@ -210,6 +213,10 @@ impl Linearizer {
     }
 }
 
+fn runtime_reqs(h: &Hugr) -> ExtensionSet {
+    h.signature(h.root()).unwrap().runtime_reqs.clone()
+}
+
 pub fn discard_array(args: &[TypeArg], lin: &Linearizer) -> Result<OpReplacement, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on OpReplacement::CompoundOp
@@ -218,22 +225,17 @@ pub fn discard_array(args: &[TypeArg], lin: &Linearizer) -> Result<OpReplacement
     };
     // Make a function that maps the linear element to unit
     let map_fn = {
-        let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), Type::UNIT)).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), Type::UNIT)).unwrap();
         let [to_discard] = dfb.input_wires_arr();
         lin.discard_op(ty)?.add(&mut dfb, [to_discard]).unwrap();
         let ret = dfb.add_load_value(Value::unary_unit_sum());
         dfb.finish_hugr_with_outputs([ret]).unwrap()
     };
-    let es = map_fn
-        .signature(map_fn.root())
-        .unwrap()
-        .runtime_reqs
-        .clone();
     // Now array.scan that over the input array to get an array of unit (which can be discarded)
-    let array_scan = ArrayScan::new(ty.clone(), Type::UNIT, vec![], *n, es);
+    let array_scan = ArrayScan::new(ty.clone(), Type::UNIT, vec![], *n, runtime_reqs(&map_fn));
     let in_type = array_type(*n, ty.clone());
     Ok(OpReplacement::CompoundOp(Box::new({
-        let mut dfb = DFGBuilder::new(Signature::new(in_type, type_row![])).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
         let [in_array] = dfb.input_wires_arr();
         let map_fn = dfb.add_load_value(Value::Function {
             hugr: Box::new(map_fn),
