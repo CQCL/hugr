@@ -109,7 +109,6 @@ pub enum ChangeTypeError {
         actual: Option<Signature>,
     },
     #[error(transparent)]
-    #[allow(missing_docs)]
     ValidationError(#[from] ValidatePassError),
 }
 
