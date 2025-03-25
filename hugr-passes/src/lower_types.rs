@@ -702,7 +702,7 @@ mod test {
     #[test]
     fn partial_replace() {
         let e = Extension::new_arc(
-            IdentList::new_unchecked("NoBoundsChecking"),
+            IdentList::new_unchecked("NoBoundsCheck"),
             Version::new(0, 0, 0),
             |e, w| {
                 let params = vec![TypeBound::Any.into()];
@@ -768,8 +768,8 @@ mod test {
             }),
         );
         assert!(lowerer.run(&mut h).unwrap());
-        // list<usz> -> read<usz> -> usz just becomes list<qb> -> read<qb> -> qb
-        // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb> -> opt<qb>
+        // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
+        // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
         assert_eq!(
             h.root_type().dataflow_signature().unwrap().io(),
             (
@@ -783,7 +783,7 @@ mod test {
                 .map(ExtensionOp::name)
                 .sorted()
                 .collect_vec(),
-            ["NoBoundsChecking.read", "collections.list.get"]
+            ["NoBoundsCheck.read", "collections.list.get"]
         );
     }
 }
