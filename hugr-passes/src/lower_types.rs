@@ -439,7 +439,7 @@ mod test {
         array_type, ArrayOp, ArrayOpDef, ArrayValue,
     };
     use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
-    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound};
+    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
@@ -682,7 +682,42 @@ mod test {
         tl.set_outputs(pred, [bools]).unwrap();
         let mut h = tl.finish_hugr().unwrap();
 
-        // Lower List<T> to Array<4,T> so we can use List's handy CustomConst
+        // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or bool_t - this should have no effect
+        let mut lowerer = LowerTypes::default();
+        lowerer.lower_parametric_type(
+            list_type_def(),
+            Box::new(|args| {
+                let [TypeArg::Type { ty }] = args else {
+                    panic!("Expected elem type")
+                };
+                (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
+            }),
+        );
+        let backup = h.clone();
+        assert!(!lowerer.run(&mut h).unwrap());
+        assert_eq!(h, backup);
+
+        //2. Lower List<T> to Array<10, T> UNLESS T is usize_t() - this leaves the Const unchanged
+        let mut lowerer = LowerTypes::default();
+        lowerer.lower_parametric_type(
+            list_type_def(),
+            Box::new(|args| {
+                let [TypeArg::Type { ty }] = args else {
+                    panic!("Expected elem type")
+                };
+                (usize_t() != *ty).then_some(array_type(10, ty.clone()))
+            }),
+        );
+        assert!(lowerer.run(&mut h).unwrap());
+        let sig = h.signature(h.root()).unwrap();
+        assert_eq!(
+            sig.input(),
+            &TypeRow::from(vec![list_type(usize_t()), array_type(10, bool_t())])
+        );
+        assert_eq!(sig.input(), sig.output());
+
+        // 3. Lower all List<T> to Array<4,T> so we can use List's handy CustomConst
+        let mut h = backup;
         let mut lowerer = LowerTypes::default();
         lowerer.lower_parametric_type(
             list_type_def(),
