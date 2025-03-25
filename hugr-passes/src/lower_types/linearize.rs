@@ -272,9 +272,11 @@ mod test {
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
-    use hugr_core::extension::{TypeDefBound, Version};
+    use hugr_core::extension::{simple_op::MakeExtensionOp, TypeDefBound, Version};
     use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
-    use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
+    use hugr_core::std_extensions::collections::array::{
+        self, array_type, ArrayOpDef, ArrayScanDef, ARRAY_TYPENAME,
+    };
     use hugr_core::types::{Signature, Type, TypeEnum, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
@@ -415,5 +417,35 @@ mod test {
                 (&vec![lin_t.clone(); 2].into(), &out_row)
             );
         }
+    }
+
+    #[test]
+    fn discard_array() {
+        let (_e, mut lowerer) = ext_lowerer();
+
+        lowerer.linearize_parametric(
+            array::EXTENSION.get_type(ARRAY_TYPENAME.as_str()).unwrap(),
+            Box::new(|_, _| panic!("No copy yet")),
+            Box::new(super::discard_array),
+        );
+
+        let mut h = DFGBuilder::new(Signature::new(array_type(5, usize_t()), type_row![]))
+            .unwrap()
+            .finish_hugr_with_outputs([])
+            .unwrap();
+
+        assert!(lowerer.run(&mut h).unwrap());
+
+        let ext_ops = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_extension_op().map(|e| (n, e)))
+            .collect_vec();
+        let [(n, ext_op)] = ext_ops.try_into().unwrap();
+        assert!(ArrayScanDef::from_extension_op(ext_op).is_ok());
+        assert_eq!(
+            ext_op.clone().signature_mut().output(),
+            &TypeRow::from(vec![array_type(5, Type::UNIT)])
+        );
+        assert_eq!(h.linked_inputs(n, 0).next(), None);
     }
 }
