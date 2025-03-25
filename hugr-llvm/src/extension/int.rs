@@ -137,7 +137,7 @@ impl DivModOp {
                 Ok(vec![quotrem
                     .build_untag(ctx.builder(), 0)?
                     .into_iter()
-                    .nth(index as usize)
+                    .nth(index)
                     .unwrap()])
             }
             // Otherwise, we have a sum type `err + [int,int]`, which we need to
@@ -740,7 +740,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
 
 // Helper to get the log width arg to an int op when it's the only argument
 // panic if there's not exactly one nat arg
-fn get_width_arg<'c, H: HugrView<Node = Node>>(args: &EmitOpArgs<'c, '_, ExtensionOp, H>) -> u64 {
+fn get_width_arg<H: HugrView<Node = Node>>(args: &EmitOpArgs<'_, '_, ExtensionOp, H>) -> u64 {
     let [arg] = args
         .node
         .args()
