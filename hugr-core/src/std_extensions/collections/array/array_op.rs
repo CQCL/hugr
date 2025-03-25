@@ -43,10 +43,12 @@ pub enum ArrayOpDef {
     /// separates leftmost element from the rest of the array:
     /// `pop_left<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
     /// where `SIZE` must be known statically (not a variable).
+    /// `None` is returned if the input array was size 0.
     pop_left,
     /// separates rightmost element from the rest of the array.
     /// `pop_right<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
     /// where `SIZE` must be known statically (not a variable).
+    /// `None` is returned in the input array was size 0.
     pop_right,
     /// Allows discarding a 0-element array of linear type.
     /// `discard_empty<elemty>: array<0, elemty> -> ` (no outputs)
