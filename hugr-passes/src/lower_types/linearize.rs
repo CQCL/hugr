@@ -1,13 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
-use hugr_core::{
-    builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder},
-    extension::{SignatureError, TypeDef},
-    hugr::hugrmut::HugrMut,
-    ops::Tag,
-    types::{Type, TypeArg, TypeEnum, TypeRow},
-    IncomingPort, Node, OutgoingPort,
-};
+use hugr_core::builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder};
+use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::types::{Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
@@ -219,14 +215,12 @@ mod test {
         endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     };
 
-    use hugr_core::extension::prelude::option_type;
-    use hugr_core::extension::{prelude::usize_t, TypeDefBound, Version};
-    use hugr_core::ops::handle::NodeHandle;
-    use hugr_core::ops::{ExtensionOp, NamedOp, OpName};
+    use hugr_core::extension::prelude::{option_type, usize_t};
+    use hugr_core::extension::{TypeDefBound, Version};
+    use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
-    use hugr_core::type_row;
     use hugr_core::types::{Signature, Type, TypeEnum, TypeRow};
-    use hugr_core::{hugr::IdentList, Extension, HugrView};
+    use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
     use crate::lower_types::OpReplacement;
