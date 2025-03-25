@@ -9,8 +9,8 @@ use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::{
     AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock, ExitBlock, ExtensionOp,
-    FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
-    Value, CFG, DFG,
+    FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, Output, Tag, TailLoop, Value,
+    CFG, DFG,
 };
 use hugr_core::types::{
     CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
@@ -370,30 +370,38 @@ mod test {
         inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
-    use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
+    use hugr_core::extension::prelude::{
+        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
+    };
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{TypeDefBound, Version};
 
-    use hugr_core::ops::{ExtensionOp, OpType, Tag, Value};
+    use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
         array_type, ArrayOp, ArrayOpDef, ArrayValue,
     };
-    use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
+    use hugr_core::std_extensions::collections::list::{
+        list_type, list_type_def, ListOp, ListValue,
+    };
 
-    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
+    use hugr_core::types::{
+        PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
+    };
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
     use super::{LowerTypes, OpReplacement};
 
     const PACKED_VEC: &str = "PackedVec";
+    const READ: &str = "read";
+
     fn i64_t() -> Type {
         INT_TYPES[6].clone()
     }
 
     fn read_op(ext: &Arc<Extension>, t: Type) -> ExtensionOp {
-        ExtensionOp::new(ext.get_op("read").unwrap().clone(), [t.into()]).unwrap()
+        ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t.into()]).unwrap()
     }
 
     fn ext() -> Arc<Extension> {
@@ -413,7 +421,7 @@ mod test {
                     .instantiate(vec![Type::new_var_use(0, TypeBound::Copyable).into()])
                     .unwrap();
                 ext.add_op(
-                    "read".into(),
+                    READ.into(),
                     "".into(),
                     PolyFuncType::new(
                         vec![TypeBound::Copyable.into()],
@@ -487,7 +495,7 @@ mod test {
                     .into(),
             ),
         );
-        lw.lower_parametric_op(ext.get_op("read").unwrap().as_ref(), Box::new(lowered_read));
+        lw.lower_parametric_op(ext.get_op(READ).unwrap().as_ref(), Box::new(lowered_read));
         lw
     }
 
@@ -697,6 +705,102 @@ mod test {
                 Type::from(array_type(4, usize_t()));
                 2
             ]))
+        );
+    }
+
+    #[test]
+    fn partial_replace() {
+        let e = Extension::new_arc(
+            IdentList::new_unchecked("NoBoundsChecking"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                let params = vec![TypeBound::Any.into()];
+                let tv = Type::new_var_use(0, TypeBound::Any);
+                let list_of_var = list_type(tv.clone());
+                e.add_op(
+                    READ.into(),
+                    "Like List::get but without the option".to_string(),
+                    PolyFuncType::new(params, Signature::new(vec![list_of_var, usize_t()], tv)),
+                    w,
+                )
+                .unwrap();
+            },
+        );
+        fn option_contents(ty: &Type) -> Option<Type> {
+            let row = ty.as_sum()?.get_variant(1).unwrap().clone();
+            let elem = row.into_owned().into_iter().exactly_one().unwrap();
+            Some(elem.try_into_type().unwrap())
+        }
+        let i32_t = || INT_TYPES[5].to_owned();
+        let opt_i32 = Type::from(option_type(i32_t()));
+        let TypeEnum::Extension(i32_custom_t) = i32_t().as_type_enum().clone() else {
+            panic!()
+        };
+        let mut dfb = DFGBuilder::new(inout_sig(
+            vec![list_type(i32_t()), list_type(opt_i32.clone())],
+            vec![i32_t(), opt_i32.clone()],
+        ))
+        .unwrap();
+        let [l_i, l_oi] = dfb.input_wires_arr();
+        let idx = dfb.add_load_value(ConstUsize::new(2));
+        let [i] = dfb
+            .add_dataflow_op(read_op(&e, i32_t()), [l_i, idx])
+            .unwrap()
+            .outputs_arr();
+        let [oi] = dfb
+            .add_dataflow_op(read_op(&e, opt_i32.clone()), [l_oi, idx])
+            .unwrap()
+            .outputs_arr();
+        let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
+
+        let mut lowerer = LowerTypes::default();
+        lowerer.lower_type(i32_custom_t, qb_t(), Box::new(|_| panic!("No consts")));
+        // Lower list<option<x>> to list<x>
+        lowerer.lower_parametric_type(
+            list_type_def(),
+            Box::new(|args| {
+                let [TypeArg::Type { ty }] = args else {
+                    panic!("Expected just elem type")
+                };
+                option_contents(ty).map(list_type)
+            }),
+            Box::new(|_| panic!("No consts")),
+        );
+        // and read<option<x>> to get<x> - the latter has the expected option<x> return type
+        lowerer.lower_parametric_op(
+            e.get_op(READ).unwrap().as_ref(),
+            Box::new(|args: &[TypeArg]| {
+                let [TypeArg::Type { ty }] = args else {
+                    panic!("Expected just elem type")
+                };
+                option_contents(ty).map(|elem| {
+                    OpReplacement::SingleOp(
+                        ListOp::get
+                            .with_type(elem)
+                            .to_extension_op()
+                            .unwrap()
+                            .into(),
+                    )
+                })
+            }),
+        );
+        assert!(lowerer.run(&mut h).unwrap());
+        // list<usz> -> read<usz> -> usz just becomes list<qb> -> read<qb> -> qb
+        // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb> -> opt<qb>
+        assert_eq!(
+            h.root_type().dataflow_signature().unwrap().io(),
+            (
+                &vec![list_type(qb_t()); 2].into(),
+                &vec![qb_t(), option_type(qb_t()).into()].into()
+            )
+        );
+        assert_eq!(
+            h.nodes()
+                .filter_map(|n| h.get_optype(n).as_extension_op())
+                .map(ExtensionOp::name)
+                .sorted()
+                .collect_vec(),
+            ["NoBoundsChecking.read", "collections.list.get"]
         );
     }
 }
