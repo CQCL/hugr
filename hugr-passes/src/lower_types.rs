@@ -404,6 +404,13 @@ mod test {
         ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t.into()]).unwrap()
     }
 
+    fn just_elem_type(args: &[TypeArg]) -> &Type {
+        let [TypeArg::Type { ty }] = args else {
+            panic!("Expected just elem type")
+        };
+        ty
+    }
+
     fn ext() -> Arc<Extension> {
         Extension::new_arc(
             IdentList::new("TestExt").unwrap(),
@@ -446,9 +453,7 @@ mod test {
 
     fn lowerer(ext: &Arc<Extension>) -> LowerTypes {
         fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
-            let [TypeArg::Type { ty }] = args else {
-                panic!("Illegal TypeArgs")
-            };
+            let ty = just_elem_type(args);
             let mut dfb = DFGBuilder::new(inout_sig(
                 vec![array_type(64, ty.clone()), i64_t()],
                 ty.clone(),
@@ -479,12 +484,7 @@ mod test {
         );
         lw.lower_parametric_type(
             pv,
-            Box::new(|args: &[TypeArg]| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Illegal TypeArgs")
-                };
-                Some(array_type(64, ty.clone()))
-            }),
+            Box::new(|args: &[TypeArg]| Some(array_type(64, just_elem_type(args).clone()))),
             Box::new(|_| panic!("There are no constants?")),
         );
         lw.lower_op(
@@ -642,9 +642,7 @@ mod test {
         lowerer.lower_parametric_type(
             list_type_def(),
             Box::new(|args| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected elem type")
-                };
+                let ty = just_elem_type(args);
                 (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
             }),
             Box::new(|_| None), // leave the List<usize> unchanged
@@ -658,9 +656,7 @@ mod test {
         lowerer.lower_parametric_type(
             list_type_def(),
             Box::new(|args| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected elem type")
-                };
+                let ty = just_elem_type(args);
                 (usize_t() != *ty).then_some(array_type(10, ty.clone()))
             }),
             Box::new(|_| None), // leave the List<usize> unchanged
@@ -678,12 +674,7 @@ mod test {
         let mut lowerer = LowerTypes::default();
         lowerer.lower_parametric_type(
             list_type_def(),
-            Box::new(|args: &[TypeArg]| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected elem type")
-                };
-                Some(array_type(4, ty.clone()))
-            }),
+            Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
             Box::new(|opaq| {
                 let lv = opaq
                     .value()
@@ -758,22 +749,14 @@ mod test {
         // Lower list<option<x>> to list<x>
         lowerer.lower_parametric_type(
             list_type_def(),
-            Box::new(|args| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected just elem type")
-                };
-                option_contents(ty).map(list_type)
-            }),
+            Box::new(|args| option_contents(just_elem_type(args)).map(list_type)),
             Box::new(|_| panic!("No consts")),
         );
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
         lowerer.lower_parametric_op(
             e.get_op(READ).unwrap().as_ref(),
             Box::new(|args: &[TypeArg]| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected just elem type")
-                };
-                option_contents(ty).map(|elem| {
+                option_contents(just_elem_type(args)).map(|elem| {
                     OpReplacement::SingleOp(
                         ListOp::get
                             .with_type(elem)
