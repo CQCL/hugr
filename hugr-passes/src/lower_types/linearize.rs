@@ -1,11 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::{
-    extension::TypeDef,
+    builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder},
+    extension::{SignatureError, TypeDef},
     hugr::hugrmut::HugrMut,
-    types::{Type, TypeArg, TypeEnum},
+    ops::Tag,
+    types::{Type, TypeArg, TypeEnum, TypeRow},
     IncomingPort, Node, OutgoingPort,
 };
+use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
 
@@ -41,6 +44,13 @@ pub enum LinearizeError {
         tgt: Node,
         tgt_parent: Node,
     },
+    /// SignatureError's can happen when converting nested types e.g. Sums
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
+    /// Type variables, Row variables, and Aliases are not supported;
+    /// nor Function types, as these are always Copyable.
+    #[error("Cannot linearize type {_0}")]
+    UnsupportedType(Type),
 }
 
 impl Linearizer {
@@ -118,28 +128,85 @@ impl Linearizer {
         if let Some((copy, _)) = self.copy_discard.get(typ) {
             return Ok(copy.clone());
         }
-        let TypeEnum::Extension(exty) = typ.as_type_enum() else {
-            todo!() // handle sums, etc....
-        };
-        let (copy_fn, _) = self
-            .copy_discard_parametric
-            .get(&exty.into())
-            .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
-        copy_fn(exty.args(), self)
+        match typ.as_type_enum() {
+            TypeEnum::Sum(sum_type) => {
+                let variants = sum_type
+                    .variants()
+                    .map(|trv| trv.clone().try_into())
+                    .collect::<Result<Vec<TypeRow>, _>>()?;
+                let mut cb = ConditionalBuilder::new(
+                    variants.clone(),
+                    vec![],
+                    vec![sum_type.clone().into(); 2],
+                )
+                .unwrap();
+                for (tag, variant) in variants.iter().enumerate() {
+                    let mut case_b = cb.case_builder(tag).unwrap();
+                    let mut orig_elems = vec![];
+                    let mut copy_elems = vec![];
+                    for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
+                        let [orig_elem, copy_elem] = self
+                            .copy_op(ty)?
+                            .add(&mut case_b, [inp])
+                            .unwrap()
+                            .outputs_arr();
+                        orig_elems.push(orig_elem);
+                        copy_elems.push(copy_elem);
+                    }
+                    let t = Tag::new(tag, variants.clone());
+                    let [orig] = case_b
+                        .add_dataflow_op(t.clone(), orig_elems)
+                        .unwrap()
+                        .outputs_arr();
+                    let [copy] = case_b.add_dataflow_op(t, copy_elems).unwrap().outputs_arr();
+                    case_b.finish_with_outputs([orig, copy]).unwrap();
+                }
+                Ok(OpReplacement::CompoundOp(Box::new(
+                    cb.finish_hugr().unwrap(),
+                )))
+            }
+            TypeEnum::Extension(cty) => {
+                let (copy_fn, _) = self
+                    .copy_discard_parametric
+                    .get(&cty.into())
+                    .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
+                copy_fn(cty.args(), self)
+            }
+            _ => Err(LinearizeError::UnsupportedType(typ.clone())),
+        }
     }
 
     fn discard_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
         if let Some((_, discard)) = self.copy_discard.get(typ) {
             return Ok(discard.clone());
         }
-        let TypeEnum::Extension(exty) = typ.as_type_enum() else {
-            todo!() // handle sums, etc...
-        };
-        let (_, discard_fn) = self
-            .copy_discard_parametric
-            .get(&exty.into())
-            .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
-        discard_fn(exty.args(), self)
+        match typ.as_type_enum() {
+            TypeEnum::Sum(sum_type) => {
+                let variants = sum_type
+                    .variants()
+                    .map(|trv| trv.clone().try_into())
+                    .collect::<Result<Vec<TypeRow>, _>>()?;
+                let mut cb = ConditionalBuilder::new(variants.clone(), vec![], vec![]).unwrap();
+                for (idx, variant) in variants.into_iter().enumerate() {
+                    let mut case_b = cb.case_builder(idx).unwrap();
+                    for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
+                        self.discard_op(ty)?.add(&mut case_b, [inp]).unwrap();
+                    }
+                    case_b.finish_with_outputs([]).unwrap();
+                }
+                Ok(OpReplacement::CompoundOp(Box::new(
+                    cb.finish_hugr().unwrap(),
+                )))
+            }
+            TypeEnum::Extension(cty) => {
+                let (_, discard_fn) = self
+                    .copy_discard_parametric
+                    .get(&cty.into())
+                    .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
+                discard_fn(cty.args(), self)
+            }
+            _ => Err(LinearizeError::UnsupportedType(typ.clone())),
+        }
     }
 }
 
