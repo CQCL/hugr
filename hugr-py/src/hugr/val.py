@@ -304,7 +304,8 @@ class Function(Value):
         )
 
     def to_model(self) -> model.Term:
-        return model.Func(self.body.to_model_region())
+        module = self.body.to_model()
+        return model.Func(module.root)
 
 
 @dataclass

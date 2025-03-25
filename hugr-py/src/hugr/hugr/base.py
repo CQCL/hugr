@@ -732,13 +732,12 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return self._to_serial().to_json()
 
     def to_model(self) -> model.Module:
-        return model.Module(self.to_model_region())
-
-    def to_model_region(self) -> model.Region:
+        """Export this module into the hugr model format."""
         from hugr.model.export import ModelExport
 
         export = ModelExport(self)
-        return export.export_region_module(self.root)
+        region = export.export_region_module(self.root)
+        return model.Module(region)
 
     @classmethod
     def load_json(cls, json_str: str) -> Hugr:

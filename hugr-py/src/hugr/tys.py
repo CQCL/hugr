@@ -760,8 +760,7 @@ class _QubitDef(Type):
         return "Qubit"
 
     def to_model(self) -> model.Term:
-        # TODO: Is this the correct name?
-        return model.Apply("prelude.Qubit", [])
+        return model.Apply("prelude.qubit", [])
 
 
 #: Qubit type.

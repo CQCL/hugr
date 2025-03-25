@@ -42,7 +42,9 @@ class ModelExport:
         for a, b in self.hugr.links():
             self.link_ports.union(a, b)
 
-    def link_name(self, port):
+    def link_name(self, port: InPort | OutPort) -> str:
+        """Return the name of the link that a given port is connected to."""
+
         root = self.link_ports[port]
 
         if root in self.link_names:
@@ -53,6 +55,8 @@ class ModelExport:
             return index
 
     def export_node(self, node: Node) -> model.Node | None:
+        """Export the node with the given node id."""
+
         node_data = self.hugr[node]
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
@@ -348,6 +352,8 @@ class ModelExport:
                 raise ValueError(error)
 
     def export_region_module(self, node: Node) -> model.Region:
+        """Export a module node as a module region."""
+
         node_data = self.hugr[node]
         children = []
 
@@ -360,6 +366,8 @@ class ModelExport:
         return model.Region(kind=model.RegionKind.MODULE, children=children)
 
     def export_region_dfg(self, node: Node) -> model.Region:
+        """Export the children of a node as a dataflow region."""
+
         node_data = self.hugr[node]
         children: list[model.Node] = []
         source_types: model.Term = model.Wildcard()
@@ -402,6 +410,8 @@ class ModelExport:
         )
 
     def export_region_cfg(self, node: Node) -> model.Region:
+        """Export the children of a node as a control flow region."""
+
         node_data = self.hugr[node]
 
         source = None
@@ -454,6 +464,8 @@ class ModelExport:
     def export_symbol(
         self, name: str, param_types: Sequence[TypeParam], body: Type
     ) -> model.Symbol:
+        """Export a symbol."""
+
         constraints = []
         params = []
 
@@ -478,6 +490,8 @@ class ModelExport:
         )
 
     def find_func_input(self, node: Node) -> str | None:
+        """Find the name of the function that a node is connected to, if any."""
+
         try:
             func_node = next(
                 out_port.node
@@ -499,6 +513,8 @@ class ModelExport:
         return _mangle_name(node, name)
 
     def find_const_input(self, node: Node) -> model.Term | None:
+        """Find and export the constant that a node is connected to, if any."""
+
         try:
             const_node = next(
                 out_port.node

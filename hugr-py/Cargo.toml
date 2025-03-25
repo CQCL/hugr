@@ -1,7 +1,12 @@
 [package]
 name = "hugr-py"
 version = "0.1.0"
-edition = "2021"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[lints]
+workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
