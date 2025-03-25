@@ -5,16 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
-try:
-    from warnings import deprecated  # type: ignore[attr-defined]
-except ImportError:
-    # Python < 3.13
-    def deprecated(_msg):  # type: ignore[no-redef]
-        def _deprecated(func):
-            return func
-
-        return _deprecated
-
+from typing_extensions import deprecated
 
 import hugr._serialization.extension as ext_s
 from hugr.envelope import (
