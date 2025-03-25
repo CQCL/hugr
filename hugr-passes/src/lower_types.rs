@@ -494,7 +494,7 @@ mod test {
         )
     }
 
-    fn lower_types(ext: &Arc<Extension>) -> LowerTypes {
+    fn lowerer(ext: &Arc<Extension>) -> LowerTypes {
         fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
             let [TypeArg::Type { ty }] = args else {
                 panic!("Illegal TypeArgs")
@@ -595,7 +595,7 @@ mod test {
         fb.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = mb.finish_hugr().unwrap();
 
-        assert!(lower_types(&ext).run(&mut h).unwrap());
+        assert!(lowerer(&ext).run(&mut h).unwrap());
 
         let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(
@@ -637,7 +637,7 @@ mod test {
         let cond = cb.finish_sub_container().unwrap();
         let mut h = dfb.finish_hugr_with_outputs(cond.outputs()).unwrap();
 
-        lower_types(&ext).run(&mut h).unwrap();
+        lowerer(&ext).run(&mut h).unwrap();
 
         let ext_ops = h
             .nodes()
