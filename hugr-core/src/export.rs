@@ -1,7 +1,7 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::{
     extension::{ExtensionId, OpDef, SignatureFunc},
-    hugr::{IdentList, NodeMetadataMap},
+    hugr::IdentList,
     ops::{
         constant::CustomSerialized, DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value,
     },
@@ -13,10 +13,10 @@ use crate::{
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
-        TypeBase, TypeBound, TypeEnum, TypeRow,
+        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
+        TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
     },
-    Direction, Hugr, HugrView, IncomingPort, Node, Port,
+    Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
@@ -478,10 +478,7 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
-        let meta = match self.hugr.get_node_metadata(node) {
-            Some(metadata_map) => self.export_node_metadata(metadata_map),
-            None => &[],
-        };
+        let meta = self.export_node_metadata(node);
 
         self.module.nodes[node_id.index()] = table::Node {
             operation,
@@ -588,9 +585,12 @@ impl<'a> Context<'a> {
         let mut targets: &[_] = &[];
         let mut input_types = None;
         let mut output_types = None;
+        let mut meta = Vec::new();
 
         let children = self.hugr.children(node);
         let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
+
+        let mut output_node = None;
 
         for child in children {
             match self.hugr.get_optype(child) {
@@ -601,10 +601,27 @@ impl<'a> Context<'a> {
                 OpType::Output(output) => {
                     targets = self.make_ports(child, Direction::Incoming, output.types.len());
                     output_types = Some(&output.types);
+                    output_node = Some(child);
                 }
-                _ => {
+                child_optype => {
                     if let Some(child_id) = self.export_node_shallow(child) {
                         region_children.push(child_id);
+
+                        // Record all order edges that originate from this node in metadata.
+                        let successors = child_optype
+                            .other_output_port()
+                            .into_iter()
+                            .flat_map(|port| self.hugr.linked_inputs(child, port))
+                            .map(|(successor, _)| successor)
+                            .filter(|successor| Some(*successor) != output_node);
+
+                        for successor in successors {
+                            let a =
+                                self.make_term(model::Literal::Nat(child.index() as u64).into());
+                            let b = self
+                                .make_term(model::Literal::Nat(successor.index() as u64).into());
+                            meta.push(self.make_term_apply(model::ORDER_HINT_ORDER, &[a, b]));
+                        }
                     }
                 }
             }
@@ -634,7 +651,7 @@ impl<'a> Context<'a> {
             sources,
             targets,
             children: region_children.into_bump_slice(),
-            meta: &[], // TODO: Export metadata
+            meta: self.bump.alloc_slice_copy(&meta),
             signature,
             scope,
         };
@@ -1013,11 +1030,37 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn export_node_metadata(&mut self, metadata_map: &NodeMetadataMap) -> &'a [table::TermId] {
-        let mut meta = BumpVec::with_capacity_in(metadata_map.len(), self.bump);
+    pub fn export_node_metadata(&mut self, node: Node) -> &'a [table::TermId] {
+        let metadata_map = self.hugr.get_node_metadata(node);
 
-        for (name, value) in metadata_map {
-            meta.push(self.export_json_meta(name, value));
+        let has_order_edges = {
+            fn is_relevant_node(hugr: &Hugr, node: Node) -> bool {
+                let optype = hugr.get_optype(node);
+                !optype.is_input() && !optype.is_output()
+            }
+
+            let optype = self.hugr.get_optype(node);
+
+            Direction::BOTH
+                .iter()
+                .filter(|dir| optype.other_port_kind(**dir) == Some(EdgeKind::StateOrder))
+                .filter_map(|dir| optype.other_port(*dir))
+                .flat_map(|port| self.hugr.linked_ports(node, port))
+                .any(|(other, _)| is_relevant_node(self.hugr, other))
+        };
+
+        let meta_capacity = metadata_map.map_or(0, |map| map.len()) + has_order_edges as usize;
+        let mut meta = BumpVec::with_capacity_in(meta_capacity, self.bump);
+
+        if let Some(metadata_map) = metadata_map {
+            for (name, value) in metadata_map {
+                meta.push(self.export_json_meta(name, value));
+            }
+        }
+
+        if has_order_edges {
+            let key = self.make_term(model::Literal::Nat(node.index() as u64).into());
+            meta.push(self.make_term_apply(model::ORDER_HINT_KEY, &[key]));
         }
 
         meta.into_bump_slice()
