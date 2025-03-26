@@ -49,14 +49,17 @@ pub enum OpReplacement {
 }
 
 impl OpReplacement {
-    fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Node {
+    /// Adds this instance to the specified [HugrMut] as a new node or subtree under a
+    /// given parent, returning the unique new child (of that parent) thus created
+    pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Node {
         match self {
             OpReplacement::SingleOp(op_type) => hugr.add_node_with_parent(parent, op_type),
             OpReplacement::CompoundOp(new_h) => hugr.insert_hugr(parent, *new_h).new_root,
         }
     }
 
-    fn add(
+    /// Adds this instance to the specified [Dataflow] builder as a new node or subtree
+    pub fn add(
         self,
         dfb: &mut impl Dataflow,
         inputs: impl IntoIterator<Item = Wire>,
@@ -200,8 +203,12 @@ impl ReplaceTypes {
     /// result of lonering a type that was either copied or discarded in the input Hugr.
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
-    pub fn linearize(&mut self, src: Type, copy: OpReplacement, discard: OpReplacement) {
-        // We could raise an error if src's bound is Copyable?
+    pub fn linearize(
+        &mut self,
+        src: Type,
+        copy: OpReplacement,
+        discard: OpReplacement,
+    ) -> Result<(), LinearizeError> {
         self.linearize.register(src, copy, discard)
     }
 
@@ -214,7 +221,7 @@ impl ReplaceTypes {
     ///
     /// (That is, this is the equivalent of [Self::linearize] but for parametric types.)
     ///
-    /// The [Linearizer] is passed so that the callbacks can use this to generate
+    /// The [Linearizer] is passed so that the callbacks can use it to generate
     /// `copy/`discard` ops for other types (e.g. the elements of a collection),
     /// as part of an [OpReplacement::CompoundOp].
     pub fn linearize_parametric(
@@ -223,7 +230,6 @@ impl ReplaceTypes {
         copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
         discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
     ) {
-        // We could raise an error if src's TypeDefBound is explicit Copyable ?
         self.linearize.register_parametric(src, copy_fn, discard_fn)
     }
 

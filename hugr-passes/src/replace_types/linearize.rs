@@ -8,6 +8,8 @@ use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
 
+/// Configuration for inserting copy and discard operations for linear types
+/// outports of which are sources of multiple or 0 edges.
 #[derive(Clone, Default)]
 pub struct Linearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -28,6 +30,7 @@ pub struct Linearizer {
 }
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum LinearizeError {
     #[error("Need copy op for {_0}")]
     NeedCopy(Type),
@@ -43,23 +46,47 @@ pub enum LinearizeError {
     /// SignatureError's can happen when converting nested types e.g. Sums
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
-    /// Type variables, Row variables, and Aliases are not supported;
-    /// nor Function types, as these are always Copyable.
+    /// We cannot linearize (insert copy and discard functions) for
+    /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
+    /// or [Alias](TypeEnum::Alias)es.
     #[error("Cannot linearize type {_0}")]
     UnsupportedType(Type),
+    /// Neither does linearization make sense for copyable types
+    #[error("Type {_0} is copyable")]
+    CopyableType(Type),
 }
 
 impl Linearizer {
-    pub fn register(&mut self, typ: Type, copy: OpReplacement, discard: OpReplacement) {
-        self.copy_discard.insert(typ, (copy, discard));
+    /// Registers a type for linearization by providing copy and discard operations.
+    ///
+    /// # Errors
+    ///
+    /// [LinearizeError::CopyableType] if `typ` is copyable
+    pub fn register(
+        &mut self,
+        typ: Type,
+        copy: OpReplacement,
+        discard: OpReplacement,
+    ) -> Result<(), LinearizeError> {
+        if typ.copyable() {
+            Err(LinearizeError::CopyableType(typ))
+        } else {
+            self.copy_discard.insert(typ, (copy, discard));
+            Ok(())
+        }
     }
 
+    /// Registers that instances of a parametrized [TypeDef] should be linearized
+    /// by providing functions that generate copy and discard functions given the [TypeArg]s.
     pub fn register_parametric(
         &mut self,
         src: &TypeDef,
         copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
         discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
     ) {
+        // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
+        // it depends on the arguments. Since there is no method to get the TypeDefBound
+        // from a TypeDef, leaving this for now.
         self.copy_discard_parametric
             .insert(src.into(), (Arc::from(copy_fn), Arc::from(discard_fn)));
     }
@@ -69,7 +96,11 @@ impl Linearizer {
     ///
     /// # Errors
     ///
-    /// If needed copy or discard ops cannot be found;
+    /// Most variants of [LinearizeError] can be raised, specifically including
+    /// [LinearizeError::CopyableType] if the type is [Copyable], in which case the Hugr
+    /// will be unchanged.
+    ///
+    /// [Copyable]: hugr_core::types::TypeBound::Copyable
     pub fn insert_copy_discard(
         &self,
         hugr: &mut impl HugrMut,
@@ -120,7 +151,9 @@ impl Linearizer {
         Ok(())
     }
 
-    fn copy_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
+    /// Gets an [OpReplacement] for copying a value of type `typ`, i.e.
+    /// a recipe for a node with one input of that type and two outputs.
+    pub fn copy_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
         if let Some((copy, _)) = self.copy_discard.get(typ) {
             return Ok(copy.clone());
         }
@@ -168,10 +201,13 @@ impl Linearizer {
                     .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
                 copy_fn(cty.args(), self)
             }
+            TypeEnum::Function(_) => Err(LinearizeError::CopyableType(typ.clone())),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
     }
 
+    /// Gets an [OpReplacement] for discarding a value of type `typ`, i.e.
+    /// a recipe for a node with one input of that type and no outputs.
     fn discard_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
         if let Some((_, discard)) = self.copy_discard.get(typ) {
             return Ok(discard.clone());
@@ -201,6 +237,7 @@ impl Linearizer {
                     .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
                 discard_fn(cty.args(), self)
             }
+            TypeEnum::Function(_) => Err(LinearizeError::CopyableType(typ.clone())),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
     }
@@ -265,11 +302,13 @@ mod test {
         let mut lowerer = ReplaceTypes::default();
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
         lowerer.replace_type(usize_custom_t, lin_t.clone());
-        lowerer.linearize(
-            lin_t,
-            OpReplacement::SingleOp(copy_op.into()),
-            OpReplacement::SingleOp(discard_op.into()),
-        );
+        lowerer
+            .linearize(
+                lin_t,
+                OpReplacement::SingleOp(copy_op.into()),
+                OpReplacement::SingleOp(discard_op.into()),
+            )
+            .unwrap();
         (e, lowerer)
     }
 
