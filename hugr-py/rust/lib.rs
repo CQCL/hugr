@@ -1,3 +1,5 @@
+//! Supporting Rust library for the hugr Python bindings.
+
 use hugr_model::v0::ast;
 use pyo3::{exceptions::PyValueError, prelude::*};
 
