@@ -114,37 +114,22 @@ impl LowerTypes {
     /// Note that if `src` is an instance of a *parametrized* [TypeDef], this takes
     /// precedence over [Self::lower_parametric_type] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
-    /// substitution (parametric polymorphism) happening later will not respect the lowering(s).
-    ///
-    /// [Const]s of the specified type are transformed using the provided `const_fn` callback,
-    /// which is passed the value of the constant.
-    pub fn lower_type(
-        &mut self,
-        src: CustomType,
-        dest: Type,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Value>,
-    ) {
+    /// substitution (parametric polymorphism) happening later will not respect this lowering.
+    pub fn lower_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable or 'src' is linear, but since we can't
         // check that for parametric types, we'll be consistent and not check here either.
-        self.type_map.insert(src.clone(), dest);
-        self.consts.insert(src, Arc::from(const_fn));
+        self.type_map.insert(src, dest);
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
-    /// via a callback `dest_fn` that builds the replacement type given the [TypeArg]s.
+    /// via a callback that builds the replacement type given the [TypeArg]s.
     /// Note that the TypeArgs will already have been lowered (e.g. they may not
     /// fit the bounds of the original type). The callback may return `None` to indicate
-    /// no change (in which case the TypeArgs will be lowered recursively but the outer
-    /// type constructor kept the same).
-    ///
-    /// Constants whose types are instantiations of `src` will be converted by the `const_fn`
-    /// callback, given the value of the constant; the callback may return `None` to
-    /// leave the constant unchanged.
+    /// no change (in which case the supplied/lowered TypeArgs will be given to `src`).
     pub fn lower_parametric_type(
         &mut self,
         src: &TypeDef,
         dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<Type>>,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
     ) {
         // No way to check that dest_fn never produces a linear type.
         // We could require copy/discard-generators if src is Copyable, or *might be*
@@ -152,15 +137,14 @@ impl LowerTypes {
         // `TypeDefBound::Explicit(TypeBound::Copyable)`) but that seems an annoying
         // overapproximation. Moreover, these depend upon the *return type* of the Fn.
         self.param_types.insert(src.into(), Arc::from(dest_fn));
-        self.param_consts.insert(src.into(), Arc::from(const_fn));
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
-    /// Note that if `src` is an instance of a *parametrized* [OpDef], this should only
-    /// be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as substitution
-    /// (parametric polymorphism) happening later will not respect the lowering(s).
-    ///
-    /// This takes precedence over [Self::lower_parametric_op] where the `src`s overlap.
+    /// Note that if `src` is an instance of a *parametrized* [OpDef], this takes
+    /// precedence over [Self::lower_parametric_op] where the `src`s overlap. Thus, this
+    /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
+    /// substitution (parametric polymorphism) happening later will not respect this
+    /// lowering.
     pub fn lower_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
         self.op_map.insert(OpHashWrapper::from(src), dest);
     }
@@ -177,6 +161,31 @@ impl LowerTypes {
         dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>,
     ) {
         self.param_ops.insert(src.into(), Arc::from(dest_fn));
+    }
+
+    /// Configures this instance to change [Const]s of type `src_ty`, using
+    /// a callback that is passed the value of the constant (of that type).
+    ///
+    /// Note that if `src_ty` is an instance of a *parametrized* [TypeDef],
+    /// this takes precedence over [Self::lower_consts_parametric] where
+    /// the `src_ty`s overlap.
+    pub fn lower_consts(
+        &mut self,
+        src_ty: CustomType,
+        const_fn: Box<dyn Fn(&OpaqueValue) -> Value>,
+    ) {
+        self.consts.insert(src_ty.clone(), Arc::from(const_fn));
+    }
+
+    /// Configures this instance to change [Const]s of all types that are instances
+    /// of a parametric typedef `src_ty`, using a callback that is passed the
+    /// value of the constant (the [OpaqueValue] contains the [TypeArg]s).
+    pub fn lower_consts_parametric(
+        &mut self,
+        src_ty: &TypeDef,
+        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
+    ) {
+        self.param_consts.insert(src_ty.into(), Arc::from(const_fn));
     }
 
     /// Run the pass using specified configuration.
@@ -468,15 +477,10 @@ mod test {
         }
         let pv = ext.get_type(PACKED_VEC).unwrap();
         let mut lw = LowerTypes::default();
-        lw.lower_type(
-            pv.instantiate([bool_t().into()]).unwrap(),
-            i64_t(),
-            Box::new(|_| panic!("There are no constants")),
-        );
+        lw.lower_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.lower_parametric_type(
             pv,
             Box::new(|args: &[TypeArg]| Some(array_type(64, just_elem_type(args).clone()))),
-            Box::new(|_| panic!("There are no constants?")),
         );
         lw.lower_op(
             &read_op(ext, bool_t()),
@@ -636,7 +640,6 @@ mod test {
                 let ty = just_elem_type(args);
                 (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
             }),
-            Box::new(|_| None), // leave the List<usize> unchanged
         );
         let backup = h.clone();
         assert!(!lowerer.run(&mut h).unwrap());
@@ -650,7 +653,6 @@ mod test {
                 let ty = just_elem_type(args);
                 (usize_t() != *ty).then_some(array_type(10, ty.clone()))
             }),
-            Box::new(|_| None), // leave the List<usize> unchanged
         );
         assert!(lowerer.run(&mut h).unwrap());
         let sig = h.signature(h.root()).unwrap();
@@ -666,6 +668,9 @@ mod test {
         lowerer.lower_parametric_type(
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
+        );
+        lowerer.lower_consts_parametric(
+            list_type_def(),
             Box::new(|opaq| {
                 let lv = opaq
                     .value()
@@ -736,12 +741,11 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
 
         let mut lowerer = LowerTypes::default();
-        lowerer.lower_type(i32_custom_t, qb_t(), Box::new(|_| panic!("No consts")));
+        lowerer.lower_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
         lowerer.lower_parametric_type(
             list_type_def(),
             Box::new(|args| option_contents(just_elem_type(args)).map(list_type)),
-            Box::new(|_| panic!("No consts")),
         );
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
         lowerer.lower_parametric_op(
