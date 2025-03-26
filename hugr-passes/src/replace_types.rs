@@ -1,4 +1,9 @@
 #![allow(clippy::type_complexity)]
+//! Replace types with other types across the Hugr.
+//!
+//! Parametrized types and ops will be reparametrized taking into account the replacements,
+//! but any ops taking/returning the replaced types *not* as a result of parametrization,
+//! will also need to be replaced - see [ReplaceTypes::replace_op]. (Similarly [Const]s.)
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -113,6 +118,10 @@ impl ReplaceTypes {
     /// precedence over [Self::replace_parametrized_type] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this lowering.
+    ///
+    /// If there are any [LoadConstant]s of this type, callers should also call [Self::replace_consts]
+    /// (or [Self::replace_consts_parametrized]) as the load-constants will be reparametrized
+    /// (and this will break the edge from const to loadconstant).
     pub fn replace_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable or 'src' is linear, but since we can't
         // check that for parametrized types, we'll be consistent and not check here either.
@@ -124,6 +133,11 @@ impl ReplaceTypes {
     /// Note that the TypeArgs will already have been lowered (e.g. they may not
     /// fit the bounds of the original type). The callback may return `None` to indicate
     /// no change (in which case the supplied/lowered TypeArgs will be given to `src`).
+    ///
+    /// If there are any [LoadConstant]s of any of these types, callers should also call
+    /// [Self::replace_consts_parametrized] (or [Self::replace_consts]) as the
+    /// load-constants will be reparametrized (and this will break the edge from const to
+    /// loadconstant).
     pub fn replace_parametrized_type(
         &mut self,
         src: &TypeDef,
@@ -389,7 +403,7 @@ mod test {
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
-    use super::{ReplaceTypes, OpReplacement};
+    use super::{OpReplacement, ReplaceTypes};
 
     const PACKED_VEC: &str = "PackedVec";
     const READ: &str = "read";
