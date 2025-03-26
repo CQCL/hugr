@@ -481,11 +481,11 @@ impl<RV: MaybeRV> TypeBase<RV> {
         }
     }
 
-    /// Returns the inner [Custom] if the type is from an extension.
+    /// Returns the inner [CustomType] if the type is from an extension.
     pub fn as_extension(&self) -> Option<&CustomType> {
         match &self.0 {
             TypeEnum::Extension(ct) => Some(ct),
-            _ => None
+            _ => None,
         }
     }
 
@@ -837,7 +837,10 @@ pub(crate) mod test {
 
     #[test]
     fn as_extension() {
-        assert_eq!(Type::new_extension(usize_t().as_extension().unwrap().clone), usize_t());
+        assert_eq!(
+            Type::new_extension(usize_t().as_extension().unwrap().clone()),
+            usize_t()
+        );
         assert_eq!(Type::new_unit_sum(0).as_extension(), None);
     }
 
