@@ -190,7 +190,8 @@ impl ReplaceTypes {
 
     /// Configures this instance to change [Const]s of all types that are instances
     /// of a parametrized typedef `src_ty`, using a callback that is passed the
-    /// value of the constant (the [OpaqueValue] contains the [TypeArg]s).
+    /// value of the constant (the [OpaqueValue] contains the [TypeArg]s). The
+    /// callback may return `None` to indicate no change to the constant.
     pub fn replace_consts_parametrized(
         &mut self,
         src_ty: &TypeDef,
