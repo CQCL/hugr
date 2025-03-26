@@ -312,22 +312,24 @@ impl ReplaceTypes {
                 any_change |= sum_type.transform(self)?;
                 Ok(any_change)
             }
-            Value::Extension { e } => Ok('changed: {
-                if let TypeEnum::Extension(exty) = e.get_type().as_type_enum() {
-                    if let Some(new_const) = self
-                        .consts
-                        .get(exty)
-                        .map(|const_fn| const_fn(e, self))
-                        .or(self
-                            .param_consts
-                            .get(&exty.into())
-                            .and_then(|const_fn| const_fn(e, self)))
-                    {
-                        *value = new_const;
-                        break 'changed true;
-                    }
+            Value::Extension { e } => Ok({
+                let new_const = match e.get_type().as_type_enum() {
+                    TypeEnum::Extension(exty) => self.consts.get(exty).map_or_else(
+                        || {
+                            self.param_consts
+                                .get(&exty.into())
+                                .and_then(|const_fn| const_fn(e, self))
+                        },
+                        |const_fn| Some(const_fn(e, self)),
+                    ),
+                    _ => None,
+                };
+                if let Some(new_const) = new_const {
+                    *value = new_const;
+                    true
+                } else {
+                    false
                 }
-                false
             }),
             Value::Function { hugr } => self.run_no_validate(&mut **hugr),
         }
