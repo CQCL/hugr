@@ -198,9 +198,12 @@ impl ReplaceTypes {
     /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
     /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.)
+    /// 
+    /// Also applies if `src` is an element of a Sum or other type.
     ///
-    /// To clarify, these are used if `src` is not [Copyable], but is (perhaps contained in) the
-    /// result of lonering a type that was either copied or discarded in the input Hugr.
+    /// # Errors
+    /// 
+    /// If `src` is [Copyable], it is returned as an `Err
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     pub fn linearize(
@@ -208,7 +211,7 @@ impl ReplaceTypes {
         src: Type,
         copy: OpReplacement,
         discard: OpReplacement,
-    ) -> Result<(), LinearizeError> {
+    ) -> Result<(), Type> {
         self.linearize.register(src, copy, discard)
     }
 

@@ -61,15 +61,15 @@ impl Linearizer {
     ///
     /// # Errors
     ///
-    /// [LinearizeError::CopyableType] if `typ` is copyable
+    /// If `typ` is copyable, it is returned as an `Err`.
     pub fn register(
         &mut self,
         typ: Type,
         copy: OpReplacement,
         discard: OpReplacement,
-    ) -> Result<(), LinearizeError> {
+    ) -> Result<(), Type> {
         if typ.copyable() {
-            Err(LinearizeError::CopyableType(typ))
+            Err(typ)
         } else {
             self.copy_discard.insert(typ, (copy, discard));
             Ok(())
@@ -207,7 +207,7 @@ impl Linearizer {
                     .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
                 copy_fn(cty.args(), self)
             }
-            TypeEnum::Function(_) => Err(LinearizeError::CopyableType(typ.clone())),
+            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
     }
@@ -248,7 +248,7 @@ impl Linearizer {
                     .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
                 discard_fn(cty.args(), self)
             }
-            TypeEnum::Function(_) => Err(LinearizeError::CopyableType(typ.clone())),
+            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
     }
