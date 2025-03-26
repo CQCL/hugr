@@ -12,7 +12,7 @@
   (meta (compat.meta_json "description" "\"This defines a function that calls the function which we declared earlier.\""))
   (dfg [%3] [%4]
        (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
-       ((core.call _ _ _ example.callee) [%3] [%4]
+       ((core.call _ _ example.callee) [%3] [%4]
                                                  (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))))
 
 (define-func
@@ -22,4 +22,4 @@
    []
    [%5]
    (signature (core.fn [] [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])]))
-   ((core.load_const _ _ example.caller) [] [%5])))
+   ((core.load_const _ example.caller) [] [%5])))

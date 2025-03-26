@@ -219,7 +219,6 @@ pub const CORE_CALL: &str = "core.call";
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`
 /// - **Parameter:** `?outputs : (core.list core.type)`
-/// - **Parameter:** `?ext : core.ext_set`
 /// - **Result:** `(core.fn [(core.fn ?inputs ?outputs) ?inputs ...] ?outputs)`
 pub const CORE_CALL_INDIRECT: &str = "core.call_indirect";
 

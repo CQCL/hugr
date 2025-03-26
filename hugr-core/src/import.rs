@@ -383,14 +383,14 @@ impl<'a> Context<'a> {
             }
 
             table::Operation::Custom(operation) => {
-                if let Some([]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
+                if let Some([_, _]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
                     let signature = self.get_node_signature(node_id)?;
                     let optype = OpType::CallIndirect(CallIndirect { signature });
                     let node = self.make_node(node_id, optype, parent)?;
                     return Ok(Some(node));
                 }
 
-                if let Some([_, _, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
+                if let Some([_, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
                     let table::Term::Apply(symbol, args) = self.get_term(func)? else {
                         return Err(table::ModelError::TypeError(func).into());
                     };
@@ -1119,7 +1119,7 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: table::TermId,
     ) -> Result<TypeBase<RV>, ImportError> {
-        if let Some([_, _, _]) = self.match_symbol(term_id, model::CORE_FN)? {
+        if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
             let func_type = self.import_func_type::<RowVariable>(term_id)?;
             return Ok(TypeBase::new_function(func_type));
         }

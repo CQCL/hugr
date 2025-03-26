@@ -21,7 +21,6 @@ extension_inference = []
 declarative = ["serde_yaml"]
 model_unstable = ["hugr-model"]
 zstd = ["dep:zstd"]
-default = ["model_unstable"]
 
 [lib]
 bench = false
