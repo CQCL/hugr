@@ -110,12 +110,12 @@ impl ReplaceTypes {
 
     /// Configures this instance to change occurrences of type `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* [TypeDef], this takes
-    /// precedence over [Self::lower_parametric_type] where the `src`s overlap. Thus, this
+    /// precedence over [Self::replace_parametrized_type] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this lowering.
-    pub fn lower_type(&mut self, src: CustomType, dest: Type) {
+    pub fn replace_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable or 'src' is linear, but since we can't
-        // check that for parametric types, we'll be consistent and not check here either.
+        // check that for parametrized types, we'll be consistent and not check here either.
         self.type_map.insert(src, dest);
     }
 
@@ -124,7 +124,7 @@ impl ReplaceTypes {
     /// Note that the TypeArgs will already have been lowered (e.g. they may not
     /// fit the bounds of the original type). The callback may return `None` to indicate
     /// no change (in which case the supplied/lowered TypeArgs will be given to `src`).
-    pub fn lower_parametric_type(
+    pub fn replace_parametrized_type(
         &mut self,
         src: &TypeDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
@@ -143,7 +143,7 @@ impl ReplaceTypes {
     /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this
     /// lowering.
-    pub fn lower_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
+    pub fn replace_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
         self.op_map.insert(OpHashWrapper::from(src), dest);
     }
 
@@ -153,7 +153,7 @@ impl ReplaceTypes {
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
-    pub fn lower_parametric_op(
+    pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<OpReplacement> + 'static,
@@ -167,7 +167,7 @@ impl ReplaceTypes {
     /// Note that if `src_ty` is an instance of a *parametrized* [TypeDef],
     /// this takes precedence over [Self::lower_consts_parametric] where
     /// the `src_ty`s overlap.
-    pub fn lower_consts(
+    pub fn replace_consts(
         &mut self,
         src_ty: CustomType,
         const_fn: impl Fn(&OpaqueValue) -> Value + 'static,
@@ -176,9 +176,9 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change [Const]s of all types that are instances
-    /// of a parametric typedef `src_ty`, using a callback that is passed the
+    /// of a parametrized typedef `src_ty`, using a callback that is passed the
     /// value of the constant (the [OpaqueValue] contains the [TypeArg]s).
-    pub fn lower_consts_parametric(
+    pub fn replace_consts_parametrized(
         &mut self,
         src_ty: &TypeDef,
         const_fn: impl Fn(&OpaqueValue) -> Option<Value> + 'static,
@@ -475,12 +475,12 @@ mod test {
         }
         let pv = ext.get_type(PACKED_VEC).unwrap();
         let mut lw = ReplaceTypes::default();
-        lw.lower_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
-        lw.lower_parametric_type(
+        lw.replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.replace_parametrized_type(
             pv,
             Box::new(|args: &[TypeArg]| Some(array_type(64, just_elem_type(args).clone()))),
         );
-        lw.lower_op(
+        lw.replace_op(
             &read_op(ext, bool_t()),
             OpReplacement::SingleOp(
                 ExtensionOp::new(ext.get_op("lowered_read_bool").unwrap().clone(), [])
@@ -488,7 +488,7 @@ mod test {
                     .into(),
             ),
         );
-        lw.lower_parametric_op(ext.get_op(READ).unwrap().as_ref(), Box::new(lowered_read));
+        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), Box::new(lowered_read));
         lw
     }
 
@@ -632,7 +632,7 @@ mod test {
 
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or bool_t - this should have no effect
         let mut lowerer = ReplaceTypes::default();
-        lowerer.lower_parametric_type(list_type_def(), |args| {
+        lowerer.replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
             (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
         });
@@ -642,7 +642,7 @@ mod test {
 
         //2. Lower List<T> to Array<10, T> UNLESS T is usize_t() - this leaves the Const unchanged
         let mut lowerer = ReplaceTypes::default();
-        lowerer.lower_parametric_type(list_type_def(), |args| {
+        lowerer.replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
             (usize_t() != *ty).then_some(array_type(10, ty.clone()))
         });
@@ -657,11 +657,11 @@ mod test {
         // 3. Lower all List<T> to Array<4,T> so we can use List's handy CustomConst
         let mut h = backup;
         let mut lowerer = ReplaceTypes::default();
-        lowerer.lower_parametric_type(
+        lowerer.replace_parametrized_type(
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
         );
-        lowerer.lower_consts_parametric(list_type_def(), |opaq| {
+        lowerer.replace_consts_parametrized(list_type_def(), |opaq| {
             let lv = opaq
                 .value()
                 .downcast_ref::<ListValue>()
@@ -727,13 +727,13 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
 
         let mut lowerer = ReplaceTypes::default();
-        lowerer.lower_type(i32_custom_t, qb_t());
+        lowerer.replace_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
-        lowerer.lower_parametric_type(list_type_def(), |args| {
+        lowerer.replace_parametrized_type(list_type_def(), |args| {
             option_contents(just_elem_type(args)).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
-        lowerer.lower_parametric_op(
+        lowerer.replace_parametrized_op(
             e.get_op(READ).unwrap().as_ref(),
             Box::new(|args: &[TypeArg]| {
                 option_contents(just_elem_type(args)).map(|elem| {
