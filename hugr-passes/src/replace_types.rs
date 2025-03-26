@@ -185,7 +185,7 @@ impl ReplaceTypes {
         src_ty: CustomType,
         const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Value + 'static,
     ) {
-        self.consts.insert(src_ty.clone(), Arc::new(const_fn));
+        self.consts.insert(src_ty, Arc::new(const_fn));
     }
 
     /// Configures this instance to change [Const]s of all types that are instances
@@ -337,6 +337,31 @@ impl ReplaceTypes {
     }
 }
 
+pub mod handlers {
+    use hugr_core::ops::{constant::OpaqueValue, Value};
+    use hugr_core::std_extensions::collections::list::ListValue;
+    use hugr_core::types::Transformable;
+
+    use super::ReplaceTypes;
+
+    pub fn list_const(val: &OpaqueValue, repl: &ReplaceTypes) -> Option<Value> {
+        let lv = val.value().downcast_ref::<ListValue>()?;
+        let mut vals: Vec<Value> = lv.get_contents().to_vec();
+        let mut ch = false;
+        for v in vals.iter_mut() {
+            ch |= repl.change_value(v).ok()?; // Silently drop errors...?
+        }
+        // If none of the values has changed, assume the Type hasn't (Values have a single known type)
+        if !ch {
+            return None;
+        };
+
+        let mut elem_t = lv.get_element_type().clone();
+        elem_t.transform(repl).ok()?; // Silently drop errors
+        Some(ListValue::new(elem_t, vals).into())
+    }
+}
+
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
     ext_name: ExtensionId,
@@ -394,6 +419,7 @@ mod test {
     use hugr_core::extension::{TypeDefBound, Version};
 
     use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
+    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
         array_type, ArrayOp, ArrayOpDef, ArrayValue,
@@ -406,7 +432,7 @@ mod test {
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
-    use super::{OpReplacement, ReplaceTypes};
+    use super::{handlers::list_const, OpReplacement, ReplaceTypes};
 
     const PACKED_VEC: &str = "PackedVec";
     const READ: &str = "read";
@@ -645,44 +671,71 @@ mod test {
             .unwrap(),
         );
         tl.set_outputs(pred, [bools]).unwrap();
-        let mut h = tl.finish_hugr().unwrap();
+        let backup = tl.finish_hugr().unwrap();
 
-        // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or bool_t - this should have no effect
         let mut lowerer = ReplaceTypes::default();
+        // Recursively descend into lists
+        lowerer.replace_consts_parametrized(list_type_def(), list_const);
+
+        // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
         lowerer.replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
-            (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
+            (![usize_t(), i64_t()].contains(ty)).then_some(array_type(10, ty.clone()))
         });
-        let backup = h.clone();
-        assert!(!lowerer.run(&mut h).unwrap());
-        assert_eq!(h, backup);
+        {
+            let mut h = backup.clone();
+            assert_eq!(lowerer.run(&mut h), Ok(true));
+            let sig = h.signature(h.root()).unwrap();
+            assert_eq!(
+                sig.input(),
+                &TypeRow::from(vec![list_type(usize_t()), array_type(10, bool_t())])
+            );
+            assert_eq!(sig.input(), sig.output());
+        }
 
-        //2. Lower List<T> to Array<10, T> UNLESS T is usize_t() - this leaves the Const unchanged
-        let mut lowerer = ReplaceTypes::default();
-        lowerer.replace_parametrized_type(list_type_def(), |args| {
-            let ty = just_elem_type(args);
-            (usize_t() != *ty).then_some(array_type(10, ty.clone()))
+        // 2. Now we'll also change usize's to i64_t's
+        let usize_custom_t = usize_t().as_extension().unwrap().clone();
+        lowerer.replace_type(usize_custom_t.clone(), i64_t());
+        lowerer.replace_consts(usize_custom_t, |opaq, _| {
+            ConstInt::new_u(
+                6,
+                opaq.value().downcast_ref::<ConstUsize>().unwrap().value(),
+            )
+            .unwrap()
+            .into()
         });
-        assert!(lowerer.run(&mut h).unwrap());
-        let sig = h.signature(h.root()).unwrap();
-        assert_eq!(
-            sig.input(),
-            &TypeRow::from(vec![list_type(usize_t()), array_type(10, bool_t())])
-        );
-        assert_eq!(sig.input(), sig.output());
+        {
+            let mut h = backup.clone();
+            assert_eq!(lowerer.run(&mut h), Ok(true));
+            let sig = h.signature(h.root()).unwrap();
+            assert_eq!(
+                sig.input(),
+                &TypeRow::from(vec![list_type(i64_t()), array_type(10, bool_t())])
+            );
+            assert_eq!(sig.input(), sig.output());
+            // This will have to update inside the Const
+            let cst = h
+                .nodes()
+                .filter_map(|n| h.get_optype(n).as_const())
+                .exactly_one()
+                .ok()
+                .unwrap();
+            assert_eq!(cst.get_type(), Type::new_sum(vec![list_type(i64_t()); 2]));
+        }
 
-        // 3. Lower all List<T> to Array<4,T> so we can use List's handy CustomConst
+        // 3. Lower all List<T> to Array<4,T>
         let mut h = backup;
-        let mut lowerer = ReplaceTypes::default();
         lowerer.replace_parametrized_type(
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
         );
-        lowerer.replace_consts_parametrized(list_type_def(), |opaq, _| {
-            let lv = opaq
-                .value()
-                .downcast_ref::<ListValue>()
-                .expect("Only one constant in test");
+        lowerer.replace_consts_parametrized(list_type_def(), |opaq, repl| {
+            // First recursively transform the contents
+            let Some(Value::Extension { e: opaq }) = list_const(opaq, repl) else {
+                panic!("Expected list value to stay a list value");
+            };
+            let lv = opaq.value().downcast_ref::<ListValue>().unwrap();
+
             Some(ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into())
         });
         lowerer.run(&mut h).unwrap();
@@ -691,10 +744,7 @@ mod test {
             h.get_optype(pred.node())
                 .as_load_constant()
                 .map(|lc| lc.constant_type()),
-            Some(&Type::new_sum(vec![
-                Type::from(array_type(4, usize_t()));
-                2
-            ]))
+            Some(&Type::new_sum(vec![Type::from(array_type(4, i64_t())); 2]))
         );
     }
 
