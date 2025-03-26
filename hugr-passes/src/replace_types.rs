@@ -198,11 +198,11 @@ impl ReplaceTypes {
     /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
     /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.)
-    /// 
+    ///
     /// Also applies if `src` is an element of a Sum or other type.
     ///
     /// # Errors
-    /// 
+    ///
     /// If `src` is [Copyable], it is returned as an `Err
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable

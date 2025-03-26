@@ -15,11 +15,10 @@ pub struct Linearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
     copy_discard: HashMap<Type, (OpReplacement, OpReplacement)>,
     // Copy/discard of parametric types handled by a function that receives the new/lowered type.
-    // We do not allow linearization to "parametrized" non-extension types, at least not
-    // in one step. We could do that using a trait, but it seems enough of a corner case.
-    // Instead that can be achieved by *firstly* lowering to a custom linear type, with copy/dup
+    // We do not allow overriding copy/discard of non-extension types, but that
+    // can be achieved by *firstly* lowering to a custom linear type, with copy/discard
     // inserted; *secondly* by lowering that to the desired non-extension linear type,
-    // including lowering of the copy/dup operations to...whatever.
+    // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
         (
