@@ -275,7 +275,7 @@ pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 ///
 /// - **Parameter:** `?key : core.nat`
 /// - **Result:** `core.meta`
-pub const ORDER_HINT_KEY: &str = "order_hint.key";
+pub const ORDER_HINT_KEY: &str = "core.order_hint.key";
 
 /// Metadata constructor for order hints.
 ///
@@ -290,7 +290,7 @@ pub const ORDER_HINT_KEY: &str = "order_hint.key";
 /// - **Parameter:** `?before : core.nat`
 /// - **Parameter:** `?after : core.nat`
 /// - **Result:** `core.meta`
-pub const ORDER_HINT_ORDER: &str = "order_hint.order";
+pub const ORDER_HINT_ORDER: &str = "core.order_hint.order";
 
 pub mod ast;
 pub mod binary;

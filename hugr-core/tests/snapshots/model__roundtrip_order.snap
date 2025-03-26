@@ -4,11 +4,13 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-orde
 ---
 (hugr 0)
 
-(import order_hint.order)
+(mod)
 
-(import order_hint.key)
+(import core.order_hint.key)
 
 (import core.fn)
+
+(import core.order_hint.order)
 
 (import arithmetic.int.types.int)
 
@@ -38,23 +40,23 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-orde
          arithmetic.int.types.int
          arithmetic.int.types.int]
         (ext)))
-    (meta (order_hint.order 4 7))
-    (meta (order_hint.order 5 6))
-    (meta (order_hint.order 5 4))
-    (meta (order_hint.order 6 7))
+    (meta (core.order_hint.order 4 7))
+    (meta (core.order_hint.order 5 6))
+    (meta (core.order_hint.order 5 4))
+    (meta (core.order_hint.order 6 7))
     (arithmetic.int.ineg [%0] [%4]
       (signature
         (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
-      (meta (order_hint.key 4)))
+      (meta (core.order_hint.key 4)))
     (arithmetic.int.ineg [%1] [%5]
       (signature
         (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
-      (meta (order_hint.key 5)))
+      (meta (core.order_hint.key 5)))
     (arithmetic.int.ineg [%2] [%6]
       (signature
         (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
-      (meta (order_hint.key 6)))
+      (meta (core.order_hint.key 6)))
     (arithmetic.int.ineg [%3] [%7]
       (signature
         (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
-      (meta (order_hint.key 7)))))
+      (meta (core.order_hint.key 7)))))

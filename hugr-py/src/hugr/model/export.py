@@ -75,7 +75,7 @@ class ModelExport:
 
         # Add an order hint key to the node if necessary
         if _needs_order_key(self.hugr, node):
-            meta.append(model.Apply("order_hint.key", [model.Literal(node.idx)]))
+            meta.append(model.Apply("core.order_hint.key", [model.Literal(node.idx)]))
 
         match node_data.op:
             case DFG() as op:
@@ -422,7 +422,7 @@ class ModelExport:
 
                     meta += [
                         model.Apply(
-                            "order_hint.order",
+                            "core.order_hint.order",
                             [model.Literal(child.idx), model.Literal(successor.idx)],
                         )
                         for successor in self.hugr.outgoing_order_links(child)
