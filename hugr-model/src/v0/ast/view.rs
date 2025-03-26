@@ -14,8 +14,7 @@ impl<'a> View<'a, TermId> for Term {
                 let terms = module.view(*terms)?;
                 Term::Apply(symbol, terms)
             }
-            table::Term::ExtSet(_) => Term::ExtSet,
-            table::Term::ConstFunc(region_id) => Term::Func(Arc::new(module.view(*region_id)?)),
+            table::Term::Func(region_id) => Term::Func(Arc::new(module.view(*region_id)?)),
             table::Term::List(list_parts) => Term::List(module.view(*list_parts)?),
             table::Term::Literal(literal) => Term::Literal(literal.clone()),
             table::Term::Tuple(tuple_parts) => Term::List(module.view(*tuple_parts)?),
