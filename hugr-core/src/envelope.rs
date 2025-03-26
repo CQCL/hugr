@@ -34,10 +34,7 @@
 //! - Bit 7,6: Constant "01" to make some headers ascii-printable.
 //!
 
-#![allow(
-    deprecated,
-    reason = "macros generate code that accesses fields of deperated variants"
-)]
+#![allow(deprecated)]
 
 mod header;
 
