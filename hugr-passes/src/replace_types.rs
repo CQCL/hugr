@@ -17,7 +17,7 @@ use hugr_core::ops::{
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, Output, Tag, TailLoop, Value,
     CFG, DFG,
 };
-use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeTransformer};
+use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
 use hugr_core::{Hugr, Node};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
@@ -66,9 +66,14 @@ pub struct ReplaceTypes {
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     op_map: HashMap<OpHashWrapper, OpReplacement>,
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
-    consts: HashMap<CustomType, Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Value>>,
-    param_consts:
-        HashMap<ParametricType, Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Option<Value>>>,
+    consts: HashMap<
+        CustomType,
+        Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
+    >,
+    param_consts: HashMap<
+        ParametricType,
+        Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
+    >,
     validation: ValidationLevel,
 }
 
@@ -183,7 +188,7 @@ impl ReplaceTypes {
     pub fn replace_consts(
         &mut self,
         src_ty: CustomType,
-        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Value + 'static,
+        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError> + 'static,
     ) {
         self.consts.insert(src_ty, Arc::new(const_fn));
     }
@@ -195,7 +200,8 @@ impl ReplaceTypes {
     pub fn replace_consts_parametrized(
         &mut self,
         src_ty: &TypeDef,
-        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Option<Value> + 'static,
+        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>
+            + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
     }
@@ -316,18 +322,18 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = e.get_type().as_extension().and_then(|exty| {
-                    self.consts.get(exty).map_or_else(
-                        || {
-                            self.param_consts
-                                .get(&exty.into())
-                                .and_then(|const_fn| const_fn(e, self))
-                        },
-                        |const_fn| Some(const_fn(e, self)),
-                    )
-                });
+                let new_const = match e.get_type().as_type_enum() {
+                    TypeEnum::Extension(exty) => match self.consts.get(exty) {
+                        Some(const_fn) => Some(const_fn(e, self)),
+                        None => self
+                            .param_consts
+                            .get(&exty.into())
+                            .and_then(|const_fn| const_fn(e, self).transpose()),
+                    },
+                    _ => None,
+                };
                 if let Some(new_const) = new_const {
-                    *value = new_const;
+                    *value = new_const?;
                     true
                 } else {
                     false
@@ -343,23 +349,28 @@ pub mod handlers {
     use hugr_core::std_extensions::collections::list::ListValue;
     use hugr_core::types::Transformable;
 
-    use super::ReplaceTypes;
+    use super::{ReplaceTypes, ReplaceTypesError};
 
-    pub fn list_const(val: &OpaqueValue, repl: &ReplaceTypes) -> Option<Value> {
-        let lv = val.value().downcast_ref::<ListValue>()?;
+    pub fn list_const(
+        val: &OpaqueValue,
+        repl: &ReplaceTypes,
+    ) -> Result<Option<Value>, ReplaceTypesError> {
+        let Some(lv) = val.value().downcast_ref::<ListValue>() else {
+            return Ok(None);
+        };
         let mut vals: Vec<Value> = lv.get_contents().to_vec();
         let mut ch = false;
         for v in vals.iter_mut() {
-            ch |= repl.change_value(v).ok()?; // Silently drop errors...?
+            ch |= repl.change_value(v)?;
         }
         // If none of the values has changed, assume the Type hasn't (Values have a single known type)
         if !ch {
-            return None;
+            return Ok(None);
         };
 
         let mut elem_t = lv.get_element_type().clone();
-        elem_t.transform(repl).ok()?; // Silently drop errors
-        Some(ListValue::new(elem_t, vals).into())
+        elem_t.transform(repl)?; // Silently drop errors
+        Ok(Some(ListValue::new(elem_t, vals).into()))
     }
 }
 
@@ -698,12 +709,12 @@ mod test {
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
         lowerer.replace_type(usize_custom_t.clone(), i64_t());
         lowerer.replace_consts(usize_custom_t, |opaq, _| {
-            ConstInt::new_u(
+            Ok(ConstInt::new_u(
                 6,
                 opaq.value().downcast_ref::<ConstUsize>().unwrap().value(),
             )
             .unwrap()
-            .into()
+            .into())
         });
         {
             let mut h = backup.clone();
@@ -732,12 +743,14 @@ mod test {
         );
         lowerer.replace_consts_parametrized(list_type_def(), |opaq, repl| {
             // First recursively transform the contents
-            let Some(Value::Extension { e: opaq }) = list_const(opaq, repl) else {
+            let Some(Value::Extension { e: opaq }) = list_const(opaq, repl)? else {
                 panic!("Expected list value to stay a list value");
             };
             let lv = opaq.value().downcast_ref::<ListValue>().unwrap();
 
-            Some(ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into())
+            Ok(Some(
+                ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into(),
+            ))
         });
         lowerer.run(&mut h).unwrap();
 
