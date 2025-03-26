@@ -252,9 +252,10 @@ mod test {
         endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     };
 
-    use hugr_core::extension::prelude::{option_type, usize_t};
+    use hugr_core::extension::prelude::usize_t;
     use hugr_core::extension::{TypeDefBound, Version};
     use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
+    use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
@@ -347,8 +348,8 @@ mod test {
 
     #[test]
     fn sums() {
-        let (e, lowerer) = ext_lowerer();
-        let sum_ty = Type::from(option_type(vec![usize_t(), usize_t()]));
+        let i8_t = || INT_TYPES[3].clone();
+        let sum_ty = Type::new_sum([vec![i8_t()], vec![usize_t(); 2]]);
         let mut outer = DFGBuilder::new(endo_sig(sum_ty.clone())).unwrap();
         let [inp] = outer.input_wires_arr();
         let inner = outer
@@ -358,11 +359,12 @@ mod test {
             .unwrap();
         let mut h = outer.finish_hugr_with_outputs([inp]).unwrap();
 
+        let (e, lowerer) = ext_lowerer();
         assert!(lowerer.run(&mut h).unwrap());
 
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
-        let option_ty = Type::from(option_type(vec![lin_t.clone(); 2]));
-        let copy_out: TypeRow = vec![option_ty.clone(); 2].into();
+        let sum_ty = Type::new_sum([vec![i8_t()], vec![lin_t.clone(); 2]]);
+        let copy_out: TypeRow = vec![sum_ty.clone(); 2].into();
         let count_tags = |n| h.children(n).filter(|n| h.get_optype(*n).is_tag()).count();
 
         // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
@@ -376,11 +378,11 @@ mod test {
                 .collect_array()
                 .unwrap();
             let [case0, case1] = h.children(cond).collect_array().unwrap();
-            // first is for empty
+            // first is for empty - the only input is Copyable so can be directly wired or ignored
             assert_eq!(h.children(case0).count(), 2 + num_tags); // Input, Output
             assert_eq!(count_tags(case0), num_tags);
             let case0 = h.get_optype(case0).as_case().unwrap();
-            assert_eq!(case0.signature.io(), (&vec![].into(), &out_row));
+            assert_eq!(case0.signature.io(), (&vec![i8_t()].into(), &out_row));
 
             // second is for two elements
             assert_eq!(h.children(case1).count(), 4 + num_tags); // Input, Output, two leaf copies/discards:
