@@ -195,6 +195,54 @@
       },
       "binary": false
     },
+    "exit": {
+      "extension": "prelude",
+      "name": "exit",
+      "description": "Exit with input error",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "error",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
+    },
     "load_nat": {
       "extension": "prelude",
       "name": "load_nat",

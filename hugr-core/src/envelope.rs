@@ -361,6 +361,7 @@ mod tests {
     #[case::empty(Package::default())]
     #[case::simple(simple_package())]
     #[case::multi(multi_module_package())]
+    #[cfg_attr(all(miri, feature = "zstd"), ignore)] // FFI calls (required to compress with zstd) are not supported in miri
     fn compressed_roundtrip(#[case] package: Package) {
         let mut buffer = Vec::new();
         let config = EnvelopeConfig {
@@ -394,7 +395,7 @@ mod tests {
         let mut buffer = Vec::new();
         let config = EnvelopeConfig {
             format: EnvelopeFormat::ModelWithExtensions,
-            ..Default::default()
+            zstd: None,
         };
         package.store(&mut buffer, config).unwrap();
         let (decoded_config, new_package) =
@@ -413,7 +414,7 @@ mod tests {
         let mut buffer = Vec::new();
         let config = EnvelopeConfig {
             format: EnvelopeFormat::Model,
-            ..Default::default()
+            zstd: None,
         };
         let res = package.store(&mut buffer, config);
 

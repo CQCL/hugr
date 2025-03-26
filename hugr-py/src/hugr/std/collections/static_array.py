@@ -41,7 +41,7 @@ class StaticArrayVal(val.ExtensionValue):
     """Constant value for a statically sized immutable array of elements."""
 
     v: list[val.Value]
-    ty: tys.Type
+    ty: StaticArray
     name: str
 
     def __init__(self, v: list[val.Value], elem_ty: tys.Type, name: str) -> None:
@@ -50,10 +50,13 @@ class StaticArrayVal(val.ExtensionValue):
         self.name = name
 
     def to_value(self) -> val.Extension:
-        # The value list must be serialized at this point, otherwise the
-        # `Extension` value would not be serializable.
-        vs = [v._to_serial_root() for v in self.v]
-        serial_val = {"values": vs, "name": self.name}
+        serial_val = {
+            "value": {
+                "values": [v._to_serial_root() for v in self.v],
+                "typ": self.ty.ty._to_serial_root(),
+            },
+            "name": self.name,
+        }
         return val.Extension(
             "StaticArrayValue", typ=self.ty, val=serial_val, extensions=[EXTENSION.name]
         )

@@ -1,7 +1,7 @@
 //! Input/output arguments for the HUGR CLI.
 
 use clio::Input;
-use hugr::envelope::read_envelope;
+use hugr::envelope::{read_envelope, EnvelopeError};
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
@@ -48,8 +48,11 @@ impl HugrInputArgs {
     pub fn get_package(&mut self) -> Result<Package, CliError> {
         let extensions = self.load_extensions()?;
         let buffer = BufReader::new(&mut self.input);
-        let (_, pkg) = read_envelope(buffer, &extensions)?;
-        Ok(pkg)
+        match read_envelope(buffer, &extensions) {
+            Ok((_, pkg)) => Ok(pkg),
+            Err(EnvelopeError::MagicNumber { .. }) => Err(CliError::NotAnEnvelope),
+            Err(e) => Err(CliError::Envelope(e)),
+        }
     }
 
     /// Read a hugr JSON file from the input.

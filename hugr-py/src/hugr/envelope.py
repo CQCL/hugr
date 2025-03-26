@@ -185,4 +185,4 @@ class EnvelopeConfig:
 # Set EnvelopeConfig's class variables.
 # These can only be initialized _after_ the class is defined.
 EnvelopeConfig.TEXT = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
-EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=0)
+EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)

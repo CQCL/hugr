@@ -14,6 +14,7 @@ from typing import (
     overload,
 )
 
+import hugr.model as model
 from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
 from hugr.exceptions import ParentBeforeChild
@@ -729,6 +730,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         See :meth:`hugr.package.Package.to_bytes`.
         """
         return self._to_serial().to_json()
+
+    def to_model(self) -> model.Module:
+        """Export this module into the hugr model format."""
+        from hugr.model.export import ModelExport
+
+        export = ModelExport(self)
+        region = export.export_region_module(self.root)
+        return model.Module(region)
 
     @classmethod
     def load_json(cls, json_str: str) -> Hugr:

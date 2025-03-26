@@ -1,24 +1,27 @@
 #![allow(clippy::type_complexity)]
+#![warn(missing_docs)]
+//! Replace types with other types across the Hugr.
+//!
+//! Parametrized types and ops will be reparametrized taking into account the replacements,
+//! but any ops taking/returning the replaced types *not* as a result of parametrization,
+//! will also need to be replaced - see [ReplaceTypes::replace_op]. (Similarly [Const]s.)
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
-use hugr_core::ops::handle::DataflowOpID;
-use itertools::Either;
 use thiserror::Error;
 
+use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
+use hugr_core::ops::handle::DataflowOpID;
 use hugr_core::ops::{
     AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock, ExitBlock, ExtensionOp,
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
     Value, CFG, DFG,
 };
-use hugr_core::types::{
-    CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
-};
+use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
 use hugr_core::{Hugr, Node, Wire};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
@@ -26,14 +29,14 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 mod linearize;
 pub use linearize::{LinearizeError, Linearizer};
 
-/// A thing to which an Op can be lowered, i.e. with which a node can be replaced.
+/// A thing with which an Op (i.e. node) can be replaced
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpReplacement {
-    /// Keep the same node (inputs/outputs, modulo lowering of types therein), change only the op
+    /// Keep the same node, change only the op (updating types of inputs/outputs)
     SingleOp(OpType),
-    /// Defines a sub-Hugr to splice in place of the op - a [CFG](OpType::CFG),
-    /// [Conditional](OpType::Conditional) or [DFG](OpType::DFG), which must have
-    /// the same (lowered) inputs and outputs as the original op.
+    /// Defines a sub-Hugr to splice in place of the op - a [CFG], [Conditional], [DFG]
+    /// or [TailLoop], which must have the same inputs and outputs as the original op,
+    /// modulo replacement.
     // Not a FuncDefn, nor Case/DataflowBlock
     /// Note this will be of limited use before [monomorphization](super::monomorphize()) because
     /// the sub-Hugr will not be able to use type variables present in the op.
@@ -42,7 +45,7 @@ pub enum OpReplacement {
     CompoundOp(Box<Hugr>),
     // TODO allow also Call to a Node in the existing Hugr
     // (can't see any other way to achieve multiple calls to the same decl.
-    // So client should add the functions before lowering, then remove unused ones afterwards.)
+    // So client should add the functions before replacement, then remove unused ones afterwards.)
 }
 
 impl OpReplacement {
@@ -82,26 +85,28 @@ impl OpReplacement {
     }
 }
 
+/// A configuration of what types, ops, and constants should be replaced with what.
+/// May be applied to a Hugr via [Self::run].
 #[derive(Clone, Default)]
-pub struct LowerTypes {
-    /// Handles simple cases like T1 -> T2.
-    /// If T1 is Copyable and T2 Linear, then error will be raised if we find e.g.
-    /// ArrayOfCopyables(T1). This would require an additional entry for that.
+pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
-    /// Parametric types are handled by a function which receives the lowered typeargs.
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: Linearizer,
-    // Handles simple cases Op1 -> Op2.
     op_map: HashMap<OpHashWrapper, OpReplacement>,
-    // Called after lowering typeargs; return None to use original OpDef
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
-    consts: HashMap<Either<CustomType, ParametricType>, Arc<dyn Fn(&OpaqueValue) -> Option<Value>>>,
-    check_sig: bool,
+    consts: HashMap<
+        CustomType,
+        Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
+    >,
+    param_consts: HashMap<
+        ParametricType,
+        Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
+    >,
     validation: ValidationLevel,
 }
 
-impl TypeTransformer for LowerTypes {
-    type Err = ChangeTypeError;
+impl TypeTransformer for ReplaceTypes {
+    type Err = ReplaceTypesError;
 
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
         Ok(if let Some(res) = self.type_map.get(ct) {
@@ -120,63 +125,70 @@ impl TypeTransformer for LowerTypes {
     }
 }
 
+/// An error produced by the [ReplaceTypes] pass
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub enum ChangeTypeError {
+#[allow(missing_docs)]
+pub enum ReplaceTypesError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
-    #[error("Lowering op {op} with original signature {old:?}\nExpected signature: {expected:?}\nBut got: {actual:?}")]
-    SignatureMismatch {
-        op: OpType,
-        old: Option<Signature>,
-        expected: Option<Signature>,
-        actual: Option<Signature>,
-    },
     #[error(transparent)]
     ValidationError(#[from] ValidatePassError),
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
 }
 
-impl LowerTypes {
+impl ReplaceTypes {
     /// Sets the validation level used before and after the pass is run.
-    // Note the self -> Self style is consistent with other passes, but not the other methods here.
-    // TODO change the others? But we are planning to drop validation_level in https://github.com/CQCL/hugr/pull/1895
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
         self
     }
 
-    /// Configures this instance to change occurrences of `src` to `dest`.
-    /// Note that if `src` is an instance of a *parametrized* Type, this should only
-    /// be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as substitution
-    /// (parametric polymorphism) happening later will not respect the lowering(s).
+    /// Configures this instance to replace occurrences of type `src` with `dest`.
+    /// Note that if `src` is an instance of a *parametrized* [TypeDef], this takes
+    /// precedence over [Self::replace_parametrized_type] where the `src`s overlap. Thus, this
+    /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
+    /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
-    /// This takes precedence over [Self::lower_parametric_type] where the `src`s overlap.
-    pub fn lower_type(&mut self, src: CustomType, dest: Type) {
+    /// If there are any [LoadConstant]s of this type, callers should also call [Self::replace_consts]
+    /// (or [Self::replace_consts_parametrized]) as the [LoadConstant]s will be reparametrized
+    /// (and this will break the edge from [Const] to [LoadConstant]).
+    ///
+    /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
+    /// [SignatureError] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
+    /// (This can be overridden by an additional [Self::replace_type].)
+    pub fn replace_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable or 'src' is linear, but since we can't
-        // check that for parametric types, we'll be consistent and not check here either.
+        // check that for parametrized types, we'll be consistent and not check here either.
         self.type_map.insert(src, dest);
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
     /// via a callback that builds the replacement type given the [TypeArg]s.
-    /// Note that the TypeArgs will already have been lowered (e.g. they may not
-    /// fit the bounds of the original type).
-    pub fn lower_parametric_type(
+    /// Note that the TypeArgs will already have been updated (e.g. they may not
+    /// fit the bounds of the original type). The callback may return `None` to indicate
+    /// no change (in which case the supplied TypeArgs will be given to `src`).
+    ///
+    /// If there are any [LoadConstant]s of any of these types, callers should also call
+    /// [Self::replace_consts_parametrized] (or [Self::replace_consts]) as the
+    /// [LoadConstant]s will be reparametrized (and this will break the edge from [Const] to
+    /// [LoadConstant]).
+    pub fn replace_parametrized_type(
         &mut self,
         src: &TypeDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<Type>>,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
     ) {
         // No way to check that dest_fn never produces a linear type.
         // We could require copy/discard-generators if src is Copyable, or *might be*
         // (depending on arguments - i.e. if src's TypeDefBound is anything other than
         // `TypeDefBound::Explicit(TypeBound::Copyable)`) but that seems an annoying
         // overapproximation. Moreover, these depend upon the *return type* of the Fn.
-        // We could take an
-        // `dyn Fn(&TypeArg) -> (Type, Fn(&Linearizer) -> OpReplacement, Fn(&Linearizer) -> OpReplacement))`
-        // but that seems too awkward.
-        self.param_types.insert(src.into(), Arc::from(dest_fn));
+        // It would be too awkward to require:
+        // dest_fn: impl Fn(&TypeArg) -> (Type,
+        //                                Fn(&Linearizer) -> OpReplacement, // copy
+        //                                Fn(&Linearizer) -> OpReplacement)` // discard
+        self.param_types.insert(src.into(), Arc::new(dest_fn));
     }
 
     /// Configures this instance that, when an outport of type `src` has other than one connected
@@ -216,109 +228,67 @@ impl LowerTypes {
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
-    /// Note that if `src` is an instance of a *parametrized* [OpDef], this should only
-    /// be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as substitution
-    /// (parametric polymorphism) happening later will not respect the lowering(s).
-    ///
-    /// This takes precedence over [Self::lower_parametric_op] where the `src`s overlap.
-    pub fn lower_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
+    /// Note that if `src` is an instance of a *parametrized* [OpDef], this takes
+    /// precedence over [Self::replace_parametrized_op] where the `src`s overlap. Thus,
+    /// this should only be used on already-*[monomorphize](super::monomorphize())d*
+    /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
+    /// this replacement.
+    pub fn replace_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
         self.op_map.insert(OpHashWrapper::from(src), dest);
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [TypeArg]s.
-    /// Note that the TypeArgs will already have been lowered (e.g. they may not
+    /// Note that the TypeArgs will already have been updated (e.g. they may not
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
-    pub fn lower_parametric_op(
+    pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<OpReplacement> + 'static,
     ) {
-        self.param_ops.insert(src.into(), Arc::from(dest_fn));
+        self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
 
-    /// Configures this instance to change occurrences consts of type `src_ty`, using
-    /// a callback given the value of the constant (of that type). (The callback may
-    /// return `None` to indicate nothing has changed; we assume `Some` means something
-    /// has changed when evaluating the `bool` result of [Self::run].)
+    /// Configures this instance to change [Const]s of type `src_ty`, using
+    /// a callback that is passed the value of the constant (of that type).
     ///
-    /// Note that if `src_ty` is an instance of a *parametrized* [TypeDef], this
-    /// takes precedence over [Self::lower_consts_parametric] where the `src_ty`s overlap.
-    pub fn lower_consts(
+    /// Note that if `src_ty` is an instance of a *parametrized* [TypeDef],
+    /// this takes precedence over [Self::replace_consts_parametrized] where
+    /// the `src_ty`s overlap.
+    pub fn replace_consts(
         &mut self,
-        src_ty: &CustomType,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
+        src_ty: CustomType,
+        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError> + 'static,
     ) {
-        self.consts
-            .insert(Either::Left(src_ty.clone()), Arc::from(const_fn));
+        self.consts.insert(src_ty, Arc::new(const_fn));
     }
 
-    /// Configures this instance to change occurrences consts of all types that
-    /// are instances of a parametric typedef `src_ty`, using a callback given
-    /// the value of the constant (the [OpaqueValue] contains the [TypeArg]s).
-    pub fn lower_consts_parametric(
+    /// Configures this instance to change [Const]s of all types that are instances
+    /// of a parametrized typedef `src_ty`, using a callback that is passed the
+    /// value of the constant (the [OpaqueValue] contains the [TypeArg]s). The
+    /// callback may return `None` to indicate no change to the constant.
+    pub fn replace_consts_parametrized(
         &mut self,
         src_ty: &TypeDef,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
+        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>
+            + 'static,
     ) {
-        self.consts
-            .insert(Either::Right(src_ty.into()), Arc::from(const_fn));
-    }
-
-    /// Configures this instance to check signatures of ops lowered following [Self::lower_op]
-    /// and [Self::lower_parametric_op] are as expected, i.e. match the signatures of the
-    /// original op modulo the required type substitutions. (If signatures are incorrect,
-    /// it is likely that the wires in the Hugr will be invalid, so this gives an early warning
-    /// by instead raising [ChangeTypeError::SignatureMismatch].)
-    pub fn check_signatures(&mut self, check_sig: bool) {
-        self.check_sig = check_sig;
+        self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
     }
 
     /// Run the pass using specified configuration.
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<bool, ChangeTypeError> {
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
         self.validation
             .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
         for n in hugr.nodes().collect::<Vec<_>>() {
-            let maybe_check_sig = if self.check_sig {
-                Some(
-                    if let Some(old_sig) = hugr.get_optype(n).dataflow_signature() {
-                        let old_sig = old_sig.into_owned();
-                        let mut expected_sig = old_sig.clone();
-                        expected_sig.transform(self)?;
-                        Some((old_sig, expected_sig))
-                    } else {
-                        None
-                    },
-                )
-            } else {
-                None
-            };
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
-            // (If check_sig) then verify that the Signature still has the same arity/wires,
-            // with only the expected changes to types within.
-            if let Some(old_and_expected) = maybe_check_sig {
-                match (&old_and_expected, &new_dfsig) {
-                    (None, None) => (),
-                    (Some((_, exp)), Some(act))
-                        if exp.input == act.input && exp.output == act.output => {}
-                    _ => {
-                        let (old, expected) = old_and_expected.unzip();
-                        return Err(ChangeTypeError::SignatureMismatch {
-                            op: hugr.get_optype(n).clone(),
-                            old,
-                            expected,
-                            actual: new_dfsig.map(Cow::into_owned),
-                        });
-                    }
-                };
-            }
             if let Some(new_sig) = (changed && n != hugr.root())
                 .then_some(new_dfsig)
                 .flatten()
@@ -340,7 +310,7 @@ impl LowerTypes {
         Ok(changed)
     }
 
-    fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ChangeTypeError> {
+    fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ReplaceTypesError> {
         match hugr.optype_mut(n) {
             OpType::FuncDefn(FuncDefn { signature, .. })
             | OpType::FuncDecl(FuncDecl { signature, .. }) => signature.body_mut().transform(self),
@@ -364,7 +334,7 @@ impl LowerTypes {
                 if change {
                     let new_inst = func_sig
                         .instantiate(type_args)
-                        .map_err(ChangeTypeError::SignatureError)?;
+                        .map_err(ReplaceTypesError::SignatureError)?;
                     *instantiation = new_inst;
                 }
                 Ok(change)
@@ -427,7 +397,9 @@ impl LowerTypes {
         }
     }
 
-    fn change_value(&self, value: &mut Value) -> Result<bool, ChangeTypeError> {
+    /// Modifies the specified Value in-place according to current configuration.
+    /// Returns whether the value has changed (conservative over-approximation).
+    pub fn change_value(&self, value: &mut Value) -> Result<bool, ReplaceTypesError> {
         match value {
             Value::Sum(Sum {
                 values, sum_type, ..
@@ -439,23 +411,59 @@ impl LowerTypes {
                 any_change |= sum_type.transform(self)?;
                 Ok(any_change)
             }
-            Value::Extension { e } => Ok('changed: {
-                if let TypeEnum::Extension(exty) = e.get_type().as_type_enum() {
-                    if let Some(const_fn) = self
-                        .consts
-                        .get(&Either::Left(exty.clone()))
-                        .or(self.consts.get(&Either::Right(exty.into())))
-                    {
-                        if let Some(new_const) = const_fn(e) {
-                            *value = new_const;
-                            break 'changed true;
-                        }
-                    }
+            Value::Extension { e } => Ok({
+                let new_const = match e.get_type().as_type_enum() {
+                    TypeEnum::Extension(exty) => match self.consts.get(exty) {
+                        Some(const_fn) => Some(const_fn(e, self)),
+                        None => self
+                            .param_consts
+                            .get(&exty.into())
+                            .and_then(|const_fn| const_fn(e, self).transpose()),
+                    },
+                    _ => None,
+                };
+                if let Some(new_const) = new_const {
+                    *value = new_const?;
+                    true
+                } else {
+                    false
                 }
-                false
             }),
             Value::Function { hugr } => self.run_no_validate(&mut **hugr),
         }
+    }
+}
+
+pub mod handlers {
+    //! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
+    use hugr_core::ops::{constant::OpaqueValue, Value};
+    use hugr_core::std_extensions::collections::list::ListValue;
+    use hugr_core::types::Transformable;
+
+    use super::{ReplaceTypes, ReplaceTypesError};
+
+    /// Handler for [ListValue] constants that recursively [ReplaceTypes::change_value]s
+    /// the elements of the list
+    pub fn list_const(
+        val: &OpaqueValue,
+        repl: &ReplaceTypes,
+    ) -> Result<Option<Value>, ReplaceTypesError> {
+        let Some(lv) = val.value().downcast_ref::<ListValue>() else {
+            return Ok(None);
+        };
+        let mut vals: Vec<Value> = lv.get_contents().to_vec();
+        let mut ch = false;
+        for v in vals.iter_mut() {
+            ch |= repl.change_value(v)?;
+        }
+        // If none of the values has changed, assume the Type hasn't (Values have a single known type)
+        if !ch {
+            return Ok(None);
+        };
+
+        let mut elem_t = lv.get_element_type().clone();
+        elem_t.transform(repl)?;
+        Ok(Some(ListValue::new(elem_t, vals).into()))
     }
 }
 
@@ -509,30 +517,44 @@ mod test {
         inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
-    use hugr_core::extension::prelude::{bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder};
+    use hugr_core::extension::prelude::{
+        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
+    };
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{TypeDefBound, Version};
 
-    use hugr_core::ops::{ExtensionOp, OpType, Tag, Value};
-
+    use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
+    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
         array_type, ArrayOp, ArrayOpDef, ArrayValue,
     };
-    use hugr_core::std_extensions::collections::list::{list_type, list_type_def, ListValue};
+    use hugr_core::std_extensions::collections::list::{
+        list_type, list_type_def, ListOp, ListValue,
+    };
+
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
-    use super::{LowerTypes, OpReplacement};
+    use super::{handlers::list_const, OpReplacement, ReplaceTypes};
 
     const PACKED_VEC: &str = "PackedVec";
+    const READ: &str = "read";
+
     fn i64_t() -> Type {
         INT_TYPES[6].clone()
     }
 
     fn read_op(ext: &Arc<Extension>, t: Type) -> ExtensionOp {
-        ExtensionOp::new(ext.get_op("read").unwrap().clone(), [t.into()]).unwrap()
+        ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t.into()]).unwrap()
+    }
+
+    fn just_elem_type(args: &[TypeArg]) -> &Type {
+        let [TypeArg::Type { ty }] = args else {
+            panic!("Expected just elem type")
+        };
+        ty
     }
 
     fn ext() -> Arc<Extension> {
@@ -552,7 +574,7 @@ mod test {
                     .instantiate(vec![Type::new_var_use(0, TypeBound::Copyable).into()])
                     .unwrap();
                 ext.add_op(
-                    "read".into(),
+                    READ.into(),
                     "".into(),
                     PolyFuncType::new(
                         vec![TypeBound::Copyable.into()],
@@ -575,11 +597,9 @@ mod test {
         )
     }
 
-    fn lowerer(ext: &Arc<Extension>) -> LowerTypes {
+    fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
         fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
-            let [TypeArg::Type { ty }] = args else {
-                panic!("Illegal TypeArgs")
-            };
+            let ty = just_elem_type(args);
             let mut dfb = DFGBuilder::new(inout_sig(
                 vec![array_type(64, ty.clone()), i64_t()],
                 ty.clone(),
@@ -602,18 +622,13 @@ mod test {
             )))
         }
         let pv = ext.get_type(PACKED_VEC).unwrap();
-        let mut lw = LowerTypes::default();
-        lw.lower_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
-        lw.lower_parametric_type(
+        let mut lw = ReplaceTypes::default();
+        lw.replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.replace_parametrized_type(
             pv,
-            Box::new(|args: &[TypeArg]| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Illegal TypeArgs")
-                };
-                Some(array_type(64, ty.clone()))
-            }),
+            Box::new(|args: &[TypeArg]| Some(array_type(64, just_elem_type(args).clone()))),
         );
-        lw.lower_op(
+        lw.replace_op(
             &read_op(ext, bool_t()),
             OpReplacement::SingleOp(
                 ExtensionOp::new(ext.get_op("lowered_read_bool").unwrap().clone(), [])
@@ -621,7 +636,7 @@ mod test {
                     .into(),
             ),
         );
-        lw.lower_parametric_op(ext.get_op("read").unwrap().as_ref(), Box::new(lowered_read));
+        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), Box::new(lowered_read));
         lw
     }
 
@@ -761,77 +776,166 @@ mod test {
             .unwrap(),
         );
         tl.set_outputs(pred, [bools]).unwrap();
-        let mut h = tl.finish_hugr().unwrap();
+        let backup = tl.finish_hugr().unwrap();
 
-        // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or bool_t - this should have no effect
-        let mut lowerer = LowerTypes::default();
-        lowerer.lower_parametric_type(
-            list_type_def(),
-            Box::new(|args| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected elem type")
-                };
-                (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
-            }),
-        );
-        let backup = h.clone();
-        assert!(!lowerer.run(&mut h).unwrap());
-        assert_eq!(h, backup);
+        let mut lowerer = ReplaceTypes::default();
+        // Recursively descend into lists
+        lowerer.replace_consts_parametrized(list_type_def(), list_const);
 
-        //2. Lower List<T> to Array<10, T> UNLESS T is usize_t() - this leaves the Const unchanged
-        let mut lowerer = LowerTypes::default();
-        lowerer.lower_parametric_type(
-            list_type_def(),
-            Box::new(|args| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected elem type")
-                };
-                (usize_t() != *ty).then_some(array_type(10, ty.clone()))
-            }),
-        );
-        assert!(lowerer.run(&mut h).unwrap());
-        let sig = h.signature(h.root()).unwrap();
-        assert_eq!(
-            sig.input(),
-            &TypeRow::from(vec![list_type(usize_t()), array_type(10, bool_t())])
-        );
-        assert_eq!(sig.input(), sig.output());
+        // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
+        lowerer.replace_parametrized_type(list_type_def(), |args| {
+            let ty = just_elem_type(args);
+            (![usize_t(), i64_t()].contains(ty)).then_some(array_type(10, ty.clone()))
+        });
+        {
+            let mut h = backup.clone();
+            assert_eq!(lowerer.run(&mut h), Ok(true));
+            let sig = h.signature(h.root()).unwrap();
+            assert_eq!(
+                sig.input(),
+                &TypeRow::from(vec![list_type(usize_t()), array_type(10, bool_t())])
+            );
+            assert_eq!(sig.input(), sig.output());
+        }
 
-        // 3. Lower all List<T> to Array<4,T> so we can use List's handy CustomConst
+        // 2. Now we'll also change usize's to i64_t's
+        let usize_custom_t = usize_t().as_extension().unwrap().clone();
+        lowerer.replace_type(usize_custom_t.clone(), i64_t());
+        lowerer.replace_consts(usize_custom_t, |opaq, _| {
+            Ok(ConstInt::new_u(
+                6,
+                opaq.value().downcast_ref::<ConstUsize>().unwrap().value(),
+            )
+            .unwrap()
+            .into())
+        });
+        {
+            let mut h = backup.clone();
+            assert_eq!(lowerer.run(&mut h), Ok(true));
+            let sig = h.signature(h.root()).unwrap();
+            assert_eq!(
+                sig.input(),
+                &TypeRow::from(vec![list_type(i64_t()), array_type(10, bool_t())])
+            );
+            assert_eq!(sig.input(), sig.output());
+            // This will have to update inside the Const
+            let cst = h
+                .nodes()
+                .filter_map(|n| h.get_optype(n).as_const())
+                .exactly_one()
+                .ok()
+                .unwrap();
+            assert_eq!(cst.get_type(), Type::new_sum(vec![list_type(i64_t()); 2]));
+        }
+
+        // 3. Lower all List<T> to Array<4,T>
         let mut h = backup;
-        let mut lowerer = LowerTypes::default();
-        lowerer.lower_parametric_type(
+        lowerer.replace_parametrized_type(
             list_type_def(),
-            Box::new(|args: &[TypeArg]| {
-                let [TypeArg::Type { ty }] = args else {
-                    panic!("Expected elem type")
-                };
-                Some(array_type(4, ty.clone()))
-            }),
+            Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
         );
-        lowerer.lower_consts_parametric(
-            list_type_def(),
-            Box::new(|opaq| {
-                let lv = opaq
-                    .value()
-                    .downcast_ref::<ListValue>()
-                    .expect("Only one constant in test");
-                Some(
-                    ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec())
-                        .into(),
-                )
-            }),
-        );
+        lowerer.replace_consts_parametrized(list_type_def(), |opaq, repl| {
+            // First recursively transform the contents
+            let Some(Value::Extension { e: opaq }) = list_const(opaq, repl)? else {
+                panic!("Expected list value to stay a list value");
+            };
+            let lv = opaq.value().downcast_ref::<ListValue>().unwrap();
+
+            Ok(Some(
+                ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into(),
+            ))
+        });
         lowerer.run(&mut h).unwrap();
 
         assert_eq!(
             h.get_optype(pred.node())
                 .as_load_constant()
                 .map(|lc| lc.constant_type()),
-            Some(&Type::new_sum(vec![
-                Type::from(array_type(4, usize_t()));
-                2
-            ]))
+            Some(&Type::new_sum(vec![Type::from(array_type(4, i64_t())); 2]))
+        );
+    }
+
+    #[test]
+    fn partial_replace() {
+        let e = Extension::new_arc(
+            IdentList::new_unchecked("NoBoundsCheck"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                let params = vec![TypeBound::Any.into()];
+                let tv = Type::new_var_use(0, TypeBound::Any);
+                let list_of_var = list_type(tv.clone());
+                e.add_op(
+                    READ.into(),
+                    "Like List::get but without the option".to_string(),
+                    PolyFuncType::new(params, Signature::new(vec![list_of_var, usize_t()], tv)),
+                    w,
+                )
+                .unwrap();
+            },
+        );
+        fn option_contents(ty: &Type) -> Option<Type> {
+            let row = ty.as_sum()?.get_variant(1).unwrap().clone();
+            let elem = row.into_owned().into_iter().exactly_one().unwrap();
+            Some(elem.try_into_type().unwrap())
+        }
+        let i32_t = || INT_TYPES[5].to_owned();
+        let opt_i32 = Type::from(option_type(i32_t()));
+        let i32_custom_t = i32_t().as_extension().unwrap().clone();
+        let mut dfb = DFGBuilder::new(inout_sig(
+            vec![list_type(i32_t()), list_type(opt_i32.clone())],
+            vec![i32_t(), opt_i32.clone()],
+        ))
+        .unwrap();
+        let [l_i, l_oi] = dfb.input_wires_arr();
+        let idx = dfb.add_load_value(ConstUsize::new(2));
+        let [i] = dfb
+            .add_dataflow_op(read_op(&e, i32_t()), [l_i, idx])
+            .unwrap()
+            .outputs_arr();
+        let [oi] = dfb
+            .add_dataflow_op(read_op(&e, opt_i32.clone()), [l_oi, idx])
+            .unwrap()
+            .outputs_arr();
+        let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
+
+        let mut lowerer = ReplaceTypes::default();
+        lowerer.replace_type(i32_custom_t, qb_t());
+        // Lower list<option<x>> to list<x>
+        lowerer.replace_parametrized_type(list_type_def(), |args| {
+            option_contents(just_elem_type(args)).map(list_type)
+        });
+        // and read<option<x>> to get<x> - the latter has the expected option<x> return type
+        lowerer.replace_parametrized_op(
+            e.get_op(READ).unwrap().as_ref(),
+            Box::new(|args: &[TypeArg]| {
+                option_contents(just_elem_type(args)).map(|elem| {
+                    OpReplacement::SingleOp(
+                        ListOp::get
+                            .with_type(elem)
+                            .to_extension_op()
+                            .unwrap()
+                            .into(),
+                    )
+                })
+            }),
+        );
+        assert!(lowerer.run(&mut h).unwrap());
+        // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
+        // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
+        assert_eq!(
+            h.root_type().dataflow_signature().unwrap().io(),
+            (
+                &vec![list_type(qb_t()); 2].into(),
+                &vec![qb_t(), option_type(qb_t()).into()].into()
+            )
+        );
+        assert_eq!(
+            h.nodes()
+                .filter_map(|n| h.get_optype(n).as_extension_op())
+                .map(ExtensionOp::name)
+                .sorted()
+                .collect_vec(),
+            ["NoBoundsCheck.read", "collections.list.get"]
         );
     }
 }

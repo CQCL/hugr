@@ -53,6 +53,11 @@ pub enum CliError {
     #[display("Error decoding HUGR envelope: {_0}")]
     /// Errors produced by the `validate` subcommand.
     Envelope(EnvelopeError),
+    /// Pretty error when the user passes a non-envelope file.
+    #[display(
+        "Input file is not a HUGR envelope. Invalid magic number.\n\nUse `--hugr-json` to read a raw HUGR JSON file instead."
+    )]
+    NotAnEnvelope,
 }
 
 /// Other arguments affecting the HUGR CLI runtime.

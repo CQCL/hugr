@@ -219,16 +219,16 @@ mod test {
     use hugr_core::extension::{TypeDefBound, Version};
     use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
-    use hugr_core::types::{Signature, Type, TypeEnum, TypeRow};
+    use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
-    use crate::lower_types::OpReplacement;
-    use crate::LowerTypes;
+    use crate::replace_types::OpReplacement;
+    use crate::ReplaceTypes;
 
     const LIN_T: &str = "Lin";
 
-    fn ext_lowerer() -> (Arc<Extension>, LowerTypes) {
+    fn ext_lowerer() -> (Arc<Extension>, ReplaceTypes) {
         // Extension with a linear type, a copy and discard op
         let e = Extension::new_arc(
             IdentList::new_unchecked("TestExt"),
@@ -262,11 +262,9 @@ mod test {
         // Configure to lower usize_t to the linear type above
         let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), []).unwrap();
         let discard_op = ExtensionOp::new(e.get_op("discard").unwrap().clone(), []).unwrap();
-        let mut lowerer = LowerTypes::default();
-        let TypeEnum::Extension(usize_custom_t) = usize_t().as_type_enum().clone() else {
-            panic!()
-        };
-        lowerer.lower_type(usize_custom_t, lin_t.clone());
+        let mut lowerer = ReplaceTypes::default();
+        let usize_custom_t = usize_t().as_extension().unwrap().clone();
+        lowerer.replace_type(usize_custom_t, lin_t.clone());
         lowerer.linearize(
             lin_t,
             OpReplacement::SingleOp(copy_op.into()),
