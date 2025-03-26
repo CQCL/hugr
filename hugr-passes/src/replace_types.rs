@@ -17,7 +17,7 @@ use hugr_core::ops::{
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, Output, Tag, TailLoop, Value,
     CFG, DFG,
 };
-use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
+use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeTransformer};
 use hugr_core::{Hugr, Node};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
@@ -313,17 +313,16 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = match e.get_type().as_type_enum() {
-                    TypeEnum::Extension(exty) => self.consts.get(exty).map_or_else(
+                let new_const = e.get_type().as_extension().and_then(|exty| {
+                    self.consts.get(exty).map_or_else(
                         || {
                             self.param_consts
                                 .get(&exty.into())
                                 .and_then(|const_fn| const_fn(e, self))
                         },
                         |const_fn| Some(const_fn(e, self)),
-                    ),
-                    _ => None,
-                };
+                    )
+                });
                 if let Some(new_const) = new_const {
                     *value = new_const;
                     true
@@ -401,9 +400,7 @@ mod test {
         list_type, list_type_def, ListOp, ListValue,
     };
 
-    use hugr_core::types::{
-        PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
-    };
+    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
@@ -724,9 +721,7 @@ mod test {
         }
         let i32_t = || INT_TYPES[5].to_owned();
         let opt_i32 = Type::from(option_type(i32_t()));
-        let TypeEnum::Extension(i32_custom_t) = i32_t().as_type_enum().clone() else {
-            panic!()
-        };
+        let i32_custom_t = i32_t().as_extension().unwrap().clone();
         let mut dfb = DFGBuilder::new(inout_sig(
             vec![list_type(i32_t()), list_type(opt_i32.clone())],
             vec![i32_t(), opt_i32.clone()],
