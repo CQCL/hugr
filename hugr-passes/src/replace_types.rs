@@ -22,14 +22,14 @@ use hugr_core::{Hugr, Node};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
 
-/// A thing to which an Op can be lowered, i.e. with which a node can be replaced.
+/// A thing with which an Op (i.e. node) can be replaced
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpReplacement {
-    /// Keep the same node (inputs/outputs, modulo lowering of types therein), change only the op
+    /// Keep the same node (inputs/outputs, modulo replacement of types therein), change only the op
     SingleOp(OpType),
     /// Defines a sub-Hugr to splice in place of the op - a [CFG](OpType::CFG),
     /// [Conditional](OpType::Conditional) or [DFG](OpType::DFG), which must have
-    /// the same (lowered) inputs and outputs as the original op.
+    /// the same inputs and outputs as the original op, modulo replacement.
     // Not a FuncDefn, nor Case/DataflowBlock
     /// Note this will be of limited use before [monomorphization](super::monomorphize()) because
     /// the sub-Hugr will not be able to use type variables present in the op.
@@ -38,7 +38,7 @@ pub enum OpReplacement {
     CompoundOp(Box<Hugr>),
     // TODO allow also Call to a Node in the existing Hugr
     // (can't see any other way to achieve multiple calls to the same decl.
-    // So client should add the functions before lowering, then remove unused ones afterwards.)
+    // So client should add the functions before replacement, then remove unused ones afterwards.)
 }
 
 impl OpReplacement {
@@ -62,15 +62,9 @@ impl OpReplacement {
 
 #[derive(Clone, Default)]
 pub struct ReplaceTypes {
-    /// Handles simple cases like T1 -> T2.
-    /// If T1 is Copyable and T2 Linear, then error will be raised if we find e.g.
-    /// ArrayOfCopyables(T1). This would require an additional entry for that.
     type_map: HashMap<CustomType, Type>,
-    /// Parametric types are handled by a function which receives the lowered typeargs.
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
-    // Handles simple cases Op1 -> Op2.
     op_map: HashMap<OpHashWrapper, OpReplacement>,
-    // Called after lowering typeargs; return None to use original OpDef
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
     consts: HashMap<CustomType, Arc<dyn Fn(&OpaqueValue) -> Value>>,
     param_consts: HashMap<ParametricType, Arc<dyn Fn(&OpaqueValue) -> Option<Value>>>,
@@ -113,15 +107,19 @@ impl ReplaceTypes {
         self
     }
 
-    /// Configures this instance to change occurrences of type `src` to `dest`.
+    /// Configures this instance to replace occurrences of type `src` with `dest`.
     /// Note that if `src` is an instance of a *parametrized* [TypeDef], this takes
     /// precedence over [Self::replace_parametrized_type] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
-    /// substitution (parametric polymorphism) happening later will not respect this lowering.
+    /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
     /// If there are any [LoadConstant]s of this type, callers should also call [Self::replace_consts]
     /// (or [Self::replace_consts_parametrized]) as the load-constants will be reparametrized
     /// (and this will break the edge from const to loadconstant).
+    /// 
+    /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
+    /// [SignatureError] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
+    /// (This can be overridden by an additional [Self::replace_type].)
     pub fn replace_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable or 'src' is linear, but since we can't
         // check that for parametrized types, we'll be consistent and not check here either.
@@ -130,9 +128,9 @@ impl ReplaceTypes {
 
     /// Configures this instance to change occurrences of a parametrized type `src`
     /// via a callback that builds the replacement type given the [TypeArg]s.
-    /// Note that the TypeArgs will already have been lowered (e.g. they may not
+    /// Note that the TypeArgs will already have been updated (e.g. they may not
     /// fit the bounds of the original type). The callback may return `None` to indicate
-    /// no change (in which case the supplied/lowered TypeArgs will be given to `src`).
+    /// no change (in which case the supplied TypeArgs will be given to `src`).
     ///
     /// If there are any [LoadConstant]s of any of these types, callers should also call
     /// [Self::replace_consts_parametrized] (or [Self::replace_consts]) as the
@@ -153,17 +151,17 @@ impl ReplaceTypes {
 
     /// Configures this instance to change occurrences of `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* [OpDef], this takes
-    /// precedence over [Self::lower_parametric_op] where the `src`s overlap. Thus, this
-    /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
-    /// substitution (parametric polymorphism) happening later will not respect this
-    /// lowering.
+    /// precedence over [Self::replace_parametrized_op] where the `src`s overlap. Thus,
+    /// this should only be used on already-*[monomorphize](super::monomorphize())d*
+    /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
+    /// this replacement.
     pub fn replace_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
         self.op_map.insert(OpHashWrapper::from(src), dest);
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [TypeArg]s.
-    /// Note that the TypeArgs will already have been lowered (e.g. they may not
+    /// Note that the TypeArgs will already have been updated (e.g. they may not
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
@@ -179,7 +177,7 @@ impl ReplaceTypes {
     /// a callback that is passed the value of the constant (of that type).
     ///
     /// Note that if `src_ty` is an instance of a *parametrized* [TypeDef],
-    /// this takes precedence over [Self::lower_consts_parametric] where
+    /// this takes precedence over [Self::replace_consts_parametrized] where
     /// the `src_ty`s overlap.
     pub fn replace_consts(
         &mut self,
