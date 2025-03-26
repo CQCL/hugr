@@ -83,6 +83,10 @@
 //! [Table]: crate::v0::table
 //! [AST]: crate::v0::ast
 use ordered_float::OrderedFloat;
+#[cfg(feature = "pyo3")]
+use pyo3::types::PyAnyMethods as _;
+#[cfg(feature = "pyo3")]
+use pyo3::PyTypeInfo as _;
 use smol_str::SmolStr;
 use std::sync::Arc;
 use table::LinkIndex;
@@ -290,6 +294,37 @@ pub enum ScopeClosure {
     Closed,
 }
 
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::FromPyObject<'py> for ScopeClosure {
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: usize = ob.getattr("value")?.extract()?;
+        match value {
+            0 => Ok(Self::Open),
+            1 => Ok(Self::Closed),
+            _ => Err(pyo3::exceptions::PyTypeError::new_err(
+                "Invalid ScopeClosure.",
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::IntoPyObject<'py> for ScopeClosure {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        let py_module = py.import("hugr.model")?;
+        let py_class = py_module.getattr("ScopeClosure")?;
+
+        match self {
+            ScopeClosure::Open => py_class.getattr("OPEN"),
+            ScopeClosure::Closed => py_class.getattr("CLOSED"),
+        }
+    }
+}
+
 /// The kind of a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum RegionKind {
@@ -300,6 +335,39 @@ pub enum RegionKind {
     ControlFlow = 1,
     /// Module region.
     Module = 2,
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::FromPyObject<'py> for RegionKind {
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: usize = ob.getattr("value")?.extract()?;
+        match value {
+            0 => Ok(Self::DataFlow),
+            1 => Ok(Self::ControlFlow),
+            2 => Ok(Self::Module),
+            _ => Err(pyo3::exceptions::PyTypeError::new_err(
+                "Invalid RegionKind.",
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::IntoPyObject<'py> for RegionKind {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        let py_module = py.import("hugr.model")?;
+        let py_class = py_module.getattr("RegionKind")?;
+
+        match self {
+            RegionKind::DataFlow => py_class.getattr("DATA_FLOW"),
+            RegionKind::ControlFlow => py_class.getattr("CONTROL_FLOW"),
+            RegionKind::Module => py_class.getattr("MODULE"),
+        }
+    }
 }
 
 /// The name of a variable.
@@ -319,6 +387,25 @@ impl AsRef<str> for VarName {
     }
 }
 
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::FromPyObject<'py> for VarName {
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let name: String = ob.extract()?;
+        Ok(Self::new(name))
+    }
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::IntoPyObject<'py> for &VarName {
+    type Target = pyo3::types::PyString;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(self.as_ref().into_pyobject(py)?)
+    }
+}
+
 /// The name of a symbol.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SymbolName(SmolStr);
@@ -333,6 +420,14 @@ impl SymbolName {
 impl AsRef<str> for SymbolName {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
+    }
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::FromPyObject<'py> for SymbolName {
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let name: String = ob.extract()?;
+        Ok(Self::new(name))
     }
 }
 
@@ -359,6 +454,25 @@ impl AsRef<str> for LinkName {
     }
 }
 
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::FromPyObject<'py> for LinkName {
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let name: String = ob.extract()?;
+        Ok(Self::new(name))
+    }
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::IntoPyObject<'py> for &LinkName {
+    type Target = pyo3::types::PyString;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(self.as_ref().into_pyobject(py)?)
+    }
+}
+
 /// A static literal value.
 ///
 /// Literal values may be large since they can include strings and byte
@@ -374,6 +488,47 @@ pub enum Literal {
     Bytes(Arc<[u8]>),
     /// Floating point literal
     Float(OrderedFloat<f64>),
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::FromPyObject<'py> for Literal {
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        if pyo3::types::PyString::is_type_of(ob) {
+            let value: String = ob.extract()?;
+            Ok(Literal::Str(value.into()))
+        } else if pyo3::types::PyInt::is_type_of(ob) {
+            let value: u64 = ob.extract()?;
+            Ok(Literal::Nat(value))
+        } else if pyo3::types::PyFloat::is_type_of(ob) {
+            let value: f64 = ob.extract()?;
+            Ok(Literal::Float(value.into()))
+        } else if pyo3::types::PyBytes::is_type_of(ob) {
+            let value: Vec<u8> = ob.extract()?;
+            Ok(Literal::Bytes(value.into()))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "Invalid literal value.",
+            ))
+        }
+    }
+}
+
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::IntoPyObject<'py> for &Literal {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(match self {
+            Literal::Str(s) => s.as_str().into_pyobject(py)?.into_any(),
+            Literal::Nat(n) => n.into_pyobject(py)?.into_any(),
+            Literal::Bytes(b) => pyo3::types::PyBytes::new(py, b)
+                .into_pyobject(py)?
+                .into_any(),
+            Literal::Float(f) => f.0.into_pyobject(py)?.into_any(),
+        })
+    }
 }
 
 #[cfg(test)]
