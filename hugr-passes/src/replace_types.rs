@@ -116,7 +116,7 @@ impl ReplaceTypes {
     /// If there are any [LoadConstant]s of this type, callers should also call [Self::replace_consts]
     /// (or [Self::replace_consts_parametrized]) as the load-constants will be reparametrized
     /// (and this will break the edge from const to loadconstant).
-    /// 
+    ///
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
     /// [SignatureError] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
     /// (This can be overridden by an additional [Self::replace_type].)
