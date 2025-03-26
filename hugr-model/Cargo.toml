@@ -29,6 +29,10 @@ pest_derive = { workspace = true }
 pretty = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
+pyo3 = { workspace = true, optional = true }
+
+[features]
+pyo3 = ["dep:pyo3"]
 
 [lints]
 workspace = true
