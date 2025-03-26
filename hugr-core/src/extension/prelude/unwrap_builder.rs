@@ -44,6 +44,21 @@ pub trait UnwrapBuilder: Dataflow {
         sum_type: SumType,
         input: Wire,
     ) -> Result<[Wire; N], BuildError> {
+        self.build_expect_sum(tag, sum_type, input, |i| {
+            format!("Expected variant {} but got variant {}", tag, i)
+        })
+    }
+
+    /// Build an unwrap operation for a sum type to extract the variant at the given tag
+    /// or panic with given message if the tag is not the expected value.
+    /// Message closure takes the unexpected tag and returns message.
+    fn build_expect_sum<const N: usize>(
+        &mut self,
+        tag: usize,
+        sum_type: SumType,
+        input: Wire,
+        message: impl Fn(usize) -> String,
+    ) -> Result<[Wire; N], BuildError> {
         let variants: Vec<TypeRow> = (0..sum_type.num_variants())
             .map(|i| {
                 let tr_rv = sum_type.get_variant(i).unwrap().to_owned();
@@ -64,8 +79,7 @@ pub trait UnwrapBuilder: Dataflow {
             } else {
                 let output_row = output_row.iter().cloned();
                 let inputs = zip_eq(case.input_wires(), variant.iter().cloned());
-                let err =
-                    ConstError::new(1, format!("Expected variant {} but got variant {}", tag, i));
+                let err = ConstError::new(1, message(i));
                 let outputs = case.add_panic(err, output_row, inputs)?.outputs();
                 case.finish_with_outputs(outputs)?;
             }
