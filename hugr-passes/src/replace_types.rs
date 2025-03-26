@@ -300,7 +300,9 @@ impl ReplaceTypes {
         }
     }
 
-    fn change_value(&self, value: &mut Value) -> Result<bool, ReplaceTypesError> {
+    /// Modifies the specified Value in-place according to current configuration.
+    /// Returns whether the value has changed (conservative over-approximation).
+    pub fn change_value(&self, value: &mut Value) -> Result<bool, ReplaceTypesError> {
         match value {
             Value::Sum(Sum {
                 values, sum_type, ..
