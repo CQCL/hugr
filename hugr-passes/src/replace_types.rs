@@ -56,7 +56,7 @@ impl OpReplacement {
 }
 
 #[derive(Clone, Default)]
-pub struct LowerTypes {
+pub struct ReplaceTypes {
     /// Handles simple cases like T1 -> T2.
     /// If T1 is Copyable and T2 Linear, then error will be raised if we find e.g.
     /// ArrayOfCopyables(T1). This would require an additional entry for that.
@@ -72,8 +72,8 @@ pub struct LowerTypes {
     validation: ValidationLevel,
 }
 
-impl TypeTransformer for LowerTypes {
-    type Err = ChangeTypeError;
+impl TypeTransformer for ReplaceTypes {
+    type Err = ReplaceTypesError;
 
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
         Ok(if let Some(res) = self.type_map.get(ct) {
@@ -94,14 +94,14 @@ impl TypeTransformer for LowerTypes {
 
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub enum ChangeTypeError {
+pub enum ReplaceTypesError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     #[error(transparent)]
     ValidationError(#[from] ValidatePassError),
 }
 
-impl LowerTypes {
+impl ReplaceTypes {
     /// Sets the validation level used before and after the pass is run.
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
@@ -187,12 +187,12 @@ impl LowerTypes {
     }
 
     /// Run the pass using specified configuration.
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<bool, ChangeTypeError> {
+    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
         self.validation
             .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ChangeTypeError> {
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
         for n in hugr.nodes().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
@@ -200,7 +200,7 @@ impl LowerTypes {
         Ok(changed)
     }
 
-    fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ChangeTypeError> {
+    fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ReplaceTypesError> {
         match hugr.optype_mut(n) {
             OpType::FuncDefn(FuncDefn { signature, .. })
             | OpType::FuncDecl(FuncDecl { signature, .. }) => signature.body_mut().transform(self),
@@ -224,7 +224,7 @@ impl LowerTypes {
                 if change {
                     let new_inst = func_sig
                         .instantiate(type_args)
-                        .map_err(ChangeTypeError::SignatureError)?;
+                        .map_err(ReplaceTypesError::SignatureError)?;
                     *instantiation = new_inst;
                 }
                 Ok(change)
@@ -287,7 +287,7 @@ impl LowerTypes {
         }
     }
 
-    fn change_value(&self, value: &mut Value) -> Result<bool, ChangeTypeError> {
+    fn change_value(&self, value: &mut Value) -> Result<bool, ReplaceTypesError> {
         match value {
             Value::Sum(Sum {
                 values, sum_type, ..
@@ -389,7 +389,7 @@ mod test {
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
-    use super::{LowerTypes, OpReplacement};
+    use super::{ReplaceTypes, OpReplacement};
 
     const PACKED_VEC: &str = "PackedVec";
     const READ: &str = "read";
@@ -449,7 +449,7 @@ mod test {
         )
     }
 
-    fn lowerer(ext: &Arc<Extension>) -> LowerTypes {
+    fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
         fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
             let ty = just_elem_type(args);
             let mut dfb = DFGBuilder::new(inout_sig(
@@ -474,7 +474,7 @@ mod test {
             )))
         }
         let pv = ext.get_type(PACKED_VEC).unwrap();
-        let mut lw = LowerTypes::default();
+        let mut lw = ReplaceTypes::default();
         lw.lower_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.lower_parametric_type(
             pv,
@@ -631,7 +631,7 @@ mod test {
         let mut h = tl.finish_hugr().unwrap();
 
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or bool_t - this should have no effect
-        let mut lowerer = LowerTypes::default();
+        let mut lowerer = ReplaceTypes::default();
         lowerer.lower_parametric_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
             (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
@@ -641,7 +641,7 @@ mod test {
         assert_eq!(h, backup);
 
         //2. Lower List<T> to Array<10, T> UNLESS T is usize_t() - this leaves the Const unchanged
-        let mut lowerer = LowerTypes::default();
+        let mut lowerer = ReplaceTypes::default();
         lowerer.lower_parametric_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
             (usize_t() != *ty).then_some(array_type(10, ty.clone()))
@@ -656,7 +656,7 @@ mod test {
 
         // 3. Lower all List<T> to Array<4,T> so we can use List's handy CustomConst
         let mut h = backup;
-        let mut lowerer = LowerTypes::default();
+        let mut lowerer = ReplaceTypes::default();
         lowerer.lower_parametric_type(
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
@@ -726,7 +726,7 @@ mod test {
             .outputs_arr();
         let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
 
-        let mut lowerer = LowerTypes::default();
+        let mut lowerer = ReplaceTypes::default();
         lowerer.lower_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
         lowerer.lower_parametric_type(list_type_def(), |args| {
