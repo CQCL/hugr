@@ -154,6 +154,9 @@ impl Linearizer {
     /// Gets an [OpReplacement] for copying a value of type `typ`, i.e.
     /// a recipe for a node with one input of that type and two outputs.
     pub fn copy_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
+        if typ.copyable() {
+            return Err(LinearizeError::CopyableType(typ.clone()));
+        };
         if let Some((copy, _)) = self.copy_discard.get(typ) {
             return Ok(copy.clone());
         }
@@ -174,11 +177,14 @@ impl Linearizer {
                     let mut orig_elems = vec![];
                     let mut copy_elems = vec![];
                     for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
-                        let [orig_elem, copy_elem] = self
-                            .copy_op(ty)?
-                            .add(&mut case_b, [inp])
-                            .unwrap()
-                            .outputs_arr();
+                        let [orig_elem, copy_elem] = if ty.copyable() {
+                            [inp, inp]
+                        } else {
+                            self.copy_op(ty)?
+                                .add(&mut case_b, [inp])
+                                .unwrap()
+                                .outputs_arr()
+                        };
                         orig_elems.push(orig_elem);
                         copy_elems.push(copy_elem);
                     }
@@ -209,6 +215,9 @@ impl Linearizer {
     /// Gets an [OpReplacement] for discarding a value of type `typ`, i.e.
     /// a recipe for a node with one input of that type and no outputs.
     fn discard_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
+        if typ.copyable() {
+            return Err(LinearizeError::CopyableType(typ.clone()));
+        };
         if let Some((_, discard)) = self.copy_discard.get(typ) {
             return Ok(discard.clone());
         }
@@ -222,7 +231,9 @@ impl Linearizer {
                 for (idx, variant) in variants.into_iter().enumerate() {
                     let mut case_b = cb.case_builder(idx).unwrap();
                     for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
-                        self.discard_op(ty)?.add(&mut case_b, [inp]).unwrap();
+                        if !ty.copyable() {
+                            self.discard_op(ty)?.add(&mut case_b, [inp]).unwrap();
+                        }
                     }
                     case_b.finish_with_outputs([]).unwrap();
                 }
