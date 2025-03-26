@@ -12,12 +12,12 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-loop
 
 (import core.adt)
 
-(define-func example.loop (param ?0 core.type) (core.fn [?0] [?0] (ext))
+(define-func example.loop (param ?0 core.type) (core.fn [?0] [?0])
   (dfg [%0] [%1]
-    (signature (core.fn [?0] [?0] (ext)))
+    (signature (core.fn [?0] [?0]))
     (tail-loop [%0] [%1]
-      (signature (core.fn [?0] [?0] (ext)))
+      (signature (core.fn [?0] [?0]))
       (dfg [%2] [%3]
-        (signature (core.fn [?0] [(core.adt [[?0] [?0]])] (ext)))
+        (signature (core.fn [?0] [(core.adt [[?0] [?0]])]))
         ((core.make_adt _ _ 0) [%2] [%3]
-          (signature (core.fn [?0] [(core.adt [[?0] [?0]])] (ext))))))))
+          (signature (core.fn [?0] [(core.adt [[?0] [?0]])])))))))

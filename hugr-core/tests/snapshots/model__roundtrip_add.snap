@@ -14,17 +14,14 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-add.
   example.add
   (core.fn
     [arithmetic.int.types.int arithmetic.int.types.int]
-    [arithmetic.int.types.int]
-    (ext))
+    [arithmetic.int.types.int])
   (dfg [%0 %1] [%2]
     (signature
       (core.fn
         [arithmetic.int.types.int arithmetic.int.types.int]
-        [arithmetic.int.types.int]
-        (ext)))
+        [arithmetic.int.types.int]))
     (arithmetic.int.iadd [%0 %1] [%2]
       (signature
         (core.fn
           [arithmetic.int.types.int arithmetic.int.types.int]
-          [arithmetic.int.types.int]
-          (ext))))))
+          [arithmetic.int.types.int])))))

@@ -144,11 +144,6 @@ fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
             print_tuple_parts(printer, tuple_parts);
             printer.parens_exit();
         }
-        Term::ExtSet => {
-            printer.parens_enter();
-            printer.text("ext");
-            printer.parens_exit();
-        }
         Term::Func(region) => {
             printer.parens_enter();
             printer.text("fn");
