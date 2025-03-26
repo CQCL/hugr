@@ -129,14 +129,14 @@ impl LowerTypes {
     pub fn lower_parametric_type(
         &mut self,
         src: &TypeDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<Type>>,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
     ) {
         // No way to check that dest_fn never produces a linear type.
         // We could require copy/discard-generators if src is Copyable, or *might be*
         // (depending on arguments - i.e. if src's TypeDefBound is anything other than
         // `TypeDefBound::Explicit(TypeBound::Copyable)`) but that seems an annoying
         // overapproximation. Moreover, these depend upon the *return type* of the Fn.
-        self.param_types.insert(src.into(), Arc::from(dest_fn));
+        self.param_types.insert(src.into(), Arc::new(dest_fn));
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
@@ -158,9 +158,9 @@ impl LowerTypes {
     pub fn lower_parametric_op(
         &mut self,
         src: &OpDef,
-        dest_fn: Box<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<OpReplacement> + 'static,
     ) {
-        self.param_ops.insert(src.into(), Arc::from(dest_fn));
+        self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -172,9 +172,9 @@ impl LowerTypes {
     pub fn lower_consts(
         &mut self,
         src_ty: CustomType,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Value>,
+        const_fn: impl Fn(&OpaqueValue) -> Value + 'static,
     ) {
-        self.consts.insert(src_ty.clone(), Arc::from(const_fn));
+        self.consts.insert(src_ty.clone(), Arc::new(const_fn));
     }
 
     /// Configures this instance to change [Const]s of all types that are instances
@@ -183,9 +183,9 @@ impl LowerTypes {
     pub fn lower_consts_parametric(
         &mut self,
         src_ty: &TypeDef,
-        const_fn: Box<dyn Fn(&OpaqueValue) -> Option<Value>>,
+        const_fn: impl Fn(&OpaqueValue) -> Option<Value> + 'static,
     ) {
-        self.param_consts.insert(src_ty.into(), Arc::from(const_fn));
+        self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
     }
 
     /// Run the pass using specified configuration.
@@ -634,26 +634,20 @@ mod test {
 
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or bool_t - this should have no effect
         let mut lowerer = LowerTypes::default();
-        lowerer.lower_parametric_type(
-            list_type_def(),
-            Box::new(|args| {
-                let ty = just_elem_type(args);
-                (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
-            }),
-        );
+        lowerer.lower_parametric_type(list_type_def(), |args| {
+            let ty = just_elem_type(args);
+            (![usize_t(), bool_t()].contains(ty)).then_some(array_type(10, ty.clone()))
+        });
         let backup = h.clone();
         assert!(!lowerer.run(&mut h).unwrap());
         assert_eq!(h, backup);
 
         //2. Lower List<T> to Array<10, T> UNLESS T is usize_t() - this leaves the Const unchanged
         let mut lowerer = LowerTypes::default();
-        lowerer.lower_parametric_type(
-            list_type_def(),
-            Box::new(|args| {
-                let ty = just_elem_type(args);
-                (usize_t() != *ty).then_some(array_type(10, ty.clone()))
-            }),
-        );
+        lowerer.lower_parametric_type(list_type_def(), |args| {
+            let ty = just_elem_type(args);
+            (usize_t() != *ty).then_some(array_type(10, ty.clone()))
+        });
         assert!(lowerer.run(&mut h).unwrap());
         let sig = h.signature(h.root()).unwrap();
         assert_eq!(
@@ -669,19 +663,13 @@ mod test {
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
         );
-        lowerer.lower_consts_parametric(
-            list_type_def(),
-            Box::new(|opaq| {
-                let lv = opaq
-                    .value()
-                    .downcast_ref::<ListValue>()
-                    .expect("Only one constant in test");
-                Some(
-                    ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec())
-                        .into(),
-                )
-            }),
-        );
+        lowerer.lower_consts_parametric(list_type_def(), |opaq| {
+            let lv = opaq
+                .value()
+                .downcast_ref::<ListValue>()
+                .expect("Only one constant in test");
+            Some(ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into())
+        });
         lowerer.run(&mut h).unwrap();
 
         assert_eq!(
@@ -743,10 +731,9 @@ mod test {
         let mut lowerer = LowerTypes::default();
         lowerer.lower_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
-        lowerer.lower_parametric_type(
-            list_type_def(),
-            Box::new(|args| option_contents(just_elem_type(args)).map(list_type)),
-        );
+        lowerer.lower_parametric_type(list_type_def(), |args| {
+            option_contents(just_elem_type(args)).map(list_type)
+        });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
         lowerer.lower_parametric_op(
             e.get_op(READ).unwrap().as_ref(),
