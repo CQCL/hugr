@@ -28,6 +28,8 @@ pub use monomorphize::remove_polyfuncs;
 #[allow(deprecated)]
 pub use monomorphize::monomorphize;
 pub use monomorphize::{MonomorphizeError, MonomorphizePass};
+pub mod replace_types;
+pub use replace_types::ReplaceTypes;
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod validation;
