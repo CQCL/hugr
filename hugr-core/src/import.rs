@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::{
     extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
-    hugr::{HugrMut, IdentList, NodeMetadata},
+    hugr::{HugrMut, NodeMetadata},
     ops::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
         AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock,
