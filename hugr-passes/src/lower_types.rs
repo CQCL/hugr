@@ -103,8 +103,6 @@ pub enum ChangeTypeError {
 
 impl LowerTypes {
     /// Sets the validation level used before and after the pass is run.
-    // Note the self -> Self style is consistent with other passes, but not the other methods here.
-    // TODO change the others? But we are planning to drop validation_level in https://github.com/CQCL/hugr/pull/1895
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
         self
