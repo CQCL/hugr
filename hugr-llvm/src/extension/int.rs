@@ -764,13 +764,9 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
 ) -> Result<LLVMSumValue<'c>> {
     let int_ty = numerator.get_type();
     let zero = int_ty.const_zero();
-    let lower_bounds_check = if signed {
+    let lower_bounds_check =
         ctx.builder()
-            .build_int_compare(IntPredicate::SGT, denominator, zero, "valid_div")
-    } else {
-        ctx.builder()
-            .build_int_compare(IntPredicate::NE, denominator, zero, "valid_div")
-    }?;
+            .build_int_compare(IntPredicate::NE, denominator, zero, "valid_div")?;
 
     let (quot, rem) = if signed {
         let quot = ctx

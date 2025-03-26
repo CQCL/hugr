@@ -20,7 +20,7 @@ entry_block:                                      ; preds = %alloca_block
   store i8 %1, i8* %"2_1", align 1
   %"2_01" = load i8, i8* %"2_0", align 1
   %"2_12" = load i8, i8* %"2_1", align 1
-  %valid_div = icmp sgt i8 %"2_12", 0
+  %valid_div = icmp ne i8 %"2_12", 0
   %quotient = sdiv i8 %"2_01", %"2_12"
   %remainder = srem i8 %"2_01", %"2_12"
   %2 = insertvalue { i8, i8 } poison, i8 %quotient, 0
