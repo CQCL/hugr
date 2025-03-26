@@ -712,7 +712,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     pcg,
                     within_bounds,
                     &ERR_IU_TO_S,
-                    arg,
+                    |_| Ok(arg),
                 )?])
             })
         }
@@ -731,7 +731,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 pcg,
                 within_bounds,
                 &ERR_IS_TO_U,
-                arg,
+                |_| Ok(arg),
             )?])
         }),
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
@@ -882,7 +882,8 @@ fn val_or_panic<'c, H: HugrView<Node = Node>>(
     pcg: &impl PreludeCodegen,
     dont_panic: IntValue<'c>,
     err: &ConstError,
-    val: BasicValueEnum<'c>, // Must be same int type as `dont_panic`
+    // Returned value must be same int type as `dont_panic`.
+    go: impl Fn(&mut EmitFuncContext<'c, '_, H>) -> Result<BasicValueEnum<'c>>,
 ) -> Result<BasicValueEnum<'c>> {
     let exit_bb = ctx.new_basic_block("exit", None);
     let go_bb = ctx.new_basic_block("panic_if_0", Some(exit_bb));
@@ -903,7 +904,7 @@ fn val_or_panic<'c, H: HugrView<Node = Node>>(
 
     ctx.builder().position_at_end(exit_bb);
 
-    Ok(val)
+    go(ctx)
 }
 
 fn val_or_error<'c, H: HugrView<Node = Node>>(
