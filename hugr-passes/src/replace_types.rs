@@ -60,6 +60,8 @@ impl OpReplacement {
     }
 }
 
+/// A configuration of what types, ops, and constants should be replaced with what.
+/// May be applied to a Hugr via [Self::run].
 #[derive(Clone, Default)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
@@ -97,6 +99,7 @@ impl TypeTransformer for ReplaceTypes {
     }
 }
 
+/// An error produced by the [ReplaceTypes] pass
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum ReplaceTypesError {
@@ -120,8 +123,8 @@ impl ReplaceTypes {
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
     /// If there are any [LoadConstant]s of this type, callers should also call [Self::replace_consts]
-    /// (or [Self::replace_consts_parametrized]) as the load-constants will be reparametrized
-    /// (and this will break the edge from const to loadconstant).
+    /// (or [Self::replace_consts_parametrized]) as the [LoadConstant]s will be reparametrized
+    /// (and this will break the edge from [Const] to [LoadConstant]).
     ///
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
     /// [SignatureError] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
@@ -140,8 +143,8 @@ impl ReplaceTypes {
     ///
     /// If there are any [LoadConstant]s of any of these types, callers should also call
     /// [Self::replace_consts_parametrized] (or [Self::replace_consts]) as the
-    /// load-constants will be reparametrized (and this will break the edge from const to
-    /// loadconstant).
+    /// [LoadConstant]s will be reparametrized (and this will break the edge from [Const] to
+    /// [LoadConstant]).
     pub fn replace_parametrized_type(
         &mut self,
         src: &TypeDef,
