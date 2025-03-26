@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![warn(missing_docs)]
 //! Replace types with other types across the Hugr.
 //!
 //! Parametrized types and ops will be reparametrized taking into account the replacements,
@@ -102,6 +103,7 @@ impl TypeTransformer for ReplaceTypes {
 /// An error produced by the [ReplaceTypes] pass
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum ReplaceTypesError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
@@ -348,12 +350,15 @@ impl ReplaceTypes {
 }
 
 pub mod handlers {
+    //! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
     use hugr_core::ops::{constant::OpaqueValue, Value};
     use hugr_core::std_extensions::collections::list::ListValue;
     use hugr_core::types::Transformable;
 
     use super::{ReplaceTypes, ReplaceTypesError};
 
+    /// Handler for [ListValue] constants that recursively [ReplaceTypes::change_value]s
+    /// the elements of the list
     pub fn list_const(
         val: &OpaqueValue,
         repl: &ReplaceTypes,
