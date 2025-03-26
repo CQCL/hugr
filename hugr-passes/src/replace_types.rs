@@ -25,11 +25,11 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 /// A thing with which an Op (i.e. node) can be replaced
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpReplacement {
-    /// Keep the same node (inputs/outputs, modulo replacement of types therein), change only the op
+    /// Keep the same node, change only the op (updating types of inputs/outputs)
     SingleOp(OpType),
-    /// Defines a sub-Hugr to splice in place of the op - a [CFG](OpType::CFG),
-    /// [Conditional](OpType::Conditional) or [DFG](OpType::DFG), which must have
-    /// the same inputs and outputs as the original op, modulo replacement.
+    /// Defines a sub-Hugr to splice in place of the op - a [CFG], [Conditional], [DFG]
+    /// or [TailLoop], which must have the same inputs and outputs as the original op,
+    /// modulo replacement.
     // Not a FuncDefn, nor Case/DataflowBlock
     /// Note this will be of limited use before [monomorphization](super::monomorphize()) because
     /// the sub-Hugr will not be able to use type variables present in the op.
@@ -369,7 +369,7 @@ pub mod handlers {
         };
 
         let mut elem_t = lv.get_element_type().clone();
-        elem_t.transform(repl)?; // Silently drop errors
+        elem_t.transform(repl)?;
         Ok(Some(ListValue::new(elem_t, vals).into()))
     }
 }
