@@ -66,8 +66,9 @@ pub struct ReplaceTypes {
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     op_map: HashMap<OpHashWrapper, OpReplacement>,
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
-    consts: HashMap<CustomType, Arc<dyn Fn(&OpaqueValue) -> Value>>,
-    param_consts: HashMap<ParametricType, Arc<dyn Fn(&OpaqueValue) -> Option<Value>>>,
+    consts: HashMap<CustomType, Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Value>>,
+    param_consts:
+        HashMap<ParametricType, Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Option<Value>>>,
     validation: ValidationLevel,
 }
 
@@ -182,7 +183,7 @@ impl ReplaceTypes {
     pub fn replace_consts(
         &mut self,
         src_ty: CustomType,
-        const_fn: impl Fn(&OpaqueValue) -> Value + 'static,
+        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Value + 'static,
     ) {
         self.consts.insert(src_ty.clone(), Arc::new(const_fn));
     }
@@ -193,7 +194,7 @@ impl ReplaceTypes {
     pub fn replace_consts_parametrized(
         &mut self,
         src_ty: &TypeDef,
-        const_fn: impl Fn(&OpaqueValue) -> Option<Value> + 'static,
+        const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Option<Value> + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
     }
@@ -313,11 +314,14 @@ impl ReplaceTypes {
             }
             Value::Extension { e } => Ok('changed: {
                 if let TypeEnum::Extension(exty) = e.get_type().as_type_enum() {
-                    if let Some(new_const) =
-                        self.consts.get(exty).map(|const_fn| const_fn(e)).or(self
+                    if let Some(new_const) = self
+                        .consts
+                        .get(exty)
+                        .map(|const_fn| const_fn(e, self))
+                        .or(self
                             .param_consts
                             .get(&exty.into())
-                            .and_then(|const_fn| const_fn(e)))
+                            .and_then(|const_fn| const_fn(e, self)))
                     {
                         *value = new_const;
                         break 'changed true;
@@ -673,7 +677,7 @@ mod test {
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
         );
-        lowerer.replace_consts_parametrized(list_type_def(), |opaq| {
+        lowerer.replace_consts_parametrized(list_type_def(), |opaq, _| {
             let lv = opaq
                 .value()
                 .downcast_ref::<ListValue>()
