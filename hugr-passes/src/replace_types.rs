@@ -443,38 +443,7 @@ impl ReplaceTypes {
     }
 }
 
-pub mod handlers {
-    //! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
-    use hugr_core::ops::{constant::OpaqueValue, Value};
-    use hugr_core::std_extensions::collections::list::ListValue;
-    use hugr_core::types::Transformable;
-
-    use super::{ReplaceTypes, ReplaceTypesError};
-
-    /// Handler for [ListValue] constants that recursively [ReplaceTypes::change_value]s
-    /// the elements of the list
-    pub fn list_const(
-        val: &OpaqueValue,
-        repl: &ReplaceTypes,
-    ) -> Result<Option<Value>, ReplaceTypesError> {
-        let Some(lv) = val.value().downcast_ref::<ListValue>() else {
-            return Ok(None);
-        };
-        let mut vals: Vec<Value> = lv.get_contents().to_vec();
-        let mut ch = false;
-        for v in vals.iter_mut() {
-            ch |= repl.change_value(v)?;
-        }
-        // If none of the values has changed, assume the Type hasn't (Values have a single known type)
-        if !ch {
-            return Ok(None);
-        };
-
-        let mut elem_t = lv.get_element_type().clone();
-        elem_t.transform(repl)?;
-        Ok(Some(ListValue::new(elem_t, vals).into()))
-    }
-}
+pub mod handlers;
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
