@@ -1,6 +1,6 @@
 version = 1
 revision = 1
-requires-python = ">=3.10, <3.14"
+requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.11'",
     "python_full_version < '3.11'",
@@ -10,7 +10,9 @@ resolution-markers = [
 members = [
     "hugr",
 ]
-requirements = [
+
+[manifest.dependency-groups]
+dev = [
     { name = "mypy", specifier = ">=1.9.0,<2" },
     { name = "pre-commit", specifier = ">=3.6.2,<4" },
     { name = "pytest", specifier = ">=8.1.1,<9" },
@@ -1061,6 +1063,7 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/a2/6c1adfc58d493009c87461f7cb368508b2aba086a2b42e2cd75cd7e15f2c/zstd-1.5.6.6-cp313-cp313-manylinux_2_14_x86_64.whl", hash = "sha256:e6be32b525bc897974ee9d227eea0c6915865fb238517b3858818c9c0950aa6d", size = 1949498 },
     { url = "https://files.pythonhosted.org/packages/7d/30/1d655fdb0940739b9c918c66d7a40f1fd69e939b528f90962a79a22f625f/zstd-1.5.6.6-cp313-cp313-win32.whl", hash = "sha256:2b9ee5f6e21f481f86f597e22bc1de1bf756bbadf109c7c29025d00dd099a2d9", size = 144805 },
     { url = "https://files.pythonhosted.org/packages/a8/4f/0d9246c136f8d7facf858b1bc95bcaf44630b703d31b78e5fe96d424be3a/zstd-1.5.6.6-cp313-cp313-win_amd64.whl", hash = "sha256:564dac02bc7a8d73f84893ddec4be1b58fc5c719e77d96db9a446fb66f169461", size = 160040 },
+    { url = "https://files.pythonhosted.org/packages/4d/d0/40ae64a3c652e1a05391c5d79a8b99450ee531af24a581aac152551003b9/zstd-1.5.6.6-cp314-cp314-manylinux_2_34_x86_64.whl", hash = "sha256:0b23e070da44dc94b015f306045dcd7c56fafcb380c98e76e09527e7870b6738", size = 1740351 },
     { url = "https://files.pythonhosted.org/packages/43/19/aac27694f847a5d696cfefdea289d783003756394231c1d20ce309e0b66b/zstd-1.5.6.6-pp310-pypy310_pp73-macosx_10_15_x86_64.whl", hash = "sha256:3319e87b6ef80d5546430c382aabbe8868379c558c382c8b60f0158f0c36c9fd", size = 249246 },
     { url = "https://files.pythonhosted.org/packages/b0/b3/22cb33c77db31f311bac3afdfb2a2a4633ebcb7773ddf0cb7b885db9841b/zstd-1.5.6.6-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:c3a71fe124b81fb0cd9c6be56e32e48a1ace3a679ffbf8552e783a573bddf81e", size = 198390 },
     { url = "https://files.pythonhosted.org/packages/97/eb/315c0e3b9d4d37e7737f29b52dbd94d0ef670c1f561fd31a438f4abf9021/zstd-1.5.6.6-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:22ff220179386432eb1adf2d82dc2963ce6ad24c4f389bb14c266c341eee79d8", size = 160082 },
