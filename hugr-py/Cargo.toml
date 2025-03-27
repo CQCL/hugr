@@ -23,5 +23,5 @@ bench = false
 bumpalo = { workspace = true, features = ["collections"] }
 hugr-model = { version = "0.18", path = "../hugr-model", features = ["pyo3"] }
 paste.workspace = true
-pyo3 = { workspace = true, features = ["extension-module"] }
+pyo3 = { workspace = true, features = ["extension-module", "abi3-py310"] }
 smol_str.workspace = true
