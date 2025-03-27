@@ -27,7 +27,7 @@ use hugr_core::{Hugr, Node, Wire};
 use crate::validation::{ValidatePassError, ValidationLevel};
 
 mod linearize;
-pub use linearize::{copy_array, discard_array, LinearizeError, Linearizer};
+pub use linearize::{LinearizeError, Linearizer};
 
 /// A thing with which an Op (i.e. node) can be replaced
 #[derive(Clone, Debug, PartialEq)]

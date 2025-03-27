@@ -1,22 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
-use hugr_core::builder::{
-    endo_sig, inout_sig, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr,
-    DataflowSubContainer, HugrBuilder,
-};
-use hugr_core::extension::prelude::{option_type, UnwrapBuilder};
-use hugr_core::extension::{ExtensionSet, SignatureError, TypeDef};
-use hugr_core::ops::{OpTrait, OpType, Tag, Value};
-use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
-use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
-use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use hugr_core::std_extensions::collections::array::{
-    array_type, ArrayOpDef, ArrayRepeat, ArrayScan,
-};
-use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{
-    hugr::hugrmut::HugrMut, type_row, Hugr, HugrView, IncomingPort, Node, OutgoingPort,
-};
+use hugr_core::builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder};
+use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::ops::Tag;
+use hugr_core::types::{Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::{hugr::hugrmut::HugrMut, HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
@@ -287,6 +275,7 @@ mod test {
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
+    use crate::replace_types::handlers::{copy_array, discard_array};
     use crate::replace_types::OpReplacement;
     use crate::ReplaceTypes;
 
@@ -432,8 +421,8 @@ mod test {
 
         lowerer.linearize_parametric(
             array_type_def(),
-            Box::new(super::copy_array),
-            Box::new(super::discard_array),
+            Box::new(copy_array),
+            Box::new(discard_array),
         );
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
         let opt_lin_ty = Type::from(option_type(lin_t.clone()));
