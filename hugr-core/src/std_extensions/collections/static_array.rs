@@ -14,7 +14,8 @@
 //!  * `get<T: Copyable>: [static_array<T>, prelude.usize] -> [[] + [T]]`
 //!  * `len<T: Copyable>: [static_array<T>] -> [prelude.usize]`
 use std::{
-    hash, iter,
+    hash::{self, Hash as _},
+    iter,
     sync::{self, Arc},
 };
 
@@ -30,7 +31,7 @@ use crate::{
         ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef,
     },
     ops::{
-        constant::{CustomConst, TryHash, ValueName},
+        constant::{maybe_hash_values, CustomConst, TryHash, ValueName},
         ExtensionOp, NamedOp, OpName, Value,
     },
     types::{
@@ -41,10 +42,9 @@ use crate::{
     Extension, Wire,
 };
 
-use super::array::ArrayValue;
-
-use delegate::delegate;
 use lazy_static::lazy_static;
+
+use super::array::ArrayValue;
 
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_static_unchecked("collections.static_array");
@@ -53,7 +53,7 @@ pub const STATIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("static_array")
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, derive_more::From)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, derive_more::From)]
 /// Statically sized array of values, all of the same [TypeBound::Copyable]
 /// type.
 pub struct StaticArrayValue {
@@ -64,11 +64,14 @@ pub struct StaticArrayValue {
 }
 
 impl StaticArrayValue {
-    delegate! {
-        to self.value {
-            /// Returns the type of values inside the `[StaticArrayValue]`.
-            pub fn get_element_type(&self) -> &Type;
-        }
+    /// Returns the type of values inside the `[StaticArrayValue]`.
+    pub fn get_element_type(&self) -> &Type {
+        self.value.get_element_type()
+    }
+
+    /// Returns the values contained inside the `[StaticArrayValue]`.
+    pub fn get_contents(&self) -> &[Value] {
+        self.value.get_contents()
     }
 
     /// Create a new [CustomConst] for an array of values of type `typ`.
@@ -102,9 +105,12 @@ impl StaticArrayValue {
 }
 
 impl TryHash for StaticArrayValue {
-    fn try_hash(&self, st: &mut dyn hash::Hasher) -> bool {
-        st.write(self.name.as_bytes());
-        self.value.try_hash(st)
+    fn try_hash(&self, mut st: &mut dyn hash::Hasher) -> bool {
+        maybe_hash_values(self.get_contents(), &mut st) && {
+            self.name.hash(&mut st);
+            self.get_element_type().hash(&mut st);
+            true
+        }
     }
 }
 
@@ -123,17 +129,15 @@ impl CustomConst for StaticArrayValue {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.value.get_contents().iter().map(Value::extension_reqs))
+        ExtensionSet::union_over(self.get_contents().iter().map(Value::extension_reqs))
             .union(EXTENSION_ID.into())
     }
 
-    delegate! {
-        to self.value {
-            fn update_extensions(
-                &mut self,
-                extensions: &WeakExtensionRegistry,
-            ) -> Result<(), ExtensionResolutionError>;
-        }
+    fn update_extensions(
+        &mut self,
+        extensions: &WeakExtensionRegistry,
+    ) -> Result<(), ExtensionResolutionError> {
+        self.value.update_extensions(extensions)
     }
 }
 

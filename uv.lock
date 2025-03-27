@@ -10,9 +10,7 @@ resolution-markers = [
 members = [
     "hugr",
 ]
-
-[manifest.dependency-groups]
-dev = [
+requirements = [
     { name = "mypy", specifier = ">=1.9.0,<2" },
     { name = "pre-commit", specifier = ">=3.6.2,<4" },
     { name = "pytest", specifier = ">=8.1.1,<9" },
@@ -275,13 +273,14 @@ wheels = [
 
 [[package]]
 name = "hugr"
-version = "0.11.1"
+version = "0.11.3"
 source = { editable = "hugr-py" }
 dependencies = [
     { name = "graphviz" },
     { name = "pydantic" },
     { name = "pydantic-extra-types" },
     { name = "semver" },
+    { name = "typing-extensions" },
     { name = "zstd" },
 ]
 
@@ -300,6 +299,7 @@ requires-dist = [
     { name = "semver", specifier = ">=3.0.2" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=8.1.3,<9.0.0" },
     { name = "sphinx-book-theme", marker = "extra == 'docs'", specifier = ">=1.1.2" },
+    { name = "typing-extensions", specifier = "~=4.12" },
     { name = "zstd", specifier = ">=1.5.6.6" },
 ]
 provides-extras = ["docs"]

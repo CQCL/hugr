@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.0...hugr-passes-v0.15.1) - 2025-03-21
+
+### Bug Fixes
+
+- correct `CallIndirect` tag from `FnCall` to `DataflowChild` ([#2006](https://github.com/CQCL/hugr/pull/2006))
+
 ## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.14.4...hugr-passes-v0.15.0) - 2025-03-14
 
 ### New Features

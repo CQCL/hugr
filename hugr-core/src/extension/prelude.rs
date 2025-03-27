@@ -102,13 +102,27 @@ lazy_static! {
                     PolyFuncTypeRV::new(
                         [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
                         FuncValueType::new(
-                            vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                            vec![TypeRV::new_extension(error_type.clone()), TypeRV::new_row_var_use(0, TypeBound::Any)],
                             vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
                         ),
                     ),
                     extension_ref,
                 )
                 .unwrap();
+            prelude
+            .add_op(
+                EXIT_OP_ID,
+                "Exit with input error".to_string(),
+                PolyFuncTypeRV::new(
+                    [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                    FuncValueType::new(
+                        vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                        vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                    ),
+                ),
+                extension_ref,
+            )
+            .unwrap();
 
             TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
             NoopDef.add_to_extension(prelude, extension_ref).unwrap();
@@ -163,7 +177,24 @@ pub fn bool_t() -> Type {
 /// second sequence of types in its instantiation. Note that the inputs and
 /// outputs only exist so that structural constraints such as linearity can be
 /// satisfied.
+///
+/// Panic immediately halts a multi-shot program. It is intended to be used in
+/// cases where an unrecoverable error is detected.
 pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
+
+/// Name of the prelude exit operation.
+///
+/// This operation can have any input and any output wires; it is instantiated
+/// with two [TypeArg::Sequence]s representing these. The first input to the
+/// operation is always an error type; the remaining inputs correspond to the
+/// first sequence of types in its instantiation; the outputs correspond to the
+/// second sequence of types in its instantiation. Note that the inputs and
+/// outputs only exist so that structural constraints such as linearity can be
+/// satisfied.
+///
+/// Exit immediately halts a single shot's execution. It is intended to be used
+/// when the user wants to exit the program early.
+pub const EXIT_OP_ID: OpName = OpName::new_inline("exit");
 
 /// Name of the string type.
 pub const STRING_TYPE_NAME: TypeName = TypeName::new_inline("string");
@@ -1077,7 +1108,7 @@ mod test {
 
         const TYPE_ARG_NONE: TypeArg = TypeArg::Sequence { elems: vec![] };
         let op = PRELUDE
-            .instantiate_extension_op(&PANIC_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
+            .instantiate_extension_op(&EXIT_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();

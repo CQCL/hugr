@@ -12,6 +12,9 @@ target/
 # Failing proptest artifacts
 proptest-regressions/
 
+# snaphsot test failures
+*.snap.new
+
 # Devenv
 .devenv*
 devenv.local.nix
