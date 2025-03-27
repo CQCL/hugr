@@ -67,6 +67,23 @@ pub enum ImportError {
     /// The model is not well-formed.
     #[error("validate error: {0}")]
     Model(#[from] table::ModelError),
+    /// Incorrect order hints.
+    #[error("incorrect order hint: {0}")]
+    OrderHint(#[from] OrderHintError),
+}
+
+/// Import error caused by incorrect order hints.
+#[derive(Debug, Clone, Error)]
+pub enum OrderHintError {
+    /// Duplicate order hint key in the same region.
+    #[error("duplicate order hint key {0}")]
+    DuplicateKey(table::NodeId, u64),
+    /// Order hint including a key not defined in the region.
+    #[error("order hint with unknown key {0}")]
+    UnknownKey(u64),
+    /// Order hint involving a node with no order port.
+    #[error("order hint on node with no order port: {0}")]
+    NoOrderPort(table::NodeId),
 }
 
 /// Helper macro to create an `ImportError::Unsupported` error with a formatted message.
@@ -646,8 +663,9 @@ impl<'a> Context<'a> {
                     continue;
                 };
 
-                // TODO: Error on duplicate key
-                order_keys.insert(*key, *child_id);
+                if let Some(_) = order_keys.insert(*key, *child_id) {
+                    return Err(OrderHintError::DuplicateKey(*child_id, *key).into());
+                }
             }
         }
 
@@ -665,28 +683,25 @@ impl<'a> Context<'a> {
                 continue;
             };
 
-            // TODO: Proper error on non-existing key
-            let a = order_keys.get(a).expect("unknown order key");
-            let b = order_keys.get(b).expect("unknown order key");
+            let a = order_keys.get(a).ok_or(OrderHintError::UnknownKey(*a))?;
+            let b = order_keys.get(b).ok_or(OrderHintError::UnknownKey(*b))?;
 
             // NOTE: The lookups here are expected to succeed since we only
             // process the order metadata after we have imported the nodes.
             let a_node = self.nodes[a];
             let b_node = self.nodes[b];
 
-            // Find the order ports
-            // TODO: Proper error on non-existing order port
             let a_port = self
                 .hugr
                 .get_optype(a_node)
                 .other_output_port()
-                .expect("order hint on node without order port");
+                .ok_or(OrderHintError::NoOrderPort(*a))?;
 
             let b_port = self
                 .hugr
                 .get_optype(b_node)
                 .other_input_port()
-                .expect("order hint on node without order port");
+                .ok_or(OrderHintError::NoOrderPort(*b))?;
 
             self.hugr.connect(a_node, a_port, b_node, b_port);
         }
