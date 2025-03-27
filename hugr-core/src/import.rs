@@ -663,7 +663,7 @@ impl<'a> Context<'a> {
                     continue;
                 };
 
-                if let Some(_) = order_keys.insert(*key, *child_id) {
+                if order_keys.insert(*key, *child_id).is_some() {
                     return Err(OrderHintError::DuplicateKey(*child_id, *key).into());
                 }
             }
