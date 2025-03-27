@@ -213,7 +213,7 @@ impl Linearizer {
 
     /// Gets an [OpReplacement] for discarding a value of type `typ`, i.e.
     /// a recipe for a node with one input of that type and no outputs.
-    fn discard_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
+    pub fn discard_op(&self, typ: &Type) -> Result<OpReplacement, LinearizeError> {
         if typ.copyable() {
             return Err(LinearizeError::CopyableType(typ.clone()));
         };
