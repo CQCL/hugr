@@ -762,41 +762,69 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
     panic: bool,
     signed: bool,
 ) -> Result<LLVMSumValue<'c>> {
-    let int_ty = numerator.get_type();
-    let zero = int_ty.const_zero();
-    let lower_bounds_check =
-        ctx.builder()
-            .build_int_compare(IntPredicate::NE, denominator, zero, "valid_div")?;
-
-    let (quot, rem) = if signed {
-        let quot = ctx
-            .builder()
-            .build_int_signed_div(numerator, denominator, "quotient")?;
-        let rem = ctx
-            .builder()
-            .build_int_signed_rem(numerator, denominator, "remainder")?;
-        (quot, rem)
-    } else {
-        let quot = ctx
-            .builder()
-            .build_int_unsigned_div(numerator, denominator, "quotient")?;
-        let rem = ctx
-            .builder()
-            .build_int_unsigned_rem(numerator, denominator, "remainder")?;
-        (quot, rem)
-    };
 
     let int_arg_ty = int_types::INT_TYPES[log_width as usize].clone();
     let tuple_sum_ty = HugrSumType::new_tuple(vec![int_arg_ty.clone(), int_arg_ty.clone()]);
 
     let pair_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), tuple_sum_ty.clone())?;
-    let pair_val = pair_ty
-        .build_tag(
-            ctx.builder(),
-            0,
-            vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
-        )?
-        .as_basic_value_enum();
+
+    let build_divmod = |ctx: &mut EmitFuncContext<'c, '_, H>| -> Result<BasicValueEnum<'c>> {
+
+        let max_signed_value = u64::pow(2, u32::pow(2, log_width as u32)) - 1;
+        let max_signed = numerator.get_type().const_int(max_signed_value, false);
+        let large_divisor = ctx.builder().build_int_compare(IntPredicate::UGT, denominator, max_signed, "is_divisor_large")?;
+        let negative_numerator = ctx.builder().build_int_compare(IntPredicate::SLT, numerator, numerator.get_type().const_zero(), "is_dividend_negative")?;
+        let tag = ctx.builder().build_left_shift(large_divisor, denominator.get_type().const_int(1, false), "")?;
+        let tag = ctx.builder().build_or(tag, negative_numerator, "tag")?;
+
+        let (quot, rem) = if signed {
+            let quot = ctx
+                .builder()
+                .build_int_signed_div(numerator, denominator, "quotient")?;
+            let rem = ctx
+                .builder()
+                .build_int_signed_rem(numerator, denominator, "remainder")?;
+            (quot, rem)
+        } else {
+            let quot = ctx
+                .builder()
+                .build_int_unsigned_div(numerator, denominator, "quotient")?;
+            let rem = ctx
+                .builder()
+                .build_int_unsigned_rem(numerator, denominator, "remainder")?;
+            (quot, rem)
+        };
+
+        // TODO: Sort out ordering
+        let negative_bigdiv = ctx.new_basic_block("negative_bigdiv", None);
+        let negative_smoldiv = ctx.new_basic_block("negative_smoldiv", None);
+        let non_negative_bigdiv = ctx.new_basic_block("non_negative_bigdiv", None);
+        let non_negative_smoldiv = ctx.new_basic_block("non_negative_smoldiv", None);
+
+        ctx.builder().build_switch(tag, non_negative_smoldiv, &[
+            //(denominator.get_type().const_int(1, false), negative_smoldiv),
+            //(denominator.get_type().const_int(2, false), non_negative_bigdiv),
+            //(denominator.get_type().const_int(3, false), negative_bigdiv),
+        ]);
+
+        // Default case (although it should only be reached by one branch)
+        ctx.builder().position_at_end(non_negative_smoldiv);
+        let default_result = pair_ty
+            .build_tag(
+                ctx.builder(),
+                0,
+                vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
+            )?
+            .as_basic_value_enum();
+
+        Ok(default_result)
+    };
+
+    let int_ty = numerator.get_type();
+    let zero = int_ty.const_zero();
+    let lower_bounds_check =
+        ctx.builder()
+        .build_int_compare(IntPredicate::NE, denominator, zero, "valid_div")?;
 
     let sum_ty = LLVMSumType::try_from_hugr_type(
         &ctx.typing_session(),
@@ -805,15 +833,16 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
 
     if panic {
         LLVMSumValue::try_new(
-            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, pair_val)?,
+            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, |ctx| build_divmod(ctx))?,
             pair_ty,
         )
     } else {
+        let result = build_divmod(ctx)?;
         LLVMSumValue::try_new(
             val_or_error(
                 ctx,
                 lower_bounds_check,
-                pair_val,
+                result,
                 &ERR_DIV_0,
                 sum_ty.clone(),
             )?,
