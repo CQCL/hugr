@@ -13,6 +13,7 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, IntValue},
     IntPredicate,
 };
+use insta::assert_compact_debug_snapshot;
 use lazy_static::lazy_static;
 
 use crate::{
@@ -762,19 +763,37 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
     panic: bool,
     signed: bool,
 ) -> Result<LLVMSumValue<'c>> {
-
     let int_arg_ty = int_types::INT_TYPES[log_width as usize].clone();
     let tuple_sum_ty = HugrSumType::new_tuple(vec![int_arg_ty.clone(), int_arg_ty.clone()]);
 
     let pair_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), tuple_sum_ty.clone())?;
 
     let build_divmod = |ctx: &mut EmitFuncContext<'c, '_, H>| -> Result<BasicValueEnum<'c>> {
-
-        let max_signed_value = u64::pow(2, u32::pow(2, log_width as u32)) - 1;
+        let max_signed_value = u64::pow(2, u32::pow(2, log_width as u32) -1) - 1;
         let max_signed = numerator.get_type().const_int(max_signed_value, false);
-        let large_divisor = ctx.builder().build_int_compare(IntPredicate::UGT, denominator, max_signed, "is_divisor_large")?;
-        let negative_numerator = ctx.builder().build_int_compare(IntPredicate::SLT, numerator, numerator.get_type().const_zero(), "is_dividend_negative")?;
-        let tag = ctx.builder().build_left_shift(large_divisor, denominator.get_type().const_int(1, false), "")?;
+        println!("max {}", max_signed_value);
+        let large_divisor_bool = ctx.builder().build_int_compare(
+            IntPredicate::UGT,
+            denominator,
+            max_signed,
+            "is_divisor_large",
+        )?;
+        // TODO: Make everything divisor type
+        //let large_divisor = ctx.builder().build_int_cast_sign_flag(large_divisor_bool, denominator.get_type(), false, "")?;
+        let large_divisor = ctx.builder().build_int_z_extend(large_divisor_bool, denominator.get_type(), "")?;
+        let negative_numerator_bool = ctx.builder().build_int_compare(
+            IntPredicate::SLT,
+            numerator,
+            numerator.get_type().const_zero(),
+            "is_dividend_negative",
+        )?;
+        let negative_numerator = ctx.builder().build_int_z_extend(negative_numerator_bool, denominator.get_type(), "")?;
+        let tag = ctx.builder().build_left_shift(
+            large_divisor,
+            denominator.get_type().const_int(1, false),
+            "",
+        )?;
+
         let tag = ctx.builder().build_or(tag, negative_numerator, "tag")?;
 
         let (quot, rem) = if signed {
@@ -795,36 +814,115 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
             (quot, rem)
         };
 
-        // TODO: Sort out ordering
-        let negative_bigdiv = ctx.new_basic_block("negative_bigdiv", None);
-        let negative_smoldiv = ctx.new_basic_block("negative_smoldiv", None);
-        let non_negative_bigdiv = ctx.new_basic_block("non_negative_bigdiv", None);
-        let non_negative_smoldiv = ctx.new_basic_block("non_negative_smoldiv", None);
+        let result_ptr = ctx.builder().build_alloca(pair_ty.clone(), "result")?;
 
-        ctx.builder().build_switch(tag, non_negative_smoldiv, &[
-            //(denominator.get_type().const_int(1, false), negative_smoldiv),
-            //(denominator.get_type().const_int(2, false), non_negative_bigdiv),
-            //(denominator.get_type().const_int(3, false), negative_bigdiv),
-        ]);
+        let finish = ctx.new_basic_block("finish", None);
+        let negative_bigdiv = ctx.new_basic_block("negative_bigdiv", Some(finish));
+        let negative_smoldiv = ctx.new_basic_block("negative_smoldiv", Some(finish));
+        let non_negative_bigdiv = ctx.new_basic_block("non_negative_bigdiv", Some(finish));
+        let non_negative_smoldiv = ctx.new_basic_block("non_negative_smoldiv", Some(finish));
+
+        ctx.builder().build_switch(
+            tag,
+            non_negative_smoldiv,
+            &[
+                (denominator.get_type().const_int(1, false), negative_smoldiv),
+                (
+                    denominator.get_type().const_int(2, false),
+                    non_negative_bigdiv,
+                ),
+                (denominator.get_type().const_int(3, false), negative_bigdiv),
+            ],
+        )?;
+
+        let build_and_store_result =
+            |ctx: &mut EmitFuncContext<'c, '_, H>, vs: Vec<BasicValueEnum<'c>>| -> Result<()> {
+                let result = pair_ty
+                    .build_tag(ctx.builder(), 0, vs)?
+                    //.build_tag(ctx.builder(), 0, vec![tag.as_basic_value_enum(), tag.as_basic_value_enum()])?
+                    .as_basic_value_enum();
+                ctx.builder().build_store(result_ptr, result)?;
+                ctx.builder().build_unconditional_branch(finish)?;
+                Ok(())
+            };
 
         // Default case (although it should only be reached by one branch)
         ctx.builder().position_at_end(non_negative_smoldiv);
-        let default_result = pair_ty
-            .build_tag(
-                ctx.builder(),
-                0,
-                vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
-            )?
-            .as_basic_value_enum();
+        build_and_store_result(
+            ctx,
+            vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
+        )?;
 
-        Ok(default_result)
+        ctx.builder().position_at_end(negative_smoldiv);
+        {
+            let if_rem_zero = pair_ty
+                .build_tag(
+                    ctx.builder(),
+                    0,
+                    vec![
+                        //quot.as_basic_value_enum(),
+                        //rem.get_type().const_zero().as_basic_value_enum(),
+                        rem.get_type().const_int(42, true).as_basic_value_enum(),
+                        rem.get_type().const_int(42, false).as_basic_value_enum(),
+                    ],
+                )?
+                .as_basic_value_enum();
+
+            let if_rem_nonzero = pair_ty
+                .build_tag(
+                    ctx.builder(),
+                    0,
+                    vec![
+                        ctx.builder()
+                            .build_int_sub(quot, quot.get_type().const_int(1, true), "")?
+                            .as_basic_value_enum(),
+                        ctx.builder()
+                            .build_int_add(denominator, rem, "")?
+                        .as_basic_value_enum(),
+                    ],
+                )?
+                .as_basic_value_enum();
+
+            let is_rem_zero = ctx.builder().build_int_compare(IntPredicate::EQ, quot, quot.get_type().const_zero(), "is_rem_0")?;
+            let result = ctx
+                .builder()
+                .build_select(is_rem_zero, if_rem_zero, if_rem_nonzero, "")?;
+            ctx.builder().build_store(result_ptr, result)?;
+            ctx.builder().build_unconditional_branch(finish)?;
+        }
+
+        // The (unsigned) divisor is bigger than the (signed) dividend could
+        // possibly be, so it's safe to return quotient 0 and remainder = dividend
+        ctx.builder().position_at_end(non_negative_bigdiv);
+        build_and_store_result(
+            ctx,
+            vec![
+                numerator.get_type().const_zero().as_basic_value_enum(),
+                numerator.as_basic_value_enum(),
+            ],
+        )?;
+
+        ctx.builder().position_at_end(negative_bigdiv);
+        build_and_store_result(
+            ctx,
+            vec![
+                numerator.get_type().const_all_ones().as_basic_value_enum(),
+                ctx.builder()
+                    .build_int_add(numerator, denominator, "")?
+                    .as_basic_value_enum(),
+            ],
+        )?;
+
+        ctx.builder().position_at_end(finish);
+        let result = ctx.builder().build_load(result_ptr, "result")?;
+        Ok(result)
     };
 
     let int_ty = numerator.get_type();
     let zero = int_ty.const_zero();
     let lower_bounds_check =
         ctx.builder()
-        .build_int_compare(IntPredicate::NE, denominator, zero, "valid_div")?;
+            .build_int_compare(IntPredicate::NE, denominator, zero, "valid_div")?;
 
     let sum_ty = LLVMSumType::try_from_hugr_type(
         &ctx.typing_session(),
@@ -833,19 +931,15 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
 
     if panic {
         LLVMSumValue::try_new(
-            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, |ctx| build_divmod(ctx))?,
+            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, |ctx| {
+                build_divmod(ctx)
+            })?,
             pair_ty,
         )
     } else {
         let result = build_divmod(ctx)?;
         LLVMSumValue::try_new(
-            val_or_error(
-                ctx,
-                lower_bounds_check,
-                result,
-                &ERR_DIV_0,
-                sum_ty.clone(),
-            )?,
+            val_or_error(ctx, lower_bounds_check, result, &ERR_DIV_0, sum_ty.clone())?,
             sum_ty,
         )
     }
@@ -1347,6 +1441,37 @@ mod test {
     }
 
     #[rstest]
+    fn test_exec_widen(
+        int_exec_ctx: TestContext,
+    ) {
+        let from: u8 = 1;
+        let to: u8 = 6;
+        let ty = INT_TYPES[to as usize].clone();
+        let input = ConstInt::new_u(from, 1).unwrap();
+
+        let ext_op = int_ops::EXTENSION
+            .instantiate_extension_op("iwiden_u".as_ref(), [(from as u64).into(), (to as u64).into()])
+            .unwrap();
+
+
+        let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
+
+        assert_eq!(int_exec_ctx.exec_hugr_u64(hugr, "main"), 1);
+
+        let input = ConstInt::new_s(from, 1).unwrap();
+
+        let ext_op = int_ops::EXTENSION
+            .instantiate_extension_op("iwiden_s".as_ref(), [(from as u64).into(), (to as u64).into()])
+            .unwrap();
+
+
+        let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
+
+        assert_eq!(int_exec_ctx.exec_hugr_u64(hugr, "main"), 1);
+    }
+
+
+    #[rstest]
     #[case("inarrow_s", 6, 2, 4)]
     #[case("inarrow_s", 6, 5, (1 << 5) - 1)]
     #[case("inarrow_s", 6, 4, -1)]
@@ -1453,5 +1578,38 @@ mod test {
             });
         let act = int_exec_ctx.exec_hugr_u64(hugr, "main");
         assert_eq!(act, (val as u64) + 42);
+    }
+
+    // Log width fixed at 3 (i.e. divmod : Fn(i8, u8) -> (i8, u8)
+    #[rstest]
+    #[case::bigdiv_non_negative(127, 255, (0, 127))] // Big divisor, positive dividend
+    #[case::bigdiv_negative(-42, 255, (-1, 213))] // Big divisor, negative dividend
+    #[case::smoldiv_non_negative(42, 10, (4, 2))] // Normal divisor, positive dividend
+    #[case::smoldiv_negative_rem0(-42, 21, (-2, 0))] // Normal divisor, negative dividend, remainder 0
+    #[case::smoldiv_negative_rem_nonzero(-42, 10, (-5, 8))] // Normal divisor, negative dividend, remainder >0
+    fn test_divmod_s(
+        int_exec_ctx: TestContext,
+        #[case] dividend: i64,
+        #[case] divisor: u64,
+        #[case] expected_result: (i64, u64),
+    ) {
+        let int_ty = INT_TYPES[3].clone();
+        let k_dividend = ConstInt::new_s(3, dividend).unwrap();
+        let k_divisor = ConstInt::new_u(3, divisor).unwrap();
+        let quot_hugr = test_int_op_with_results(
+            make_int_op("idiv_s", 3),
+            3,
+            Some([k_dividend.clone(), k_divisor.clone()]),
+            int_ty.clone(),
+        );
+        let rem_hugr = test_int_op_with_results(
+            make_int_op("imod_s", 3),
+            3,
+            Some([k_dividend, k_divisor]),
+            int_ty,
+        );
+        let quot = int_exec_ctx.exec_hugr_i64(quot_hugr, "main");
+        let rem = int_exec_ctx.exec_hugr_u64(rem_hugr, "main");
+        assert_eq!((quot, rem), expected_result);
     }
 }
