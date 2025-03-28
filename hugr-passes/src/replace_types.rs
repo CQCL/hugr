@@ -31,6 +31,8 @@ pub use linearize::{LinearizeError, Linearizer};
 
 /// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
 /// or in order to replace an existing node.
+///
+/// [DataflowParent]: hugr_core::ops::OpTag::DataflowParent
 #[derive(Clone, Debug, PartialEq)]
 pub enum NodeTemplate {
     /// A single node - so if replacing an existing node, change only the op
