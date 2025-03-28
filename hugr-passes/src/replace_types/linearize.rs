@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder};
 use hugr_core::extension::{SignatureError, TypeDef};
-use hugr_core::types::{Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 
@@ -13,7 +13,7 @@ use super::{OpReplacement, ParametricType};
 #[derive(Clone, Default)]
 pub struct Linearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
-    copy_discard: HashMap<Type, (OpReplacement, OpReplacement)>,
+    copy_discard: HashMap<CustomType, (OpReplacement, OpReplacement)>,
     // Copy/discard of parametric types handled by a function that receives the new/lowered type.
     // We do not allow overriding copy/discard of non-extension types, but that
     // can be achieved by *firstly* lowering to a custom linear type, with copy/discard
@@ -63,11 +63,11 @@ impl Linearizer {
     /// If `typ` is copyable, it is returned as an `Err`.
     pub fn register(
         &mut self,
-        typ: Type,
+        typ: CustomType,
         copy: OpReplacement,
         discard: OpReplacement,
-    ) -> Result<(), Type> {
-        if typ.copyable() {
+    ) -> Result<(), CustomType> {
+        if typ.bound() == TypeBound::Copyable {
             Err(typ)
         } else {
             self.copy_discard.insert(typ, (copy, discard));
@@ -156,9 +156,6 @@ impl Linearizer {
         if typ.copyable() {
             return Err(LinearizeError::CopyableType(typ.clone()));
         };
-        if let Some((copy, _)) = self.copy_discard.get(typ) {
-            return Ok(copy.clone());
-        }
         match typ.as_type_enum() {
             TypeEnum::Sum(sum_type) => {
                 let variants = sum_type
@@ -199,13 +196,16 @@ impl Linearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => {
-                let (copy_fn, _) = self
-                    .copy_discard_parametric
-                    .get(&cty.into())
-                    .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
-                copy_fn(cty.args(), self)
-            }
+            TypeEnum::Extension(cty) => match self.copy_discard.get(cty) {
+                Some((copy, _)) => Ok(copy.clone()),
+                None => {
+                    let (copy_fn, _) = self
+                        .copy_discard_parametric
+                        .get(&cty.into())
+                        .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
+                    copy_fn(cty.args(), self)
+                }
+            },
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
@@ -217,9 +217,6 @@ impl Linearizer {
         if typ.copyable() {
             return Err(LinearizeError::CopyableType(typ.clone()));
         };
-        if let Some((_, discard)) = self.copy_discard.get(typ) {
-            return Ok(discard.clone());
-        }
         match typ.as_type_enum() {
             TypeEnum::Sum(sum_type) => {
                 let variants = sum_type
@@ -240,13 +237,16 @@ impl Linearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => {
-                let (_, discard_fn) = self
-                    .copy_discard_parametric
-                    .get(&cty.into())
-                    .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
-                discard_fn(cty.args(), self)
-            }
+            TypeEnum::Extension(cty) => match self.copy_discard.get(cty) {
+                Some((_, discard)) => Ok(discard.clone()),
+                None => {
+                    let (_, discard_fn) = self
+                        .copy_discard_parametric
+                        .get(&cty.into())
+                        .ok_or_else(|| LinearizeError::NeedDiscard(typ.clone()))?;
+                    discard_fn(cty.args(), self)
+                }
+            },
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
@@ -305,7 +305,8 @@ mod test {
             },
         );
 
-        let lin_t = Type::new_extension(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
+        let lin_custom_t = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
+        let lin_t = Type::new_extension(lin_custom_t.clone());
 
         // Configure to lower usize_t to the linear type above
         let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), []).unwrap();
@@ -315,7 +316,7 @@ mod test {
         lowerer.replace_type(usize_custom_t, lin_t.clone());
         lowerer
             .linearize(
-                lin_t,
+                lin_custom_t,
                 OpReplacement::SingleOp(copy_op.into()),
                 OpReplacement::SingleOp(discard_op.into()),
             )

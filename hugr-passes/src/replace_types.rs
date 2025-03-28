@@ -199,7 +199,7 @@ impl ReplaceTypes {
     /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.)
     ///
-    /// Also applies if `src` is an element of a Sum or other type.
+    /// The same [OpReplacement]s are also used in cases where `src` is an element of a [TypeEnum::Sum].
     ///
     /// # Errors
     ///
@@ -208,10 +208,10 @@ impl ReplaceTypes {
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     pub fn linearize(
         &mut self,
-        src: Type,
+        src: CustomType,
         copy: OpReplacement,
         discard: OpReplacement,
-    ) -> Result<(), Type> {
+    ) -> Result<(), CustomType> {
         self.linearize.register(src, copy, discard)
     }
 
