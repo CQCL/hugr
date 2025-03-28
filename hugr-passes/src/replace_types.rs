@@ -220,20 +220,23 @@ impl ReplaceTypes {
     /// * is not [Copyable](hugr_core::types::TypeBound::Copyable), and
     /// * has other than one connected inport,
     ///
-    /// ...then these functions should be used to generate `copy` or `discard` ops.
+    /// ...then the provided callback should be used to generate a `copy` or `discard` op,
+    /// passing the desired number of outports (which will never be 1).
     ///
-    /// (That is, this is the equivalent of [Self::linearize] but for parametric types.)
+    /// (That is, this is like [Self::linearize] but for parametric types and/or
+    ///  with a callback that can generate an n-way copy directly, rather than
+    ///  with a 0-way and 2-way copy.)
     ///
-    /// The [Linearizer] is passed so that the callbacks can use it to generate
-    /// `copy/`discard` ops for other types (e.g. the elements of a collection),
+    /// The [Linearizer] is passed so that the callback can use it to generate
+    /// `copy`/`discard` ops for other types (e.g. the elements of a collection),
     /// as part of an [OpReplacement::CompoundOp].
     pub fn linearize_parametric(
         &mut self,
         src: &TypeDef,
-        copy_fn: impl Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError> + 'static,
-        discard_fn: impl Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError> + 'static,
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &Linearizer) -> Result<OpReplacement, LinearizeError>
+            + 'static,
     ) {
-        self.linearize.register_parametric(src, copy_fn, discard_fn)
+        self.linearize.register_parametric(src, copy_discard_fn)
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
