@@ -109,41 +109,33 @@ impl Linearizer {
         typ: &Type, // Or better to get the signature ourselves??
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {
-        let (tgt_node, tgt_inport) = match targets.len() {
-            0 => {
-                let parent = hugr.get_parent(src_node).unwrap();
-                (
-                    self.copy_discard_op(typ, 0)?.add_hugr(hugr, parent),
-                    0.into(),
-                )
+        let (tgt_node, tgt_inport) = if targets.len() == 1 {
+            *targets.first().unwrap()
+        } else {
+            // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
+            let src_parent = hugr
+                .get_parent(src_node)
+                .expect("Root node cannot have out edges");
+            if let Some((tgt, tgt_parent)) = targets.iter().find_map(|(tgt, _)| {
+                let tgt_parent = hugr
+                    .get_parent(*tgt)
+                    .expect("Root node cannot have incoming edges");
+                (tgt_parent != src_parent).then_some((*tgt, tgt_parent))
+            }) {
+                return Err(LinearizeError::NoLinearNonLocalEdges {
+                    src: src_node,
+                    src_parent,
+                    tgt,
+                    tgt_parent,
+                });
             }
-            1 => *targets.first().unwrap(),
-            _ => {
-                // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
-                let src_parent = hugr
-                    .get_parent(src_node)
-                    .expect("Root node cannot have out edges");
-                if let Some((tgt, tgt_parent)) = targets.iter().find_map(|(tgt, _)| {
-                    let tgt_parent = hugr
-                        .get_parent(*tgt)
-                        .expect("Root node cannot have incoming edges");
-                    (tgt_parent != src_parent).then_some((*tgt, tgt_parent))
-                }) {
-                    return Err(LinearizeError::NoLinearNonLocalEdges {
-                        src: src_node,
-                        src_parent,
-                        tgt,
-                        tgt_parent,
-                    });
-                }
-                let copy_op = self
-                    .copy_discard_op(typ, targets.len())?
-                    .add_hugr(hugr, src_parent);
-                for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
-                    hugr.connect(copy_op, n, *tgt_node, *tgt_port);
-                }
-                (copy_op, 0.into())
+            let copy_discard_op = self
+                .copy_discard_op(typ, targets.len())?
+                .add_hugr(hugr, src_parent);
+            for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
+                hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
             }
+            (copy_discard_op, 0.into())
         };
         hugr.connect(src_node, src_port, tgt_node, tgt_inport);
         Ok(())
