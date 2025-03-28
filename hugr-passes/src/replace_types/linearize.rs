@@ -315,14 +315,13 @@ mod test {
         );
 
         let lin_custom_t = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
-        let lin_t = Type::new_extension(lin_custom_t.clone());
 
         // Configure to lower usize_t to the linear type above, using a 2-way copy only
         let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), [2.into()]).unwrap();
         let discard_op = ExtensionOp::new(e.get_op("discard").unwrap().clone(), []).unwrap();
         let mut lowerer = ReplaceTypes::default();
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
-        lowerer.replace_type(usize_custom_t, lin_t.clone());
+        lowerer.replace_type(usize_custom_t, Type::new_extension(lin_custom_t.clone()));
         lowerer
             .linearize(
                 lin_custom_t,
@@ -438,7 +437,7 @@ mod test {
         lowerer.linearize_parametric(lin_t_def, move |args, num_outs, _| {
             assert!(args.is_empty());
             Ok(OpReplacement::SingleOp(
-                ExtensionOp::new(opdef2.clone(), [TypeArg::BoundedNat { n: num_outs as _ }])
+                ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
                     .unwrap()
                     .into(),
             ))
@@ -471,9 +470,7 @@ mod test {
                 .children(case1)
                 .filter_map(|n| h.get_optype(n).as_extension_op())
                 .collect_vec();
-            let expected_op =
-                ExtensionOp::new(opdef.clone(), [TypeArg::BoundedNat { n: num_tags as _ }])
-                    .unwrap();
+            let expected_op = ExtensionOp::new(opdef.clone(), [(num_tags as u64).into()]).unwrap();
             assert_eq!(ext_ops, vec![&expected_op; 2]);
 
             let case1 = h.get_optype(case1).as_case().unwrap();
