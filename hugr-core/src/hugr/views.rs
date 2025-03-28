@@ -338,16 +338,8 @@ pub trait HugrView: HugrInternals {
         self.root_type().inner_function_type()
     }
 
-    /// Returns the function type defined by this HUGR.
-    ///
-    /// For HUGRs with a [`DataflowParent`][crate::ops::DataflowParent] root
-    /// operation, report the signature of the inner dataflow sibling graph.
-    ///
-    /// For HUGRS with a [`FuncDecl`][crate::ops::FuncDecl] or
-    /// [`FuncDefn`][crate::ops::FuncDefn] root operation, report the signature
-    /// of the function.
-    ///
-    /// Otherwise, returns `None`.
+    /// Returns the function type defined by this HUGR, i.e. `Some` iff the root is
+    /// a [`FuncDecl`][crate::ops::FuncDecl] or [`FuncDefn`][crate::ops::FuncDefn].
     fn poly_func_type(&self) -> Option<PolyFuncType> {
         match self.root_type() {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
