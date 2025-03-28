@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (declare-func
  example.callee
  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])

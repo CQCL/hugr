@@ -4,6 +4,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
 ---
 (hugr 0)
 
+(mod)
+
 (import core.fn)
 
 (import core.type)

@@ -4,8 +4,8 @@ use hugr_model::v0::ast;
 use std::str::FromStr as _;
 
 fn roundtrip(source: &str) -> String {
-    let module = ast::Module::from_str(source).unwrap();
-    module.to_string()
+    let package = ast::Package::from_str(source).unwrap();
+    package.to_string()
 }
 
 #[test]

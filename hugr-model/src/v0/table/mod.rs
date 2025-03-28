@@ -32,6 +32,31 @@ mod view;
 use super::{ast, Literal, RegionKind};
 pub use view::View;
 
+/// A package consisting of a sequence of [`Module`]s.
+///
+/// See [`ast::Package`] for the AST representation.
+///
+/// [`ast::Package`]: crate::v0::ast::Package
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct Package<'a> {
+    /// The modules in the package.
+    pub modules: Vec<Module<'a>>,
+}
+
+impl Package<'_> {
+    /// Convert the package to the [ast] representation.
+    ///
+    /// [ast]: crate::v0::ast
+    pub fn as_ast(&self) -> Option<ast::Package> {
+        let modules = self
+            .modules
+            .iter()
+            .map(|module| module.as_ast())
+            .collect::<Option<_>>()?;
+        Some(ast::Package { modules })
+    }
+}
+
 /// A module consisting of a hugr graph together with terms.
 ///
 /// See [`ast::Module`] for the AST representation.
