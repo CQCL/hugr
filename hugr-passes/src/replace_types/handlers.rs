@@ -59,6 +59,8 @@ pub fn linearize_array(
     let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
         panic!("Illegal TypeArgs to array: {:?}", args)
     };
+    // The num_outports==0 and num_outports>1 cases will combine, and become much easier,
+    // when we have a more generalized ArrayScan https://github.com/CQCL/hugr/issues/2041
     if num_outports == 0 {
         // Make a function that maps the linear element to unit
         let map_fn = {
