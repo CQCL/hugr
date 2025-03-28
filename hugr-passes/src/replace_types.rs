@@ -194,7 +194,7 @@ impl ReplaceTypes {
         self.param_types.insert(src.into(), Arc::new(dest_fn));
     }
 
-    /// Configures this instance that, when an outport of type `src` has other than one connected
+    /// Configures this instance so that, when an outport of type `src` has other than one connected
     /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
     /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.)
