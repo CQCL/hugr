@@ -26,6 +26,7 @@ test-rust:
         --features 'hugr/extension_inference hugr/declarative hugr/model_unstable hugr/llvm hugr/llvm-test hugr/zstd'
 # Run all python tests.
 test-python:
+    uv run maturin develop --uv
     cargo build -p hugr-cli
     HUGR_RENDER_DOT=1 uv run pytest
 

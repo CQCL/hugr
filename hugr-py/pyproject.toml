@@ -47,9 +47,12 @@ requires = ["maturin>=1.4,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
-features = ["pyo3/extension-module"]
-python-source = "src/"
+# Make sure to copy any changes to the root `pyproject.toml` config too.
 module-name = "hugr._hugr"
+python-source = "src/"
+manifest-path = "Cargo.toml"
+# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
+features = ["pyo3/extension-module"]
 
 [tool.pyright]
 # Rust bindings have typing stubs but no python source code.
