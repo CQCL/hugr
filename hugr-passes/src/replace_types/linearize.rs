@@ -249,15 +249,21 @@ mod test {
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
-    use hugr_core::extension::{simple_op::MakeExtensionOp, TypeDefBound, Version};
+    use hugr_core::extension::simple_op::MakeExtensionOp;
+    use hugr_core::extension::{
+        CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
+    };
     use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
     use hugr_core::ops::{handle::NodeHandle, DataflowOpTrait, ExtensionOp, NamedOp, OpName};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::{
         array_type, array_type_def, ArrayOpDef, ArrayRepeat, ArrayScan, ArrayScanDef,
     };
-    use hugr_core::types::{Signature, Type, TypeEnum, TypeRow};
-    use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
+    use hugr_core::types::type_param::TypeParam;
+    use hugr_core::types::{
+        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeEnum, TypeRow,
+    };
+    use hugr_core::{hugr::IdentList, type_row, Extension, Hugr, HugrView, Node};
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -267,8 +273,28 @@ mod test {
 
     const LIN_T: &str = "Lin";
 
+    struct NWayCopySigFn(Type);
+    impl CustomSignatureFunc for NWayCopySigFn {
+        fn compute_signature<'o, 'a: 'o>(
+            &'a self,
+            arg_values: &[TypeArg],
+            _def: &'o OpDef,
+        ) -> Result<PolyFuncTypeRV, SignatureError> {
+            let [TypeArg::BoundedNat { n }] = arg_values else {
+                panic!()
+            };
+            let outs = vec![self.0.clone(); *n as usize];
+            Ok(FuncValueType::new(self.0.clone(), outs).into())
+        }
+
+        fn static_params(&self) -> &[TypeParam] {
+            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat()];
+            JUST_NAT
+        }
+    }
+
     fn ext_lowerer() -> (Arc<Extension>, ReplaceTypes) {
-        // Extension with a linear type, a copy and discard op
+        // Extension with a linear type, an n-way parametric copy op, and a discard op
         let e = Extension::new_arc(
             IdentList::new_unchecked("TestExt"),
             Version::new(0, 0, 0),
@@ -280,16 +306,16 @@ mod test {
                         .unwrap(),
                 );
                 e.add_op(
-                    "copy".into(),
+                    "discard".into(),
                     String::new(),
-                    Signature::new(lin.clone(), vec![lin.clone(); 2]),
+                    Signature::new(lin.clone(), vec![]),
                     w,
                 )
                 .unwrap();
                 e.add_op(
-                    "discard".into(),
+                    "copy".into(),
                     String::new(),
-                    Signature::new(lin, vec![]),
+                    SignatureFunc::CustomFunc(Box::new(NWayCopySigFn(lin))),
                     w,
                 )
                 .unwrap();
@@ -297,14 +323,13 @@ mod test {
         );
 
         let lin_custom_t = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
-        let lin_t = Type::new_extension(lin_custom_t.clone());
 
-        // Configure to lower usize_t to the linear type above
-        let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), []).unwrap();
+        // Configure to lower usize_t to the linear type above, using a 2-way copy only
+        let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), [2.into()]).unwrap();
         let discard_op = ExtensionOp::new(e.get_op("discard").unwrap().clone(), []).unwrap();
         let mut lowerer = ReplaceTypes::default();
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
-        lowerer.replace_type(usize_custom_t, lin_t.clone());
+        lowerer.replace_type(usize_custom_t, Type::new_extension(lin_custom_t.clone()));
         lowerer
             .linearize(
                 lin_custom_t,
@@ -348,24 +373,83 @@ mod test {
         );
     }
 
-    #[rstest]
-    fn sums(#[values(2, 3, 4)] num_copies: usize) {
-        let copy_nodes = num_copies - 1; // 2 binary copy nodes produce 3 outputs, etc.
-        let i8_t = || INT_TYPES[3].clone();
-        let sum_ty = Type::new_sum([vec![i8_t()], vec![usize_t(); 2]]);
-        let mut outer =
-            DFGBuilder::new(inout_sig(sum_ty.clone(), vec![sum_ty.clone(); copy_nodes])).unwrap();
+    fn copy_n_discard_one(ty: Type, n: usize) -> (Hugr, Node) {
+        let mut outer = DFGBuilder::new(inout_sig(ty.clone(), vec![ty.clone(); n - 1])).unwrap();
         let [inp] = outer.input_wires_arr();
         let inner = outer
-            .dfg_builder(inout_sig(sum_ty, vec![]), [inp])
+            .dfg_builder(inout_sig(ty, vec![]), [inp])
             .unwrap()
             .finish_with_outputs([])
             .unwrap();
-        let mut h = outer
-            .finish_hugr_with_outputs(vec![inp; copy_nodes])
-            .unwrap();
+        let h = outer.finish_hugr_with_outputs(vec![inp; n - 1]).unwrap();
+        (h, inner.node())
+    }
+
+    #[rstest]
+    fn sums_2way_copy(#[values(2, 3, 4)] num_copies: usize) {
+        let (mut h, inner) = copy_n_discard_one(option_type(usize_t()).into(), num_copies);
 
         let (e, lowerer) = ext_lowerer();
+        assert!(lowerer.run(&mut h).unwrap());
+
+        let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
+        let sum_ty: Type = option_type(lin_t.clone()).into();
+        let count_tags = |n| h.children(n).filter(|n| h.get_optype(*n).is_tag()).count();
+
+        // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
+        for (dfg, num_tags, expected_ext_ops) in [
+            (inner.node(), 0, vec!["TestExt.discard"]),
+            (h.root(), num_copies, vec!["TestExt.copy"; num_copies - 1]), // 2 copy nodes -> 3 outputs, etc.
+        ] {
+            let [(cond_node, cond)] = h
+                .children(dfg)
+                .filter_map(|n| h.get_optype(n).as_conditional().map(|c| (n, c)))
+                .collect_array()
+                .unwrap();
+            assert_eq!(
+                cond.signature().output(),
+                &TypeRow::from(vec![sum_ty.clone(); num_tags])
+            );
+            let [case0, case1] = h.children(cond_node).collect_array().unwrap();
+            // first is for empty variant
+            assert_eq!(h.children(case0).count(), 2 + num_tags); // Input, Output
+            assert_eq!(count_tags(case0), num_tags);
+
+            // second is for variant of a LIN_T
+            assert_eq!(h.children(case1).count(), 3 + num_tags); // Input, Output, copy/discard
+            assert_eq!(count_tags(case1), num_tags);
+            let ext_ops = DescendantsGraph::<Node>::try_new(&h, case1)
+                .unwrap()
+                .nodes()
+                .filter_map(|n| h.get_optype(n).as_extension_op().map(ExtensionOp::name))
+                .collect_vec();
+            assert_eq!(ext_ops, expected_ext_ops);
+        }
+    }
+
+    #[rstest]
+    fn sum_nway_copy(#[values(2, 5, 9)] num_copies: usize) {
+        let i8_t = || INT_TYPES[3].clone();
+        let sum_ty = Type::new_sum([vec![i8_t()], vec![usize_t(); 2]]);
+
+        let (mut h, inner) = copy_n_discard_one(sum_ty, num_copies);
+        let (e, _) = ext_lowerer();
+        let mut lowerer = ReplaceTypes::default();
+        let lin_t_def = e.get_type(LIN_T).unwrap();
+        lowerer.replace_type(
+            usize_t().as_extension().unwrap().clone(),
+            lin_t_def.instantiate([]).unwrap().into(),
+        );
+        let opdef = e.get_op("copy").unwrap();
+        let opdef2 = opdef.clone();
+        lowerer.linearize_parametric(lin_t_def, move |args, num_outs, _| {
+            assert!(args.is_empty());
+            Ok(OpReplacement::SingleOp(
+                ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
+                    .unwrap()
+                    .into(),
+            ))
+        });
         assert!(lowerer.run(&mut h).unwrap());
 
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
@@ -373,10 +457,7 @@ mod test {
         let count_tags = |n| h.children(n).filter(|n| h.get_optype(*n).is_tag()).count();
 
         // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
-        for (dfg, num_tags, expected_ext_ops) in [
-            (inner.node(), 0, vec!["TestExt.discard"; 2]),
-            (h.root(), num_copies, vec!["TestExt.copy"; 2 * copy_nodes]),
-        ] {
+        for (dfg, num_tags) in [(inner.node(), 0), (h.root(), num_copies)] {
             let [cond] = h
                 .children(dfg)
                 .filter(|n| h.get_optype(*n).is_conditional())
@@ -393,12 +474,12 @@ mod test {
             // second is for variant of two elements
             assert_eq!(h.children(case1).count(), 4 + num_tags); // Input, Output, two leaf copies/discards:
             assert_eq!(count_tags(case1), num_tags);
-            let ext_ops = DescendantsGraph::<hugr_core::Node>::try_new(&h, case1)
-                .unwrap()
-                .nodes()
-                .filter_map(|n| h.get_optype(n).as_extension_op().map(ExtensionOp::name))
+            let ext_ops = h
+                .children(case1)
+                .filter_map(|n| h.get_optype(n).as_extension_op())
                 .collect_vec();
-            assert_eq!(ext_ops, expected_ext_ops);
+            let expected_op = ExtensionOp::new(opdef.clone(), [(num_tags as u64).into()]).unwrap();
+            assert_eq!(ext_ops, vec![&expected_op; 2]);
 
             let case1 = h.get_optype(case1).as_case().unwrap();
             assert_eq!(
