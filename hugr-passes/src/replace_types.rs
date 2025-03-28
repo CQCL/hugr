@@ -230,8 +230,8 @@ impl ReplaceTypes {
     pub fn linearize_parametric(
         &mut self,
         src: &TypeDef,
-        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
-        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
+        copy_fn: impl Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError> + 'static,
+        discard_fn: impl Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError> + 'static,
     ) {
         self.linearize.register_parametric(src, copy_fn, discard_fn)
     }
