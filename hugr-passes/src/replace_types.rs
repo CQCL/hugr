@@ -301,9 +301,8 @@ impl ReplaceTypes {
         for n in hugr.nodes().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
-            if let Some(new_sig) = (changed && n != hugr.root())
-                .then_some(new_dfsig)
-                .flatten()
+            if let Some(new_sig) = new_dfsig
+                .filter(|_| changed && n != hugr.root())
                 .map(Cow::into_owned)
             {
                 for outp in new_sig.output_ports() {
