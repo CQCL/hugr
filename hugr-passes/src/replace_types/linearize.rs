@@ -7,7 +7,8 @@ use hugr_core::builder::{
 };
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::types::{CustomType, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node, OutgoingPort};
+use hugr_core::Wire;
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
 use itertools::Itertools;
 
 use super::{OpReplacement, ParametricType};
@@ -101,20 +102,24 @@ impl Linearizer {
     /// will be unchanged.
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
+    ///
+    /// # Panics
+    ///
+    /// if `src` is not a valid Wire (does not identify a dataflow out-port)
     pub fn insert_copy_discard(
         &self,
         hugr: &mut impl HugrMut,
-        src_node: Node,
-        src_port: OutgoingPort,
-        typ: &Type, // Or better to get the signature ourselves??
+        src: Wire,
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {
+        let sig = hugr.signature(src.node()).unwrap();
+        let typ = sig.port_type(src.source()).unwrap();
         let (tgt_node, tgt_inport) = if targets.len() == 1 {
             *targets.first().unwrap()
         } else {
             // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
             let src_parent = hugr
-                .get_parent(src_node)
+                .get_parent(src.node())
                 .expect("Root node cannot have out edges");
             if let Some((tgt, tgt_parent)) = targets.iter().find_map(|(tgt, _)| {
                 let tgt_parent = hugr
@@ -123,7 +128,7 @@ impl Linearizer {
                 (tgt_parent != src_parent).then_some((*tgt, tgt_parent))
             }) {
                 return Err(LinearizeError::NoLinearNonLocalEdges {
-                    src: src_node,
+                    src: src.node(),
                     src_parent,
                     tgt,
                     tgt_parent,
@@ -137,7 +142,7 @@ impl Linearizer {
             }
             (copy_discard_op, 0.into())
         };
-        hugr.connect(src_node, src_port, tgt_node, tgt_inport);
+        hugr.connect(src.node(), src.source(), tgt_node, tgt_inport);
         Ok(())
     }
 

@@ -216,7 +216,7 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance that when lowering produces an outport which
-    /// * has type an instantiation of the parametric type `src`, and
+    /// * has type which is an instantiation of the parametric type `src`, and
     /// * is not [Copyable](hugr_core::types::TypeBound::Copyable), and
     /// * has other than one connected inport,
     ///
@@ -310,9 +310,8 @@ impl ReplaceTypes {
                         let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
                         if targets.len() != 1 {
                             hugr.disconnect(n, outp);
-                            let typ = new_sig.out_port_type(outp).unwrap();
-                            self.linearize
-                                .insert_copy_discard(hugr, n, outp, typ, &targets)?;
+                            let src = Wire::new(n, outp);
+                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
                         }
                     }
                 }
