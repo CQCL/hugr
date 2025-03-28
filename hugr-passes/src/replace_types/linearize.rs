@@ -172,9 +172,9 @@ impl Linearizer {
                 .unwrap();
                 for (tag, variant) in variants.iter().enumerate() {
                     let mut case_b = cb.case_builder(tag).unwrap();
-                    let mut elems_per_output = vec![vec![]; num_outports];
+                    let mut elems_for_copy = vec![vec![]; num_outports];
                     for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
-                        let elems_this_input = if ty.copyable() {
+                        let inp_copies = if ty.copyable() {
                             repeat(inp).take(num_outports).collect::<Vec<_>>()
                         } else {
                             self.copy_discard_op(ty, num_outports)?
@@ -183,22 +183,20 @@ impl Linearizer {
                                 .outputs()
                                 .collect()
                         };
-                        for (src, elems_this_output) in elems_this_input
-                            .into_iter()
-                            .zip_eq(elems_per_output.iter_mut())
+                        for (src, elems) in inp_copies.into_iter().zip_eq(elems_for_copy.iter_mut())
                         {
-                            elems_this_output.push(src)
+                            elems.push(src)
                         }
                     }
                     let t = Tag::new(tag, variants.clone());
-                    let outputs = elems_per_output
+                    let outputs = elems_for_copy
                         .into_iter()
-                        .map(|elems_this_output| {
-                            let [this_output] = case_b
-                                .add_dataflow_op(t.clone(), elems_this_output)
+                        .map(|elems| {
+                            let [copy] = case_b
+                                .add_dataflow_op(t.clone(), elems)
                                 .unwrap()
                                 .outputs_arr();
-                            this_output
+                            copy
                         })
                         .collect::<Vec<_>>(); // must collect to end borrow of `case_b` by closure
                     case_b.finish_with_outputs(outputs).unwrap();
