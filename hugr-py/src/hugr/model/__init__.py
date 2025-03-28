@@ -251,13 +251,27 @@ class Module:
     def __str__(self):
         return rust.module_to_string(self)
 
-    def __bytes__(self):
-        return rust.module_to_bytes(self)
-
     @staticmethod
     def from_str(s: str) -> "Module":
         return rust.string_to_module(s)
 
+
+@dataclass
+class Package:
+    """A sequence of hugr modules."""
+
+    modules: Sequence[Module]
+
+    def __str__(self):
+        return rust.package_to_string(self)
+
+    def __bytes__(self):
+        return rust.package_to_bytes(self)
+
     @staticmethod
-    def from_bytes(b: bytes) -> "Module":
-        return rust.bytes_to_module(b)
+    def from_str(s: str) -> "Package":
+        return rust.string_to_package(s)
+
+    @staticmethod
+    def from_bytes(b: bytes) -> "Package":
+        return rust.bytes_to_package(b)
