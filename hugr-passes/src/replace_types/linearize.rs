@@ -421,8 +421,8 @@ mod test {
 
         lowerer.linearize_parametric(
             array_type_def(),
-            Box::new(copy_array),
-            Box::new(discard_array),
+            copy_array,
+            discard_array,
         );
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
         let opt_lin_ty = Type::from(option_type(lin_t.clone()));
