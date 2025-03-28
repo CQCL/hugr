@@ -246,14 +246,16 @@ mod test {
     use hugr_core::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
 
     use hugr_core::extension::prelude::{option_type, usize_t};
-    use hugr_core::extension::{CustomSignatureFunc, SignatureFunc, TypeDefBound, Version};
+    use hugr_core::extension::{
+        CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
+    };
     use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
     use hugr_core::ops::DataflowOpTrait;
     use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
     use hugr_core::types::type_param::TypeParam;
-    use hugr_core::types::{FuncValueType, Signature, Type, TypeRow};
+    use hugr_core::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeRow};
     use hugr_core::{hugr::IdentList, Extension, Hugr, HugrView, Node};
     use itertools::Itertools;
     use rstest::rstest;
@@ -263,8 +265,28 @@ mod test {
 
     const LIN_T: &str = "Lin";
 
+    struct NWayCopySigFn(Type);
+    impl CustomSignatureFunc for NWayCopySigFn {
+        fn compute_signature<'o, 'a: 'o>(
+            &'a self,
+            arg_values: &[TypeArg],
+            _def: &'o OpDef,
+        ) -> Result<PolyFuncTypeRV, SignatureError> {
+            let [TypeArg::BoundedNat { n }] = arg_values else {
+                panic!()
+            };
+            let outs = vec![self.0.clone(); *n as usize];
+            Ok(FuncValueType::new(self.0.clone(), outs).into())
+        }
+
+        fn static_params(&self) -> &[TypeParam] {
+            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat()];
+            JUST_NAT
+        }
+    }
+
     fn ext_lowerer() -> (Arc<Extension>, ReplaceTypes) {
-        // Extension with a linear type, a copy and discard op
+        // Extension with a linear type, an n-way parametric copy op, and a discard op
         let e = Extension::new_arc(
             IdentList::new_unchecked("TestExt"),
             Version::new(0, 0, 0),
@@ -276,16 +298,16 @@ mod test {
                         .unwrap(),
                 );
                 e.add_op(
-                    "copy".into(),
+                    "discard".into(),
                     String::new(),
-                    Signature::new(lin.clone(), vec![lin.clone(); 2]),
+                    Signature::new(lin.clone(), vec![]),
                     w,
                 )
                 .unwrap();
                 e.add_op(
-                    "discard".into(),
+                    "copy".into(),
                     String::new(),
-                    Signature::new(lin, vec![]),
+                    SignatureFunc::CustomFunc(Box::new(NWayCopySigFn(lin))),
                     w,
                 )
                 .unwrap();
@@ -295,8 +317,8 @@ mod test {
         let lin_custom_t = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
         let lin_t = Type::new_extension(lin_custom_t.clone());
 
-        // Configure to lower usize_t to the linear type above
-        let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), []).unwrap();
+        // Configure to lower usize_t to the linear type above, using a 2-way copy only
+        let copy_op = ExtensionOp::new(e.get_op("copy").unwrap().clone(), [2.into()]).unwrap();
         let discard_op = ExtensionOp::new(e.get_op("discard").unwrap().clone(), []).unwrap();
         let mut lowerer = ReplaceTypes::default();
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
@@ -370,7 +392,7 @@ mod test {
         // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
         for (dfg, num_tags, expected_ext_ops) in [
             (inner.node(), 0, vec!["TestExt.discard"]),
-            (h.root(), num_copies, vec!["TestExt.copy"; num_copies - 1]), // 2 copy nodes produce 3 outputs, etc.
+            (h.root(), num_copies, vec!["TestExt.copy"; num_copies - 1]), // 2 copy nodes -> 3 outputs, etc.
         ] {
             let [(cond_node, cond)] = h
                 .children(dfg)
@@ -400,65 +422,18 @@ mod test {
 
     #[rstest]
     fn sum_nway_copy(#[values(2, 5, 9)] num_copies: usize) {
-        use hugr_core::{
-            extension::{OpDef, SignatureError},
-            types::{PolyFuncTypeRV, TypeArg},
-        };
-
         let i8_t = || INT_TYPES[3].clone();
         let sum_ty = Type::new_sum([vec![i8_t()], vec![usize_t(); 2]]);
 
         let (mut h, inner) = copy_n_discard_one(sum_ty, num_copies);
-        let e = Extension::new_arc(
-            IdentList::new_unchecked("NWay"),
-            Version::new(0, 0, 1),
-            |e, w| {
-                e.add_type(LIN_T.into(), vec![], String::new(), TypeDefBound::any(), w)
-                    .unwrap();
-                struct NWayCopy;
-                impl CustomSignatureFunc for NWayCopy {
-                    fn compute_signature<'o, 'a: 'o>(
-                        &'a self,
-                        arg_values: &[TypeArg],
-                        def: &'o OpDef,
-                    ) -> Result<PolyFuncTypeRV, SignatureError> {
-                        let [TypeArg::BoundedNat { n }] = arg_values else {
-                            panic!()
-                        };
-                        let lin_t = Type::from(
-                            def.extension()
-                                .upgrade()
-                                .unwrap()
-                                .get_type(LIN_T)
-                                .unwrap()
-                                .instantiate([])
-                                .unwrap(),
-                        );
-                        let outs = vec![lin_t.clone(); *n as usize];
-                        Ok(FuncValueType::new(lin_t, outs).into())
-                    }
-
-                    fn static_params(&self) -> &[TypeParam] {
-                        const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat()];
-                        JUST_NAT
-                    }
-                }
-                e.add_op(
-                    "copy_n".into(),
-                    String::new(),
-                    SignatureFunc::CustomFunc(Box::new(NWayCopy)),
-                    w,
-                )
-                .unwrap();
-            },
-        );
+        let (e, _) = ext_lowerer();
         let mut lowerer = ReplaceTypes::default();
         let lin_t_def = e.get_type(LIN_T).unwrap();
         lowerer.replace_type(
             usize_t().as_extension().unwrap().clone(),
             lin_t_def.instantiate([]).unwrap().into(),
         );
-        let opdef = e.get_op("copy_n").unwrap();
+        let opdef = e.get_op("copy").unwrap();
         let opdef2 = opdef.clone();
         lowerer.linearize_parametric(lin_t_def, move |args, num_outs, _| {
             assert!(args.is_empty());
