@@ -81,14 +81,14 @@ impl Linearizer {
     pub fn register_parametric(
         &mut self,
         src: &TypeDef,
-        copy_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
-        discard_fn: Box<dyn Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError>>,
+        copy_fn: impl Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError> + 'static,
+        discard_fn: impl Fn(&[TypeArg], &Linearizer) -> Result<OpReplacement, LinearizeError> + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
         // it depends on the arguments. Since there is no method to get the TypeDefBound
         // from a TypeDef, leaving this for now.
         self.copy_discard_parametric
-            .insert(src.into(), (Arc::from(copy_fn), Arc::from(discard_fn)));
+            .insert(src.into(), (Arc::new(copy_fn), Arc::new(discard_fn)));
     }
 
     /// Insert copy or discard operations (as appropriate) enough to wire `src_port` of `src_node`
