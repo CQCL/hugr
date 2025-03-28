@@ -243,9 +243,7 @@ mod test {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    use hugr_core::builder::{
-        endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    };
+    use hugr_core::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
 
     use hugr_core::extension::prelude::usize_t;
     use hugr_core::extension::{TypeDefBound, Version};
@@ -253,9 +251,10 @@ mod test {
     use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
-    use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
+    use hugr_core::types::{Signature, Type};
+    use hugr_core::{hugr::IdentList, Extension, HugrView};
     use itertools::Itertools;
+    use rstest::rstest;
 
     use crate::replace_types::OpReplacement;
     use crate::ReplaceTypes;
@@ -343,31 +342,34 @@ mod test {
         );
     }
 
-    #[test]
-    fn sums() {
+    #[rstest]
+    fn sums(#[values(2, 3, 4)] num_copies: usize) {
+        let copy_nodes = num_copies - 1; // 2 binary copy nodes produce 3 outputs, etc.
         let i8_t = || INT_TYPES[3].clone();
         let sum_ty = Type::new_sum([vec![i8_t()], vec![usize_t(); 2]]);
-        let mut outer = DFGBuilder::new(endo_sig(sum_ty.clone())).unwrap();
+        let mut outer =
+            DFGBuilder::new(inout_sig(sum_ty.clone(), vec![sum_ty.clone(); copy_nodes])).unwrap();
         let [inp] = outer.input_wires_arr();
         let inner = outer
             .dfg_builder(inout_sig(sum_ty, vec![]), [inp])
             .unwrap()
             .finish_with_outputs([])
             .unwrap();
-        let mut h = outer.finish_hugr_with_outputs([inp]).unwrap();
+        let mut h = outer
+            .finish_hugr_with_outputs(vec![inp; copy_nodes])
+            .unwrap();
 
         let (e, lowerer) = ext_lowerer();
         assert!(lowerer.run(&mut h).unwrap());
 
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
         let sum_ty = Type::new_sum([vec![i8_t()], vec![lin_t.clone(); 2]]);
-        let copy_out: TypeRow = vec![sum_ty.clone(); 2].into();
         let count_tags = |n| h.children(n).filter(|n| h.get_optype(*n).is_tag()).count();
 
         // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
-        for (dfg, num_tags, out_row, ext_op_name) in [
-            (inner.node(), 0, type_row![], "TestExt.discard"),
-            (h.root(), 2, copy_out, "TestExt.copy"),
+        for (dfg, num_tags, expected_ext_ops) in [
+            (inner.node(), 0, vec!["TestExt.discard"; 2]),
+            (h.root(), num_copies, vec!["TestExt.copy"; 2 * copy_nodes]),
         ] {
             let [cond] = h
                 .children(dfg)
@@ -375,25 +377,26 @@ mod test {
                 .collect_array()
                 .unwrap();
             let [case0, case1] = h.children(cond).collect_array().unwrap();
-            // first is for empty - the only input is Copyable so can be directly wired or ignored
+            let out_row = vec![sum_ty.clone(); num_tags].into();
+            // first is for empty variant - the only input is Copyable so can be directly wired or ignored
             assert_eq!(h.children(case0).count(), 2 + num_tags); // Input, Output
             assert_eq!(count_tags(case0), num_tags);
             let case0 = h.get_optype(case0).as_case().unwrap();
             assert_eq!(case0.signature.io(), (&vec![i8_t()].into(), &out_row));
 
-            // second is for two elements
+            // second is for variant of two elements
             assert_eq!(h.children(case1).count(), 4 + num_tags); // Input, Output, two leaf copies/discards:
             assert_eq!(count_tags(case1), num_tags);
+            let ext_ops = DescendantsGraph::<hugr_core::Node>::try_new(&h, case1)
+                .unwrap()
+                .nodes()
+                .filter_map(|n| h.get_optype(n).as_extension_op().map(ExtensionOp::name))
+                .collect_vec();
+            assert_eq!(ext_ops, expected_ext_ops);
+
+            let case1 = h.get_optype(case1).as_case().unwrap();
             assert_eq!(
-                DescendantsGraph::<hugr_core::Node>::try_new(&h, case1)
-                    .unwrap()
-                    .nodes()
-                    .filter_map(|n| h.get_optype(n).as_extension_op().map(ExtensionOp::name))
-                    .collect_vec(),
-                vec![ext_op_name; 2]
-            );
-            assert_eq!(
-                h.get_optype(case1).as_case().unwrap().signature.io(),
+                case1.signature.io(),
                 (&vec![lin_t.clone(); 2].into(), &out_row)
             );
         }
