@@ -11,14 +11,14 @@ use hugr_core::Wire;
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
 use itertools::Itertools;
 
-use super::{OpReplacement, ParametricType};
+use super::{NodeTemplate, ParametricType};
 
 /// Configuration for inserting copy and discard operations for linear types
 /// outports of which are sources of multiple or 0 edges.
 #[derive(Clone, Default)]
 pub struct Linearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
-    copy_discard: HashMap<CustomType, (OpReplacement, OpReplacement)>,
+    copy_discard: HashMap<CustomType, (NodeTemplate, NodeTemplate)>,
     // Copy/discard of parametric types handled by a function that receives the new/lowered type.
     // We do not allow overriding copy/discard of non-extension types, but that
     // can be achieved by *firstly* lowering to a custom linear type, with copy/discard
@@ -26,7 +26,7 @@ pub struct Linearizer {
     // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        Arc<dyn Fn(&[TypeArg], usize, &Linearizer) -> Result<OpReplacement, LinearizeError>>,
+        Arc<dyn Fn(&[TypeArg], usize, &Linearizer) -> Result<NodeTemplate, LinearizeError>>,
     >,
 }
 
@@ -66,8 +66,8 @@ impl Linearizer {
     pub fn register(
         &mut self,
         typ: CustomType,
-        copy: OpReplacement,
-        discard: OpReplacement,
+        copy: NodeTemplate,
+        discard: NodeTemplate,
     ) -> Result<(), CustomType> {
         if typ.bound() == TypeBound::Copyable {
             Err(typ)
@@ -82,7 +82,7 @@ impl Linearizer {
     pub fn register_parametric(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &Linearizer) -> Result<OpReplacement, LinearizeError>
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &Linearizer) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
@@ -146,7 +146,7 @@ impl Linearizer {
         Ok(())
     }
 
-    /// Gets an [OpReplacement] for copying or discarding a value of type `typ`, i.e.
+    /// Gets an [NodeTemplate] for copying or discarding a value of type `typ`, i.e.
     /// a recipe for a node with one input of that type and the specified number of
     /// outports. Note that `num_outports` should never be 1 (as no node is required)
     ///
@@ -157,7 +157,7 @@ impl Linearizer {
         &self,
         typ: &Type,
         num_outports: usize,
-    ) -> Result<OpReplacement, LinearizeError> {
+    ) -> Result<NodeTemplate, LinearizeError> {
         if typ.copyable() {
             return Err(LinearizeError::CopyableType(typ.clone()));
         };
@@ -206,7 +206,7 @@ impl Linearizer {
                         .collect::<Vec<_>>(); // must collect to end borrow of `case_b` by closure
                     case_b.finish_with_outputs(outputs).unwrap();
                 }
-                Ok(OpReplacement::CompoundOp(Box::new(
+                Ok(NodeTemplate::CompoundOp(Box::new(
                     cb.finish_hugr().unwrap(),
                 )))
             }
@@ -225,7 +225,7 @@ impl Linearizer {
                         src = out1;
                     }
                     outputs.push(src);
-                    OpReplacement::CompoundOp(Box::new(
+                    NodeTemplate::CompoundOp(Box::new(
                         dfb.finish_hugr_with_outputs(outputs).unwrap(),
                     ))
                 }),
@@ -265,7 +265,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::OpReplacement;
+    use crate::replace_types::NodeTemplate;
     use crate::ReplaceTypes;
 
     const LIN_T: &str = "Lin";
@@ -330,8 +330,8 @@ mod test {
         lowerer
             .linearize(
                 lin_custom_t,
-                OpReplacement::SingleOp(copy_op.into()),
-                OpReplacement::SingleOp(discard_op.into()),
+                NodeTemplate::SingleOp(copy_op.into()),
+                NodeTemplate::SingleOp(discard_op.into()),
             )
             .unwrap();
         (e, lowerer)
@@ -441,7 +441,7 @@ mod test {
         let opdef2 = opdef.clone();
         lowerer.linearize_parametric(lin_t_def, move |args, num_outs, _| {
             assert!(args.is_empty());
-            Ok(OpReplacement::SingleOp(
+            Ok(NodeTemplate::SingleOp(
                 ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
                     .unwrap()
                     .into(),
