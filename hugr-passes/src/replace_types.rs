@@ -31,7 +31,7 @@ pub use linearize::{LinearizeError, Linearizer};
 
 /// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
 /// or in order to replace an existing node.
-///
+/// 
 /// [DataflowParent]: hugr_core::ops::OpTag::DataflowParent
 #[derive(Clone, Debug, PartialEq)]
 pub enum NodeTemplate {
@@ -197,50 +197,19 @@ impl ReplaceTypes {
         self.param_types.insert(src.into(), Arc::new(dest_fn));
     }
 
-    /// Configures this instance so that, when an outport of type `src` has other than one connected
-    /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
-    /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
-    /// `discard` should have exactly one inport, of type 'src', and no outports.)
-    ///
-    /// The same [NodeTemplate]s are also used in cases where `src` is an element of a [TypeEnum::Sum].
-    ///
-    /// # Errors
-    ///
-    /// If `src` is [Copyable], it is returned as an `Err
-    ///
-    /// [Copyable]: hugr_core::types::TypeBound::Copyable
-    pub fn linearize(
-        &mut self,
-        src: CustomType,
-        copy: NodeTemplate,
-        discard: NodeTemplate,
-    ) -> Result<(), CustomType> {
-        self.linearize.register(src, copy, discard)
-    }
-
-    /// Configures this instance that when lowering produces an outport which
-    /// * has type which is an instantiation of the parametric type `src`, and
-    /// * is not [Copyable](hugr_core::types::TypeBound::Copyable), and
+    /// Allows to configure how to deal with types/wires that were [Copyable]
+    /// but have become linear as a result of type-changing. Specifically,
+    /// the [Linearizer] is used whenever lowering produces an outport which both
+    /// * has a non-[Copyable] type - perhaps a direct substitution, or perhaps e.g.
+    /// as a result of changing the element type of a collection such as an [`array`]
     /// * has other than one connected inport,
     ///
-    /// ...then the provided callback should be used to generate a `copy` or `discard` op,
-    /// passing the desired number of outports (which will never be 1).
-    ///
-    /// (That is, this is like [Self::linearize] but for parametric types and/or
-    ///  with a callback that can generate an n-way copy directly, rather than
-    ///  with a 0-way and 2-way copy.)
-    ///
-    /// The [Linearizer] is passed so that the callback can use it to generate
-    /// `copy`/`discard` ops for other types (e.g. the elements of a collection),
-    /// as part of an [NodeTemplate::CompoundOp].
-    pub fn linearize_parametric(
-        &mut self,
-        src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &Linearizer) -> Result<NodeTemplate, LinearizeError>
-            + 'static,
-    ) {
-        self.linearize.register_parametric(src, copy_discard_fn)
-    }
+    /// [Copyable]: hugr_core::types::TypeBound::Copyable
+    /// [`array`]: hugr_core::std_extensions::collections::array::array_type
+    pub fn linearizer(
+        &mut self) -> &mut Linearizer {
+            &mut self.linearize
+        }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* [OpDef], this takes

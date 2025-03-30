@@ -58,6 +58,19 @@ pub enum LinearizeError {
 }
 
 impl Linearizer {
+    /// Configures this instance so that, when an outport of type `src` has other than one connected
+    /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
+    /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
+    /// `discard` should have exactly one inport, of type 'src', and no outports.)
+    ///
+    /// The same [NodeTemplate]s are also used in cases where `src` is an element of a [TypeEnum::Sum].
+    ///
+    /// # Errors
+    ///
+    /// If `src` is [Copyable], it is returned as an `Err
+    ///
+    /// [Copyable]: hugr_core::types::TypeBound::Copyable
+
     /// Registers a type for linearization by providing copy and discard operations.
     ///
     /// # Errors
@@ -76,6 +89,23 @@ impl Linearizer {
             Ok(())
         }
     }
+
+
+    /// Configures this instance that when lowering produces an outport which
+    /// * has type which is an instantiation of the parametric type `src`, and
+    /// * is not [Copyable](hugr_core::types::TypeBound::Copyable), and
+    /// * has other than one connected inport,
+    ///
+    /// ...then the provided callback should be used to generate a `copy` or `discard` op,
+    /// passing the desired number of outports (which will never be 1).
+    ///
+    /// (That is, this is like [Self::linearize] but for parametric types and/or
+    ///  with a callback that can generate an n-way copy directly, rather than
+    ///  with a 0-way and 2-way copy.)
+    ///
+    /// The [Linearizer] is passed so that the callback can use it to generate
+    /// `copy`/`discard` ops for other types (e.g. the elements of a collection),
+    /// as part of an [NodeTemplate::CompoundOp].
 
     /// Registers that instances of a parametrized [TypeDef] should be linearized
     /// by providing functions that generate copy and discard functions given the [TypeArg]s.
@@ -328,7 +358,8 @@ mod test {
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
         lowerer.replace_type(usize_custom_t, Type::new_extension(lin_custom_t.clone()));
         lowerer
-            .linearize(
+            .linearizer()
+            .register(
                 lin_custom_t,
                 NodeTemplate::SingleOp(copy_op.into()),
                 NodeTemplate::SingleOp(discard_op.into()),
@@ -439,7 +470,7 @@ mod test {
         );
         let opdef = e.get_op("copy").unwrap();
         let opdef2 = opdef.clone();
-        lowerer.linearize_parametric(lin_t_def, move |args, num_outs, _| {
+        lowerer.linearizer().register_parametric(lin_t_def, move |args, num_outs, _| {
             assert!(args.is_empty());
             Ok(NodeTemplate::SingleOp(
                 ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
