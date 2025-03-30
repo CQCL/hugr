@@ -13,8 +13,18 @@ use itertools::Itertools;
 
 use super::{NodeTemplate, ParametricType};
 
-/// Configuration for inserting copy and discard operations for linear types
-/// outports of which are sources of multiple or 0 edges.
+/// Configuration for inserting copy and discard operations for linear types when a
+///[ReplaceTypes](super::ReplaceTypes) creates outports of these types (or of types
+/// containing them) which are sources of multiple or 0 edges.
+///
+/// Note that this is not really effective before [monomorphization]: if a
+/// function polymorphic over a [TypeBound::Copyable] becomes called with a
+/// non-Copyable type argument, [Linearizer] cannot insert copy/discard operations
+/// for such a case. However, following [monomorphization], there would be a
+/// specific instantiation of the function for the type-that-becomes-linear,
+/// into which copy/discard can be inserted.
+///
+/// [monomorphization]: crate::monomorphize()
 #[derive(Clone, Default)]
 pub struct Linearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -58,24 +68,15 @@ pub enum LinearizeError {
 }
 
 impl Linearizer {
-    /// Configures this instance so that, when an outport of type `src` has other than one connected
-    /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
-    /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
-    /// `discard` should have exactly one inport, of type 'src', and no outports.)
-    ///
-    /// The same [NodeTemplate]s are also used in cases where `src` is an element of a [TypeEnum::Sum].
-    ///
-    /// # Errors
-    ///
-    /// If `src` is [Copyable], it is returned as an `Err
-    ///
-    /// [Copyable]: hugr_core::types::TypeBound::Copyable
-
-    /// Registers a type for linearization by providing copy and discard operations.
+    /// Configures this instance that the specified monomorphic type can be copied and/or
+    /// discarded via the provided [NodeTemplate]s - directly or as part of a compound type
+    /// e.g. [TypeEnum::Sum].
+    /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
+    /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///
     /// # Errors
     ///
-    /// If `typ` is copyable, it is returned as an `Err`.
+    /// If `typ` is [Copyable](TypeBound::Copyable), it is returned as an `Err
     pub fn register(
         &mut self,
         typ: CustomType,
@@ -90,25 +91,18 @@ impl Linearizer {
         }
     }
 
-
-    /// Configures this instance that when lowering produces an outport which
-    /// * has type which is an instantiation of the parametric type `src`, and
-    /// * is not [Copyable](hugr_core::types::TypeBound::Copyable), and
-    /// * has other than one connected inport,
+    /// Configures this instance that instances of the specified [TypeDef] (perhaps
+    /// polymorphic) can be copied and/or discarded by using the provided callback
+    /// to generate a [NodeTemplate] for an appropriate copy/discard operation.
     ///
-    /// ...then the provided callback should be used to generate a `copy` or `discard` op,
-    /// passing the desired number of outports (which will never be 1).
-    ///
-    /// (That is, this is like [Self::linearize] but for parametric types and/or
-    ///  with a callback that can generate an n-way copy directly, rather than
-    ///  with a 0-way and 2-way copy.)
-    ///
-    /// The [Linearizer] is passed so that the callback can use it to generate
+    /// The callback is given
+    /// * the type arguments (if any - we do not *require* that [TypeDef] take parameters]
+    /// * the desired number of outports (this will never be 1)
+    /// * A handle to the [Linearizer], so that the callback can use it to generate
     /// `copy`/`discard` ops for other types (e.g. the elements of a collection),
     /// as part of an [NodeTemplate::CompoundOp].
-
-    /// Registers that instances of a parametrized [TypeDef] should be linearized
-    /// by providing functions that generate copy and discard functions given the [TypeArg]s.
+    ///
+    /// Note that [Self::register] takes precedence when the `src` types overlap.
     pub fn register_parametric(
         &mut self,
         src: &TypeDef,
@@ -470,14 +464,16 @@ mod test {
         );
         let opdef = e.get_op("copy").unwrap();
         let opdef2 = opdef.clone();
-        lowerer.linearizer().register_parametric(lin_t_def, move |args, num_outs, _| {
-            assert!(args.is_empty());
-            Ok(NodeTemplate::SingleOp(
-                ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
-                    .unwrap()
-                    .into(),
-            ))
-        });
+        lowerer
+            .linearizer()
+            .register_parametric(lin_t_def, move |args, num_outs, _| {
+                assert!(args.is_empty());
+                Ok(NodeTemplate::SingleOp(
+                    ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
+                        .unwrap()
+                        .into(),
+                ))
+            });
         assert!(lowerer.run(&mut h).unwrap());
 
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());

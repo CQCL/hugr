@@ -1,10 +1,7 @@
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
-//! Replace types with other types across the Hugr.
+//! Replace types with other types across the Hugr. See [ReplaceTypes] and [Linearizer].
 //!
-//! Parametrized types and ops will be reparametrized taking into account the replacements,
-//! but any ops taking/returning the replaced types *not* as a result of parametrization,
-//! will also need to be replaced - see [ReplaceTypes::replace_op]. (Similarly [Const]s.)
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -31,7 +28,7 @@ pub use linearize::{LinearizeError, Linearizer};
 
 /// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
 /// or in order to replace an existing node.
-/// 
+///
 /// [DataflowParent]: hugr_core::ops::OpTag::DataflowParent
 #[derive(Clone, Debug, PartialEq)]
 pub enum NodeTemplate {
@@ -93,6 +90,31 @@ impl NodeTemplate {
 
 /// A configuration of what types, ops, and constants should be replaced with what.
 /// May be applied to a Hugr via [Self::run].
+///
+/// Parametrized types and ops will be reparametrized taking into account the
+/// replacements, but any ops taking/returning the replaced types *not* as a result of
+/// parametrization, will also need to be replaced - see [Self::replace_op].
+/// Similarly [Const]s.
+///
+/// Types that are [Copyable](hugr_core::types::TypeBound::Copyable) may also be replaced
+/// with types that are not, see [Linearizer].
+///
+/// Note that although this pass may be used before [monomorphization], there are some
+/// limitations (that do not apply if done after [monomorphization]):
+/// * [NodeTemplate::CompoundOp] only works for operations that do not use type variables
+/// * "Overrides" of specific instantiations of polymorphic types will not be detected if
+///   the instantiations are created inside polymorphic functions. For example, suppose
+///   we [Self::replace_type] type `A` with `X`, [Self::replace_parametrized_type]
+///   container `MyList` with `List`, and [Self::replace_type] `MyList<A>` with
+///   `SpecialListOfXs`. If a function `foo` polymorphic over a type variable `T` dealing
+///   with `MyList<T>`s, that is called with type argument `A`, then `foo<T>` will be
+///   updated to deal with `List<T>`s and the call `foo<A>` updated to `foo<X>`, but this
+///   will still result in using `List<X>` rather than `SpecialListOfXs`. (However this
+///   would be fine *after* [monomorphization]: the monomorphic definition of `foo_A`
+///   would use `SpecialListOfXs`.)
+/// * See also limitations noted for [Linearizer].
+///
+/// [monomorphization]: super::monomorphize()
 #[derive(Clone, Default)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
@@ -206,10 +228,9 @@ impl ReplaceTypes {
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     /// [`array`]: hugr_core::std_extensions::collections::array::array_type
-    pub fn linearizer(
-        &mut self) -> &mut Linearizer {
-            &mut self.linearize
-        }
+    pub fn linearizer(&mut self) -> &mut Linearizer {
+        &mut self.linearize
+    }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
     /// Note that if `src` is an instance of a *parametrized* [OpDef], this takes
