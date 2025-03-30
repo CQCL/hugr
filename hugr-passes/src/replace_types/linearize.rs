@@ -99,8 +99,8 @@ impl Linearizer {
     /// * the type arguments (if any - we do not *require* that [TypeDef] take parameters]
     /// * the desired number of outports (this will never be 1)
     /// * A handle to the [Linearizer], so that the callback can use it to generate
-    /// `copy`/`discard` ops for other types (e.g. the elements of a collection),
-    /// as part of an [NodeTemplate::CompoundOp].
+    ///   `copy`/`discard` ops for other types (e.g. the elements of a collection),
+    ///   as part of an [NodeTemplate::CompoundOp].
     ///
     /// Note that [Self::register] takes precedence when the `src` types overlap.
     pub fn register_parametric(

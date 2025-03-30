@@ -223,7 +223,7 @@ impl ReplaceTypes {
     /// but have become linear as a result of type-changing. Specifically,
     /// the [Linearizer] is used whenever lowering produces an outport which both
     /// * has a non-[Copyable] type - perhaps a direct substitution, or perhaps e.g.
-    /// as a result of changing the element type of a collection such as an [`array`]
+    ///   as a result of changing the element type of a collection such as an [`array`]
     /// * has other than one connected inport,
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
