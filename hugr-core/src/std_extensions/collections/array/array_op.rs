@@ -29,23 +29,23 @@ pub enum ArrayOpDef {
     /// `new_array<SIZE><elemty>: (elemty)^SIZE -> array<SIZE, elemty>`
     /// where `SIZE` must be statically known (not a variable)
     new_array,
-    /// copies an element out of the array ([TypeBound::Copyable] elements only):
+    /// Copies an element out of the array ([TypeBound::Copyable] elements only):
     /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>`
     get,
-    /// exchanges an element of the array with an external value:
+    /// Exchanges an element of the array with an external value:
     /// `set<size, elemty>: array<size, elemty>, index, elemty -> either(elemty, array | elemty, array)`
     /// tagged for failure/success respectively
     set,
-    /// exchanges two indices within the array:
+    /// Exchanges the elements at two indices within the array:
     /// `swap<size, elemty>: array<size, elemty>, index, index -> either(array, array)`
     /// tagged for failure/success respectively
     swap,
-    /// separates leftmost element from the rest of the array:
+    /// Separates the leftmost element from the rest of the array:
     /// `pop_left<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
     /// where `SIZE` must be known statically (not a variable).
     /// `None` is returned if the input array was size 0.
     pop_left,
-    /// separates rightmost element from the rest of the array.
+    /// Separates the rightmost element from the rest of the array.
     /// `pop_right<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
     /// where `SIZE` must be known statically (not a variable).
     /// `None` is returned if the input array was size 0.
