@@ -196,7 +196,7 @@ impl FunctionBuilder<Hugr> {
         // Update the builder metadata
         self.0.num_in_wires += 1;
 
-        self.input_wires().last().unwrap()
+        self.input_wires().next_back().unwrap()
     }
 
     /// Add a new output to the function being constructed.
