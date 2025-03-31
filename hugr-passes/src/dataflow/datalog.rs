@@ -401,6 +401,13 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
                 outs
             }))
         }
-        o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
+        OpType::CallIndirect(_) => Some(ValueRow::from_iter(if row_contains_bottom(ins) {
+            vec![PartialValue::Bottom; num_outs]
+        } else {
+            let mut outs = vec![PartialValue::Top; num_outs];
+            ctx.interpret_call_indirect(&ins[0], &ins[1..], &mut outs[..]);
+            outs
+        })),
+        o => todo!("Unhandled: {:?}", o), // OpType is "non-exhaustive"
     }
 }

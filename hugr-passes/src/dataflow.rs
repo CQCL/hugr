@@ -35,6 +35,18 @@ pub trait DFContext<V>: ConstLoader<V> {
         _outs: &mut [PartialValue<V>],
     ) {
     }
+
+    /// Given lattice values for the called function, and arguments to pass to it, update
+    /// lattice values for the (dataflow) outputs
+    /// of a [CallIndirect](hugr_core::ops::CallIndirect).
+    /// (The default does nothing, i.e. leaves `Top` for all outputs.)
+    fn interpret_call_indirect(
+        &mut self,
+        _func: &PartialValue<V>,
+        _args: &[PartialValue<V>],
+        _outs: &mut [PartialValue<V>],
+    ) {
+    }
 }
 
 /// A location where a [Value] could be find in a Hugr. That is,
