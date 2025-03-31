@@ -207,13 +207,6 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
 
 struct ConstFoldContext<'a, H>(&'a H);
 
-impl<H: HugrView> std::ops::Deref for ConstFoldContext<'_, H> {
-    type Target = H;
-    fn deref(&self) -> &H {
-        self.0
-    }
-}
-
 impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
     type Node = H::Node;
 
@@ -244,7 +237,7 @@ impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldCo
         };
         // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
         // but not for transforming to a direct Call.
-        let func = DescendantsGraph::<FuncID<true>>::try_new(&**self, node).ok()?;
+        let func = DescendantsGraph::<FuncID<true>>::try_new(self.0, node).ok()?;
         Some(ValueHandle::new_const_hugr(
             ConstLocation::Node(node),
             Box::new(func.extract_hugr()),
