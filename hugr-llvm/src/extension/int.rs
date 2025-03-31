@@ -13,7 +13,6 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, IntValue},
     IntPredicate,
 };
-use insta::assert_compact_debug_snapshot;
 use lazy_static::lazy_static;
 
 use crate::{
