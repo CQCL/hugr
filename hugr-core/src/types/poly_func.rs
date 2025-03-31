@@ -119,7 +119,7 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     /// # Errors
     /// If there is not exactly one [TypeArg] for each binder ([Self::params]),
     /// or an arg does not fit into its corresponding [TypeParam]
-    pub(crate) fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<RV>, SignatureError> {
+    pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<RV>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;

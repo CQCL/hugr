@@ -2,16 +2,16 @@
 
 (define-func example.cfg
   (param ?a core.type)
-  (core.fn [?a] [?a] (ext))
+  (core.fn [?a] [?a])
   (dfg [%0] [%1]
-       (signature (core.fn [?a] [?a] (ext)))
+       (signature (core.fn [?a] [?a]))
        (cfg [%0] [%1]
-            (signature (core.fn [?a] [?a] (ext)))
+            (signature (core.fn [?a] [?a]))
             (cfg [%2] [%4]
-                 (signature (core.fn [(core.ctrl [?a])] [(core.ctrl [?a])] (ext)))
+                 (signature (core.fn [(core.ctrl [?a])] [(core.ctrl [?a])]))
                  (block [%2] [%4 %2]
-                        (signature (core.fn [(core.ctrl [?a])] [(core.ctrl [?a]) (core.ctrl [?a])] (ext)))
+                        (signature (core.fn [(core.ctrl [?a])] [(core.ctrl [?a]) (core.ctrl [?a])]))
                         (dfg [%5] [%6]
-                             (signature (core.fn [?a] [(core.adt [[?a] [?a]])] (ext)))
+                             (signature (core.fn [?a] [(core.adt [[?a] [?a]])]))
                              ((core.make_adt _ _ 0) [%5] [%6]
-                                                    (signature (core.fn [?a] [(core.adt [[?a] [?a]])] (ext))))))))))
+                                                    (signature (core.fn [?a] [(core.adt [[?a] [?a]])])))))))))

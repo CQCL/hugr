@@ -97,24 +97,16 @@ struct Term {
         list @4 :List(SeqPart);
         string @5 :Text;
         nat @6 :UInt64;
-        extSet @7 :List(ExtSetPart);
-        bytes @8 :Data;
-        float @9 :Float64;
-        constFunc @10 :RegionId;
-        wildcard @11 :Void;
-        tuple @12 :List(SeqPart);
+        bytes @7 :Data;
+        float @8 :Float64;
+        func @9 :RegionId;
+        wildcard @10 :Void;
+        tuple @11 :List(SeqPart);
     }
 
     struct SeqPart {
         union {
             item @0 :TermId;
-            splice @1 :TermId;
-        }
-    }
-
-    struct ExtSetPart {
-        union {
-            extension @0 :Text;
             splice @1 :TermId;
         }
     }

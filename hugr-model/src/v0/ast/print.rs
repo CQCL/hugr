@@ -144,11 +144,6 @@ fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
             print_tuple_parts(printer, tuple_parts);
             printer.parens_exit();
         }
-        Term::ExtSet => {
-            printer.parens_enter();
-            printer.text("ext");
-            printer.parens_exit();
-        }
         Term::Func(region) => {
             printer.parens_enter();
             printer.text("fn");
@@ -426,6 +421,7 @@ impl_display!(Param, print_param);
 impl_display!(Term, print_term);
 impl_display!(SeqPart, print_seq_part);
 impl_display!(Literal, print_literal);
+impl_display!(Symbol, print_symbol);
 
 impl Display for VarName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

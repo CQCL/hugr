@@ -80,7 +80,6 @@ fn parse_term(pair: Pair<Rule>) -> ParseResult<Term> {
             let parts = pairs.map(parse_seq_part).collect::<ParseResult<_>>()?;
             Term::Tuple(parts)
         }
-        Rule::term_ext_set => Term::ExtSet,
         Rule::literal => {
             let literal = parse_literal(pair)?;
             Term::Literal(literal)
@@ -444,3 +443,4 @@ impl_from_str!(Param, param, parse_param);
 impl_from_str!(Module, module, parse_module);
 impl_from_str!(SeqPart, part, parse_seq_part);
 impl_from_str!(Literal, literal, parse_literal);
+impl_from_str!(Symbol, symbol, parse_symbol);

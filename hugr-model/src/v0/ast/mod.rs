@@ -29,6 +29,8 @@ use super::{LinkName, Literal, RegionKind, SymbolName, VarName};
 
 mod parse;
 mod print;
+#[cfg(feature = "pyo3")]
+mod python;
 mod resolve;
 mod view;
 
@@ -231,10 +233,6 @@ pub enum Term {
     Tuple(Arc<[SeqPart]>),
     /// Function constant.
     Func(Arc<Region>),
-    /// Extension set.
-    ///
-    /// __REMARK__: Extension sets will be removed, so this is a standin.
-    ExtSet,
 }
 
 impl From<Literal> for Term {

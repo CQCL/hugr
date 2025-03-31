@@ -1,0 +1,27 @@
+[package]
+name = "hugr-py"
+version = "0.1.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[lints]
+workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "hugr_py"
+crate-type = ["cdylib", "rlib"]
+path = "rust/lib.rs"
+# This library requires a Python runtime to be tested.
+# It is tested by the py tests in the `tests` directory.
+doc = false
+test = false
+bench = false
+
+[dependencies]
+bumpalo = { workspace = true, features = ["collections"] }
+hugr-model = { version = "0.18", path = "../hugr-model", features = ["pyo3"] }
+paste.workspace = true
+pyo3 = { workspace = true, features = ["extension-module", "abi3-py310"] }
+smol_str.workspace = true
