@@ -3,6 +3,7 @@
 //! An (example) use of the [dataflow analysis framework](super::dataflow).
 
 mod value_handle;
+use itertools::{Either, Itertools};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
@@ -255,6 +256,44 @@ impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldCont
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
             outs[p.index()] =
                 partial_from_const(self, ConstLocation::Field(p.index(), &node.into()), &v);
+        }
+    }
+
+    fn interpret_call_indirect(
+        &mut self,
+        func: &PartialValue<ValueHandle<H::Node>>,
+        args: &[PartialValue<ValueHandle<H::Node>>],
+        outs: &mut [PartialValue<ValueHandle<H::Node>>],
+    ) {
+        let PartialValue::Value(func) = func else {
+            return;
+        };
+        let inputs = args.iter().cloned().enumerate().map(|(i, v)| (i.into(), v));
+        let vals: Vec<_> = match func {
+            ValueHandle::NodeRef(node, _) => {
+                let mut m = Machine::new(self.0);
+                m.prepopulate_inputs(*node, inputs).unwrap();
+                let results = m.run(ConstFoldContext(self.0), []);
+                (0..outs.len())
+                    .map(|p| results.read_out_wire(Wire::new(*node, p)))
+                    .collect()
+            }
+            ValueHandle::Unhashable {
+                leaf: Either::Right(hugr),
+                ..
+            } => {
+                let h = hugr.as_ref();
+                let results = Machine::new(h).run(ConstFoldContext(h), inputs);
+                (0..outs.len())
+                    .map(|p| results.read_out_wire(Wire::new(h.root(), p)))
+                    .collect()
+            }
+            _ => return,
+        };
+        for (val, out) in vals.into_iter().zip_eq(outs) {
+            if let Some(val) = val {
+                *out = val;
+            }
         }
     }
 }
