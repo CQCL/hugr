@@ -32,9 +32,14 @@ pub enum UntupleRecursive {
 /// by `UnpackTuple`s.
 ///
 /// If the tuple output is consumed by other operations, only the `UnpackTuple`s
-/// are removed and their outputs are connected to the original values accordingly.
+/// are removed and their outputs are connected to the original values
+/// accordingly.
 ///
-/// Removes `MakeTuple` operations that are not consumed by any other operations.
+/// Currently only unpack operations in the same region as the `MakeTuple` are
+/// removed. This may be extended in the future.
+///
+/// Removes `MakeTuple` operations that are not consumed by any other
+/// operations.
 #[derive(Debug, Clone, Default)]
 pub struct UntuplePass {
     /// Whether to traverse the HUGR recursively.
@@ -153,8 +158,8 @@ fn is_unpack_tuple(optype: &OpType) -> bool {
     optype.name() == format!("prelude.{}", TupleOpDef::UnpackTuple.name())
 }
 
-/// If this is a MakeTuple operation followed by some number of UnpackTuple operations,
-/// return a rewrite to remove them.
+/// If this is a MakeTuple operation followed by some number of UnpackTuple operations
+/// on the same region, return a rewrite to remove them.
 ///
 /// Otherwise, return None.
 fn make_rewrite<'h, T: HugrView>(
@@ -168,6 +173,7 @@ fn make_rewrite<'h, T: HugrView>(
         return None;
     }
     let tuple_types = op.dataflow_signature().unwrap().input_types().to_vec();
+    let node_parent = hugr.get_parent(node);
 
     // See if it is followed by a tuple unpack
     let links = hugr
@@ -177,6 +183,7 @@ fn make_rewrite<'h, T: HugrView>(
 
     let unpack_nodes = links
         .iter()
+        .filter(|&&neigh| hugr.get_parent(neigh) == node_parent)
         .filter(|&&neigh| is_unpack_tuple(hugr.get_optype(neigh)))
         .copied()
         .collect_vec();
