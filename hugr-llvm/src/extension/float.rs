@@ -12,8 +12,8 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum},
 };
 
-use crate::emit::{emit_value, get_intrinsic};
 use crate::emit::ops::{emit_custom_binary_op, emit_custom_unary_op};
+use crate::emit::{emit_value, get_intrinsic};
 use crate::emit::{func::EmitFuncContext, EmitOpArgs};
 
 use crate::custom::CodegenExtsBuilder;
