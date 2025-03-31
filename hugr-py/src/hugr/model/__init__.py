@@ -12,10 +12,12 @@ class Term(Protocol):
     """A model term for static data such as types, constants and metadata."""
 
     def __str__(self) -> str:
+        """Convert the term to its string representation."""
         return rust.term_to_string(self)
 
     @staticmethod
     def from_str(s: str) -> "Term":
+        """Read the term from its string representation."""
         return rust.string_to_term(s)
 
 
@@ -85,10 +87,12 @@ class Param:
     type: Term
 
     def __str__(self):
+        """Convert the parameter to its string representation."""
         return rust.param_to_string(self)
 
     @staticmethod
     def from_str(s: str) -> "Param":
+        """Read the parameter from its string representation."""
         return rust.string_to_param(s)
 
 
@@ -102,10 +106,12 @@ class Symbol:
     signature: Term = field(default_factory=Wildcard)
 
     def __str__(self):
+        """Convert the symbol to its string representation."""
         return rust.symbol_to_string(self)
 
     @staticmethod
     def from_str(s: str) -> "Symbol":
+        """Read the symbol from its string representation."""
         return rust.string_to_symbol(s)
 
 
@@ -235,10 +241,12 @@ class Region:
     signature: Term | None = None
 
     def __str__(self):
+        """Convert the region to its string representation."""
         return rust.region_to_string(self)
 
     @staticmethod
     def from_str(s: str) -> "Region":
+        """Read the region from its string representation."""
         return rust.string_to_region(s)
 
 
@@ -249,10 +257,12 @@ class Module:
     root: Region
 
     def __str__(self):
+        """Convert the module to its string representation."""
         return rust.module_to_string(self)
 
     @staticmethod
     def from_str(s: str) -> "Module":
+        """Read the module from its string representation."""
         return rust.string_to_module(s)
 
 
@@ -263,15 +273,19 @@ class Package:
     modules: Sequence[Module]
 
     def __str__(self):
+        """Convert the package into its string representation."""
         return rust.package_to_string(self)
 
     def __bytes__(self):
+        """Convert the package into its binary representation."""
         return rust.package_to_bytes(self)
 
     @staticmethod
     def from_str(s: str) -> "Package":
+        """Read a package from its string representation."""
         return rust.string_to_package(s)
 
     @staticmethod
     def from_bytes(b: bytes) -> "Package":
+        """Read a package from its binary representation."""
         return rust.bytes_to_package(b)
