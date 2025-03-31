@@ -248,7 +248,7 @@ fn decode_model(
     extension_registry: &ExtensionRegistry,
     format: EnvelopeFormat,
 ) -> Result<Package, EnvelopeError> {
-    use crate::Extension;
+    use crate::{import::import_package, Extension};
     use hugr_model::v0::bumpalo::Bump;
 
     if format.model_version() != Some(0) {
@@ -270,7 +270,7 @@ fn decode_model(
         }
     }
 
-    Ok(Package::from_model(&model_package, &extension_registry)?)
+    Ok(import_package(&model_package, &extension_registry)?)
 }
 
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
@@ -305,6 +305,8 @@ fn encode_model(
 ) -> Result<(), EnvelopeError> {
     use hugr_model::v0::{binary::write_to_writer, bumpalo::Bump};
 
+    use crate::export::export_package;
+
     if format.model_version() != Some(0) {
         return Err(EnvelopeError::FormatUnsupported {
             format,
@@ -313,7 +315,7 @@ fn encode_model(
     }
 
     let bump = Bump::default();
-    let model_package = package.to_model(&bump);
+    let model_package = export_package(package, &bump);
     write_to_writer(&model_package, &mut writer)?;
 
     if format.append_extensions() {

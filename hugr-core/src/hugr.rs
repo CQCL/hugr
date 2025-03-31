@@ -34,13 +34,6 @@ use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
 
-#[cfg(feature = "model_unstable")]
-use crate::export::export_hugr;
-#[cfg(feature = "model_unstable")]
-use crate::import::{import_hugr, ImportError};
-#[cfg(feature = "model_unstable")]
-use hugr_model::v0 as model;
-
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hugr {
@@ -262,21 +255,6 @@ impl Hugr {
 
         self.extensions = used_extensions;
         Ok(())
-    }
-
-    /// Export this module to the model representation.
-    #[cfg(feature = "model_unstable")]
-    pub fn to_model<'a>(&'a self, bump: &'a model::bumpalo::Bump) -> model::table::Module<'a> {
-        export_hugr(self, bump)
-    }
-
-    /// Import a module from the model representation.
-    #[cfg(feature = "model_unstable")]
-    pub fn from_model<'a>(
-        module: &'a model::table::Module<'a>,
-        extensions: &ExtensionRegistry,
-    ) -> Result<Self, ImportError> {
-        import_hugr(module, extensions)
     }
 }
 

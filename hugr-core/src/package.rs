@@ -14,11 +14,6 @@ use crate::hugr::{ExtensionError, HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
 use crate::{Extension, Hugr};
 
-#[cfg(feature = "model_unstable")]
-use crate::import::ImportError;
-#[cfg(feature = "model_unstable")]
-use hugr_model::v0 as model;
-
 #[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Package of module HUGRs.
 pub struct Package {
@@ -312,34 +307,6 @@ impl Package {
         let writer = io::BufWriter::new(file);
         #[allow(deprecated)]
         self.to_json_writer(writer)
-    }
-
-    /// Export this package to the model representation.
-    #[cfg(feature = "model_unstable")]
-    pub fn to_model<'a>(&'a self, bump: &'a model::bumpalo::Bump) -> model::table::Package<'a> {
-        let modules = self
-            .modules
-            .iter()
-            .map(|module| module.to_model(bump))
-            .collect();
-        model::table::Package { modules }
-    }
-
-    /// Import a package from the model representation.
-    #[cfg(feature = "model_unstable")]
-    pub fn from_model<'a>(
-        package: &'a model::table::Package<'a>,
-        extensions: &ExtensionRegistry,
-    ) -> Result<Self, ImportError> {
-        let modules = package
-            .modules
-            .iter()
-            .map(|module| Hugr::from_model(module, extensions))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // This does not panic since the import already requires a module root.
-        let package = Self::new(modules).expect("non-module root");
-        Ok(package)
     }
 }
 

@@ -2,15 +2,16 @@
 
 use std::str::FromStr;
 
-use hugr::{package::Package, std_extensions::std_reg};
+use hugr::std_extensions::std_reg;
+use hugr_core::{export::export_package, import::import_package};
 use hugr_model::v0 as model;
 
 fn roundtrip(source: &str) -> String {
     let bump = model::bumpalo::Bump::new();
     let package_ast = model::ast::Package::from_str(source).unwrap();
     let package_table = package_ast.resolve(&bump).unwrap();
-    let core = Package::from_model(&package_table, &std_reg()).unwrap();
-    let exported_table = core.to_model(&bump);
+    let core = import_package(&package_table, &std_reg()).unwrap();
+    let exported_table = export_package(&core, &bump);
     let exported_ast = exported_table.as_ast().unwrap();
     exported_ast.to_string()
 }
