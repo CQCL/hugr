@@ -769,151 +769,167 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
     let pair_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), tuple_sum_ty.clone())?;
 
     let build_divmod = |ctx: &mut EmitFuncContext<'c, '_, H>| -> Result<BasicValueEnum<'c>> {
-        let max_signed_value = u64::pow(2, u32::pow(2, log_width as u32) -1) - 1;
-        let max_signed = numerator.get_type().const_int(max_signed_value, false);
-        println!("max {}", max_signed_value);
-        let large_divisor_bool = ctx.builder().build_int_compare(
-            IntPredicate::UGT,
-            denominator,
-            max_signed,
-            "is_divisor_large",
-        )?;
-        // TODO: Make everything divisor type
-        //let large_divisor = ctx.builder().build_int_cast_sign_flag(large_divisor_bool, denominator.get_type(), false, "")?;
-        let large_divisor = ctx.builder().build_int_z_extend(large_divisor_bool, denominator.get_type(), "")?;
-        let negative_numerator_bool = ctx.builder().build_int_compare(
-            IntPredicate::SLT,
-            numerator,
-            numerator.get_type().const_zero(),
-            "is_dividend_negative",
-        )?;
-        let negative_numerator = ctx.builder().build_int_z_extend(negative_numerator_bool, denominator.get_type(), "")?;
-        let tag = ctx.builder().build_left_shift(
-            large_divisor,
-            denominator.get_type().const_int(1, false),
-            "",
-        )?;
-
-        let tag = ctx.builder().build_or(tag, negative_numerator, "tag")?;
-
-        let (quot, rem) = if signed {
-            let quot = ctx
-                .builder()
-                .build_int_signed_div(numerator, denominator, "quotient")?;
-            let rem = ctx
-                .builder()
-                .build_int_signed_rem(numerator, denominator, "remainder")?;
-            (quot, rem)
-        } else {
+        if !signed {
             let quot = ctx
                 .builder()
                 .build_int_unsigned_div(numerator, denominator, "quotient")?;
             let rem = ctx
                 .builder()
                 .build_int_unsigned_rem(numerator, denominator, "remainder")?;
-            (quot, rem)
-        };
+            Ok(pair_ty
+                .build_tag(
+                    ctx.builder(),
+                    0,
+                    vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
+                )?
+                .as_basic_value_enum())
+        } else {
+            let max_signed_value = u64::pow(2, u32::pow(2, log_width as u32) - 1) - 1;
+            let max_signed = numerator.get_type().const_int(max_signed_value, false);
+            println!("max {}", max_signed_value);
+            let large_divisor_bool = ctx.builder().build_int_compare(
+                IntPredicate::UGT,
+                denominator,
+                max_signed,
+                "is_divisor_large",
+            )?;
+            // TODO: Make everything divisor type
+            //let large_divisor = ctx.builder().build_int_cast_sign_flag(large_divisor_bool, denominator.get_type(), false, "")?;
+            let large_divisor =
+                ctx.builder()
+                    .build_int_z_extend(large_divisor_bool, denominator.get_type(), "")?;
+            let negative_numerator_bool = ctx.builder().build_int_compare(
+                IntPredicate::SLT,
+                numerator,
+                numerator.get_type().const_zero(),
+                "is_dividend_negative",
+            )?;
+            let negative_numerator = ctx.builder().build_int_z_extend(
+                negative_numerator_bool,
+                denominator.get_type(),
+                "",
+            )?;
+            let tag = ctx.builder().build_left_shift(
+                large_divisor,
+                denominator.get_type().const_int(1, false),
+                "",
+            )?;
 
-        let result_ptr = ctx.builder().build_alloca(pair_ty.clone(), "result")?;
+            let tag = ctx.builder().build_or(tag, negative_numerator, "tag")?;
 
-        let finish = ctx.new_basic_block("finish", None);
-        let negative_bigdiv = ctx.new_basic_block("negative_bigdiv", Some(finish));
-        let negative_smoldiv = ctx.new_basic_block("negative_smoldiv", Some(finish));
-        let non_negative_bigdiv = ctx.new_basic_block("non_negative_bigdiv", Some(finish));
-        let non_negative_smoldiv = ctx.new_basic_block("non_negative_smoldiv", Some(finish));
+            let quot = ctx
+                .builder()
+                .build_int_signed_div(numerator, denominator, "quotient")?;
+            let rem = ctx
+                .builder()
+                .build_int_signed_rem(numerator, denominator, "remainder")?;
 
-        ctx.builder().build_switch(
-            tag,
-            non_negative_smoldiv,
-            &[
-                (denominator.get_type().const_int(1, false), negative_smoldiv),
-                (
-                    denominator.get_type().const_int(2, false),
-                    non_negative_bigdiv,
-                ),
-                (denominator.get_type().const_int(3, false), negative_bigdiv),
-            ],
-        )?;
+            let result_ptr = ctx.builder().build_alloca(pair_ty.clone(), "result")?;
 
-        let build_and_store_result =
-            |ctx: &mut EmitFuncContext<'c, '_, H>, vs: Vec<BasicValueEnum<'c>>| -> Result<()> {
-                let result = pair_ty
-                    .build_tag(ctx.builder(), 0, vs)?
-                    //.build_tag(ctx.builder(), 0, vec![tag.as_basic_value_enum(), tag.as_basic_value_enum()])?
+            let finish = ctx.new_basic_block("finish", None);
+            let negative_bigdiv = ctx.new_basic_block("negative_bigdiv", Some(finish));
+            let negative_smoldiv = ctx.new_basic_block("negative_smoldiv", Some(finish));
+            let non_negative_bigdiv = ctx.new_basic_block("non_negative_bigdiv", Some(finish));
+            let non_negative_smoldiv = ctx.new_basic_block("non_negative_smoldiv", Some(finish));
+
+            ctx.builder().build_switch(
+                tag,
+                non_negative_smoldiv,
+                &[
+                    (denominator.get_type().const_int(1, false), negative_smoldiv),
+                    (
+                        denominator.get_type().const_int(2, false),
+                        non_negative_bigdiv,
+                    ),
+                    (denominator.get_type().const_int(3, false), negative_bigdiv),
+                ],
+            )?;
+
+            let build_and_store_result =
+                |ctx: &mut EmitFuncContext<'c, '_, H>, vs: Vec<BasicValueEnum<'c>>| -> Result<()> {
+                    let result = pair_ty
+                        .build_tag(ctx.builder(), 0, vs)?
+                        //.build_tag(ctx.builder(), 0, vec![tag.as_basic_value_enum(), tag.as_basic_value_enum()])?
+                        .as_basic_value_enum();
+                    ctx.builder().build_store(result_ptr, result)?;
+                    ctx.builder().build_unconditional_branch(finish)?;
+                    Ok(())
+                };
+
+            // Default case (although it should only be reached by one branch)
+            ctx.builder().position_at_end(non_negative_smoldiv);
+            build_and_store_result(
+                ctx,
+                vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
+            )?;
+
+            ctx.builder().position_at_end(negative_smoldiv);
+            {
+                let if_rem_zero = pair_ty
+                    .build_tag(
+                        ctx.builder(),
+                        0,
+                        vec![
+                            quot.as_basic_value_enum(),
+                            rem.get_type().const_zero().as_basic_value_enum(),
+                        ],
+                    )?
                     .as_basic_value_enum();
+
+                let if_rem_nonzero = pair_ty
+                    .build_tag(
+                        ctx.builder(),
+                        0,
+                        vec![
+                            ctx.builder()
+                                .build_int_sub(quot, quot.get_type().const_int(1, true), "")?
+                                .as_basic_value_enum(),
+                            ctx.builder()
+                                .build_int_add(denominator, rem, "")?
+                                .as_basic_value_enum(),
+                        ],
+                    )?
+                    .as_basic_value_enum();
+
+                let is_rem_zero = ctx.builder().build_int_compare(
+                    IntPredicate::EQ,
+                    rem,
+                    rem.get_type().const_zero(),
+                    "is_rem_0",
+                )?;
+                let result =
+                    ctx.builder()
+                        .build_select(is_rem_zero, if_rem_zero, if_rem_nonzero, "")?;
                 ctx.builder().build_store(result_ptr, result)?;
                 ctx.builder().build_unconditional_branch(finish)?;
-                Ok(())
-            };
+            }
 
-        // Default case (although it should only be reached by one branch)
-        ctx.builder().position_at_end(non_negative_smoldiv);
-        build_and_store_result(
-            ctx,
-            vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
-        )?;
+            // The (unsigned) divisor is bigger than the (signed) dividend could
+            // possibly be, so it's safe to return quotient 0 and remainder = dividend
+            ctx.builder().position_at_end(non_negative_bigdiv);
+            build_and_store_result(
+                ctx,
+                vec![
+                    numerator.get_type().const_zero().as_basic_value_enum(),
+                    numerator.as_basic_value_enum(),
+                ],
+            )?;
 
-        ctx.builder().position_at_end(negative_smoldiv);
-        {
-            let if_rem_zero = pair_ty
-                .build_tag(
-                    ctx.builder(),
-                    0,
-                    vec![
-                        quot.as_basic_value_enum(),
-                        rem.get_type().const_zero().as_basic_value_enum(),
-                    ],
-                )?
-                .as_basic_value_enum();
-
-            let if_rem_nonzero = pair_ty
-                .build_tag(
-                    ctx.builder(),
-                    0,
-                    vec![
-                        ctx.builder()
-                            .build_int_sub(quot, quot.get_type().const_int(1, true), "")?
-                            .as_basic_value_enum(),
-                        ctx.builder()
-                            .build_int_add(denominator, rem, "")?
+            ctx.builder().position_at_end(negative_bigdiv);
+            build_and_store_result(
+                ctx,
+                vec![
+                    numerator.get_type().const_all_ones().as_basic_value_enum(),
+                    ctx.builder()
+                        .build_int_add(numerator, denominator, "")?
                         .as_basic_value_enum(),
-                    ],
-                )?
-                .as_basic_value_enum();
+                ],
+            )?;
 
-            let is_rem_zero = ctx.builder().build_int_compare(IntPredicate::EQ, rem, rem.get_type().const_zero(), "is_rem_0")?;
-            let result = ctx
-                .builder()
-                .build_select(is_rem_zero, if_rem_zero, if_rem_nonzero, "")?;
-            ctx.builder().build_store(result_ptr, result)?;
-            ctx.builder().build_unconditional_branch(finish)?;
+            ctx.builder().position_at_end(finish);
+            let result = ctx.builder().build_load(result_ptr, "result")?;
+            Ok(result)
         }
-
-        // The (unsigned) divisor is bigger than the (signed) dividend could
-        // possibly be, so it's safe to return quotient 0 and remainder = dividend
-        ctx.builder().position_at_end(non_negative_bigdiv);
-        build_and_store_result(
-            ctx,
-            vec![
-                numerator.get_type().const_zero().as_basic_value_enum(),
-                numerator.as_basic_value_enum(),
-            ],
-        )?;
-
-        ctx.builder().position_at_end(negative_bigdiv);
-        build_and_store_result(
-            ctx,
-            vec![
-                numerator.get_type().const_all_ones().as_basic_value_enum(),
-                ctx.builder()
-                    .build_int_add(numerator, denominator, "")?
-                    .as_basic_value_enum(),
-            ],
-        )?;
-
-        ctx.builder().position_at_end(finish);
-        let result = ctx.builder().build_load(result_ptr, "result")?;
-        Ok(result)
     };
 
     let int_ty = numerator.get_type();
@@ -1439,18 +1455,18 @@ mod test {
     }
 
     #[rstest]
-    fn test_exec_widen(
-        int_exec_ctx: TestContext,
-    ) {
+    fn test_exec_widen(int_exec_ctx: TestContext) {
         let from: u8 = 1;
         let to: u8 = 6;
         let ty = INT_TYPES[to as usize].clone();
         let input = ConstInt::new_u(from, 1).unwrap();
 
         let ext_op = int_ops::EXTENSION
-            .instantiate_extension_op("iwiden_u".as_ref(), [(from as u64).into(), (to as u64).into()])
+            .instantiate_extension_op(
+                "iwiden_u".as_ref(),
+                [(from as u64).into(), (to as u64).into()],
+            )
             .unwrap();
-
 
         let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
 
@@ -1459,15 +1475,16 @@ mod test {
         let input = ConstInt::new_s(from, 1).unwrap();
 
         let ext_op = int_ops::EXTENSION
-            .instantiate_extension_op("iwiden_s".as_ref(), [(from as u64).into(), (to as u64).into()])
+            .instantiate_extension_op(
+                "iwiden_s".as_ref(),
+                [(from as u64).into(), (to as u64).into()],
+            )
             .unwrap();
-
 
         let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
 
         assert_eq!(int_exec_ctx.exec_hugr_u64(hugr, "main"), 1);
     }
-
 
     #[rstest]
     #[case("inarrow_s", 6, 2, 4)]

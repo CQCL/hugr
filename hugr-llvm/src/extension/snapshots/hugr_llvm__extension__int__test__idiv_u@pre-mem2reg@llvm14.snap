@@ -22,10 +22,6 @@ entry_block:                                      ; preds = %alloca_block
   %"2_01" = load i8, i8* %"2_0", align 1
   %"2_12" = load i8, i8* %"2_1", align 1
   %valid_div = icmp ne i8 %"2_12", 0
-  %quotient = udiv i8 %"2_01", %"2_12"
-  %remainder = urem i8 %"2_01", %"2_12"
-  %2 = insertvalue { i8, i8 } poison, i8 %quotient, 0
-  %3 = insertvalue { i8, i8 } %2, i8 %remainder, 1
   br label %panic_if_0
 
 panic_if_0:                                       ; preds = %entry_block
@@ -34,13 +30,17 @@ panic_if_0:                                       ; preds = %entry_block
   ]
 
 panic:                                            ; preds = %panic_if_0
-  %4 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0))
+  %2 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0))
   call void @abort()
   br label %exit
 
 exit:                                             ; preds = %panic_if_0, %panic
-  %5 = extractvalue { i8, i8 } %3, 0
-  %6 = extractvalue { i8, i8 } %3, 1
+  %quotient = udiv i8 %"2_01", %"2_12"
+  %remainder = urem i8 %"2_01", %"2_12"
+  %3 = insertvalue { i8, i8 } poison, i8 %quotient, 0
+  %4 = insertvalue { i8, i8 } %3, i8 %remainder, 1
+  %5 = extractvalue { i8, i8 } %4, 0
+  %6 = extractvalue { i8, i8 } %4, 1
   store i8 %5, i8* %"4_0", align 1
   %"4_03" = load i8, i8* %"4_0", align 1
   store i8 %"4_03", i8* %"0", align 1
