@@ -7,7 +7,8 @@ use hugr_core::builder::{
 };
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::types::{CustomType, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, Hugr, HugrView, IncomingPort, Node, Wire};
+use hugr_core::Wire;
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
 use itertools::Itertools;
 
 use super::{NodeTemplate, ParametricType};
@@ -47,7 +48,7 @@ pub trait Linearizer {
     /// if `src` is not a valid Wire (does not identify a dataflow out-port)
     fn insert_copy_discard(
         &self,
-        hugr: &mut Hugr,
+        hugr: &mut impl HugrMut,
         src: Wire,
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {
@@ -112,9 +113,15 @@ pub struct DelegatingLinearizer {
     // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        Arc<dyn Fn(&[TypeArg], usize, &dyn Linearizer) -> Result<NodeTemplate, LinearizeError>>,
+        Arc<dyn Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>>,
     >,
 }
+
+/// Implementation of [Linearizer] passed to callbacks, (e.g.) so that callbacks for
+/// handling collection types can use it to generate copy/discards of elements.
+// (Note, this is its own type just to give a bit of room for future expansion,
+// rather than passing a &DelegatingLinearizer directly)
+pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 #[allow(missing_docs)]
@@ -182,7 +189,7 @@ impl DelegatingLinearizer {
     pub fn register_parametric(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &dyn Linearizer) -> Result<NodeTemplate, LinearizeError>
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
@@ -275,12 +282,22 @@ impl Linearizer for DelegatingLinearizer {
                         .copy_discard_parametric
                         .get(&cty.into())
                         .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
-                    copy_discard_fn(cty.args(), num_outports, self)
+                    copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))
                 }
             },
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
+    }
+}
+
+impl<'a> Linearizer for CallbackHandler<'a> {
+    fn copy_discard_op(
+        &self,
+        typ: &Type,
+        num_outports: usize,
+    ) -> Result<NodeTemplate, LinearizeError> {
+        self.0.copy_discard_op(typ, num_outports)
     }
 }
 
