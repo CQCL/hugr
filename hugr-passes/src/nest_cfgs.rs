@@ -13,14 +13,14 @@
 //!    *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
 //!    where cycle-equivalent means every cycle has either both a and b, or neither
 //! 2. cycle equivalence is unaffected if all edges are considered *un*directed
-//!     (not obvious, see paper for proof)
+//!    (not obvious, see paper for proof)
 //! 3. take undirected CFG, perform depth-first traversal
-//!     => all edges are either *tree edges*, or *backedges* where one endpoint is an ancestor of the other
+//!    => all edges are either *tree edges*, or *backedges* where one endpoint is an ancestor of the other
 //! 4. identify the "bracketlist" of each tree edge - the set of backedges going from a descendant of that edge to an ancestor
-//!     -- post-order traversal, merging bracketlists of children,
-//!            then delete backedges from below to here, add backedges from here to above
-//!     => tree edges with the same bracketlist are cycle-equivalent;
-//!        + a tree edge with a single-element bracketlist is cycle-equivalent with that single element
+//!    - post-order traversal, merging bracketlists of children,
+//!      then delete backedges from below to here, add backedges from here to above
+//!    - tree edges with the same bracketlist are cycle-equivalent;
+//!    + a tree edge with a single-element bracketlist is cycle-equivalent with that single element
 //! 5. this would be expensive (comparing large sets of backedges) - so to optimize,
 //!     - the backedge most recently added (at the top) of the bracketlist, plus the size of the bracketlist,
 //!       is sufficient to identify the set *when the UDFS tree is linear*;

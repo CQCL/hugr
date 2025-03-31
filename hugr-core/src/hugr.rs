@@ -206,8 +206,8 @@ impl Hugr {
     /// # Parameters
     ///
     /// - `extensions`: The extension set considered when resolving opaque
-    ///     operations and types. The original Hugr's internal extension
-    ///     registry is ignored and replaced with the newly computed one.
+    ///   operations and types. The original Hugr's internal extension
+    ///   registry is ignored and replaced with the newly computed one.
     ///
     /// # Errors
     ///

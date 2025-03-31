@@ -59,7 +59,7 @@ use crate::import::ImportError;
 /// Parameters:
 /// - `reader`: The reader to read the envelope from.
 /// - `registry`: An extension registry with additional extensions to use when
-///     decoding the HUGR, if they are not already included in the package.
+///   decoding the HUGR, if they are not already included in the package.
 pub fn read_envelope(
     mut reader: impl BufRead,
     registry: &ExtensionRegistry,
