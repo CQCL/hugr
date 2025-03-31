@@ -296,7 +296,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 .as_basic_value_enum()])
         }),
         IntOpDef::idiv_s => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::Div,
@@ -313,7 +313,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::idiv_u => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::Div,
@@ -330,7 +330,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::imod_s => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::Mod,
@@ -347,7 +347,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::imod_u => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::Mod,
@@ -364,7 +364,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::idivmod_u => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::DivMod,
@@ -381,7 +381,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::idivmod_s => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::DivMod,
@@ -398,7 +398,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::idiv_checked_s => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::Div,
@@ -415,7 +415,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::idiv_checked_u => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
 
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
@@ -433,7 +433,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::imod_checked_s => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::Mod,
@@ -450,7 +450,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::imod_checked_u => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::Mod,
@@ -467,7 +467,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::idivmod_checked_u => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::DivMod,
@@ -484,7 +484,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::idivmod_checked_s => {
-            let log_width = get_width_arg(&args);
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let op = DivModOp {
                     op: DivOrMod::DivMod,
@@ -688,11 +688,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::iu_to_s => {
-            let [TypeArg::BoundedNat { n: log_width }] =
-                TryInto::<[TypeArg; 1]>::try_into(args.node.args().to_vec()).unwrap()
-            else {
-                bail!("Type argument to iu_to_s wasn't a number");
-            };
+            let log_width = get_width_arg(&args, &op)?;
             emit_custom_unary_op(context, args, |ctx, arg, _| {
                 let (_, max_val, _) = int_type_bounds(u32::pow(2, log_width as u32));
                 let max = arg
@@ -740,17 +736,14 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
 
 // Helper to get the log width arg to an int op when it's the only argument
 // panic if there's not exactly one nat arg
-fn get_width_arg<H: HugrView<Node = Node>>(args: &EmitOpArgs<'_, '_, ExtensionOp, H>) -> u64 {
-    let [arg] = args
-        .node
-        .args()
-        .to_owned()
-        .try_into()
-        .expect("Exactly one type argument to int op");
-    let TypeArg::BoundedNat { n: log_width } = arg else {
-        panic!("Unexpected non-nat arg to int op");
+pub(crate) fn get_width_arg<H: HugrView<Node = Node>>(
+    args: &EmitOpArgs<'_, '_, ExtensionOp, H>,
+    op: &impl NamedOp,
+) -> Result<u64> {
+    let [TypeArg::BoundedNat { n: log_width }] = args.node.args() else {
+        bail!("Expected exactly one BoundedNat parameter to {}", op.name())
     };
-    log_width
+    Ok(*log_width)
 }
 
 fn make_divmod<'c, H: HugrView<Node = Node>>(
