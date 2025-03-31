@@ -7,6 +7,7 @@ use std::sync::Arc;
 use hugr_core::core::HugrNode;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
+use hugr_core::types::TypeArg;
 use hugr_core::{Hugr, Node};
 use itertools::Either;
 
@@ -46,6 +47,15 @@ impl Hash for HashedConst {
 /// An [Eq]-able and [Hash]-able leaf (non-[Sum](Value::Sum)) Value
 #[derive(Clone, Debug)]
 pub enum ValueHandle<N = Node> {
+    /// The result of [LoadFunction] on a [FuncDefn] (or [FuncDecl]), i.e. a "function
+    /// pointer" to a function in the Hugr. (Cannot be represented as a [Value::Function]
+    /// without lots of cloning, because it may have static edges from other
+    /// functions/constants/etc.)
+    ///
+    /// [LoadFunction]: hugr_core::ops::LoadFunction
+    /// [FuncDefn]: hugr_core::ops::FuncDefn
+    /// [FuncDecl]: hugr_core::ops::FuncDefn
+    NodeRef(N, Vec<TypeArg>),
     /// A [Value::Extension] that has been hashed
     Hashable(HashedConst),
     /// Either a [Value::Extension] that can't be hashed, or a [Value::Function].
@@ -108,6 +118,7 @@ impl<N: HugrNode> AbstractValue for ValueHandle<N> {}
 impl<N: HugrNode> PartialEq for ValueHandle<N> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (Self::NodeRef(n1, args1), Self::NodeRef(n2, args2)) => n1 == n2 && args1 == args2,
             (Self::Hashable(h1), Self::Hashable(h2)) => h1 == h2,
             (
                 Self::Unhashable {
@@ -138,6 +149,10 @@ impl<N: HugrNode> Eq for ValueHandle<N> {}
 impl<N: HugrNode> Hash for ValueHandle<N> {
     fn hash<I: Hasher>(&self, state: &mut I) {
         match self {
+            ValueHandle::NodeRef(n, args) => {
+                n.hash(state);
+                args.hash(state);
+            }
             ValueHandle::Hashable(hc) => hc.hash(state),
             ValueHandle::Unhashable {
                 node,
@@ -153,9 +168,11 @@ impl<N: HugrNode> Hash for ValueHandle<N> {
 
 // Unfortunately we need From<ValueHandle> for Value to be able to pass
 // Value's into interpret_leaf_op. So that probably doesn't make sense...
-impl<N: HugrNode> From<ValueHandle<N>> for Value {
-    fn from(value: ValueHandle<N>) -> Self {
-        match value {
+impl<N: HugrNode> TryFrom<ValueHandle<N>> for Value {
+    type Error = N;
+    fn try_from(value: ValueHandle<N>) -> Result<Value, N> {
+        Ok(match value {
+            ValueHandle::NodeRef(n, _) => return Err(n),
             ValueHandle::Hashable(HashedConst { val, .. })
             | ValueHandle::Unhashable {
                 leaf: Either::Left(val),
@@ -169,7 +186,7 @@ impl<N: HugrNode> From<ValueHandle<N>> for Value {
             } => Value::function(Arc::try_unwrap(hugr).unwrap_or_else(|a| a.as_ref().clone()))
                 .map_err(|e| e.to_string())
                 .unwrap(),
-        }
+        })
     }
 }
 
