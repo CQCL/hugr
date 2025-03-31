@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use linearize::LinearizerCache;
 use thiserror::Error;
 
 use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
@@ -291,6 +292,7 @@ impl ReplaceTypes {
 
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
+        let mut lin_cache = LinearizerCache::default();
         for n in hugr.nodes().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
@@ -304,7 +306,12 @@ impl ReplaceTypes {
                         if targets.len() != 1 {
                             hugr.disconnect(n, outp);
                             let src = Wire::new(n, outp);
-                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
+                            self.linearize.insert_copy_discard(
+                                hugr,
+                                src,
+                                &targets,
+                                &mut lin_cache,
+                            )?;
                         }
                     }
                 }

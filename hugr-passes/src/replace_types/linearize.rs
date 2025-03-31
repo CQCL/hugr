@@ -7,8 +7,7 @@ use hugr_core::builder::{
 };
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::types::{CustomType, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
-use hugr_core::Wire;
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, Hugr, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
 use super::{NodeTemplate, ParametricType};
@@ -36,9 +35,23 @@ pub struct Linearizer {
     // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        Arc<dyn Fn(&[TypeArg], usize, &Linearizer) -> Result<NodeTemplate, LinearizeError>>,
+        Arc<
+            dyn Fn(
+                &[TypeArg],
+                usize,
+                &Linearizer,
+                &mut LinearizerCache,
+                &mut Hugr,
+            ) -> Result<NodeTemplate, LinearizeError>,
+        >,
     >,
 }
+
+/// Caches state of linearization across a [ReplaceTypes::run] for a single [Hugr].
+/// (This is forwards-looking but intended to allow sharing of code between copy/discard
+/// operations)
+#[derive(Default)]
+pub struct LinearizerCache {}
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 #[allow(missing_docs)]
@@ -101,12 +114,20 @@ impl Linearizer {
     /// * A handle to the [Linearizer], so that the callback can use it to generate
     ///   `copy`/`discard` ops for other types (e.g. the elements of a collection),
     ///   as part of an [NodeTemplate::CompoundOp].
+    /// * The cache, to pass to [Linearizer::copy_discard_fn] and other related methods,
+    /// * The mut Hugr, as previous, or to enable adding e.g. shared code to the Hugr.
     ///
     /// Note that [Self::register] takes precedence when the `src` types overlap.
     pub fn register_parametric(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &Linearizer) -> Result<NodeTemplate, LinearizeError>
+        copy_discard_fn: impl Fn(
+                &[TypeArg],
+                usize,
+                &Linearizer,
+                &mut LinearizerCache,
+                &mut Hugr,
+            ) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
@@ -135,6 +156,7 @@ impl Linearizer {
         hugr: &mut impl HugrMut,
         src: Wire,
         targets: &[(Node, IncomingPort)],
+        cache: &mut LinearizerCache,
     ) -> Result<(), LinearizeError> {
         let sig = hugr.signature(src.node()).unwrap();
         let typ = sig.port_type(src.source()).unwrap();
@@ -159,7 +181,7 @@ impl Linearizer {
                 });
             }
             let copy_discard_op = self
-                .copy_discard_op(typ, targets.len())?
+                .copy_discard_op(&typ.clone(), targets.len(), cache, hugr.hugr_mut())?
                 .add_hugr(hugr, src_parent);
             for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
                 hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
@@ -181,6 +203,8 @@ impl Linearizer {
         &self,
         typ: &Type,
         num_outports: usize,
+        cache: &mut LinearizerCache,
+        hugr: &mut Hugr,
     ) -> Result<NodeTemplate, LinearizeError> {
         if typ.copyable() {
             return Err(LinearizeError::CopyableType(typ.clone()));
@@ -206,7 +230,7 @@ impl Linearizer {
                         let inp_copies = if ty.copyable() {
                             repeat(inp).take(num_outports).collect::<Vec<_>>()
                         } else {
-                            self.copy_discard_op(ty, num_outports)?
+                            self.copy_discard_op(ty, num_outports, cache, hugr)?
                                 .add(&mut case_b, [inp])
                                 .unwrap()
                                 .outputs()
@@ -258,7 +282,7 @@ impl Linearizer {
                         .copy_discard_parametric
                         .get(&cty.into())
                         .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
-                    copy_discard_fn(cty.args(), num_outports, self)
+                    copy_discard_fn(cty.args(), num_outports, self, cache, hugr)
                 }
             },
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
@@ -466,7 +490,7 @@ mod test {
         let opdef2 = opdef.clone();
         lowerer
             .linearizer()
-            .register_parametric(lin_t_def, move |args, num_outs, _| {
+            .register_parametric(lin_t_def, move |args, num_outs, _, _, _| {
                 assert!(args.is_empty());
                 Ok(NodeTemplate::SingleOp(
                     ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
