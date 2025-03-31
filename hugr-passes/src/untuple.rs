@@ -1,6 +1,5 @@
 //! Pass for removing redundant tuple pack->unpack operations.
 
-use core::panic;
 use std::collections::VecDeque;
 
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
@@ -40,6 +39,11 @@ pub enum UntupleRecursive {
 ///
 /// Removes `MakeTuple` operations that are not consumed by any other
 /// operations.
+///
+/// # Panics
+///
+/// - Order edges are not supported yet. The pass currently panics if it encounters
+///   a pack/unpack pair with connected order edges. See <https://github.com/CQCL/hugr/issues/1974>.
 #[derive(Debug, Clone, Default)]
 pub struct UntuplePass {
     /// Whether to traverse the HUGR recursively.
@@ -217,8 +221,6 @@ fn remove_pack_unpack<'h, T: HugrView>(
 ) -> SimpleReplacement<T::Node> {
     let num_unpack_outputs = tuple_types.len() * unpack_nodes.len();
 
-    dbg!(num_unpack_outputs, num_other_outputs);
-
     let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr));
 
     let mut nodes = unpack_nodes;
@@ -277,6 +279,7 @@ mod test {
     use super::*;
     use hugr_core::extension::prelude::{bool_t, qb_t, UnpackTuple};
 
+    use hugr_core::ops::handle::NodeHandle;
     use hugr_core::types::Signature;
     use hugr_core::Hugr;
     use rstest::{fixture, rstest};
@@ -314,6 +317,30 @@ mod test {
         let op = UnpackTuple::new(vec![qb_t(), bool_t()].into());
         let [qb1, b2] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
 
+        h.finish_hugr_with_outputs([qb1, b2]).unwrap()
+    }
+
+    /// A simple pack/unpack pair with order edges between them.
+    ///
+    /// In the future we should be able to preserve some order edges, but for now
+    /// we just remove everything.
+    #[fixture]
+    fn ordered_pack_unpack() -> Hugr {
+        let mut h =
+            DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()]).with_prelude()).unwrap();
+        let mut inps = h.input_wires();
+        let qb1 = inps.next().unwrap();
+        let b2 = inps.next().unwrap();
+
+        let tuple = h.make_tuple([qb1, b2]).unwrap();
+        h.set_order(&h.input(), &tuple.node());
+
+        let op = UnpackTuple::new(vec![qb_t(), bool_t()].into());
+        let untuple = h.add_dataflow_op(op, [tuple]).unwrap();
+        let [qb1, b2] = untuple.outputs_arr();
+        h.set_order(&tuple.node(), &untuple.node());
+
+        h.set_order(&untuple.node(), &h.output());
         h.finish_hugr_with_outputs([qb1, b2]).unwrap()
     }
 
@@ -382,18 +409,21 @@ mod test {
     #[case::simple(simple_pack_unpack(), 1, 2)]
     #[case::multi(multi_unpack(), 1, 2)]
     #[case::partial(partial_unpack(), 1, 3)]
+    // TODO: Remove this once <https://github.com/CQCL/hugr/issues/1974>, and update the `UntuplePass` docs.
+    #[should_panic(expected = "Connected order edges not supported at the boundary")]
+    #[case::ordered(ordered_pack_unpack(), 1, 2)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
         #[case] expected_rewrites: usize,
         #[case] remaining_nodes: usize,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) {
         let pass = UntuplePass::default().recursive(UntupleRecursive::NonRecursive);
 
         let parent = hugr.root();
-        let res = pass.run(&mut hugr, parent)?;
+        let res = pass
+            .run(&mut hugr, parent)
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(res.rewrites_applied, expected_rewrites);
         assert_eq!(hugr.children(parent).count(), remaining_nodes);
-
-        Ok(())
     }
 }
