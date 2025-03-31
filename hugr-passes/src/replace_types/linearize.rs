@@ -7,8 +7,7 @@ use hugr_core::builder::{
 };
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::types::{CustomType, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
-use hugr_core::Wire;
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, Hugr, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
 use super::{NodeTemplate, ParametricType};
@@ -48,7 +47,7 @@ pub trait Linearizer {
     /// if `src` is not a valid Wire (does not identify a dataflow out-port)
     fn insert_copy_discard(
         &self,
-        hugr: &mut impl HugrMut,
+        hugr: &mut Hugr,
         src: Wire,
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {
@@ -113,13 +112,7 @@ pub struct DelegatingLinearizer {
     // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        Arc<
-            dyn Fn(
-                &[TypeArg],
-                usize,
-                &DelegatingLinearizer,
-            ) -> Result<NodeTemplate, LinearizeError>,
-        >,
+        Arc<dyn Fn(&[TypeArg], usize, &dyn Linearizer) -> Result<NodeTemplate, LinearizeError>>,
     >,
 }
 
@@ -189,7 +182,7 @@ impl DelegatingLinearizer {
     pub fn register_parametric(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &DelegatingLinearizer) -> Result<NodeTemplate, LinearizeError>
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &dyn Linearizer) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
