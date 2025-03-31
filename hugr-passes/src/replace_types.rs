@@ -24,7 +24,7 @@ use hugr_core::{Hugr, Node, Wire};
 use crate::validation::{ValidatePassError, ValidationLevel};
 
 mod linearize;
-pub use linearize::{LinearizeError, Linearizer};
+pub use linearize::{DelegatingLinearizer, LinearizeError, Linearizer};
 
 /// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
 /// or in order to replace an existing node.
@@ -119,7 +119,7 @@ impl NodeTemplate {
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
-    linearize: Linearizer,
+    linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, NodeTemplate>,
     param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>>,
     consts: HashMap<
@@ -228,7 +228,7 @@ impl ReplaceTypes {
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     /// [`array`]: hugr_core::std_extensions::collections::array::array_type
-    pub fn linearizer(&mut self) -> &mut Linearizer {
+    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
         &mut self.linearize
     }
 

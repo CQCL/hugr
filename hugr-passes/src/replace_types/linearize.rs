@@ -13,9 +13,10 @@ use itertools::Itertools;
 
 use super::{NodeTemplate, ParametricType};
 
-/// Configuration for inserting copy and discard operations for linear types when a
-///[ReplaceTypes](super::ReplaceTypes) creates outports of these types (or of types
-/// containing them) which are sources of multiple or 0 edges.
+/// Trait for things that know how to wire up linear outports to other than one target.
+/// Used to restore Hugr validity a [ReplaceTypes](super::ReplaceTypes) results in types
+/// of such outports changing from [Copyable](TypeBound::Copyable) to linear (i.e.
+/// [TypeBound::Any]).
 ///
 /// Note that this is not really effective before [monomorphization]: if a
 /// function polymorphic over a [TypeBound::Copyable] becomes called with a
@@ -25,99 +26,14 @@ use super::{NodeTemplate, ParametricType};
 /// into which copy/discard can be inserted.
 ///
 /// [monomorphization]: crate::monomorphize()
-#[derive(Clone, Default)]
-pub struct Linearizer {
-    // Keyed by lowered type, as only needed when there is an op outputting such
-    copy_discard: HashMap<CustomType, (NodeTemplate, NodeTemplate)>,
-    // Copy/discard of parametric types handled by a function that receives the new/lowered type.
-    // We do not allow overriding copy/discard of non-extension types, but that
-    // can be achieved by *firstly* lowering to a custom linear type, with copy/discard
-    // inserted; *secondly* by lowering that to the desired non-extension linear type,
-    // including lowering of the copy/discard operations to...whatever.
-    copy_discard_parametric: HashMap<
-        ParametricType,
-        Arc<dyn Fn(&[TypeArg], usize, &Linearizer) -> Result<NodeTemplate, LinearizeError>>,
-    >,
-}
-
-#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
-#[allow(missing_docs)]
-pub enum LinearizeError {
-    #[error("Need copy op for {_0}")]
-    NeedCopy(Type),
-    #[error("Need discard op for {_0}")]
-    NeedDiscard(Type),
-    #[error("Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})")]
-    NoLinearNonLocalEdges {
-        src: Node,
-        src_parent: Node,
-        tgt: Node,
-        tgt_parent: Node,
-    },
-    /// SignatureError's can happen when converting nested types e.g. Sums
-    #[error(transparent)]
-    SignatureError(#[from] SignatureError),
-    /// We cannot linearize (insert copy and discard functions) for
-    /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
-    /// or [Alias](TypeEnum::Alias)es.
-    #[error("Cannot linearize type {_0}")]
-    UnsupportedType(Type),
-    /// Neither does linearization make sense for copyable types
-    #[error("Type {_0} is copyable")]
-    CopyableType(Type),
-}
-
-impl Linearizer {
-    /// Configures this instance that the specified monomorphic type can be copied and/or
-    /// discarded via the provided [NodeTemplate]s - directly or as part of a compound type
-    /// e.g. [TypeEnum::Sum].
-    /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
-    /// `discard` should have exactly one inport, of type 'src', and no outports.
-    ///
-    /// # Errors
-    ///
-    /// If `typ` is [Copyable](TypeBound::Copyable), it is returned as an `Err
-    pub fn register(
-        &mut self,
-        typ: CustomType,
-        copy: NodeTemplate,
-        discard: NodeTemplate,
-    ) -> Result<(), CustomType> {
-        if typ.bound() == TypeBound::Copyable {
-            Err(typ)
-        } else {
-            self.copy_discard.insert(typ, (copy, discard));
-            Ok(())
-        }
-    }
-
-    /// Configures this instance that instances of the specified [TypeDef] (perhaps
-    /// polymorphic) can be copied and/or discarded by using the provided callback
-    /// to generate a [NodeTemplate] for an appropriate copy/discard operation.
-    ///
-    /// The callback is given
-    /// * the type arguments (if any - we do not *require* that [TypeDef] take parameters]
-    /// * the desired number of outports (this will never be 1)
-    /// * A handle to the [Linearizer], so that the callback can use it to generate
-    ///   `copy`/`discard` ops for other types (e.g. the elements of a collection),
-    ///   as part of an [NodeTemplate::CompoundOp].
-    ///
-    /// Note that [Self::register] takes precedence when the `src` types overlap.
-    pub fn register_parametric(
-        &mut self,
-        src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &Linearizer) -> Result<NodeTemplate, LinearizeError>
-            + 'static,
-    ) {
-        // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
-        // it depends on the arguments. Since there is no method to get the TypeDefBound
-        // from a TypeDef, leaving this for now.
-        self.copy_discard_parametric
-            .insert(src.into(), Arc::new(copy_discard_fn));
-    }
-
-    /// Insert copy or discard operations (as appropriate) enough to wire `src_port` of `src_node`
+pub trait Linearizer {
+    /// Insert copy or discard operations (as appropriate) enough to wire `src`
     /// up to all `targets`.
+    ///
+    /// The default implementation
+    /// * if `targets.len() == 1`, wires `src` to the unique target
+    /// * otherwise, makes a single call to [Self::copy_discard_op], inserts that op,
+    ///   and wires its outputs 1:1 to each target
     ///
     /// # Errors
     ///
@@ -130,7 +46,7 @@ impl Linearizer {
     /// # Panics
     ///
     /// if `src` is not a valid Wire (does not identify a dataflow out-port)
-    pub fn insert_copy_discard(
+    fn insert_copy_discard(
         &self,
         hugr: &mut impl HugrMut,
         src: Wire,
@@ -172,12 +88,120 @@ impl Linearizer {
 
     /// Gets an [NodeTemplate] for copying or discarding a value of type `typ`, i.e.
     /// a recipe for a node with one input of that type and the specified number of
-    /// outports. Note that `num_outports` should never be 1 (as no node is required)
+    /// outports.
     ///
-    /// # Panics
+    /// Implementations are free to panic if `num_outports == 1`, such calls should never
+    /// occur as source/target can be directly wired without any node/op being required.
+    fn copy_discard_op(
+        &self,
+        typ: &Type,
+        num_outports: usize,
+    ) -> Result<NodeTemplate, LinearizeError>;
+}
+
+/// A configuration for implementing [CopyDiscardInserter] by delegating to
+/// type-specific callbacks, and by  composing them in order to handle compound types
+/// such as [TypeEnum::Sum]s.
+#[derive(Clone, Default)]
+pub struct DelegatingLinearizer {
+    // Keyed by lowered type, as only needed when there is an op outputting such
+    copy_discard: HashMap<CustomType, (NodeTemplate, NodeTemplate)>,
+    // Copy/discard of parametric types handled by a function that receives the new/lowered type.
+    // We do not allow overriding copy/discard of non-extension types, but that
+    // can be achieved by *firstly* lowering to a custom linear type, with copy/discard
+    // inserted; *secondly* by lowering that to the desired non-extension linear type,
+    // including lowering of the copy/discard operations to...whatever.
+    copy_discard_parametric: HashMap<
+        ParametricType,
+        Arc<
+            dyn Fn(
+                &[TypeArg],
+                usize,
+                &DelegatingLinearizer,
+            ) -> Result<NodeTemplate, LinearizeError>,
+        >,
+    >,
+}
+
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum LinearizeError {
+    #[error("Need copy op for {_0}")]
+    NeedCopy(Type),
+    #[error("Need discard op for {_0}")]
+    NeedDiscard(Type),
+    #[error("Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})")]
+    NoLinearNonLocalEdges {
+        src: Node,
+        src_parent: Node,
+        tgt: Node,
+        tgt_parent: Node,
+    },
+    /// SignatureError's can happen when converting nested types e.g. Sums
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
+    /// We cannot linearize (insert copy and discard functions) for
+    /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
+    /// or [Alias](TypeEnum::Alias)es.
+    #[error("Cannot linearize type {_0}")]
+    UnsupportedType(Type),
+    /// Neither does linearization make sense for copyable types
+    #[error("Type {_0} is copyable")]
+    CopyableType(Type),
+}
+
+impl DelegatingLinearizer {
+    /// Configures this instance that the specified monomorphic type can be copied and/or
+    /// discarded via the provided [NodeTemplate]s - directly or as part of a compound type
+    /// e.g. [TypeEnum::Sum].
+    /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
+    /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///
-    /// if `num_outports == 1`
-    pub fn copy_discard_op(
+    /// # Errors
+    ///
+    /// If `typ` is [Copyable](TypeBound::Copyable), it is returned as an `Err
+    pub fn register(
+        &mut self,
+        typ: CustomType,
+        copy: NodeTemplate,
+        discard: NodeTemplate,
+    ) -> Result<(), CustomType> {
+        if typ.bound() == TypeBound::Copyable {
+            Err(typ)
+        } else {
+            self.copy_discard.insert(typ, (copy, discard));
+            Ok(())
+        }
+    }
+
+    /// Configures this instance that instances of the specified [TypeDef] (perhaps
+    /// polymorphic) can be copied and/or discarded by using the provided callback
+    /// to generate a [NodeTemplate] for an appropriate copy/discard operation.
+    ///
+    /// The callback is given
+    /// * the type arguments (if any - we do not *require* that [TypeDef] take parameters]
+    /// * the desired number of outports (this will never be 1)
+    /// * A handle to the [Linearizer], so that the callback can use it to generate
+    ///   `copy`/`discard` ops for other types (e.g. the elements of a collection),
+    ///   as part of an [NodeTemplate::CompoundOp].
+    ///
+    /// Note that [Self::register] takes precedence when the `src` types overlap.
+    pub fn register_parametric(
+        &mut self,
+        src: &TypeDef,
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &DelegatingLinearizer) -> Result<NodeTemplate, LinearizeError>
+            + 'static,
+    ) {
+        // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
+        // it depends on the arguments. Since there is no method to get the TypeDefBound
+        // from a TypeDef, leaving this for now.
+        self.copy_discard_parametric
+            .insert(src.into(), Arc::new(copy_discard_fn));
+    }
+}
+
+impl Linearizer for DelegatingLinearizer {
+    fn copy_discard_op(
         &self,
         typ: &Type,
         num_outports: usize,
