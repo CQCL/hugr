@@ -746,6 +746,15 @@ pub(crate) fn get_width_arg<H: HugrView<Node = Node>>(
     Ok(*log_width)
 }
 
+// The semantics of the hugr operation specify that the divisor argument is
+// always unsigned, and the signed/unsigned variants affect the types of the
+// dividend and quotient only.
+//
+// LLVM's semantics for `srem`, however, have both operands being the same type.
+// Moreover, llvm's `srem` does not implement the modulo operation: the
+// remainder will have the same sign as the dividend instead of the divisor.
+//
+// See discussion at: https://github.com/CQCL/hugr/pull/2025#discussion_r2012537992
 fn make_divmod<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     pcg: &impl PreludeCodegen,
@@ -778,15 +787,15 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
         } else {
             let max_signed_value = u64::pow(2, u32::pow(2, log_width as u32) - 1) - 1;
             let max_signed = numerator.get_type().const_int(max_signed_value, false);
-            println!("max {}", max_signed_value);
+            // Determine whether the divisor is "big" or "smol" for special casing.
+            // Here, "big" means the divisor is larger than the biggest value
+            // that could be represented by the type of the dividend.
             let large_divisor_bool = ctx.builder().build_int_compare(
                 IntPredicate::UGT,
                 denominator,
                 max_signed,
                 "is_divisor_large",
             )?;
-            // TODO: Make everything divisor type
-            //let large_divisor = ctx.builder().build_int_cast_sign_flag(large_divisor_bool, denominator.get_type(), false, "")?;
             let large_divisor =
                 ctx.builder()
                     .build_int_z_extend(large_divisor_bool, denominator.get_type(), "")?;
@@ -848,15 +857,20 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
                     Ok(())
                 };
 
-            // Default case (although it should only be reached by one branch)
+            // Default case (although it should only be reached by one branch).
+            // When the divisor is smol and the dividend is positive, we can
+            // rely on LLVM intrinsics.
             ctx.builder().position_at_end(non_negative_smoldiv);
             build_and_store_result(
                 ctx,
                 vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
             )?;
 
+            // When the divisor is smol and the dividend is negative,
+            // we have two cases:
             ctx.builder().position_at_end(negative_smoldiv);
             {
+                // If the remainder is 0, we can use the results of LLVM's `srem`
                 let if_rem_zero = pair_ty
                     .build_tag(
                         ctx.builder(),
@@ -868,6 +882,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
                     )?
                     .as_basic_value_enum();
 
+                // Otherwise, we return `(quotient - 1, divisor + remainder)`
                 let if_rem_nonzero = pair_ty
                     .build_tag(
                         ctx.builder(),
@@ -907,6 +922,9 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
                 ],
             )?;
 
+            // The divisor is larger than the dividend can possibly be, and the
+            // dividend is negative. This means we have to return `quotient - 1`
+            // and the remainder is `dividend + divisor`.
             ctx.builder().position_at_end(negative_bigdiv);
             build_and_store_result(
                 ctx,
