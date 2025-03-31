@@ -860,10 +860,8 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
                     ctx.builder(),
                     0,
                     vec![
-                        //quot.as_basic_value_enum(),
-                        //rem.get_type().const_zero().as_basic_value_enum(),
-                        rem.get_type().const_int(42, true).as_basic_value_enum(),
-                        rem.get_type().const_int(42, false).as_basic_value_enum(),
+                        quot.as_basic_value_enum(),
+                        rem.get_type().const_zero().as_basic_value_enum(),
                     ],
                 )?
                 .as_basic_value_enum();
@@ -883,7 +881,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
                 )?
                 .as_basic_value_enum();
 
-            let is_rem_zero = ctx.builder().build_int_compare(IntPredicate::EQ, quot, quot.get_type().const_zero(), "is_rem_0")?;
+            let is_rem_zero = ctx.builder().build_int_compare(IntPredicate::EQ, rem, rem.get_type().const_zero(), "is_rem_0")?;
             let result = ctx
                 .builder()
                 .build_select(is_rem_zero, if_rem_zero, if_rem_nonzero, "")?;
