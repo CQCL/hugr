@@ -920,6 +920,46 @@ mod test {
     }
 
     #[rstest]
+    #[case(-127)]
+    #[case(-1)]
+    #[case(0)]
+    #[case(1)]
+    #[case(127)]
+    fn test_exec_widen(int_exec_ctx: TestContext, #[case] num: i16) {
+        let from: u8 = 3;
+        let to: u8 = 6;
+        let ty = INT_TYPES[to as usize].clone();
+
+        if num >= 0 {
+            let input = ConstInt::new_u(from, num as u64).unwrap();
+
+            let ext_op = int_ops::EXTENSION
+                .instantiate_extension_op(
+                    "iwiden_u".as_ref(),
+                    [(from as u64).into(), (to as u64).into()],
+                )
+                .unwrap();
+
+            let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
+
+            assert_eq!(int_exec_ctx.exec_hugr_u64(hugr, "main"), num as u64);
+        }
+
+        let input = ConstInt::new_s(from, num as i64).unwrap();
+
+        let ext_op = int_ops::EXTENSION
+            .instantiate_extension_op(
+                "iwiden_s".as_ref(),
+                [(from as u64).into(), (to as u64).into()],
+            )
+            .unwrap();
+
+        let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
+
+        assert_eq!(int_exec_ctx.exec_hugr_i64(hugr, "main"), num as i64);
+    }
+
+    #[rstest]
     #[case("inarrow_s", 6, 2, 4)]
     #[case("inarrow_s", 6, 5, (1 << 5) - 1)]
     #[case("inarrow_s", 6, 4, -1)]
