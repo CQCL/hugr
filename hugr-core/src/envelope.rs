@@ -35,6 +35,10 @@
 //!
 
 #![allow(deprecated)]
+// TODO: Due to a bug in `derive_more`
+// (https://github.com/JelteF/derive_more/issues/419) we need to deactivate
+// deprecation warnings here. We can reactivate them once the bug is fixed by
+// https://github.com/JelteF/derive_more/pull/454.
 
 mod header;
 
