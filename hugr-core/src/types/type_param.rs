@@ -15,7 +15,6 @@ use super::{
     check_typevar_decl, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound,
     TypeTransformer,
 };
-use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -184,15 +183,6 @@ pub enum TypeArg {
         /// List of element types
         elems: Vec<TypeArg>,
     },
-    /// Instance of [TypeParam::Extensions], providing the extension ids.
-    #[display("Exts({})", {
-        use itertools::Itertools as _;
-        es.iter().map(|t|t.to_string()).join(",")
-    })]
-    Extensions {
-        #[allow(missing_docs)]
-        es: ExtensionSet,
-    },
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [TypeArg::Type] (not even a row variable i.e. [TypeParam::List] of type)
     /// nor [TypeArg::Extensions] - see [TypeArg::new_var_use]
@@ -239,12 +229,6 @@ impl From<Vec<TypeArg>> for TypeArg {
     }
 }
 
-impl From<ExtensionSet> for TypeArg {
-    fn from(es: ExtensionSet) -> Self {
-        Self::Extensions { es }
-    }
-}
-
 /// Variable in a TypeArg, that is neither a [TypeArg::Extensions]
 /// nor a single [TypeArg::Type] (i.e. not a [Type::new_var_use]
 /// - it might be a [Type::new_row_var_use]).
@@ -270,10 +254,6 @@ impl TypeArg {
             // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
             // not a RowVariable.
             TypeParam::Type { b } => Type::new_var_use(idx, b).into(),
-            // Prevent TypeArg::Variable(idx, TypeParam::Extensions)
-            TypeParam::Extensions => TypeArg::Extensions {
-                es: ExtensionSet::type_var(idx),
-            },
             _ => TypeArg::Variable {
                 v: TypeArgVariable {
                     idx,
@@ -314,7 +294,6 @@ impl TypeArg {
             TypeArg::Type { ty } => ty.validate(var_decls),
             TypeArg::BoundedNat { .. } | TypeArg::String { .. } => Ok(()),
             TypeArg::Sequence { elems } => elems.iter().try_for_each(|a| a.validate(var_decls)),
-            TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => {
@@ -362,9 +341,6 @@ impl TypeArg {
                 };
                 TypeArg::Sequence { elems }
             }
-            TypeArg::Extensions { es } => TypeArg::Extensions {
-                es: es.substitute(t),
-            },
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
@@ -377,10 +353,9 @@ impl Transformable for TypeArg {
         match self {
             TypeArg::Type { ty } => ty.transform(tr),
             TypeArg::Sequence { elems } => elems.transform(tr),
-            TypeArg::BoundedNat { .. }
-            | TypeArg::String { .. }
-            | TypeArg::Extensions { .. }
-            | TypeArg::Variable { .. } => Ok(false),
+            TypeArg::BoundedNat { .. } | TypeArg::String { .. } | TypeArg::Variable { .. } => {
+                Ok(false)
+            }
         }
     }
 }
@@ -449,7 +424,6 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         }
 
         (TypeArg::String { .. }, TypeParam::String) => Ok(()),
-        (TypeArg::Extensions { .. }, TypeParam::Extensions) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),

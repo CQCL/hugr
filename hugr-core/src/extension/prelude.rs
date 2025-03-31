@@ -10,7 +10,7 @@ use crate::extension::simple_op::{
     try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
 use crate::extension::{
-    ConstFold, ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDefBound,
+    ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDefBound,
 };
 use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::OpName;
@@ -244,10 +244,6 @@ impl CustomConst for ConstString {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
-
     fn get_type(&self) -> Type {
         string_type()
     }
@@ -437,10 +433,6 @@ impl CustomConst for ConstUsize {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
-
     fn get_type(&self) -> Type {
         usize_t()
     }
@@ -483,9 +475,6 @@ impl CustomConst for ConstError {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
     fn get_type(&self) -> Type {
         error_type()
     }
@@ -529,18 +518,8 @@ impl CustomConst for ConstExternalSymbol {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
     fn get_type(&self) -> Type {
         self.typ.clone()
-    }
-
-    fn update_extensions(
-        &mut self,
-        extensions: &WeakExtensionRegistry,
-    ) -> Result<(), ExtensionResolutionError> {
-        resolve_type_extensions(&mut self.typ, extensions)
     }
 
     fn validate(&self) -> Result<(), CustomCheckFailure> {

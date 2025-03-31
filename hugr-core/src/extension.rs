@@ -9,7 +9,7 @@ pub use semver::Version;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::UnsafeCell;
 use std::collections::btree_map;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
@@ -24,7 +24,7 @@ use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::RowVariable;
-use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
+use crate::types::{CustomType, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
 mod const_fold;
@@ -578,8 +578,6 @@ pub struct Extension {
     pub version: Version,
     /// Unique identifier for the extension.
     pub name: ExtensionId,
-    /// Runtime dependencies this extension has on other extensions.
-    pub runtime_reqs: ExtensionSet,
     /// Types defined by this extension.
     types: BTreeMap<TypeName, TypeDef>,
     /// Static values defined by this extension.
@@ -605,7 +603,6 @@ impl Extension {
         Self {
             name,
             version,
-            runtime_reqs: Default::default(),
             types: Default::default(),
             values: Default::default(),
             operations: Default::default(),
@@ -661,12 +658,6 @@ impl Extension {
             Some(e) => Err(e),
             None => Ok(ext),
         }
-    }
-
-    /// Extend the runtime requirements of this extension with another set of extensions.
-    pub fn add_requirements(&mut self, runtime_reqs: impl Into<ExtensionSet>) {
-        let reqs = mem::take(&mut self.runtime_reqs);
-        self.runtime_reqs = reqs.union(runtime_reqs.into());
     }
 
     /// Allows read-only access to the operations in this Extension
@@ -788,158 +779,6 @@ pub enum ExtensionBuildError {
     ValueExists(ValueName),
 }
 
-/// A set of extensions identified by their unique [`ExtensionId`].
-#[derive(
-    Clone, Debug, Display, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
-#[display("[{}]", _0.iter().join(", "))]
-pub struct ExtensionSet(BTreeSet<ExtensionId>);
-
-/// A special ExtensionId which indicates that the delta of a non-Function
-/// container node should be computed by extension inference.
-///
-/// See [`infer_extensions`] which lists the container nodes to which this can be applied.
-///
-/// [`infer_extensions`]: crate::hugr::Hugr::infer_extensions
-pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked(".TO_BE_INFERRED");
-
-impl ExtensionSet {
-    /// Creates a new empty extension set.
-    pub const fn new() -> Self {
-        Self(BTreeSet::new())
-    }
-
-    /// Adds a extension to the set.
-    pub fn insert(&mut self, extension: ExtensionId) {
-        self.0.insert(extension.clone());
-    }
-
-    /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
-    pub fn insert_type_var(&mut self, idx: usize) {
-        // Represent type vars as string representation of variable index.
-        // This is not a legal IdentList or ExtensionId so should not conflict.
-        self.0
-            .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));
-    }
-
-    /// Returns `true` if the set contains the given extension.
-    pub fn contains(&self, extension: &ExtensionId) -> bool {
-        self.0.contains(extension)
-    }
-
-    /// Returns `true` if the set is a subset of `other`.
-    pub fn is_subset(&self, other: &Self) -> bool {
-        self.0.is_subset(&other.0)
-    }
-
-    /// Returns `true` if the set is a superset of `other`.
-    pub fn is_superset(&self, other: &Self) -> bool {
-        self.0.is_superset(&other.0)
-    }
-
-    /// Create a extension set with a single element.
-    pub fn singleton(extension: ExtensionId) -> Self {
-        let mut set = Self::new();
-        set.insert(extension);
-        set
-    }
-
-    /// An ExtensionSet containing a single type variable
-    /// (which must have been declared as a [TypeParam::Extensions])
-    pub fn type_var(idx: usize) -> Self {
-        let mut set = Self::new();
-        set.insert_type_var(idx);
-        set
-    }
-
-    /// Returns the union of two extension sets.
-    pub fn union(mut self, other: Self) -> Self {
-        self.0.extend(other.0);
-        self
-    }
-
-    /// Returns the union of an arbitrary collection of [ExtensionSet]s
-    pub fn union_over(sets: impl IntoIterator<Item = Self>) -> Self {
-        // `union` clones the receiver, which we do not need to do here
-        let mut res = ExtensionSet::new();
-        for s in sets {
-            res.0.extend(s.0)
-        }
-        res
-    }
-
-    /// The things in other which are in not in self
-    pub fn missing_from(&self, other: &Self) -> Self {
-        ExtensionSet::from_iter(other.0.difference(&self.0).cloned())
-    }
-
-    /// Iterate over the contained ExtensionIds
-    pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
-        self.0.iter()
-    }
-
-    /// True if this set contains no [ExtensionId]s
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
-        self.iter()
-            .filter_map(as_typevar)
-            .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
-    }
-
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
-        Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
-            None => vec![e.clone()],
-            Some(i) => match t.apply_var(i, &TypeParam::Extensions) {
-                TypeArg::Extensions{es} => es.iter().cloned().collect::<Vec<_>>(),
-                _ => panic!("value for type var was not extension set - type scheme should be validated first"),
-            },
-        }))
-    }
-}
-
-impl From<ExtensionId> for ExtensionSet {
-    fn from(id: ExtensionId) -> Self {
-        Self::singleton(id)
-    }
-}
-
-impl IntoIterator for ExtensionSet {
-    type Item = ExtensionId;
-    type IntoIter = std::collections::btree_set::IntoIter<ExtensionId>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a ExtensionSet {
-    type Item = &'a ExtensionId;
-    type IntoIter = std::collections::btree_set::Iter<'a, ExtensionId>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-fn as_typevar(e: &ExtensionId) -> Option<usize> {
-    // Type variables are represented as radix-10 numbers, which are illegal
-    // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
-    // we assume it must be a type variable, and fail fast if it isn't.
-    match e.chars().next() {
-        Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
-        _ => None,
-    }
-}
-
-impl FromIterator<ExtensionId> for ExtensionSet {
-    fn from_iter<I: IntoIterator<Item = ExtensionId>>(iter: I) -> Self {
-        Self(BTreeSet::from_iter(iter))
-    }
-}
-
 /// Extension tests.
 #[cfg(test)]
 pub mod test {
@@ -1015,31 +854,5 @@ pub mod test {
 
         assert!(reg.remove_extension(&ext_1_id).unwrap().version() == &Version::new(1, 1, 0));
         assert_eq!(reg.len(), 1);
-    }
-
-    mod proptest {
-
-        use ::proptest::{collection::hash_set, prelude::*};
-
-        use super::super::{ExtensionId, ExtensionSet};
-
-        impl Arbitrary for ExtensionSet {
-            type Parameters = ();
-            type Strategy = BoxedStrategy<Self>;
-
-            fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-                (
-                    hash_set(0..10usize, 0..3),
-                    hash_set(any::<ExtensionId>(), 0..3),
-                )
-                    .prop_map(|(vars, extensions)| {
-                        ExtensionSet::union_over(
-                            std::iter::once(extensions.into_iter().collect::<ExtensionSet>())
-                                .chain(vars.into_iter().map(ExtensionSet::type_var)),
-                        )
-                    })
-                    .boxed()
-            }
-        }
     }
 }

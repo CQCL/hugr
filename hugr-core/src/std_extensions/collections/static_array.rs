@@ -28,7 +28,7 @@ use crate::{
             try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
             OpLoadError,
         },
-        ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef,
+        ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef,
     },
     ops::{
         constant::{maybe_hash_values, CustomConst, TryHash, ValueName},
@@ -126,11 +126,6 @@ impl CustomConst for StaticArrayValue {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.get_contents().iter().map(Value::extension_reqs))
-            .union(EXTENSION_ID.into())
     }
 
     fn update_extensions(

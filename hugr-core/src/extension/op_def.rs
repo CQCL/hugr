@@ -5,8 +5,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Weak};
 
 use super::{
-    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
-    SignatureError,
+    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, SignatureError,
 };
 
 use crate::ops::{OpName, OpNameRef};
@@ -107,7 +106,6 @@ pub trait CustomLowerFunc: Send + Sync {
         name: &OpNameRef,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_json::Value>,
-        available_extensions: &ExtensionSet,
     ) -> Option<Hugr>;
 }
 
@@ -246,10 +244,6 @@ impl SignatureFunc {
         };
         let mut res = pf.instantiate(args)?;
 
-        // Automatically add the extensions where the operation is defined to
-        // the runtime requirements of the op.
-        res.runtime_reqs.insert(def.extension.clone());
-
         // If there are any row variables left, this will fail with an error:
         res.try_into()
     }
@@ -275,8 +269,6 @@ pub enum LowerFunc {
     /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
     /// this will generally only be applicable if the [OpDef] has no [TypeParam]s.
     FixedHugr {
-        /// The extensions required by the [`Hugr`]
-        extensions: ExtensionSet,
         /// The [`Hugr`] to be used to replace [ExtensionOp]s matching the parent
         /// [OpDef]
         ///
@@ -368,21 +360,13 @@ impl OpDef {
 
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
     /// given a set of available extensions that may be used in the Hugr.
-    pub fn try_lower(&self, args: &[TypeArg], available_extensions: &ExtensionSet) -> Option<Hugr> {
+    pub fn try_lower(&self, args: &[TypeArg]) -> Option<Hugr> {
         // TODO test this
         self.lower_funcs
             .iter()
             .flat_map(|f| match f {
-                LowerFunc::FixedHugr { extensions, hugr } => {
-                    if available_extensions.is_superset(extensions) {
-                        Some(hugr.clone())
-                    } else {
-                        None
-                    }
-                }
-                LowerFunc::CustomFunc(f) => {
-                    f.try_lower(&self.name, args, &self.misc, available_extensions)
-                }
+                LowerFunc::FixedHugr { hugr } => Some(hugr.clone()),
+                LowerFunc::CustomFunc(f) => f.try_lower(&self.name, args, &self.misc),
             })
             .next()
     }
@@ -621,9 +605,7 @@ pub(super) mod test {
                     .map(|lf| match lf {
                         // as with get_sig above, this should break if the hierarchy
                         // is changed, update similarly.
-                        LowerFunc::FixedHugr { extensions, hugr } => {
-                            Some((extensions.clone(), hugr.clone()))
-                        }
+                        LowerFunc::FixedHugr { hugr } => Some((hugr.clone())),
                         // This is ruled out by `new()` but leave it here for later.
                         LowerFunc::CustomFunc(_) => None,
                     })
@@ -652,7 +634,6 @@ pub(super) mod test {
 
             let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
             def.add_lower_func(LowerFunc::FixedHugr {
-                extensions: ExtensionSet::new(),
                 hugr: crate::builder::test::simple_dfg_hugr(), // this is nonsense, but we are not testing the actual lowering here
             });
             def.add_misc("key", Default::default());
@@ -874,7 +855,6 @@ pub(super) mod test {
                 // not serialized. When it is, we should generate examples here.
                 any::<ExtensionSet>()
                     .prop_map(|extensions| LowerFunc::FixedHugr {
-                        extensions,
                         hugr: simple_dfg_hugr(),
                     })
                     .boxed()

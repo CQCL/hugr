@@ -8,7 +8,7 @@ use itertools::Itertools;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef};
+use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
@@ -57,7 +57,6 @@ impl ArrayScanDef {
         let t1 = Type::new_var_use(1, TypeBound::Any);
         let t2 = Type::new_var_use(2, TypeBound::Any);
         let s = TypeRV::new_row_var_use(3, TypeBound::Any);
-        let es = ExtensionSet::type_var(4);
         PolyFuncTypeRV::new(
             params,
             FuncTypeBase::<RowVariable>::new(
@@ -65,13 +64,10 @@ impl ArrayScanDef {
                     instantiate_array(array_def, n.clone(), t1.clone())
                         .expect("Array type instantiation failed")
                         .into(),
-                    Type::new_function(
-                        FuncTypeBase::<RowVariable>::new(
-                            vec![t1.into(), s.clone()],
-                            vec![t2.clone().into(), s.clone()],
-                        )
-                        .with_extension_delta(es),
-                    )
+                    Type::new_function(FuncTypeBase::<RowVariable>::new(
+                        vec![t1.into(), s.clone()],
+                        vec![t2.clone().into(), s.clone()],
+                    ))
                     .into(),
                     s.clone(),
                 ],
@@ -145,25 +141,16 @@ pub struct ArrayScan {
     pub acc_tys: Vec<Type>,
     /// Size of the array.
     pub size: u64,
-    /// The extensions required by the scan function.
-    pub extension_reqs: ExtensionSet,
 }
 
 impl ArrayScan {
     /// Creates a new array scan op.
-    pub fn new(
-        src_ty: Type,
-        tgt_ty: Type,
-        acc_tys: Vec<Type>,
-        size: u64,
-        extension_reqs: ExtensionSet,
-    ) -> Self {
+    pub fn new(src_ty: Type, tgt_ty: Type, acc_tys: Vec<Type>, size: u64) -> Self {
         ArrayScan {
             src_ty,
             tgt_ty,
             acc_tys,
             size,
-            extension_reqs,
         }
     }
 }
@@ -191,9 +178,6 @@ impl MakeExtensionOp for ArrayScan {
             TypeArg::Sequence {
                 elems: self.acc_tys.clone().into_iter().map_into().collect(),
             },
-            TypeArg::Extensions {
-                es: self.extension_reqs.clone(),
-            },
         ]
     }
 }
@@ -217,7 +201,7 @@ impl HasConcrete for ArrayScanDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::Sequence { elems: acc_tys }, TypeArg::Extensions { es }] =>
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::Sequence { elems: acc_tys }] =>
             {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
@@ -226,13 +210,7 @@ impl HasConcrete for ArrayScanDef {
                         _ => Err(SignatureError::InvalidTypeArgs.into()),
                     })
                     .collect();
-                Ok(ArrayScan::new(
-                    src_ty.clone(),
-                    tgt_ty.clone(),
-                    acc_tys?,
-                    *n,
-                    es.clone(),
-                ))
+                Ok(ArrayScan::new(src_ty.clone(), tgt_ty.clone(), acc_tys?, *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
@@ -254,13 +232,7 @@ mod tests {
 
     #[test]
     fn test_scan_def() {
-        let op = ArrayScan::new(
-            bool_t(),
-            qb_t(),
-            vec![usize_t()],
-            2,
-            ExtensionSet::singleton(EXTENSION_ID),
-        );
+        let op = ArrayScan::new(bool_t(), qb_t(), vec![usize_t()], 2);
         let optype: OpType = op.clone().into();
         let new_op: ArrayScan = optype.cast().unwrap();
         assert_eq!(new_op, op);
@@ -271,9 +243,8 @@ mod tests {
         let size = 2;
         let src_ty = qb_t();
         let tgt_ty = bool_t();
-        let es = ExtensionSet::singleton(EXTENSION_ID);
 
-        let op = ArrayScan::new(src_ty.clone(), tgt_ty.clone(), vec![], size, es.clone());
+        let op = ArrayScan::new(src_ty.clone(), tgt_ty.clone(), vec![], size);
         let optype: OpType = op.into();
         let sig = optype.dataflow_signature().unwrap();
 
@@ -299,14 +270,12 @@ mod tests {
         let tgt_ty = bool_t();
         let acc_ty1 = usize_t();
         let acc_ty2 = qb_t();
-        let es = ExtensionSet::singleton(EXTENSION_ID);
 
         let op = ArrayScan::new(
             src_ty.clone(),
             tgt_ty.clone(),
             vec![acc_ty1.clone(), acc_ty2.clone()],
             size,
-            es.clone(),
         );
         let optype: OpType = op.into();
         let sig = optype.dataflow_signature().unwrap();

@@ -10,7 +10,7 @@ use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeErr
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
-use crate::hugr::{ExtensionError, HugrView, ValidationError};
+use crate::hugr::{HugrView, ValidationError};
 use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
 use crate::{Extension, Hugr};
 
@@ -412,8 +412,6 @@ pub enum PackageEncodingError {
     Package(PackageError),
     /// Could not resolve the extension needed to encode the hugr.
     ExtensionResolution(ExtensionResolutionError),
-    /// Could not resolve the runtime extensions for the hugr.
-    RuntimeExtensionResolution(ExtensionError),
 }
 
 /// Error raised while validating a package.

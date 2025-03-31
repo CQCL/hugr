@@ -5,9 +5,8 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::extension::TO_BE_INFERRED;
 use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
-use crate::{extension::ExtensionSet, types::Signature};
+use crate::types::Signature;
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
@@ -158,9 +157,6 @@ impl CFGBuilder<Hugr> {
 
 impl HugrBuilder for CFGBuilder<Hugr> {
     fn finish_hugr(mut self) -> Result<Hugr, crate::hugr::ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.base.infer_extensions(false)?;
-        }
         self.base.validate()?;
         Ok(self.base)
     }
@@ -192,7 +188,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
     /// and `outputs` and the variants of the branching Sum value
-    /// specified by `sum_rows`. Extension delta will be inferred.
+    /// specified by `sum_rows`.
     ///
     /// # Errors
     ///
@@ -203,36 +199,12 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder_exts(inputs, sum_rows, other_outputs, TO_BE_INFERRED)
-    }
-
-    /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching Sum value
-    /// specified by `sum_rows`. Extension delta will be inferred.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error adding the node.
-    pub fn block_builder_exts(
-        &mut self,
-        inputs: TypeRow,
-        sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_outputs: TypeRow,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.any_block_builder(
-            inputs,
-            extension_delta.into(),
-            sum_rows,
-            other_outputs,
-            false,
-        )
+        self.any_block_builder(inputs, sum_rows, other_outputs, false)
     }
 
     fn any_block_builder(
         &mut self,
         inputs: TypeRow,
-        extension_delta: ExtensionSet,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
         entry: bool,
@@ -242,7 +214,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             sum_rows,
-            extension_delta,
         });
         let parent = self.container_node();
         let block_n = if entry {
@@ -269,17 +240,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         signature: Signature,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder_exts(
+        self.block_builder(
             signature.input,
             vec![type_row![]; n_cases],
             signature.output,
-            signature.runtime_reqs,
         )
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`
     /// and the variants of the branching Sum value specified by `sum_rows`.
-    /// Extension delta will be inferred.
     ///
     /// # Errors
     ///
@@ -289,34 +258,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder_exts(sum_rows, other_outputs, TO_BE_INFERRED)
-    }
-
-    /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`,
-    /// the variants of the branching Sum value specified by `sum_rows`, and
-    /// `extension_delta` explicitly specified. ([entry_builder](Self::entry_builder)
-    /// may be used to infer.)
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if an entry block has already been built.
-    pub fn entry_builder_exts(
-        &mut self,
-        sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_outputs: TypeRow,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let inputs = self
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.any_block_builder(
-            inputs,
-            extension_delta.into(),
-            sum_rows,
-            other_outputs,
-            true,
-        )
+        self.any_block_builder(inputs, sum_rows, other_outputs, true)
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with
@@ -331,22 +277,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
-    }
-
-    /// Return a builder for the entry [`DataflowBlock`] child graph with
-    /// `outputs` and a Sum of `n_cases` unit types, and explicit `extension_delta`.
-    /// ([simple_entry_builder](Self::simple_entry_builder) may be used to infer.)
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error adding the node.
-    pub fn simple_entry_builder_exts(
-        &mut self,
-        outputs: TypeRow,
-        n_cases: usize,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder_exts(vec![type_row![]; n_cases], outputs, extension_delta)
     }
 
     /// Returns the exit block of this [`CFGBuilder`].
@@ -412,23 +342,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 
 impl BlockBuilder<Hugr> {
     /// Initialize a [`DataflowBlock`] rooted HUGR builder.
-    /// Extension delta will be inferred.
     pub fn new(
         inputs: impl Into<TypeRow>,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
-    ) -> Result<Self, BuildError> {
-        Self::new_exts(inputs, sum_rows, other_outputs, TO_BE_INFERRED)
-    }
-
-    /// Initialize a [`DataflowBlock`] rooted HUGR builder.
-    /// `extension_delta` is explicitly specified; alternatively, [new](Self::new)
-    /// may be used to infer it.
-    pub fn new_exts(
-        inputs: impl Into<TypeRow>,
-        sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_outputs: impl Into<TypeRow>,
-        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
@@ -437,7 +354,6 @@ impl BlockBuilder<Hugr> {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             sum_rows,
-            extension_delta: extension_delta.into(),
         };
 
         let base = Hugr::new(op);

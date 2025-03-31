@@ -5,7 +5,7 @@ use std::sync::{Arc, Weak};
 use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
 use crate::{
-    extension::{ExtensionId, ExtensionSet},
+    extension::ExtensionId,
     ops::constant::CustomConst,
     types::{CustomType, Type, TypeBound},
     Extension,
@@ -97,10 +97,6 @@ impl CustomConst for ConstF64 {
 
     fn equal_consts(&self, _: &dyn CustomConst) -> bool {
         false
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(EXTENSION_ID)
     }
 }
 

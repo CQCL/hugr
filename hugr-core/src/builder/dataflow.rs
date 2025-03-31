@@ -83,9 +83,6 @@ impl DFGBuilder<Hugr> {
 
 impl HugrBuilder for DFGBuilder<Hugr> {
     fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.base.infer_extensions(false)?;
-        }
         self.base.validate()?;
         Ok(self.base)
     }

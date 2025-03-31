@@ -7,7 +7,6 @@ use std::sync::Weak;
 
 use super::types::collect_type_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{CustomType, FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};

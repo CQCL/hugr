@@ -14,7 +14,7 @@ use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
 use crate::{
-    extension::{ExtensionId, ExtensionSet, SignatureError},
+    extension::{ExtensionId, SignatureError},
     types::{type_param::TypeArg, Type},
     Extension,
 };
@@ -252,7 +252,6 @@ lazy_static! {
     /// Extension for basic integer operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(ExtensionSet::singleton(super::int_types::EXTENSION_ID));
             IntOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };

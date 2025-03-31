@@ -1,4 +1,3 @@
-use crate::extension::{ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{self, DataflowOpTrait};
 
 use crate::hugr::views::HugrView;
@@ -72,29 +71,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
 
 impl TailLoopBuilder<Hugr> {
     /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
-    /// Extension delta will be inferred.
     pub fn new(
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,
         just_outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
-        Self::new_exts(just_inputs, inputs_outputs, just_outputs, TO_BE_INFERRED)
-    }
-
-    /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
-    /// `extension_delta` is explicitly specified; alternatively, [new](Self::new)
-    /// may be used to infer it.
-    pub fn new_exts(
-        just_inputs: impl Into<TypeRow>,
-        inputs_outputs: impl Into<TypeRow>,
-        just_outputs: impl Into<TypeRow>,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
-            extension_delta: extension_delta.into(),
         };
         let base = Hugr::new(tail_loop.clone());
         let root = base.root();

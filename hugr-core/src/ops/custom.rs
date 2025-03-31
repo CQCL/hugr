@@ -220,7 +220,6 @@ impl OpaqueOp {
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
-        let signature = signature.with_extension_delta(extension.clone());
         Self {
             extension,
             name: name.into(),

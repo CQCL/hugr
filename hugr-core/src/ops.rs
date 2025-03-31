@@ -15,7 +15,7 @@ use crate::extension::resolution::{
 use std::borrow::Cow;
 
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet};
+use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::types::{EdgeKind, Signature, Substitution};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -381,12 +381,6 @@ pub trait OpTrait: Sized + Clone {
     /// Only dataflow operations have a signature, otherwise returns None.
     fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         None
-    }
-
-    /// The delta between the input extensions specified for a node,
-    /// and the output extensions calculated for that node
-    fn extension_delta(&self) -> ExtensionSet {
-        ExtensionSet::new()
     }
 
     /// The edge kind for the non-dataflow inputs of the operation,

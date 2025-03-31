@@ -89,7 +89,7 @@
 use thiserror::Error;
 
 use crate::extension::simple_op::OpLoadError;
-use crate::extension::{SignatureError, TO_BE_INFERRED};
+use crate::extension::SignatureError;
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
@@ -123,16 +123,14 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 mod circuit;
 pub use circuit::{CircuitBuildError, CircuitBuilder};
 
-/// Return a FunctionType with the same input and output types (specified)
-/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
+/// Return a FunctionType with the same input and output types (specified).
 pub fn endo_sig(types: impl Into<TypeRow>) -> Signature {
-    Signature::new_endo(types).with_extension_delta(TO_BE_INFERRED)
+    Signature::new_endo(types)
 }
 
-/// Return a FunctionType with the specified input and output types
-/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
+/// Return a FunctionType with the specified input and output types.
 pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Signature {
-    Signature::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
+    Signature::new(inputs, outputs)
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]

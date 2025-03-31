@@ -1,4 +1,3 @@
-use crate::extension::TO_BE_INFERRED;
 use crate::hugr::views::HugrView;
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::types::{Signature, TypeRow};
@@ -16,7 +15,7 @@ use super::{
 };
 
 use crate::Node;
-use crate::{extension::ExtensionSet, hugr::HugrMut, Hugr};
+use crate::{hugr::HugrMut, Hugr};
 
 use std::collections::HashSet;
 
@@ -107,7 +106,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
             .clone()
             .try_into()
             .expect("Parent node does not have Conditional optype.");
-        let extension_delta = cond.signature().runtime_reqs.clone();
         let inputs = cond
             .case_input_row(case)
             .ok_or(ConditionalBuildError::NotCase { conditional, case })?;
@@ -118,8 +116,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let outputs = cond.outputs;
         let case_op = ops::Case {
-            signature: Signature::new(inputs.clone(), outputs.clone())
-                .with_extension_delta(extension_delta.clone()),
+            signature: Signature::new(inputs.clone(), outputs.clone()),
         };
         let case_node =
             // add case before any existing subsequent cases
@@ -134,7 +131,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            Signature::new(inputs, outputs).with_extension_delta(extension_delta),
+            Signature::new(inputs, outputs),
         )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
@@ -143,32 +140,17 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
 impl HugrBuilder for ConditionalBuilder<Hugr> {
     fn finish_hugr(mut self) -> Result<Hugr, crate::hugr::ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.base.infer_extensions(false)?;
-        }
         self.base.validate()?;
         Ok(self.base)
     }
 }
 
 impl ConditionalBuilder<Hugr> {
-    /// Initialize a Conditional rooted HUGR builder, extension delta will be inferred.
+    /// Initialize a Conditional rooted HUGR builder.
     pub fn new(
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_inputs: impl Into<TypeRow>,
         outputs: impl Into<TypeRow>,
-    ) -> Result<Self, BuildError> {
-        Self::new_exts(sum_rows, other_inputs, outputs, TO_BE_INFERRED)
-    }
-
-    /// Initialize a Conditional rooted HUGR builder,
-    /// `extension_delta` explicitly specified. Alternatively,
-    /// [new](Self::new) may be used to infer it.
-    pub fn new_exts(
-        sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_inputs: impl Into<TypeRow>,
-        outputs: impl Into<TypeRow>,
-        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<Self, BuildError> {
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
         let other_inputs = other_inputs.into();
@@ -181,7 +163,6 @@ impl ConditionalBuilder<Hugr> {
             sum_rows,
             other_inputs,
             outputs,
-            extension_delta: extension_delta.into(),
         };
         let base = Hugr::new(op);
         let conditional_node = base.root();

@@ -7,7 +7,7 @@
 //! updates the weak links to point to the correct extensions.
 
 use super::{ExtensionCollectionError, WeakExtensionRegistry};
-use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::extension::ExtensionRegistry;
 use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
