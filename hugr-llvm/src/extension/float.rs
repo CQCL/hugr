@@ -12,8 +12,8 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum},
 };
 
-use crate::emit::emit_value;
 use crate::emit::ops::{emit_custom_binary_op, emit_custom_unary_op};
+use crate::emit::{emit_value, get_intrinsic};
 use crate::emit::{func::EmitFuncContext, EmitOpArgs};
 
 use crate::custom::CodegenExtsBuilder;
@@ -85,6 +85,16 @@ fn emit_float_op<'c, H: HugrView<Node = Node>>(
             Ok(vec![ctx
                 .builder()
                 .build_float_div(lhs.into_float_value(), rhs.into_float_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        FloatOps::fpow => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();
+            let func = get_intrinsic(ctx.get_current_module(), "llvm.pow.f64", [float_ty])?;
+            Ok(vec![ctx
+                .builder()
+                .build_call(func, &[lhs.into(), rhs.into()], "")?
+                .try_as_basic_value()
+                .unwrap_left()
                 .as_basic_value_enum()])
         }),
         // Missing ops, not supported by inkwell
@@ -196,6 +206,7 @@ mod test {
     #[case::fneg(FloatOps::fneg)]
     #[case::fmul(FloatOps::fmul)]
     #[case::fdiv(FloatOps::fdiv)]
+    #[case::fpow(FloatOps::fpow)]
     fn float_operations(mut llvm_ctx: TestContext, #[case] op: FloatOps) {
         let name: &str = op.into();
         let hugr = test_float_op(op);
