@@ -127,10 +127,8 @@ pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum LinearizeError {
-    #[error("Need copy op for {_0}")]
-    NeedCopy(Type),
-    #[error("Need discard op for {_0}")]
-    NeedDiscard(Type),
+    #[error("Need copy/discard op for {_0}")]
+    NeedCopyDiscard(Type),
     #[error("Callback generated wrong signature for {typ} - requested (1 input and) {num_outports} outputs, got signature {sig:?}")]
     WrongSignature {
         typ: Type,
@@ -288,7 +286,7 @@ impl Linearizer for DelegatingLinearizer {
                     let copy_discard_fn = self
                         .copy_discard_parametric
                         .get(&cty.into())
-                        .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
+                        .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
                     let tmpl = copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))?;
                     let sig = tmpl.signature();
                     if sig.as_ref().is_some_and(|sig| {
