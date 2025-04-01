@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.2...hugr-passes-v0.15.3) - 2025-04-01
+
+### New Features
+
+- ReplaceTypes pass allows replacing extension types and ops ([#1989](https://github.com/CQCL/hugr/pull/1989))
+- MakeTuple->UnpackTuple elision pass ([#2012](https://github.com/CQCL/hugr/pull/2012))
+
 ## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.0...hugr-passes-v0.15.1) - 2025-03-21
 
 ### Bug Fixes

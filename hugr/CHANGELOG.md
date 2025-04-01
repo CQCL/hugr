@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-v0.15.2...hugr-v0.15.3) - 2025-04-01
+
+### New Features
+
+- MakeTuple->UnpackTuple elision pass ([#2012](https://github.com/CQCL/hugr/pull/2012))
+- Expand SimpleReplacement API ([#1920](https://github.com/CQCL/hugr/pull/1920))
+- Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/pull/1959))
+- ReplaceTypes pass allows replacing extension types and ops ([#1989](https://github.com/CQCL/hugr/pull/1989))
+- Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/pull/2031))
+
 ## [0.15.2](https://github.com/CQCL/hugr/compare/hugr-v0.15.1...hugr-v0.15.2) - 2025-03-21
 
 ### Bug Fixes
