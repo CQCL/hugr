@@ -18,8 +18,10 @@ use hugr_core::ops::{
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
     Value, CFG, DFG,
 };
-use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
-use hugr_core::{Hugr, Node, Wire};
+use hugr_core::types::{
+    CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
+};
+use hugr_core::{Hugr, HugrView, Node, Wire};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
 
@@ -85,6 +87,14 @@ impl NodeTemplate {
             }
         };
         *hugr.optype_mut(n) = new_optype;
+    }
+
+    fn signature(&self) -> Option<Cow<'_, Signature>> {
+        match self {
+            NodeTemplate::SingleOp(op_type) => op_type,
+            NodeTemplate::CompoundOp(hugr) => hugr.root_type(),
+        }
+        .dataflow_signature()
     }
 }
 

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::iter::repeat;
 use std::{collections::HashMap, sync::Arc};
 
@@ -6,7 +7,7 @@ use hugr_core::builder::{
     HugrBuilder,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
-use hugr_core::types::{CustomType, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
 use hugr_core::Wire;
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
 use itertools::Itertools;
@@ -130,6 +131,12 @@ pub enum LinearizeError {
     NeedCopy(Type),
     #[error("Need discard op for {_0}")]
     NeedDiscard(Type),
+    #[error("Callback generated wrong signature for {typ} - requested (1 input and) {num_outports} outputs, got signature {sig:?}")]
+    WrongSignature {
+        typ: Type,
+        num_outports: usize,
+        sig: Option<Signature>,
+    },
     #[error("Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})")]
     NoLinearNonLocalEdges {
         src: Node,
@@ -282,7 +289,19 @@ impl Linearizer for DelegatingLinearizer {
                         .copy_discard_parametric
                         .get(&cty.into())
                         .ok_or_else(|| LinearizeError::NeedCopy(typ.clone()))?;
-                    copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))
+                    let tmpl = copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))?;
+                    let sig = tmpl.signature();
+                    if sig.as_ref().is_some_and(|sig| {
+                        sig.io() == (&typ.clone().into(), &vec![typ.clone(); num_outports].into())
+                    }) {
+                        Ok(tmpl)
+                    } else {
+                        Err(LinearizeError::WrongSignature {
+                            typ: typ.clone(),
+                            num_outports,
+                            sig: sig.map(Cow::into_owned),
+                        })
+                    }
                 }
             },
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
