@@ -9,10 +9,10 @@ use super::{
     SignatureError,
 };
 
-use crate::ops::{OpName, OpNameRef};
+use crate::ops::{OpName, OpNameRef, Value};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
-use crate::Hugr;
+use crate::{Hugr, IncomingPort};
 mod serialize_signature_func;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -460,9 +460,23 @@ impl OpDef {
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Value)],
+        consts: &[(IncomingPort, Value)],
     ) -> ConstFoldResult {
         (self.constant_folder.as_ref())?.fold(type_args, consts)
+    }
+
+    /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
+    /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s and
+    /// access to the containing Hugr.
+    pub fn constant_fold_with_hugr(
+        &self,
+        type_args: &[TypeArg],
+        consts: &[(IncomingPort, Value)],
+        hugr: &Hugr,
+    ) -> ConstFoldResult {
+        self.constant_folder
+            .as_ref()?
+            .fold_with_hugr(type_args, consts, hugr)
     }
 
     /// Returns a reference to the signature function of this [`OpDef`].

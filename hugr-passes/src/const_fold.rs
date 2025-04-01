@@ -253,7 +253,10 @@ impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldCont
                     .map(|v| (IncomingPort::from(i), v))
             })
             .collect::<Vec<_>>();
-        for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
+        for (p, v) in op
+            .constant_fold_with_hugr(&known_ins, self.0.base_hugr())
+            .unwrap_or_default()
+        {
             outs[p.index()] =
                 partial_from_const(self, ConstLocation::Field(p.index(), &node.into()), &v);
         }
