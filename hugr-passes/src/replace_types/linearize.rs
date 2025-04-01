@@ -7,7 +7,7 @@ use hugr_core::builder::{
     HugrBuilder,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
-use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::Wire;
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
 use itertools::Itertools;
@@ -129,7 +129,7 @@ pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 pub enum LinearizeError {
     #[error("Need copy/discard op for {_0}")]
     NeedCopyDiscard(Type),
-    #[error("Callback generated wrong signature for {typ} - requested (1 input and) {num_outports} outputs, got signature {sig:?}")]
+    #[error("Copy/discard op for {typ} with {num_outports} outputs had wrong signature {sig:?}")]
     WrongSignature {
         typ: Type,
         num_outports: usize,
@@ -167,16 +167,18 @@ impl DelegatingLinearizer {
     /// If `typ` is [Copyable](TypeBound::Copyable), it is returned as an `Err
     pub fn register(
         &mut self,
-        typ: CustomType,
+        cty: CustomType,
         copy: NodeTemplate,
         discard: NodeTemplate,
-    ) -> Result<(), CustomType> {
-        if typ.bound() == TypeBound::Copyable {
-            Err(typ)
-        } else {
-            self.copy_discard.insert(typ, (copy, discard));
-            Ok(())
+    ) -> Result<(), LinearizeError> {
+        let typ = Type::new_extension(cty.clone());
+        if typ.copyable() {
+            return Err(LinearizeError::CopyableType(typ));
         }
+        check_sig(&copy, &typ, 2)?;
+        check_sig(&discard, &typ, 0)?;
+        self.copy_discard.insert(cty, (copy, discard));
+        Ok(())
     }
 
     /// Configures this instance that instances of the specified [TypeDef] (perhaps
@@ -202,6 +204,21 @@ impl DelegatingLinearizer {
         // from a TypeDef, leaving this for now.
         self.copy_discard_parametric
             .insert(src.into(), Arc::new(copy_discard_fn));
+    }
+}
+
+fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(), LinearizeError> {
+    let sig = tmpl.signature();
+    if sig.as_ref().is_some_and(|sig| {
+        sig.io() == (&typ.clone().into(), &vec![typ.clone(); num_outports].into())
+    }) {
+        Ok(())
+    } else {
+        Err(LinearizeError::WrongSignature {
+            typ: typ.clone(),
+            num_outports,
+            sig: sig.map(Cow::into_owned),
+        })
     }
 }
 
@@ -288,18 +305,8 @@ impl Linearizer for DelegatingLinearizer {
                         .get(&cty.into())
                         .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
                     let tmpl = copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))?;
-                    let sig = tmpl.signature();
-                    if sig.as_ref().is_some_and(|sig| {
-                        sig.io() == (&typ.clone().into(), &vec![typ.clone(); num_outports].into())
-                    }) {
-                        Ok(tmpl)
-                    } else {
-                        Err(LinearizeError::WrongSignature {
-                            typ: typ.clone(),
-                            num_outports,
-                            sig: sig.map(Cow::into_owned),
-                        })
-                    }
+                    check_sig(&tmpl, typ, num_outports)?;
+                    Ok(tmpl)
                 }
             },
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
@@ -330,8 +337,8 @@ mod test {
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
     };
     use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
-    use hugr_core::ops::DataflowOpTrait;
     use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
+    use hugr_core::ops::{DataflowOpTrait, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
     use hugr_core::types::type_param::TypeParam;
@@ -340,7 +347,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::NodeTemplate;
+    use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
     use crate::ReplaceTypes;
 
     const LIN_T: &str = "Lin";
@@ -562,5 +569,76 @@ mod test {
                 (&vec![lin_t.clone(); 2].into(), &out_row)
             );
         }
+    }
+
+    #[test]
+    fn bad_sig() {
+        // Change usize to QB_T
+        let (ext, _) = ext_lowerer();
+        let lin_ct = ext.get_type(LIN_T).unwrap().instantiate([]).unwrap();
+        let lin_t = Type::from(lin_ct.clone());
+        let copy3 = OpType::from(
+            ExtensionOp::new(ext.get_op("copy").unwrap().clone(), [3.into()]).unwrap(),
+        );
+        let copy2 = ExtensionOp::new(ext.get_op("copy").unwrap().clone(), [2.into()]).unwrap();
+        let discard = ExtensionOp::new(ext.get_op("discard").unwrap().clone(), []).unwrap();
+        let mut replacer = ReplaceTypes::default();
+        replacer.replace_type(usize_t().as_extension().unwrap().clone(), lin_t.clone());
+
+        let bad_copy = replacer.linearizer().register(
+            lin_ct.clone(),
+            NodeTemplate::SingleOp(copy3.clone()),
+            NodeTemplate::SingleOp(discard.clone().into()),
+        );
+        let sig3 = Some(
+            Signature::new(lin_t.clone(), vec![lin_t.clone(); 3])
+                .with_extension_delta(ext.name().clone()),
+        );
+        assert_eq!(
+            bad_copy,
+            Err(LinearizeError::WrongSignature {
+                typ: lin_t.clone(),
+                num_outports: 2,
+                sig: sig3.clone()
+            })
+        );
+
+        let bad_discard = replacer.linearizer().register(
+            lin_ct.clone(),
+            NodeTemplate::SingleOp(copy2.into()),
+            NodeTemplate::SingleOp(copy3.clone()),
+        );
+
+        assert_eq!(
+            bad_discard,
+            Err(LinearizeError::WrongSignature {
+                typ: lin_t.clone(),
+                num_outports: 0,
+                sig: sig3.clone()
+            })
+        );
+
+        // Try parametrized instead, but this version always returns 3 outports
+        replacer
+            .linearizer()
+            .register_parametric(ext.get_type(LIN_T).unwrap(), move |_args, _, _| {
+                Ok(NodeTemplate::SingleOp(copy3.clone()))
+            });
+
+        // A hugr that copies a usize
+        let dfb = DFGBuilder::new(inout_sig(usize_t(), vec![usize_t(); 2])).unwrap();
+        let [inp] = dfb.input_wires_arr();
+        let mut h = dfb.finish_hugr_with_outputs([inp, inp]).unwrap();
+
+        assert_eq!(
+            replacer.run(&mut h),
+            Err(ReplaceTypesError::LinearizeError(
+                LinearizeError::WrongSignature {
+                    typ: lin_t.clone(),
+                    num_outports: 2,
+                    sig: sig3.clone()
+                }
+            ))
+        );
     }
 }
