@@ -283,6 +283,13 @@ impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldCont
                 ..
             } => {
                 let h = hugr.as_ref();
+                // The problem here---which we'd see if we didn't constrain H::Node==Node,
+                // because the ValueHandle's would be incompatible---is that `args` may contain
+                //   (a) UnhashableConsts keyed by NodeId in the *outer* Hugr (`self.0`, not `h`).
+                //   (b) NodeRefs referring to nodes in the outer Hugr !
+                //
+                // We can solve the first by remapping keys of HashedConsts to the input ports
+                // (like `fresh_node` in ConstFoldContext::run_no_validate), but not the second.
                 let results = Machine::new(h).run(ConstFoldContext(h), inputs);
                 (0..outs.len())
                     .map(|p| results.read_out_wire(Wire::new(h.root(), p)))
