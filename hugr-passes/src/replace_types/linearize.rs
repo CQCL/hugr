@@ -315,7 +315,7 @@ impl Linearizer for DelegatingLinearizer {
     }
 }
 
-impl<'a> Linearizer for CallbackHandler<'a> {
+impl Linearizer for CallbackHandler<'_> {
     fn copy_discard_op(
         &self,
         typ: &Type,
