@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.2...hugr-core-v0.16.0) - 2025-04-02
+
+### Documentation
+
+- Provide docs for array ops, fix bad doc for HugrView::poly_func_type ([#2021](https://github.com/CQCL/hugr/pull/2021))
+
+### New Features
+
+- Expand SimpleReplacement API ([#1920](https://github.com/CQCL/hugr/pull/1920))
+- Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/pull/1959))
+- ReplaceTypes pass allows replacing extension types and ops ([#1989](https://github.com/CQCL/hugr/pull/1989))
+- Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/pull/2031))
+- Packages in `hugr-model` and envelope support. ([#2026](https://github.com/CQCL/hugr/pull/2026))
+- Represent order edges in `hugr-model` as metadata. ([#2027](https://github.com/CQCL/hugr/pull/2027))
+- add `build_expect_sum` to allow specific error messages ([#2032](https://github.com/CQCL/hugr/pull/2032))
+
 ## [0.15.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.1...hugr-core-v0.15.2) - 2025-03-21
 
 ### Bug Fixes

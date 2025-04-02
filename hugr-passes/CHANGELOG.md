@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.2...hugr-passes-v0.16.0) - 2025-04-02
+
+### New Features
+
+- ReplaceTypes pass allows replacing extension types and ops ([#1989](https://github.com/CQCL/hugr/pull/1989))
+- MakeTuple->UnpackTuple elision pass ([#2012](https://github.com/CQCL/hugr/pull/2012))
+- [**breaking**] Extend LowerTypes pass to linearize by inserting copy/discard ([#2018](https://github.com/CQCL/hugr/pull/2018))
+
 ## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.0...hugr-passes-v0.15.1) - 2025-03-21
 
 ### Bug Fixes
