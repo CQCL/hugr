@@ -4,12 +4,16 @@ use std::fmt::Debug;
 
 use crate::ops::Value;
 use crate::types::TypeArg;
-use crate::{Hugr, IncomingPort, OutgoingPort};
+
+use crate::IncomingPort;
+use crate::OutgoingPort;
+
+use crate::ops;
 
 /// Output of constant folding an operation, None indicates folding was either
 /// not possible or unsuccessful. An empty vector indicates folding was
 /// successful and no values are output.
-pub type ConstFoldResult = Option<Vec<(OutgoingPort, Value)>>;
+pub type ConstFoldResult = Option<Vec<(OutgoingPort, ops::Value)>>;
 
 /// Tag some output constants with [`OutgoingPort`] inferred from the ordering.
 pub fn fold_out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult {
@@ -23,19 +27,6 @@ pub fn fold_out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult 
 
 /// Trait implemented by extension operations that can perform constant folding.
 pub trait ConstFold: Send + Sync {
-    /// Given the containing Hugr,  type arguments `type_args` and [`crate::ops::Const`]
-    /// values for inputs at [`crate::IncomingPort`]s, try to evaluate the operation.
-    ///
-    /// Defaults to calling [Self::fold] (ignoring the Hugr)
-    fn fold_with_hugr(
-        &self,
-        type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Value)],
-        _hugr: &Hugr,
-    ) -> ConstFoldResult {
-        self.fold(type_args, consts)
-    }
-
     /// Given type arguments `type_args` and
     /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s,
     /// try to evaluate the operation.

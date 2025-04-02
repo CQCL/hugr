@@ -14,7 +14,7 @@ use {
 
 use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
 use crate::types::{type_param::TypeArg, Signature};
-use crate::{ops, Hugr, IncomingPort, Node};
+use crate::{ops, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -94,16 +94,6 @@ impl ExtensionOp {
     /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
     pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Value)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
-    }
-
-    /// Attempt to evaluate this operation, See ['OpDef::constant_fold_with_hugr`]
-    pub fn constant_fold_with_hugr(
-        &self,
-        consts: &[(IncomingPort, ops::Value)],
-        hugr: &Hugr,
-    ) -> ConstFoldResult {
-        self.def()
-            .constant_fold_with_hugr(self.args(), consts, hugr)
     }
 
     /// Creates a new [`OpaqueOp`] as a downgraded version of this
