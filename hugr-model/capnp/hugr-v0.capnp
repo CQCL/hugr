@@ -18,6 +18,10 @@ using LinkId = UInt32;
 # The index of a `Link`.
 using LinkIndex = UInt32;
 
+struct Package {
+    modules @0 :List(Module);
+}
+
 struct Module {
     root @0 :RegionId;
     nodes @1 :List(Node);

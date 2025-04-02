@@ -12,6 +12,7 @@ mod half_node;
 pub mod lower;
 pub mod merge_bbs;
 mod monomorphize;
+pub mod untuple;
 
 // TODO: Deprecated re-export. Remove on a breaking release.
 #[deprecated(
@@ -36,3 +37,4 @@ pub mod validation;
 pub use force_order::{force_order, force_order_by_key};
 pub use lower::{lower_ops, replace_many_ops};
 pub use non_local::{ensure_no_nonlocal_edges, nonlocal_edges};
+pub use untuple::UntuplePass;

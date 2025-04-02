@@ -6,10 +6,10 @@
 //! the following builders:
 //!
 //! - [ModuleBuilder]: For building a module with function declarations and
-//!       definitions.
+//!   definitions.
 //! - [DFGBuilder]: For building a dataflow graph.
 //! - [FunctionBuilder]: A `DFGBuilder` specialised in defining functions with a
-//!       dataflow graph.
+//!   dataflow graph.
 //! - [CFGBuilder]: For building a control flow graph.
 //! - [ConditionalBuilder]: For building a conditional node.
 //! - [TailLoopBuilder]: For building a tail-loop node.

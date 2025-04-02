@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.3...hugr-py-v0.11.4) (2025-03-28)
+
+
+### Features
+
+* Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/issues/1959)) ([25df063](https://github.com/CQCL/hugr/commit/25df06380d9e14a4bde8f6353c70dc27ef58c3ef))
+* Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/issues/2031)) ([5dd1f96](https://github.com/CQCL/hugr/commit/5dd1f9659f0954e937e0a3a41886e953db58628b))
+
 ## [0.11.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.2...hugr-py-v0.11.3) (2025-03-21)
 
 

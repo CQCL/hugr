@@ -34,6 +34,12 @@
 //! - Bit 7,6: Constant "01" to make some headers ascii-printable.
 //!
 
+#![allow(deprecated)]
+// TODO: Due to a bug in `derive_more`
+// (https://github.com/JelteF/derive_more/issues/419) we need to deactivate
+// deprecation warnings here. We can reactivate them once the bug is fixed by
+// https://github.com/JelteF/derive_more/pull/454.
+
 mod header;
 
 pub use header::{EnvelopeConfig, EnvelopeFormat, ZstdConfig, MAGIC_NUMBERS};
@@ -59,7 +65,7 @@ use crate::import::ImportError;
 /// Parameters:
 /// - `reader`: The reader to read the envelope from.
 /// - `registry`: An extension registry with additional extensions to use when
-///     decoding the HUGR, if they are not already included in the package.
+///   decoding the HUGR, if they are not already included in the package.
 pub fn read_envelope(
     mut reader: impl BufRead,
     registry: &ExtensionRegistry,
@@ -161,9 +167,11 @@ pub enum EnvelopeError {
     ZstdUnsupported,
     /// Tried to encode a package with multiple HUGRs, when only 1 was expected.
     #[display(
-        "Packages with multiple HUGRs are currently unsupported. Tried to encode {count} HUGRs, when 1 was expected."
-    )]
+            "Packages with multiple HUGRs are currently unsupported. Tried to encode {count} HUGRs, when 1 was expected."
+        )]
     #[from(ignore)]
+    /// Deprecated: Packages with multiple HUGRs is a legacy feature that is no longer supported.
+    #[deprecated(since = "0.15.2", note = "Multiple HUGRs are supported via packages.")]
     MultipleHugrs {
         /// The number of HUGRs in the package.
         count: usize,
@@ -244,7 +252,7 @@ fn decode_model(
     extension_registry: &ExtensionRegistry,
     format: EnvelopeFormat,
 ) -> Result<Package, EnvelopeError> {
-    use crate::{import::import_hugr, Extension};
+    use crate::{import::import_package, Extension};
     use hugr_model::v0::bumpalo::Bump;
 
     if format.model_version() != Some(0) {
@@ -255,7 +263,7 @@ fn decode_model(
     }
 
     let bump = Bump::default();
-    let module_list = hugr_model::v0::binary::read_from_reader(&mut stream, &bump)?;
+    let model_package = hugr_model::v0::binary::read_from_reader(&mut stream, &bump)?;
 
     let mut extension_registry = extension_registry.clone();
     if format.append_extensions() {
@@ -266,9 +274,7 @@ fn decode_model(
         }
     }
 
-    // TODO: Import multiple hugrs from the model?
-    let hugr = import_hugr(&module_list, &extension_registry)?;
-    Ok(Package::new([hugr])?)
+    Ok(import_package(&model_package, &extension_registry)?)
 }
 
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
@@ -301,8 +307,9 @@ fn encode_model(
     package: &Package,
     format: EnvelopeFormat,
 ) -> Result<(), EnvelopeError> {
-    use crate::export::export_hugr;
     use hugr_model::v0::{binary::write_to_writer, bumpalo::Bump};
+
+    use crate::export::export_package;
 
     if format.model_version() != Some(0) {
         return Err(EnvelopeError::FormatUnsupported {
@@ -311,15 +318,9 @@ fn encode_model(
         });
     }
 
-    // TODO: Export multiple hugrs to the model?
-    if package.modules.len() != 1 {
-        return Err(EnvelopeError::MultipleHugrs {
-            count: package.modules.len(),
-        });
-    }
     let bump = Bump::default();
-    let module = export_hugr(&package.modules[0], &bump);
-    write_to_writer(&module, &mut writer)?;
+    let model_package = export_package(package, &bump);
+    write_to_writer(&model_package, &mut writer)?;
 
     if format.append_extensions() {
         serde_json::to_writer(writer, &package.extensions.iter().collect_vec())?;

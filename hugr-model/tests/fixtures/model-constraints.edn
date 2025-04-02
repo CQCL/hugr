@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (declare-func array.replicate
               (param ?n core.nat)
               (param ?t core.type)

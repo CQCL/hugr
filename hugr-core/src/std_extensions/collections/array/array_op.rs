@@ -22,15 +22,36 @@ use super::{array_type, array_type_def, ARRAY_TYPENAME};
 
 /// Array operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
-#[allow(non_camel_case_types, missing_docs)]
+#[allow(non_camel_case_types)]
 #[non_exhaustive]
 pub enum ArrayOpDef {
+    /// Makes a new array, given distinct inputs equal to its length:
+    /// `new_array<SIZE><elemty>: (elemty)^SIZE -> array<SIZE, elemty>`
+    /// where `SIZE` must be statically known (not a variable)
     new_array,
+    /// Copies an element out of the array ([TypeBound::Copyable] elements only):
+    /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>`
     get,
+    /// Exchanges an element of the array with an external value:
+    /// `set<size, elemty>: array<size, elemty>, index, elemty -> either(elemty, array | elemty, array)`
+    /// tagged for failure/success respectively
     set,
+    /// Exchanges the elements at two indices within the array:
+    /// `swap<size, elemty>: array<size, elemty>, index, index -> either(array, array)`
+    /// tagged for failure/success respectively
     swap,
+    /// Separates the leftmost element from the rest of the array:
+    /// `pop_left<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
+    /// where `SIZE` must be known statically (not a variable).
+    /// `None` is returned if the input array was size 0.
     pop_left,
+    /// Separates the rightmost element from the rest of the array.
+    /// `pop_right<SIZE><elemty>: array<SIZE, elemty> -> Option<elemty, array<SIZE-1, elemty>>`
+    /// where `SIZE` must be known statically (not a variable).
+    /// `None` is returned if the input array was size 0.
     pop_right,
+    /// Allows discarding a 0-element array of linear type.
+    /// `discard_empty<elemty>: array<0, elemty> -> ` (no outputs)
     discard_empty,
 }
 

@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (declare-alias local.float core.type)
 
 (define-alias local.int core.type arithmetic.int.types.int)
