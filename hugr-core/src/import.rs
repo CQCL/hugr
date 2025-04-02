@@ -35,6 +35,7 @@ use thiserror::Error;
 
 /// Error during import.
 #[derive(Debug, Clone, Error)]
+#[non_exhaustive]
 pub enum ImportError {
     /// The model contains a feature that is not supported by the importer yet.
     /// Errors of this kind are expected to be removed as the model format and
@@ -75,6 +76,7 @@ pub enum ImportError {
 
 /// Import error caused by incorrect order hints.
 #[derive(Debug, Clone, Error)]
+#[non_exhaustive]
 pub enum OrderHintError {
     /// Duplicate order hint key in the same region.
     #[error("duplicate order hint key {0}")]
