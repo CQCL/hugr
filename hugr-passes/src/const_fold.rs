@@ -204,7 +204,7 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
 
 struct ConstFoldContext<'a, H>(&'a H);
 
-impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+impl<H: HugrView> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
     type Node = H::Node;
 
     fn value_from_opaque(
