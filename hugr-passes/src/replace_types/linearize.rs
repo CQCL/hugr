@@ -14,17 +14,19 @@ use itertools::Itertools;
 
 use super::{NodeTemplate, ParametricType};
 
-/// Trait for things that know how to wire up linear outports to other than one target.
-/// Used to restore Hugr validity a [ReplaceTypes](super::ReplaceTypes) results in types
-/// of such outports changing from [Copyable](TypeBound::Copyable) to linear (i.e.
-/// [TypeBound::Any]).
+/// Trait for things that know how to wire up linear outports to other than one
+/// target.  Used to restore Hugr validity a [ReplaceTypes](super::ReplaceTypes)
+/// results in types of such outports changing from
+/// [Copyable](hugr_core::types::TypeBound::Copyable) to linear (i.e.
+/// [hugr_core::types::TypeBound::Any]).
 ///
 /// Note that this is not really effective before [monomorphization]: if a
-/// function polymorphic over a [TypeBound::Copyable] becomes called with a
-/// non-Copyable type argument, [Linearizer] cannot insert copy/discard operations
-/// for such a case. However, following [monomorphization], there would be a
-/// specific instantiation of the function for the type-that-becomes-linear,
-/// into which copy/discard can be inserted.
+/// function polymorphic over a
+/// [Copyable](hugr_core::types::TypeBound::Copyable) becomes called with a
+/// non-Copyable type argument, [Linearizer] cannot insert copy/discard
+/// operations for such a case. However, following [monomorphization], there
+/// would be a specific instantiation of the function for the
+/// type-that-becomes-linear, into which copy/discard can be inserted.
 ///
 /// [monomorphization]: crate::monomorphize()
 pub trait Linearizer {
@@ -100,7 +102,7 @@ pub trait Linearizer {
     ) -> Result<NodeTemplate, LinearizeError>;
 }
 
-/// A configuration for implementing [CopyDiscardInserter] by delegating to
+/// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
 /// such as [TypeEnum::Sum]s.
 #[derive(Clone, Default)]
@@ -164,7 +166,7 @@ impl DelegatingLinearizer {
     ///
     /// # Errors
     ///
-    /// If `typ` is [Copyable](TypeBound::Copyable), it is returned as an `Err
+    /// If `typ` is [Copyable](hugr_core::types::TypeBound::Copyable), it is returned as an `Err
     pub fn register(
         &mut self,
         cty: CustomType,
