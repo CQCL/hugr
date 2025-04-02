@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-v0.15.2...hugr-v0.16.0) - 2025-04-02
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-v0.15.2...hugr-v0.15.3) - 2025-04-02
 
 ### Documentation
 
@@ -9,7 +9,7 @@
 ### New Features
 
 - MakeTuple->UnpackTuple elision pass ([#2012](https://github.com/CQCL/hugr/pull/2012))
-- [**breaking**] Extend LowerTypes pass to linearize by inserting copy/discard ([#2018](https://github.com/CQCL/hugr/pull/2018))
+- Extend LowerTypes pass to linearize by inserting copy/discard ([#2018](https://github.com/CQCL/hugr/pull/2018))
 - Expand SimpleReplacement API ([#1920](https://github.com/CQCL/hugr/pull/1920))
 - Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/pull/1959))
 - ReplaceTypes pass allows replacing extension types and ops ([#1989](https://github.com/CQCL/hugr/pull/1989))

@@ -1,7 +1,7 @@
 # Changelog
 
 
-## [0.16.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.15.2...hugr-cli-v0.16.0) - 2025-04-02
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-cli-v0.15.2...hugr-cli-v0.15.3) - 2025-04-02
 
 ### Documentation
 
