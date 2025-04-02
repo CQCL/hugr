@@ -78,3 +78,10 @@ pub fn test_roundtrip_const() {
         "../../hugr-model/tests/fixtures/model-const.edn"
     )));
 }
+
+#[test]
+pub fn test_roundtrip_order() {
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-order.edn"
+    )));
+}

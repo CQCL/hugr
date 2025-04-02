@@ -265,6 +265,33 @@ pub const COMPAT_META_JSON: &str = "compat.meta_json";
 /// - **Result:** `(core.const ?type)`
 pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 
+/// Metadata constructor for order hint keys.
+///
+/// Nodes in a dataflow region can be annotated with a key. Each node may have
+/// at most one key and the key must be unique among all nodes in the same
+/// dataflow region. The parent dataflow graph can then use the
+/// `order_hint.order` metadata to imply a desired ordering relation, referring
+/// to the nodes by their key.
+///
+/// - **Parameter:** `?key : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_KEY: &str = "core.order_hint.key";
+
+/// Metadata constructor for order hints.
+///
+/// When this metadata is attached to a dataflow region, it can indicate a
+/// preferred ordering relation between child nodes. Code generation must take
+/// this into account when deciding on an execution order. The child nodes are
+/// identified by a key, using the `order_hint.key` metadata.
+///
+/// The graph consisting of both value dependencies between nodes and order
+/// hints must be directed acyclic.
+///
+/// - **Parameter:** `?before : core.nat`
+/// - **Parameter:** `?after : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_ORDER: &str = "core.order_hint.order";
+
 pub mod ast;
 pub mod binary;
 pub mod scope;

@@ -1,7 +1,6 @@
 WHITESPACE  = _{ " " | "\t" | "\r" | "\n" }
 COMMENT     = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
 identifier  = @{ (ASCII_ALPHA | "_" | "-") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
-ext_name    = @{ identifier ~ ("." ~ identifier)* }
 symbol_name = @{ identifier ~ ("." ~ identifier)* }
 link_name   = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 
@@ -71,7 +70,6 @@ term = {
   | term_list
   | term_list_type
   | literal
-  | term_ext_set
   | term_tuple
   | term_const_func
   | term_apply
@@ -83,7 +81,6 @@ term_apply      =  { symbol_name | ("(" ~ symbol_name ~ term* ~ ")") }
 term_list       =  { "[" ~ part* ~ "]" }
 term_tuple      =  { "(" ~ "tuple" ~ part* ~ ")" }
 term_list_type  =  { "(" ~ "list" ~ term ~ ")" }
-term_ext_set    =  { "(" ~ "ext" ~ (spliced_term | ext_name)* ~ ")" }
 term_const_func =  { "(" ~ "fn" ~ term ~ ")" }
 
 part         = { spliced_term | term }
