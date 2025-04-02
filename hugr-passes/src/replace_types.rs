@@ -26,7 +26,7 @@ use hugr_core::{Hugr, HugrView, Node, Wire};
 use crate::validation::{ValidatePassError, ValidationLevel};
 
 mod linearize;
-pub use linearize::{DelegatingLinearizer, LinearizeError, Linearizer};
+pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
 
 /// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
 /// or in order to replace an existing node.

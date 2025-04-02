@@ -15,20 +15,19 @@ use itertools::Itertools;
 use super::{NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
-/// target.  Used to restore Hugr validity a [ReplaceTypes](super::ReplaceTypes)
-/// results in types of such outports changing from
-/// [Copyable](hugr_core::types::TypeBound::Copyable) to linear (i.e.
+/// target.  Used to restore Hugr validity when a [ReplaceTypes](super::ReplaceTypes)
+/// results in types of such outports changing from [Copyable] to linear (i.e.
 /// [hugr_core::types::TypeBound::Any]).
 ///
 /// Note that this is not really effective before [monomorphization]: if a
-/// function polymorphic over a
-/// [Copyable](hugr_core::types::TypeBound::Copyable) becomes called with a
+/// function polymorphic over a [Copyable] becomes called with a
 /// non-Copyable type argument, [Linearizer] cannot insert copy/discard
 /// operations for such a case. However, following [monomorphization], there
 /// would be a specific instantiation of the function for the
 /// type-that-becomes-linear, into which copy/discard can be inserted.
 ///
 /// [monomorphization]: crate::monomorphize()
+/// [Copyable]: hugr_core::types::TypeBound::Copyable
 pub trait Linearizer {
     /// Insert copy or discard operations (as appropriate) enough to wire `src`
     /// up to all `targets`.
@@ -166,8 +165,11 @@ impl DelegatingLinearizer {
     ///
     /// # Errors
     ///
-    /// If `typ` is [Copyable](hugr_core::types::TypeBound::Copyable), it is returned as an `Err
-    pub fn register(
+    /// * [LinearizeError::CopyableType] If `typ` is
+    ///   [Copyable](hugr_core::types::TypeBound::Copyable)
+    /// * [LinearizeError::WrongSignature] if `copy` or `discard` do not have the
+    ///   expected inputs or outputs
+    pub fn register_simple(
         &mut self,
         cty: CustomType,
         copy: NodeTemplate,
@@ -188,14 +190,14 @@ impl DelegatingLinearizer {
     /// to generate a [NodeTemplate] for an appropriate copy/discard operation.
     ///
     /// The callback is given
-    /// * the type arguments (if any - we do not *require* that [TypeDef] take parameters]
+    /// * the type arguments (as appropriate for the [TypeDef], so perhaps empty)
     /// * the desired number of outports (this will never be 1)
-    /// * A handle to the [Linearizer], so that the callback can use it to generate
+    /// * A [CallbackHandler] that the callback can use it to generate
     ///   `copy`/`discard` ops for other types (e.g. the elements of a collection),
     ///   as part of an [NodeTemplate::CompoundOp].
     ///
-    /// Note that [Self::register] takes precedence when the `src` types overlap.
-    pub fn register_parametric(
+    /// Note that [Self::register_simple] takes precedence when the `src` types overlap.
+    pub fn register_callback(
         &mut self,
         src: &TypeDef,
         copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>
@@ -413,7 +415,7 @@ mod test {
         lowerer.replace_type(usize_custom_t, Type::new_extension(lin_custom_t.clone()));
         lowerer
             .linearizer()
-            .register(
+            .register_simple(
                 lin_custom_t,
                 NodeTemplate::SingleOp(copy_op.into()),
                 NodeTemplate::SingleOp(discard_op.into()),
@@ -526,7 +528,7 @@ mod test {
         let opdef2 = opdef.clone();
         lowerer
             .linearizer()
-            .register_parametric(lin_t_def, move |args, num_outs, _| {
+            .register_callback(lin_t_def, move |args, num_outs, _| {
                 assert!(args.is_empty());
                 Ok(NodeTemplate::SingleOp(
                     ExtensionOp::new(opdef2.clone(), [(num_outs as u64).into()])
@@ -587,7 +589,7 @@ mod test {
         let mut replacer = ReplaceTypes::default();
         replacer.replace_type(usize_t().as_extension().unwrap().clone(), lin_t.clone());
 
-        let bad_copy = replacer.linearizer().register(
+        let bad_copy = replacer.linearizer().register_simple(
             lin_ct.clone(),
             NodeTemplate::SingleOp(copy3.clone()),
             NodeTemplate::SingleOp(discard.clone().into()),
@@ -605,7 +607,7 @@ mod test {
             })
         );
 
-        let bad_discard = replacer.linearizer().register(
+        let bad_discard = replacer.linearizer().register_simple(
             lin_ct.clone(),
             NodeTemplate::SingleOp(copy2.into()),
             NodeTemplate::SingleOp(copy3.clone()),
@@ -623,7 +625,7 @@ mod test {
         // Try parametrized instead, but this version always returns 3 outports
         replacer
             .linearizer()
-            .register_parametric(ext.get_type(LIN_T).unwrap(), move |_args, _, _| {
+            .register_callback(ext.get_type(LIN_T).unwrap(), move |_args, _, _| {
                 Ok(NodeTemplate::SingleOp(copy3.clone()))
             });
 
