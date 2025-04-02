@@ -2,7 +2,7 @@
 //! Constant-folding pass.
 //! An (example) use of the [dataflow analysis framework](super::dataflow).
 
-mod value_handle;
+pub mod value_handle;
 use itertools::{Either, Itertools};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
