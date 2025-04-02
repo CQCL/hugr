@@ -32,6 +32,7 @@ Flags:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
@@ -53,13 +54,21 @@ def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
     payload: bytes
     match config.format:
         case EnvelopeFormat.JSON:
-            json = package._to_serial().model_dump_json()
+            json_str = package._to_serial().model_dump_json()
             # This introduces an extra encode/decode roundtrip when calling
             # `make_envelope_str`, but we prioritize speed for binary formats.
-            payload = json.encode("utf-8")
-        case EnvelopeFormat.MODULE | EnvelopeFormat.MODULE_WITH_EXTS:
-            msg = "MODULE encoding of HUGR envelopes is not supported yet."
-            raise ValueError(msg)
+            payload = json_str.encode("utf-8")
+
+        case EnvelopeFormat.MODULE:
+            payload = bytes(package.to_model())
+
+        case EnvelopeFormat.MODULE_WITH_EXTS:
+            package_bytes = bytes(package.to_model())
+            extension_str = json.dumps(
+                [ext._to_serial().model_dump(mode="json") for ext in package.extensions]
+            )
+            extension_bytes = extension_str.encode("utf8")
+            payload = package_bytes + extension_bytes
 
     if config.zstd is not None:
         payload = pyzstd.compress(payload, config.zstd)

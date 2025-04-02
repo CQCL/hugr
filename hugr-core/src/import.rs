@@ -14,6 +14,7 @@ use crate::{
         ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
         Output, Tag, TailLoop, Value, CFG, DFG,
     },
+    package::Package,
     std_extensions::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
@@ -79,7 +80,23 @@ macro_rules! error_uninferred {
     ($($e:expr),*) => { ImportError::Uninferred(format!($($e),*)) }
 }
 
-/// Import a `hugr` module from its model representation.
+/// Import a [`Package`] from its model representation.
+pub fn import_package(
+    package: &table::Package,
+    extensions: &ExtensionRegistry,
+) -> Result<Package, ImportError> {
+    let modules = package
+        .modules
+        .iter()
+        .map(|module| import_hugr(module, extensions))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // This does not panic since the import already requires a module root.
+    let package = Package::new(modules).expect("non-module root");
+    Ok(package)
+}
+
+/// Import a [`Hugr`] module from its model representation.
 pub fn import_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,

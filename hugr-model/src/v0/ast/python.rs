@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{Module, Node, Operation, Param, Region, SeqPart, Symbol, Term};
+use super::{Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, Term};
 use pyo3::{
     exceptions::PyTypeError,
     types::{PyAnyMethods, PyStringMethods as _, PyTypeMethods as _},
@@ -367,8 +367,8 @@ impl<'py> pyo3::IntoPyObject<'py> for &Region {
 }
 
 impl<'py> pyo3::FromPyObject<'py> for Module {
-    fn extract_bound(region: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let root = region.getattr("root")?.extract()?;
+    fn extract_bound(module: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let root = module.getattr("root")?.extract()?;
         Ok(Self { root })
     }
 }
@@ -382,6 +382,25 @@ impl<'py> pyo3::IntoPyObject<'py> for &Module {
         let py_module = py.import("hugr.model")?;
         let py_class = py_module.getattr("Module")?;
         py_class.call1((&self.root,))
+    }
+}
+
+impl<'py> pyo3::FromPyObject<'py> for Package {
+    fn extract_bound(package: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let modules = package.getattr("modules")?.extract()?;
+        Ok(Self { modules })
+    }
+}
+
+impl<'py> pyo3::IntoPyObject<'py> for &Package {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        let py_module = py.import("hugr.model")?;
+        let py_class = py_module.getattr("Package")?;
+        py_class.call1((&self.modules,))
     }
 }
 
@@ -404,6 +423,7 @@ impl_into_pyobject_owned!(SeqPart);
 impl_into_pyobject_owned!(Param);
 impl_into_pyobject_owned!(Symbol);
 impl_into_pyobject_owned!(Module);
+impl_into_pyobject_owned!(Package);
 impl_into_pyobject_owned!(Node);
 impl_into_pyobject_owned!(Region);
 impl_into_pyobject_owned!(Operation);
