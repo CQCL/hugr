@@ -29,7 +29,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 mod view;
-use super::{ast, Literal, RegionKind};
+use super::{ast, Literal, RegionKind, SymbolName, VarName};
 pub use view::View;
 
 /// A package consisting of a sequence of [`Module`]s.
@@ -230,23 +230,20 @@ pub enum Operation<'a> {
     DeclareOperation(&'a Symbol<'a>),
 
     /// Import a symbol.
-    Import {
-        /// The name of the symbol to be imported.
-        name: &'a str,
-    },
+    Import(SymbolName),
 }
 
 impl<'a> Operation<'a> {
-    /// Returns the symbol introduced by the operation, if any.
-    pub fn symbol(&self) -> Option<&'a str> {
+    /// Returns the name of the symbol introduced by the operation, if any.
+    pub fn symbol_name(&self) -> Option<&SymbolName> {
         match self {
-            Operation::DefineFunc(symbol) => Some(symbol.name),
-            Operation::DeclareFunc(symbol) => Some(symbol.name),
-            Operation::DefineAlias(symbol, _) => Some(symbol.name),
-            Operation::DeclareAlias(symbol) => Some(symbol.name),
-            Operation::DeclareConstructor(symbol) => Some(symbol.name),
-            Operation::DeclareOperation(symbol) => Some(symbol.name),
-            Operation::Import { name } => Some(name),
+            Operation::DefineFunc(symbol) => Some(&symbol.name),
+            Operation::DeclareFunc(symbol) => Some(&symbol.name),
+            Operation::DefineAlias(symbol, _) => Some(&symbol.name),
+            Operation::DeclareAlias(symbol) => Some(&symbol.name),
+            Operation::DeclareConstructor(symbol) => Some(&symbol.name),
+            Operation::DeclareOperation(symbol) => Some(&symbol.name),
+            Operation::Import(name) => Some(name),
             _ => None,
         }
     }
@@ -289,12 +286,12 @@ pub struct RegionScope {
 /// See [`ast::Symbol`] for the AST representation.
 ///
 /// [`ast::Symbol`]: crate::v0::ast::Symbol
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Symbol<'a> {
     /// The name of the symbol.
-    pub name: &'a str,
+    pub name: SymbolName,
     /// The static parameters.
-    pub params: &'a [Param<'a>],
+    pub params: &'a [Param],
     /// The constraints on the static parameters.
     pub constraints: &'a [TermId],
     /// The signature of the symbol.
@@ -374,10 +371,10 @@ pub enum SeqPart {
 /// See [`ast::Param`] for the AST representation.
 ///
 /// [`ast::Param`]: crate::v0::ast::Param
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Param<'a> {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Param {
     /// The name of the parameter.
-    pub name: &'a str,
+    pub name: VarName,
     /// The type of the parameter.
     pub r#type: TermId,
 }

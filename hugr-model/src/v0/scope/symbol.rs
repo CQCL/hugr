@@ -1,10 +1,12 @@
-use std::{borrow::Cow, hash::BuildHasherDefault};
-
 use fxhash::FxHasher;
 use indexmap::IndexMap;
+use std::hash::BuildHasherDefault;
 use thiserror::Error;
 
-use crate::v0::table::{NodeId, RegionId};
+use crate::v0::{
+    table::{NodeId, RegionId},
+    SymbolName,
+};
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -40,13 +42,13 @@ type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 /// assert!(!symbols.is_visible(NodeId(1)));
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct SymbolTable<'a> {
-    symbols: FxIndexMap<&'a str, BindingIndex>,
+pub struct SymbolTable {
+    symbols: FxIndexMap<SymbolName, BindingIndex>,
     bindings: FxIndexMap<NodeId, Binding>,
     scopes: FxIndexMap<RegionId, Scope>,
 }
 
-impl<'a> SymbolTable<'a> {
+impl SymbolTable {
     /// Create a new symbol table.
     pub fn new() -> Self {
         Self::default()
@@ -92,28 +94,48 @@ impl<'a> SymbolTable<'a> {
     /// # Panics
     ///
     /// Panics if there is no current scope.
-    pub fn insert(&mut self, name: &'a str, node: NodeId) -> Result<(), DuplicateSymbolError> {
+    pub fn insert(&mut self, name: SymbolName, node: NodeId) -> Result<(), DuplicateSymbolError> {
         let scope_depth = self.scopes.len() as u16 - 1;
-        let (symbol_index, shadowed) = self.symbols.insert_full(name, self.bindings.len());
 
-        if let Some(shadowed) = shadowed {
-            let (shadowed_node, shadowed_binding) = self.bindings.get_index(shadowed).unwrap();
-            if shadowed_binding.scope_depth == scope_depth {
-                self.symbols.insert(name, shadowed);
-                return Err(DuplicateSymbolError(name.into(), node, *shadowed_node));
+        let (symbol_index, shadows) = match self.symbols.entry(name) {
+            indexmap::map::Entry::Occupied(entry) => {
+                let (shadowed_node, shadowed_binding) =
+                    self.bindings.get_index(*entry.get()).unwrap();
+
+                if shadowed_binding.scope_depth == scope_depth {
+                    return Err(DuplicateSymbolError(
+                        entry.key().clone(),
+                        node,
+                        *shadowed_node,
+                    ));
+                }
+
+                (entry.index(), Some(*entry.get()))
             }
-        }
+            indexmap::map::Entry::Vacant(entry) => {
+                let index = entry.index();
+                entry.insert(self.bindings.len());
+                (index, None)
+            }
+        };
 
         self.bindings.insert(
             node,
             Binding {
                 scope_depth,
-                shadows: shadowed,
+                shadows,
                 symbol_index,
             },
         );
 
         Ok(())
+    }
+
+    /// Get the name of the symbol defined by the given node.
+    pub fn symbol_name(&self, node: NodeId) -> Option<&SymbolName> {
+        let binding = self.bindings.get(&node)?;
+        let (name, _) = self.symbols.get_index(binding.symbol_index)?;
+        Some(name)
     }
 
     /// Check whether a symbol is currently visible in the current scope.
@@ -127,11 +149,11 @@ impl<'a> SymbolTable<'a> {
     }
 
     /// Tries to resolve a symbol name in the current scope.
-    pub fn resolve(&self, name: &'a str) -> Result<NodeId, UnknownSymbolError> {
+    pub fn resolve(&self, name: impl AsRef<str>) -> Result<NodeId, UnknownSymbolError> {
         let index = *self
             .symbols
-            .get(name)
-            .ok_or(UnknownSymbolError(name.into()))?;
+            .get(name.as_ref())
+            .ok_or(UnknownSymbolError(SymbolName::new(name.as_ref())))?;
 
         // NOTE: The unwrap is safe because the `symbols` map
         // points to valid indices in the `bindings` map.
@@ -190,9 +212,9 @@ pub type ScopeDepth = u16;
 /// Error that occurs when trying to resolve an unknown symbol.
 #[derive(Debug, Clone, Error)]
 #[error("symbol name `{0}` not found in this scope")]
-pub struct UnknownSymbolError<'a>(pub Cow<'a, str>);
+pub struct UnknownSymbolError(SymbolName);
 
 /// Error that occurs when trying to introduce a symbol that is already defined in the current scope.
 #[derive(Debug, Clone, Error)]
 #[error("symbol `{0}` is already defined in this scope")]
-pub struct DuplicateSymbolError<'a>(pub Cow<'a, str>, pub NodeId, pub NodeId);
+pub struct DuplicateSymbolError(SymbolName, pub NodeId, pub NodeId);

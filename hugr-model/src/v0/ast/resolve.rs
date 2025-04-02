@@ -17,7 +17,7 @@ pub struct Context<'a> {
     bump: &'a Bump,
     vars: VarTable<'a>,
     links: LinkTable<&'a str>,
-    symbols: SymbolTable<'a>,
+    symbols: SymbolTable,
     imports: FxHashMap<SymbolName, NodeId>,
     terms: FxHashMap<table::Term<'a>, TermId>,
 }
@@ -125,7 +125,7 @@ impl<'a> Context<'a> {
         for (id, node) in zip_eq(ids, nodes) {
             if let Some(symbol_name) = node.operation.symbol_name() {
                 self.symbols
-                    .insert(symbol_name.as_ref(), *id)
+                    .insert(symbol_name.clone(), *id)
                     .map_err(|_| ResolveError::DuplicateSymbol(symbol_name.clone()))?;
             }
         }
@@ -182,9 +182,7 @@ impl<'a> Context<'a> {
                 let symbol = self.resolve_symbol(symbol)?;
                 table::Operation::DeclareOperation(symbol)
             }
-            Operation::Import(symbol_name) => table::Operation::Import {
-                name: symbol_name.as_ref(),
-            },
+            Operation::Import(symbol_name) => table::Operation::Import(symbol_name.clone()),
             Operation::Custom(term) => {
                 let term = self.resolve_term(term)?;
                 table::Operation::Custom(term)
@@ -288,7 +286,7 @@ impl<'a> Context<'a> {
     }
 
     fn resolve_symbol(&mut self, symbol: &'a Symbol) -> BuildResult<&'a table::Symbol<'a>> {
-        let name = symbol.name.as_ref();
+        let name = symbol.name.clone();
         let params = self.resolve_params(&symbol.params)?;
         let constraints = self.resolve_terms(&symbol.constraints)?;
         let signature = self.resolve_term(&symbol.signature)?;
@@ -306,7 +304,7 @@ impl<'a> Context<'a> {
     /// This incrementally inserts the names of the parameters into the current
     /// variable scope, so that any parameter is in scope for each of its
     /// succeeding parameters.
-    fn resolve_params(&mut self, params: &'a [Param]) -> BuildResult<&'a [table::Param<'a>]> {
+    fn resolve_params(&mut self, params: &'a [Param]) -> BuildResult<&'a [table::Param]> {
         try_alloc_slice(
             self.bump,
             params.iter().map(|param| self.resolve_param(param)),
@@ -317,8 +315,8 @@ impl<'a> Context<'a> {
     ///
     /// This inserts the name of the parameter into the current variable scope,
     /// making the parameter accessible as a variable.
-    fn resolve_param(&mut self, param: &'a Param) -> BuildResult<table::Param<'a>> {
-        let name = param.name.as_ref();
+    fn resolve_param(&mut self, param: &'a Param) -> BuildResult<table::Param> {
+        let name = param.name.clone();
         let r#type = self.resolve_term(&param.r#type)?;
 
         self.vars
@@ -347,9 +345,7 @@ impl<'a> Context<'a> {
 
         *self.imports.entry(symbol_name.clone()).or_insert_with(|| {
             self.module.insert_node(table::Node {
-                operation: table::Operation::Import {
-                    name: symbol_name.as_ref(),
-                },
+                operation: table::Operation::Import(symbol_name.clone()),
                 ..Default::default()
             })
         })

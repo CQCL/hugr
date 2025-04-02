@@ -145,7 +145,7 @@ struct Context<'a> {
 
     local_vars: FxHashMap<table::VarId, LocalVar>,
 
-    custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
+    custom_name_cache: FxHashMap<&'a model::SymbolName, (ExtensionId, SmolStr)>,
 
     region_scope: table::RegionId,
 }
@@ -284,11 +284,14 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    fn get_symbol_name(&self, node_id: table::NodeId) -> Result<&'a str, ImportError> {
+    fn get_symbol_name(
+        &self,
+        node_id: table::NodeId,
+    ) -> Result<&'a model::SymbolName, ImportError> {
         let node_data = self.get_node(node_id)?;
         let name = node_data
             .operation
-            .symbol()
+            .symbol_name()
             .ok_or(table::ModelError::InvalidSymbol(node_id))?;
         Ok(name)
     }
@@ -303,7 +306,7 @@ impl<'a> Context<'a> {
             _ => return Err(table::ModelError::UnexpectedOperation(func_node).into()),
         };
 
-        self.import_poly_func_type(func_node, *symbol, |_, signature| Ok(signature))
+        self.import_poly_func_type(func_node, symbol, |_, signature| Ok(signature))
     }
 
     /// Import the root region of the module.
@@ -359,7 +362,7 @@ impl<'a> Context<'a> {
             }
 
             table::Operation::DefineFunc(symbol) => {
-                self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
+                self.import_poly_func_type(node_id, symbol, |ctx, signature| {
                     let optype = OpType::FuncDefn(FuncDefn {
                         name: symbol.name.to_string(),
                         signature,
@@ -378,7 +381,7 @@ impl<'a> Context<'a> {
             }
 
             table::Operation::DeclareFunc(symbol) => {
-                self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
+                self.import_poly_func_type(node_id, symbol, |ctx, signature| {
                     let optype = OpType::FuncDecl(FuncDecl {
                         name: symbol.name.to_string(),
                         signature,
@@ -893,7 +896,7 @@ impl<'a> Context<'a> {
     fn import_poly_func_type<RV: MaybeRV, T>(
         &mut self,
         node: table::NodeId,
-        symbol: table::Symbol<'a>,
+        symbol: &'a table::Symbol<'a>,
         in_scope: impl FnOnce(&mut Self, PolyFuncTypeBase<RV>) -> Result<T, ImportError>,
     ) -> Result<T, ImportError> {
         let mut imported_params = Vec::with_capacity(symbol.params.len());
@@ -1339,18 +1342,18 @@ impl<'a> Context<'a> {
 
     fn import_custom_name(
         &mut self,
-        symbol: &'a str,
+        symbol: &'a model::SymbolName,
     ) -> Result<(ExtensionId, SmolStr), ImportError> {
         use std::collections::hash_map::Entry;
         match self.custom_name_cache.entry(symbol) {
             Entry::Occupied(occupied_entry) => Ok(occupied_entry.get().clone()),
             Entry::Vacant(vacant_entry) => {
-                let qualified_name = ExtensionId::new(symbol)
-                    .map_err(|_| table::ModelError::MalformedName(symbol.to_smolstr()))?;
+                let qualified_name = ExtensionId::new(symbol.as_ref())
+                    .map_err(|_| table::ModelError::MalformedName(symbol.as_ref().to_smolstr()))?;
 
-                let (extension, id) = qualified_name
-                    .split_last()
-                    .ok_or_else(|| table::ModelError::MalformedName(symbol.to_smolstr()))?;
+                let (extension, id) = qualified_name.split_last().ok_or_else(|| {
+                    table::ModelError::MalformedName(symbol.as_ref().to_smolstr())
+                })?;
 
                 vacant_entry.insert((extension.clone(), id.clone()));
                 Ok((extension, id))
@@ -1527,7 +1530,7 @@ impl<'a> Context<'a> {
             return Ok(None);
         };
 
-        if name != self.get_symbol_name(*symbol)? {
+        if name != self.get_symbol_name(*symbol)?.as_ref() {
             return Ok(None);
         }
 

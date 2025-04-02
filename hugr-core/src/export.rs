@@ -22,11 +22,11 @@ use crate::{
 use fxhash::{FxBuildHasher, FxHashMap};
 use hugr_model::v0::{
     self as model,
-    bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump},
+    bumpalo::{collections::Vec as BumpVec, Bump},
     table,
 };
 use petgraph::unionfind::UnionFind;
-use std::fmt::Write;
+use smol_str::{format_smolstr, ToSmolStr};
 
 /// Export a [`Package`] to its representation in the model.
 pub fn export_package<'a>(package: &'a Package, bump: &'a Bump) -> table::Package<'a> {
@@ -77,10 +77,10 @@ struct Context<'a> {
     links: Links,
 
     /// The symbol table tracking symbols that are currently in scope.
-    symbols: model::scope::SymbolTable<'a>,
+    symbols: model::scope::SymbolTable,
 
     /// Mapping from implicit imports to their node ids.
-    implicit_imports: FxHashMap<&'a str, table::NodeId>,
+    implicit_imports: FxHashMap<model::SymbolName, table::NodeId>,
 
     /// Map from node ids in the [`Hugr`] to the corresponding node ids in the model.
     node_to_id: FxHashMap<Node, table::NodeId>,
@@ -187,11 +187,8 @@ impl<'a> Context<'a> {
         &mut self,
         extension: &ExtensionId,
         name: impl AsRef<str>,
-    ) -> &'a str {
-        let capacity = extension.len() + name.as_ref().len() + 1;
-        let mut output = BumpString::with_capacity_in(capacity, self.bump);
-        let _ = write!(&mut output, "{}.{}", extension, name.as_ref());
-        output.into_bump_str()
+    ) -> model::SymbolName {
+        model::SymbolName::new(format_smolstr!("{}.{}", extension, name.as_ref()))
     }
 
     pub fn make_named_global_ref(
@@ -211,16 +208,6 @@ impl<'a> Context<'a> {
         match self.hugr.get_optype(func_node) {
             OpType::FuncDecl(_) => Some(func_node),
             OpType::FuncDefn(_) => Some(func_node),
-            _ => None,
-        }
-    }
-
-    /// Get the name of a function definition or declaration node. Returns `None` if not
-    /// one of those operations.
-    fn get_func_name(&self, func_node: Node) -> Option<&'a str> {
-        match self.hugr.get_optype(func_node) {
-            OpType::FuncDecl(func_decl) => Some(&func_decl.name),
-            OpType::FuncDefn(func_defn) => Some(&func_defn.name),
             _ => None,
         }
     }
@@ -262,7 +249,7 @@ impl<'a> Context<'a> {
 
         if let Some(symbol) = symbol {
             self.symbols
-                .insert(symbol, node_id)
+                .insert(model::SymbolName::new(symbol), node_id)
                 .expect("duplicate symbol");
         }
 
@@ -319,7 +306,7 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
+                let name = this.symbols.symbol_name(node_id).unwrap().clone();
                 let symbol = this.export_poly_func_type(name, &func.signature);
                 regions = this
                     .bump
@@ -328,7 +315,7 @@ impl<'a> Context<'a> {
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
+                let name = this.symbols.symbol_name(node_id).unwrap().clone();
                 let symbol = this.export_poly_func_type(name, &func.signature);
                 table::Operation::DeclareFunc(symbol)
             }),
@@ -337,7 +324,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
-                    name: &alias.name,
+                    name: model::SymbolName::new(alias.name.clone()),
                     params: &[],
                     constraints: &[],
                     signature,
@@ -350,7 +337,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
-                    name: &alias.name,
+                    name: model::SymbolName::new(alias.name.clone()),
                     params: &[],
                     constraints: &[],
                     signature,
@@ -737,7 +724,7 @@ impl<'a> Context<'a> {
     /// Exports a polymorphic function type.
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
-        name: &'a str,
+        name: model::SymbolName,
         t: &PolyFuncTypeBase<RV>,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
@@ -746,7 +733,7 @@ impl<'a> Context<'a> {
             .expect("exporting poly func type outside of local scope");
 
         for (i, param) in t.params().iter().enumerate() {
-            let name = self.bump.alloc_str(&i.to_string());
+            let name = model::VarName::new(i.to_smolstr());
             let r#type = self.export_type_param(param, Some((scope, i as _)));
             let param = table::Param { name, r#type };
             params.push(param)
@@ -771,7 +758,7 @@ impl<'a> Context<'a> {
         match t {
             TypeEnum::Extension(ext) => self.export_custom_type(ext),
             TypeEnum::Alias(alias) => {
-                let symbol = self.resolve_symbol(self.bump.alloc_str(alias.name()));
+                let symbol = self.resolve_symbol(alias.name());
                 self.make_term(table::Term::Apply(symbol, &[]))
             }
             TypeEnum::Function(func) => self.export_func_type(func),
@@ -1030,17 +1017,20 @@ impl<'a> Context<'a> {
         self.make_term_apply(model::COMPAT_META_JSON, &[name, value])
     }
 
-    fn resolve_symbol(&mut self, name: &'a str) -> table::NodeId {
-        let result = self.symbols.resolve(name);
+    fn resolve_symbol(&mut self, name: impl AsRef<str>) -> table::NodeId {
+        let result = self.symbols.resolve(name.as_ref());
 
         match result {
             Ok(node) => node,
-            Err(_) => *self.implicit_imports.entry(name).or_insert_with(|| {
-                self.module.insert_node(table::Node {
-                    operation: table::Operation::Import { name },
-                    ..table::Node::default()
-                })
-            }),
+            Err(_) => *self
+                .implicit_imports
+                .entry(model::SymbolName::new(name.as_ref()))
+                .or_insert_with_key(|name| {
+                    self.module.insert_node(table::Node {
+                        operation: table::Operation::Import(name.clone()),
+                        ..table::Node::default()
+                    })
+                }),
         }
     }
 

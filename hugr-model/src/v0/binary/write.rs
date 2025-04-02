@@ -99,8 +99,8 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &tabl
             write_symbol(builder, symbol);
         }
 
-        table::Operation::Import { name } => {
-            builder.set_import(*name);
+        table::Operation::Import(name) => {
+            builder.set_import(name);
         }
 
         table::Operation::Invalid => builder.set_invalid(()),
@@ -108,14 +108,14 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &tabl
 }
 
 fn write_symbol(mut builder: hugr_capnp::symbol::Builder, symbol: &table::Symbol) {
-    builder.set_name(symbol.name);
+    builder.set_name(&symbol.name);
     write_list!(builder, init_params, write_param, symbol.params);
     let _ = builder.set_constraints(table::TermId::unwrap_slice(symbol.constraints));
     builder.set_signature(symbol.signature.0);
 }
 
 fn write_param(mut builder: hugr_capnp::param::Builder, param: &table::Param) {
-    builder.set_name(param.name);
+    builder.set_name(&param.name);
     builder.set_type(param.r#type.0);
 }
 
