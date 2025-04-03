@@ -32,6 +32,12 @@ pub trait HugrInternals {
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
 
+    /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
+    /// returned by [`HugrInternals::portgraph`].
+    fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy> {
+        Cow::Borrowed(&self.base_hugr().hierarchy)
+    }
+
     /// Returns the Hugr at the base of a chain of views.
     fn base_hugr(&self) -> &Hugr;
 
