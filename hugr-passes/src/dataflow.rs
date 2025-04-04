@@ -9,7 +9,7 @@ mod results;
 pub use results::{AnalysisResults, TailLoopTermination};
 
 mod partial_value;
-pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
+pub use partial_value::{AbstractValue, LoadedFunction, PartialSum, PartialValue, Sum};
 
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
@@ -31,8 +31,8 @@ pub trait DFContext<V>: ConstLoader<V> {
         &mut self,
         _node: Self::Node,
         _e: &ExtensionOp,
-        _ins: &[PartialValue<V>],
-        _outs: &mut [PartialValue<V>],
+        _ins: &[PartialValue<V, Self::Node>],
+        _outs: &mut [PartialValue<V, Self::Node>],
     ) {
     }
 }
@@ -94,7 +94,7 @@ pub fn partial_from_const<'a, V, CL: ConstLoader<V>>(
     cl: &CL,
     loc: impl Into<ConstLocation<'a, CL::Node>>,
     cst: &Value,
-) -> PartialValue<V>
+) -> PartialValue<V, CL::Node>
 where
     CL::Node: 'a,
 {
@@ -120,8 +120,8 @@ where
 
 /// A row of inputs to a node contains bottom (can't happen, the node
 /// can't execute) if any element [contains_bottom](PartialValue::contains_bottom).
-pub fn row_contains_bottom<'a, V: AbstractValue + 'a>(
-    elements: impl IntoIterator<Item = &'a PartialValue<V>>,
+pub fn row_contains_bottom<'a, V: 'a, N: 'a>(
+    elements: impl IntoIterator<Item = &'a PartialValue<V, N>>,
 ) -> bool {
     elements.into_iter().any(PartialValue::contains_bottom)
 }

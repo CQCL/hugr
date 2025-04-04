@@ -15,7 +15,7 @@ use super::{
     PartialValue,
 };
 
-type PV<V> = PartialValue<V>;
+type PV<V, N> = PartialValue<V, N>;
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Make a new instance via [Self::new()]
@@ -27,7 +27,7 @@ type PV<V> = PartialValue<V>;
 /// 3. Call [Self::run] to produce [AnalysisResults]
 pub struct Machine<H: HugrView, V: AbstractValue>(
     H,
-    HashMap<H::Node, Vec<(IncomingPort, PartialValue<V>)>>,
+    HashMap<H::Node, Vec<(IncomingPort, PV<V, H::Node>)>>,
 );
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
@@ -40,7 +40,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Provide initial values for a wire - these will be `join`d with any computed
     /// or any value previously prepopulated for the same Wire.
-    pub fn prepopulate_wire(&mut self, w: Wire<H::Node>, v: PartialValue<V>) {
+    pub fn prepopulate_wire(&mut self, w: Wire<H::Node>, v: PartialValue<V, H::Node>) {
         for (n, inp) in self.0.linked_inputs(w.node(), w.source()) {
             self.1.entry(n).or_default().push((inp, v.clone()));
         }
@@ -54,7 +54,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     pub fn prepopulate_inputs(
         &mut self,
         parent: H::Node,
-        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
+        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> Result<(), OpType> {
         match self.0.get_optype(parent) {
             OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => {
@@ -102,7 +102,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     pub fn run(
         mut self,
         context: impl DFContext<V, Node = H::Node>,
-        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
+        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> AnalysisResults<V, H> {
         let root = self.0.root();
         if self.0.get_optype(root).is_module() {
@@ -138,7 +138,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
 pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
     mut ctx: impl DFContext<V, Node = H::Node>,
     hugr: H,
-    in_wire_value_proto: Vec<(H::Node, IncomingPort, PV<V>)>,
+    in_wire_value_proto: Vec<(H::Node, IncomingPort, PV<V, H::Node>)>,
 ) -> AnalysisResults<V, H> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.
@@ -155,9 +155,9 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         relation parent_of_node(H::Node, H::Node); // <Node> is parent of <Node>
         relation input_child(H::Node, H::Node); // <Node> has 1st child <Node> that is its `Input`
         relation output_child(H::Node, H::Node); // <Node> has 2nd child <Node> that is its `Output`
-        lattice out_wire_value(H::Node, OutgoingPort, PV<V>); // <Node> produces, on <OutgoingPort>, the value <PV>
-        lattice in_wire_value(H::Node, IncomingPort, PV<V>); // <Node> receives, on <IncomingPort>, the value <PV>
-        lattice node_in_value_row(H::Node, ValueRow<V>); // <Node>'s inputs are <ValueRow>
+        lattice out_wire_value(H::Node, OutgoingPort, PV<V, H::Node>); // <Node> produces, on <OutgoingPort>, the value <PV>
+        lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
+        lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
 
         node(n) <-- for n in hugr.nodes();
 
@@ -341,9 +341,9 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
     ctx: &mut impl DFContext<V, Node = H::Node>,
     hugr: &H,
     n: H::Node,
-    ins: &[PV<V>],
+    ins: &[PV<V, H::Node>],
     num_outs: usize,
-) -> Option<ValueRow<V>> {
+) -> Option<ValueRow<V, H::Node>> {
     match hugr.get_optype(n) {
         // Handle basics here. We could instead leave these to DFContext,
         // but at least we'd want these impls to be easily reusable.
