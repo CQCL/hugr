@@ -65,7 +65,7 @@ pub struct LoadedFunction<N> {
 /// A representation of a value of [SumType], that may have one or more possible tags,
 /// with a [PartialValue] representation of each element-value of each possible tag.
 #[derive(PartialEq, Clone, Eq)]
-pub struct PartialSum<V, N>(pub HashMap<usize, Vec<PartialValue<V, N>>>);
+pub struct PartialSum<V, N = Node>(pub HashMap<usize, Vec<PartialValue<V, N>>>);
 
 impl<V, N> PartialSum<V, N> {
     /// New instance for a single known tag.
@@ -529,7 +529,6 @@ mod test {
     use std::sync::Arc;
 
     use ascent::{lattice::BoundedLattice, Lattice};
-    use hugr_core::Node;
     use itertools::{zip_eq, Itertools as _};
     use prop::sample::subsequence;
     use proptest::prelude::*;
@@ -568,7 +567,7 @@ mod test {
     }
 
     impl TestSumType {
-        fn check_value(&self, pv: &PartialValue<TestValue, Node>) -> bool {
+        fn check_value(&self, pv: &PartialValue<TestValue>) -> bool {
             match (self, pv) {
                 (_, PartialValue::Bottom) | (_, PartialValue::Top) => true,
                 (Self::Leaf(None), _) => pv == &PartialValue::new_unit(),
@@ -629,7 +628,7 @@ mod test {
     fn single_sum_strat(
         tag: usize,
         elems: Vec<Arc<TestSumType>>,
-    ) -> impl Strategy<Value = PartialSum<TestValue, Node>> {
+    ) -> impl Strategy<Value = PartialSum<TestValue>> {
         elems
             .iter()
             .map(Arc::as_ref)
@@ -640,11 +639,11 @@ mod test {
 
     fn partial_sum_strat(
         variants: &[Vec<Arc<TestSumType>>],
-    ) -> impl Strategy<Value = PartialSum<TestValue, Node>> {
+    ) -> impl Strategy<Value = PartialSum<TestValue>> {
         // We have to clone the `variants` here but only as far as the Vec<Vec<Arc<_>>>
         let tagged_variants = variants.iter().cloned().enumerate().collect::<Vec<_>>();
         // The type annotation here (and the .boxed() enabling it) are just for documentation
-        let sum_variants_strat: BoxedStrategy<Vec<PartialSum<TestValue, Node>>> =
+        let sum_variants_strat: BoxedStrategy<Vec<PartialSum<TestValue>>> =
             subsequence(tagged_variants, 1..=variants.len())
                 .prop_flat_map(|selected_variants| {
                     selected_variants
@@ -653,7 +652,7 @@ mod test {
                         .collect::<Vec<_>>()
                 })
                 .boxed();
-        sum_variants_strat.prop_map(|psums: Vec<PartialSum<TestValue, Node>>| {
+        sum_variants_strat.prop_map(|psums: Vec<PartialSum<TestValue>>| {
             let mut psums = psums.into_iter();
             let first = psums.next().unwrap();
             psums.fold(first, |mut a, b| {
@@ -665,7 +664,7 @@ mod test {
 
     fn any_partial_value_of_type(
         ust: &TestSumType,
-    ) -> impl Strategy<Value = PartialValue<TestValue, Node>> {
+    ) -> impl Strategy<Value = PartialValue<TestValue>> {
         match ust {
             TestSumType::Leaf(None) => Just(PartialValue::new_unit()).boxed(),
             TestSumType::Leaf(Some(i)) => (0..*i)
@@ -678,16 +677,15 @@ mod test {
 
     fn any_partial_value_with(
         params: <TestSumType as Arbitrary>::Parameters,
-    ) -> impl Strategy<Value = PartialValue<TestValue, Node>> {
+    ) -> impl Strategy<Value = PartialValue<TestValue>> {
         any_with::<TestSumType>(params).prop_flat_map(|t| any_partial_value_of_type(&t))
     }
 
-    fn any_partial_value() -> impl Strategy<Value = PartialValue<TestValue, Node>> {
+    fn any_partial_value() -> impl Strategy<Value = PartialValue<TestValue>> {
         any_partial_value_with(Default::default())
     }
 
-    fn any_partial_values<const N: usize>(
-    ) -> impl Strategy<Value = [PartialValue<TestValue, Node>; N]> {
+    fn any_partial_values<const N: usize>() -> impl Strategy<Value = [PartialValue<TestValue>; N]> {
         any::<TestSumType>().prop_flat_map(|ust| {
             TryInto::<[_; N]>::try_into(
                 (0..N)
@@ -698,8 +696,7 @@ mod test {
         })
     }
 
-    fn any_typed_partial_value(
-    ) -> impl Strategy<Value = (TestSumType, PartialValue<TestValue, Node>)> {
+    fn any_typed_partial_value() -> impl Strategy<Value = (TestSumType, PartialValue<TestValue>)> {
         any::<TestSumType>()
             .prop_flat_map(|t| any_partial_value_of_type(&t).prop_map(move |v| (t.clone(), v)))
     }
