@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (define-func example.swap
   ; The types of the values to be swapped are passed as implicit parameters.
   (param ?a core.type)

@@ -1,5 +1,6 @@
 """Helpers to export hugr graphs from their python representation to hugr model."""
 
+import json
 from collections.abc import Sequence
 from typing import Generic, TypeVar, cast
 
@@ -59,6 +60,22 @@ class ModelExport:
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
+        meta = []
+
+        # Export JSON metadata
+        for meta_name, meta_value in node_data.metadata.items():
+            # TODO: Is this the correct way to convert the metadata as JSON?
+            meta_json = json.dumps(meta_value)
+            meta.append(
+                model.Apply(
+                    "compat.meta_json",
+                    [model.Literal(meta_name), model.Literal(meta_json)],
+                )
+            )
+
+        # Add an order hint key to the node if necessary
+        if _needs_order_key(self.hugr, node):
+            meta.append(model.Apply("core.order_hint.key", [model.Literal(node.idx)]))
 
         match node_data.op:
             case DFG() as op:
@@ -70,6 +87,7 @@ class ModelExport:
                     signature=op.outer_signature().to_model(),
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case Custom() as op:
@@ -82,6 +100,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case AsExtOp() as op:
@@ -96,6 +115,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case Conditional() as op:
@@ -111,6 +131,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case TailLoop() as op:
@@ -122,6 +143,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case FuncDefn() as op:
@@ -132,8 +154,7 @@ class ModelExport:
                 region = self.export_region_dfg(node)
 
                 return model.Node(
-                    operation=model.DefineFunc(symbol),
-                    regions=[region],
+                    operation=model.DefineFunc(symbol), regions=[region], meta=meta
                 )
 
             case FuncDecl() as op:
@@ -141,21 +162,21 @@ class ModelExport:
                 symbol = self.export_symbol(
                     name, op.signature.params, op.signature.body
                 )
-                return model.Node(
-                    operation=model.DeclareFunc(symbol),
-                )
+                return model.Node(operation=model.DeclareFunc(symbol), meta=meta)
 
             case AliasDecl() as op:
                 symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
 
-                return model.Node(operation=model.DeclareAlias(symbol))
+                return model.Node(operation=model.DeclareAlias(symbol), meta=meta)
 
             case AliasDefn() as op:
                 symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
 
                 alias_value = cast(model.Term, op.definition.to_model())
 
-                return model.Node(operation=model.DefineAlias(symbol, alias_value))
+                return model.Node(
+                    operation=model.DefineAlias(symbol, alias_value), meta=meta
+                )
 
             case Call() as op:
                 input_types = [type.to_model() for type in op.instantiation.input]
@@ -186,6 +207,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case LoadFunc() as op:
@@ -208,6 +230,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case CallIndirect() as op:
@@ -240,6 +263,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case LoadConst() as op:
@@ -259,6 +283,7 @@ class ModelExport:
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
+                    meta=meta,
                 )
 
             case Const() as op:
@@ -268,13 +293,13 @@ class ModelExport:
                 signature = op.outer_signature().to_model()
                 region = self.export_region_cfg(node)
 
-                # TODO: Export CFGs
                 return model.Node(
                     operation=model.Cfg(),
                     signature=signature,
                     inputs=inputs,
                     outputs=outputs,
                     regions=[region],
+                    meta=meta,
                 )
 
             case DataflowBlock() as op:
@@ -314,6 +339,7 @@ class ModelExport:
                     outputs=outputs,
                     regions=[region],
                     signature=signature,
+                    meta=meta,
                 )
 
             case Tag() as op:
@@ -338,6 +364,7 @@ class ModelExport:
                     inputs=inputs,
                     outputs=outputs,
                     signature=signature,
+                    meta=meta,
                 )
 
             case op:
@@ -365,6 +392,7 @@ class ModelExport:
         target_types: model.Term = model.Wildcard()
         sources = []
         targets = []
+        meta = []
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -387,8 +415,19 @@ class ModelExport:
                 case _:
                     child_node = self.export_node(child)
 
-                    if child_node is not None:
-                        children.append(child_node)
+                    if child_node is None:
+                        continue
+
+                    children.append(child_node)
+
+                    meta += [
+                        model.Apply(
+                            "core.order_hint.order",
+                            [model.Literal(child.idx), model.Literal(successor.idx)],
+                        )
+                        for successor in self.hugr.outgoing_order_links(child)
+                        if not isinstance(self.hugr[successor].op, Output)
+                    ]
 
         signature = model.Apply("core.fn", [source_types, target_types])
 
@@ -559,3 +598,21 @@ class _UnionFind(Generic[T]):
 
         self.parents[b] = a
         self.sizes[a] += self.sizes[b]
+
+
+def _needs_order_key(hugr: Hugr, node: Node) -> bool:
+    """Checks whether the node has any order links for the purposes of
+    exporting order hint metadata. Order links to `Input` or `Output`
+    operations are ignored, since they are not present in the model format.
+    """
+    for succ in hugr.outgoing_order_links(node):
+        succ_op = hugr[succ].op
+        if not isinstance(succ_op, Output):
+            return True
+
+    for pred in hugr.incoming_order_links(node):
+        pred_op = hugr[pred].op
+        if not isinstance(pred_op, Input):
+            return True
+
+    return False

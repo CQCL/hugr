@@ -1,5 +1,6 @@
 //! Prelude extension - available in all contexts, defining common types,
 //! operations and constants.
+use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
@@ -447,13 +448,18 @@ impl CustomConst for ConstUsize {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-/// Structure for holding constant usize values.
+/// Structure for holding constant [error types].
+///
+/// [error types]: crate::extension::prelude::error_type
 pub struct ConstError {
     /// Integer tag/signal for the error.
     pub signal: u32,
     /// Error message.
     pub message: String,
 }
+
+/// Default error signal.
+pub const DEFAULT_ERROR_SIGNAL: u32 = 1;
 
 impl ConstError {
     /// Define a new error value.
@@ -464,6 +470,12 @@ impl ConstError {
         }
     }
 
+    /// Define a new error value with the [default signal].
+    ///
+    /// [default signal]: DEFAULT_ERROR_SIGNAL
+    pub fn new_default_signal(message: impl ToString) -> Self {
+        Self::new(DEFAULT_ERROR_SIGNAL, message)
+    }
     /// Returns an "either" value with a failure variant.
     ///
     /// args:
@@ -488,6 +500,20 @@ impl CustomConst for ConstError {
     }
     fn get_type(&self) -> Type {
         error_type()
+    }
+}
+
+impl FromStr for ConstError {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::new_default_signal(s))
+    }
+}
+
+impl From<String> for ConstError {
+    fn from(s: String) -> Self {
+        Self::new_default_signal(s)
     }
 }
 

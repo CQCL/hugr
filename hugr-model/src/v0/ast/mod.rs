@@ -36,6 +36,32 @@ mod view;
 
 pub use resolve::ResolveError;
 
+/// A package in the hugr AST.
+///
+/// See [`table::Package`] for the table representation.
+///
+/// [`table::Package`]: crate::v0::table::Package
+pub struct Package {
+    /// The sequence of modules in the package.
+    pub modules: Vec<Module>,
+}
+
+impl Package {
+    /// Try to convert this package into the table representation by
+    /// independently resolving its modules via [`Module::resolve`].
+    pub fn resolve<'a>(
+        &'a self,
+        bump: &'a Bump,
+    ) -> Result<table::Package<'a>, resolve::ResolveError> {
+        let modules = self
+            .modules
+            .iter()
+            .map(|module| module.resolve(bump))
+            .collect::<Result<_, _>>()?;
+        Ok(table::Package { modules })
+    }
+}
+
 /// A module in the hugr AST.
 ///
 /// See [`table::Module`] for the table representation.

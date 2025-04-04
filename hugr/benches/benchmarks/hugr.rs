@@ -32,13 +32,16 @@ impl Serializer for CapnpSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
         let bump = bumpalo::Bump::new();
         let module = hugr_core::export::export_hugr(hugr, &bump);
-        hugr_model::v0::binary::write_to_vec(&module)
+        let package = hugr_model::v0::table::Package {
+            modules: vec![module],
+        };
+        hugr_model::v0::binary::write_to_vec(&package)
     }
 
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
         let bump = bumpalo::Bump::new();
-        let module = hugr_model::v0::binary::read_from_slice(bytes, &bump).unwrap();
-        hugr_core::import::import_hugr(&module, &STD_REG).unwrap()
+        let package = hugr_model::v0::binary::read_from_slice(bytes, &bump).unwrap();
+        hugr_core::import::import_hugr(&package.modules[0], &STD_REG).unwrap()
     }
 }
 

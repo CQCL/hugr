@@ -19,6 +19,7 @@ use crate::types::type_param::TypeParam;
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
 
+use super::internal::HugrInternals;
 use super::views::{HierarchyView, HugrView, SiblingGraph};
 use super::ExtensionError;
 
@@ -104,7 +105,7 @@ impl<'a> ValidationContext<'a> {
     /// Check the validity of the HUGR.
     pub fn validate(&mut self) -> Result<(), ValidationError> {
         // Root node must be a root in the hierarchy.
-        if !self.hugr.hierarchy.is_root(self.hugr.root) {
+        if !self.hugr.hierarchy().is_root(self.hugr.root) {
             return Err(ValidationError::RootNotRoot {
                 node: self.hugr.root(),
             });
@@ -315,7 +316,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_children(&self, node: Node, op_type: &OpType) -> Result<(), ValidationError> {
         let flags = op_type.validity_flags();
 
-        if self.hugr.hierarchy.child_count(node.pg_index()) > 0 {
+        if self.hugr.hierarchy().child_count(node.pg_index()) > 0 {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
@@ -362,7 +363,7 @@ impl<'a> ValidationContext<'a> {
 
             // Additional validations running over the edges of the contained graph
             if let Some(edge_check) = flags.edge_check {
-                for source in self.hugr.hierarchy.children(node.pg_index()) {
+                for source in self.hugr.hierarchy().children(node.pg_index()) {
                     for target in self.hugr.graph.output_neighbours(source) {
                         if self.hugr.hierarchy.parent(target) != Some(node.pg_index()) {
                             continue;
