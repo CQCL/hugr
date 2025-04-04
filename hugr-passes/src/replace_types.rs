@@ -442,6 +442,7 @@ impl ReplaceTypes {
                     false
                 }
             }),
+            #[allow(deprecated)] // remove when Value::Function removed
             Value::Function { hugr } => self.run_no_validate(&mut **hugr),
         }
     }

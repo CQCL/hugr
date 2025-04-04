@@ -169,11 +169,14 @@ impl HasConcrete for LoadNatDef {
 mod tests {
     use crate::{
         builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{usize_t, ConstUsize},
-        ops::{constant, OpType},
+        extension::{
+            prelude::{usize_t, ConstUsize},
+            FoldVal,
+        },
+        ops::OpType,
         type_row,
         types::TypeArg,
-        HugrView, OutgoingPort,
+        HugrView,
     };
 
     use super::LoadNat;
@@ -209,10 +212,10 @@ mod tests {
 
         match optype {
             OpType::ExtensionOp(ext_op) => {
-                let result = ext_op.constant_fold(&[]);
-                let exp_port: OutgoingPort = 0.into();
-                let exp_val: constant::Value = ConstUsize::new(5).into();
-                assert_eq!(result, Some(vec![(exp_port, exp_val)]))
+                let mut out = [FoldVal::Unknown];
+                ext_op.constant_fold2(&[], &mut out);
+                let exp_val: FoldVal = ConstUsize::new(5).into();
+                assert_eq!(out, [exp_val])
             }
             _ => panic!(),
         }

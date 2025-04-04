@@ -173,15 +173,15 @@ pub(crate) mod test {
     use std::sync::Arc;
 
     use super::{extension, LogicOp, FALSE_NAME, TRUE_NAME};
+
     use crate::{
-        extension::{
-            prelude::bool_t,
-            simple_op::{MakeOpDef, MakeRegisteredOp},
-        },
-        ops::{NamedOp, Value},
+        extension::simple_op::{MakeOpDef, MakeRegisteredOp},
+        extension::{prelude::bool_t, ConstFold, FoldVal},
+        ops::NamedOp,
         Extension,
     };
 
+    use itertools::Itertools;
     use rstest::rstest;
     use strum::IntoEnumIterator;
 
@@ -248,15 +248,11 @@ pub(crate) mod test {
         use itertools::Itertools;
 
         use crate::extension::ConstFold;
-        let in_vals = ins
-            .into_iter()
-            .enumerate()
-            .map(|(i, b)| (i.into(), Value::from_bool(b)))
-            .collect_vec();
-        assert_eq!(
-            Some(vec![(0.into(), Value::from_bool(out))]),
-            op.fold(&[(in_vals.len() as u64).into()], &in_vals)
-        );
+        let in_vals = ins.into_iter().map(FoldVal::from_bool).collect_vec();
+        let type_args = [(in_vals.len() as u64).into()];
+        let mut outs = [FoldVal::Unknown];
+        op.fold2(&type_args, &in_vals, &mut outs);
+        assert_eq!(outs, [FoldVal::from_bool(out)]);
     }
 
     #[rstest]
@@ -272,18 +268,13 @@ pub(crate) mod test {
         #[case] ins: impl IntoIterator<Item = Option<bool>>,
         #[case] mb_out: Option<bool>,
     ) {
-        use itertools::Itertools;
-
-        use crate::extension::ConstFold;
-        let in_vals0 = ins.into_iter().enumerate().collect_vec();
-        let num_args = in_vals0.len() as u64;
-        let in_vals = in_vals0
+        let in_vals = ins
             .into_iter()
-            .filter_map(|(i, mb_b)| mb_b.map(|b| (i.into(), Value::from_bool(b))))
+            .map(|mb_b| mb_b.map_or(FoldVal::Unknown, FoldVal::from_bool))
             .collect_vec();
-        assert_eq!(
-            mb_out.map(|out| vec![(0.into(), Value::from_bool(out))]),
-            op.fold(&[num_args.into()], &in_vals)
-        );
+        let type_args = [(in_vals.len() as u64).into()];
+        let mut outs = [FoldVal::Unknown];
+        op.fold2(&type_args, &in_vals, &mut outs);
+        assert_eq!(outs, [mb_out.map_or(FoldVal::Unknown, FoldVal::from_bool)]);
     }
 }
