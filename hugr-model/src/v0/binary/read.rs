@@ -128,7 +128,7 @@ fn read_operation<'a>(
         Which::Block(()) => table::Operation::Block,
         Which::FuncDefn(reader) => {
             let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
+            let name = model::SymbolName::new(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
             let signature = table::TermId(reader.get_signature());
@@ -142,7 +142,7 @@ fn read_operation<'a>(
         }
         Which::FuncDecl(reader) => {
             let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
+            let name = model::SymbolName::new(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
             let signature = table::TermId(reader.get_signature());
@@ -157,7 +157,7 @@ fn read_operation<'a>(
         Which::AliasDefn(reader) => {
             let symbol = reader.get_symbol()?;
             let value = table::TermId(reader.get_value());
-            let name = bump.alloc_str(symbol.get_name()?.to_str()?);
+            let name = model::SymbolName::new(symbol.get_name()?.to_str()?);
             let params = read_list!(bump, symbol.get_params()?, read_param);
             let signature = table::TermId(symbol.get_signature());
             let symbol = bump.alloc(table::Symbol {
@@ -170,7 +170,7 @@ fn read_operation<'a>(
         }
         Which::AliasDecl(reader) => {
             let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
+            let name = model::SymbolName::new(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let signature = table::TermId(reader.get_signature());
             let symbol = bump.alloc(table::Symbol {
@@ -183,7 +183,7 @@ fn read_operation<'a>(
         }
         Which::ConstructorDecl(reader) => {
             let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
+            let name = model::SymbolName::new(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
             let signature = table::TermId(reader.get_signature());
@@ -197,7 +197,7 @@ fn read_operation<'a>(
         }
         Which::OperationDecl(reader) => {
             let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
+            let name = model::SymbolName::new(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader.get_params()?, read_param);
             let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
             let signature = table::TermId(reader.get_signature());
@@ -212,9 +212,10 @@ fn read_operation<'a>(
         Which::Custom(operation) => table::Operation::Custom(table::TermId(operation)),
         Which::TailLoop(()) => table::Operation::TailLoop,
         Which::Conditional(()) => table::Operation::Conditional,
-        Which::Import(name) => table::Operation::Import {
-            name: bump.alloc_str(name?.to_str()?),
-        },
+        Which::Import(name) => {
+            let name = model::SymbolName::new(name?.to_str()?);
+            table::Operation::Import(name)
+        }
     })
 }
 
@@ -304,11 +305,8 @@ fn read_seq_part(
     })
 }
 
-fn read_param<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::param::Reader,
-) -> ReadResult<table::Param<'a>> {
-    let name = bump.alloc_str(reader.get_name()?.to_str()?);
+fn read_param<'a>(_: &'a Bump, reader: hugr_capnp::param::Reader) -> ReadResult<table::Param> {
+    let name = model::VarName::new(reader.get_name()?.to_str()?);
     let r#type = table::TermId(reader.get_type());
     Ok(table::Param { name, r#type })
 }

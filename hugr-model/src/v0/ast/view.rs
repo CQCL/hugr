@@ -26,35 +26,35 @@ impl<'a> View<'a, NodeId> for Node {
     fn view(module: &'a table::Module<'a>, id: NodeId) -> Option<Self> {
         let node = module.get_node(id)?;
 
-        let operation = match node.operation {
+        let operation = match &node.operation {
             table::Operation::Invalid => Operation::Invalid,
             table::Operation::Dfg => Operation::Dfg,
             table::Operation::Cfg => Operation::Cfg,
             table::Operation::Block => Operation::Block,
             table::Operation::DefineFunc(symbol) => {
-                Operation::DefineFunc(Box::new(module.view(*symbol)?))
+                Operation::DefineFunc(Box::new(module.view(symbol)?))
             }
             table::Operation::DeclareFunc(symbol) => {
-                Operation::DeclareFunc(Box::new(module.view(*symbol)?))
+                Operation::DeclareFunc(Box::new(module.view(symbol)?))
             }
             table::Operation::Custom(operation) => Operation::Custom(module.view(operation)?),
             table::Operation::DefineAlias(symbol, value) => {
-                let symbol = Box::new(module.view(*symbol)?);
+                let symbol = Box::new(module.view(symbol)?);
                 let value = module.view(value)?;
                 Operation::DefineAlias(symbol, value)
             }
             table::Operation::DeclareAlias(symbol) => {
-                Operation::DeclareAlias(Box::new(module.view(*symbol)?))
+                Operation::DeclareAlias(Box::new(module.view(symbol)?))
             }
             table::Operation::DeclareConstructor(symbol) => {
-                Operation::DeclareConstructor(Box::new(module.view(*symbol)?))
+                Operation::DeclareConstructor(Box::new(module.view(symbol)?))
             }
             table::Operation::DeclareOperation(symbol) => {
-                Operation::DeclareOperation(Box::new(module.view(*symbol)?))
+                Operation::DeclareOperation(Box::new(module.view(symbol)?))
             }
             table::Operation::TailLoop => Operation::TailLoop,
             table::Operation::Conditional => Operation::Conditional,
-            table::Operation::Import { name } => Operation::Import(SymbolName::new(name)),
+            table::Operation::Import(name) => Operation::Import(name.clone()),
         };
 
         let meta = module.view(node.meta)?;
@@ -89,9 +89,9 @@ impl<'a> View<'a, table::SeqPart> for SeqPart {
     }
 }
 
-impl<'a> View<'a, table::Symbol<'a>> for Symbol {
-    fn view(module: &'a table::Module<'a>, id: table::Symbol<'a>) -> Option<Self> {
-        let name = SymbolName::new(id.name);
+impl<'a> View<'a, &'a table::Symbol<'a>> for Symbol {
+    fn view(module: &'a table::Module<'a>, id: &'a table::Symbol<'a>) -> Option<Self> {
+        let name = id.name.clone();
         let params = module.view(id.params)?;
         let constraints = module.view(id.constraints)?;
         let signature = module.view(id.signature)?;
@@ -104,9 +104,9 @@ impl<'a> View<'a, table::Symbol<'a>> for Symbol {
     }
 }
 
-impl<'a> View<'a, table::Param<'a>> for Param {
-    fn view(module: &'a table::Module<'a>, param: table::Param<'a>) -> Option<Self> {
-        let name = VarName::new(param.name);
+impl<'a> View<'a, &'a table::Param> for Param {
+    fn view(module: &'a table::Module<'a>, param: &'a table::Param) -> Option<Self> {
+        let name = param.name.clone();
         let r#type = module.view(param.r#type)?;
         Some(Param { name, r#type })
     }
@@ -147,14 +147,14 @@ impl<'a> View<'a, VarId> for VarName {
         };
 
         let param = &symbol.params[id.1 as usize];
-        Some(Self(param.name.into()))
+        Some(param.name.clone())
     }
 }
 
 impl<'a> View<'a, NodeId> for SymbolName {
     fn view(module: &'a table::Module<'a>, id: NodeId) -> Option<Self> {
         let node = module.get_node(id)?;
-        let name = node.operation.symbol()?;
-        Some(Self(name.into()))
+        let name = node.operation.symbol_name()?;
+        Some(name.clone())
     }
 }

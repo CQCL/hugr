@@ -88,6 +88,7 @@ use pyo3::types::PyAnyMethods as _;
 #[cfg(feature = "pyo3")]
 use pyo3::PyTypeInfo as _;
 use smol_str::SmolStr;
+use std::borrow::Borrow;
 use std::sync::Arc;
 use table::LinkIndex;
 
@@ -402,6 +403,12 @@ impl AsRef<str> for VarName {
     }
 }
 
+impl Borrow<str> for VarName {
+    fn borrow(&self) -> &str {
+        self.as_ref()
+    }
+}
+
 #[cfg(feature = "pyo3")]
 impl<'py> pyo3::FromPyObject<'py> for VarName {
     fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
@@ -438,6 +445,12 @@ impl AsRef<str> for SymbolName {
     }
 }
 
+impl Borrow<str> for SymbolName {
+    fn borrow(&self) -> &str {
+        self.as_ref()
+    }
+}
+
 #[cfg(feature = "pyo3")]
 impl<'py> pyo3::FromPyObject<'py> for SymbolName {
     fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
@@ -466,6 +479,12 @@ impl LinkName {
 impl AsRef<str> for LinkName {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
+    }
+}
+
+impl Borrow<str> for LinkName {
+    fn borrow(&self) -> &str {
+        self.as_ref()
     }
 }
 
