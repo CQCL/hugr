@@ -590,18 +590,17 @@ fn call_indirect() {
         .outputs_arr();
     let h = dfb.finish_hugr_with_outputs([res1, res2]).unwrap();
 
+    let run = |v0, v1, v2| {
+        Machine::new(&h).run(
+            TestContext,
+            [(0.into(), v0), (1.into(), v1), (2.into(), v2)],
+        )
+    };
     // 1. Test with `which` unknown -> second output unknown
     let (w1, w2) = (Wire::new(h.root(), 0), Wire::new(h.root(), 1));
     for inp1 in [pv_false(), pv_true()] {
         for inp2 in [pv_false(), pv_true()] {
-            let results = Machine::new(&h).run(
-                TestContext,
-                [
-                    (0.into(), inp1.clone()),
-                    (1.into(), PartialValue::Top),
-                    (2.into(), inp2),
-                ],
-            );
+            let results = run(inp1.clone(), PartialValue::Top, inp2);
             assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
             assert_eq!(results.read_out_wire(w2), Some(PartialValue::Top));
         }
@@ -610,16 +609,21 @@ fn call_indirect() {
     // 2. Test with `which` selecting second function -> both passthrough
     for inp1 in [pv_false(), pv_true()] {
         for inp2 in [pv_false(), pv_true()] {
-            let results = Machine::new(&h).run(
-                TestContext,
-                [
-                    (0.into(), inp1.clone()),
-                    (1.into(), pv_true()),
-                    (2.into(), inp2.clone()),
-                ],
-            );
+            let results = run(inp1.clone(), pv_true(), inp2.clone());
             assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
             assert_eq!(results.read_out_wire(w2), Some(inp2.clone()));
         }
+    }
+
+    //3. Test with `which` selecting first function -> alias
+    for (inp1, inp2) in [(pv_false(), pv_true()), (pv_true(), pv_false())] {
+        // A. same input bool to both calls
+        let results1 = run(inp1.clone(), pv_false(), inp1.clone());
+        assert_eq!(results1.read_out_wire(w1), Some(inp1.clone()));
+        assert_eq!(results1.read_out_wire(w2), Some(inp1.clone()));
+        // B. different inputs to both calls. Both alias - even the Call.
+        let results2 = run(inp1, pv_false(), inp2);
+        assert_eq!(results2.read_out_wire(w1), Some(pv_true_or_false()));
+        assert_eq!(results2.read_out_wire(w2), Some(pv_true_or_false()));
     }
 }
