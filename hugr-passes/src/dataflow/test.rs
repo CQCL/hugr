@@ -548,8 +548,12 @@ fn test_module() {
     }
 }
 
-#[test]
-fn call_indirect() {
+#[rstest]
+#[case(pv_false(), pv_false())]
+#[case(pv_false(), pv_true())]
+#[case(pv_true(), pv_false())]
+#[case(pv_true(), pv_true())]
+fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
     let b2b = || Signature::new_endo(bool_t());
     let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
 
@@ -590,40 +594,31 @@ fn call_indirect() {
         .outputs_arr();
     let h = dfb.finish_hugr_with_outputs([res1, res2]).unwrap();
 
-    let run = |v0, v1, v2| {
+    let run = |which| {
         Machine::new(&h).run(
             TestContext,
-            [(0.into(), v0), (1.into(), v1), (2.into(), v2)],
+            [
+                (0.into(), inp1.clone()),
+                (1.into(), which),
+                (2.into(), inp2.clone()),
+            ],
         )
     };
-    // 1. Test with `which` unknown -> second output unknown
     let (w1, w2) = (Wire::new(h.root(), 0), Wire::new(h.root(), 1));
-    for inp1 in [pv_false(), pv_true()] {
-        for inp2 in [pv_false(), pv_true()] {
-            let results = run(inp1.clone(), PartialValue::Top, inp2);
-            assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
-            assert_eq!(results.read_out_wire(w2), Some(PartialValue::Top));
-        }
-    }
+
+    // 1. Test with `which` unknown -> second output unknown
+    let results = run(PartialValue::Top);
+    assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+    assert_eq!(results.read_out_wire(w2), Some(PartialValue::Top));
 
     // 2. Test with `which` selecting second function -> both passthrough
-    for inp1 in [pv_false(), pv_true()] {
-        for inp2 in [pv_false(), pv_true()] {
-            let results = run(inp1.clone(), pv_true(), inp2.clone());
-            assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
-            assert_eq!(results.read_out_wire(w2), Some(inp2.clone()));
-        }
-    }
+    let results = run(pv_true());
+    assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+    assert_eq!(results.read_out_wire(w2), Some(inp2.clone()));
 
     //3. Test with `which` selecting first function -> alias
-    for (inp1, inp2) in [(pv_false(), pv_true()), (pv_true(), pv_false())] {
-        // A. same input bool to both calls
-        let results1 = run(inp1.clone(), pv_false(), inp1.clone());
-        assert_eq!(results1.read_out_wire(w1), Some(inp1.clone()));
-        assert_eq!(results1.read_out_wire(w2), Some(inp1.clone()));
-        // B. different inputs to both calls. Both alias - even the Call.
-        let results2 = run(inp1, pv_false(), inp2);
-        assert_eq!(results2.read_out_wire(w1), Some(pv_true_or_false()));
-        assert_eq!(results2.read_out_wire(w2), Some(pv_true_or_false()));
-    }
+    let results = run(pv_false());
+    let out = Some(inp1.join(inp2));
+    assert_eq!(results.read_out_wire(w1), out);
+    assert_eq!(results.read_out_wire(w2), out);
 }
