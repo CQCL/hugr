@@ -6,7 +6,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{OpTrait, OpType, TailLoop};
+use hugr_core::ops::{DataflowOpTrait, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -341,6 +341,15 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             indirect_call(call, func),
             output_child(func, outp),
             in_wire_value(outp, p, v);
+
+        // Default out-value is Bottom, but if we can't determine the called function,
+        // assign everything to Top
+        out_wire_value(call, p, PV::Top) <--
+            node(call),
+            if let OpType::CallIndirect(ci) = hugr.get_optype(*call),
+            in_wire_value(call, IncomingPort::from(0), v),
+            if !matches!(v, PartialValue::LoadedFunction(_)),
+            for p in ci.signature().output_ports();
     };
     let out_wire_values = all_results
         .out_wire_value

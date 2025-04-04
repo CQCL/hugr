@@ -1,9 +1,9 @@
 use ascent::{lattice::BoundedLattice, Lattice};
 
-use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder};
+use hugr_core::builder::{inout_sig, CFGBuilder, Container, DataflowHugr, ModuleBuilder};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::handle::DfgID;
-use hugr_core::ops::TailLoop;
+use hugr_core::ops::{CallIndirect, TailLoop};
 use hugr_core::types::TypeRow;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
@@ -545,5 +545,66 @@ fn test_module() {
             results_two_calls.read_out_wire(Wire::new(call.node(), 1)),
             Some(pv_true_or_false())
         );
+    }
+}
+
+#[test]
+fn call_indirect() {
+    let b2b = || Signature::new_endo(bool_t());
+    let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
+
+    let [id1, id2] = ["id1", "[id2]"].map(|name| {
+        let fb = dfb.define_function(name, b2b()).unwrap();
+        let [inp] = fb.input_wires_arr();
+        fb.finish_with_outputs([inp]).unwrap()
+    });
+
+    let [inp_direct, which, inp_indirect] = dfb.input_wires_arr();
+    let [res1] = dfb
+        .call(id1.handle(), &[], [inp_direct])
+        .unwrap()
+        .outputs_arr();
+
+    // We'll unconditionally load both functions, to demonstrate that it's
+    // the CallIndirect that matters, not just which functions are loaded.
+    let lf1 = dfb.load_func(id1.handle(), &[]).unwrap();
+    let lf2 = dfb.load_func(id2.handle(), &[]).unwrap();
+    let bool_func = || Type::new_function(b2b());
+    let mut cond = dfb
+        .conditional_builder(
+            (vec![type_row![]; 2], which),
+            [(bool_func(), lf1), (bool_func(), lf2)],
+            bool_func().into(),
+        )
+        .unwrap();
+    let case_false = cond.case_builder(0).unwrap();
+    let [f0, _f1] = case_false.input_wires_arr();
+    case_false.finish_with_outputs([f0]).unwrap();
+    let case_true = cond.case_builder(1).unwrap();
+    let [_f0, f1] = case_true.input_wires_arr();
+    case_true.finish_with_outputs([f1]).unwrap();
+    let [tgt] = cond.finish_sub_container().unwrap().outputs_arr();
+    let [res2] = dfb
+        .add_dataflow_op(CallIndirect { signature: b2b() }, [tgt, inp_indirect])
+        .unwrap()
+        .outputs_arr();
+    let h = dfb.finish_hugr_with_outputs([res1, res2]).unwrap();
+
+    // 1. Test with `which` unknown -> second output unknown
+    let (w1, w2) = (Wire::new(h.root(), 0), Wire::new(h.root(), 1));
+    for inp1 in [pv_false(), pv_true()] {
+        for inp2 in [pv_false(), pv_true()] {
+            let results = Machine::new(&h).run(
+                TestContext,
+                [
+                    (0.into(), inp1.clone()),
+                    (1.into(), PartialValue::Top),
+                    (2.into(), inp2),
+                ],
+            );
+            assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+            assert_eq!(results.read_out_wire(w2), Some(PartialValue::Top));
+            );
+        }
     }
 }
