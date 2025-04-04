@@ -323,6 +323,24 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             func_call(call, func),
             output_child(func, outp),
             in_wire_value(outp, p, v);
+
+        // CallIndirect --------------------
+        relation indirect_call(H::Node, H::Node); // <Node> is an `IndirectCall` to `FuncDefn` <Node>
+        indirect_call(call, func_node) <--
+            node(call),
+            if let OpType::CallIndirect(_) = hugr.get_optype(*call),
+            in_wire_value(call, IncomingPort::from(0), v),
+            if let PartialValue::LoadedFunction(LoadedFunction {func_node, ..}) = v;
+
+        out_wire_value(inp, OutgoingPort::from(p.index()-1), v) <--
+            indirect_call(call, func),
+            input_child(func, inp),
+            in_wire_value(call, p, v);
+
+        out_wire_value(call, OutgoingPort::from(p.index()), v) <--
+            indirect_call(call, func),
+            output_child(func, outp),
+            in_wire_value(outp, p, v);
     };
     let out_wire_values = all_results
         .out_wire_value
@@ -363,8 +381,7 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
             ins.iter().cloned(),
         )])),
         OpType::Input(_) | OpType::Output(_) | OpType::ExitBlock(_) => None, // handled by parent
-        OpType::Call(_) => None,  // handled via Input/Output of FuncDefn
-        OpType::Const(_) => None, // handled by LoadConstant:
+        OpType::Call(_) | OpType::CallIndirect(_) => None, // handled via Input/Output of FuncDefn
         OpType::LoadConstant(load_op) => {
             assert!(ins.is_empty()); // static edge, so need to find constant
             let const_node = hugr
@@ -404,6 +421,7 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
                 outs
             }))
         }
-        o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
+        // We only call propagate_leaf_op for dataflow op non-containers,
+        o => todo!("Unhandled: {:?}", o), // and OpType is non-exhaustive
     }
 }
