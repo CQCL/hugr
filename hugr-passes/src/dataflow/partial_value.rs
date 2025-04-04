@@ -56,7 +56,9 @@ pub struct Sum<V> {
 /// to a function at a specific node, instantiated with the provided type-args.    
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct LoadedFunction<N> {
+    /// The [FuncDefn](hugr_core::ops::FuncDefn) or `FuncDecl`` that was loaded
     pub func_node: N,
+    /// The type arguments provided when loading
     pub args: Vec<TypeArg>,
 }
 

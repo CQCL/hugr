@@ -17,6 +17,8 @@ use super::{
 
 type PV<V, N> = PartialValue<V, N>;
 
+type NodeInputs<V, N> = Vec<(IncomingPort, PV<V, N>)>;
+
 /// Basic structure for performing an analysis. Usage:
 /// 1. Make a new instance via [Self::new()]
 /// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] and/or
@@ -25,10 +27,7 @@ type PV<V, N> = PartialValue<V, N>;
 ///    [Self::prepopulate_inputs] can be used on each externally-callable
 ///    [FuncDefn](OpType::FuncDefn) to set all inputs to [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
-pub struct Machine<H: HugrView, V: AbstractValue>(
-    H,
-    HashMap<H::Node, Vec<(IncomingPort, PV<V, H::Node>)>>,
-);
+pub struct Machine<H: HugrView, V: AbstractValue>(H, HashMap<H::Node, NodeInputs<V, H::Node>>);
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Create a new Machine to analyse the given Hugr(View)
@@ -135,10 +134,12 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     }
 }
 
+pub(super) type InWire<V, N> = (N, IncomingPort, PartialValue<V, N>);
+
 pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
     mut ctx: impl DFContext<V, Node = H::Node>,
     hugr: H,
-    in_wire_value_proto: Vec<(H::Node, IncomingPort, PV<V, H::Node>)>,
+    in_wire_value_proto: Vec<InWire<V, H::Node>>,
 ) -> AnalysisResults<V, H> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.

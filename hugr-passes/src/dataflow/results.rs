@@ -1,14 +1,17 @@
 use std::collections::HashMap;
 
-use hugr_core::{HugrView, IncomingPort, PortIndex, Wire};
+use hugr_core::{HugrView, PortIndex, Wire};
 
-use super::{partial_value::ExtractValueError, AbstractValue, LoadedFunction, PartialValue, Sum};
+use super::{
+    datalog::InWire, partial_value::ExtractValueError, AbstractValue, LoadedFunction, PartialValue,
+    Sum,
+};
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
 pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
     pub(super) hugr: H,
-    pub(super) in_wire_value: Vec<(H::Node, IncomingPort, PartialValue<V, H::Node>)>,
+    pub(super) in_wire_value: Vec<InWire<V, H::Node>>,
     pub(super) case_reachable: Vec<(H::Node, H::Node)>,
     pub(super) bb_reachable: Vec<(H::Node, H::Node)>,
     pub(super) out_wire_values: HashMap<Wire<H::Node>, PartialValue<V, H::Node>>,
@@ -84,6 +87,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     /// `None` if the analysis did not produce a result for that wire, or if
     ///    the Hugr did not have a [Type](hugr_core::types::Type) for the specified wire
     /// `Some(e)` if [conversion to a concrete value](PartialValue::try_into_concrete) failed with error `e`
+    #[allow(clippy::type_complexity)]
     pub fn try_read_wire_concrete<V2, VE, SE, LE>(
         &self,
         w: Wire<H::Node>,

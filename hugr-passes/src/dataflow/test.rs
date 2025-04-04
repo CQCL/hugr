@@ -19,10 +19,7 @@ use hugr_core::{
 use hugr_core::{Hugr, Node, Wire};
 use rstest::{fixture, rstest};
 
-use super::{
-    AbstractValue, ConstLoader, DFContext, Machine, PartialValue,
-    TailLoopTermination,
-};
+use super::{AbstractValue, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination};
 
 // ------- Minimal implementation of DFContext and AbstractValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
