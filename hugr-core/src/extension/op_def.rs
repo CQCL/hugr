@@ -480,7 +480,7 @@ impl OpDef {
     pub fn constant_fold2(
         &self,
         type_args: &[TypeArg],
-        inputs: Vec<FoldVal>,
+        inputs: &[FoldVal],
         outputs: &mut [FoldVal],
     ) {
         if let Some(cf) = self.constant_folder.as_ref() {

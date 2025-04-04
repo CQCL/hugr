@@ -101,9 +101,10 @@ pub trait ConstFold: Send + Sync {
     ///
     /// Defaults to calling [Self::fold] with those arguments that can be converted ---
     /// [FoldVal::LoadedFunction]s will be lost as these are not representable as [Value]s.
-    fn fold2(&self, type_args: &[TypeArg], inputs: Vec<FoldVal>, outputs: &mut [FoldVal]) {
+    fn fold2(&self, type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
         let consts = inputs
-            .into_iter()
+            .iter()
+            .cloned()
             .enumerate()
             .filter_map(|(p, fv)| Some((p.into(), fv.try_into().ok()?)))
             .collect::<Vec<_>>();

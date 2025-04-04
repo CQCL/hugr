@@ -101,7 +101,7 @@ impl ExtensionOp {
     }
 
     /// Attempt to evaluate this operation, See ['OpDef::constant_fold2`]
-    pub fn constant_fold2(&self, inputs: Vec<FoldVal>, outputs: &mut [FoldVal]) {
+    pub fn constant_fold2(&self, inputs: &[FoldVal], outputs: &mut [FoldVal]) {
         self.def().constant_fold2(self.args(), inputs, outputs)
     }
 
