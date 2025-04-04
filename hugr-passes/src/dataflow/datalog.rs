@@ -335,7 +335,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         out_wire_value(inp, OutgoingPort::from(p.index()-1), v) <--
             indirect_call(call, func),
             input_child(func, inp),
-            in_wire_value(call, p, v);
+            in_wire_value(call, p, v)
+            if p.index() > 0;
 
         out_wire_value(call, OutgoingPort::from(p.index()), v) <--
             indirect_call(call, func),
@@ -348,7 +349,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             node(call),
             if let OpType::CallIndirect(ci) = hugr.get_optype(*call),
             in_wire_value(call, IncomingPort::from(0), v),
-            if !matches!(v, PartialValue::LoadedFunction(_)),
+            // Second alternative below addresses function::Value's:
+            if matches!(v, PartialValue::Top | PartialValue::Value(_)),
             for p in ci.signature().output_ports();
     };
     let out_wire_values = all_results

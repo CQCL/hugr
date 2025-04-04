@@ -604,7 +604,22 @@ fn call_indirect() {
             );
             assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
             assert_eq!(results.read_out_wire(w2), Some(PartialValue::Top));
+        }
+    }
+
+    // 2. Test with `which` selecting second function -> both passthrough
+    for inp1 in [pv_false(), pv_true()] {
+        for inp2 in [pv_false(), pv_true()] {
+            let results = Machine::new(&h).run(
+                TestContext,
+                [
+                    (0.into(), inp1.clone()),
+                    (1.into(), pv_true()),
+                    (2.into(), inp2.clone()),
+                ],
             );
+            assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+            assert_eq!(results.read_out_wire(w2), Some(inp2.clone()));
         }
     }
 }
