@@ -3,11 +3,12 @@
 //! An (example) use of the [dataflow analysis framework](super::dataflow).
 
 pub mod value_handle;
+use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
-    core::HugrNode,
+    extension::FoldVal,
     hugr::hugrmut::HugrMut,
     ops::{
         constant::OpaqueValue, Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value,
@@ -18,7 +19,7 @@ use hugr_core::{
 use value_handle::ValueHandle;
 
 use crate::dataflow::{
-    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
+    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialSum, PartialValue,
     TailLoopTermination,
 };
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
@@ -127,6 +128,9 @@ impl ConstantFoldPass {
                 (!hugr.get_optype(src).is_load_constant() && Some(src) != mb_root_inp).then_some((
                     n,
                     ip,
+                    // TODO switch to using FoldVal rather than Value here, thus enabling turning CallIndirect
+                    // into Call when the function input is known. (This will mean we will be unable to handle
+                    // Value::Function's, so best to wait until those are removed.)
                     results
                         .try_read_wire_concrete::<Value, _, _, _>(Wire::new(src, outp))
                         .ok()?,
@@ -204,51 +208,72 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
 
 struct ConstFoldContext;
 
-impl<N: HugrNode> ConstLoader<ValueHandle<N>> for ConstFoldContext {
-    type Node = N;
+impl ConstLoader<ValueHandle<Node>> for ConstFoldContext {
+    type Node = Node;
 
     fn value_from_opaque(
         &self,
-        loc: ConstLocation<N>,
+        loc: ConstLocation<Node>,
         val: &OpaqueValue,
-    ) -> Option<ValueHandle<N>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
 
     fn value_from_const_hugr(
         &self,
-        loc: ConstLocation<N>,
+        loc: ConstLocation<Node>,
         h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle<N>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
     }
 }
 
-impl<N: HugrNode> DFContext<ValueHandle<N>> for ConstFoldContext {
+impl DFContext<ValueHandle<Node>> for ConstFoldContext {
     fn interpret_leaf_op(
         &mut self,
-        node: N,
+        node: Node,
         op: &ExtensionOp,
-        ins: &[PartialValue<ValueHandle<N>, N>],
-        outs: &mut [PartialValue<ValueHandle<N>, N>],
+        ins: &[PartialValue<ValueHandle<Node>, Node>],
+        outs: &mut [PartialValue<ValueHandle<Node>, Node>],
     ) {
         let sig = op.signature();
-        let known_ins = sig
+        let inp_fvs = sig
             .input_types()
             .iter()
-            .enumerate()
-            .zip(ins.iter())
-            .filter_map(|((i, ty), pv)| {
-                pv.clone()
-                    .try_into_concrete(ty)
-                    .ok()
-                    .map(|v| (IncomingPort::from(i), v))
-            })
+            .zip_eq(ins.iter())
+            .map(|(ty, pv)| pv.clone().try_into_concrete(ty).unwrap_or_default())
             .collect::<Vec<_>>();
-        for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
-            outs[p.index()] =
-                partial_from_const(self, ConstLocation::Field(p.index(), &node.into()), &v);
+        let mut out_fvs = vec![FoldVal::Unknown; outs.len()];
+        op.constant_fold2(inp_fvs, &mut out_fvs);
+        for ((p, out), out_fv) in outs.iter_mut().enumerate().zip(out_fvs) {
+            // UGH. Need a partial_from_const for FoldVal, *as well* as the one from Value
+            // 'coz we need to keep the latter for constants!!
+            *out = pv_from_fold_val(ConstLocation::Field(p, &node.into()), out_fv);
         }
+    }
+}
+
+fn pv_from_fold_val(
+    loc: ConstLocation<Node>,
+    value: FoldVal,
+) -> PartialValue<ValueHandle<Node>, Node> {
+    match value {
+        FoldVal::Unknown => PartialValue::Top,
+        FoldVal::Sum {
+            tag,
+            sum_type: _,
+            items,
+        } => PartialValue::PartialSum(PartialSum::new_variant(
+            tag,
+            items
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| pv_from_fold_val(ConstLocation::Field(i, &loc), v)),
+        )),
+        FoldVal::Extension(opaque_value) => {
+            PartialValue::Value(ValueHandle::new_opaque(loc, opaque_value))
+        }
+        FoldVal::LoadedFunction(node, args) => PartialValue::new_load(node, args),
     }
 }
 

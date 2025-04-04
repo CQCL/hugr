@@ -5,12 +5,13 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use hugr_core::core::HugrNode;
+use hugr_core::extension::FoldVal;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
 use hugr_core::{Hugr, Node};
 use itertools::Either;
 
-use crate::dataflow::{AbstractValue, ConstLocation};
+use crate::dataflow::{AbstractValue, ConstLocation, LoadedFunction};
 
 /// A custom constant that has been successfully hashed via [TryHash](hugr_core::ops::constant::TryHash)
 #[derive(Clone, Debug)]
@@ -170,6 +171,26 @@ impl<N: HugrNode> From<ValueHandle<N>> for Value {
                 .map_err(|e| e.to_string())
                 .unwrap(),
         }
+    }
+}
+
+impl From<ValueHandle<Node>> for FoldVal {
+    fn from(value: ValueHandle<Node>) -> FoldVal {
+        match value {
+            ValueHandle::Hashable(HashedConst { val, .. })
+            | ValueHandle::Unhashable {
+                leaf: Either::Left(val),
+                ..
+            } => FoldVal::Extension(Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone())),
+            _ => FoldVal::Unknown,
+        }
+    }
+}
+
+impl From<LoadedFunction<Node>> for FoldVal {
+    fn from(value: LoadedFunction<Node>) -> Self {
+        let LoadedFunction { func_node, args } = value;
+        FoldVal::LoadedFunction(func_node, args)
     }
 }
 
