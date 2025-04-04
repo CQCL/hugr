@@ -378,6 +378,7 @@ pub static EMPTY_REG: ExtensionRegistry = ExtensionRegistry {
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
