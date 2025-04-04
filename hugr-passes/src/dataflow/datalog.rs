@@ -12,7 +12,7 @@ use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 use super::value_row::ValueRow;
 use super::{
     partial_from_const, row_contains_bottom, AbstractValue, AnalysisResults, DFContext,
-    PartialValue,
+    LoadedFunction, PartialValue,
 };
 
 type PV<V, N> = PartialValue<V, N>;
@@ -381,10 +381,12 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
                 .unwrap()
                 .0;
             // Node could be a FuncDefn or a FuncDecl, so do not pass the node itself
-            Some(ValueRow::singleton(
-                ctx.value_from_function(func_node, &load_op.type_args)
-                    .map_or(PV::Top, PV::Value),
-            ))
+            Some(ValueRow::singleton(PartialValue::LoadedFunction(
+                LoadedFunction {
+                    func_node,
+                    args: load_op.type_args.clone(),
+                },
+            )))
         }
         OpType::ExtensionOp(e) => {
             Some(ValueRow::from_iter(if row_contains_bottom(ins) {

@@ -55,8 +55,8 @@ impl<N> From<N> for ConstLocation<'_, N> {
 }
 
 /// Trait for loading [PartialValue]s from constant [Value]s in a Hugr.
-/// Implementors will likely want to override some/all of [Self::value_from_opaque],
-/// [Self::value_from_const_hugr], and [Self::value_from_function]: the defaults
+/// Implementors will likely want to override either/both of [Self::value_from_opaque]
+/// and [Self::value_from_const_hugr]: the defaults
 /// are "correct" but maximally conservative (minimally informative).
 pub trait ConstLoader<V> {
     /// The type of nodes in the Hugr.
@@ -81,6 +81,7 @@ pub trait ConstLoader<V> {
     /// [FuncDefn]: hugr_core::ops::FuncDefn
     /// [FuncDecl]: hugr_core::ops::FuncDecl
     /// [LoadFunction]: hugr_core::ops::LoadFunction
+    #[deprecated(note = "Automatically handled by Datalog, implementation will be ignored")]
     fn value_from_function(&self, _node: Self::Node, _type_args: &[TypeArg]) -> Option<V> {
         None
     }
