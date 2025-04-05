@@ -23,30 +23,12 @@ pub trait ComposablePass: Sized {
 
     /// Returns a [ComposablePass] that does "`self` then `other`", so long as
     /// `other::Err` maps into ours.
-    fn then<P: ComposablePass>(
+    fn then<P: ComposablePass, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
-    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = Self::Error>
-    where
-        P::Error: Into<Self::Error>,
-    {
-        (self, other.map_err(Into::into))
+    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = E> {
+        Sequence(self, other, PhantomData)
     }
-
-    /// Returns a [ComposablePass] that does "`self` then `other`", combining
-    /// the two error types via `Either`
-    fn then_either<P: ComposablePass>(
-        self,
-        other: P,
-    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = Either<Self::Error, P::Error>>
-    {
-        (self.map_err(Either::Left), other.map_err(Either::Right))
-    }
-
-    // Note: in the short term another variant could be useful:
-    // fn then_inf(self, other: impl ComposablePass<Err=Infallible>) -> impl ComposablePass<Err = Self::Err>
-    // however this will become redundant when Infallible is replaced by ! (never_type)
-    // as (unlike Infallible) ! converts Into anything
 }
 
 struct ErrMapper<P, E, F>(P, F, PhantomData<E>);
@@ -66,15 +48,20 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMa
     }
 }
 
-impl<E: Error, P1: ComposablePass<Error = E>, P2: ComposablePass<Error = E>> ComposablePass
-    for (P1, P2)
+struct Sequence<E, P1, P2>(P1, P2, PhantomData<E>);
+impl<E, P1, P2> ComposablePass for Sequence<E, P1, P2>
+where
+    P1: ComposablePass,
+    P2: ComposablePass,
+    E: ErrorCombiner<P1::Error, P2::Error> + Error,
 {
     type Error = E;
+
     type Result = (P1::Result, P2::Result);
 
     fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
-        let res1 = self.0.run(hugr)?;
-        let res2 = self.1.run(hugr)?;
+        let res1 = self.0.run(hugr).map_err(E::from_first)?;
+        let res2 = self.1.run(hugr).map_err(E::from_second)?;
         Ok((res1, res2))
     }
 }
@@ -148,17 +135,54 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
     }
 }
 
-struct IfTrueThen<A,B>(A, B);
-impl<A: ComposablePass<Result=bool>, B: ComposablePass> ComposablePass for IfTrueThen<A,B> {
-    type Error = Either<A::Error, B::Error>;
+struct IfTrueThen<E, A, B>(A, B, PhantomData<E>);
+impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Error, B::Error>>
+    ComposablePass for IfTrueThen<E, A, B>
+{
+    type Error = E;
 
     type Result = Option<B::Result>;
 
     fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
-        let res: bool = self.0.run(hugr).map_err(Either::Left)?;
-        res.then(|| self.1.run(hugr).map_err(Either::Right)).transpose()
+        let res: bool = self.0.run(hugr).map_err(ErrorCombiner::from_first)?;
+        res.then(|| self.1.run(hugr).map_err(ErrorCombiner::from_second))
+            .transpose()
     }
 }
+
+pub trait ErrorCombiner<A, B>: Error {
+    fn from_first(a: A) -> Self;
+    fn from_second(b: B) -> Self;
+}
+
+impl<A: Error, B: Into<A>> ErrorCombiner<A, B> for A {
+    fn from_first(a: A) -> Self {
+        a
+    }
+
+    fn from_second(b: B) -> Self {
+        b.into()
+    }
+}
+
+impl<A: Error, B: Error> ErrorCombiner<A, B> for Either<A, B> {
+    fn from_first(a: A) -> Self {
+        Either::Left(a)
+    }
+
+    fn from_second(b: B) -> Self {
+        Either::Right(b)
+    }
+}
+
+// Note: in the short term two more impls could be useful:
+//   impl<E:Error> ErrorCombiner<Infallible, E> for E
+//   impl<E:Error> ErrorCombiner<E, Infallible> for E
+// however, these aren't possible as they conflict with
+//   impl<A, B:Into<A>> ErrorCombiner<A,B> for A
+// (when A=E=Infallible), boo :-(.
+// However this will become possible, indeed automatic, when Infallible is replaced
+// by ! (never_type) as (unlike Infallible) ! converts Into anything
 
 pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
@@ -212,10 +236,8 @@ mod test {
         cfold.run(&mut hugr.clone()).unwrap();
 
         let exp_err = ConstFoldError::InvalidEntryPoint(id2.node(), DEFAULT_OPTYPE);
-        let r: Result<_, Either<Infallible, ConstFoldError>> = dce
-            .clone()
-            .then_either(cfold.clone())
-            .run(&mut hugr.clone());
+        let r: Result<_, Either<Infallible, ConstFoldError>> =
+            dce.clone().then(cfold.clone()).run(&mut hugr.clone());
         assert_eq!(r, Err(Either::Right(exp_err.clone())));
 
         let r: Result<_, ConstFoldError> = dce
