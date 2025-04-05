@@ -148,6 +148,18 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
     }
 }
 
+struct IfTrueThen<A,B>(A, B);
+impl<A: ComposablePass<Result=bool>, B: ComposablePass> ComposablePass for IfTrueThen<A,B> {
+    type Error = Either<A::Error, B::Error>;
+
+    type Result = Option<B::Result>;
+
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
+        let res: bool = self.0.run(hugr).map_err(Either::Left)?;
+        res.then(|| self.1.run(hugr).map_err(Either::Right)).transpose()
+    }
+}
+
 pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
     hugr: &mut impl HugrMut,
