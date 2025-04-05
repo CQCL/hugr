@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.19.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.18.1...hugr-model-v0.19.0) - 2025-04-02
+
+### New Features
+
+- Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/pull/1959))
+- Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/pull/2031))
+- Packages in `hugr-model` and envelope support. ([#2026](https://github.com/CQCL/hugr/pull/2026))
+- Represent order edges in `hugr-model` as metadata. ([#2027](https://github.com/CQCL/hugr/pull/2027))
+
+## [0.18.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.17.1...hugr-model-v0.18.0) - 2025-03-14
+
+### Bug Fixes
+
+- Hugr-model using undeclared derive_more features ([#1940](https://github.com/CQCL/hugr/pull/1940))
+
+### New Features
+
+- *(hugr-model)* [**breaking**] Add `read_from_reader` and `write_to_writer` for streaming reads and writes. ([#1871](https://github.com/CQCL/hugr/pull/1871))
+- `hugr-model` AST ([#1953](https://github.com/CQCL/hugr/pull/1953))
+
+### Refactor
+
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` ([#1870](https://github.com/CQCL/hugr/pull/1870))
+
 ## [0.17.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.17.0...hugr-model-v0.17.1) - 2025-02-05
 
 ### Bug Fixes

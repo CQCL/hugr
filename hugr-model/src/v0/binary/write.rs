@@ -22,24 +22,28 @@ macro_rules! write_list {
     };
 }
 
-/// Writes a module to an impl of [Write].
-pub fn write_to_writer(module: &table::Module, writer: impl Write) -> Result<(), WriteError> {
+/// Writes a package to an impl of [Write].
+pub fn write_to_writer(package: &table::Package, writer: impl Write) -> Result<(), WriteError> {
     let mut message = capnp::message::Builder::new_default();
     let builder = message.init_root();
-    write_module(builder, module);
+    write_package(builder, package);
 
     Ok(capnp::serialize_packed::write_message(writer, &message)?)
 }
 
-/// Writes a module to a byte vector.
-pub fn write_to_vec(module: &table::Module) -> Vec<u8> {
+/// Writes a package to a byte vector.
+pub fn write_to_vec(package: &table::Package) -> Vec<u8> {
     let mut message = capnp::message::Builder::new_default();
     let builder = message.init_root();
-    write_module(builder, module);
+    write_package(builder, package);
 
     let mut output = Vec::new();
     let _ = capnp::serialize_packed::write_message(&mut output, &message);
     output
+}
+
+fn write_package(mut builder: hugr_capnp::package::Builder, package: &table::Package) {
+    write_list!(builder, init_modules, write_module, package.modules);
 }
 
 fn write_module(mut builder: hugr_capnp::module::Builder, module: &table::Module) {
@@ -154,7 +158,7 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &table::Term) {
             model::Literal::Float(value) => builder.set_float(value.into_inner()),
         },
 
-        table::Term::ConstFunc(region) => builder.set_const_func(region.0),
+        table::Term::Func(region) => builder.set_func(region.0),
         table::Term::Apply(symbol, args) => {
             let mut builder = builder.init_apply();
             builder.set_symbol(symbol.0);
@@ -163,10 +167,6 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &table::Term) {
 
         table::Term::List(parts) => {
             write_list!(builder, init_list, write_seq_part, parts);
-        }
-
-        table::Term::ExtSet(parts) => {
-            write_list!(builder, init_ext_set, write_ext_set_part, parts);
         }
 
         table::Term::Tuple(parts) => {
@@ -179,15 +179,5 @@ fn write_seq_part(mut builder: hugr_capnp::term::seq_part::Builder, part: &table
     match part {
         table::SeqPart::Item(term_id) => builder.set_item(term_id.0),
         table::SeqPart::Splice(term_id) => builder.set_splice(term_id.0),
-    }
-}
-
-fn write_ext_set_part(
-    mut builder: hugr_capnp::term::ext_set_part::Builder,
-    part: &table::ExtSetPart,
-) {
-    match part {
-        table::ExtSetPart::Extension(ext) => builder.set_extension(ext),
-        table::ExtSetPart::Splice(term_id) => builder.set_splice(term_id.0),
     }
 }

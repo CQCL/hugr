@@ -19,6 +19,7 @@ pub struct Context<'a> {
     links: LinkTable<&'a str>,
     symbols: SymbolTable<'a>,
     imports: FxHashMap<SymbolName, NodeId>,
+    terms: FxHashMap<table::Term<'a>, TermId>,
 }
 
 impl<'a> Context<'a> {
@@ -30,6 +31,7 @@ impl<'a> Context<'a> {
             links: LinkTable::new(),
             symbols: SymbolTable::new(),
             imports: FxHashMap::default(),
+            terms: FxHashMap::default(),
         }
     }
 
@@ -86,12 +88,14 @@ impl<'a> Context<'a> {
             Term::Tuple(parts) => table::Term::Tuple(self.resolve_seq_parts(parts)?),
             Term::Func(region) => {
                 let region = self.resolve_region(region, ScopeClosure::Closed)?;
-                table::Term::ConstFunc(region)
+                table::Term::Func(region)
             }
-            Term::ExtSet => table::Term::ExtSet(&[]),
         };
 
-        Ok(self.module.insert_term(term))
+        Ok(*self
+            .terms
+            .entry(term.clone())
+            .or_insert_with(|| self.module.insert_term(term)))
     }
 
     fn resolve_seq_parts(&mut self, parts: &'a [SeqPart]) -> BuildResult<&'a [table::SeqPart]> {

@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView};
 
 use crate::ops::handle::NodeHandle;
-use crate::ops::OpTrait;
+use crate::ops::{OpTag, OpTrait};
 use crate::{Direction, Hugr, Node};
 
 use super::hugrmut::{panic_invalid_node, panic_invalid_non_root};
@@ -31,6 +31,13 @@ pub trait HugrInternals {
 
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
+
+    /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
+    /// returned by [`HugrInternals::portgraph`].
+    #[inline]
+    fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy> {
+        Cow::Borrowed(&self.base_hugr().hierarchy)
+    }
 
     /// Returns the Hugr at the base of a chain of views.
     fn base_hugr(&self) -> &Hugr;
@@ -56,6 +63,11 @@ impl HugrInternals for Hugr {
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
         &self.graph
+    }
+
+    #[inline]
+    fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy> {
+        Cow::Borrowed(&self.hierarchy)
     }
 
     #[inline]
@@ -87,6 +99,7 @@ impl<T: HugrInternals> HugrInternals for &T {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -105,6 +118,7 @@ impl<T: HugrInternals> HugrInternals for &mut T {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -123,6 +137,7 @@ impl<T: HugrInternals> HugrInternals for Rc<T> {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -141,6 +156,7 @@ impl<T: HugrInternals> HugrInternals for Arc<T> {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -159,6 +175,7 @@ impl<T: HugrInternals> HugrInternals for Box<T> {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -177,6 +194,7 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -309,6 +327,22 @@ pub trait HugrMutInternals: RootTagged<Node = Node> {
         }
         self.hugr_mut().replace_op(node, op)
     }
+
+    /// Gets a mutable reference to the optype.
+    ///
+    /// Changing this may invalidate the ports, which may need to be resized to
+    /// match the OpType signature.
+    ///
+    /// Will panic for the root node unless [`Self::RootHandle`](RootTagged::RootHandle)
+    /// is [OpTag::Any], as mutation could invalidate the bound.
+    fn optype_mut(&mut self, node: Node) -> &mut OpType {
+        if Self::RootHandle::TAG.is_superset(OpTag::Any) {
+            panic_invalid_node(self, node);
+        } else {
+            panic_invalid_non_root(self, node);
+        }
+        self.hugr_mut().op_types.get_mut(node.pg_index())
+    }
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -406,8 +440,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMutInterna
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
         // We know RootHandle=Node here so no need to check
-        let cur = self.hugr_mut().op_types.get_mut(node.pg_index());
-        Ok(std::mem::replace(cur, op.into()))
+        Ok(std::mem::replace(self.optype_mut(node), op.into()))
     }
 }
 

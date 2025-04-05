@@ -7,6 +7,7 @@
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr::builder::{DFGBuilder, DataflowSubContainer, ModuleBuilder};
+use hugr::envelope::EnvelopeConfig;
 use hugr::package::Package;
 use hugr::types::Type;
 use hugr::{
@@ -14,7 +15,6 @@ use hugr::{
     extension::prelude::{bool_t, qb_t},
     std_extensions::arithmetic::float_types::float64_type,
     types::Signature,
-    Hugr,
 };
 use hugr_cli::validate::VALID_PRINT;
 use predicates::{prelude::*, str::contains};
@@ -51,24 +51,15 @@ fn test_package(#[default(bool_t())] id_type: Type) -> Package {
     Package::new(vec![hugr]).unwrap()
 }
 
-/// A DFG-rooted HUGR.
 #[fixture]
-fn test_hugr(#[default(bool_t())] id_type: Type) -> Hugr {
-    let mut df = DFGBuilder::new(Signature::new_endo(id_type)).unwrap();
-    let [i] = df.input_wires_arr();
-    df.set_outputs([i]).unwrap();
-    df.hugr().clone() // unvalidated
+fn test_envelope_str(test_package: Package) -> String {
+    test_package.store_str(EnvelopeConfig::text()).unwrap()
 }
 
 #[fixture]
-fn test_hugr_string(test_hugr: Hugr) -> String {
-    serde_json::to_string(&test_hugr).unwrap()
-}
-
-#[fixture]
-fn test_hugr_file(test_hugr_string: String) -> NamedTempFile {
+fn test_envelope_file(test_envelope_str: String) -> NamedTempFile {
     let file = assert_fs::NamedTempFile::new("sample.hugr").unwrap();
-    file.write_str(&test_hugr_string).unwrap();
+    file.write_str(&test_envelope_str).unwrap();
     file
 }
 
@@ -82,23 +73,23 @@ fn test_doesnt_exist(mut val_cmd: Command) {
 }
 
 #[rstest]
-fn test_validate(test_hugr_file: NamedTempFile, mut val_cmd: Command) {
-    val_cmd.arg(test_hugr_file.path());
+fn test_validate(test_envelope_file: NamedTempFile, mut val_cmd: Command) {
+    val_cmd.arg(test_envelope_file.path());
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
 #[rstest]
-fn test_stdin(test_hugr_string: String, mut val_cmd: Command) {
-    val_cmd.write_stdin(test_hugr_string);
+fn test_stdin(test_envelope_str: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(test_envelope_str);
     val_cmd.arg("-");
 
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
 #[rstest]
-fn test_stdin_silent(test_hugr_string: String, mut val_cmd: Command) {
+fn test_stdin_silent(test_envelope_str: String, mut val_cmd: Command) {
     val_cmd.args(["-", "-q"]);
-    val_cmd.write_stdin(test_hugr_string);
+    val_cmd.write_stdin(test_envelope_str);
 
     val_cmd
         .assert()
@@ -107,10 +98,10 @@ fn test_stdin_silent(test_hugr_string: String, mut val_cmd: Command) {
 }
 
 #[rstest]
-fn test_mermaid(test_hugr_file: NamedTempFile, mut cmd: Command) {
-    const MERMAID: &str = "graph LR\n    subgraph 0 [\"(0) DFG\"]";
+fn test_mermaid(test_envelope_file: NamedTempFile, mut cmd: Command) {
+    const MERMAID: &str = "graph LR";
     cmd.arg("mermaid");
-    cmd.arg(test_hugr_file.path());
+    cmd.arg(test_envelope_file.path());
     cmd.assert().success().stdout(contains(MERMAID));
 }
 
@@ -126,6 +117,7 @@ fn bad_hugr_string() -> String {
 fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
     cmd.arg("mermaid");
     cmd.arg("--validate");
+    cmd.arg("--hugr-json");
     cmd.write_stdin(bad_hugr_string);
     cmd.assert()
         .failure()
@@ -135,6 +127,7 @@ fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
 #[rstest]
 fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
     val_cmd.write_stdin(bad_hugr_string);
+    val_cmd.arg("--hugr-json");
     val_cmd.arg("-");
 
     val_cmd
@@ -145,29 +138,31 @@ fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
 
 #[rstest]
 fn test_bad_json(mut val_cmd: Command) {
-    val_cmd.write_stdin(r#"{"foo": "bar"}"#);
+    const TEXT_HEADER: &str = "HUGRiHJv?@";
+    val_cmd.write_stdin(format!("{TEXT_HEADER}{}", r#"{"foo": "bar"}"#));
     val_cmd.arg("-");
 
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error parsing package"));
+        .stderr(contains("Error decoding HUGR envelope"));
 }
 
 #[rstest]
 fn test_bad_json_silent(mut val_cmd: Command) {
-    val_cmd.write_stdin(r#"{"foo": "bar"}"#);
+    const TEXT_HEADER: &str = "HUGRiHJv?@";
+    val_cmd.write_stdin(format!("{TEXT_HEADER}{}", r#"{"foo": "bar"}"#));
     val_cmd.args(["-", "-qqq"]);
 
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error parsing package").not());
+        .stderr(contains("Error decoding HUGR envelope").not());
 }
 
 #[rstest]
-fn test_no_std(test_hugr_string: String, mut val_cmd: Command) {
-    val_cmd.write_stdin(test_hugr_string);
+fn test_no_std(test_envelope_str: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(test_envelope_str);
     val_cmd.arg("-");
     val_cmd.arg("--no-std");
     // test hugr doesn't have any standard extensions, so this should succeed
@@ -176,20 +171,8 @@ fn test_no_std(test_hugr_string: String, mut val_cmd: Command) {
 }
 
 #[fixture]
-fn float_hugr_string(#[with(float64_type())] test_hugr: Hugr) -> String {
-    serde_json::to_string(&test_hugr).unwrap()
-}
-
-#[rstest]
-fn test_no_std_fail(float_hugr_string: String, mut val_cmd: Command) {
-    val_cmd.write_stdin(float_hugr_string);
-    val_cmd.arg("-");
-    val_cmd.arg("--no-std");
-
-    val_cmd
-        .assert()
-        .failure()
-        .stderr(contains(" requires extension arithmetic.float.types"));
+fn float_hugr_string(#[with(float64_type())] test_package: Package) -> String {
+    test_package.store_str(EnvelopeConfig::text()).unwrap()
 }
 
 #[rstest]
@@ -204,7 +187,7 @@ fn test_float_extension(float_hugr_string: String, mut val_cmd: Command) {
 }
 #[fixture]
 fn package_string(#[with(float64_type())] test_package: Package) -> String {
-    serde_json::to_string(&test_package).unwrap()
+    test_package.store_str(EnvelopeConfig::text()).unwrap()
 }
 
 #[rstest]

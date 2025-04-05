@@ -7,13 +7,14 @@ use std::sync::Arc;
 
 use crate::{
     extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
-    hugr::{HugrMut, IdentList},
+    hugr::{HugrMut, NodeMetadata},
     ops::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
         AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock,
         ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
         Output, Tag, TailLoop, Value, CFG, DFG,
     },
+    package::Package,
     std_extensions::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
@@ -67,6 +68,23 @@ pub enum ImportError {
     /// The model is not well-formed.
     #[error("validate error: {0}")]
     Model(#[from] table::ModelError),
+    /// Incorrect order hints.
+    #[error("incorrect order hint: {0}")]
+    OrderHint(#[from] OrderHintError),
+}
+
+/// Import error caused by incorrect order hints.
+#[derive(Debug, Clone, Error)]
+pub enum OrderHintError {
+    /// Duplicate order hint key in the same region.
+    #[error("duplicate order hint key {0}")]
+    DuplicateKey(table::NodeId, u64),
+    /// Order hint including a key not defined in the region.
+    #[error("order hint with unknown key {0}")]
+    UnknownKey(u64),
+    /// Order hint involving a node with no order port.
+    #[error("order hint on node with no order port: {0}")]
+    NoOrderPort(table::NodeId),
 }
 
 /// Helper macro to create an `ImportError::Unsupported` error with a formatted message.
@@ -79,7 +97,23 @@ macro_rules! error_uninferred {
     ($($e:expr),*) => { ImportError::Uninferred(format!($($e),*)) }
 }
 
-/// Import a `hugr` module from its model representation.
+/// Import a [`Package`] from its model representation.
+pub fn import_package(
+    package: &table::Package,
+    extensions: &ExtensionRegistry,
+) -> Result<Package, ImportError> {
+    let modules = package
+        .modules
+        .iter()
+        .map(|module| import_hugr(module, extensions))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // This does not panic since the import already requires a module root.
+    let package = Package::new(modules).expect("non-module root");
+    Ok(package)
+}
+
+/// Import a [`Hugr`] module from its model representation.
 pub fn import_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
@@ -180,11 +214,27 @@ impl<'a> Context<'a> {
         self.record_links(node, Direction::Incoming, node_data.inputs);
         self.record_links(node, Direction::Outgoing, node_data.outputs);
 
+        // Import the JSON metadata
         for meta_item in node_data.meta {
-            // TODO: For now we expect all metadata to be JSON since this is how
-            // it is handled in `hugr-core`.
-            let (name, value) = self.import_json_meta(*meta_item)?;
-            self.hugr.set_metadata(node, name, value);
+            let Some([name_arg, json_arg]) =
+                self.match_symbol(*meta_item, model::COMPAT_META_JSON)?
+            else {
+                continue;
+            };
+
+            let table::Term::Literal(model::Literal::Str(name)) = self.get_term(name_arg)? else {
+                return Err(table::ModelError::TypeError(*meta_item).into());
+            };
+
+            let table::Term::Literal(model::Literal::Str(json_str)) = self.get_term(json_arg)?
+            else {
+                return Err(table::ModelError::TypeError(*meta_item).into());
+            };
+
+            let json_value: NodeMetadata = serde_json::from_str(json_str)
+                .map_err(|_| table::ModelError::TypeError(*meta_item))?;
+
+            self.hugr.set_metadata(node, name, json_value);
         }
 
         Ok(node)
@@ -383,14 +433,14 @@ impl<'a> Context<'a> {
             }
 
             table::Operation::Custom(operation) => {
-                if let Some([]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
+                if let Some([_, _]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
                     let signature = self.get_node_signature(node_id)?;
                     let optype = OpType::CallIndirect(CallIndirect { signature });
                     let node = self.make_node(node_id, optype, parent)?;
                     return Ok(Some(node));
                 }
 
-                if let Some([_, _, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
+                if let Some([_, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
                     let table::Term::Apply(symbol, args) = self.get_term(func)? else {
                         return Err(table::ModelError::TypeError(func).into());
                     };
@@ -409,7 +459,7 @@ impl<'a> Context<'a> {
                     return Ok(Some(node));
                 }
 
-                if let Some([_, _, value]) = self.match_symbol(operation, model::CORE_LOAD_CONST)? {
+                if let Some([_, value]) = self.match_symbol(operation, model::CORE_LOAD_CONST)? {
                     // If the constant refers directly to a function, import this as the `LoadFunc` operation.
                     if let table::Term::Apply(symbol, args) = self.get_term(value)? {
                         let func_node_data = self
@@ -440,7 +490,7 @@ impl<'a> Context<'a> {
                     let signature = node_data
                         .signature
                         .ok_or_else(|| error_uninferred!("node signature"))?;
-                    let [_, outputs, _] = self.get_func_type(signature)?;
+                    let [_, outputs] = self.get_func_type(signature)?;
                     let outputs = self.import_closed_list(outputs)?;
                     let output = outputs
                         .first()
@@ -474,7 +524,7 @@ impl<'a> Context<'a> {
                     let signature = node_data
                         .signature
                         .ok_or_else(|| error_uninferred!("node signature"))?;
-                    let [_, outputs, _] = self.get_func_type(signature)?;
+                    let [_, outputs] = self.get_func_type(signature)?;
                     let (variants, _) = self.import_adt_and_rest(node_id, outputs)?;
                     let node = self.make_node(
                         node_id,
@@ -600,7 +650,78 @@ impl<'a> Context<'a> {
             self.import_node(*child, node)?;
         }
 
+        self.create_order_edges(region)?;
+
         self.region_scope = prev_region;
+
+        Ok(())
+    }
+
+    /// Create order edges between nodes of a dataflow region based on order hint metadata.
+    ///
+    /// This method assumes that the nodes for the children of the region have already been imported.
+    fn create_order_edges(&mut self, region_id: table::RegionId) -> Result<(), ImportError> {
+        let region_data = self.get_region(region_id)?;
+        debug_assert_eq!(region_data.kind, model::RegionKind::DataFlow);
+
+        // Collect order hint keys
+        // PERFORMANCE: It might be worthwhile to reuse the map to avoid allocations.
+        let mut order_keys = FxHashMap::<u64, table::NodeId>::default();
+
+        for child_id in region_data.children {
+            let child_data = self.get_node(*child_id)?;
+
+            for meta_id in child_data.meta {
+                let Some([key]) = self.match_symbol(*meta_id, model::ORDER_HINT_KEY)? else {
+                    continue;
+                };
+
+                let table::Term::Literal(model::Literal::Nat(key)) = self.get_term(key)? else {
+                    continue;
+                };
+
+                if order_keys.insert(*key, *child_id).is_some() {
+                    return Err(OrderHintError::DuplicateKey(*child_id, *key).into());
+                }
+            }
+        }
+
+        // Insert order edges
+        for meta_id in region_data.meta {
+            let Some([a, b]) = self.match_symbol(*meta_id, model::ORDER_HINT_ORDER)? else {
+                continue;
+            };
+
+            let table::Term::Literal(model::Literal::Nat(a)) = self.get_term(a)? else {
+                continue;
+            };
+
+            let table::Term::Literal(model::Literal::Nat(b)) = self.get_term(b)? else {
+                continue;
+            };
+
+            let a = order_keys.get(a).ok_or(OrderHintError::UnknownKey(*a))?;
+            let b = order_keys.get(b).ok_or(OrderHintError::UnknownKey(*b))?;
+
+            // NOTE: The lookups here are expected to succeed since we only
+            // process the order metadata after we have imported the nodes.
+            let a_node = self.nodes[a];
+            let b_node = self.nodes[b];
+
+            let a_port = self
+                .hugr
+                .get_optype(a_node)
+                .other_output_port()
+                .ok_or(OrderHintError::NoOrderPort(*a))?;
+
+            let b_port = self
+                .hugr
+                .get_optype(b_node)
+                .other_input_port()
+                .ok_or(OrderHintError::NoOrderPort(*b))?;
+
+            self.hugr.connect(a_node, a_port, b_node, b_port);
+        }
 
         Ok(())
     }
@@ -643,7 +764,7 @@ impl<'a> Context<'a> {
         };
         let region_data = self.get_region(*region)?;
 
-        let [_, region_outputs, _] = self.get_func_type(
+        let [_, region_outputs] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -684,7 +805,7 @@ impl<'a> Context<'a> {
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
         debug_assert_eq!(node_data.operation, table::Operation::Conditional);
-        let [inputs, outputs, _] = self.get_func_type(
+        let [inputs, outputs] = self.get_func_type(
             node_data
                 .signature
                 .ok_or_else(|| error_uninferred!("node signature"))?,
@@ -736,7 +857,7 @@ impl<'a> Context<'a> {
             self.region_scope = region;
         }
 
-        let [region_source, region_targets, _] = self.get_func_type(
+        let [region_source, region_targets] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -853,20 +974,19 @@ impl<'a> Context<'a> {
             return Err(table::ModelError::InvalidRegions(node_id).into());
         };
         let region_data = self.get_region(*region)?;
-        let [inputs, outputs, extensions] = self.get_func_type(
+        let [inputs, outputs] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
         let inputs = self.import_type_row(inputs)?;
         let (sum_rows, other_outputs) = self.import_adt_and_rest(node_id, outputs)?;
-        let extension_delta = self.import_extension_set(extensions)?;
 
         let optype = OpType::DataflowBlock(DataflowBlock {
             inputs,
             other_outputs,
             sum_rows,
-            extension_delta,
+            extension_delta: ExtensionSet::new(),
         });
         let node = self.make_node(node_id, optype, parent)?;
 
@@ -971,10 +1091,6 @@ impl<'a> Context<'a> {
             ));
         }
 
-        if let Some([]) = self.match_symbol(term_id, model::CORE_EXT_SET)? {
-            return Ok(TypeParam::Extensions);
-        }
-
         if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
             // At present `hugr-model` has no way to express that the item
             // type of a list must be copyable. Therefore we import it as `Any`.
@@ -999,8 +1115,7 @@ impl<'a> Context<'a> {
 
             table::Term::Tuple(_)
             | table::Term::List { .. }
-            | table::Term::ExtSet { .. }
-            | table::Term::ConstFunc { .. }
+            | table::Term::Func { .. }
             | table::Term::Literal(_) => Err(table::ModelError::TypeError(term_id).into()),
         }
     }
@@ -1048,10 +1163,6 @@ impl<'a> Context<'a> {
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
             return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_STATIC));
-        }
-
-        if let Some([]) = self.match_symbol(term_id, model::CORE_EXT_SET)? {
-            return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_EXT_SET));
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
@@ -1108,9 +1219,6 @@ impl<'a> Context<'a> {
             table::Term::Literal(model::Literal::Nat(value)) => {
                 Ok(TypeArg::BoundedNat { n: *value })
             }
-            table::Term::ExtSet { .. } => Ok(TypeArg::Extensions {
-                es: self.import_extension_set(term_id)?,
-            }),
 
             table::Term::Literal(model::Literal::Bytes(_)) => {
                 Err(error_unsupported!("`(bytes ..)` as `TypeArg`"))
@@ -1118,9 +1226,7 @@ impl<'a> Context<'a> {
             table::Term::Literal(model::Literal::Float(_)) => {
                 Err(error_unsupported!("float literal as `TypeArg`"))
             }
-            table::Term::ConstFunc { .. } => {
-                Err(error_unsupported!("function constant as `TypeArg`"))
-            }
+            table::Term::Func { .. } => Err(error_unsupported!("function constant as `TypeArg`")),
 
             table::Term::Apply { .. } => {
                 let ty = self.import_type(term_id)?;
@@ -1129,50 +1235,12 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn import_extension_set(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<ExtensionSet, ImportError> {
-        let mut es = ExtensionSet::new();
-        let mut stack = vec![term_id];
-
-        while let Some(term_id) = stack.pop() {
-            match self.get_term(term_id)? {
-                table::Term::Wildcard => return Err(error_uninferred!("wildcard")),
-
-                table::Term::Var(table::VarId(_, index)) => {
-                    es.insert_type_var(*index as _);
-                }
-
-                table::Term::ExtSet(parts) => {
-                    for part in *parts {
-                        match part {
-                            table::ExtSetPart::Extension(ext) => {
-                                let ext_ident = IdentList::new(*ext).map_err(|_| {
-                                    table::ModelError::MalformedName(ext.to_smolstr())
-                                })?;
-                                es.insert(ext_ident);
-                            }
-                            table::ExtSetPart::Splice(term_id) => {
-                                // The order in an extension set does not matter.
-                                stack.push(*term_id);
-                            }
-                        }
-                    }
-                }
-                _ => return Err(table::ModelError::TypeError(term_id).into()),
-            }
-        }
-
-        Ok(es)
-    }
-
     /// Import a `Type` from a term that represents a runtime type.
     fn import_type<RV: MaybeRV>(
         &mut self,
         term_id: table::TermId,
     ) -> Result<TypeBase<RV>, ImportError> {
-        if let Some([_, _, _]) = self.match_symbol(term_id, model::CORE_FN)? {
+        if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
             let func_type = self.import_func_type::<RowVariable>(term_id)?;
             return Ok(TypeBase::new_function(func_type));
         }
@@ -1231,15 +1299,14 @@ impl<'a> Context<'a> {
 
             // The following terms are not runtime types, but the core `Type` only contains runtime types.
             // We therefore report a type error here.
-            table::Term::ExtSet { .. }
-            | table::Term::List { .. }
+            table::Term::List { .. }
             | table::Term::Tuple { .. }
             | table::Term::Literal(_)
-            | table::Term::ConstFunc { .. } => Err(table::ModelError::TypeError(term_id).into()),
+            | table::Term::Func { .. } => Err(table::ModelError::TypeError(term_id).into()),
         }
     }
 
-    fn get_func_type(&mut self, term_id: table::TermId) -> Result<[table::TermId; 3], ImportError> {
+    fn get_func_type(&mut self, term_id: table::TermId) -> Result<[table::TermId; 2], ImportError> {
         self.match_symbol(term_id, model::CORE_FN)?
             .ok_or(table::ModelError::TypeError(term_id).into())
     }
@@ -1248,11 +1315,10 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: table::TermId,
     ) -> Result<FuncTypeBase<RV>, ImportError> {
-        let [inputs, outputs, extensions] = self.get_func_type(term_id)?;
+        let [inputs, outputs] = self.get_func_type(term_id)?;
         let inputs = self.import_type_row(inputs)?;
         let outputs = self.import_type_row(outputs)?;
-        let extensions = self.import_extension_set(extensions)?;
-        Ok(FuncTypeBase::new(inputs, outputs).with_extension_delta(extensions))
+        Ok(FuncTypeBase::new(inputs, outputs))
     }
 
     fn import_closed_list(
@@ -1396,28 +1462,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn import_json_meta(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<(&'a str, serde_json::Value), ImportError> {
-        let [name_arg, json_arg] = self
-            .match_symbol(term_id, model::COMPAT_META_JSON)?
-            .ok_or(table::ModelError::TypeError(term_id))?;
-
-        let table::Term::Literal(model::Literal::Str(name)) = self.get_term(name_arg)? else {
-            return Err(table::ModelError::TypeError(term_id).into());
-        };
-
-        let table::Term::Literal(model::Literal::Str(json_str)) = self.get_term(json_arg)? else {
-            return Err(table::ModelError::TypeError(term_id).into());
-        };
-
-        let json_value =
-            serde_json::from_str(json_str).map_err(|_| table::ModelError::TypeError(term_id))?;
-
-        Ok((name, json_value))
-    }
-
     fn import_value(
         &mut self,
         term_id: table::TermId,
@@ -1428,9 +1472,7 @@ impl<'a> Context<'a> {
         // NOTE: We have special cased arrays, integers, and floats for now.
         // TODO: Allow arbitrary extension values to be imported from terms.
 
-        if let Some([runtime_type, extensions, json]) =
-            self.match_symbol(term_id, model::COMPAT_CONST_JSON)?
-        {
+        if let Some([runtime_type, json]) = self.match_symbol(term_id, model::COMPAT_CONST_JSON)? {
             let table::Term::Literal(model::Literal::Str(json)) = self.get_term(json)? else {
                 return Err(table::ModelError::TypeError(term_id).into());
             };
@@ -1445,11 +1487,9 @@ impl<'a> Context<'a> {
                 return Ok(Value::Extension { e: opaque_value });
             } else {
                 let runtime_type = self.import_type(runtime_type)?;
-                let extensions = self.import_extension_set(extensions)?;
-
                 let value: serde_json::Value = serde_json::from_str(json)
                     .map_err(|_| table::ModelError::TypeError(term_id))?;
-                let custom_const = CustomSerialized::new(runtime_type, value, extensions);
+                let custom_const = CustomSerialized::new(runtime_type, value, ExtensionSet::new());
                 let opaque_value = OpaqueValue::new(custom_const);
                 return Ok(Value::Extension { e: opaque_value });
             }
@@ -1500,7 +1540,7 @@ impl<'a> Context<'a> {
             return Ok(ConstF64::new(value.into_inner()).into());
         }
 
-        if let Some([_, _, _, tag, values]) = self.match_symbol(term_id, model::CORE_CONST_ADT)? {
+        if let Some([_, _, tag, values]) = self.match_symbol(term_id, model::CORE_CONST_ADT)? {
             let [variants] = self.expect_symbol(type_id, model::CORE_ADT)?;
             let values = self.import_closed_tuple(values)?;
             let variants = self.import_closed_list(variants)?;
@@ -1548,12 +1588,11 @@ impl<'a> Context<'a> {
                 // - custom constructors for values
             }
 
-            table::Term::List { .. }
-            | table::Term::ExtSet { .. }
-            | table::Term::Tuple(_)
-            | table::Term::Literal(_) => Err(table::ModelError::TypeError(term_id).into()),
+            table::Term::List { .. } | table::Term::Tuple(_) | table::Term::Literal(_) => {
+                Err(table::ModelError::TypeError(term_id).into())
+            }
 
-            table::Term::ConstFunc { .. } => Err(error_unsupported!("constant function value")),
+            table::Term::Func { .. } => Err(error_unsupported!("constant function value")),
         }
     }
 

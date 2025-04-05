@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (declare-ctr array.Array
              (param ?t core.type)
              (param ?n core.nat)
@@ -9,5 +11,5 @@
 (declare-operation array.Init
                    (param ?t core.type)
                    (param ?n core.nat)
-                   (core.fn [?t] [(array.Array ?t ?n)] (ext array))
+                   (core.fn [?t] [(array.Array ?t ?n)])
                    (meta (core.meta.description "Initialize an array of size ?n with copies of a default value.")))

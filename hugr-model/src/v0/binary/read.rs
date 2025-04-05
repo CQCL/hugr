@@ -16,17 +16,17 @@ pub enum ReadError {
 
 type ReadResult<T> = Result<T, ReadError>;
 
-/// Read a hugr module from a byte slice.
-pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<table::Module<'a>> {
+/// Read a hugr package from a byte slice.
+pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<table::Package<'a>> {
     read_from_reader(slice, bump)
 }
 
-/// Read a hugr module from an impl of [BufRead].
-pub fn read_from_reader(reader: impl BufRead, bump: &Bump) -> ReadResult<table::Module<'_>> {
+/// Read a hugr package from an impl of [BufRead].
+pub fn read_from_reader(reader: impl BufRead, bump: &Bump) -> ReadResult<table::Package<'_>> {
     let reader =
         capnp::serialize_packed::read_message(reader, capnp::message::ReaderOptions::new())?;
-    let root = reader.get_root::<hugr_capnp::module::Reader>()?;
-    read_module(bump, root)
+    let root = reader.get_root::<hugr_capnp::package::Reader>()?;
+    read_package(bump, root)
 }
 
 /// Read a list of structs from a reader into a slice allocated through the bump allocator.
@@ -51,6 +51,19 @@ macro_rules! read_scalar_list {
         }
         __list.into_bump_slice()
     }};
+}
+
+fn read_package<'a>(
+    bump: &'a Bump,
+    reader: hugr_capnp::package::Reader,
+) -> ReadResult<table::Package<'a>> {
+    let modules = reader
+        .get_modules()?
+        .iter()
+        .map(|m| read_module(bump, m))
+        .collect::<ReadResult<_>>()?;
+
+    Ok(table::Package { modules })
 }
 
 fn read_module<'a>(
@@ -268,17 +281,12 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             table::Term::List(parts)
         }
 
-        Which::ExtSet(reader) => {
-            let parts = read_list!(bump, reader?, read_ext_set_part);
-            table::Term::ExtSet(parts)
-        }
-
         Which::Tuple(reader) => {
             let parts = read_list!(bump, reader?, read_seq_part);
             table::Term::Tuple(parts)
         }
 
-        Which::ConstFunc(region) => table::Term::ConstFunc(table::RegionId(region)),
+        Which::Func(region) => table::Term::Func(table::RegionId(region)),
 
         Which::Bytes(bytes) => table::Term::Literal(model::Literal::Bytes(bytes?.into())),
         Which::Float(value) => table::Term::Literal(model::Literal::Float(value.into())),
@@ -293,17 +301,6 @@ fn read_seq_part(
     Ok(match reader.which()? {
         Which::Item(term) => table::SeqPart::Item(table::TermId(term)),
         Which::Splice(list) => table::SeqPart::Splice(table::TermId(list)),
-    })
-}
-
-fn read_ext_set_part<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::term::ext_set_part::Reader,
-) -> ReadResult<table::ExtSetPart<'a>> {
-    use hugr_capnp::term::ext_set_part::Which;
-    Ok(match reader.which()? {
-        Which::Extension(ext) => table::ExtSetPart::Extension(bump.alloc_str(ext?.to_str()?)),
-        Which::Splice(list) => table::ExtSetPart::Splice(table::TermId(list)),
     })
 }
 

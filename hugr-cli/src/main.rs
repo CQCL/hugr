@@ -42,7 +42,7 @@ fn run_mermaid(mut args: mermaid::MermaidArgs) {
     let result = args.run_print();
 
     if let Err(e) = result {
-        if args.hugr_args.verbosity(Level::Error) {
+        if args.other_args.verbosity(Level::Error) {
             eprintln!("{}", e);
         }
         std::process::exit(1);

@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.2...hugr-core-v0.15.3) - 2025-04-02
+
+### Documentation
+
+- Provide docs for array ops, fix bad doc for HugrView::poly_func_type ([#2021](https://github.com/CQCL/hugr/pull/2021))
+
+### New Features
+
+- Expand SimpleReplacement API ([#1920](https://github.com/CQCL/hugr/pull/1920))
+- Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/pull/1959))
+- ReplaceTypes pass allows replacing extension types and ops ([#1989](https://github.com/CQCL/hugr/pull/1989))
+- Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/pull/2031))
+- Packages in `hugr-model` and envelope support. ([#2026](https://github.com/CQCL/hugr/pull/2026))
+- Represent order edges in `hugr-model` as metadata. ([#2027](https://github.com/CQCL/hugr/pull/2027))
+- add `build_expect_sum` to allow specific error messages ([#2032](https://github.com/CQCL/hugr/pull/2032))
+
+## [0.15.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.1...hugr-core-v0.15.2) - 2025-03-21
+
+### Bug Fixes
+
+- Don't enable envelope compression by default (yet) ([#2014](https://github.com/CQCL/hugr/pull/2014))
+- Inconsistent behaviour in `SiblingSubgraph::from_nodes` ([#2011](https://github.com/CQCL/hugr/pull/2011))
+
+## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.0...hugr-core-v0.15.1) - 2025-03-21
+
+### Bug Fixes
+
+- correct `CallIndirect` tag from `FnCall` to `DataflowChild` ([#2006](https://github.com/CQCL/hugr/pull/2006))
+- StaticArrayValue serialisation ([#2009](https://github.com/CQCL/hugr/pull/2009))
+
+### New Features
+
+- traits for transforming Types/TypeArgs/etc. ([#1991](https://github.com/CQCL/hugr/pull/1991))
+- add exit operation to prelude ([#2008](https://github.com/CQCL/hugr/pull/2008))
+- Add llvm codegen for collections.static_array ([#2003](https://github.com/CQCL/hugr/pull/2003))
+
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.4...hugr-core-v0.15.0) - 2025-03-14
+
+### New Features
+
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- Rewrite for inlining a single Call ([#1934](https://github.com/CQCL/hugr/pull/1934))
+- [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))
+- Add float <--> int bytecasting ops to conversions extension ([#1956](https://github.com/CQCL/hugr/pull/1956))
+- Add collections.static_array extension. ([#1964](https://github.com/CQCL/hugr/pull/1964))
+- [**breaking**] Generic HUGR serialization with envelopes ([#1958](https://github.com/CQCL/hugr/pull/1958))
+
+### Refactor
+
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.14.3...hugr-core-v0.14.4) - 2025-02-24
 
 ### Bug Fixes

@@ -4,6 +4,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
 ---
 (hugr 0)
 
+(mod)
+
 (import core.fn)
 
 (import core.type)
@@ -12,5 +14,5 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
   example.swap
   (param ?0 core.type)
   (param ?1 core.type)
-  (core.fn [?0 ?1] [?1 ?0] (ext))
-  (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0] (ext)))))
+  (core.fn [?0 ?1] [?1 ?0])
+  (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0]))))

@@ -20,8 +20,9 @@ entry_block:                                      ; preds = %alloca_block
   %upper_bounds_check = icmp sgt i8 %"2_01", 7
   %lower_bounds_check = icmp slt i8 %"2_01", -8
   %outside_range = or i1 %upper_bounds_check, %lower_bounds_check
+  %inbounds = xor i1 %outside_range, true
   %1 = insertvalue { i1, { i32, i8* }, i8 } { i1 true, { i32, i8* } poison, i8 poison }, i8 %"2_01", 2
-  %2 = select i1 %outside_range, { i1, { i32, i8* }, i8 } { i1 false, { i32, i8* } { i32 2, i8* getelementptr inbounds ([25 x i8], [25 x i8]* @0, i32 0, i32 0) }, i8 poison }, { i1, { i32, i8* }, i8 } %1
+  %2 = select i1 %inbounds, { i1, { i32, i8* }, i8 } %1, { i1, { i32, i8* }, i8 } { i1 false, { i32, i8* } { i32 2, i8* getelementptr inbounds ([25 x i8], [25 x i8]* @0, i32 0, i32 0) }, i8 poison }
   store { i1, { i32, i8* }, i8 } %2, { i1, { i32, i8* }, i8 }* %"4_0", align 8
   %"4_02" = load { i1, { i32, i8* }, i8 }, { i1, { i32, i8* }, i8 }* %"4_0", align 8
   store { i1, { i32, i8* }, i8 } %"4_02", { i1, { i32, i8* }, i8 }* %"0", align 8

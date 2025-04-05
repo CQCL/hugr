@@ -5,6 +5,7 @@ import pytest
 from hugr import val
 from hugr.std.collections.array import Array, ArrayVal
 from hugr.std.collections.list import List, ListVal
+from hugr.std.collections.static_array import StaticArray, StaticArrayVal
 from hugr.std.float import FLOAT_T
 from hugr.std.int import INT_T, _int_tv
 from hugr.tys import (
@@ -123,6 +124,7 @@ def test_args_str(arg: TypeArg, string: str):
     ("ty", "string"),
     [
         (Array(Bool, 3), "array<3, Type(Bool)>"),
+        (StaticArray(Bool), "static_array<Type(Bool)>"),
         (Variable(2, TypeBound.Any), "$2"),
         (RowVariable(4, TypeBound.Copyable), "$4"),
         (USize(), "USize"),
@@ -174,3 +176,21 @@ def test_array():
     ar_val = ArrayVal([val.TRUE, val.FALSE], Bool)
     assert ar_val.v == [val.TRUE, val.FALSE]
     assert ar_val.ty == Array(Bool, 2)
+
+
+def test_static_array():
+    ty_var = Variable(0, TypeBound.Copyable)
+
+    ls = StaticArray(Bool)
+    assert ls.ty == Bool
+
+    ls = StaticArray(ty_var)
+    assert ls.ty == ty_var
+
+    name = "array_name"
+    ar_val = StaticArrayVal([val.TRUE, val.FALSE], Bool, name)
+    assert ar_val.v == [val.TRUE, val.FALSE]
+    assert ar_val.ty == StaticArray(Bool)
+
+    with pytest.raises(ValueError, match="Static array elements must be copyable"):
+        StaticArray(Qubit)

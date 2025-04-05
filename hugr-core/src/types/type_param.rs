@@ -11,7 +11,10 @@ use std::num::NonZeroU64;
 use thiserror::Error;
 
 use super::row_var::MaybeRV;
-use super::{check_typevar_decl, NoRV, RowVariable, Substitution, Type, TypeBase, TypeBound};
+use super::{
+    check_typevar_decl, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound,
+    TypeTransformer,
+};
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
@@ -365,6 +368,19 @@ impl TypeArg {
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
+        }
+    }
+}
+
+impl Transformable for TypeArg {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match self {
+            TypeArg::Type { ty } => ty.transform(tr),
+            TypeArg::Sequence { elems } => elems.transform(tr),
+            TypeArg::BoundedNat { .. }
+            | TypeArg::String { .. }
+            | TypeArg::Extensions { .. }
+            | TypeArg::Variable { .. } => Ok(false),
         }
     }
 }

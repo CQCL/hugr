@@ -1,20 +1,73 @@
-//! Standard command line tools, used by the hugr binary.
+//! Standard command line tools for the HUGR format.
+//!
+//! This library provides utilities for the HUGR CLI.
+//!
+//! ## CLI Usage
+//!
+//! Run `cargo install hugr-cli` to install the CLI tools. This will make the
+//! `hugr` executable available in your shell as long as you have [cargo's bin
+//! directory](https://doc.rust-lang.org/book/ch14-04-installing-binaries.html)
+//! in your path.
+//!
+//! The CLI provides two subcommands:
+//!
+//! - `validate` for validating HUGR files.
+//! - `mermaid` for visualizing HUGR files as mermaid diagrams.
+//!
+//! ### Validate
+//!
+//! Validate and visualize a HUGR file
+//!
+//! Usage: `hugr validate [OPTIONS] [INPUT]`
+//!
+//! ```text
+//! Options:
+//!   -v, --verbose...  Increase logging verbosity
+//!   -q, --quiet...    Decrease logging verbosity
+//!   -h, --help        Print help (see more with '--help')
+//!   -V, --version     Print version
+//!
+//! Input:
+//!       --no-std                   Don't use standard extensions when validating hugrs. Prelude is still used.
+//!   -e, --extensions <EXTENSIONS>  Paths to serialised extensions to validate against.
+//!       --hugr-json                Read the input as a HUGR JSON file instead of an envelope
+//!   [INPUT]                    Input file. Defaults to `-` for stdin
+//! ```
+//!
+//! ### Mermaid
+//!
+//! Write HUGR as mermaid diagrams
+//!
+//! Usage: `hugr mermaid [OPTIONS] [INPUT]`
+//!
+//! ```text
+//! Options:
+//!       --validate         Validate before rendering, includes extension inference.
+//!   -o, --output <OUTPUT>  Output file '-' for stdout [default: -]
+//!   -v, --verbose...       Increase logging verbosity
+//!   -q, --quiet...         Decrease logging verbosity
+//!   -h, --help             Print help (see more with '--help')
+//!   -V, --version          Print version
+//!
+//! Input:
+//!       --no-std                   Don't use standard extensions when validating hugrs. Prelude is still used.
+//!   -e, --extensions <EXTENSIONS>  Paths to serialised extensions to validate against.
+//!       --hugr-json                Read the input as a HUGR JSON file instead of an envelope
+//!   [INPUT]                    Input file. Defaults to `-` for stdin.
+//! ```
 
 use clap::{crate_version, Parser};
+use clap_verbosity_flag::log::Level;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use clio::Input;
-use derive_more::{Display, Error, From};
-use hugr::extension::ExtensionRegistry;
+use hugr::envelope::EnvelopeError;
+use hugr::hugr::LoadHugrError;
 use hugr::package::{PackageEncodingError, PackageValidationError};
-use hugr::Hugr;
-use std::io::{Cursor, Read, Seek, SeekFrom};
-use std::{ffi::OsString, path::PathBuf};
+use std::ffi::OsString;
 
 pub mod extensions;
+pub mod hugr_io;
 pub mod mermaid;
 pub mod validate;
-
-use hugr::package::Package;
 
 /// CLI arguments.
 #[derive(Parser, Debug)]
@@ -35,7 +88,7 @@ pub enum CliArgs {
 }
 
 /// Error type for the CLI.
-#[derive(Debug, Display, Error, From)]
+#[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
 #[non_exhaustive]
 pub enum CliError {
     /// Error reading input.
@@ -44,107 +97,36 @@ pub enum CliError {
     /// Error parsing input.
     #[display("Error parsing package: {_0}")]
     Parse(serde_json::Error),
-    /// Hugr load error.
+    /// Package load error.
     #[display("Error parsing package: {_0}")]
-    HUGRLoad(PackageEncodingError),
+    PackageLoad(PackageEncodingError),
+    /// Hugr load error.
+    #[display("Error loading hugr: {_0}")]
+    HugrLoad(LoadHugrError),
     #[display("Error validating HUGR: {_0}")]
     /// Errors produced by the `validate` subcommand.
     Validate(PackageValidationError),
+    #[display("Error decoding HUGR envelope: {_0}")]
+    /// Errors produced by the `validate` subcommand.
+    Envelope(EnvelopeError),
+    /// Pretty error when the user passes a non-envelope file.
+    #[display(
+        "Input file is not a HUGR envelope. Invalid magic number.\n\nUse `--hugr-json` to read a raw HUGR JSON file instead."
+    )]
+    NotAnEnvelope,
 }
 
-/// Validate and visualise a HUGR file.
+/// Other arguments affecting the HUGR CLI runtime.
 #[derive(Parser, Debug)]
-pub struct HugrArgs {
-    /// Input HUGR file, use '-' for stdin
-    #[clap(value_parser, default_value = "-")]
-    pub input: Input,
+pub struct OtherArgs {
     /// Verbosity.
     #[command(flatten)]
     pub verbose: Verbosity<InfoLevel>,
-    /// No standard extensions.
-    #[arg(
-        long,
-        help = "Don't use standard extensions when validating. Prelude is still used."
-    )]
-    pub no_std: bool,
-    /// Extensions paths.
-    #[arg(
-        short,
-        long,
-        help = "Paths to serialised extensions to validate against."
-    )]
-    pub extensions: Vec<PathBuf>,
 }
 
-/// A simple enum containing either a package or a single hugr.
-///
-/// This is required since `Package`s can only contain module-rooted hugrs.
-#[derive(Debug, Clone, PartialEq)]
-pub enum PackageOrHugr {
-    /// A package with module-rooted HUGRs and some required extensions.
-    Package(Package),
-    /// An arbitrary HUGR.
-    Hugr(Hugr),
-}
-
-impl PackageOrHugr {
-    /// Returns the list of hugrs in the package.
-    pub fn into_hugrs(self) -> Vec<Hugr> {
-        match self {
-            PackageOrHugr::Package(pkg) => pkg.modules,
-            PackageOrHugr::Hugr(hugr) => vec![hugr],
-        }
-    }
-
-    /// Validates the package or hugr.
-    pub fn validate(&self) -> Result<(), PackageValidationError> {
-        match self {
-            PackageOrHugr::Package(pkg) => pkg.validate(),
-            PackageOrHugr::Hugr(hugr) => Ok(hugr.validate()?),
-        }
-    }
-}
-
-impl AsRef<[Hugr]> for PackageOrHugr {
-    fn as_ref(&self) -> &[Hugr] {
-        match self {
-            PackageOrHugr::Package(pkg) => &pkg.modules,
-            PackageOrHugr::Hugr(hugr) => std::slice::from_ref(hugr),
-        }
-    }
-}
-
-impl HugrArgs {
-    /// Read either a package or a single hugr from the input.
-    pub fn get_package_or_hugr(
-        &mut self,
-        extensions: &ExtensionRegistry,
-    ) -> Result<PackageOrHugr, CliError> {
-        // We need to read the input twice; once to try to load it as a HUGR, and if that fails, as a package.
-        // If `input` is a file, we can reuse the reader by seeking back to the start.
-        // Else, we need to read the file into a buffer.
-        match self.input.can_seek() {
-            true => get_package_or_hugr_seek(&mut self.input, extensions),
-            false => {
-                let mut buffer = Vec::new();
-                self.input.read_to_end(&mut buffer)?;
-                get_package_or_hugr_seek(Cursor::new(buffer), extensions)
-            }
-        }
-    }
-}
-
-/// Load a package or hugr from a seekable input.
-fn get_package_or_hugr_seek<I: Seek + Read>(
-    mut input: I,
-    extensions: &ExtensionRegistry,
-) -> Result<PackageOrHugr, CliError> {
-    match Hugr::load_json(&mut input, extensions) {
-        Ok(hugr) => Ok(PackageOrHugr::Hugr(hugr)),
-        Err(_) => {
-            input.seek(SeekFrom::Start(0))?;
-            let pkg = Package::from_json_reader(input, extensions)?;
-            Ok(PackageOrHugr::Package(pkg))
-        }
+impl OtherArgs {
+    /// Test whether a `level` message should be output.
+    pub fn verbosity(&self, level: Level) -> bool {
+        self.verbose.log_level_filter() >= level
     }
 }

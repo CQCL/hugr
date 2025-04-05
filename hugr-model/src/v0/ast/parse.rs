@@ -28,7 +28,7 @@ use thiserror::Error;
 use crate::v0::ast::{LinkName, Module, Operation, SeqPart};
 use crate::v0::{Literal, RegionKind};
 
-use super::{Node, Param, Region, Symbol, VarName};
+use super::{Node, Package, Param, Region, Symbol, VarName};
 use super::{SymbolName, Term};
 
 mod pest_parser {
@@ -80,7 +80,6 @@ fn parse_term(pair: Pair<Rule>) -> ParseResult<Term> {
             let parts = pairs.map(parse_seq_part).collect::<ParseResult<_>>()?;
             Term::Tuple(parts)
         }
-        Rule::term_ext_set => Term::ExtSet,
         Rule::literal => {
             let literal = parse_literal(pair)?;
             Term::Literal(literal)
@@ -120,6 +119,17 @@ fn parse_seq_part(pair: Pair<Rule>) -> ParseResult<SeqPart> {
         }
         _ => unreachable!("expected term or spliced term"),
     })
+}
+
+fn parse_package(pair: Pair<Rule>) -> ParseResult<Package> {
+    debug_assert_eq!(pair.as_rule(), Rule::package);
+    let mut pairs = pair.into_inner();
+
+    let modules = take_rule(&mut pairs, Rule::module)
+        .map(parse_module)
+        .collect::<ParseResult<_>>()?;
+
+    Ok(Package { modules })
 }
 
 fn parse_module(pair: Pair<Rule>) -> ParseResult<Module> {
@@ -441,6 +451,8 @@ impl_from_str!(Term, term, parse_term);
 impl_from_str!(Node, node, parse_node);
 impl_from_str!(Region, region, parse_region);
 impl_from_str!(Param, param, parse_param);
+impl_from_str!(Package, package, parse_package);
 impl_from_str!(Module, module, parse_module);
 impl_from_str!(SeqPart, part, parse_seq_part);
 impl_from_str!(Literal, literal, parse_literal);
+impl_from_str!(Symbol, symbol, parse_symbol);

@@ -73,8 +73,13 @@ repos:
         pass_filenames: false
       - id: cargo-test
         name: cargo test
-        description: Run tests with `cargo test`.
-        entry: cargo test --all-features --workspace
+        description:
+          Run tests with `cargo test`.
+          # We cannot use --all-features as `hugr-model`s pyo3 feature cannot be
+          # built into a binary build (without using `maturin`)
+          #
+          # This feature list should be kept in sync with the `hugr-py/pyproject.toml`
+        entry: cargo test --workspace --exclude 'hugr-py' --features 'hugr/extension_inference hugr/declarative hugr/model_unstable hugr/llvm hugr/llvm-test hugr/zstd'
         language: system
         files: \.rs$
         pass_filenames: false

@@ -1,7 +1,7 @@
 [project]
 name = "hugr"
-version = "0.10.3"
-requires-python = ">=3.10,<3.14"
+version = "0.11.4"
+requires-python = ">=3.10"
 description = "Quantinuum's common representation for quantum programs"
 license = { file = "LICENCE" }
 readme = "README.md"
@@ -27,10 +27,12 @@ classifiers = [
 ]
 
 dependencies = [
-    "pydantic>=2.8,<2.11",
+    "graphviz>=0.20.3",
+    "pydantic>=2.8,<2.12",
     "pydantic-extra-types>=2.9.0",
     "semver>=3.0.2",
-    "graphviz>=0.20.3",
+    "typing-extensions~=4.12",
+    "pyzstd~=0.16.2",
 ]
 
 [project.optional-dependencies]
@@ -41,5 +43,17 @@ homepage = "https://github.com/CQCL/hugr/tree/main/hugr-py"
 repository = "https://github.com/CQCL/hugr/tree/main/hugr-py"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+# Make sure to copy any changes to the root `pyproject.toml` config too.
+module-name = "hugr._hugr"
+python-source = "src/"
+manifest-path = "Cargo.toml"
+# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
+features = ["pyo3/extension-module"]
+
+[tool.pyright]
+# Rust bindings have typing stubs but no python source code.
+reportMissingModuleSource = "none"

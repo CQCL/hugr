@@ -7,7 +7,7 @@ use hugr_core::{
     },
     ops::{constant::Value, custom::ExtensionOp, DataflowOpTrait as _},
     std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
-    types::{TypeArg, TypeEnum, TypeRow},
+    types::{TypeEnum, TypeRow},
     HugrView, Node,
 };
 
@@ -20,6 +20,7 @@ use crate::{
         ops::{emit_custom_unary_op, emit_value},
         EmitOpArgs,
     },
+    extension::int::get_width_arg,
     sum::LLVMSumValue,
     types::HugrType,
 };
@@ -153,11 +154,7 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
     match conversion_op {
         ConvertOpDef::trunc_u | ConvertOpDef::trunc_s => {
             let signed = conversion_op == ConvertOpDef::trunc_s;
-            let Some(TypeArg::BoundedNat { n: log_width }) = args.node().args().last().cloned()
-            else {
-                panic!("This op should have one type arg only: the log-width of the int we're truncating to.: {:?}", conversion_op.type_args())
-            };
-
+            let log_width = get_width_arg(&args, &conversion_op)?;
             build_trunc_op(context, signed, log_width, args)
         }
 
@@ -318,7 +315,7 @@ mod test {
     #[case("convert_s", 5)]
     fn test_convert(mut llvm_ctx: TestContext, #[case] op_name: &str, #[case] log_width: u8) -> () {
         llvm_ctx.add_extensions(|ceb| {
-            ceb.add_int_extensions()
+            ceb.add_default_int_extensions()
                 .add_float_extensions()
                 .add_conversion_extensions()
         });
@@ -338,7 +335,7 @@ mod test {
     ) -> () {
         llvm_ctx.add_extensions(|builder| {
             builder
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_float_extensions()
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
@@ -364,7 +361,7 @@ mod test {
         let [in_t, out_t] = tys;
         llvm_ctx.add_extensions(|builder| {
             builder
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_float_extensions()
                 .add_conversion_extensions()
         });
@@ -419,7 +416,7 @@ mod test {
             });
         exec_ctx.add_extensions(|builder| {
             builder
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
         });
@@ -489,7 +486,7 @@ mod test {
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
                 .add_float_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
     }
 
@@ -617,7 +614,7 @@ mod test {
             builder
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         assert_eq!(i * 5 + 1, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -639,7 +636,7 @@ mod test {
             builder
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         assert_eq!(i, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -667,7 +664,7 @@ mod test {
             builder
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_float_extensions()
         });
         let hugr_f = exec_ctx.exec_hugr_f64(hugr, "main");
@@ -694,7 +691,7 @@ mod test {
             builder
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_float_extensions()
         });
         assert_eq!(f.to_bits(), exec_ctx.exec_hugr_u64(hugr, "main"));

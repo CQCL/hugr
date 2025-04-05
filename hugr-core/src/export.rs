@@ -1,10 +1,11 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::{
-    extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
-    hugr::{IdentList, NodeMetadataMap},
+    extension::{ExtensionId, OpDef, SignatureFunc},
+    hugr::IdentList,
     ops::{
         constant::CustomSerialized, DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value,
     },
+    package::Package,
     std_extensions::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
@@ -12,10 +13,10 @@ use crate::{
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
-        TypeBase, TypeBound, TypeEnum, TypeRow,
+        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
+        TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
     },
-    Direction, Hugr, HugrView, IncomingPort, Node, Port,
+    Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
@@ -26,6 +27,16 @@ use hugr_model::v0::{
 };
 use petgraph::unionfind::UnionFind;
 use std::fmt::Write;
+
+/// Export a [`Package`] to its representation in the model.
+pub fn export_package<'a>(package: &'a Package, bump: &'a Bump) -> table::Package<'a> {
+    let modules = package
+        .modules
+        .iter()
+        .map(|module| export_hugr(module, bump))
+        .collect();
+    table::Package { modules }
+}
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> table::Module<'a> {
@@ -278,13 +289,10 @@ impl<'a> Context<'a> {
                 panic!("output nodes should have been handled by the region export")
             }
 
-            OpType::DFG(dfg) => {
-                let extensions = self.export_ext_set(&dfg.signature.runtime_reqs);
-                regions = self.bump.alloc_slice_copy(&[self.export_dfg(
-                    node,
-                    extensions,
-                    model::ScopeClosure::Open,
-                )]);
+            OpType::DFG(_) => {
+                regions = self
+                    .bump
+                    .alloc_slice_copy(&[self.export_dfg(node, model::ScopeClosure::Open)]);
                 table::Operation::Dfg
             }
 
@@ -303,25 +311,19 @@ impl<'a> Context<'a> {
                 todo!("case nodes should have been handled by the region export")
             }
 
-            OpType::DataflowBlock(block) => {
-                let extensions = self.export_ext_set(&block.extension_delta);
-                regions = self.bump.alloc_slice_copy(&[self.export_dfg(
-                    node,
-                    extensions,
-                    model::ScopeClosure::Open,
-                )]);
+            OpType::DataflowBlock(_) => {
+                regions = self
+                    .bump
+                    .alloc_slice_copy(&[self.export_dfg(node, model::ScopeClosure::Open)]);
                 table::Operation::Block
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
                 let symbol = this.export_poly_func_type(name, &func.signature);
-                let extensions = this.export_ext_set(&func.signature.body().runtime_reqs);
-                regions = this.bump.alloc_slice_copy(&[this.export_dfg(
-                    node,
-                    extensions,
-                    model::ScopeClosure::Closed,
-                )]);
+                regions = this
+                    .bump
+                    .alloc_slice_copy(&[this.export_dfg(node, model::ScopeClosure::Closed)]);
                 table::Operation::DefineFunc(symbol)
             }),
 
@@ -369,9 +371,7 @@ impl<'a> Context<'a> {
                 let signature = call.signature();
                 let inputs = self.export_type_row(&signature.input);
                 let outputs = self.export_type_row(&signature.output);
-                let ext = self.export_ext_set(&signature.runtime_reqs);
-                let operation =
-                    self.make_term_apply(model::CORE_CALL, &[inputs, outputs, ext, func]);
+                let operation = self.make_term_apply(model::CORE_CALL, &[inputs, outputs, func]);
                 table::Operation::Custom(operation)
             }
 
@@ -383,9 +383,7 @@ impl<'a> Context<'a> {
                 let args = args.into_bump_slice();
                 let func = self.make_term(table::Term::Apply(symbol, args));
                 let runtime_type = self.make_term(table::Term::Wildcard);
-                let ext = self.make_term(table::Term::Wildcard);
-                let operation =
-                    self.make_term_apply(model::CORE_LOAD_CONST, &[runtime_type, ext, func]);
+                let operation = self.make_term_apply(model::CORE_LOAD_CONST, &[runtime_type, func]);
                 table::Operation::Custom(operation)
             }
 
@@ -405,19 +403,16 @@ impl<'a> Context<'a> {
                 // TODO: Share the constant value between all nodes that load it.
 
                 let runtime_type = self.make_term(table::Term::Wildcard);
-                let ext = self.make_term(table::Term::Wildcard);
                 let value = self.export_value(&const_node_data.value);
                 let operation =
-                    self.make_term_apply(model::CORE_LOAD_CONST, &[runtime_type, ext, value]);
+                    self.make_term_apply(model::CORE_LOAD_CONST, &[runtime_type, value]);
                 table::Operation::Custom(operation)
             }
 
             OpType::CallIndirect(call) => {
                 let inputs = self.export_type_row(&call.signature.input);
                 let outputs = self.export_type_row(&call.signature.output);
-                let ext = self.export_ext_set(&call.signature.runtime_reqs);
-                let operation =
-                    self.make_term_apply(model::CORE_CALL_INDIRECT, &[inputs, outputs, ext]);
+                let operation = self.make_term_apply(model::CORE_CALL_INDIRECT, &[inputs, outputs]);
                 table::Operation::Custom(operation)
             }
 
@@ -429,13 +424,10 @@ impl<'a> Context<'a> {
                 table::Operation::Custom(operation)
             }
 
-            OpType::TailLoop(tail_loop) => {
-                let extensions = self.export_ext_set(&tail_loop.extension_delta);
-                regions = self.bump.alloc_slice_copy(&[self.export_dfg(
-                    node,
-                    extensions,
-                    model::ScopeClosure::Open,
-                )]);
+            OpType::TailLoop(_) => {
+                regions = self
+                    .bump
+                    .alloc_slice_copy(&[self.export_dfg(node, model::ScopeClosure::Open)]);
                 table::Operation::TailLoop
             }
 
@@ -486,10 +478,7 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
-        let meta = match self.hugr.get_node_metadata(node) {
-            Some(metadata_map) => self.export_node_metadata(metadata_map),
-            None => &[],
-        };
+        let meta = self.export_node_metadata(node);
 
         self.module.nodes[node_id.index()] = table::Node {
             operation,
@@ -578,19 +567,13 @@ impl<'a> Context<'a> {
             self.make_term(table::Term::List(outputs.into_bump_slice()))
         };
 
-        let extensions = self.export_ext_set(&block.extension_delta);
-        self.make_term_apply(model::CORE_FN, &[inputs, outputs, extensions])
+        self.make_term_apply(model::CORE_FN, &[inputs, outputs])
     }
 
     /// Creates a data flow region from the given node's children.
     ///
     /// `Input` and `Output` nodes are used to determine the source and target ports of the region.
-    pub fn export_dfg(
-        &mut self,
-        node: Node,
-        extensions: table::TermId,
-        closure: model::ScopeClosure,
-    ) -> table::RegionId {
+    pub fn export_dfg(&mut self, node: Node, closure: model::ScopeClosure) -> table::RegionId {
         let region = self.module.insert_region(table::Region::default());
 
         self.symbols.enter(region);
@@ -602,9 +585,12 @@ impl<'a> Context<'a> {
         let mut targets: &[_] = &[];
         let mut input_types = None;
         let mut output_types = None;
+        let mut meta = Vec::new();
 
         let children = self.hugr.children(node);
         let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
+
+        let mut output_node = None;
 
         for child in children {
             match self.hugr.get_optype(child) {
@@ -615,10 +601,27 @@ impl<'a> Context<'a> {
                 OpType::Output(output) => {
                     targets = self.make_ports(child, Direction::Incoming, output.types.len());
                     output_types = Some(&output.types);
+                    output_node = Some(child);
                 }
-                _ => {
+                child_optype => {
                     if let Some(child_id) = self.export_node_shallow(child) {
                         region_children.push(child_id);
+
+                        // Record all order edges that originate from this node in metadata.
+                        let successors = child_optype
+                            .other_output_port()
+                            .into_iter()
+                            .flat_map(|port| self.hugr.linked_inputs(child, port))
+                            .map(|(successor, _)| successor)
+                            .filter(|successor| Some(*successor) != output_node);
+
+                        for successor in successors {
+                            let a =
+                                self.make_term(model::Literal::Nat(child.index() as u64).into());
+                            let b = self
+                                .make_term(model::Literal::Nat(successor.index() as u64).into());
+                            meta.push(self.make_term_apply(model::ORDER_HINT_ORDER, &[a, b]));
+                        }
                     }
                 }
             }
@@ -631,7 +634,7 @@ impl<'a> Context<'a> {
         let signature = {
             let inputs = self.export_type_row(input_types.unwrap());
             let outputs = self.export_type_row(output_types.unwrap());
-            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs, extensions]))
+            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs]))
         };
 
         let scope = match closure {
@@ -648,7 +651,7 @@ impl<'a> Context<'a> {
             sources,
             targets,
             children: region_children.into_bump_slice(),
-            meta: &[], // TODO: Export metadata
+            meta: self.bump.alloc_slice_copy(&meta),
             signature,
             scope,
         };
@@ -707,8 +710,7 @@ impl<'a> Context<'a> {
 
             let inputs = wrap_ctrl(node_signature.input());
             let outputs = wrap_ctrl(node_signature.output());
-            let extensions = self.export_ext_set(&node_signature.runtime_reqs);
-            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs, extensions]))
+            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs]))
         };
 
         let scope = match closure {
@@ -739,12 +741,11 @@ impl<'a> Context<'a> {
         let mut regions = BumpVec::with_capacity_in(children.size_hint().0, self.bump);
 
         for child in children {
-            let OpType::Case(case_op) = self.hugr.get_optype(child) else {
+            let OpType::Case(_) = self.hugr.get_optype(child) else {
                 panic!("expected a `Case` node as a child of a `Conditional` node");
             };
 
-            let extensions = self.export_ext_set(&case_op.signature.runtime_reqs);
-            regions.push(self.export_dfg(child, extensions, model::ScopeClosure::Open));
+            regions.push(self.export_dfg(child, model::ScopeClosure::Open));
         }
 
         regions.into_bump_slice()
@@ -803,8 +804,7 @@ impl<'a> Context<'a> {
     pub fn export_func_type<RV: MaybeRV>(&mut self, t: &FuncTypeBase<RV>) -> table::TermId {
         let inputs = self.export_type_row(t.input());
         let outputs = self.export_type_row(t.output());
-        let extensions = self.export_ext_set(&t.runtime_reqs);
-        self.make_term_apply(model::CORE_FN, &[inputs, outputs, extensions])
+        self.make_term_apply(model::CORE_FN, &[inputs, outputs])
     }
 
     pub fn export_custom_type(&mut self, t: &CustomType) -> table::TermId {
@@ -831,7 +831,7 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
-            TypeArg::Extensions { es } => self.export_ext_set(es),
+            TypeArg::Extensions { .. } => self.make_term_apply("compat.ext_set", &[]),
             TypeArg::Variable { v } => self.export_type_arg_var(v),
         }
     }
@@ -938,27 +938,8 @@ impl<'a> Context<'a> {
                 let types = self.make_term(table::Term::List(parts));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
-            TypeParam::Extensions => self.make_term_apply(model::CORE_EXT_SET, &[]),
+            TypeParam::Extensions => self.make_term_apply("compat.ext_set_type", &[]),
         }
-    }
-
-    pub fn export_ext_set(&mut self, ext_set: &ExtensionSet) -> table::TermId {
-        let capacity = ext_set.iter().size_hint().0;
-        let mut parts = BumpVec::with_capacity_in(capacity, self.bump);
-
-        for ext in ext_set.iter() {
-            // `ExtensionSet`s represent variables by extension names that parse to integers.
-            match ext.parse::<u16>() {
-                Ok(index) => {
-                    let node = self.local_scope.expect("local variable out of scope");
-                    let term = self.make_term(table::Term::Var(table::VarId(node, index)));
-                    parts.push(table::ExtSetPart::Splice(term));
-                }
-                Err(_) => parts.push(table::ExtSetPart::Extension(self.bump.alloc_str(ext))),
-            }
-        }
-
-        self.make_term(table::Term::ExtSet(parts.into_bump_slice()))
     }
 
     fn export_value(&mut self, value: &'a Value) -> table::TermId {
@@ -1009,10 +990,7 @@ impl<'a> Context<'a> {
 
                 let json = self.make_term(model::Literal::Str(json.into()).into());
                 let runtime_type = self.export_type(&e.get_type());
-                let extensions = self.export_ext_set(&e.extension_reqs());
-                let args = self
-                    .bump
-                    .alloc_slice_copy(&[runtime_type, extensions, json]);
+                let args = self.bump.alloc_slice_copy(&[runtime_type, json]);
                 let symbol = self.resolve_symbol(model::COMPAT_CONST_JSON);
                 self.make_term(table::Term::Apply(symbol, args))
             }
@@ -1022,22 +1000,18 @@ impl<'a> Context<'a> {
                 let outer_node_to_id = std::mem::take(&mut self.node_to_id);
 
                 let region = match hugr.root_type() {
-                    OpType::DFG(dfg) => {
-                        let extensions = self.export_ext_set(&dfg.extension_delta());
-                        self.export_dfg(hugr.root(), extensions, model::ScopeClosure::Closed)
-                    }
+                    OpType::DFG(_) => self.export_dfg(hugr.root(), model::ScopeClosure::Closed),
                     _ => panic!("Value::Function root must be a DFG"),
                 };
 
                 self.node_to_id = outer_node_to_id;
                 self.hugr = outer_hugr;
 
-                self.make_term(table::Term::ConstFunc(region))
+                self.make_term(table::Term::Func(region))
             }
 
             Value::Sum(sum) => {
                 let variants = self.export_sum_variants(&sum.sum_type);
-                let ext = self.make_term(table::Term::Wildcard);
                 let types = self.make_term(table::Term::Wildcard);
                 let tag = self.make_term(model::Literal::Nat(sum.tag as u64).into());
 
@@ -1051,16 +1025,42 @@ impl<'a> Context<'a> {
                     self.make_term(table::Term::Tuple(values.into_bump_slice()))
                 };
 
-                self.make_term_apply(model::CORE_CONST_ADT, &[variants, ext, types, tag, values])
+                self.make_term_apply(model::CORE_CONST_ADT, &[variants, types, tag, values])
             }
         }
     }
 
-    pub fn export_node_metadata(&mut self, metadata_map: &NodeMetadataMap) -> &'a [table::TermId] {
-        let mut meta = BumpVec::with_capacity_in(metadata_map.len(), self.bump);
+    pub fn export_node_metadata(&mut self, node: Node) -> &'a [table::TermId] {
+        let metadata_map = self.hugr.get_node_metadata(node);
 
-        for (name, value) in metadata_map {
-            meta.push(self.export_json_meta(name, value));
+        let has_order_edges = {
+            fn is_relevant_node(hugr: &Hugr, node: Node) -> bool {
+                let optype = hugr.get_optype(node);
+                !optype.is_input() && !optype.is_output()
+            }
+
+            let optype = self.hugr.get_optype(node);
+
+            Direction::BOTH
+                .iter()
+                .filter(|dir| optype.other_port_kind(**dir) == Some(EdgeKind::StateOrder))
+                .filter_map(|dir| optype.other_port(*dir))
+                .flat_map(|port| self.hugr.linked_ports(node, port))
+                .any(|(other, _)| is_relevant_node(self.hugr, other))
+        };
+
+        let meta_capacity = metadata_map.map_or(0, |map| map.len()) + has_order_edges as usize;
+        let mut meta = BumpVec::with_capacity_in(meta_capacity, self.bump);
+
+        if let Some(metadata_map) = metadata_map {
+            for (name, value) in metadata_map {
+                meta.push(self.export_json_meta(name, value));
+            }
+        }
+
+        if has_order_edges {
+            let key = self.make_term(model::Literal::Nat(node.index() as u64).into());
+            meta.push(self.make_term_apply(model::ORDER_HINT_KEY, &[key]));
         }
 
         meta.into_bump_slice()

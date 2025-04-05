@@ -24,7 +24,7 @@ use crate::ComposablePass;
 /// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
 ///     - [crate::remove_dead_funcs] can be used when no other Hugr will be linked in that might instantiate these
 /// * else, the originals are removed (they are invisible from outside the Hugr); however, note
-///     that this behaviour is expected to change in a future release to match Module-rooted Hugrs.
+///   that this behaviour is expected to change in a future release to match Module-rooted Hugrs.
 ///
 /// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
 /// signature then the HUGR will not be modified.

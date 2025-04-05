@@ -13,10 +13,22 @@ check:
     HUGR_TEST_SCHEMA=1 uv run pre-commit run --all-files
 
 # Run all the tests.
-test language="[rust|python]" : (_run_lang language \
-        "HUGR_TEST_SCHEMA=1 cargo test --all-features" \
-        "cargo build -p hugr-cli && HUGR_RENDER_DOT=1 uv run pytest"
-    )
+test: test-rust test-python
+# Run all rust tests.
+test-rust:
+    @# We cannot use --workspace --all-features as `hugr-model`s pyo3 feature cannot be
+    @# built into a binary build (without using `maturin`)
+    @#
+    @# This feature list should be kept in sync with the `hugr-py/pyproject.toml`
+    HUGR_TEST_SCHEMA=1 cargo test \
+        --workspace \
+        --exclude 'hugr-py' \
+        --features 'hugr/extension_inference hugr/declarative hugr/model_unstable hugr/llvm hugr/llvm-test hugr/zstd'
+# Run all python tests.
+test-python:
+    uv run maturin develop --uv
+    cargo build -p hugr-cli
+    HUGR_RENDER_DOT=1 uv run pytest
 
 # Run all the benchmarks.
 bench language="[rust|python]": (_run_lang language \

@@ -963,7 +963,7 @@ mod test {
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
                 .add_default_array_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_logic_extensions()
         });
         assert_eq!(1, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1073,7 +1073,7 @@ mod test {
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
                 .add_default_array_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_logic_extensions()
         });
         assert_eq!(1, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1142,7 +1142,7 @@ mod test {
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
                 .add_default_array_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -1196,7 +1196,7 @@ mod test {
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
                 .add_default_array_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         assert_eq!(value, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -1271,7 +1271,7 @@ mod test {
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
                 .add_default_array_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         let expected: u64 = (inc..size + inc).sum();
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1333,7 +1333,7 @@ mod test {
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
                 .add_default_array_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         let expected: u64 = (0..size).sum();
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
