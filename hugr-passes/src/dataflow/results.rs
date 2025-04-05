@@ -88,14 +88,14 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     ///    the Hugr did not have a [Type](hugr_core::types::Type) for the specified wire
     /// `Some(e)` if [conversion to a concrete value](PartialValue::try_into_concrete) failed with error `e`
     #[allow(clippy::type_complexity)]
-    pub fn try_read_wire_concrete<V2, VE, SE, LE>(
+    pub fn try_read_wire_concrete<V2, VE, SE>(
         &self,
         w: Wire<H::Node>,
-    ) -> Result<V2, Option<ExtractValueError<V, H::Node, VE, SE, LE>>>
+    ) -> Result<V2, Option<ExtractValueError<V, H::Node, VE, SE>>>
     where
         V2: TryFrom<V, Error = VE>
             + TryFrom<Sum<V2>, Error = SE>
-            + TryFrom<LoadedFunction<H::Node>, Error = LE>,
+            + TryFrom<LoadedFunction<H::Node>, Error = LoadedFunction<H::Node>>,
     {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self

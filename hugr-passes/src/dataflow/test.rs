@@ -296,7 +296,7 @@ fn test_conditional() {
     let cond_r1: Value = results.try_read_wire_concrete(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
     assert!(results
-        .try_read_wire_concrete::<Value, _, _, _>(cond_o2)
+        .try_read_wire_concrete::<Value, _, _>(cond_o2)
         .is_err());
 
     assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only

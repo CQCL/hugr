@@ -175,14 +175,14 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
     /// If this PartialSum had multiple possible tags; or if `typ` was not a [TypeEnum::Sum]
     /// supporting the single possible tag with the correct number of elements and no row variables;
     /// or if converting a child element failed via [PartialValue::try_into_concrete].
-    pub fn try_into_sum<C, VE, SE, LE>(
+    pub fn try_into_sum<C, VE, SE>(
         self,
         typ: &Type,
-    ) -> Result<Sum<C>, ExtractValueError<V, N, VE, SE, LE>>
+    ) -> Result<Sum<C>, ExtractValueError<V, N, VE, SE>>
     where
         V: TryInto<C, Error = VE>,
         Sum<C>: TryInto<C, Error = SE>,
-        LoadedFunction<N>: TryInto<C, Error = LE>,
+        LoadedFunction<N>: TryInto<C, Error = LoadedFunction<N>>,
     {
         if self.0.len() != 1 {
             return Err(ExtractValueError::MultipleVariants(self));
@@ -215,7 +215,7 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
 /// via [PartialValue::try_into_concrete] or [PartialSum::try_into_sum]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
-pub enum ExtractValueError<V, N, VE, SE, LE> {
+pub enum ExtractValueError<V, N, VE, SE> {
     #[error("PartialSum value had multiple possible tags: {0}")]
     MultipleVariants(PartialSum<V, N>),
     #[error("Value contained `Bottom`")]
@@ -226,8 +226,8 @@ pub enum ExtractValueError<V, N, VE, SE, LE> {
     CouldNotConvert(V, #[source] VE),
     #[error("Could not build Sum from concrete element values")]
     CouldNotBuildSum(#[source] SE),
-    #[error("Could not turn LoadedFunction into concrete")]
-    CouldNotLoadFunction(#[source] LE),
+    #[error("Could not convert into concrete function pointer {0}")]
+    CouldNotLoadFunction(LoadedFunction<N>),
     #[error("Expected a SumType with tag {tag} having {num_elements} elements, found {typ}")]
     BadSumType {
         typ: Type,
@@ -395,14 +395,14 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialValue<V, N> {
     /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
     /// that could not be converted into a [Sum] by [PartialSum::try_into_sum] (e.g. if `typ` is
     /// incorrect), or if that [Sum] could not be converted into a `V2`.
-    pub fn try_into_concrete<C, VE, SE, LE>(
+    pub fn try_into_concrete<C, VE, SE>(
         self,
         typ: &Type,
-    ) -> Result<C, ExtractValueError<V, N, VE, SE, LE>>
+    ) -> Result<C, ExtractValueError<V, N, VE, SE>>
     where
         V: TryInto<C, Error = VE>,
         Sum<C>: TryInto<C, Error = SE>,
-        LoadedFunction<N>: TryInto<C, Error = LE>,
+        LoadedFunction<N>: TryInto<C, Error = LoadedFunction<N>>,
     {
         match self {
             Self::Value(v) => v
