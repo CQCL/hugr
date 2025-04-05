@@ -352,7 +352,7 @@ mod test {
     use rstest::rstest;
 
     use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
-    use crate::ReplaceTypes;
+    use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
 

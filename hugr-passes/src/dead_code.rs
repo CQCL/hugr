@@ -159,6 +159,7 @@ impl DeadCodeElimPass {
 
 impl ComposablePass for DeadCodeElimPass {
     type Error = Infallible;
+    type Result = ();
 
     fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Infallible> {
         let needed = self.find_needed_nodes(&*hugr);

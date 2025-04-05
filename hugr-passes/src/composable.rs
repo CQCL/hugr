@@ -10,15 +10,23 @@ use itertools::Either;
 /// e.g. by [ValidatingPass]
 pub trait ComposablePass: Sized {
     type Error: Error;
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error>;
+    type Result; // Would like to default to () but currently unstable
 
-    fn map_err<E2: Error>(self, f: impl Fn(Self::Error) -> E2) -> impl ComposablePass<Error = E2> {
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error>;
+
+    fn map_err<E2: Error>(
+        self,
+        f: impl Fn(Self::Error) -> E2,
+    ) -> impl ComposablePass<Result = Self::Result, Error = E2> {
         ErrMapper::new(self, f)
     }
 
     /// Returns a [ComposablePass] that does "`self` then `other`", so long as
     /// `other::Err` maps into ours.
-    fn then<P: ComposablePass>(self, other: P) -> impl ComposablePass<Error = Self::Error>
+    fn then<P: ComposablePass>(
+        self,
+        other: P,
+    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = Self::Error>
     where
         P::Error: Into<Self::Error>,
     {
@@ -30,7 +38,8 @@ pub trait ComposablePass: Sized {
     fn then_either<P: ComposablePass>(
         self,
         other: P,
-    ) -> impl ComposablePass<Error = Either<Self::Error, P::Error>> {
+    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = Either<Self::Error, P::Error>>
+    {
         (self.map_err(Either::Left), other.map_err(Either::Right))
     }
 
@@ -50,8 +59,9 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ErrMapper<P, E, F> {
 
 impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMapper<P, E, F> {
     type Error = E;
+    type Result = P::Result;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<P::Result, Self::Error> {
         self.0.run(hugr).map_err(&self.1)
     }
 }
@@ -60,10 +70,12 @@ impl<E: Error, P1: ComposablePass<Error = E>, P2: ComposablePass<Error = E>> Com
     for (P1, P2)
 {
     type Error = E;
+    type Result = (P1::Result, P2::Result);
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error> {
-        self.0.run(hugr)?;
-        self.1.run(hugr)
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
+        let res1 = self.0.run(hugr)?;
+        let res2 = self.1.run(hugr)?;
+        Ok((res1, res2))
     }
 }
 
@@ -120,24 +132,26 @@ impl<P: ComposablePass> ValidatingPass<P> {
 
 impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
     type Error = ValidatePassError<P::Error>;
+    type Result = P::Result;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<P::Result, Self::Error> {
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Input {
             err,
             pretty_hugr,
         })?;
-        self.0.run(hugr).map_err(ValidatePassError::Underlying)?;
+        let res = self.0.run(hugr).map_err(ValidatePassError::Underlying)?;
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Output {
             err,
             pretty_hugr,
-        })
+        })?;
+        Ok(res)
     }
 }
 
 pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
     hugr: &mut impl HugrMut,
-) -> Result<(), ValidatePassError<P::Error>> {
+) -> Result<P::Result, ValidatePassError<P::Error>> {
     if cfg!(test) {
         ValidatingPass::new_default(pass).run(hugr)
     } else {
@@ -186,13 +200,13 @@ mod test {
         cfold.run(&mut hugr.clone()).unwrap();
 
         let exp_err = ConstFoldError::InvalidEntryPoint(id2.node(), DEFAULT_OPTYPE);
-        let r: Result<(), Either<Infallible, ConstFoldError>> = dce
+        let r: Result<_, Either<Infallible, ConstFoldError>> = dce
             .clone()
             .then_either(cfold.clone())
             .run(&mut hugr.clone());
         assert_eq!(r, Err(Either::Right(exp_err.clone())));
 
-        let r: Result<(), ConstFoldError> = dce
+        let r: Result<_, ConstFoldError> = dce
             .map_err(|inf| match inf {})
             .then(cfold)
             .run(&mut hugr.clone());

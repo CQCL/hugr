@@ -23,7 +23,7 @@ use hugr_core::types::{
 };
 use hugr_core::{Hugr, HugrView, Node, Wire};
 
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::ComposablePass;
 
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
@@ -140,7 +140,6 @@ pub struct ReplaceTypes {
         ParametricType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
-    validation: ValidationLevel,
 }
 
 impl TypeTransformer for ReplaceTypes {
@@ -171,18 +170,10 @@ pub enum ReplaceTypesError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     #[error(transparent)]
-    ValidationError(#[from] ValidatePassError),
-    #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
 }
 
 impl ReplaceTypes {
-    /// Sets the validation level used before and after the pass is run.
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
     /// Configures this instance to replace occurrences of type `src` with `dest`.
     /// Note that if `src` is an instance of a *parametrized* [TypeDef], this takes
     /// precedence over [Self::replace_parametrized_type] where the `src`s overlap. Thus, this
@@ -291,36 +282,6 @@ impl ReplaceTypes {
             + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
-    }
-
-    /// Run the pass using specified configuration.
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
-    }
-
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
-        let mut changed = false;
-        for n in hugr.nodes().collect::<Vec<_>>() {
-            changed |= self.change_node(hugr, n)?;
-            let new_dfsig = hugr.get_optype(n).dataflow_signature();
-            if let Some(new_sig) = new_dfsig
-                .filter(|_| changed && n != hugr.root())
-                .map(Cow::into_owned)
-            {
-                for outp in new_sig.output_ports() {
-                    if !new_sig.out_port_type(outp).unwrap().copyable() {
-                        let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
-                        if targets.len() != 1 {
-                            hugr.disconnect(n, outp);
-                            let src = Wire::new(n, outp);
-                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
-                        }
-                    }
-                }
-            }
-        }
-        Ok(changed)
     }
 
     fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ReplaceTypesError> {
@@ -442,11 +403,39 @@ impl ReplaceTypes {
                     false
                 }
             }),
-            Value::Function { hugr } => self.run_no_validate(&mut **hugr),
+            Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
 }
 
+impl ComposablePass for ReplaceTypes {
+    type Error = ReplaceTypesError;
+    type Result = bool;
+
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
+        let mut changed = false;
+        for n in hugr.nodes().collect::<Vec<_>>() {
+            changed |= self.change_node(hugr, n)?;
+            let new_dfsig = hugr.get_optype(n).dataflow_signature();
+            if let Some(new_sig) = new_dfsig
+                .filter(|_| changed && n != hugr.root())
+                .map(Cow::into_owned)
+            {
+                for outp in new_sig.output_ports() {
+                    if !new_sig.out_port_type(outp).unwrap().copyable() {
+                        let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
+                        if targets.len() != 1 {
+                            hugr.disconnect(n, outp);
+                            let src = Wire::new(n, outp);
+                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(changed)
+    }
+}
 pub mod handlers {
     //! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
     use hugr_core::ops::{constant::OpaqueValue, Value};
@@ -549,6 +538,8 @@ mod test {
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
+
+    use crate::ComposablePass;
 
     use super::{handlers::list_const, NodeTemplate, ReplaceTypes};
 

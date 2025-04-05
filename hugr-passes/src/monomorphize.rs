@@ -259,6 +259,7 @@ pub struct MonomorphizePass;
 
 impl ComposablePass for MonomorphizePass {
     type Error = Infallible;
+    type Result = ();
 
     fn run(&self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         let root = h.root();
