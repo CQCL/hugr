@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use crate::{
-    extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
+    extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, TypeDef},
     hugr::HugrMut,
     ops::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
@@ -24,7 +24,7 @@ use crate::{
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
         TypeEnum, TypeName, TypeRow,
     },
-    Direction, Hugr, HugrView, Node, Port,
+    Direction, Extension, Hugr, HugrView, Node, Port,
 };
 use fxhash::FxHashMap;
 use hugr_model::v0 as model;
@@ -111,8 +111,9 @@ pub fn import_hugr(
         extensions,
         nodes: FxHashMap::default(),
         local_vars: FxHashMap::default(),
-        custom_name_cache: FxHashMap::default(),
         region_scope: table::RegionId::default(),
+        cache_typedef: FxHashMap::default(),
+        cache_custom_name: FxHashMap::default(),
     };
 
     ctx.import_root()?;
@@ -145,7 +146,8 @@ struct Context<'a> {
 
     local_vars: FxHashMap<table::VarId, LocalVar>,
 
-    custom_name_cache: FxHashMap<&'a model::SymbolName, (ExtensionId, SmolStr)>,
+    cache_custom_name: FxHashMap<table::NodeId, (ExtensionId, SmolStr)>,
+    cache_typedef: FxHashMap<table::NodeId, (&'a Arc<Extension>, &'a TypeDef)>,
 
     region_scope: table::RegionId,
 }
@@ -510,12 +512,11 @@ impl<'a> Context<'a> {
                 let table::Term::Apply(node, params) = self.get_term(operation)? else {
                     return Err(table::ModelError::TypeError(operation).into());
                 };
-                let name = self.get_symbol_name(*node)?;
                 let args = params
                     .iter()
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;
-                let (extension, name) = self.import_custom_name(name)?;
+                let (extension, name) = self.import_custom_name(*node)?;
                 let signature = self.get_node_signature(node_id)?;
 
                 // TODO: Currently we do not have the description or any other metadata for
@@ -1162,25 +1163,32 @@ impl<'a> Context<'a> {
                     .map(|arg| self.import_type_arg(*arg))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = self.get_symbol_name(*symbol)?;
-                let (extension, id) = self.import_custom_name(name)?;
+                let (extension_ref, ext_type) = match self.cache_typedef.get(symbol) {
+                    Some(ext_type) => *ext_type,
+                    None => {
+                        let (extension, id) = self.import_custom_name(*symbol)?;
 
-                let extension_ref =
-                    self.extensions
-                        .get(&extension)
-                        .ok_or_else(|| ImportError::Extension {
-                            missing_ext: extension.clone(),
-                            available: self.extensions.ids().cloned().collect(),
+                        let extension_ref = self.extensions.get(&extension).ok_or_else(|| {
+                            ImportError::Extension {
+                                missing_ext: extension.clone(),
+                                available: self.extensions.ids().cloned().collect(),
+                            }
                         })?;
 
-                let ext_type =
-                    extension_ref
-                        .get_type(&id)
-                        .ok_or_else(|| ImportError::ExtensionType {
-                            ext: extension.clone(),
-                            name: id.clone(),
+                        let typedef = extension_ref.get_type(&id).ok_or_else(|| {
+                            ImportError::ExtensionType {
+                                ext: extension.clone(),
+                                name: id.clone(),
+                            }
                         })?;
 
+                        self.cache_typedef.insert(*symbol, (extension_ref, typedef));
+                        (extension_ref, typedef)
+                    }
+                };
+
+                let id = ext_type.name().clone();
+                let extension = extension_ref.name().clone();
                 let bound = ext_type.bound(&args);
 
                 Ok(TypeBase::new_extension(CustomType::new(
@@ -1342,23 +1350,23 @@ impl<'a> Context<'a> {
 
     fn import_custom_name(
         &mut self,
-        symbol: &'a model::SymbolName,
+        node: table::NodeId,
     ) -> Result<(ExtensionId, SmolStr), ImportError> {
-        use std::collections::hash_map::Entry;
-        match self.custom_name_cache.entry(symbol) {
-            Entry::Occupied(occupied_entry) => Ok(occupied_entry.get().clone()),
-            Entry::Vacant(vacant_entry) => {
-                let qualified_name = ExtensionId::new(symbol.as_ref())
-                    .map_err(|_| table::ModelError::MalformedName(symbol.as_ref().to_smolstr()))?;
-
-                let (extension, id) = qualified_name.split_last().ok_or_else(|| {
-                    table::ModelError::MalformedName(symbol.as_ref().to_smolstr())
-                })?;
-
-                vacant_entry.insert((extension.clone(), id.clone()));
-                Ok((extension, id))
-            }
+        if let Some(ext_id) = self.cache_custom_name.get(&node) {
+            return Ok(ext_id.clone());
         }
+
+        let symbol = self.get_symbol_name(node)?;
+
+        let qualified_name = ExtensionId::new(symbol.as_ref())
+            .map_err(|_| table::ModelError::MalformedName(symbol.as_ref().to_smolstr()))?;
+
+        let ext_id = qualified_name
+            .split_last()
+            .ok_or_else(|| table::ModelError::MalformedName(symbol.as_ref().to_smolstr()))?;
+
+        self.cache_custom_name.insert(node, ext_id.clone());
+        Ok(ext_id)
     }
 
     fn import_json_meta(
