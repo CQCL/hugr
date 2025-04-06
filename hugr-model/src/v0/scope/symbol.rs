@@ -1,6 +1,8 @@
 use fxhash::FxHasher;
+use indexmap::Equivalent;
 use indexmap::IndexMap;
 use std::hash::BuildHasherDefault;
+use std::hash::Hash;
 use thiserror::Error;
 
 use crate::v0::{
@@ -41,17 +43,24 @@ type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 /// assert!(symbols.is_visible(NodeId(0)));
 /// assert!(!symbols.is_visible(NodeId(1)));
 /// ```
-#[derive(Debug, Clone, Default)]
-pub struct SymbolTable {
-    symbols: FxIndexMap<SymbolName, BindingIndex>,
+#[derive(Debug, Clone)]
+pub struct SymbolTable<K = SymbolName> {
+    symbols: FxIndexMap<K, BindingIndex>,
     bindings: FxIndexMap<NodeId, Binding>,
     scopes: FxIndexMap<RegionId, Scope>,
 }
 
-impl SymbolTable {
+impl<K> SymbolTable<K>
+where
+    K: Clone + Eq + Hash,
+{
     /// Create a new symbol table.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            symbols: Default::default(),
+            bindings: Default::default(),
+            scopes: Default::default(),
+        }
     }
 
     /// Enter a new scope for the given region.
@@ -94,7 +103,7 @@ impl SymbolTable {
     /// # Panics
     ///
     /// Panics if there is no current scope.
-    pub fn insert(&mut self, name: SymbolName, node: NodeId) -> Result<(), DuplicateSymbolError> {
+    pub fn insert(&mut self, name: K, node: NodeId) -> Result<(), DuplicateSymbolError> {
         let scope_depth = self.scopes.len() as u16 - 1;
 
         let (symbol_index, shadows) = match self.symbols.entry(name) {
@@ -103,11 +112,7 @@ impl SymbolTable {
                     self.bindings.get_index(*entry.get()).unwrap();
 
                 if shadowed_binding.scope_depth == scope_depth {
-                    return Err(DuplicateSymbolError(
-                        entry.key().clone(),
-                        node,
-                        *shadowed_node,
-                    ));
+                    return Err(DuplicateSymbolError(node, *shadowed_node));
                 }
 
                 (entry.index(), Some(*entry.get()))
@@ -132,7 +137,7 @@ impl SymbolTable {
     }
 
     /// Get the name of the symbol defined by the given node.
-    pub fn symbol_name(&self, node: NodeId) -> Option<&SymbolName> {
+    pub fn symbol_name(&self, node: NodeId) -> Option<&K> {
         let binding = self.bindings.get(&node)?;
         let (name, _) = self.symbols.get_index(binding.symbol_index)?;
         Some(name)
@@ -149,11 +154,11 @@ impl SymbolTable {
     }
 
     /// Tries to resolve a symbol name in the current scope.
-    pub fn resolve(&self, name: impl AsRef<str>) -> Result<NodeId, UnknownSymbolError> {
-        let index = *self
-            .symbols
-            .get(name.as_ref())
-            .ok_or(UnknownSymbolError(SymbolName::new(name.as_ref())))?;
+    pub fn resolve<Q>(&self, name: &Q) -> Result<NodeId, UnknownSymbolError>
+    where
+        Q: ?Sized + Hash + Equivalent<K>,
+    {
+        let index = *self.symbols.get(name).ok_or(UnknownSymbolError)?;
 
         // NOTE: The unwrap is safe because the `symbols` map
         // points to valid indices in the `bindings` map.
@@ -178,6 +183,15 @@ impl SymbolTable {
         self.symbols.clear();
         self.bindings.clear();
         self.scopes.clear();
+    }
+}
+
+impl<K> Default for SymbolTable<K>
+where
+    K: Clone + Eq + Hash,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -211,10 +225,10 @@ pub type ScopeDepth = u16;
 
 /// Error that occurs when trying to resolve an unknown symbol.
 #[derive(Debug, Clone, Error)]
-#[error("symbol name `{0}` not found in this scope")]
-pub struct UnknownSymbolError(SymbolName);
+#[error("symbol name not found in this scope")]
+pub struct UnknownSymbolError;
 
 /// Error that occurs when trying to introduce a symbol that is already defined in the current scope.
 #[derive(Debug, Clone, Error)]
-#[error("symbol `{0}` is already defined in this scope")]
-pub struct DuplicateSymbolError(SymbolName, pub NodeId, pub NodeId);
+#[error("symbol is already defined in this scope")]
+pub struct DuplicateSymbolError(pub NodeId, pub NodeId);

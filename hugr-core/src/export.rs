@@ -26,7 +26,7 @@ use hugr_model::v0::{
     table,
 };
 use petgraph::unionfind::UnionFind;
-use smol_str::{format_smolstr, ToSmolStr};
+use smol_str::{format_smolstr, SmolStr, ToSmolStr};
 
 /// Export a [`Package`] to its representation in the model.
 pub fn export_package<'a>(package: &'a Package, bump: &'a Bump) -> table::Package<'a> {
@@ -77,18 +77,18 @@ struct Context<'a> {
     links: Links,
 
     /// The symbol table tracking symbols that are currently in scope.
-    symbols: model::scope::SymbolTable,
+    symbols: model::scope::SymbolTable<CoreSymbol>,
 
     /// Mapping from implicit imports to their node ids.
-    implicit_imports: FxHashMap<model::SymbolName, table::NodeId>,
+    implicit_imports: FxHashMap<CoreSymbol, table::NodeId>,
 
     /// Map from node ids in the [`Hugr`] to the corresponding node ids in the model.
     node_to_id: FxHashMap<Node, table::NodeId>,
 
     /// Mapping from node ids in the [`Hugr`] to the corresponding model nodes.
     id_to_node: FxHashMap<table::NodeId, Node>,
-    // TODO: Once this module matures, we should consider adding an auxiliary structure
-    // that ensures that the `node_to_id` and `id_to_node` maps stay in sync.
+
+    static_symbols: FxHashMap<&'static str, CoreSymbol>,
 }
 
 impl<'a> Context<'a> {
@@ -110,6 +110,7 @@ impl<'a> Context<'a> {
             implicit_imports: FxHashMap::default(),
             node_to_id: FxHashMap::default(),
             id_to_node: FxHashMap::default(),
+            static_symbols: FxHashMap::default(),
         }
     }
 
@@ -183,23 +184,6 @@ impl<'a> Context<'a> {
             .or_insert_with(|| self.module.insert_term(term))
     }
 
-    pub fn make_qualified_name(
-        &mut self,
-        extension: &ExtensionId,
-        name: impl AsRef<str>,
-    ) -> model::SymbolName {
-        model::SymbolName::new(format_smolstr!("{}.{}", extension, name.as_ref()))
-    }
-
-    pub fn make_named_global_ref(
-        &mut self,
-        extension: &IdentList,
-        name: impl AsRef<str>,
-    ) -> table::NodeId {
-        let symbol = self.make_qualified_name(extension, name);
-        self.resolve_symbol(symbol)
-    }
-
     /// Get the node that declares or defines the function associated with the given
     /// node via the static input. Returns `None` if the node is not connected to a function.
     fn connected_function(&self, node: Node) -> Option<Node> {
@@ -240,16 +224,16 @@ impl<'a> Context<'a> {
 
         // We record the name of the symbol defined by the node, if any.
         let symbol = match optype {
-            OpType::FuncDefn(func_defn) => Some(func_defn.name.as_str()),
-            OpType::FuncDecl(func_decl) => Some(func_decl.name.as_str()),
-            OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
-            OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),
+            OpType::FuncDefn(func_defn) => Some(func_defn.name.to_smolstr()),
+            OpType::FuncDecl(func_decl) => Some(func_decl.name.to_smolstr()),
+            OpType::AliasDecl(alias_decl) => Some(alias_decl.name.clone()),
+            OpType::AliasDefn(alias_defn) => Some(alias_defn.name.clone()),
             _ => None,
         };
 
         if let Some(symbol) = symbol {
             self.symbols
-                .insert(model::SymbolName::new(symbol), node_id)
+                .insert(CoreSymbol::Local(symbol), node_id)
                 .expect("duplicate symbol");
         }
 
@@ -433,7 +417,8 @@ impl<'a> Context<'a> {
             }
 
             OpType::OpaqueOp(op) => {
-                let node = self.make_named_global_ref(op.extension(), op.op_name());
+                let name = CoreSymbol::Qualified(op.extension().clone(), op.op_name().clone());
+                let node = self.resolve_symbol(&name);
                 let params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
@@ -492,7 +477,11 @@ impl<'a> Context<'a> {
 
         let poly_func_type = match opdef.signature_func() {
             SignatureFunc::PolyFuncType(poly_func_type) => poly_func_type,
-            _ => return self.make_named_global_ref(opdef.extension_id(), opdef.name()),
+            _ => {
+                let name =
+                    CoreSymbol::Qualified(opdef.extension_id().clone(), opdef.name().clone());
+                return self.resolve_symbol(&name);
+            }
         };
 
         let key = (opdef.extension_id().clone(), opdef.name().clone());
@@ -506,7 +495,7 @@ impl<'a> Context<'a> {
         };
 
         let symbol = self.with_local_scope(node, |this| {
-            let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
+            let name = CoreSymbol::Qualified(opdef.extension_id().clone(), opdef.name().clone());
             this.export_poly_func_type(name, poly_func_type)
         });
 
@@ -724,7 +713,7 @@ impl<'a> Context<'a> {
     /// Exports a polymorphic function type.
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
-        name: model::SymbolName,
+        name: CoreSymbol,
         t: &PolyFuncTypeBase<RV>,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
@@ -743,7 +732,7 @@ impl<'a> Context<'a> {
         let body = self.export_func_type(t.body());
 
         self.bump.alloc(table::Symbol {
-            name,
+            name: name.into(),
             params: params.into_bump_slice(),
             constraints,
             signature: body,
@@ -758,7 +747,8 @@ impl<'a> Context<'a> {
         match t {
             TypeEnum::Extension(ext) => self.export_custom_type(ext),
             TypeEnum::Alias(alias) => {
-                let symbol = self.resolve_symbol(alias.name());
+                let name = CoreSymbol::Local(alias.name().to_smolstr());
+                let symbol = self.resolve_symbol(&name);
                 self.make_term(table::Term::Apply(symbol, &[]))
             }
             TypeEnum::Function(func) => self.export_func_type(func),
@@ -778,7 +768,8 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_custom_type(&mut self, t: &CustomType) -> table::TermId {
-        let symbol = self.make_named_global_ref(t.extension(), t.name());
+        let name = CoreSymbol::Qualified(t.extension().clone(), t.name().clone());
+        let symbol = self.resolve_symbol(&name);
 
         let args = self
             .bump
@@ -930,26 +921,19 @@ impl<'a> Context<'a> {
                     }
 
                     let contents = self.make_term(table::Term::List(contents.into_bump_slice()));
-
-                    let symbol = self.resolve_symbol(ArrayValue::CTR_NAME);
-                    let args = self.bump.alloc_slice_copy(&[len, element_type, contents]);
-                    return self.make_term(table::Term::Apply(symbol, args));
+                    return self
+                        .make_term_apply(ArrayValue::CTR_NAME, &[len, element_type, contents]);
                 }
 
                 if let Some(v) = e.value().downcast_ref::<ConstInt>() {
                     let bitwidth = self.make_term(model::Literal::Nat(v.log_width() as u64).into());
                     let literal = self.make_term(model::Literal::Nat(v.value_u()).into());
-
-                    let symbol = self.resolve_symbol(ConstInt::CTR_NAME);
-                    let args = self.bump.alloc_slice_copy(&[bitwidth, literal]);
-                    return self.make_term(table::Term::Apply(symbol, args));
+                    return self.make_term_apply(ConstInt::CTR_NAME, &[bitwidth, literal]);
                 }
 
                 if let Some(v) = e.value().downcast_ref::<ConstF64>() {
                     let literal = self.make_term(model::Literal::Float(v.value().into()).into());
-                    let symbol = self.resolve_symbol(ConstF64::CTR_NAME);
-                    let args = self.bump.alloc_slice_copy(&[literal]);
-                    return self.make_term(table::Term::Apply(symbol, args));
+                    return self.make_term_apply(ConstF64::CTR_NAME, &[literal]);
                 }
 
                 let json = match e.value().downcast_ref::<CustomSerialized>() {
@@ -960,9 +944,7 @@ impl<'a> Context<'a> {
 
                 let json = self.make_term(model::Literal::Str(json.into()).into());
                 let runtime_type = self.export_type(&e.get_type());
-                let args = self.bump.alloc_slice_copy(&[runtime_type, json]);
-                let symbol = self.resolve_symbol(model::COMPAT_CONST_JSON);
-                self.make_term(table::Term::Apply(symbol, args))
+                return self.make_term_apply(model::COMPAT_CONST_JSON, &[runtime_type, json]);
             }
 
             Value::Function { hugr } => {
@@ -1017,31 +999,61 @@ impl<'a> Context<'a> {
         self.make_term_apply(model::COMPAT_META_JSON, &[name, value])
     }
 
-    fn resolve_symbol(&mut self, name: impl AsRef<str>) -> table::NodeId {
-        let result = self.symbols.resolve(name.as_ref());
+    fn resolve_symbol(&mut self, name: &CoreSymbol) -> table::NodeId {
+        let result = self.symbols.resolve(name);
 
-        match result {
-            Ok(node) => node,
-            Err(_) => *self
-                .implicit_imports
-                .entry(model::SymbolName::new(name.as_ref()))
-                .or_insert_with_key(|name| {
-                    self.module.insert_node(table::Node {
-                        operation: table::Operation::Import(name.clone()),
-                        ..table::Node::default()
-                    })
-                }),
+        if let Ok(node) = result {
+            return node;
         }
+
+        // NOTE: We do not use the entry API here in order to avoid allocating
+        // a new `SymbolName` when the import already exists.
+        if let Some(node) = self.implicit_imports.get(name) {
+            return *node;
+        }
+
+        let node = self.module.insert_node(table::Node {
+            operation: table::Operation::Import(name.clone().into()),
+            ..table::Node::default()
+        });
+        self.implicit_imports.insert(name.clone(), node);
+        node
     }
 
-    fn make_term_apply(&mut self, name: &'a str, args: &[table::TermId]) -> table::TermId {
-        let symbol = self.resolve_symbol(name);
+    fn make_term_apply(&mut self, name: &'static str, args: &[table::TermId]) -> table::TermId {
+        let name = self
+            .static_symbols
+            .entry(name)
+            .or_insert_with(|| {
+                let (ext, name) = name.rsplit_once(".").unwrap();
+                let ext = IdentList::new_unchecked(ext);
+                let name = name.to_smolstr();
+                CoreSymbol::Qualified(ext, name)
+            })
+            .clone();
+
+        let symbol = self.resolve_symbol(&name);
         let args = self.bump.alloc_slice_copy(args);
         self.make_term(table::Term::Apply(symbol, args))
     }
 }
 
 type FxIndexSet<T> = indexmap::IndexSet<T, FxBuildHasher>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum CoreSymbol {
+    Qualified(ExtensionId, SmolStr),
+    Local(SmolStr),
+}
+
+impl From<CoreSymbol> for model::SymbolName {
+    fn from(value: CoreSymbol) -> Self {
+        Self::new(match value {
+            CoreSymbol::Qualified(ext, name) => format_smolstr!("{}.{}", ext, name),
+            CoreSymbol::Local(name) => name,
+        })
+    }
+}
 
 /// Data structure for translating the edges between ports in the `Hugr` graph
 /// into the hypergraph representation used by `hugr_model`.
