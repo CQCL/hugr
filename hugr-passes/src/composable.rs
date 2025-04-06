@@ -27,9 +27,65 @@ pub trait ComposablePass: Sized {
         self,
         other: P,
     ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = E> {
+        struct Sequence<E, P1, P2>(P1, P2, PhantomData<E>);
+        impl<E, P1, P2> ComposablePass for Sequence<E, P1, P2>
+        where
+            P1: ComposablePass,
+            P2: ComposablePass,
+            E: ErrorCombiner<P1::Error, P2::Error>,
+        {
+            type Error = E;
+
+            type Result = (P1::Result, P2::Result);
+
+            fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
+                let res1 = self.0.run(hugr).map_err(E::from_first)?;
+                let res2 = self.1.run(hugr).map_err(E::from_second)?;
+                Ok((res1, res2))
+            }
+        }
+
         Sequence(self, other, PhantomData)
     }
 }
+
+/// Trait for combining the error types from two different passes
+/// into a single error.
+pub trait ErrorCombiner<A, B>: Error {
+    fn from_first(a: A) -> Self;
+    fn from_second(b: B) -> Self;
+}
+
+impl<A: Error, B: Into<A>> ErrorCombiner<A, B> for A {
+    fn from_first(a: A) -> Self {
+        a
+    }
+
+    fn from_second(b: B) -> Self {
+        b.into()
+    }
+}
+
+impl<A: Error, B: Error> ErrorCombiner<A, B> for Either<A, B> {
+    fn from_first(a: A) -> Self {
+        Either::Left(a)
+    }
+
+    fn from_second(b: B) -> Self {
+        Either::Right(b)
+    }
+}
+
+// Note: in the short term two more impls could be useful:
+//   impl<E:Error> ErrorCombiner<Infallible, E> for E
+//   impl<E:Error> ErrorCombiner<E, Infallible> for E
+// however, these aren't possible as they conflict with
+//   impl<A, B:Into<A>> ErrorCombiner<A,B> for A
+// (when A=E=Infallible), boo :-(.
+// However this will become possible, indeed automatic, when Infallible is replaced
+// by ! (never_type) as (unlike Infallible) ! converts Into anything
+
+// ErrMapper ------------------------------
 
 struct ErrMapper<P, E, F>(P, F, PhantomData<E>);
 
@@ -48,23 +104,7 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMa
     }
 }
 
-struct Sequence<E, P1, P2>(P1, P2, PhantomData<E>);
-impl<E, P1, P2> ComposablePass for Sequence<E, P1, P2>
-where
-    P1: ComposablePass,
-    P2: ComposablePass,
-    E: ErrorCombiner<P1::Error, P2::Error> + Error,
-{
-    type Error = E;
-
-    type Result = (P1::Result, P2::Result);
-
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
-        let res1 = self.0.run(hugr).map_err(E::from_first)?;
-        let res2 = self.1.run(hugr).map_err(E::from_second)?;
-        Ok((res1, res2))
-    }
-}
+// ValidatingPass ------------------------------
 
 /// Error from a [ValidatingPass]
 #[derive(thiserror::Error, Debug)]
@@ -135,7 +175,11 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
     }
 }
 
-struct IfTrueThen<E, A, B>(A, B, PhantomData<E>);
+// IfTrueThen ------------------------------
+/// [ComposablePass] that executes a first pass that returns a `bool`
+/// result; and then, if-and-only-if that first result was true,
+/// executes a second pass
+pub struct IfTrueThen<E, A, B>(A, B, PhantomData<E>);
 impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Error, B::Error>>
     ComposablePass for IfTrueThen<E, A, B>
 {
@@ -149,40 +193,6 @@ impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Er
             .transpose()
     }
 }
-
-pub trait ErrorCombiner<A, B>: Error {
-    fn from_first(a: A) -> Self;
-    fn from_second(b: B) -> Self;
-}
-
-impl<A: Error, B: Into<A>> ErrorCombiner<A, B> for A {
-    fn from_first(a: A) -> Self {
-        a
-    }
-
-    fn from_second(b: B) -> Self {
-        b.into()
-    }
-}
-
-impl<A: Error, B: Error> ErrorCombiner<A, B> for Either<A, B> {
-    fn from_first(a: A) -> Self {
-        Either::Left(a)
-    }
-
-    fn from_second(b: B) -> Self {
-        Either::Right(b)
-    }
-}
-
-// Note: in the short term two more impls could be useful:
-//   impl<E:Error> ErrorCombiner<Infallible, E> for E
-//   impl<E:Error> ErrorCombiner<E, Infallible> for E
-// however, these aren't possible as they conflict with
-//   impl<A, B:Into<A>> ErrorCombiner<A,B> for A
-// (when A=E=Infallible), boo :-(.
-// However this will become possible, indeed automatic, when Infallible is replaced
-// by ! (never_type) as (unlike Infallible) ! converts Into anything
 
 pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
