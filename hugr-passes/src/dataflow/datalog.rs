@@ -409,11 +409,9 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
                 .unwrap()
                 .0;
             // Node could be a FuncDefn or a FuncDecl, so do not pass the node itself
-            Some(ValueRow::singleton(PartialValue::LoadedFunction(
-                LoadedFunction {
-                    func_node,
-                    args: load_op.type_args.clone(),
-                },
+            Some(ValueRow::singleton(PartialValue::new_load(
+                func_node,
+                load_op.type_args.clone(),
             )))
         }
         OpType::ExtensionOp(e) => {
