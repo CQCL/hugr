@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 
 use ascent::lattice::BoundedLattice;
+use ascent::Lattice;
+use hugr_core::core::HugrNode;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
@@ -325,21 +327,23 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             in_wire_value(outp, p, v);
 
         // CallIndirect --------------------
-        relation indirect_call(H::Node, H::Node); // <Node> is an `IndirectCall` to `FuncDefn` <Node>
-        indirect_call(call, func_node) <--
+        lattice indirect_call(H::Node, LatticeWrapper<H::Node>); // <Node> is an `IndirectCall` to `FuncDefn` <Node>
+        indirect_call(call, tgt) <--
             node(call),
             if let OpType::CallIndirect(_) = hugr.get_optype(*call),
             in_wire_value(call, IncomingPort::from(0), v),
-            if let PartialValue::LoadedFunction(LoadedFunction {func_node, ..}) = v;
+            let tgt = load_func(v);
 
         out_wire_value(inp, OutgoingPort::from(p.index()-1), v) <--
-            indirect_call(call, func),
+            indirect_call(call, lv),
+            if let LatticeWrapper::Value(func) = lv,
             input_child(func, inp),
             in_wire_value(call, p, v)
             if p.index() > 0;
 
         out_wire_value(call, OutgoingPort::from(p.index()), v) <--
-            indirect_call(call, func),
+            indirect_call(call, lv),
+            if let LatticeWrapper::Value(func) = lv,
             output_child(func, outp),
             in_wire_value(outp, p, v);
 
@@ -364,6 +368,51 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         in_wire_value: all_results.in_wire_value,
         case_reachable: all_results.case_reachable,
         bb_reachable: all_results.bb_reachable,
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, PartialOrd)]
+enum LatticeWrapper<T> {
+    Bottom,
+    Value(T),
+    Top,
+}
+
+impl<N: HugrNode> Lattice for LatticeWrapper<N> {
+    fn meet_mut(&mut self, other: Self) -> bool {
+        if *self == other || *self == LatticeWrapper::Bottom || other == LatticeWrapper::Top {
+            return false;
+        };
+        if *self == LatticeWrapper::Top || other == LatticeWrapper::Bottom {
+            *self = other;
+            return true;
+        };
+        // Both are `Value`s and not equal
+        *self = LatticeWrapper::Bottom;
+        true
+    }
+
+    fn join_mut(&mut self, other: Self) -> bool {
+        if *self == other || *self == LatticeWrapper::Top || other == LatticeWrapper::Bottom {
+            return false;
+        };
+        if *self == LatticeWrapper::Bottom || other == LatticeWrapper::Top {
+            *self = other;
+            return true;
+        };
+        // Both are `Value`s and are not equal
+        *self = LatticeWrapper::Top;
+        true
+    }
+}
+
+fn load_func<V, N: Copy>(v: &PV<V, N>) -> LatticeWrapper<N> {
+    match v {
+        PartialValue::Bottom | PartialValue::PartialSum(_) => LatticeWrapper::Bottom,
+        PartialValue::LoadedFunction(LoadedFunction { func_node, .. }) => {
+            LatticeWrapper::Value(*func_node)
+        }
+        PartialValue::Value(_) | PartialValue::Top => LatticeWrapper::Top,
     }
 }
 
