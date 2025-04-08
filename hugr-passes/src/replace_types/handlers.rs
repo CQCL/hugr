@@ -17,7 +17,9 @@ use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{type_row, Hugr, HugrView};
 use itertools::Itertools;
 
-use super::{LinearizeError, Linearizer, OpReplacement, ReplaceTypes, ReplaceTypesError};
+use super::{
+    CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
+};
 
 /// Handler for [ListValue] constants that recursively [ReplaceTypes::change_value]s
 /// the elements of the list
@@ -52,10 +54,10 @@ fn runtime_reqs(h: &Hugr) -> ExtensionSet {
 pub fn linearize_array(
     args: &[TypeArg],
     num_outports: usize,
-    lin: &Linearizer,
-) -> Result<OpReplacement, LinearizeError> {
+    lin: &CallbackHandler,
+) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
-    // restriction on OpReplacement::CompoundOp
+    // restriction on NodeTemplate::CompoundOp
     let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
         panic!("Illegal TypeArgs to array: {:?}", args)
     };
@@ -75,7 +77,7 @@ pub fn linearize_array(
         // Now array.scan that over the input array to get an array of unit (which can be discarded)
         let array_scan = ArrayScan::new(ty.clone(), Type::UNIT, vec![], *n, runtime_reqs(&map_fn));
         let in_type = array_type(*n, ty.clone());
-        Ok(OpReplacement::CompoundOp(Box::new({
+        Ok(NodeTemplate::CompoundOp(Box::new({
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
             let [in_array] = dfb.input_wires_arr();
             let map_fn = dfb.add_load_value(Value::Function {
@@ -198,7 +200,7 @@ pub fn linearize_array(
             .unwrap()
             .outputs_arr();
 
-        Ok(OpReplacement::CompoundOp(Box::new(
+        Ok(NodeTemplate::CompoundOp(Box::new(
             dfb.finish_hugr_with_outputs([out_array1, out_array2])
                 .unwrap(),
         )))

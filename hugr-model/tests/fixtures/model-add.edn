@@ -3,12 +3,11 @@
 (define-func example.add
   (core.fn
    [arithmetic.int.types.int arithmetic.int.types.int]
-   [arithmetic.int.types.int]
-   (ext))
+   [arithmetic.int.types.int])
   (dfg
    [%0 %1]
    [%2]
-   (signature (core.fn [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int] (ext)))
+   (signature (core.fn [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int]))
    (arithmetic.int.iadd
     [%0 %1] [%2]
-    (signature (core.fn [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int] (ext))))))
+    (signature (core.fn [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int])))))

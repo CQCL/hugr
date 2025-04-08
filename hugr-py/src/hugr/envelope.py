@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
 
-import zstd
+import pyzstd
 
 if TYPE_CHECKING:
     from hugr.package import Package
@@ -62,7 +62,7 @@ def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
             raise ValueError(msg)
 
     if config.zstd is not None:
-        payload = zstd.compress(payload, config.zstd)
+        payload = pyzstd.compress(payload, config.zstd)
 
     envelope += payload
     return bytes(envelope)
@@ -85,7 +85,7 @@ def read_envelope(envelope: bytes) -> Package:
     payload = envelope[10:]
 
     if header.zstd:
-        payload = zstd.uncompress(payload)
+        payload = pyzstd.decompress(payload)
 
     match header.format:
         case EnvelopeFormat.JSON:

@@ -310,15 +310,10 @@ pub enum Term<'a> {
     /// A static literal value.
     Literal(Literal),
 
-    /// Extension set.
-    ///
-    /// **Type:** `core.ext_set`
-    ExtSet(&'a [ExtSetPart<'a>]),
-
     /// A constant anonymous function.
     ///
     /// **Type:** `(core.const (core.fn ?ins ?outs ?ext) (ext))`
-    ConstFunc(RegionId),
+    Func(RegionId),
 
     /// Tuple of static data.
     ///
@@ -344,15 +339,6 @@ pub enum SeqPart {
     /// A single item.
     Item(TermId),
     /// A list to be spliced into the parent list/tuple.
-    Splice(TermId),
-}
-
-/// A part of an extension set term.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ExtSetPart<'a> {
-    /// An extension.
-    Extension(&'a str),
-    /// An extension set to be spliced into the parent extension set.
     Splice(TermId),
 }
 

@@ -13,7 +13,6 @@ impl<'py> pyo3::FromPyObject<'py> for Term {
 
         Ok(match name.to_str()? {
             "Wildcard" => Self::Wildcard,
-            "ExtSet" => Self::ExtSet,
             "Var" => {
                 let name = term.getattr("name")?.extract()?;
                 Self::Var(name)
@@ -84,10 +83,6 @@ impl<'py> pyo3::IntoPyObject<'py> for &Term {
             Term::Func(region) => {
                 let py_class = py_module.getattr("Func")?;
                 py_class.call1((region.as_ref(),))
-            }
-            Term::ExtSet => {
-                let py_class = py_module.getattr("ExtSet")?;
-                py_class.call0()
             }
         }
     }

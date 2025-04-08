@@ -1,10 +1,7 @@
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
-//! Replace types with other types across the Hugr.
+//! Replace types with other types across the Hugr. See [ReplaceTypes] and [Linearizer].
 //!
-//! Parametrized types and ops will be reparametrized taking into account the replacements,
-//! but any ops taking/returning the replaced types *not* as a result of parametrization,
-//! will also need to be replaced - see [ReplaceTypes::replace_op]. (Similarly [Const]s.)
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -21,25 +18,30 @@ use hugr_core::ops::{
     FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
     Value, CFG, DFG,
 };
-use hugr_core::types::{CustomType, Transformable, Type, TypeArg, TypeEnum, TypeTransformer};
-use hugr_core::{Hugr, Node, Wire};
+use hugr_core::types::{
+    CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
+};
+use hugr_core::{Hugr, HugrView, Node, Wire};
 
 use crate::validation::{ValidatePassError, ValidationLevel};
 
 mod linearize;
-pub use linearize::{LinearizeError, Linearizer};
+pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
 
-/// A thing with which an Op (i.e. node) can be replaced
+/// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
+/// or in order to replace an existing node.
+///
+/// [DataflowParent]: hugr_core::ops::OpTag::DataflowParent
 #[derive(Clone, Debug, PartialEq)]
-pub enum OpReplacement {
-    /// Keep the same node, change only the op (updating types of inputs/outputs)
+pub enum NodeTemplate {
+    /// A single node - so if replacing an existing node, change only the op
     SingleOp(OpType),
-    /// Defines a sub-Hugr to splice in place of the op - a [CFG], [Conditional], [DFG]
-    /// or [TailLoop], which must have the same inputs and outputs as the original op,
-    /// modulo replacement.
+    /// Defines a sub-Hugr to insert, whose root becomes (or replaces) the desired Node.
+    /// The root must be a [CFG], [Conditional], [DFG] or [TailLoop].
     // Not a FuncDefn, nor Case/DataflowBlock
-    /// Note this will be of limited use before [monomorphization](super::monomorphize()) because
-    /// the sub-Hugr will not be able to use type variables present in the op.
+    /// Note this will be of limited use before [monomorphization](super::monomorphize())
+    /// because the new subtree will not be able to use type variables present in the
+    /// parent Hugr or previous op.
     // TODO: store also a vec<TypeParam>, and update Hugr::validate to take &[TypeParam]s
     // (defaulting to empty list) - see https://github.com/CQCL/hugr/issues/709
     CompoundOp(Box<Hugr>),
@@ -48,13 +50,13 @@ pub enum OpReplacement {
     // So client should add the functions before replacement, then remove unused ones afterwards.)
 }
 
-impl OpReplacement {
+impl NodeTemplate {
     /// Adds this instance to the specified [HugrMut] as a new node or subtree under a
     /// given parent, returning the unique new child (of that parent) thus created
     pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Node {
         match self {
-            OpReplacement::SingleOp(op_type) => hugr.add_node_with_parent(parent, op_type),
-            OpReplacement::CompoundOp(new_h) => hugr.insert_hugr(parent, *new_h).new_root,
+            NodeTemplate::SingleOp(op_type) => hugr.add_node_with_parent(parent, op_type),
+            NodeTemplate::CompoundOp(new_h) => hugr.insert_hugr(parent, *new_h).new_root,
         }
     }
 
@@ -65,16 +67,16 @@ impl OpReplacement {
         inputs: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         match self {
-            OpReplacement::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
-            OpReplacement::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
+            NodeTemplate::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
+            NodeTemplate::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
         }
     }
 
     fn replace(&self, hugr: &mut impl HugrMut, n: Node) {
         assert_eq!(hugr.children(n).count(), 0);
         let new_optype = match self.clone() {
-            OpReplacement::SingleOp(op_type) => op_type,
-            OpReplacement::CompoundOp(new_h) => {
+            NodeTemplate::SingleOp(op_type) => op_type,
+            NodeTemplate::CompoundOp(new_h) => {
                 let new_root = hugr.insert_hugr(n, *new_h).new_root;
                 let children = hugr.children(new_root).collect::<Vec<_>>();
                 let root_opty = hugr.remove_node(new_root);
@@ -86,17 +88,50 @@ impl OpReplacement {
         };
         *hugr.optype_mut(n) = new_optype;
     }
+
+    fn signature(&self) -> Option<Cow<'_, Signature>> {
+        match self {
+            NodeTemplate::SingleOp(op_type) => op_type,
+            NodeTemplate::CompoundOp(hugr) => hugr.root_type(),
+        }
+        .dataflow_signature()
+    }
 }
 
 /// A configuration of what types, ops, and constants should be replaced with what.
 /// May be applied to a Hugr via [Self::run].
+///
+/// Parametrized types and ops will be reparametrized taking into account the
+/// replacements, but any ops taking/returning the replaced types *not* as a result of
+/// parametrization, will also need to be replaced - see [Self::replace_op].
+/// Similarly [Const]s.
+///
+/// Types that are [Copyable](hugr_core::types::TypeBound::Copyable) may also be replaced
+/// with types that are not, see [Linearizer].
+///
+/// Note that although this pass may be used before [monomorphization], there are some
+/// limitations (that do not apply if done after [monomorphization]):
+/// * [NodeTemplate::CompoundOp] only works for operations that do not use type variables
+/// * "Overrides" of specific instantiations of polymorphic types will not be detected if
+///   the instantiations are created inside polymorphic functions. For example, suppose
+///   we [Self::replace_type] type `A` with `X`, [Self::replace_parametrized_type]
+///   container `MyList` with `List`, and [Self::replace_type] `MyList<A>` with
+///   `SpecialListOfXs`. If a function `foo` polymorphic over a type variable `T` dealing
+///   with `MyList<T>`s, that is called with type argument `A`, then `foo<T>` will be
+///   updated to deal with `List<T>`s and the call `foo<A>` updated to `foo<X>`, but this
+///   will still result in using `List<X>` rather than `SpecialListOfXs`. (However this
+///   would be fine *after* [monomorphization]: the monomorphic definition of `foo_A`
+///   would use `SpecialListOfXs`.)
+/// * See also limitations noted for [Linearizer].
+///
+/// [monomorphization]: super::monomorphize()
 #[derive(Clone, Default)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
-    linearize: Linearizer,
-    op_map: HashMap<OpHashWrapper, OpReplacement>,
-    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<OpReplacement>>>,
+    linearize: DelegatingLinearizer,
+    op_map: HashMap<OpHashWrapper, NodeTemplate>,
+    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>>,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -189,54 +224,22 @@ impl ReplaceTypes {
         // overapproximation. Moreover, these depend upon the *return type* of the Fn.
         // It would be too awkward to require:
         // dest_fn: impl Fn(&TypeArg) -> (Type,
-        //                                Fn(&Linearizer) -> OpReplacement, // copy
-        //                                Fn(&Linearizer) -> OpReplacement)` // discard
+        //                                Fn(&Linearizer) -> NodeTemplate, // copy
+        //                                Fn(&Linearizer) -> NodeTemplate)` // discard
         self.param_types.insert(src.into(), Arc::new(dest_fn));
     }
 
-    /// Configures this instance that, when an outport of type `src` has other than one connected
-    /// inport, the specified `copy` and or `discard` ops should be used to wire it to those inports.
-    /// (`copy` should have exactly one inport, of type `src`, and two outports, of same type;
-    /// `discard` should have exactly one inport, of type 'src', and no outports.)
-    ///
-    /// The same [OpReplacement]s are also used in cases where `src` is an element of a [TypeEnum::Sum].
-    ///
-    /// # Errors
-    ///
-    /// If `src` is [Copyable], it is returned as an `Err
-    ///
-    /// [Copyable]: hugr_core::types::TypeBound::Copyable
-    pub fn linearize(
-        &mut self,
-        src: CustomType,
-        copy: OpReplacement,
-        discard: OpReplacement,
-    ) -> Result<(), CustomType> {
-        self.linearize.register(src, copy, discard)
-    }
-
-    /// Configures this instance that when lowering produces an outport which
-    /// * has type an instantiation of the parametric type `src`, and
-    /// * is not [Copyable](hugr_core::types::TypeBound::Copyable), and
+    /// Allows to configure how to deal with types/wires that were [Copyable]
+    /// but have become linear as a result of type-changing. Specifically,
+    /// the [Linearizer] is used whenever lowering produces an outport which both
+    /// * has a non-[Copyable] type - perhaps a direct substitution, or perhaps e.g.
+    ///   as a result of changing the element type of a collection such as an [`array`]
     /// * has other than one connected inport,
     ///
-    /// ...then the provided callback should be used to generate a `copy` or `discard` op,
-    /// passing the desired number of outports (which will never be 1).
-    ///
-    /// (That is, this is like [Self::linearize] but for parametric types and/or
-    ///  with a callback that can generate an n-way copy directly, rather than
-    ///  with a 0-way and 2-way copy.)
-    ///
-    /// The [Linearizer] is passed so that the callback can use it to generate
-    /// `copy`/`discard` ops for other types (e.g. the elements of a collection),
-    /// as part of an [OpReplacement::CompoundOp].
-    pub fn linearize_parametric(
-        &mut self,
-        src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &Linearizer) -> Result<OpReplacement, LinearizeError>
-            + 'static,
-    ) {
-        self.linearize.register_parametric(src, copy_discard_fn)
+    /// [Copyable]: hugr_core::types::TypeBound::Copyable
+    /// [`array`]: hugr_core::std_extensions::collections::array::array_type
+    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
+        &mut self.linearize
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
@@ -245,7 +248,7 @@ impl ReplaceTypes {
     /// this should only be used on already-*[monomorphize](super::monomorphize())d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
-    pub fn replace_op(&mut self, src: &ExtensionOp, dest: OpReplacement) {
+    pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
         self.op_map.insert(OpHashWrapper::from(src), dest);
     }
 
@@ -258,7 +261,7 @@ impl ReplaceTypes {
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<OpReplacement> + 'static,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
     ) {
         self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
@@ -301,9 +304,8 @@ impl ReplaceTypes {
         for n in hugr.nodes().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
-            if let Some(new_sig) = (changed && n != hugr.root())
-                .then_some(new_dfsig)
-                .flatten()
+            if let Some(new_sig) = new_dfsig
+                .filter(|_| changed && n != hugr.root())
                 .map(Cow::into_owned)
             {
                 for outp in new_sig.output_ports() {
@@ -311,9 +313,8 @@ impl ReplaceTypes {
                         let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
                         if targets.len() != 1 {
                             hugr.disconnect(n, outp);
-                            let typ = new_sig.out_port_type(outp).unwrap();
-                            self.linearize
-                                .insert_copy_discard(hugr, n, outp, typ, &targets)?;
+                            let src = Wire::new(n, outp);
+                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
                         }
                     }
                 }
@@ -518,7 +519,7 @@ mod test {
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
 
-    use super::{handlers::list_const, OpReplacement, ReplaceTypes};
+    use super::{handlers::list_const, NodeTemplate, ReplaceTypes};
 
     const PACKED_VEC: &str = "PackedVec";
     const READ: &str = "read";
@@ -579,7 +580,7 @@ mod test {
     }
 
     fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
-        fn lowered_read(args: &[TypeArg]) -> Option<OpReplacement> {
+        fn lowered_read(args: &[TypeArg]) -> Option<NodeTemplate> {
             let ty = just_elem_type(args);
             let mut dfb = DFGBuilder::new(inout_sig(
                 vec![array_type(64, ty.clone()), i64_t()],
@@ -598,7 +599,7 @@ mod test {
             let [res] = dfb
                 .build_unwrap_sum(1, option_type(Type::from(ty.clone())), opt)
                 .unwrap();
-            Some(OpReplacement::CompoundOp(Box::new(
+            Some(NodeTemplate::CompoundOp(Box::new(
                 dfb.finish_hugr_with_outputs([res]).unwrap(),
             )))
         }
@@ -611,7 +612,7 @@ mod test {
         );
         lw.replace_op(
             &read_op(ext, bool_t()),
-            OpReplacement::SingleOp(
+            NodeTemplate::SingleOp(
                 ExtensionOp::new(ext.get_op("lowered_read_bool").unwrap().clone(), [])
                     .unwrap()
                     .into(),
@@ -890,7 +891,7 @@ mod test {
             e.get_op(READ).unwrap().as_ref(),
             Box::new(|args: &[TypeArg]| {
                 option_contents(just_elem_type(args)).map(|elem| {
-                    OpReplacement::SingleOp(
+                    NodeTemplate::SingleOp(
                         ListOp::get
                             .with_type(elem)
                             .to_extension_op()

@@ -199,7 +199,8 @@ class ExtensionsParam(TypeParam):
         return "Extensions"
 
     def to_model(self) -> model.Term:
-        return model.Apply("core.ext_set")
+        # Since extension sets will be deprecated, this is just a placeholder.
+        return model.Apply("compat.ext_set_type")
 
 
 # ------------------------------------------
@@ -293,7 +294,7 @@ class ExtensionsArg(TypeArg):
 
     def to_model(self) -> model.Term:
         # Since extension sets will be deprecated, this is just a placeholder.
-        return model.ExtSet()
+        return model.Apply("compat.ext_set")
 
 
 @dataclass(frozen=True)
@@ -585,8 +586,7 @@ class FunctionType(Type):
     def to_model(self) -> model.Term:
         inputs = model.List([input.to_model() for input in self.input])
         outputs = model.List([output.to_model() for output in self.output])
-        exts = model.ExtSet()
-        return model.Apply("core.fn", [inputs, outputs, exts])
+        return model.Apply("core.fn", [inputs, outputs])
 
 
 @dataclass(frozen=True)

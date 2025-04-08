@@ -4,8 +4,7 @@
               (param ?n core.nat)
               (param ?t core.type)
               (where (core.nonlinear ?t))
-              (core.fn [?t] [(collections.array.array ?n ?t)]
-                       (ext)))
+              (core.fn [?t] [(collections.array.array ?n ?t)]))
 
 (declare-func
  array.copy
@@ -15,11 +14,11 @@
  (core.fn
   [(collections.array.array ?n ?t)]
   [(collections.array.array ?n ?t)
-   (collections.array.array ?n ?t)] (ext)))
+   (collections.array.array ?n ?t)]))
 
 (define-func util.copy
   (param ?t core.type)
   (where (core.nonlinear ?t))
-  (core.fn [?t] [?t ?t] (ext))
+  (core.fn [?t] [?t ?t])
   (dfg [%0] [%0 %0]
-       (signature (core.fn [?t] [?t ?t] (ext)))))
+       (signature (core.fn [?t] [?t ?t]))))
