@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-v0.15.3...hugr-v0.15.4) - 2025-04-08
+
+### New Features
+
+- Export the portgraph hierarchy in HugrInternals ([#2057](https://github.com/CQCL/hugr/pull/2057))
+
 ## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-v0.15.2...hugr-v0.15.3) - 2025-04-02
 
 ### Documentation
