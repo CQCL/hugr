@@ -254,7 +254,7 @@ jobs:
       - name: Generate minimal Cargo.lock
         run: |
           rm Cargo.lock
-          cargo minimal-versions check
+          cargo minimal-versions check --direct
       - name: Build with no features
         run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
