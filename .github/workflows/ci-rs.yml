@@ -252,7 +252,12 @@ jobs:
           cargo binstall cargo-hack --force
           cargo binstall cargo-minimal-versions --force
       - name: Pin transitive dependencies not compatible with our MSRV
-        run: cargo update half --precise 2.4.1
+        # Add new dependencies as needed if the check fails due to
+        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.75.0"
+        run: |
+          cargo add -p hugr half@2.4.1
+          cargo add -p hugr litemap@0.7.4
+          cargo add -p hugr zerofrom@0.1.5
       - name: Build with no features
         run: cargo minimal-versions --direct test --verbose  --no-default-features --no-run
       - name: Tests with no features
