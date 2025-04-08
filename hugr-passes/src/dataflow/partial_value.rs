@@ -1,5 +1,6 @@
 use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
+use hugr_core::extension::FoldVal;
 use hugr_core::ops::Value;
 use hugr_core::types::{ConstTypeError, SumType, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::Node;
@@ -427,6 +428,17 @@ impl TryFrom<Sum<Value>> for Value {
 
     fn try_from(value: Sum<Value>) -> Result<Self, Self::Error> {
         Self::sum(value.tag, value.values, value.st)
+    }
+}
+
+impl From<Sum<FoldVal>> for FoldVal {
+    fn from(value: Sum<FoldVal>) -> Self {
+        let Sum { tag, values, st } = value;
+        Self::Sum {
+            tag,
+            sum_type: st,
+            items: values,
+        }
     }
 }
 

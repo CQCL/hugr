@@ -4,15 +4,16 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Weak};
 
+use super::const_fold::FoldVal;
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
     SignatureError,
 };
 
-use crate::ops::{OpName, OpNameRef};
+use crate::ops::{OpName, OpNameRef, Value};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
-use crate::Hugr;
+use crate::{Hugr, IncomingPort};
 mod serialize_signature_func;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -457,12 +458,28 @@ impl OpDef {
 
     /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
     /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s.
+    #[deprecated(note = "use constant_fold2")]
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Value)],
+        consts: &[(IncomingPort, Value)],
     ) -> ConstFoldResult {
+        #[allow(deprecated)] // we are in deprecated function, remove at same time
         (self.constant_folder.as_ref())?.fold(type_args, consts)
+    }
+
+    /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
+    /// [FoldVal] values for each input, and update the outputs, which should be
+    /// initialised to [FoldVal::Unknown].
+    pub fn constant_fold2(
+        &self,
+        type_args: &[TypeArg],
+        inputs: &[FoldVal],
+        outputs: &mut [FoldVal],
+    ) {
+        if let Some(cf) = self.constant_folder.as_ref() {
+            cf.fold2(type_args, inputs, outputs)
+        }
     }
 
     /// Returns a reference to the signature function of this [`OpDef`].
