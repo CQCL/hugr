@@ -1,10 +1,12 @@
+use std::convert::Infallible;
+
 use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::{inout_sig, CFGBuilder, Container, DataflowHugr, ModuleBuilder};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::handle::DfgID;
 use hugr_core::ops::{CallIndirect, TailLoop};
-use hugr_core::types::TypeRow;
+use hugr_core::types::{ConstTypeError, TypeRow};
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -19,7 +21,10 @@ use hugr_core::{
 use hugr_core::{Hugr, Node, Wire};
 use rstest::{fixture, rstest};
 
-use super::{AbstractValue, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination};
+use super::{
+    AbstractValue, AsConcrete, ConstLoader, DFContext, LoadedFunction, Machine, PartialValue, Sum,
+    TailLoopTermination,
+};
 
 // ------- Minimal implementation of DFContext and AbstractValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -35,9 +40,21 @@ impl ConstLoader<Void> for TestContext {
 impl DFContext<Void> for TestContext {}
 
 // This allows testing creation of tuple/sum Values (only)
-impl From<Void> for Value {
-    fn from(v: Void) -> Self {
+impl<N> AsConcrete<Void, N> for Value {
+    type ValErr = Infallible;
+
+    type SumErr = ConstTypeError;
+
+    fn from_value(v: Void) -> Result<Self, Infallible> {
         match v {}
+    }
+
+    fn from_sum(value: Sum<Self>) -> Result<Self, Self::SumErr> {
+        Self::sum(value.tag, value.values, value.st)
+    }
+
+    fn from_func(func: LoadedFunction<N>) -> Result<Self, crate::dataflow::LoadedFunction<N>> {
+        Err(func)
     }
 }
 
@@ -295,9 +312,7 @@ fn test_conditional() {
 
     let cond_r1: Value = results.try_read_wire_concrete(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
-    assert!(results
-        .try_read_wire_concrete::<Value, _, _>(cond_o2)
-        .is_err());
+    assert!(results.try_read_wire_concrete::<Value>(cond_o2).is_err());
 
     assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
     assert_eq!(results.case_reachable(case2.node()), Some(true));

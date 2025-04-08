@@ -1,7 +1,6 @@
 use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
-use hugr_core::ops::Value;
-use hugr_core::types::{ConstTypeError, SumType, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::Node;
 use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
@@ -166,6 +165,30 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> PartialSum<V, N> {
     }
 }
 
+/// Trait implemented by value types into which [PartialValue]s can be converted,
+/// so long as the PV has no [Top](PartialValue::Top), [Bottom](PartialValue::Bottom)
+/// or [PartialSum]s with more than one possible tag. See [PartialSum::try_into_sum]
+/// and [PartialValue::try_into_concrete].
+///
+/// `V` is the type of [AbstractValue] from which `Self` can (fallibly) be constructed,
+/// `N` is the type of [HugrNode](hugr_core::core::HugrNode) for function pointers
+pub trait AsConcrete<V, N>: Sized {
+    /// Kind of error raised when creating `Self` from a value `V`, see [Self::from_value]
+    type ValErr: std::error::Error;
+    /// Kind of error that may be raised when creating `Self` from a [Sum] of `Self`s,
+    /// see [Self::from_sum]
+    type SumErr: std::error::Error;
+
+    /// Convert an abstract value into concrete
+    fn from_value(val: V) -> Result<Self, Self::ValErr>;
+
+    /// Convert a sum (of concrete values, already recursively converted) into concrete
+    fn from_sum(sum: Sum<Self>) -> Result<Self, Self::SumErr>;
+
+    /// Convert a function pointer into a concrete value
+    fn from_func(func: LoadedFunction<N>) -> Result<Self, LoadedFunction<N>>;
+}
+
 impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
     /// Turns this instance into a [Sum] of some "concrete" value type `C`,
     /// *if* this PartialSum has exactly one possible tag.
@@ -175,15 +198,11 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
     /// If this PartialSum had multiple possible tags; or if `typ` was not a [TypeEnum::Sum]
     /// supporting the single possible tag with the correct number of elements and no row variables;
     /// or if converting a child element failed via [PartialValue::try_into_concrete].
-    pub fn try_into_sum<C, VE, SE>(
+    #[allow(clippy::type_complexity)] // Since C is a parameter, can't declare type aliases
+    pub fn try_into_sum<C: AsConcrete<V, N>>(
         self,
         typ: &Type,
-    ) -> Result<Sum<C>, ExtractValueError<V, N, VE, SE>>
-    where
-        V: TryInto<C, Error = VE>,
-        Sum<C>: TryInto<C, Error = SE>,
-        LoadedFunction<N>: TryInto<C, Error = LoadedFunction<N>>,
-    {
+    ) -> Result<Sum<C>, ExtractValueError<V, N, C::ValErr, C::SumErr>> {
         if self.0.len() != 1 {
             return Err(ExtractValueError::MultipleVariants(self));
         }
@@ -395,46 +414,23 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialValue<V, N> {
     /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
     /// that could not be converted into a [Sum] by [PartialSum::try_into_sum] (e.g. if `typ` is
     /// incorrect), or if that [Sum] could not be converted into a `V2`.
-    pub fn try_into_concrete<C, VE, SE>(
+    pub fn try_into_concrete<C: AsConcrete<V, N>>(
         self,
         typ: &Type,
-    ) -> Result<C, ExtractValueError<V, N, VE, SE>>
-    where
-        V: TryInto<C, Error = VE>,
-        Sum<C>: TryInto<C, Error = SE>,
-        LoadedFunction<N>: TryInto<C, Error = LoadedFunction<N>>,
-    {
+    ) -> Result<C, ExtractValueError<V, N, C::ValErr, C::SumErr>> {
         match self {
-            Self::Value(v) => v
-                .clone()
-                .try_into()
-                .map_err(|e| ExtractValueError::CouldNotConvert(v, e)),
-            Self::LoadedFunction(lf) => lf
-                .try_into()
-                .map_err(ExtractValueError::CouldNotLoadFunction),
-            Self::PartialSum(ps) => ps
-                .try_into_sum(typ)?
-                .try_into()
-                .map_err(ExtractValueError::CouldNotBuildSum),
+            Self::Value(v) => {
+                C::from_value(v.clone()).map_err(|e| ExtractValueError::CouldNotConvert(v, e))
+            }
+            Self::LoadedFunction(lf) => {
+                C::from_func(lf).map_err(ExtractValueError::CouldNotLoadFunction)
+            }
+            Self::PartialSum(ps) => {
+                C::from_sum(ps.try_into_sum(typ)?).map_err(ExtractValueError::CouldNotBuildSum)
+            }
             Self::Top => Err(ExtractValueError::ValueIsTop),
             Self::Bottom => Err(ExtractValueError::ValueIsBottom),
         }
-    }
-}
-
-impl TryFrom<Sum<Value>> for Value {
-    type Error = ConstTypeError;
-
-    fn try_from(value: Sum<Value>) -> Result<Self, Self::Error> {
-        Self::sum(value.tag, value.values, value.st)
-    }
-}
-
-impl<N> TryFrom<LoadedFunction<N>> for Value {
-    type Error = LoadedFunction<N>;
-
-    fn try_from(value: LoadedFunction<N>) -> Result<Self, Self::Error> {
-        Err(value)
     }
 }
 

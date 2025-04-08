@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use hugr_core::{HugrView, PortIndex, Wire};
 
 use super::{
-    datalog::InWire, partial_value::ExtractValueError, AbstractValue, LoadedFunction, PartialValue,
-    Sum,
+    datalog::InWire, partial_value::ExtractValueError, AbstractValue, AsConcrete, PartialValue,
 };
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
@@ -88,15 +87,10 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     ///    the Hugr did not have a [Type](hugr_core::types::Type) for the specified wire
     /// `Some(e)` if [conversion to a concrete value](PartialValue::try_into_concrete) failed with error `e`
     #[allow(clippy::type_complexity)]
-    pub fn try_read_wire_concrete<V2, VE, SE>(
+    pub fn try_read_wire_concrete<V2: AsConcrete<V, H::Node>>(
         &self,
         w: Wire<H::Node>,
-    ) -> Result<V2, Option<ExtractValueError<V, H::Node, VE, SE>>>
-    where
-        V2: TryFrom<V, Error = VE>
-            + TryFrom<Sum<V2>, Error = SE>
-            + TryFrom<LoadedFunction<H::Node>, Error = LoadedFunction<H::Node>>,
-    {
+    ) -> Result<V2, Option<ExtractValueError<V, H::Node, V2::ValErr, V2::SumErr>>> {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
             .hugr

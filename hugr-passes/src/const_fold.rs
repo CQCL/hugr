@@ -127,7 +127,7 @@ impl ConstantFoldPass {
                     n,
                     ip,
                     results
-                        .try_read_wire_concrete::<Value, _, _>(Wire::new(src, outp))
+                        .try_read_wire_concrete::<Value>(Wire::new(src, outp))
                         .ok()?,
                 ))
             })
