@@ -2,7 +2,7 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
-use super::Rewrite;
+use super::{ApplyPatchHugrMut, VerifyPatch};
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{IncomingPort, Node, OutgoingPort, PortIndex};
 
@@ -21,12 +21,11 @@ pub enum InlineDFGError {
     NoParent,
 }
 
-impl Rewrite for InlineDFG {
+impl VerifyPatch for InlineDFG {
     /// Returns the removed nodes: the DFG, and its Input and Output children.
-    type ApplyResult = [Node; 3];
     type Error = InlineDFGError;
 
-    const UNCHANGED_ON_FAILURE: bool = true;
+    type Node = Node;
 
     fn verify(&self, h: &impl crate::HugrView<Node = Node>) -> Result<(), Self::Error> {
         let n = self.0.node();
@@ -39,7 +38,20 @@ impl Rewrite for InlineDFG {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl crate::hugr::HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+        [self.0.node()].into_iter()
+    }
+}
+
+impl ApplyPatchHugrMut for InlineDFG {
+    type Outcome = [Node; 3];
+
+    const UNCHANGED_ON_FAILURE: bool = true;
+
+    fn apply_hugr_mut(
+        self,
+        h: &mut impl crate::hugr::HugrMut,
+    ) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let n = self.0.node();
         let (oth_in, oth_out) = {
@@ -120,10 +132,6 @@ impl Rewrite for InlineDFG {
         h.remove_node(n);
         Ok([n, input, output])
     }
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        [self.0.node()].into_iter()
-    }
 }
 
 #[cfg(test)]
@@ -138,7 +146,7 @@ mod test {
     };
     use crate::extension::prelude::qb_t;
     use crate::extension::ExtensionSet;
-    use crate::hugr::rewrite::inline_dfg::InlineDFGError;
+    use crate::hugr::patch::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};

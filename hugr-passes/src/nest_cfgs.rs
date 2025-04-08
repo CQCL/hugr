@@ -44,10 +44,10 @@ use std::hash::Hash;
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr_core::hugr::rewrite::outline_cfg::OutlineCfg;
+use hugr_core::hugr::patch::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::sibling::SiblingMut;
 use hugr_core::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use hugr_core::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
+use hugr_core::hugr::{hugrmut::HugrMut, ApplyPatch, RootTagged};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
@@ -576,7 +576,7 @@ pub(crate) mod test {
     };
     use hugr_core::extension::{prelude::usize_t, ExtensionSet};
 
-    use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
+    use hugr_core::hugr::patch::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::ops::Value;
