@@ -88,9 +88,8 @@ impl<'a> Context<'a> {
             Term::Tuple(parts) => table::Term::Tuple(self.resolve_seq_parts(parts)?),
             Term::Func(region) => {
                 let region = self.resolve_region(region, ScopeClosure::Closed)?;
-                table::Term::ConstFunc(region)
+                table::Term::Func(region)
             }
-            Term::ExtSet => table::Term::ExtSet(&[]),
         };
 
         Ok(*self

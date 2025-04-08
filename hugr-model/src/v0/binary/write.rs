@@ -154,7 +154,7 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &table::Term) {
             model::Literal::Float(value) => builder.set_float(value.into_inner()),
         },
 
-        table::Term::ConstFunc(region) => builder.set_const_func(region.0),
+        table::Term::Func(region) => builder.set_func(region.0),
         table::Term::Apply(symbol, args) => {
             let mut builder = builder.init_apply();
             builder.set_symbol(symbol.0);
@@ -163,10 +163,6 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &table::Term) {
 
         table::Term::List(parts) => {
             write_list!(builder, init_list, write_seq_part, parts);
-        }
-
-        table::Term::ExtSet(parts) => {
-            write_list!(builder, init_ext_set, write_ext_set_part, parts);
         }
 
         table::Term::Tuple(parts) => {
@@ -179,15 +175,5 @@ fn write_seq_part(mut builder: hugr_capnp::term::seq_part::Builder, part: &table
     match part {
         table::SeqPart::Item(term_id) => builder.set_item(term_id.0),
         table::SeqPart::Splice(term_id) => builder.set_splice(term_id.0),
-    }
-}
-
-fn write_ext_set_part(
-    mut builder: hugr_capnp::term::ext_set_part::Builder,
-    part: &table::ExtSetPart,
-) {
-    match part {
-        table::ExtSetPart::Extension(ext) => builder.set_extension(ext),
-        table::ExtSetPart::Splice(term_id) => builder.set_splice(term_id.0),
     }
 }

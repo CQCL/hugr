@@ -93,7 +93,6 @@ class Sum(Value):
             "core.const.adt",
             [
                 model.List(variants),
-                model.ExtSet(),
                 model.List(types),
                 model.Literal(self.tag),
                 model.Tuple(values),
@@ -333,9 +332,7 @@ class Extension(Value):
     def to_model(self) -> model.Term:
         type = cast(model.Term, self.typ.to_model())
         json = sops.CustomConst(c=self.name, v=self.val).model_dump_json()
-        return model.Apply(
-            "compat.const_json", [type, model.ExtSet(), model.Literal(json)]
-        )
+        return model.Apply("compat.const_json", [type, model.Literal(json)])
 
 
 class ExtensionValue(Value, Protocol):

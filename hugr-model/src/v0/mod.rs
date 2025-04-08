@@ -95,7 +95,6 @@ use table::LinkIndex;
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`
 /// - **Parameter:** `?outputs : (core.list core.type)`
-/// - **Parameter:** `?ext : core.ext-set`
 /// - **Result:** `core.type`
 pub const CORE_FN: &str = "core.fn";
 
@@ -175,26 +174,19 @@ pub const CORE_CTRL: &str = "core.ctrl";
 /// - **Result:** `?type : core.static`
 pub const CORE_CTRL_TYPE: &str = "core.ctrl_type";
 
-/// The type of extension sets.
-///
-/// - **Result:** `?type : core.static`
-pub const CORE_EXT_SET: &str = "core.ext_set";
-
 /// The type for runtime constants.
 ///
 /// - **Parameter:** `?type : core.type`
-/// - **Parameter:** `?ext : core.ext_set`
 /// - **Result:** `core.static`
 pub const CORE_CONST: &str = "core.const";
 
 /// Constants for runtime algebraic data types.
 ///
 /// - **Parameter:** `?variants : (core.list core.type)`
-/// - **Parameter:** `?ext : core.ext_set`
 /// - **Parameter:** `?types : (core.list core.static)`
 /// - **Parameter:** `?tag : core.nat`
 /// - **Parameter:** `?values : (core.tuple ?types)`
-/// - **Result:** `(core.const (core.adt ?variants) ?ext)`
+/// - **Result:** `(core.const (core.adt ?variants))`
 pub const CORE_CONST_ADT: &str = "core.const.adt";
 
 /// The type for lists of static data.
@@ -219,8 +211,7 @@ pub const CORE_TUPLE_TYPE: &str = "core.tuple";
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`
 /// - **Parameter:** `?outputs : (core.list core.type)`
-/// - **Parameter:** `?ext : core.ext_set`
-/// - **Parameter:** `?func : (core.const (core.fn ?inputs ?outputs ?ext) ?ext)`
+/// - **Parameter:** `?func : (core.const (core.fn ?inputs ?outputs))`
 /// - **Result:** `(core.fn ?inputs ?outputs ?ext)`
 pub const CORE_CALL: &str = "core.call";
 
@@ -228,16 +219,14 @@ pub const CORE_CALL: &str = "core.call";
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`
 /// - **Parameter:** `?outputs : (core.list core.type)`
-/// - **Parameter:** `?ext : core.ext_set`
-/// - **Result:** `(core.fn [(core.fn ?inputs ?outputs ?ext) ?inputs ...] ?outputs ?ext)`
+/// - **Result:** `(core.fn [(core.fn ?inputs ?outputs) ?inputs ...] ?outputs)`
 pub const CORE_CALL_INDIRECT: &str = "core.call_indirect";
 
 /// Operation to load a constant value.
 ///
 /// - **Parameter:** `?type : core.type`
-/// - **Parameter:** `?ext : core.ext_set`
-/// - **Parameter:** `?value : (core.const ?type ?ext)`
-/// - **Result:** `(core.fn [] [?type] ?ext)`
+/// - **Parameter:** `?value : (core.const ?type)`
+/// - **Result:** `(core.fn [] [?type])`
 pub const CORE_LOAD_CONST: &str = "core.load_const";
 
 /// Operation to create a value of an algebraic data type.
@@ -245,7 +234,7 @@ pub const CORE_LOAD_CONST: &str = "core.load_const";
 /// - **Parameter:** `?variants : (core.list (core.list core.type))`
 /// - **Parameter:** `?types : (core.list core.type)`
 /// - **Parameter:** `?tag : core.nat`
-/// - **Result:** `(core.fn ?types [(core.adt ?variants)] (ext))`
+/// - **Result:** `(core.fn ?types [(core.adt ?variants)])`
 pub const CORE_MAKE_ADT: &str = "core.make_adt";
 
 /// Constructor for documentation metadata.
@@ -272,9 +261,8 @@ pub const COMPAT_META_JSON: &str = "compat.meta_json";
 /// expressed with custom constructors.
 ///
 /// - **Parameter:** `?type : core.type`
-/// - **Parameter:** `?ext : core.ext_set`
 /// - **Parameter:** `?json : core.str`
-/// - **Result:** `(core.const ?type ?ext)`
+/// - **Result:** `(core.const ?type)`
 pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 
 pub mod ast;

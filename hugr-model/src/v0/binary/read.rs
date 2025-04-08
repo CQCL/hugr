@@ -268,17 +268,12 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             table::Term::List(parts)
         }
 
-        Which::ExtSet(reader) => {
-            let parts = read_list!(bump, reader?, read_ext_set_part);
-            table::Term::ExtSet(parts)
-        }
-
         Which::Tuple(reader) => {
             let parts = read_list!(bump, reader?, read_seq_part);
             table::Term::Tuple(parts)
         }
 
-        Which::ConstFunc(region) => table::Term::ConstFunc(table::RegionId(region)),
+        Which::Func(region) => table::Term::Func(table::RegionId(region)),
 
         Which::Bytes(bytes) => table::Term::Literal(model::Literal::Bytes(bytes?.into())),
         Which::Float(value) => table::Term::Literal(model::Literal::Float(value.into())),
@@ -293,17 +288,6 @@ fn read_seq_part(
     Ok(match reader.which()? {
         Which::Item(term) => table::SeqPart::Item(table::TermId(term)),
         Which::Splice(list) => table::SeqPart::Splice(table::TermId(list)),
-    })
-}
-
-fn read_ext_set_part<'a>(
-    bump: &'a Bump,
-    reader: hugr_capnp::term::ext_set_part::Reader,
-) -> ReadResult<table::ExtSetPart<'a>> {
-    use hugr_capnp::term::ext_set_part::Which;
-    Ok(match reader.which()? {
-        Which::Extension(ext) => table::ExtSetPart::Extension(bump.alloc_str(ext?.to_str()?)),
-        Which::Splice(list) => table::ExtSetPart::Splice(table::TermId(list)),
     })
 }
 

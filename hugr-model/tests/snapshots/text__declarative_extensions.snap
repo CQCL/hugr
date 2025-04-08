@@ -11,7 +11,7 @@ expression: "roundtrip(include_str!(\"fixtures/model-decl-exts.edn\"))"
   array.Init
   (param ?t core.type)
   (param ?n core.nat)
-  (core.fn [?t] [(array.Array ?t ?n)] (ext))
+  (core.fn [?t] [(array.Array ?t ?n)])
   (meta
     (core.meta.description
       "Initialize an array of size ?n with copies of a default value.")))

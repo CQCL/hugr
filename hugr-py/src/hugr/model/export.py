@@ -179,7 +179,6 @@ class ModelExport:
                             [
                                 model.List(input_types),
                                 model.List(output_types),
-                                model.ExtSet(),
                                 func,
                             ],
                         )
@@ -204,9 +203,7 @@ class ModelExport:
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply(
-                            "core.load_const", [signature, model.ExtSet(), func]
-                        )
+                        model.Apply("core.load_const", [signature, func])
                     ),
                     signature=signature,
                     inputs=inputs,
@@ -219,7 +216,7 @@ class ModelExport:
 
                 func = model.Apply(
                     "core.fn",
-                    [model.List(input_types), model.List(output_types), model.ExtSet()],
+                    [model.List(input_types), model.List(output_types)],
                 )
 
                 signature = model.Apply(
@@ -227,7 +224,6 @@ class ModelExport:
                     [
                         model.List([func, *input_types]),
                         model.List(output_types),
-                        model.ExtSet(),
                     ],
                 )
 
@@ -238,7 +234,6 @@ class ModelExport:
                             [
                                 model.List(input_types),
                                 model.List(output_types),
-                                model.ExtSet(),
                             ],
                         )
                     ),
@@ -259,7 +254,7 @@ class ModelExport:
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.load_const", [type, model.ExtSet(), value])
+                        model.Apply("core.load_const", [type, value])
                     ),
                     signature=signature,
                     inputs=inputs,
@@ -310,7 +305,7 @@ class ModelExport:
 
                 signature = model.Apply(
                     "core.fn",
-                    [model.List(input_types), model.List(output_types), model.ExtSet()],
+                    [model.List(input_types), model.List(output_types)],
                 )
 
                 return model.Node(
@@ -395,7 +390,7 @@ class ModelExport:
                     if child_node is not None:
                         children.append(child_node)
 
-        signature = model.Apply("core.fn", [source_types, target_types, model.ExtSet()])
+        signature = model.Apply("core.fn", [source_types, target_types])
 
         return model.Region(
             kind=model.RegionKind.DATA_FLOW,
@@ -446,7 +441,7 @@ class ModelExport:
             error = f"CFG {node} has no entry block."
             raise ValueError(error)
 
-        signature = model.Apply("core.fn", [source_types, target_types, model.ExtSet()])
+        signature = model.Apply("core.fn", [source_types, target_types])
 
         return model.Region(
             kind=model.RegionKind.CONTROL_FLOW,

@@ -77,11 +77,6 @@ class Func(Term):
     region: "Region"
 
 
-@dataclass(frozen=True)
-class ExtSet(Term):
-    """Extension set. (deprecated)."""
-
-
 @dataclass
 class Param:
     """A parameter to a Symbol."""

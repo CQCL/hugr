@@ -233,10 +233,6 @@ pub enum Term {
     Tuple(Arc<[SeqPart]>),
     /// Function constant.
     Func(Arc<Region>),
-    /// Extension set.
-    ///
-    /// __REMARK__: Extension sets will be removed, so this is a standin.
-    ExtSet,
 }
 
 impl From<Literal> for Term {

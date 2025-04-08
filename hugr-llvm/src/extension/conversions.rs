@@ -7,7 +7,7 @@ use hugr_core::{
     },
     ops::{constant::Value, custom::ExtensionOp, DataflowOpTrait as _},
     std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
-    types::{TypeArg, TypeEnum, TypeRow},
+    types::{TypeEnum, TypeRow},
     HugrView, Node,
 };
 
@@ -20,6 +20,7 @@ use crate::{
         ops::{emit_custom_unary_op, emit_value},
         EmitOpArgs,
     },
+    extension::int::get_width_arg,
     sum::LLVMSumValue,
     types::HugrType,
 };
@@ -153,11 +154,7 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
     match conversion_op {
         ConvertOpDef::trunc_u | ConvertOpDef::trunc_s => {
             let signed = conversion_op == ConvertOpDef::trunc_s;
-            let Some(TypeArg::BoundedNat { n: log_width }) = args.node().args().last().cloned()
-            else {
-                panic!("This op should have one type arg only: the log-width of the int we're truncating to.: {:?}", conversion_op.type_args())
-            };
-
+            let log_width = get_width_arg(&args, &conversion_op)?;
             build_trunc_op(context, signed, log_width, args)
         }
 
