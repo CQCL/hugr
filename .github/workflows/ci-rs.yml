@@ -256,19 +256,19 @@ jobs:
           rm Cargo.lock
           cargo minimal-versions check --direct
       - name: Build with no features
-        run: cargo test --verbose  --no-default-features --no-run
+        run: cargo test --locked --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose  --no-default-features
+        run: cargo test --locked --verbose  --no-default-features
       - name: Build with all features
-        run: cargo test --verbose  --all-features --no-run
+        run: cargo test --locked --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose  --all-features
+        run: cargo test --locked --verbose  --all-features
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+        run: cargo test --locked -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+        run: cargo test --locked -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
