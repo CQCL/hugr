@@ -334,9 +334,7 @@ mod test {
     use std::iter::successors;
     use std::sync::Arc;
 
-    use hugr_core::builder::{
-        endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    };
+    use hugr_core::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
 
     use hugr_core::extension::prelude::{option_type, usize_t};
     use hugr_core::extension::simple_op::MakeExtensionOp;
@@ -654,8 +652,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn array() {
+    #[rstest]
+    fn array(#[values(2, 3, 4)] num_outports: usize) {
+        let num_new = num_outports - 1;
         let (e, mut lowerer) = ext_lowerer();
 
         lowerer
@@ -663,7 +662,8 @@ mod test {
             .register_callback(array_type_def(), linearize_array);
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
         let opt_lin_ty = Type::from(option_type(lin_t.clone()));
-        let mut dfb = DFGBuilder::new(endo_sig(array_type(5, usize_t()))).unwrap();
+        let array_ty = || array_type(5, usize_t());
+        let mut dfb = DFGBuilder::new(inout_sig(array_ty(), vec![array_ty(); num_new])).unwrap();
         let [array_in] = dfb.input_wires_arr();
         // The outer DFG passes the input array into (1) a DFG that discards it
         let discard = dfb
@@ -675,7 +675,9 @@ mod test {
             .finish_with_outputs([])
             .unwrap();
         // and (2) its own output
-        let mut h = dfb.finish_hugr_with_outputs([array_in]).unwrap();
+        let mut h = dfb
+            .finish_hugr_with_outputs(vec![array_in; num_new])
+            .unwrap();
 
         assert!(lowerer.run(&mut h).unwrap());
 
@@ -694,42 +696,57 @@ mod test {
             );
             assert_eq!(h.linked_inputs(n, 0).next(), None);
         }
-        assert_eq!(copy_ops.len(), 3);
+        assert_eq!(copy_ops.len(), num_new * 2 + 1); // 1 middle scan; 1repeat+1unwrap per new
         let copy_ops = copy_ops.into_iter().map(|(_, e)| e).collect_vec();
-        let rpt = *copy_ops
+        let rpts = copy_ops
             .iter()
-            .find(|e| ArrayRepeat::from_extension_op(e).is_ok())
-            .unwrap();
-        assert_eq!(
-            rpt.signature().output(),
-            &TypeRow::from(array_type(5, opt_lin_ty.clone()))
-        );
-        let scan0 = copy_ops
+            .copied()
+            .filter(|e| ArrayRepeat::from_extension_op(e).is_ok())
+            .collect_vec();
+        assert_eq!(rpts.len(), num_new);
+        for rpt in rpts {
+            assert_eq!(
+                rpt.signature().output(),
+                &TypeRow::from(array_type(5, opt_lin_ty.clone()))
+            );
+        }
+        let unwrap_scans = copy_ops
             .iter()
-            .find_map(|e| {
+            .filter_map(|e| {
                 ArrayScan::from_extension_op(e)
                     .ok()
                     .filter(|sc| sc.acc_tys.is_empty())
             })
-            .unwrap();
-        assert_eq!(scan0.src_ty, opt_lin_ty);
-        assert_eq!(scan0.tgt_ty, lin_t);
+            .collect_vec();
+        assert_eq!(unwrap_scans.len(), num_new);
+        for scan in unwrap_scans {
+            assert_eq!(scan.src_ty, opt_lin_ty);
+            assert_eq!(scan.tgt_ty, lin_t);
+        }
 
-        let scan2 = *copy_ops
-            .iter()
+        let copy_sig = copy_ops
+            .into_iter()
             .find(|e| ArrayScan::from_extension_op(e).is_ok_and(|sc| !sc.acc_tys.is_empty()))
-            .unwrap();
-        let sig = scan2.signature().into_owned();
+            .unwrap()
+            .signature()
+            .into_owned();
         assert_eq!(
-            sig.output,
-            TypeRow::from(vec![
-                array_type(5, lin_t.clone()),
-                INT_TYPES[6].to_owned(),
-                array_type(5, option_type(lin_t.clone()).into())
-            ])
+            copy_sig.output,
+            TypeRow::from(
+                [array_type(5, lin_t.clone()), INT_TYPES[6].to_owned()]
+                    .into_iter()
+                    .chain(vec![
+                        array_type(5, option_type(lin_t.clone()).into());
+                        num_new
+                    ])
+                    .collect_vec()
+            )
         );
-        assert_eq!(sig.input[0], sig.output[0]);
-        assert!(matches!(sig.input[1].as_type_enum(), TypeEnum::Function(_)));
-        assert_eq!(sig.input[2..], sig.output[1..]);
+        assert_eq!(copy_sig.input[0], copy_sig.output[0]);
+        assert!(matches!(
+            copy_sig.input[1].as_type_enum(),
+            TypeEnum::Function(_)
+        ));
+        assert_eq!(copy_sig.input[2..], copy_sig.output[1..]);
     }
 }

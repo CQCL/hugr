@@ -90,7 +90,11 @@ pub fn linearize_array(
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
     let num_new = num_outports - 1;
     let array_ty = array_type(*n, ty.clone());
-    let mut dfb = DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty.clone(); 2])).unwrap();
+    let mut dfb = DFGBuilder::new(inout_sig(
+        array_ty.clone(),
+        vec![array_ty.clone(); num_outports],
+    ))
+    .unwrap();
     // 1. make num_new array<SZ, Option<T>>, initialized to None...
     let option_sty = option_type(ty.clone());
     let option_ty = Type::from(option_sty.clone());
