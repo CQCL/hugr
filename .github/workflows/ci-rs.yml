@@ -226,7 +226,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
-    name: tests (Rust MSRV)
+    name: tests (Rust MSRV, min dependencies)
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.9
@@ -255,6 +255,7 @@ jobs:
         # Add new dependencies as needed if the check fails due to
         # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.75.0"
         run: |
+          rm Cargo.lock
           cargo add -p hugr half@2.4.1
           cargo add -p hugr litemap@0.7.4
           cargo add -p hugr zerofrom@0.1.5
