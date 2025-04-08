@@ -230,11 +230,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.9
-      - id: toolchain
+      - name: Install MSRV toolchain
+        id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.75"
-      - uses: dtolnay/rust-toolchain@master
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
           # Nightly must be installed for `cargo-minimal-versions` to work
           toolchain: "nightly"
@@ -249,20 +251,24 @@ jobs:
         run: |
           cargo binstall cargo-hack --force
           cargo binstall cargo-minimal-versions --force
+      - name: Generate minimal Cargo.lock
+        run: |
+          rm Cargo.lock
+          cargo minimal-versions check
       - name: Build with no features
-        run: cargo minimal-versions cargo test --verbose  --no-default-features --no-run
+        run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo minimal-versions cargo test --verbose  --no-default-features
+        run: cargo test --verbose  --no-default-features
       - name: Build with all features
-        run: cargo minimal-versions cargo test --verbose  --all-features --no-run
+        run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo minimal-versions cargo test --verbose  --all-features
+        run: cargo test --verbose  --all-features
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo minimal-versions cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo minimal-versions cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
