@@ -98,7 +98,7 @@ impl ConstantFoldPass {
                 n,
                 in_vals.iter().map(|(p, v)| {
                     let const_with_dummy_loc = partial_from_const(
-                        &ConstFoldContext(hugr),
+                        &ConstFoldContext,
                         ConstLocation::Field(p.index(), &fresh_node.into()),
                         v,
                     );
@@ -108,7 +108,7 @@ impl ConstantFoldPass {
             .map_err(|opty| ConstFoldError::InvalidEntryPoint(n, opty))?;
         }
 
-        let results = m.run(ConstFoldContext(hugr), []);
+        let results = m.run(ConstFoldContext, []);
         let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
         let wires_to_break = hugr
@@ -201,36 +201,35 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
     c.run(h).unwrap()
 }
 
-// Probably intend to remove this in a future PR, but not certain, so leaving in for now
-struct ConstFoldContext<'a, H>(#[allow(unused)] &'a H);
+struct ConstFoldContext;
 
-impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
-    type Node = H::Node;
+impl ConstLoader<ValueHandle<Node>> for ConstFoldContext {
+    type Node = Node;
 
     fn value_from_opaque(
         &self,
-        loc: ConstLocation<H::Node>,
+        loc: ConstLocation<Node>,
         val: &OpaqueValue,
-    ) -> Option<ValueHandle<H::Node>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
 
     fn value_from_const_hugr(
         &self,
-        loc: ConstLocation<H::Node>,
+        loc: ConstLocation<Node>,
         h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle<H::Node>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
     }
 }
 
-impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+impl DFContext<ValueHandle<Node>> for ConstFoldContext {
     fn interpret_leaf_op(
         &mut self,
-        node: H::Node,
+        node: Node,
         op: &ExtensionOp,
-        ins: &[PartialValue<ValueHandle<H::Node>>],
-        outs: &mut [PartialValue<ValueHandle<H::Node>>],
+        ins: &[PartialValue<ValueHandle<Node>>],
+        outs: &mut [PartialValue<ValueHandle<Node>>],
     ) {
         let sig = op.signature();
         let known_ins = sig
