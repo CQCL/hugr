@@ -12,6 +12,7 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
+use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
 use crate::types::{type_param::TypeArg, Signature};
 use crate::{ops, IncomingPort, Node};
@@ -122,6 +123,13 @@ impl ExtensionOp {
     /// Returns a mutable reference to the type arguments of the operation.
     pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
         self.args.as_mut_slice()
+    }
+
+    /// Cast the operation to an specific extension op.
+    ///
+    /// Returns `None` if the operation is not of the requested type.
+    pub fn cast<T: MakeExtensionOp>(&self) -> Option<T> {
+        T::from_extension_op(self).ok()
     }
 }
 
