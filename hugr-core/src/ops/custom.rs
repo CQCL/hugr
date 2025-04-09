@@ -131,6 +131,11 @@ impl ExtensionOp {
     pub fn cast<T: MakeExtensionOp>(&self) -> Option<T> {
         T::from_extension_op(self).ok()
     }
+
+    /// Returns the extension id of the operation.
+    pub fn extension_id(&self) -> &ExtensionId {
+        self.def.extension_id()
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
