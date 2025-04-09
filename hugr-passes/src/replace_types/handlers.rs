@@ -1,5 +1,5 @@
 //! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
-//! and [ReplaceTypes::linearize_parametric]
+//! and [DelegatingLinearizer::register_callback](super::DelegatingLinearizer::register_callback)
 
 use hugr_core::builder::{endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{option_type, UnwrapBuilder};
@@ -49,8 +49,10 @@ fn runtime_reqs(h: &Hugr) -> ExtensionSet {
     h.signature(h.root()).unwrap().runtime_reqs.clone()
 }
 
-/// Handler for copying/discarding arrays, for use with [ReplaceTypes::linearize_parametric] of
+/// Handler for copying/discarding arrays, for use with [register_callback] for
 /// [array_type_def](hugr_core::std_extensions::collections::array::array_type_def)
+///
+/// [register_callback]: super::DelegatingLinearizer::register_callback
 pub fn linearize_array(
     args: &[TypeArg],
     num_outports: usize,
