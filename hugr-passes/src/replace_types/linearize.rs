@@ -115,7 +115,9 @@ pub struct DelegatingLinearizer {
     // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        Arc<dyn Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>>,
+        Arc<
+            dyn Fn(&[TypeArg], usize, &mut CallbackHandler) -> Result<NodeTemplate, LinearizeError>,
+        >,
     >,
 }
 
@@ -217,7 +219,7 @@ impl DelegatingLinearizer {
     pub fn register_callback(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &mut CallbackHandler) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
@@ -325,7 +327,8 @@ impl Linearizer for DelegatingLinearizer {
                         .copy_discard_parametric
                         .get(&cty.into())
                         .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
-                    let tmpl = copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))?;
+                    let tmpl =
+                        copy_discard_fn(cty.args(), num_outports, &mut CallbackHandler(self))?;
                     check_sig(&tmpl, typ, num_outports)?;
                     Ok(tmpl)
                 }

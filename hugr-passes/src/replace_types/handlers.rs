@@ -78,7 +78,7 @@ fn runtime_reqs(h: &Hugr) -> ExtensionSet {
 pub fn linearize_array(
     args: &[TypeArg],
     num_outports: usize,
-    lin: &CallbackHandler,
+    lin: &mut CallbackHandler,
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
