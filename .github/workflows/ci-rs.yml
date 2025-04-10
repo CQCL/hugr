@@ -190,7 +190,8 @@ jobs:
       matrix:
         # Stable is covered by `tests-stable-no-features` and `tests-stable-all-features`
         # Nightly is covered by `tests-nightly-coverage`
-        rust: ["1.75", beta]
+        # MSRV is covered by `tests-msrv`
+        rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
@@ -219,6 +220,59 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+
+  # Run tests on the minimum supported rust version, with minimal dependency versions
+  tests-msrv:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    runs-on: ubuntu-latest
+    name: tests (Rust MSRV, min dependencies)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Install MSRV toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.75"
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # Nightly must be installed for `cargo-minimal-versions` to work
+          toolchain: "nightly"
+      - name: Configure default rust toolchain
+        run: rustup override set ${{steps.toolchain.outputs.name}}
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-minimal-versions
+        run: |
+          cargo binstall cargo-hack --force
+          cargo binstall cargo-minimal-versions --force
+      - name: Pin transitive dependencies not compatible with our MSRV
+        # Add new dependencies as needed if the check fails due to
+        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.75.0"
+        run: |
+          rm Cargo.lock
+          cargo add -p hugr half@2.4.1
+          cargo add -p hugr litemap@0.7.4
+          cargo add -p hugr zerofrom@0.1.5
+      - name: Build with no features
+        run: cargo minimal-versions --direct test --verbose  --no-default-features --no-run
+      - name: Tests with no features
+        run: cargo minimal-versions --direct test --verbose  --no-default-features
+      - name: Build with all features
+        run: cargo minimal-versions --direct test --verbose  --all-features --no-run
+      - name: Tests with all features
+        run: cargo minimal-versions --direct test --verbose  --all-features
+      - name: Build hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+      - name: Tests hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
