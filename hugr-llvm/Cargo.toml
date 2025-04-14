@@ -25,7 +25,7 @@ llvm14-0 = ["inkwell/llvm14-0"]
 [dependencies]
 inkwell = { version = "0.5.0", default-features = false }
 hugr-core = { path = "../hugr-core", version = "0.15.3" }
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 itertools.workspace = true
 delegate.workspace = true
 petgraph.workspace = true
