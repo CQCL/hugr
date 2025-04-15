@@ -275,9 +275,17 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     }
 }
 
+/// Result of applying a [`SimpleReplacement`].
+pub struct ApplyResult {
+    /// Map from Node in replacement to corresponding Node in the result Hugr
+    pub node_map: HashMap<Node, Node>,
+    /// Nodes removed from the result Hugr and their weights
+    pub removed_nodes: Vec<(Node, OpType)>,
+}
+
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
-    type ApplyResult = Vec<(Node, OpType)>;
+    type ApplyResult = ApplyResult;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), SimpleReplacementError> {
@@ -305,10 +313,7 @@ impl Rewrite for SimpleReplacement {
         } = self;
 
         // 2. Insert the replacement as a whole.
-        let InsertionResult {
-            new_root,
-            node_map: index_map,
-        } = h.insert_hugr(parent, replacement);
+        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, replacement);
 
         // remove the Input and Output nodes from the replacement graph
         let replace_children = h.children(new_root).collect::<Vec<Node>>();
@@ -324,17 +329,22 @@ impl Rewrite for SimpleReplacement {
 
         // 3. Insert all boundary edges.
         for (src, tgt) in boundary_edges {
-            let (src_node, src_port) = src.map_replacement(&index_map);
-            let (tgt_node, tgt_port) = tgt.map_replacement(&index_map);
+            let (src_node, src_port) = src.map_replacement(&node_map);
+            let (tgt_node, tgt_port) = tgt.map_replacement(&node_map);
             h.connect(src_node, src_port, tgt_node, tgt_port);
         }
 
         // 4. Remove all nodes in subgraph and edges between them.
-        Ok(subgraph
+        let removed_nodes = subgraph
             .nodes()
             .iter()
             .map(|&node| (node, h.remove_node(node)))
-            .collect())
+            .collect();
+
+        Ok(ApplyResult {
+            node_map,
+            removed_nodes,
+        })
     }
 
     #[inline]
