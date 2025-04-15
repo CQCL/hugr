@@ -224,7 +224,9 @@ mod test {
         Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
         ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple};
+    use hugr_core::extension::prelude::{
+        bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple, PRELUDE_ID,
+    };
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DEFAULT_OPTYPE, DFG};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
@@ -309,7 +311,8 @@ mod test {
         let tr = TypeRow::from(vec![usize_t(); 2]);
 
         let h = {
-            let mut fb = FunctionBuilder::new("tupuntup", Signature::new_endo(tr.clone())).unwrap();
+            let sig = Signature::new_endo(tr.clone()).with_extension_delta(PRELUDE_ID);
+            let mut fb = FunctionBuilder::new("tupuntup", sig).unwrap();
             let [a, b] = fb.input_wires_arr();
             let tup = fb
                 .add_dataflow_op(MakeTuple::new(tr.clone()), [a, b])
