@@ -16,7 +16,7 @@ use crate::extension::resolution::{
     WeakExtensionRegistry,
 };
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use crate::extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound};
+use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{maybe_hash_values, CustomConst, TryHash, ValueName};
 use crate::ops::{ExtensionOp, OpName, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
@@ -140,11 +140,6 @@ impl CustomConst for ArrayValue {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.values.iter().map(Value::extension_reqs))
-            .union(EXTENSION_ID.into())
     }
 
     fn update_extensions(

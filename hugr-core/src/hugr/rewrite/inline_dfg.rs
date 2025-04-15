@@ -137,7 +137,6 @@ mod test {
         SubContainer,
     };
     use crate::extension::prelude::qb_t;
-    use crate::extension::ExtensionSet;
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
@@ -326,12 +325,8 @@ mod test {
             .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
             .outputs_arr();
         // Node using the boolean. Here we just select between two empty computations.
-        let mut if_n = inner.conditional_builder_exts(
-            ([type_row![], type_row![]], b),
-            [],
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let mut if_n =
+            inner.conditional_builder(([type_row![], type_row![]], b), [], type_row![])?;
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;

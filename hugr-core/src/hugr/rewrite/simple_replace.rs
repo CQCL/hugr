@@ -375,7 +375,6 @@ pub(in crate::hugr::rewrite) mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::extension::ExtensionSet;
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
     use crate::ops::dataflow::DataflowOpTrait;
@@ -385,7 +384,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::logic::LogicOp;
     use crate::types::{Signature, Type};
-    use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
+    use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
@@ -402,12 +401,8 @@ pub(in crate::hugr::rewrite) mod test {
     fn make_hugr() -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let _f_id = {
-            let just_q: ExtensionSet = EXTENSION_ID.into();
-            let mut func_builder = module_builder.define_function(
-                "main",
-                Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
-                    .with_extension_delta(just_q.clone()),
-            )?;
+            let mut func_builder = module_builder
+                .define_function("main", Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]))?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
 
@@ -443,7 +438,7 @@ pub(in crate::hugr::rewrite) mod test {
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]).with_prelude())?;
+        let mut dfg_builder = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;

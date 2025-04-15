@@ -12,7 +12,14 @@ members = [
     "hugr-llvm",
     "hugr-py",
 ]
-default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
+default-members = [
+    "hugr",
+    "hugr-core",
+    "hugr-passes",
+    "hugr-cli",
+    "hugr-model",
+    "hugr-llvm",
+]
 
 [workspace.package]
 rust-version = "1.75"

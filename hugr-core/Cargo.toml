@@ -17,7 +17,6 @@ categories = ["compilers"]
 workspace = true
 
 [features]
-extension_inference = []
 declarative = ["serde_yaml"]
 model_unstable = ["hugr-model"]
 zstd = ["dep:zstd"]

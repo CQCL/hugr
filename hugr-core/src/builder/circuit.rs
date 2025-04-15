@@ -245,8 +245,8 @@ mod test {
 
     use crate::builder::{Container, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::{qb_t, usize_t};
-    use crate::extension::{ExtensionId, ExtensionSet};
-    use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
+    use crate::extension::ExtensionId;
+    use crate::std_extensions::arithmetic::float_types::ConstF64;
     use crate::utils::test_quantum_extension::{
         self, cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
     };
@@ -260,10 +260,7 @@ mod test {
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()])
-                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
-                .with_extension_delta(float_types::EXTENSION_ID)
-                .into(),
+            Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()]).into(),
             |mut f_build| {
                 let wires = f_build.input_wires().map(Some).collect();
 
@@ -314,11 +311,7 @@ mod test {
                 Signature::new(
                     vec![qb_t(), qb_t(), usize_t()],
                     vec![qb_t(), qb_t(), bool_t()],
-                )
-                .with_extension_delta(ExtensionSet::from_iter([
-                    test_quantum_extension::EXTENSION_ID,
-                    my_ext_name,
-                ])),
+                ),
             )
             .unwrap();
 
@@ -351,38 +344,33 @@ mod test {
 
     #[test]
     fn ancillae() {
-        let build_res = build_main(
-            Signature::new_endo(qb_t())
-                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
-                .into(),
-            |mut f_build| {
-                let mut circ = f_build.as_circuit(f_build.input_wires());
-                assert_eq!(circ.n_wires(), 1);
+        let build_res = build_main(Signature::new_endo(qb_t()).into(), |mut f_build| {
+            let mut circ = f_build.as_circuit(f_build.input_wires());
+            assert_eq!(circ.n_wires(), 1);
 
-                let [q0] = circ.tracked_units_arr();
-                let [ancilla] = circ.append_with_outputs_arr(q_alloc(), [] as [CircuitUnit; 0])?;
-                let ancilla = circ.track_wire(ancilla);
+            let [q0] = circ.tracked_units_arr();
+            let [ancilla] = circ.append_with_outputs_arr(q_alloc(), [] as [CircuitUnit; 0])?;
+            let ancilla = circ.track_wire(ancilla);
 
-                assert_ne!(ancilla, 0);
-                assert_eq!(circ.n_wires(), 2);
-                assert_eq!(circ.tracked_units_arr(), [q0, ancilla]);
+            assert_ne!(ancilla, 0);
+            assert_eq!(circ.n_wires(), 2);
+            assert_eq!(circ.tracked_units_arr(), [q0, ancilla]);
 
-                circ.append(cx_gate(), [q0, ancilla])?;
-                let [_bit] = circ.append_with_outputs_arr(measure(), [q0])?;
+            circ.append(cx_gate(), [q0, ancilla])?;
+            let [_bit] = circ.append_with_outputs_arr(measure(), [q0])?;
 
-                let q0 = circ.untrack_wire(q0)?;
+            let q0 = circ.untrack_wire(q0)?;
 
-                assert_eq!(circ.tracked_units_arr(), [ancilla]);
+            assert_eq!(circ.tracked_units_arr(), [ancilla]);
 
-                circ.append_and_consume(q_discard(), [q0])?;
+            circ.append_and_consume(q_discard(), [q0])?;
 
-                let outs = circ.finish();
+            let outs = circ.finish();
 
-                assert_eq!(outs.len(), 1);
+            assert_eq!(outs.len(), 1);
 
-                f_build.finish_with_outputs(outs)
-            },
-        );
+            f_build.finish_with_outputs(outs)
+        });
 
         assert_matches!(build_res, Ok(_));
     }

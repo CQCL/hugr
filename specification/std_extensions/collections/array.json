@@ -61,8 +61,7 @@
               "bound": "A"
             }
           ],
-          "output": [],
-          "runtime_reqs": []
+          "output": []
         }
       },
       "binary": false
@@ -127,8 +126,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -167,9 +165,6 @@
           {
             "tp": "Type",
             "b": "A"
-          },
-          {
-            "tp": "Extensions"
           }
         ],
         "body": {
@@ -183,9 +178,6 @@
                   "i": 1,
                   "b": "A"
                 }
-              ],
-              "runtime_reqs": [
-                "2"
               ]
             }
           ],
@@ -214,8 +206,7 @@
               ],
               "bound": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -244,9 +235,6 @@
               "tp": "Type",
               "b": "A"
             }
-          },
-          {
-            "tp": "Extensions"
           }
         ],
         "body": {
@@ -300,9 +288,6 @@
                   "i": 3,
                   "b": "A"
                 }
-              ],
-              "runtime_reqs": [
-                "4"
               ]
             },
             {
@@ -341,8 +326,7 @@
               "i": 3,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -466,8 +450,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -579,8 +562,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

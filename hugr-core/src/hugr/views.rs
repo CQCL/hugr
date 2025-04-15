@@ -468,15 +468,6 @@ pub trait HugrView: HugrInternals {
     fn validate(&self) -> Result<(), ValidationError> {
         self.base_hugr().validate()
     }
-
-    /// Check the validity of the underlying HUGR, but don't check consistency
-    /// of extension requirements between connected nodes or between parents and
-    /// children.
-    ///
-    /// For a more thorough check, use [`HugrView::validate`].
-    fn validate_no_extensions(&self) -> Result<(), ValidationError> {
-        self.base_hugr().validate_no_extensions()
-    }
 }
 
 /// Trait for views that provides a guaranteed bound on the type of the root node.

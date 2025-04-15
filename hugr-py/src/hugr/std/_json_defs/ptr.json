@@ -57,8 +57,7 @@
               ],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -99,8 +98,7 @@
               "i": 0,
               "b": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -140,8 +138,7 @@
               "b": "C"
             }
           ],
-          "output": [],
-          "runtime_reqs": []
+          "output": []
         }
       },
       "binary": false

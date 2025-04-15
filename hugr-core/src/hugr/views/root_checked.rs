@@ -94,7 +94,6 @@ impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecke
 mod test {
     use super::RootChecked;
     use crate::extension::prelude::MakeTuple;
-    use crate::extension::ExtensionSet;
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
@@ -123,7 +122,6 @@ mod test {
             inputs: type_row![],
             other_outputs: type_row![],
             sum_rows: vec![type_row![]],
-            extension_delta: ExtensionSet::new(),
         }
         .into();
         let r = dfg_v.replace_op(root, bb.clone());

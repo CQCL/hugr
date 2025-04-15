@@ -110,23 +110,11 @@ class TupleParam(BaseTypeParam):
         return tys.TupleParam(params=deser_it(self.params))
 
 
-class ExtensionsParam(BaseTypeParam):
-    tp: Literal["Extensions"] = "Extensions"
-
-    def deserialize(self) -> tys.ExtensionsParam:
-        return tys.ExtensionsParam()
-
-
 class TypeParam(RootModel):
     """A type parameter."""
 
     root: Annotated[
-        TypeTypeParam
-        | BoundedNatParam
-        | StringParam
-        | ListParam
-        | TupleParam
-        | ExtensionsParam,
+        TypeTypeParam | BoundedNatParam | StringParam | ListParam | TupleParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
@@ -178,14 +166,6 @@ class SequenceArg(BaseTypeArg):
         return tys.SequenceArg(elems=deser_it(self.elems))
 
 
-class ExtensionsArg(BaseTypeArg):
-    tya: Literal["Extensions"] = "Extensions"
-    es: ExtensionSet
-
-    def deserialize(self) -> tys.ExtensionsArg:
-        return tys.ExtensionsArg(extensions=self.es)
-
-
 class VariableArg(BaseTypeArg):
     tya: Literal["Variable"] = "Variable"
     idx: int
@@ -199,12 +179,7 @@ class TypeArg(RootModel):
     """A type argument."""
 
     root: Annotated[
-        TypeTypeArg
-        | BoundedNatArg
-        | StringArg
-        | SequenceArg
-        | ExtensionsArg
-        | VariableArg,
+        TypeTypeArg | BoundedNatArg | StringArg | SequenceArg | VariableArg,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 

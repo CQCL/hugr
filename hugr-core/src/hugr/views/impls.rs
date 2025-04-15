@@ -82,7 +82,6 @@ macro_rules! hugr_view_methods {
                 fn out_value_types(&self, node: Self::Node) -> impl Iterator<Item = (OutgoingPort, Type)>;
                 fn extensions(&self) -> &ExtensionRegistry;
                 fn validate(&self) -> Result<(), ValidationError>;
-                fn validate_no_extensions(&self) -> Result<(), ValidationError>;
             }
         }
     }
