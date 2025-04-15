@@ -4,7 +4,6 @@ use std::collections::HashMap;
 
 use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
-use hugr_core::core::HugrNode;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
@@ -378,7 +377,7 @@ enum LatticeWrapper<T> {
     Top,
 }
 
-impl<N: HugrNode> Lattice for LatticeWrapper<N> {
+impl<N: PartialEq + PartialOrd> Lattice for LatticeWrapper<N> {
     fn meet_mut(&mut self, other: Self) -> bool {
         if *self == other || *self == LatticeWrapper::Bottom || other == LatticeWrapper::Top {
             return false;
