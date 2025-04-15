@@ -145,8 +145,6 @@ mod test {
         SubContainer,
     };
     use crate::extension::prelude::qb_t;
-    use crate::extension::ExtensionSet;
-    use crate::hugr::patch::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
@@ -175,6 +173,8 @@ mod test {
     #[case(true)]
     #[case(false)]
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::hugr::patch::inline_dfg::InlineDFGError;
+
         let int_ty = &int_types::INT_TYPES[6];
 
         let mut outer = DFGBuilder::new(inout_sig(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
@@ -334,12 +334,8 @@ mod test {
             .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
             .outputs_arr();
         // Node using the boolean. Here we just select between two empty computations.
-        let mut if_n = inner.conditional_builder_exts(
-            ([type_row![], type_row![]], b),
-            [],
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let mut if_n =
+            inner.conditional_builder(([type_row![], type_row![]], b), [], type_row![])?;
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;

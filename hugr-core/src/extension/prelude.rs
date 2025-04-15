@@ -11,7 +11,7 @@ use crate::extension::simple_op::{
     try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
 use crate::extension::{
-    ConstFold, ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDefBound,
+    ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDefBound,
 };
 use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::OpName;
@@ -245,10 +245,6 @@ impl CustomConst for ConstString {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
-
     fn get_type(&self) -> Type {
         string_type()
     }
@@ -438,10 +434,6 @@ impl CustomConst for ConstUsize {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
-
     fn get_type(&self) -> Type {
         usize_t()
     }
@@ -495,9 +487,6 @@ impl CustomConst for ConstError {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
     fn get_type(&self) -> Type {
         error_type()
     }
@@ -555,9 +544,6 @@ impl CustomConst for ConstExternalSymbol {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
     fn get_type(&self) -> Type {
         self.typ.clone()
     }
@@ -1068,7 +1054,7 @@ mod test {
         let optype: OpType = op.clone().into();
         assert_eq!(
             optype.dataflow_signature().unwrap().as_ref(),
-            &Signature::new_endo(type_row![Type::UNIT]).with_prelude()
+            &Signature::new_endo(type_row![Type::UNIT])
         );
 
         let new_op = Barrier::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
@@ -1121,10 +1107,6 @@ mod test {
 
         assert!(error_val.validate().is_ok());
 
-        assert_eq!(
-            error_val.extension_reqs(),
-            ExtensionSet::singleton(PRELUDE_ID)
-        );
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
 
@@ -1181,10 +1163,6 @@ mod test {
         let string_const: ConstString = ConstString::new("Lorem ipsum".into());
         assert_eq!(string_const.name(), "ConstString(\"Lorem ipsum\")");
         assert!(string_const.validate().is_ok());
-        assert_eq!(
-            string_const.extension_reqs(),
-            ExtensionSet::singleton(PRELUDE_ID)
-        );
         assert!(string_const.equal_consts(&ConstString::new("Lorem ipsum".into())));
         assert!(!string_const.equal_consts(&ConstString::new("Lorem ispum".into())));
     }
@@ -1206,10 +1184,6 @@ mod test {
         assert_eq!(subject.get_type(), Type::UNIT);
         assert_eq!(subject.name(), "@foo");
         assert!(subject.validate().is_ok());
-        assert_eq!(
-            subject.extension_reqs(),
-            ExtensionSet::singleton(PRELUDE_ID)
-        );
         assert!(subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("bar", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", string_type(), false)));

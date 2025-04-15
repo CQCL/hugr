@@ -180,7 +180,7 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use hugr_core::extension::prelude::{usize_t, ConstUsize, PRELUDE_ID};
+    use hugr_core::extension::prelude::{usize_t, ConstUsize};
     use hugr_core::ops::{handle::NodeHandle, OpTag, OpTrait};
     use hugr_core::types::Signature;
     use hugr_core::{ops::Value, type_row, HugrView};
@@ -192,9 +192,7 @@ mod test {
 
     #[test]
     fn test_cfg_callback() {
-        let mut cb =
-            CFGBuilder::new(Signature::new_endo(type_row![]).with_extension_delta(PRELUDE_ID))
-                .unwrap();
+        let mut cb = CFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
         let cst_unused = cb.add_constant(Value::from(ConstUsize::new(3)));
         let cst_used_in_dfg = cb.add_constant(Value::from(ConstUsize::new(5)));
         let cst_used = cb.add_constant(Value::unary_unit_sum());

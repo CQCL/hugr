@@ -1,7 +1,6 @@
 {
   "version": "0.1.0",
   "name": "logic",
-  "runtime_reqs": [],
   "types": {},
   "operations": {
     "And": {
@@ -29,8 +28,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -60,8 +58,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -86,8 +83,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -117,8 +113,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -148,8 +143,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

@@ -277,13 +277,6 @@
                     },
                     "title": "Sum Rows",
                     "type": "array"
-                },
-                "extension_delta": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extension Delta",
-                    "type": "array"
                 }
             },
             "required": [
@@ -428,13 +421,6 @@
                     },
                     "title": "Sum Rows",
                     "type": "array"
-                },
-                "extension_delta": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extension Delta",
-                    "type": "array"
                 }
             },
             "required": [
@@ -502,14 +488,6 @@
                     "title": "Name",
                     "type": "string"
                 },
-                "runtime_reqs": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Runtime Reqs",
-                    "type": "array",
-                    "uniqueItems": true
-                },
                 "types": {
                     "additionalProperties": {
                         "$ref": "#/$defs/TypeDef"
@@ -528,7 +506,6 @@
             "required": [
                 "version",
                 "name",
-                "runtime_reqs",
                 "types",
                 "operations"
             ],
@@ -579,42 +556,6 @@
                 "name"
             ],
             "title": "ExtensionOp",
-            "type": "object"
-        },
-        "ExtensionsArg": {
-            "additionalProperties": false,
-            "properties": {
-                "tya": {
-                    "const": "Extensions",
-                    "default": "Extensions",
-                    "title": "Tya",
-                    "type": "string"
-                },
-                "es": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Es",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "es"
-            ],
-            "title": "ExtensionsArg",
-            "type": "object"
-        },
-        "ExtensionsParam": {
-            "additionalProperties": false,
-            "properties": {
-                "tp": {
-                    "const": "Extensions",
-                    "default": "Extensions",
-                    "title": "Tp",
-                    "type": "string"
-                }
-            },
-            "title": "ExtensionsParam",
             "type": "object"
         },
         "FixedHugr": {
@@ -741,13 +682,6 @@
                         "$ref": "#/$defs/Type"
                     },
                     "title": "Output",
-                    "type": "array"
-                },
-                "runtime_reqs": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Runtime Reqs",
                     "type": "array"
                 }
             },
@@ -1541,13 +1475,6 @@
                     },
                     "title": "Rest",
                     "type": "array"
-                },
-                "extension_delta": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extension Delta",
-                    "type": "array"
                 }
             },
             "required": [
@@ -1654,7 +1581,6 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
-                    "Extensions": "#/$defs/ExtensionsArg",
                     "Sequence": "#/$defs/SequenceArg",
                     "String": "#/$defs/StringArg",
                     "Type": "#/$defs/TypeTypeArg",
@@ -1674,9 +1600,6 @@
                 },
                 {
                     "$ref": "#/$defs/SequenceArg"
-                },
-                {
-                    "$ref": "#/$defs/ExtensionsArg"
                 },
                 {
                     "$ref": "#/$defs/VariableArg"
@@ -1753,7 +1676,6 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
-                    "Extensions": "#/$defs/ExtensionsParam",
                     "List": "#/$defs/ListParam",
                     "String": "#/$defs/StringParam",
                     "Tuple": "#/$defs/TupleParam",
@@ -1776,9 +1698,6 @@
                 },
                 {
                     "$ref": "#/$defs/TupleParam"
-                },
-                {
-                    "$ref": "#/$defs/ExtensionsParam"
                 }
             ],
             "required": [

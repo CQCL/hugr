@@ -456,7 +456,6 @@ class MakeTuple(AsExtOp, _PartialOp):
         return tys.FunctionType(
             input=self.types,
             output=[tys.Tuple(*self.types)],
-            runtime_reqs=["prelude"],
         )
 
     def type_args(self) -> list[tys.TypeArg]:
@@ -499,7 +498,6 @@ class UnpackTuple(AsExtOp, _PartialOp):
         return tys.FunctionType(
             input=[tys.Tuple(*self.types)],
             output=self.types,
-            runtime_reqs=["prelude"],
         )
 
     def type_args(self) -> list[tys.TypeArg]:
@@ -632,7 +630,6 @@ class DFG(DfParentOp, DataflowOp):
     #: Inputs types of the operation.
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = field(default=None, repr=False)
-    _extension_delta: tys.ExtensionSet = field(default_factory=list, repr=False)
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -650,7 +647,7 @@ class DFG(DfParentOp, DataflowOp):
         Raises:
             IncompleteOp: If the outputs have not been set.
         """
-        return tys.FunctionType(self.inputs, self.outputs, self._extension_delta)
+        return tys.FunctionType(self.inputs, self.outputs)
 
     @property
     def num_out(self) -> int:
@@ -729,7 +726,6 @@ class DataflowBlock(DfParentOp):
     inputs: tys.TypeRow
     _sum: tys.Sum | None = None
     _other_outputs: tys.TypeRow | None = field(default=None, repr=False)
-    extension_delta: tys.ExtensionSet = field(default_factory=list)
 
     @property
     def sum_ty(self) -> tys.Sum:
@@ -762,7 +758,6 @@ class DataflowBlock(DfParentOp):
             inputs=ser_it(self.inputs),
             sum_rows=list(map(ser_it, self.sum_ty.variant_rows)),
             other_outputs=ser_it(self.other_outputs),
-            extension_delta=self.extension_delta,
         )
 
     def inner_signature(self) -> tys.FunctionType:
@@ -993,7 +988,6 @@ class TailLoop(DfParentOp, DataflowOp):
     #: Types that are appended to both inputs and outputs of the graph.
     rest: tys.TypeRow
     _just_outputs: tys.TypeRow | None = field(default=None, repr=False)
-    extension_delta: tys.ExtensionSet = field(default_factory=list, repr=False)
 
     @property
     def just_outputs(self) -> tys.TypeRow:
@@ -1014,7 +1008,6 @@ class TailLoop(DfParentOp, DataflowOp):
             just_inputs=ser_it(self.just_inputs),
             just_outputs=ser_it(self.just_outputs),
             rest=ser_it(self.rest),
-            extension_delta=self.extension_delta,
         )
 
     def inner_signature(self) -> tys.FunctionType:
@@ -1334,13 +1327,11 @@ class Noop(AsExtOp, _PartialOp):
     def cached_signature(self) -> tys.FunctionType | None:
         return tys.FunctionType.endo(
             [self.type_],
-            runtime_reqs=["prelude"],
         )
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType.endo(
             [self.type_],
-            runtime_reqs=["prelude"],
         )
 
     def _set_in_types(self, types: tys.TypeRow) -> None:

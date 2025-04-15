@@ -14,10 +14,6 @@ Please read the [API documentation here][].
 
 ## Experimental Features
 
-- `extension_inference`:
-  Experimental feature which allows automatic inference of which extra extensions
-  are required at runtime by a HUGR when validating it.
-  Not enabled by default.
 - `declarative`:
   Experimental support for declaring extensions in YAML files, support is limited.
 

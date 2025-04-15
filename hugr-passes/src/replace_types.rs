@@ -745,8 +745,7 @@ mod test {
         let inps = fb.input_wires();
         let id = fb.finish_with_outputs(inps).unwrap();
 
-        let sig = Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t())
-            .with_extension_delta(ext.name.clone());
+        let sig = Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t());
         let mut fb = mb.define_function("main", sig).unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
         let [indices] = fb

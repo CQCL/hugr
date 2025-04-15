@@ -6,11 +6,9 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
-use crate::extension::ExtensionSet;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::controlflow::BasicBlock;
-use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{DataflowBlock, OpType};
 use crate::PortIndex;
@@ -33,12 +31,11 @@ impl OutlineCfg {
     }
 
     /// Compute the entry and exit nodes of the CFG which contains
-    /// [`self.blocks`], along with the output neighbour its parent graph and
-    /// the combined extension_deltas of all of the blocks.
-    fn compute_entry_exit_outside_extensions(
+    /// [`self.blocks`], along with the output neighbour its parent graph.
+    fn compute_entry_exit(
         &self,
         h: &impl HugrView<Node = Node>,
-    ) -> Result<(Node, Node, Node, ExtensionSet), OutlineCfgError> {
+    ) -> Result<(Node, Node, Node), OutlineCfgError> {
         let cfg_n = match self
             .blocks
             .iter()
@@ -50,13 +47,12 @@ impl OutlineCfg {
             _ => return Err(OutlineCfgError::NotSiblings),
         };
         let o = h.get_optype(cfg_n);
-        let OpType::CFG(o) = o else {
+        let OpType::CFG(_) = o else {
             return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
         };
         let cfg_entry = h.children(cfg_n).next().unwrap();
         let mut entry = None;
         let mut exit_succ = None;
-        let mut extension_delta = ExtensionSet::new();
         for &n in self.blocks.iter() {
             if n == cfg_entry
                 || h.input_neighbours(n)
@@ -71,7 +67,6 @@ impl OutlineCfg {
                     }
                 }
             }
-            extension_delta = extension_delta.union(o.signature().runtime_reqs.clone());
             let external_succs = h.output_neighbours(n).filter(|s| !self.blocks.contains(s));
             match external_succs.at_most_one() {
                 Ok(None) => (), // No external successors
@@ -87,7 +82,7 @@ impl OutlineCfg {
             };
         }
         match (entry, exit_succ) {
-            (Some(e), Some((x, o))) => Ok((e, x, o, extension_delta)),
+            (Some(e), Some((x, o))) => Ok((e, x, o)),
             (None, _) => Err(OutlineCfgError::NoEntryNode),
             (_, None) => Err(OutlineCfgError::NoExitNode),
         }
@@ -98,7 +93,7 @@ impl PatchVerification for OutlineCfg {
     type Error = OutlineCfgError;
     type Node = Node;
     fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), OutlineCfgError> {
-        self.compute_entry_exit_outside_extensions(h)?;
+        self.compute_entry_exit(h)?;
         Ok(())
     }
 
@@ -118,8 +113,7 @@ impl PatchHugrMut for OutlineCfg {
         self,
         h: &mut impl HugrMut<Node = Node>,
     ) -> Result<[Node; 2], OutlineCfgError> {
-        let (entry, exit, outside, extension_delta) =
-            self.compute_entry_exit_outside_extensions(h)?;
+        let (entry, exit, outside) = self.compute_entry_exit(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
         let OpType::DataflowBlock(DataflowBlock { inputs, .. }) = h.get_optype(entry) else {
@@ -136,17 +130,10 @@ impl PatchHugrMut for OutlineCfg {
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
         let (new_block, cfg_node) = {
-            let mut new_block_bldr = BlockBuilder::new_exts(
-                inputs.clone(),
-                vec![type_row![]],
-                outputs.clone(),
-                extension_delta.clone(),
-            )
-            .unwrap();
+            let mut new_block_bldr =
+                BlockBuilder::new(inputs.clone(), vec![type_row![]], outputs.clone()).unwrap();
             let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
-            let cfg = new_block_bldr
-                .cfg_builder_exts(wires_in, outputs, extension_delta)
-                .unwrap();
+            let cfg = new_block_bldr.cfg_builder(wires_in, outputs).unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
             let unit_sum = new_block_bldr.add_constant(ops::Value::unary_unit_sum());
             let pred_wire = new_block_bldr.load_const(&unit_sum);

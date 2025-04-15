@@ -609,21 +609,18 @@ mod test {
                 inputs: vec![listy.clone()].into(),
                 sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
-                extension_delta: list::EXTENSION_ID.into(),
             },
         );
         let r_df1 = replacement.add_node_with_parent(
             r_bb,
             DFG {
-                signature: Signature::new(vec![listy.clone()], simple_unary_plus(intermed.clone()))
-                    .with_extension_delta(list::EXTENSION_ID),
+                signature: Signature::new(vec![listy.clone()], simple_unary_plus(intermed.clone())),
             },
         );
         let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
-                signature: Signature::new(intermed, simple_unary_plus(just_list.clone()))
-                    .with_extension_delta(list::EXTENSION_ID),
+                signature: Signature::new(intermed, simple_unary_plus(just_list.clone())),
             },
         );
         [0, 1]
@@ -706,7 +703,7 @@ mod test {
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder_exts(op_sig.output.clone(), 1, op_sig.runtime_reqs.clone())?
+            h.simple_entry_builder(op_sig.output.clone(), 1)?
         } else {
             h.simple_block_builder(op_sig.into_owned(), 1)?
         };
@@ -733,25 +730,20 @@ mod test {
             ext.add_op("baz".into(), "".to_string(), utou.clone(), extension_ref)
                 .unwrap();
         });
-        let ext_name = ext.name().clone();
         let foo = ext.instantiate_extension_op("foo", []).unwrap();
         let bar = ext.instantiate_extension_op("bar", []).unwrap();
         let baz = ext.instantiate_extension_op("baz", []).unwrap();
         let mut registry = test_quantum_extension::REG.clone();
         registry.register(ext).unwrap();
 
-        let mut h = DFGBuilder::new(
-            Signature::new(vec![usize_t(), bool_t()], vec![usize_t()])
-                .with_extension_delta(ext_name.clone()),
-        )
-        .unwrap();
+        let mut h =
+            DFGBuilder::new(Signature::new(vec![usize_t(), bool_t()], vec![usize_t()])).unwrap();
         let [i, b] = h.input_wires_arr();
         let mut cond = h
-            .conditional_builder_exts(
+            .conditional_builder(
                 (vec![type_row![]; 2], b),
                 [(usize_t(), i)],
                 vec![usize_t()].into(),
-                ext_name.clone(),
             )
             .unwrap();
         let mut case1 = cond.case_builder(0).unwrap();
@@ -759,12 +751,7 @@ mod test {
         let case1 = case1.finish_with_outputs(foo.outputs()).unwrap().node();
         let mut case2 = cond.case_builder(1).unwrap();
         let bar = case2.add_dataflow_op(bar, case2.input_wires()).unwrap();
-        let mut baz_dfg = case2
-            .dfg_builder(
-                utou.clone().with_extension_delta(ext_name.clone()),
-                bar.outputs(),
-            )
-            .unwrap();
+        let mut baz_dfg = case2.dfg_builder(utou.clone(), bar.outputs()).unwrap();
         let baz = baz_dfg.add_dataflow_op(baz, baz_dfg.input_wires()).unwrap();
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs()).unwrap();
         let case2 = case2.finish_with_outputs(baz_dfg.outputs()).unwrap().node();

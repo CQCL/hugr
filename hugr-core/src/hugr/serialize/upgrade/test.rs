@@ -55,7 +55,6 @@ pub fn hugr_with_named_op() -> Hugr {
 #[rstest]
 #[case("empty_hugr", empty_hugr())]
 #[case("hugr_with_named_op", hugr_with_named_op())]
-#[cfg_attr(feature = "extension_inference", ignore = "Fails extension inference")]
 fn serial_upgrade(#[case] name: String, #[case] hugr: Hugr) {
     let path = TEST_CASE_DIR.join(format!("{}.json", name));
     if !path.exists() {

@@ -1,7 +1,6 @@
 {
   "version": "0.1.0",
   "name": "collections.list",
-  "runtime_reqs": [],
   "types": {
     "List": {
       "extension": "collections.list",
@@ -70,8 +69,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -151,8 +149,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -207,8 +204,7 @@
             {
               "t": "I"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -274,8 +270,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -332,8 +327,7 @@
               ],
               "bound": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -413,8 +407,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

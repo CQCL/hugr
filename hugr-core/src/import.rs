@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use crate::{
-    extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError},
+    extension::{ExtensionId, ExtensionRegistry, SignatureError},
     hugr::{HugrMut, NodeMetadata},
     ops::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
@@ -791,7 +791,6 @@ impl<'a> Context<'a> {
             just_inputs,
             just_outputs,
             rest,
-            extension_delta: ExtensionSet::new(),
         });
 
         let node = self.make_node(node_id, optype, parent)?;
@@ -819,7 +818,6 @@ impl<'a> Context<'a> {
             sum_rows,
             other_inputs,
             outputs,
-            extension_delta: ExtensionSet::new(),
         });
 
         let node = self.make_node(node_id, optype, parent)?;
@@ -887,7 +885,6 @@ impl<'a> Context<'a> {
                     inputs: types.clone(),
                     other_outputs: TypeRow::default(),
                     sum_rows: vec![types.clone()],
-                    extension_delta: ExtensionSet::default(),
                 }),
             );
 
@@ -988,7 +985,6 @@ impl<'a> Context<'a> {
             inputs,
             other_outputs,
             sum_rows,
-            extension_delta: ExtensionSet::new(),
         });
         let node = self.make_node(node_id, optype, parent)?;
 
@@ -1491,7 +1487,7 @@ impl<'a> Context<'a> {
                 let runtime_type = self.import_type(runtime_type)?;
                 let value: serde_json::Value = serde_json::from_str(json)
                     .map_err(|_| table::ModelError::TypeError(term_id))?;
-                let custom_const = CustomSerialized::new(runtime_type, value, ExtensionSet::new());
+                let custom_const = CustomSerialized::new(runtime_type, value);
                 let opaque_value = OpaqueValue::new(custom_const);
                 return Ok(Value::Extension { e: opaque_value });
             }

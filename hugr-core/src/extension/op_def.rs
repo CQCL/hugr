@@ -244,11 +244,7 @@ impl SignatureFunc {
             // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
-        let mut res = pf.instantiate(args)?;
-
-        // Automatically add the extensions where the operation is defined to
-        // the runtime requirements of the op.
-        res.runtime_reqs.insert(def.extension.clone());
+        let res = pf.instantiate(args)?;
 
         // If there are any row variables left, this will fail with an error:
         res.try_into()
@@ -722,8 +718,7 @@ pub(super) mod test {
                 Ok(Signature::new(
                     vec![usize_t(); 3],
                     vec![Type::new_tuple(vec![usize_t(); 3])]
-                )
-                .with_extension_delta(EXT_ID))
+                ))
             );
             assert_eq!(def.validate_args(&args, &[]), Ok(()));
 
@@ -733,10 +728,10 @@ pub(super) mod test {
             let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
             assert_eq!(
                 def.compute_signature(&args),
-                Ok(
-                    Signature::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
-                        .with_extension_delta(EXT_ID)
-                )
+                Ok(Signature::new(
+                    tyvars.clone(),
+                    vec![Type::new_tuple(tyvars)]
+                ))
             );
             def.validate_args(&args, &[TypeBound::Copyable.into()])
                 .unwrap();
@@ -787,14 +782,11 @@ pub(super) mod test {
                 ),
                 extension_ref,
             )?;
-            let tv = Type::new_var_use(1, TypeBound::Copyable);
+            let tv = Type::new_var_use(0, TypeBound::Copyable);
             let args = [TypeArg::Type { ty: tv.clone() }];
-            let decls = [TypeParam::Extensions, TypeBound::Copyable.into()];
+            let decls = [TypeBound::Copyable.into()];
             def.validate_args(&args, &decls).unwrap();
-            assert_eq!(
-                def.compute_signature(&args),
-                Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID))
-            );
+            assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo(tv)));
             // But not with an external row variable
             let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
             assert_eq!(
@@ -808,36 +800,6 @@ pub(super) mod test {
             );
             Ok(())
         })?;
-        Ok(())
-    }
-
-    #[test]
-    fn instantiate_extension_delta() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::extension::prelude::bool_t;
-
-        let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            let params: Vec<TypeParam> = vec![TypeParam::Extensions];
-            let db_set = ExtensionSet::type_var(0);
-            let fun_ty = Signature::new_endo(bool_t()).with_extension_delta(db_set);
-
-            let def = ext.add_op(
-                "SimpleOp".into(),
-                "".into(),
-                PolyFuncTypeRV::new(params.clone(), fun_ty),
-                extension_ref,
-            )?;
-
-            // Concrete extension set
-            let es = ExtensionSet::singleton(EXT_ID);
-            let exp_fun_ty = Signature::new_endo(bool_t()).with_extension_delta(es.clone());
-            let args = [TypeArg::Extensions { es }];
-
-            def.validate_args(&args, &params).unwrap();
-            assert_eq!(def.compute_signature(&args), Ok(exp_fun_ty));
-
-            Ok(())
-        })?;
-
         Ok(())
     }
 

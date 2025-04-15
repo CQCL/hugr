@@ -7,9 +7,8 @@ use hugr::builder::{
     HugrBuilder, ModuleBuilder,
 };
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};
-use hugr::extension::ExtensionSet;
 use hugr::ops::OpName;
-use hugr::std_extensions::arithmetic::float_types::{self, float64_type, ConstF64};
+use hugr::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
 use hugr::types::Signature;
 use hugr::{type_row, CircuitUnit, Extension, Hugr, Node};
 use lazy_static::lazy_static;
@@ -97,11 +96,7 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     let h_gate = QUANTUM_EXT.instantiate_extension_op("H", []).unwrap();
     let cx_gate = QUANTUM_EXT.instantiate_extension_op("CX", []).unwrap();
     let rz = QUANTUM_EXT.instantiate_extension_op("Rz", []).unwrap();
-    let signature =
-        Signature::new_endo(vec![qb_t(), qb_t()]).with_extension_delta(ExtensionSet::from_iter([
-            QUANTUM_EXT.name().clone(),
-            float_types::EXTENSION_ID,
-        ]));
+    let signature = Signature::new_endo(vec![qb_t(), qb_t()]);
     let mut module_builder = ModuleBuilder::new();
     let mut f_build = module_builder.define_function("main", signature).unwrap();
 

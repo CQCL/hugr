@@ -94,7 +94,7 @@ mod test {
 
     #[fixture]
     fn noop_hugr() -> Hugr {
-        let mut b = DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
+        let mut b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
         let out = b
             .add_dataflow_op(Noop::new(bool_t()), [b.input_wires().next().unwrap()])
             .unwrap()

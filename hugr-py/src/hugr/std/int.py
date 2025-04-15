@@ -93,7 +93,7 @@ class _DivModDef(RegisteredOp):
 
     def cached_signature(self) -> tys.FunctionType | None:
         row: list[tys.Type] = [int_t(self.width)] * 2
-        return tys.FunctionType.endo(row, runtime_reqs=[INT_OPS_EXTENSION.name])
+        return tys.FunctionType.endo(row)
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:

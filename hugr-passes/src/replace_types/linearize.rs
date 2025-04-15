@@ -622,10 +622,7 @@ mod test {
             NodeTemplate::SingleOp(copy3.clone()),
             NodeTemplate::SingleOp(discard.clone().into()),
         );
-        let sig3 = Some(
-            Signature::new(lin_t.clone(), vec![lin_t.clone(); 3])
-                .with_extension_delta(ext.name().clone()),
-        );
+        let sig3 = Some(Signature::new(lin_t.clone(), vec![lin_t.clone(); 3]));
         assert_eq!(
             bad_copy,
             Err(LinearizeError::WrongSignature {
@@ -782,11 +779,7 @@ mod test {
         let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
         let discard_fn = {
             let mut fb = dfb
-                .define_function(
-                    "drop",
-                    Signature::new(lin_t.clone(), type_row![])
-                        .with_extension_delta(e.name().clone()),
-                )
+                .define_function("drop", Signature::new(lin_t.clone(), type_row![]))
                 .unwrap();
             let ins = fb.input_wires();
             fb.add_dataflow_op(

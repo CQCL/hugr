@@ -17,7 +17,6 @@ categories = ["compilers"]
 workspace = true
 
 [features]
-extension_inference = []
 declarative = ["serde_yaml"]
 zstd = ["dep:zstd"]
 
