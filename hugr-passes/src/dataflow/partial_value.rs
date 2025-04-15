@@ -571,7 +571,7 @@ mod test {
                 (
                     Self::LeafPtr(max),
                     PartialValue::LoadedFunction(LoadedFunction { func_node, args }),
-                ) => args.len() == 0 && func_node.index() <= *max,
+                ) => args.is_empty() && func_node.index() <= *max,
                 (Self::Branch(sop), PartialValue::PartialSum(ps)) => {
                     for (k, v) in &ps.0 {
                         if *k >= sop.len() {
@@ -601,7 +601,7 @@ mod test {
                 let leaf_strat = prop_oneof![
                     (0..usize::MAX).prop_map(TestSumType::LeafVal),
                     // This is the maximum value accepted by portgraph::NodeIndex::new
-                    (0..(2usize ^ 31 - 2)).prop_map(TestSumType::LeafPtr)
+                    (0..((2usize ^ 31) - 2)).prop_map(TestSumType::LeafPtr)
                 ];
                 leaf_strat.prop_mutually_recursive(
                     params.depth as u32,
