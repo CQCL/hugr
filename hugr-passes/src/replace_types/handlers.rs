@@ -10,7 +10,7 @@ use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use hugr_core::std_extensions::collections::array::{
-    array_type, ArrayOpDef, ArrayRepeat, ArrayScan,
+    array_type, ArrayOpDef, ArrayRepeat, ArrayScan, ArrayValue,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
@@ -21,8 +21,8 @@ use super::{
     CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
 };
 
-/// Handler for [ListValue] constants that recursively [ReplaceTypes::change_value]s
-/// the elements of the list
+/// Handler for [ListValue] constants that updates the element type and
+/// recursively [ReplaceTypes::change_value]s the elements of the list
 pub fn list_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -30,20 +30,41 @@ pub fn list_const(
     let Some(lv) = val.value().downcast_ref::<ListValue>() else {
         return Ok(None);
     };
-    let mut vals: Vec<Value> = lv.get_contents().to_vec();
-    let mut ch = false;
-    for v in vals.iter_mut() {
-        ch |= repl.change_value(v)?;
-    }
-    // If none of the values has changed, assume the Type hasn't (Values have a single known type)
-    if !ch {
-        return Ok(None);
-    };
-
     let mut elem_t = lv.get_element_type().clone();
-    elem_t.transform(repl)?;
+    if !elem_t.transform(repl)? {
+        // No change to type, so values should not change either
+        return Ok(None)
+    }
+
+    let mut vals: Vec<Value> = lv.get_contents().to_vec();
+    for v in vals.iter_mut() {
+        repl.change_value(v)?;
+    }
     Ok(Some(ListValue::new(elem_t, vals).into()))
 }
+
+/// Handler for [ArrayValue] constants that recursively
+/// [ReplaceTypes::change_value]s the elements of the list
+pub fn array_const(
+    val: &OpaqueValue,
+    repl: &ReplaceTypes,
+) -> Result<Option<Value>, ReplaceTypesError> {
+    let Some(av) = val.value().downcast_ref::<ArrayValue>() else {
+        return Ok(None);
+    };
+    let mut elem_t = av.get_element_type().clone();
+    if !elem_t.transform(repl)? {
+        // No change to type, so values should not change either
+        return Ok(None)
+    }
+
+    let mut vals: Vec<Value> = av.get_contents().to_vec();
+    for v in vals.iter_mut() {
+        repl.change_value(v)?;
+    }
+    Ok(Some(ArrayValue::new(elem_t, vals).into()))
+}
+
 
 fn runtime_reqs(h: &Hugr) -> ExtensionSet {
     h.signature(h.root()).unwrap().runtime_reqs.clone()
