@@ -29,7 +29,8 @@ pub struct SimpleReplacement<HostNode = Node> {
     /// A hugr with DFG root (consisting of replacement nodes).
     replacement: Hugr,
     /// A map from (target ports of edges from the Input node of `replacement`)
-    /// to (target ports of edges from nodes not in `subgraph` to nodes in `subgraph`).
+    /// to (target ports of edges from nodes not in `subgraph` to nodes in
+    /// `subgraph`).
     nu_inp: HashMap<(Node, IncomingPort), (HostNode, IncomingPort)>,
     /// A map from (target ports of edges from nodes in `subgraph` to nodes not
     /// in `subgraph`) to (input ports of the Output node of `replacement`).
@@ -126,7 +127,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             })
             .map(
                 |(&(rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port))| {
-                    // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
+                    // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node,
+                    // n_inp_port)
                     let (rem_inp_pred_node, rem_inp_pred_port) = host
                         .single_linked_output(*rem_inp_node, *rem_inp_port)
                         .unwrap();
@@ -159,8 +161,9 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     > + 'a {
         let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
 
-        // For each q = self.nu_out[p] such that the predecessor of q is not an Input port,
-        // there will be an edge from (the new copy of) the predecessor of q to p.
+        // For each q = self.nu_out[p] such that the predecessor of q is not an Input
+        // port, there will be an edge from (the new copy of) the predecessor of
+        // q to p.
         self.nu_out
             .iter()
             .filter_map(move |(&(rem_out_node, rem_out_port), rep_out_port)| {
@@ -197,8 +200,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     > + 'a {
         let [_, replacement_output_node] = self.get_replacement_io().expect("replacement is a DFG");
 
-        // For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
-        // to p1.
+        // For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the
+        // predecessor of p0 to p1.
         self.nu_out
             .iter()
             .filter_map(move |(&(rem_out_node, rem_out_port), &rep_out_port)| {
@@ -246,8 +249,9 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Get all edges that the replacement would add between `host` and
     /// `self.replacement`.
     ///
-    /// This is equivalent to chaining the results of [`Self::incoming_boundary`],
-    /// [`Self::outgoing_boundary`], and [`Self::host_to_host_boundary`].
+    /// This is equivalent to chaining the results of
+    /// [`Self::incoming_boundary`], [`Self::outgoing_boundary`], and
+    /// [`Self::host_to_host_boundary`].
     ///
     /// This panics if self.replacement is not a DFG.
     pub fn all_boundary_edges<'a>(
@@ -291,8 +295,16 @@ impl<HostNode: HugrNode> VerifyPatch for SimpleReplacement<HostNode> {
     }
 }
 
+/// Result of applying a [`SimpleReplacement`].
+pub struct ApplyOutcome {
+    /// Map from Node in replacement to corresponding Node in the result Hugr
+    pub node_map: HashMap<Node, Node>,
+    /// Nodes removed from the result Hugr and their weights
+    pub removed_nodes: Vec<(Node, OpType)>,
+}
+
 impl ApplyPatchHugrMut for SimpleReplacement<Node> {
-    type Outcome = Vec<(Node, OpType)>;
+    type Outcome = ApplyOutcome;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
@@ -316,10 +328,7 @@ impl ApplyPatchHugrMut for SimpleReplacement<Node> {
         } = self;
 
         // 2. Insert the replacement as a whole.
-        let InsertionResult {
-            new_root,
-            node_map: index_map,
-        } = h.insert_hugr(parent, replacement);
+        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, replacement);
 
         // remove the Input and Output nodes from the replacement graph
         let replace_children = h.children(new_root).collect::<Vec<Node>>();
@@ -335,17 +344,22 @@ impl ApplyPatchHugrMut for SimpleReplacement<Node> {
 
         // 3. Insert all boundary edges.
         for (src, tgt) in boundary_edges {
-            let (src_node, src_port) = src.map_replacement(&index_map);
-            let (tgt_node, tgt_port) = tgt.map_replacement(&index_map);
+            let (src_node, src_port) = src.map_replacement(&node_map);
+            let (tgt_node, tgt_port) = tgt.map_replacement(&node_map);
             h.connect(src_node, src_port, tgt_node, tgt_port);
         }
 
         // 4. Remove all nodes in subgraph and edges between them.
-        Ok(subgraph
+        let removed_nodes = subgraph
             .nodes()
             .iter()
             .map(|&node| (node, h.remove_node(node)))
-            .collect())
+            .collect();
+
+        Ok(ApplyOutcome {
+            node_map,
+            removed_nodes,
+        })
     }
 }
 
@@ -489,7 +503,8 @@ pub(in crate::hugr::patch) mod test {
     ///  └─────────┘   │    ┌─────────┐
     ///                └────┤ (2) NOT ├──
     ///                     └─────────┘
-    /// This can be replaced with an empty hugr coping the input to both outputs.
+    /// This can be replaced with an empty hugr coping the input to both
+    /// outputs.
     ///
     /// Returns the hugr and the nodes of the NOT gates, in order.
     #[fixture]
@@ -520,7 +535,8 @@ pub(in crate::hugr::patch) mod test {
     ///  └─────────┘   │
     ///                └─────────────────
     ///
-    /// This can be replaced with a single NOT op, coping the input to the first output.
+    /// This can be replaced with a single NOT op, coping the input to the first
+    /// output.
     ///
     /// Returns the hugr and the nodes of the NOT ops, in order.
     #[fixture]
@@ -806,8 +822,8 @@ pub(in crate::hugr::patch) mod test {
         assert_eq!(h.node_count(), orig.node_count());
     }
 
-    /// Remove all the NOT gates in [`dfg_hugr_copy_bools`] by connecting the input
-    /// directly to the outputs.
+    /// Remove all the NOT gates in [`dfg_hugr_copy_bools`] by connecting the
+    /// input directly to the outputs.
     ///
     /// https://github.com/CQCL/hugr/issues/1190
     #[rstest]
@@ -828,8 +844,9 @@ pub(in crate::hugr::patch) mod test {
         let subgraph =
             SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0, output_not_1], &hugr)
                 .unwrap();
-        // A map from (target ports of edges from the Input node of `replacement`) to (target ports of
-        // edges from nodes not in `removal` to nodes in `removal`).
+        // A map from (target ports of edges from the Input node of `replacement`) to
+        // (target ports of edges from nodes not in `removal` to nodes in
+        // `removal`).
         let nu_inp = [
             (
                 (repl_output, IncomingPort::from(0)),
@@ -842,8 +859,8 @@ pub(in crate::hugr::patch) mod test {
         ]
         .into_iter()
         .collect();
-        // A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
-        // (input ports of the Output node of `replacement`).
+        // A map from (target ports of edges from nodes in `removal` to nodes not in
+        // `removal`) to (input ports of the Output node of `replacement`).
         let nu_out = [
             ((output, IncomingPort::from(0)), IncomingPort::from(0)),
             ((output, IncomingPort::from(1)), IncomingPort::from(1)),
@@ -863,8 +880,8 @@ pub(in crate::hugr::patch) mod test {
         assert_eq!(hugr.node_count(), 3);
     }
 
-    /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting the input
-    /// directly to the output.
+    /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting
+    /// the input directly to the output.
     ///
     /// https://github.com/CQCL/hugr/issues/1323
     #[rstest]
@@ -886,8 +903,9 @@ pub(in crate::hugr::patch) mod test {
 
         let subgraph =
             SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0], &hugr).unwrap();
-        // A map from (target ports of edges from the Input node of `replacement`) to (target ports of
-        // edges from nodes not in `removal` to nodes in `removal`).
+        // A map from (target ports of edges from the Input node of `replacement`) to
+        // (target ports of edges from nodes not in `removal` to nodes in
+        // `removal`).
         let nu_inp = [
             (
                 (repl_output, IncomingPort::from(0)),
@@ -900,8 +918,8 @@ pub(in crate::hugr::patch) mod test {
         ]
         .into_iter()
         .collect();
-        // A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
-        // (input ports of the Output node of `replacement`).
+        // A map from (target ports of edges from nodes in `removal` to nodes not in
+        // `removal`) to (input ports of the Output node of `replacement`).
         let nu_out = [
             ((output, IncomingPort::from(0)), IncomingPort::from(0)),
             ((output, IncomingPort::from(1)), IncomingPort::from(1)),
