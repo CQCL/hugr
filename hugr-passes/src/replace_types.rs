@@ -19,7 +19,7 @@ use hugr_core::ops::{
     Value, CFG, DFG,
 };
 use hugr_core::types::{
-    CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
 };
 use hugr_core::{Hugr, HugrView, Node, Wire};
 
@@ -172,6 +172,8 @@ pub enum ReplaceTypesError {
     SignatureError(#[from] SignatureError),
     #[error(transparent)]
     ValidationError(#[from] ValidatePassError),
+    #[error(transparent)]
+    ConstError(#[from] ConstTypeError),
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
 }
@@ -505,20 +507,26 @@ mod test {
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{TypeDefBound, Version};
 
+    use hugr_core::ops::constant::OpaqueValue;
     use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
-        array_type, ArrayOp, ArrayOpDef, ArrayValue,
+        array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue,
     };
     use hugr_core::std_extensions::collections::list::{
         list_type, list_type_def, ListOp, ListValue,
     };
 
+    use hugr_core::hugr::ValidationError;
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
+    use rstest::rstest;
 
+    use crate::validation::ValidatePassError;
+
+    use super::ReplaceTypesError;
     use super::{handlers::list_const, NodeTemplate, ReplaceTypes};
 
     const PACKED_VEC: &str = "PackedVec";
@@ -919,5 +927,39 @@ mod test {
                 .collect_vec(),
             ["NoBoundsCheck.read", "collections.list.get"]
         );
+    }
+
+    #[rstest]
+    #[case(&[])]
+    #[case(&[3])]
+    #[case(&[5,7,11,13,17,19])]
+    fn array_const(#[case] vals: &[u64]) {
+        use super::handlers::array_const;
+        let mut dfb = DFGBuilder::new(inout_sig(
+            type_row![],
+            array_type(vals.len() as _, usize_t()),
+        ))
+        .unwrap();
+        let c = dfb.add_load_value(ArrayValue::new(
+            usize_t(),
+            vals.iter().map(|u| ConstUsize::new(*u).into()),
+        ));
+        let backup = dfb.finish_hugr_with_outputs([c]).unwrap();
+
+        let mut repl = ReplaceTypes::default();
+        let usize_custom_t = usize_t().as_extension().unwrap().clone();
+        repl.replace_type(usize_custom_t.clone(), INT_TYPES[6].clone());
+        repl.replace_consts(usize_custom_t, |cst: &OpaqueValue, _| {
+            let cu = cst.value().downcast_ref::<ConstUsize>().unwrap();
+            Ok(ConstInt::new_u(6, cu.value())?.into())
+        });
+        assert!(
+            matches!(repl.run(&mut backup.clone()), Err(ReplaceTypesError::ValidationError(ValidatePassError::OutputError {
+                err: ValidationError::IncompatiblePorts {from, to, ..}, ..
+            })) if backup.get_optype(from).is_const() && to == c.node())
+        );
+        repl.replace_consts_parametrized(array_type_def(), array_const);
+        let mut h = backup;
+        repl.run(&mut h).unwrap(); // Includes validation
     }
 }

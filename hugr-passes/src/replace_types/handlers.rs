@@ -33,7 +33,7 @@ pub fn list_const(
     let mut elem_t = lv.get_element_type().clone();
     if !elem_t.transform(repl)? {
         // No change to type, so values should not change either
-        return Ok(None)
+        return Ok(None);
     }
 
     let mut vals: Vec<Value> = lv.get_contents().to_vec();
@@ -55,7 +55,7 @@ pub fn array_const(
     let mut elem_t = av.get_element_type().clone();
     if !elem_t.transform(repl)? {
         // No change to type, so values should not change either
-        return Ok(None)
+        return Ok(None);
     }
 
     let mut vals: Vec<Value> = av.get_contents().to_vec();
@@ -64,7 +64,6 @@ pub fn array_const(
     }
     Ok(Some(ArrayValue::new(elem_t, vals).into()))
 }
-
 
 fn runtime_reqs(h: &Hugr) -> ExtensionSet {
     h.signature(h.root()).unwrap().runtime_reqs.clone()
