@@ -174,13 +174,24 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
     }
 }
 
-// IfTrueThen ------------------------------
+// IfThen ------------------------------
 /// [ComposablePass] that executes a first pass that returns a `bool`
 /// result; and then, if-and-only-if that first result was true,
 /// executes a second pass
-pub struct IfTrueThen<E, A, B>(A, B, PhantomData<E>);
+pub struct IfThen<E, A, B>(A, B, PhantomData<E>);
+
 impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Error, B::Error>>
-    ComposablePass for IfTrueThen<E, A, B>
+    IfThen<E, A, B>
+{
+    /// Make a new instance given the [ComposablePass] to run first
+    /// and (maybe) second
+    pub fn new(fst: A, opt_snd: B) -> Self {
+        Self(fst, opt_snd, PhantomData)
+    }
+}
+
+impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Error, B::Error>>
+    ComposablePass for IfThen<E, A, B>
 {
     type Error = E;
 
@@ -288,5 +299,63 @@ mod test {
 
         let r = ValidatingPass(cfold, false).run(&mut h);
         assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if e == err));
+    }
+
+    #[test]
+    fn test_if_then() {
+        let tr = TypeRow::from(vec![usize_t(); 2]);
+
+        let h = {
+            let mut fb = FunctionBuilder::new("tupuntup", Signature::new_endo(tr.clone())).unwrap();
+            let [a, b] = fb.input_wires_arr();
+            let tup = fb
+                .add_dataflow_op(MakeTuple::new(tr.clone()), [a, b])
+                .unwrap();
+            let untup = fb
+                .add_dataflow_op(UnpackTuple::new(tr.clone()), tup.outputs())
+                .unwrap();
+            fb.finish_hugr_with_outputs(untup.outputs()).unwrap()
+        };
+
+        fn change_type_then_untup(
+            t: CustomType,
+        ) -> impl ComposablePass<Result = Option<UntupleResult>> {
+            let mut repl = ReplaceTypes::default();
+            repl.replace_type(t, INT_TYPES[6].clone());
+            IfThen::<Either<_, _>, _, _>::new(repl, UntuplePass::new(UntupleRecursive::Recursive))
+        }
+
+        {
+            // Change usize_t to INT_TYPES[6], and if that did anything (it will!), then Untuple
+            let mut h = h.clone();
+            let r = validate_if_test(
+                change_type_then_untup(usize_t().as_extension().unwrap().clone()),
+                &mut h,
+            )
+            .unwrap();
+            assert_eq!(
+                r,
+                Some(UntupleResult {
+                    rewrites_applied: 1
+                })
+            );
+            let [tuple_in, tuple_out] = h.children(h.root()).collect_array().unwrap();
+            assert_eq!(h.output_neighbours(tuple_in).collect_vec(), [tuple_out; 2]);
+        }
+
+        // Change INT_TYPES[5] to INT_TYPES[6]; that won't do anything, so don't Untuple
+        let mut h = h;
+        let r = validate_if_test(
+            change_type_then_untup(INT_TYPES[5].as_extension().unwrap().clone()),
+            &mut h,
+        )
+        .unwrap();
+        assert_eq!(r, None);
+        assert_eq!(h.children(h.root()).count(), 4);
+        let mktup = h
+            .output_neighbours(h.first_child(h.root()).unwrap())
+            .next()
+            .unwrap();
+        assert_eq!(h.get_optype(mktup), &OpType::from(MakeTuple::new(tr)));
     }
 }

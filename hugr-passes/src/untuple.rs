@@ -61,7 +61,7 @@ pub enum UntupleError {
 }
 
 /// Result type for the untuple pass.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct UntupleResult {
     /// Number of `MakeTuple` rewrites applied.
     pub rewrites_applied: usize,
