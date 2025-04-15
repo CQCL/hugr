@@ -76,17 +76,16 @@ impl<A: Error, B: Error> ErrorCombiner<A, B> for Either<A, B> {
     }
 }
 
-// Note: in the short term two more impls could be useful:
+// Note: in the short term two we could wish for more impls:
 //   impl<E:Error> ErrorCombiner<Infallible, E> for E
 //   impl<E:Error> ErrorCombiner<E, Infallible> for E
 // however, these aren't possible as they conflict with
 //   impl<A, B:Into<A>> ErrorCombiner<A,B> for A
-// (when A=E=Infallible), boo :-(.
+// when A=E=Infallible, boo :-(.
 // However this will become possible, indeed automatic, when Infallible is replaced
 // by ! (never_type) as (unlike Infallible) ! converts Into anything
 
 // ErrMapper ------------------------------
-
 struct ErrMapper<P, E, F>(P, F, PhantomData<E>);
 
 impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ErrMapper<P, E, F> {
@@ -225,7 +224,7 @@ mod test {
     use super::ComposablePass;
 
     #[test]
-    fn test_sequence() {
+    fn test_then() {
         let mut mb = ModuleBuilder::new();
         let id1 = mb
             .define_function("id1", Signature::new_endo(usize_t()))
@@ -250,11 +249,15 @@ mod test {
             dce.clone().then(cfold.clone()).run(&mut hugr.clone());
         assert_eq!(r, Err(Either::Right(exp_err.clone())));
 
-        let r: Result<_, ConstFoldError> = dce
+        let r = dce
+            .clone()
             .map_err(|inf| match inf {})
-            .then(cfold)
+            .then(cfold.clone())
             .run(&mut hugr.clone());
         assert_eq!(r, Err(exp_err));
+
+        let r2: Result<_, Either<_, _>> = cfold.then(dce).run(&mut hugr.clone());
+        r2.unwrap();
     }
 
     #[test]
