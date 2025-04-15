@@ -22,7 +22,8 @@ use super::{
 };
 
 /// Handler for [ListValue] constants that updates the element type and
-/// recursively [ReplaceTypes::change_value]s the elements of the list
+/// recursively [ReplaceTypes::change_value]s the elements of the list.
+/// Included in [ReplaceTypes::default].
 pub fn list_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -44,7 +45,8 @@ pub fn list_const(
 }
 
 /// Handler for [ArrayValue] constants that recursively
-/// [ReplaceTypes::change_value]s the elements of the list
+/// [ReplaceTypes::change_value]s the elements of the list.
+/// Included in [ReplaceTypes::default].
 pub fn array_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -69,10 +71,10 @@ fn runtime_reqs(h: &Hugr) -> ExtensionSet {
     h.signature(h.root()).unwrap().runtime_reqs.clone()
 }
 
-/// Handler for copying/discarding arrays, for use with [register_callback] for
-/// [array_type_def](hugr_core::std_extensions::collections::array::array_type_def)
+/// Handler for copying/discarding arrays if their elements have become linear.
+/// Included in [ReplaceTypes::default] and [DelegatingLinearizer::default].
 ///
-/// [register_callback]: super::DelegatingLinearizer::register_callback
+/// [DelegatingLinearizer::default]: super::DelegatingLinearizer::default
 pub fn linearize_array(
     args: &[TypeArg],
     num_outports: usize,
@@ -117,6 +119,7 @@ pub fn linearize_array(
         vec![array_ty.clone(); num_outports],
     ))
     .unwrap();
+
     // 1. make num_new array<SZ, Option<T>>, initialized to None...
     let option_sty = option_type(ty.clone());
     let option_ty = Type::from(option_sty.clone());
@@ -142,7 +145,6 @@ pub fn linearize_array(
 
     // 2. use a scan through the input array, copying the element num_outputs times;
     // return the first copy, and put each of the other copies into one of the array<option>
-
     let i64_t = INT_TYPES[6].to_owned();
     let option_array = array_type(*n, option_ty.clone());
     let copy_elem = {
@@ -163,7 +165,8 @@ pub fn linearize_array(
             .unwrap()
             .outputs();
         let copy0 = copies.next().unwrap(); // We'll return this directly
-                                            // Wrap remaining copies into an option
+
+        // Wrap each remaining copy into an option
         let set_op = OpType::from(ArrayOpDef::set.to_concrete(option_ty.clone(), *n));
         let either_st = set_op.dataflow_signature().unwrap().output[0]
             .as_sum()
