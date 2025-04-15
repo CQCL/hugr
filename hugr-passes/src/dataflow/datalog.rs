@@ -370,7 +370,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd)]
 enum LatticeWrapper<T> {
     Bottom,
     Value(T),
@@ -480,5 +480,52 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
         }
         // We only call propagate_leaf_op for dataflow op non-containers,
         o => todo!("Unhandled: {:?}", o), // and OpType is non-exhaustive
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use ascent::Lattice;
+
+    use super::LatticeWrapper;
+
+    #[test]
+    fn latwrap_join() {
+        for lv in [
+            LatticeWrapper::Value(3),
+            LatticeWrapper::Value(5),
+            LatticeWrapper::Top,
+        ] {
+            let mut subject = LatticeWrapper::Bottom;
+            assert!(subject.join_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert!(!subject.join_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert_eq!(
+                subject.join_mut(LatticeWrapper::Value(11)),
+                lv != LatticeWrapper::Top
+            );
+            assert_eq!(subject, LatticeWrapper::Top);
+        }
+    }
+
+    #[test]
+    fn latwrap_meet() {
+        for lv in [
+            LatticeWrapper::Bottom,
+            LatticeWrapper::Value(3),
+            LatticeWrapper::Value(5),
+        ] {
+            let mut subject = LatticeWrapper::Top;
+            assert!(subject.meet_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert!(!subject.meet_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert_eq!(
+                subject.meet_mut(LatticeWrapper::Value(11)),
+                lv != LatticeWrapper::Bottom
+            );
+            assert_eq!(subject, LatticeWrapper::Bottom);
+        }
     }
 }
