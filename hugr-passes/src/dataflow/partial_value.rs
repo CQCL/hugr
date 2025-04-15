@@ -449,7 +449,7 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> Lattice for PartialValue<V, N>
             (Self::LoadedFunction(lf1), Self::LoadedFunction(lf2))
                 if lf1.func_node == lf2.func_node =>
             {
-                // TODO we should also require TypeArgs to be equal by at the moment these are ignored
+                // TODO we should also join the TypeArgs but at the moment these are ignored
                 (Self::LoadedFunction(lf1), false)
             }
             (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_join_mut(ps2) {
@@ -476,7 +476,7 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> Lattice for PartialValue<V, N>
             (Self::LoadedFunction(lf1), Self::LoadedFunction(lf2))
                 if lf1.func_node == lf2.func_node =>
             {
-                // TODO we should also require TypeArgs to be equal by at the moment these are ignored
+                // TODO we should also meet the TypeArgs but at the moment these are ignored
                 (Self::LoadedFunction(lf1), false)
             }
             (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_meet_mut(ps2) {
@@ -525,19 +525,20 @@ mod test {
     use std::sync::Arc;
 
     use ascent::{lattice::BoundedLattice, Lattice};
+    use hugr_core::NodeIndex;
     use itertools::{zip_eq, Itertools as _};
     use prop::sample::subsequence;
     use proptest::prelude::*;
 
     use proptest_recurse::{StrategyExt, StrategySet};
 
-    use super::{AbstractValue, PartialSum, PartialValue};
+    use super::{AbstractValue, LoadedFunction, PartialSum, PartialValue};
 
     #[derive(Debug, PartialEq, Eq, Clone)]
     enum TestSumType {
         Branch(Vec<Vec<Arc<TestSumType>>>),
-        /// None => unit, Some => TestValue <= this *usize*
-        Leaf(Option<usize>),
+        LeafVal(usize), // contains a TestValue <= this usize
+        LeafPtr(usize), // contains a LoadedFunction with node <= this *usize*
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -566,8 +567,11 @@ mod test {
         fn check_value(&self, pv: &PartialValue<TestValue>) -> bool {
             match (self, pv) {
                 (_, PartialValue::Bottom) | (_, PartialValue::Top) => true,
-                (Self::Leaf(None), _) => pv == &PartialValue::new_unit(),
-                (Self::Leaf(Some(max)), PartialValue::Value(TestValue(val))) => val <= max,
+                (Self::LeafVal(max), PartialValue::Value(TestValue(val))) => val <= max,
+                (
+                    Self::LeafPtr(max),
+                    PartialValue::LoadedFunction(LoadedFunction { func_node, args }),
+                ) => args.len() == 0 && func_node.index() <= *max,
                 (Self::Branch(sop), PartialValue::PartialSum(ps)) => {
                     for (k, v) in &ps.0 {
                         if *k >= sop.len() {
@@ -594,8 +598,11 @@ mod test {
         fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
             fn arb(params: SumTypeParams, set: &mut StrategySet) -> SBoxedStrategy<TestSumType> {
                 use proptest::collection::vec;
-                let int_strat = (0..usize::MAX).prop_map(|i| TestSumType::Leaf(Some(i)));
-                let leaf_strat = prop_oneof![Just(TestSumType::Leaf(None)), int_strat];
+                let leaf_strat = prop_oneof![
+                    (0..usize::MAX).prop_map(TestSumType::LeafVal),
+                    // This is the maximum value accepted by portgraph::NodeIndex::new
+                    (0..(2usize ^ 31 - 2)).prop_map(TestSumType::LeafPtr)
+                ];
                 leaf_strat.prop_mutually_recursive(
                     params.depth as u32,
                     params.desired_size as u32,
@@ -662,10 +669,17 @@ mod test {
         ust: &TestSumType,
     ) -> impl Strategy<Value = PartialValue<TestValue>> {
         match ust {
-            TestSumType::Leaf(None) => Just(PartialValue::new_unit()).boxed(),
-            TestSumType::Leaf(Some(i)) => (0..*i)
+            TestSumType::LeafVal(i) => (0..=*i)
                 .prop_map(TestValue)
                 .prop_map(PartialValue::from)
+                .boxed(),
+            TestSumType::LeafPtr(i) => (0..=*i)
+                .prop_map(|i| {
+                    PartialValue::LoadedFunction(LoadedFunction {
+                        func_node: portgraph::NodeIndex::new(i).into(),
+                        args: vec![],
+                    })
+                })
                 .boxed(),
             TestSumType::Branch(sop) => partial_sum_strat(sop).prop_map(PartialValue::from).boxed(),
         }
