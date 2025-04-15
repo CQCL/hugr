@@ -246,6 +246,41 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         self.nu_inp.get(&(node, port)).copied().map(Into::into)
     }
 
+    /// Map the host nodes in `self` according to `node_map`.
+    ///
+    /// `node_map` must map nodes in the current hugr of the subgraph to
+    /// its equivalent nodes in `new_hugr`.
+    ///
+    /// This converts a replacement that acts on nodes of type `HostNode` to
+    /// a replacement that acts on `new_hugr`, with nodes of type `N`.
+    ///
+    /// This does not check convexity. It is up to the caller to ensure that
+    /// the mapped replacement obtained from this applies on a convex subgraph
+    /// of the new Hugr.
+    pub(crate) fn map_host_nodes<N: HugrNode>(
+        &self,
+        node_map: impl Fn(HostNode) -> N,
+    ) -> SimpleReplacement<N> {
+        let Self {
+            subgraph,
+            replacement,
+            nu_inp,
+            nu_out,
+        } = self;
+        let nu_inp = nu_inp
+            .iter()
+            .map(|(&(node, port), &(host_node, host_port))| {
+                ((node, port), (node_map(host_node), host_port))
+            })
+            .collect();
+        let nu_out = nu_out
+            .into_iter()
+            .map(|(&(host_node, host_port), &port)| ((node_map(host_node), host_port), port))
+            .collect();
+        let subgraph = subgraph.map_nodes(node_map);
+        SimpleReplacement::new(subgraph, replacement.clone(), nu_inp, nu_out)
+    }
+
     /// Get all edges that the replacement would add between `host` and
     /// `self.replacement`.
     ///
