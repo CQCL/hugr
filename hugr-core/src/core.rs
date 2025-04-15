@@ -301,10 +301,10 @@ impl std::fmt::Debug for OutgoingPort {
     }
 }
 
-impl std::fmt::Debug for Wire {
+impl<N: HugrNode> std::fmt::Debug for Wire<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Wire")
-            .field("node", &self.0.index())
+            .field("node", &self.0)
             .field("port", &self.1)
             .finish()
     }
