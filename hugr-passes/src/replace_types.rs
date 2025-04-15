@@ -6,6 +6,9 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use handlers::list_const;
+use hugr_core::std_extensions::collections::array::array_type_def;
+use hugr_core::std_extensions::collections::list::list_type_def;
 use thiserror::Error;
 
 use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
@@ -125,7 +128,7 @@ impl NodeTemplate {
 /// * See also limitations noted for [Linearizer].
 ///
 /// [monomorphization]: super::monomorphize()
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
@@ -141,6 +144,16 @@ pub struct ReplaceTypes {
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
     validation: ValidationLevel,
+}
+
+impl Default for ReplaceTypes {
+    fn default() -> Self {
+        let mut res = Self::new_empty();
+        res.linearize = DelegatingLinearizer::default();
+        res.replace_consts_parametrized(array_type_def(), handlers::array_const);
+        res.replace_consts_parametrized(list_type_def(), list_const);
+        res
+    }
 }
 
 impl TypeTransformer for ReplaceTypes {
@@ -179,6 +192,21 @@ pub enum ReplaceTypesError {
 }
 
 impl ReplaceTypes {
+    /// Makes a new instance. Unlike [Self::default], this does not understand
+    /// any extension types, even those in the prelude.
+    pub fn new_empty() -> Self {
+        Self {
+            type_map: Default::default(),
+            param_types: Default::default(),
+            linearize: DelegatingLinearizer::new_empty(),
+            op_map: Default::default(),
+            param_ops: Default::default(),
+            consts: Default::default(),
+            param_consts: Default::default(),
+            validation: Default::default(),
+        }
+    }
+
     /// Sets the validation level used before and after the pass is run.
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
@@ -769,8 +797,6 @@ mod test {
         let backup = tl.finish_hugr().unwrap();
 
         let mut lowerer = ReplaceTypes::default();
-        // Recursively descend into lists
-        lowerer.replace_consts_parametrized(list_type_def(), list_const);
 
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
         lowerer.replace_parametrized_type(list_type_def(), |args| {
@@ -946,7 +972,7 @@ mod test {
         ));
         let backup = dfb.finish_hugr_with_outputs([c]).unwrap();
 
-        let mut repl = ReplaceTypes::default();
+        let mut repl = ReplaceTypes::new_empty();
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
         repl.replace_type(usize_custom_t.clone(), INT_TYPES[6].clone());
         repl.replace_consts(usize_custom_t, |cst: &OpaqueValue, _| {

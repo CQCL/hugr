@@ -7,11 +7,12 @@ use hugr_core::builder::{
     HugrBuilder,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
-use super::{NodeTemplate, ParametricType};
+use super::{handlers::linearize_array, NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
 /// target.  Used to restore Hugr validity when a [ReplaceTypes](super::ReplaceTypes)
@@ -103,7 +104,7 @@ pub trait Linearizer {
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
 /// such as [TypeEnum::Sum]s.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
     copy_discard: HashMap<CustomType, (NodeTemplate, NodeTemplate)>,
@@ -116,6 +117,14 @@ pub struct DelegatingLinearizer {
         ParametricType,
         Arc<dyn Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>>,
     >,
+}
+
+impl Default for DelegatingLinearizer {
+    fn default() -> Self {
+        let mut res = Self::new_empty();
+        res.register_callback(array_type_def(), linearize_array);
+        res
+    }
 }
 
 /// Implementation of [Linearizer] passed to callbacks, (e.g.) so that callbacks for
@@ -156,6 +165,15 @@ pub enum LinearizeError {
 }
 
 impl DelegatingLinearizer {
+    /// Makes a new instance. Unlike [Self::default], this does not understand
+    /// any extension types, even those in the prelude.
+    pub fn new_empty() -> Self {
+        Self {
+            copy_discard: Default::default(),
+            copy_discard_parametric: Default::default(),
+        }
+    }
+
     /// Configures this instance that the specified monomorphic type can be copied and/or
     /// discarded via the provided [NodeTemplate]s - directly or as part of a compound type
     /// e.g. [TypeEnum::Sum].
