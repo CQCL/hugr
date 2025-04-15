@@ -217,22 +217,25 @@ pub(crate) fn validate_if_test<P: ComposablePass>(
 
 #[cfg(test)]
 mod test {
+    use itertools::{Either, Itertools};
     use std::convert::Infallible;
 
     use hugr_core::builder::{
-        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize};
+    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple};
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::ops::{handle::NodeHandle, Input, Output, DEFAULT_OPTYPE, DFG};
-    use hugr_core::{types::Signature, Hugr, HugrView, IncomingPort};
-    use itertools::Either;
+    use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DEFAULT_OPTYPE, DFG};
+    use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
+    use hugr_core::types::{CustomType, Signature, TypeRow};
+    use hugr_core::{Hugr, HugrView, IncomingPort};
 
-    use crate::composable::{ValidatePassError, ValidatingPass};
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
-    use crate::DeadCodeElimPass;
+    use crate::untuple::{UntupleRecursive, UntupleResult};
+    use crate::{DeadCodeElimPass, ReplaceTypes, UntuplePass};
 
-    use super::ComposablePass;
+    use super::{validate_if_test, ComposablePass, IfThen, ValidatePassError, ValidatingPass};
 
     #[test]
     fn test_then() {
