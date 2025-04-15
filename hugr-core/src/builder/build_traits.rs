@@ -119,7 +119,7 @@ pub trait Container {
     }
 
     /// Insert a copy of a HUGR as a child of the container.
-    fn add_hugr_view(&mut self, child: &impl HugrView) -> InsertionResult {
+    fn add_hugr_view<H: HugrView>(&mut self, child: &H) -> InsertionResult<H::Node, Node> {
         let parent = self.container_node();
         self.hugr_mut().insert_from_view(parent, child)
     }
