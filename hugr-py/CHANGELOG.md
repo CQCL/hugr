@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.5](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.4...hugr-py-v0.11.5) (2025-04-16)
+
+
+### Features
+
+* **hugr-py:** move in result classes from guppylang ([#2084](https://github.com/CQCL/hugr/issues/2084)) ([b6efb03](https://github.com/CQCL/hugr/commit/b6efb03bde407740ba546fff72435cc9d70a380b))
+* Packages in `hugr-model` and envelope support. ([#2026](https://github.com/CQCL/hugr/issues/2026)) ([a16389f](https://github.com/CQCL/hugr/commit/a16389fd6909e29ba1a7d93efea2fc75f810e6b8))
+* Represent order edges in `hugr-model` as metadata. ([#2027](https://github.com/CQCL/hugr/issues/2027)) ([09de9e3](https://github.com/CQCL/hugr/commit/09de9e32712c2659cf9ce0ef0254273e2cc916b1))
+
 ## [0.11.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.3...hugr-py-v0.11.4) (2025-03-28)
 
 
