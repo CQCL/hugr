@@ -22,7 +22,8 @@ use hugr_core::ops::{
     Value, CFG, DFG,
 };
 use hugr_core::types::{
-    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
+    TypeTransformer,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
 
@@ -49,20 +50,20 @@ pub enum NodeTemplate {
     // (defaulting to empty list) - see https://github.com/CQCL/hugr/issues/709
     CompoundOp(Box<Hugr>),
     /// A Call to a function (already) existing in the Hugr.
-    Call(Node, Vec<TypeArg>)
+    Call(Node, Vec<TypeArg>),
 }
 
 impl NodeTemplate {
     /// Adds this instance to the specified [HugrMut] as a new node or subtree under a
     /// given parent, returning the unique new child (of that parent) thus created
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// * If `parent` is not in the `hugr`
     /// * If `self` is a [Self::Call] and the target Node either
     ///    * is neither a [FuncDefn] nor a [FuncDecl]
     ///    * has a [`signature`] which the type-args of the [Self::Call] do not match
-    /// 
+    ///
     /// [`signature`]: hugr_core::types::PolyFuncType
     pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Node {
         match self {
@@ -89,7 +90,9 @@ impl NodeTemplate {
             NodeTemplate::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
             // Really we should check whether func points at a FuncDecl or FuncDefn and create
             // the appropriate variety of FuncID but it doesn't matter for the purpose of making a Call.
-            NodeTemplate::Call(func, type_args) => dfb.call(&FuncID::<true>::from(func) , &type_args, inputs)
+            NodeTemplate::Call(func, type_args) => {
+                dfb.call(&FuncID::<true>::from(func), &type_args, inputs)
+            }
         }
     }
 
@@ -119,12 +122,22 @@ impl NodeTemplate {
         *hugr.optype_mut(n) = new_optype;
     }
 
-    fn signature(&self) -> Option<Cow<'_, Signature>> {
-        match self {
+    fn check_signature(
+        &self,
+        inputs: &TypeRow,
+        outputs: &TypeRow,
+    ) -> Result<(), Option<Signature>> {
+        let sig = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(hugr) => hugr.root_type(),
+            NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
-        .dataflow_signature()
+        .dataflow_signature();
+        if sig.as_deref().map(Signature::io) == Some((inputs, outputs)) {
+            Ok(())
+        } else {
+            Err(sig.map(Cow::into_owned))
+        }
     }
 }
 
@@ -132,7 +145,7 @@ fn call<H: HugrView>(h: &H, func: H::Node, type_args: Vec<TypeArg>) -> Call {
     let func_sig = match h.get_optype(func) {
         OpType::FuncDecl(fd) => fd.signature.clone(),
         OpType::FuncDefn(fd) => fd.signature.clone(),
-        o => panic!("Node {func}: expected FuncDecl or FuncDefn, got {o:?}")
+        o => panic!("Node {func}: expected FuncDecl or FuncDefn, got {o:?}"),
     };
     Call::try_new(func_sig, type_args).unwrap()
 }
