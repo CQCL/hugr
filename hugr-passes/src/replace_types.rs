@@ -576,7 +576,7 @@ mod test {
 
     use hugr_core::builder::{
         inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
+        FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
     use hugr_core::extension::prelude::{
         bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
@@ -584,6 +584,7 @@ mod test {
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{TypeDefBound, Version};
 
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::constant::OpaqueValue;
     use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
@@ -1044,5 +1045,53 @@ mod test {
         repl.replace_consts_parametrized(array_type_def(), array_const);
         let mut h = backup;
         repl.run(&mut h).unwrap(); // Includes validation
+    }
+
+    #[test]
+    fn op_to_call() {
+        let e = ext();
+        let pv = e.get_type(PACKED_VEC).unwrap();
+        let inner = pv.instantiate([usize_t().into()]).unwrap();
+        let outer = pv
+            .instantiate([Type::new_extension(inner.clone()).into()])
+            .unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig(vec![outer.into(), i64_t()], usize_t())).unwrap();
+        let [outer, idx] = dfb.input_wires_arr();
+        let [inner] = dfb
+            .add_dataflow_op(read_op(&e, inner.clone().into()), [outer, idx])
+            .unwrap()
+            .outputs_arr();
+        let res = dfb
+            .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
+            .unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
+        let read_func = h
+            .insert_hugr(
+                h.root(),
+                lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
+                    FunctionBuilder::new(
+                        "lowered_read",
+                        PolyFuncType::new([TypeBound::Copyable.into()], sig),
+                    )
+                })
+                .finish_hugr()
+                .unwrap(),
+            )
+            .new_root;
+
+        let mut lw = lowerer(&e);
+        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {
+            Some(NodeTemplate::Call(read_func, args.to_owned()))
+        });
+        lw.run(&mut h).unwrap();
+
+        assert_eq!(h.output_neighbours(read_func).count(), 2);
+        let ext_op_names = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_extension_op())
+            .map(|e| e.def().name())
+            .sorted()
+            .collect_vec();
+        assert_eq!(ext_op_names, ["get", "itousize", "panic",]);
     }
 }
