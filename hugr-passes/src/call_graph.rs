@@ -45,7 +45,8 @@ impl<N: HugrNode> CallGraph<N> {
     /// Calls to functions outside the view will be dropped.
     pub fn new(hugr: &impl HugrView<Node = N>) -> Self {
         let mut g = Graph::default();
-        let non_func_root = (!hugr.get_optype(hugr.root()).is_module()).then_some(hugr.root());
+        let non_func_root =
+            (!hugr.get_optype(hugr.entrypoint()).is_module()).then_some(hugr.entrypoint());
         let node_to_g = hugr
             .nodes()
             .filter_map(|n| {

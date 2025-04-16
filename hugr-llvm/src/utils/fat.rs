@@ -4,10 +4,10 @@
 //! methods that return [FatNode]s rather than [Node]s.
 use std::{cmp::Ordering, fmt, hash::Hash, marker::PhantomData, ops::Deref};
 
+use hugr_core::hugr::views::Rerooted;
 use hugr_core::{
     core::HugrNode,
-    hugr::{views::HierarchyView, HugrError},
-    ops::{DataflowBlock, ExitBlock, Input, OpType, Output, CFG},
+    ops::{DataflowBlock, ExitBlock, Input, NamedOp, OpType, Output, CFG},
     types::Type,
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
 };
@@ -188,14 +188,12 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
             .map(|n| FatNode::new_optype(self.hugr, n))
     }
 
-    /// Delegates to `HV::try_new` with the internal [HugrView] and [Node].
-    pub fn try_new_hierarchy_view<HV: HierarchyView<'hugr, Node = H::Node>>(
-        &self,
-    ) -> Result<HV, HugrError>
+    /// Returns a view of the internal [HugrView] with this [Node] as entrypoint.
+    pub fn as_entrypoint(&self) -> Rerooted<&H>
     where
         H: Sized,
     {
-        HV::try_new(self.hugr, self.node)
+        self.hugr.with_entrypoint(self.node)
     }
 }
 
@@ -373,7 +371,7 @@ pub trait FatExt: HugrView {
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
-        self.try_fat(self.root())
+        self.try_fat(self.entrypoint())
     }
 }
 

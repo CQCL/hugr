@@ -205,7 +205,7 @@ mod test {
             outer.children(inner.node()).count(),
             if nonlocal { 3 } else { 5 }
         ); // Input, Output, add; + const, load_const
-        assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
+        assert_eq!(find_dfgs(&outer), vec![outer.entrypoint(), inner.node()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(
             outer.get_parent(outer.get_parent(add).unwrap()),
@@ -216,7 +216,7 @@ mod test {
             // Check we can't inline the outer DFG
             let mut h = outer.clone();
             assert_eq!(
-                h.apply_patch(InlineDFG(DfgID::from(h.root()))),
+                h.apply_patch(InlineDFG(DfgID::from(h.entrypoint()))),
                 Err(InlineDFGError::NoParent)
             );
             assert_eq!(h, outer); // unchanged
@@ -225,10 +225,10 @@ mod test {
         outer.apply_patch(InlineDFG(*inner.handle()))?;
         outer.validate()?;
         assert_eq!(outer.nodes().count(), 7);
-        assert_eq!(find_dfgs(&outer), vec![outer.root()]);
+        assert_eq!(find_dfgs(&outer), vec![outer.entrypoint()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
-        assert_eq!(outer.get_parent(add), Some(outer.root()));
-        assert_eq!(outer.get_parent(sub), Some(outer.root()));
+        assert_eq!(outer.get_parent(add), Some(outer.entrypoint()));
+        assert_eq!(outer.get_parent(sub), Some(outer.entrypoint()));
         assert_eq!(
             outer.node_connections(add, sub).collect::<Vec<_>>().len(),
             1
@@ -252,7 +252,7 @@ mod test {
         let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
 
         let mut h = h.finish_hugr_with_outputs(cx.outputs())?;
-        assert_eq!(find_dfgs(&h), vec![h.root(), swap.node()]);
+        assert_eq!(find_dfgs(&h), vec![h.entrypoint(), swap.node()]);
         assert_eq!(h.nodes().count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
                                           // No permutation outside the swap DFG:
         assert_eq!(
@@ -279,7 +279,7 @@ mod test {
         );
 
         h.apply_patch(InlineDFG(*swap.handle()))?;
-        assert_eq!(find_dfgs(&h), vec![h.root()]);
+        assert_eq!(find_dfgs(&h), vec![h.entrypoint()]);
         assert_eq!(h.nodes().count(), 5); // Dfg+I+O
         let mut ops = extension_ops(&h);
         ops.sort_by_key(|n| h.num_outputs(*n)); // Put H before CX

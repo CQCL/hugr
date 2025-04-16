@@ -9,8 +9,9 @@ graph LR
             direction LR
             2["(2) Input"]
             3["(3) Output"]
-            subgraph 4 ["(4) CFG"]
+            subgraph 4 ["(4) [**CFG**]"]
                 direction LR
+                style 4 stroke:#832561,stroke-width:3px
                 subgraph 6 ["(6) DataflowBlock"]
                     direction LR
                     7["(7) Input"]
@@ -22,13 +23,13 @@ graph LR
                 5["(5) ExitBlock"]
                 subgraph 10 ["(10) DataflowBlock"]
                     direction LR
-                    12["(12) Input"]
-                    13["(13) Output"]
-                    14["(14) const:seq:{}"]
-                    15["(15) LoadConstant"]
-                    12--"0:1<br>usize"-->13
-                    14--"0:0<br>Unit"-->15
-                    15--"0:0<br>Unit"-->13
+                    11["(11) Input"]
+                    12["(12) Output"]
+                    13["(13) const:seq:{}"]
+                    14["(14) LoadConstant"]
+                    11--"0:1<br>usize"-->12
+                    13--"0:0<br>Unit"-->14
+                    14--"0:0<br>Unit"-->12
                 end
                 6-."0:0".->10
                 6-."1:0".->5

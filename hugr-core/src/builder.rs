@@ -303,14 +303,14 @@ pub(crate) mod test {
     #[fixture]
     pub(crate) fn simple_package() -> Package {
         let hugr = simple_module_hugr();
-        Package::new([hugr]).unwrap()
+        Package::new([hugr])
     }
 
     #[fixture]
     pub(crate) fn multi_module_package() -> Package {
         let hugr0 = simple_module_hugr();
         let hugr1 = simple_module_hugr();
-        Package::new([hugr0, hugr1]).unwrap()
+        Package::new([hugr0, hugr1])
     }
 
     /// A helper method which creates a DFG rooted hugr with Input and Output node
@@ -321,13 +321,13 @@ pub(crate) mod test {
             signature: signature.clone(),
         });
         hugr.add_node_with_parent(
-            hugr.root(),
+            hugr.entrypoint(),
             ops::Input {
                 types: signature.input,
             },
         );
         hugr.add_node_with_parent(
-            hugr.root(),
+            hugr.entrypoint(),
             ops::Output {
                 types: signature.output,
             },

@@ -59,7 +59,7 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
 )]
 fn remove_polyfuncs_ref(h: &mut impl HugrMut<Node = Node>) {
     let mut pfs_to_delete = Vec::new();
-    let mut to_scan = Vec::from_iter(h.children(h.root()));
+    let mut to_scan = Vec::from_iter(h.children(h.entrypoint()));
     while let Some(n) = to_scan.pop() {
         if is_polymorphic_funcdefn(h.get_optype(n)) {
             pfs_to_delete.push(n)
@@ -264,7 +264,7 @@ impl ComposablePass for MonomorphizePass {
     type Result = ();
 
     fn run(&self, h: &mut impl HugrMut<Node = Node>) -> Result<(), Self::Error> {
-        let root = h.root();
+        let root = h.entrypoint();
         // If the root is a polymorphic function, then there are no external calls, so nothing to do
         if !is_polymorphic_funcdefn(h.get_optype(root)) {
             mono_scan(h, root, None, &mut HashMap::new());
@@ -586,7 +586,9 @@ mod test {
         );
         for (n, fd) in funcs.into_values() {
             assert!(!is_polymorphic(fd));
-            assert!(mono_hugr.get_parent(n) == (fd.name != "mainish").then_some(mono_hugr.root()));
+            assert!(
+                mono_hugr.get_parent(n) == (fd.name != "mainish").then_some(mono_hugr.entrypoint())
+            );
         }
     }
 
@@ -633,7 +635,7 @@ mod test {
         #[allow(clippy::unnecessary_to_owned)] // It is necessary
         let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
         assert_eq!(m, mono.handle().node());
-        assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.root()));
+        assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.entrypoint()));
         for t in [usize_t(), ity()] {
             let (n, _) = funcs.remove(&mangle_name("id", &[t.into()])).unwrap();
             assert_eq!(mono_hugr.get_parent(n), Some(m)); // Not lifted to top

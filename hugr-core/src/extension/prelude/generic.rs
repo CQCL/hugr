@@ -186,7 +186,7 @@ mod tests {
 
         let exp_optype: OpType = op.into();
 
-        for child in result.children(result.root()) {
+        for child in result.children(result.entrypoint()) {
             let node_optype = result.get_optype(child);
             // The only node in the HUGR besides Input and Output should be LoadNat.
             if !node_optype.is_input() && !node_optype.is_output() {

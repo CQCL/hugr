@@ -111,7 +111,7 @@ pub fn import_package(
         .collect::<Result<Vec<_>, _>>()?;
 
     // This does not panic since the import already requires a module root.
-    let package = Package::new(modules).expect("non-module root");
+    let package = Package::new(modules);
     Ok(package)
 }
 
@@ -347,7 +347,7 @@ impl<'a> Context<'a> {
         let region_data = self.get_region(self.module.root)?;
 
         for node in region_data.children {
-            self.import_node(*node, self.hugr.root())?;
+            self.import_node(*node, self.hugr.entrypoint())?;
         }
 
         Ok(())

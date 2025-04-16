@@ -48,7 +48,7 @@ fn test_package(#[default(bool_t())] id_type: Type) -> Package {
     df.finish_with_outputs([i]).unwrap();
     let hugr = module.hugr().clone(); // unvalidated
 
-    Package::new(vec![hugr]).unwrap()
+    Package::new(vec![hugr])
 }
 
 #[fixture]
@@ -121,7 +121,7 @@ fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
     cmd.write_stdin(bad_hugr_string);
     cmd.assert()
         .failure()
-        .stderr(contains("has an unconnected port"));
+        .stderr(contains("Error loading hugr"));
 }
 
 #[rstest]
@@ -133,7 +133,7 @@ fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Node(1)").and(contains("unconnected port")));
+        .stderr(contains("Error loading hugr"));
 }
 
 #[rstest]

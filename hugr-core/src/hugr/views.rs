@@ -1,23 +1,22 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
-pub mod descendants;
 mod impls;
 pub mod petgraph;
 pub mod render;
+mod rerooted;
 mod root_checked;
-pub mod sibling;
 pub mod sibling_subgraph;
 
 #[cfg(test)]
 mod tests;
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
-pub use descendants::DescendantsGraph;
+pub use rerooted::Rerooted;
 pub use root_checked::{check_tag, RootCheckable, RootChecked};
-pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
 use itertools::Itertools;
@@ -25,8 +24,10 @@ use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
 
 use super::internal::{HugrInternals, HugrMutInternals};
-use super::{Hugr, HugrError, HugrMut, Node, NodeMetadata, ValidationError};
+use super::{Hugr, HugrMut, Node, NodeMetadata, ValidationError};
+use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
@@ -37,15 +38,56 @@ use itertools::Either;
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
 pub trait HugrView: HugrInternals {
-    /// Return the root node of this view.
-    fn root(&self) -> Self::Node;
+    /// The distinguished node from where operations are applied, commonly
+    /// defining a region of interest.
+    ///
+    /// This node represents the execution entrypoint of the HUGR. When running
+    /// local graph analysis or optimizations, the region defined under this
+    /// node will be used as the starting point.
+    fn entrypoint(&self) -> Self::Node;
 
-    /// Return the optype of the HUGR root node.
+    /// Returns the operation type of the entrypoint node.
     #[inline]
-    fn root_optype(&self) -> &OpType {
-        let node_type = self.get_optype(self.root());
-        node_type
+    fn entrypoint_optype(&self) -> &OpType {
+        self.get_optype(self.entrypoint())
     }
+
+    /// An operation tag that is guaranteed to represent the
+    /// [`HugrView::entrypoint`] node operation.
+    ///
+    /// The specificity of the tag may vary depending on the HUGR view.
+    /// [`OpTag::Any`] may be returned for any node, but more specific tags may
+    /// be used instead.
+    ///
+    /// The tag returned may vary if the entrypoint node's operation is modified,
+    /// or if the entrypoint node is replaced with another node.
+    #[inline]
+    fn entrypoint_tag(&self) -> OpTag {
+        self.entrypoint_optype().tag()
+    }
+
+    /// Returns a non-mutable view of the HUGR with a different entrypoint.
+    ///
+    /// For a mutable view, use [HugrMut::with_entrypoint_mut] instead.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entrypoint node is not valid in the HUGR.
+    fn with_entrypoint(&self, entrypoint: Self::Node) -> Rerooted<&Self>
+    where
+        Self: Sized,
+    {
+        Rerooted::new(self, entrypoint)
+    }
+
+    /// A pointer to the module region defined at the root of the HUGR.
+    ///
+    /// This node is the root node of the [`HugrInternals::hierarchy`]. It is
+    /// the ancestor of all other nodes in the HUGR.
+    ///
+    /// Operations applied to a hugr normally start at the
+    /// [`HugrView::entrypoint`] instead.
+    fn module_root(&self) -> Self::Node;
 
     /// Returns `true` if the node exists in the HUGR.
     fn contains_node(&self, node: Self::Node) -> bool;
@@ -95,7 +137,7 @@ pub trait HugrView: HugrInternals {
     /// Iterates over the all the nodes in the HUGR.
     ///
     /// This iterator returns every node in the HUGR, including those that are
-    /// not descendants from the root node.
+    /// not descendants from the entrypoint node.
     ///
     /// See [`HugrView::descendants`] and [`HugrView::children`] for more specific
     /// iterators.
@@ -303,13 +345,13 @@ pub trait HugrView: HugrInternals {
     /// In contrast to [`poly_func_type`][HugrView::poly_func_type], this
     /// method always return a concrete [`Signature`].
     fn inner_function_type(&self) -> Option<Cow<'_, Signature>> {
-        self.root_optype().inner_function_type()
+        self.entrypoint_optype().inner_function_type()
     }
 
     /// Returns the function type defined by this HUGR, i.e. `Some` iff the root is
     /// a [`FuncDecl`][crate::ops::FuncDecl] or [`FuncDefn`][crate::ops::FuncDefn].
     fn poly_func_type(&self) -> Option<PolyFuncType> {
-        match self.root_optype() {
+        match self.entrypoint_optype() {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
             OpType::FuncDefn(defn) => Some(defn.signature.clone()),
             _ => None,
@@ -404,58 +446,71 @@ pub trait HugrView: HugrInternals {
         #[allow(deprecated)]
         self.base_hugr().validate()
     }
-}
 
-/// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: HugrView + Sized {
-    /// Create a hierarchical view of a HUGR given a root node.
+    /// Extracts a HUGR containing the current entrypoint and all its
+    /// descendants.
     ///
-    /// # Errors
-    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [OpTag]
-    fn try_new(
-        hugr: &'a impl HugrView<Node = Self::Node>,
-        root: Self::Node,
-    ) -> Result<Self, HugrError>;
+    /// Returns a new HUGR and a map from the nodes in the source HUGR to the nodes
+    /// in the extracted HUGR.
+    ///
+    /// Edges that connected to nodes outside the entrypoint are not be included
+    /// in the new HUGR.
+    ///
+    /// If the entrypoint is not a module, the returned HUGR will contain some
+    /// additional nodes to contain the new entrypoint. E.g. if the optype must
+    /// be contained in a dataflow region, a module with a function definition
+    /// will be created to contain it.
+    ///
+    /// If you need to extract the complete HUGR, move the entrypoint to the
+    /// [`HugrView::module_root`] first.
+    fn extract_hugr(&self) -> (Hugr, impl ExtractionResult<Self::Node> + 'static);
 }
 
-/// A trait for [`HugrView`]s that can be extracted into a valid HUGR containing
-/// only the nodes and edges of the view.
-pub trait ExtractHugr: HugrView + Sized {
-    /// Extracts the view into an owned HUGR, rooted at the view's root node
-    /// and containing only the nodes and edges of the view.
-    fn extract_hugr(self) -> Hugr {
-        let mut hugr = Hugr::default();
-        let old_root = hugr.root();
-        let new_root = hugr.insert_from_view(old_root, &self).new_root;
-        hugr.set_root(new_root);
-        hugr.remove_node(old_root);
-        hugr
+/// Records the result of extracting a Hugr via [HugrView::extract_hugr].
+///
+/// Contains a map from the nodes in the source HUGR to the nodes in the extracted
+/// HUGR, using their respective `Node` types.
+pub trait ExtractionResult<SourceN> {
+    /// Returns the node in the extracted HUGR that corresponds to the given
+    /// node in the source HUGR.
+    ///
+    /// If the source node was not a descendant of the entrypoint, the result
+    /// is undefined.
+    fn extracted_node(&self, node: SourceN) -> Node;
+}
+
+/// A node map that defaults to the identity function if the node is not found.
+struct DefaultNodeMap(HashMap<Node, Node>);
+
+impl ExtractionResult<Node> for DefaultNodeMap {
+    #[inline]
+    fn extracted_node(&self, node: Node) -> Node {
+        self.0.get(&node).copied().unwrap_or(node)
     }
 }
 
-// Explicit implementation to avoid cloning the Hugr.
-impl ExtractHugr for Hugr {
-    fn extract_hugr(self) -> Hugr {
-        self
-    }
-}
-
-impl ExtractHugr for &Hugr {
-    fn extract_hugr(self) -> Hugr {
-        self.clone()
-    }
-}
-
-impl ExtractHugr for &mut Hugr {
-    fn extract_hugr(self) -> Hugr {
-        self.clone()
+impl<S: HugrNode> ExtractionResult<S> for HashMap<S, Node> {
+    #[inline]
+    fn extracted_node(&self, node: S) -> Node {
+        self[&node]
     }
 }
 
 impl HugrView for Hugr {
     #[inline]
-    fn root(&self) -> Self::Node {
-        self.root.into()
+    fn entrypoint(&self) -> Self::Node {
+        self.entrypoint.into()
+    }
+
+    #[inline]
+    fn module_root(&self) -> Self::Node {
+        let node: Self::Node = self.module_root.into();
+        let handle = node.try_cast();
+        debug_assert!(
+            handle.is_some(),
+            "The root node in a HUGR must be a module."
+        );
+        handle.unwrap()
     }
 
     #[inline]
@@ -475,10 +530,7 @@ impl HugrView for Hugr {
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        // TODO: This currently fails because some methods get the optype of
-        // e.g. a parent outside a region view. We should be able to re-enable
-        // this once we add hugr entrypoints.
-        //panic_invalid_node(self, node);
+        panic_invalid_node(self, node);
         self.op_types.get(self.to_portgraph_node(node))
     }
 
@@ -575,6 +627,7 @@ impl HugrView for Hugr {
             node_indices: true,
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
+            entrypoint: Some(self.to_portgraph_node(self.entrypoint())),
         })
     }
 
@@ -593,7 +646,10 @@ impl HugrView for Hugr {
         Self: Sized,
     {
         let graph = self.portgraph();
-        let config = RenderConfig::default();
+        let config = RenderConfig {
+            entrypoint: Some(self.to_portgraph_node(self.entrypoint())),
+            ..RenderConfig::default()
+        };
         graph
             .dot_format()
             .with_hierarchy(&self.hierarchy)
@@ -606,6 +662,64 @@ impl HugrView for Hugr {
     #[inline]
     fn extensions(&self) -> &ExtensionRegistry {
         &self.extensions
+    }
+
+    #[inline]
+    fn extract_hugr(&self) -> (Hugr, impl ExtractionResult<Node> + 'static) {
+        // Shortcircuit if the extracted HUGr is the same as the original
+        if self.entrypoint() == self.module_root().node() {
+            return (self.clone(), DefaultNodeMap(HashMap::new()));
+        }
+
+        let new_entrypoint_op = self.entrypoint_optype().clone();
+        let mut extracted = Hugr::new(new_entrypoint_op);
+
+        let old_entrypoint = extracted.entrypoint();
+        let old_parent = extracted.get_parent(old_entrypoint);
+
+        let inserted = extracted.insert_from_view(old_entrypoint, self);
+        let new_entrypoint = inserted.inserted_entrypoint;
+
+        match old_parent {
+            Some(old_parent) => {
+                // Depending on the entrypoint operation, the old entrypoint may
+                // be connected to other nodes (dataflow region input/outputs).
+                let old_ins = extracted
+                    .node_inputs(old_entrypoint)
+                    .flat_map(|inp| {
+                        extracted
+                            .linked_outputs(old_entrypoint, inp)
+                            .map(move |link| (inp, link))
+                    })
+                    .collect_vec();
+                let old_outs = extracted
+                    .node_outputs(old_entrypoint)
+                    .flat_map(|out| {
+                        extracted
+                            .linked_inputs(old_entrypoint, out)
+                            .map(move |link| (out, link))
+                    })
+                    .collect_vec();
+                // Replace the node
+                extracted.set_entrypoint(new_entrypoint);
+                extracted.remove_node(old_entrypoint);
+                extracted.set_parent(new_entrypoint, old_parent);
+                // Reconnect the inputs and outputs to the new entrypoint
+                for (inp, (neigh, neigh_out)) in old_ins {
+                    extracted.connect(neigh, neigh_out, new_entrypoint, inp);
+                }
+                for (out, (neigh, neigh_in)) in old_outs {
+                    extracted.connect(new_entrypoint, out, neigh, neigh_in);
+                }
+            }
+            // The entrypoint a module op
+            None => {
+                extracted.set_entrypoint(new_entrypoint);
+                extracted.set_module_root(new_entrypoint);
+                extracted.remove_node(old_entrypoint);
+            }
+        }
+        (extracted, DefaultNodeMap(inserted.node_map))
     }
 }
 
@@ -647,28 +761,29 @@ where
 {
 }
 
+/// Returns `true` if the node exists in the graph and is not the entrypoint node.
+pub(super) fn check_valid_non_entrypoint<H: HugrView + ?Sized>(hugr: &H, node: H::Node) -> bool {
+    hugr.contains_node(node) && node != hugr.entrypoint()
+}
+
 /// Returns `true` if the node exists in the graph and is not the module at the hierarchy root.
 pub(super) fn check_valid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) -> bool {
-    hugr.contains_node(node) && node != hugr.root()
+    hugr.contains_node(node) && node != hugr.module_root().node()
 }
 
 /// Panic if [`HugrView::contains_node`] fails.
 #[track_caller]
 pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    // TODO: When stacking hugr wrappers, this gets called for every layer.
-    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
     if !hugr.contains_node(node) {
         panic!("Received an invalid node {node}.",);
     }
 }
 
-/// Panic if [`check_valid_non_root`] fails.
+/// Panic if [`check_valid_non_entrypoint`] fails.
 #[track_caller]
-pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    // TODO: When stacking hugr wrappers, this gets called for every layer.
-    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
-    if !check_valid_non_root(hugr, node) {
-        panic!("Received an invalid non-root node {node}.",);
+pub(super) fn panic_invalid_non_entrypoint<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
+    if !check_valid_non_entrypoint(hugr, node) {
+        panic!("Received an invalid non-entrypoint node {node}.",);
     }
 }
 
@@ -680,13 +795,11 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
     port: impl Into<Port>,
 ) {
     let port = port.into();
-    // TODO: When stacking hugr wrappers, this gets called for every layer.
-    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
     if hugr
         .portgraph()
         .port_index(node.into_portgraph(), port.pg_offset())
         .is_none()
     {
-        panic!("Received an invalid port {port} for node {node} while mutating a HUGR");
+        panic!("Received an invalid {port} for {node} while mutating a HUGR");
     }
 }

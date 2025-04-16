@@ -17,8 +17,7 @@ use hugr_core::extension::prelude::{
 };
 
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
-use hugr_core::ops::{constant::CustomConst, handle::BasicBlockID, OpTag, OpTrait, OpType, Value};
+use hugr_core::ops::{constant::CustomConst, OpTag, OpTrait, OpType, Value};
 use hugr_core::std_extensions::arithmetic::{
     conversions::ConvertOpDef,
     float_ops::FloatOps,
@@ -80,7 +79,7 @@ pub fn assert_fully_folded(h: &impl HugrView, expected_value: &Value) {
 fn assert_fully_folded_with(h: &impl HugrView, check_value: impl Fn(&Value) -> bool) {
     let mut node_count = 0;
 
-    for node in h.children(h.root()) {
+    for node in h.children(h.entrypoint()) {
         let op = h.get_optype(node);
         match op {
             OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
@@ -1372,7 +1371,7 @@ fn test_tail_loop_unknown() {
     let mut loop_nodes = Vec::new();
     for n in h.nodes() {
         if let Some(p) = h.get_parent(n) {
-            if p == h.root() {
+            if p == h.entrypoint() {
                 dfg_nodes.push(n)
             } else {
                 assert_eq!(p, tl);
@@ -1420,7 +1419,7 @@ fn test_tail_loop_unknown() {
     );
 
     // Outer DFG contains two constants (we know) - a 5, used by the loop, and a 10, output.
-    let [_, root_out] = h.get_io(h.root()).unwrap();
+    let [_, root_out] = h.get_io(h.entrypoint()).unwrap();
     let mut cst5 = Some(cst5.into());
     for n in dfg_nodes {
         let Some(cst) = h.get_optype(n).as_const() else {
@@ -1443,7 +1442,7 @@ fn test_tail_loop_unknown() {
 fn test_tail_loop_never_iterates() {
     let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
     ConstantFoldPass::default()
-        .with_inputs(h.root(), [(0, Value::true_val())]) // true = 1 = break
+        .with_inputs(h.entrypoint(), [(0, Value::true_val())]) // true = 1 = break
         .run(&mut h)
         .unwrap();
     assert_fully_folded(&h, &ConstInt::new_u(4, 12).unwrap().into());
@@ -1515,13 +1514,13 @@ fn test_cfg(
     let backup = cfg_hugr();
     let mut hugr = backup.clone();
     let pass = ConstantFoldPass::default().with_inputs(
-        hugr.root(),
+        hugr.entrypoint(),
         inputs.iter().map(|(p, b)| (*p, Value::from_bool(*b))),
     );
     pass.run(&mut hugr).unwrap();
     // CFG inside DFG retained
     let nested = hugr
-        .children(hugr.root())
+        .children(hugr.entrypoint())
         .filter(|n| hugr.get_optype(*n).is_dfg())
         .exactly_one()
         .ok()
@@ -1540,7 +1539,7 @@ fn test_cfg(
     {
         if is_folded {
             assert_fully_folded(
-                &DescendantsGraph::<BasicBlockID>::try_new(&hugr, blk).unwrap(),
+                &hugr.with_entrypoint(blk),
                 &ConstInt::new_u(4, folded_cst).unwrap().into(),
             );
         } else {
@@ -1561,7 +1560,7 @@ fn test_cfg(
         }
     }
     let output_src = hugr
-        .input_neighbours(hugr.get_io(hugr.root()).unwrap()[1])
+        .input_neighbours(hugr.get_io(hugr.entrypoint()).unwrap()[1])
         .exactly_one()
         .ok()
         .unwrap();
@@ -1604,9 +1603,9 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let main = main.finish_with_outputs([lc7, add])?;
     let mut hugr = mb.finish_hugr()?;
     constant_fold_pass(&mut hugr);
-    assert!(hugr.get_optype(hugr.root()).is_module());
+    assert!(hugr.get_optype(hugr.entrypoint()).is_module());
     assert_eq!(
-        hugr.children(hugr.root()).collect_vec(),
+        hugr.children(hugr.entrypoint()).collect_vec(),
         [c7.node(), ad1.node(), ad2.node(), main.node()]
     );
     let tags = hugr

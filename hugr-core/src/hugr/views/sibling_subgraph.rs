@@ -3,11 +3,6 @@
 //! Views into convex subgraphs of HUGRs within a single level of the
 //! hierarchy, i.e. within a sibling graph. Convex subgraph are always
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
-//!
-//! Sibling subgraphs complement [`super::HierarchyView`]s in the sense that the
-//! latter provide views for subgraphs defined by hierarchical relationships,
-//! while the former provide views for subgraphs within a single level of the
-//! hierarchy.
 
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
@@ -32,17 +27,16 @@ use super::root_checked::RootCheckable;
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
-/// A HUGR region in which all nodes share the same parent. Unlike
-/// [`super::SiblingGraph`],  not all nodes of the sibling graph must be
-/// included. A convex subgraph is always an induced subgraph, i.e. it is defined
-/// by a set of nodes and all edges between them.
+/// A HUGR region in which all nodes share the same parent. A convex subgraph is
+/// always an induced subgraph, i.e. it is defined by a set of nodes and all
+/// edges between them.
 ///
 /// The incoming boundary (resp. outgoing boundary) is given by the input (resp.
-/// output) ports of the subgraph that are linked to nodes outside of the subgraph.
-/// The signature of the subgraph is then given by the types of the incoming
-/// and outgoing boundary ports. Given a replacement with the same signature,
-/// a [`SimpleReplacement`] can be constructed to rewrite the subgraph with the
-/// replacement.
+/// output) ports of the subgraph that are linked to nodes outside of the
+/// subgraph. The signature of the subgraph is then given by the types of the
+/// incoming and outgoing boundary ports. Given a replacement with the same
+/// signature, a [`SimpleReplacement`] can be constructed to rewrite the
+/// subgraph with the replacement.
 ///
 /// The ordering of the nodes in the subgraph is irrelevant to define the convex
 /// subgraph, but it determines the ordering of the boundary signature.
@@ -54,8 +48,6 @@ use super::root_checked::RootCheckable;
 /// The `boundary_port` and `signature` methods will panic if any are found.
 /// State order edges are also unsupported in replacements in
 /// `create_simple_replacement`.
-// TODO: implement a borrowing wrapper that implements a view into the Hugr
-// given a reference.
 #[derive(Clone, Debug)]
 pub struct SiblingSubgraph<N = Node> {
     /// The nodes of the induced subgraph.
@@ -87,9 +79,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// HUGR.
     ///
     /// The subgraph is given by the nodes between the input and output children
-    /// nodes of the root node. If you wish to create a subgraph from another
-    /// root, wrap the `region` argument in a [`super::SiblingGraph`].
-    ///
+    /// nodes of the root node.
     /// Wires connecting the input and output nodes are ignored. Note that due
     /// to this the resulting subgraph's signature may not match the signature
     /// of the dataflow parent.
@@ -108,7 +98,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         };
         let dfg_graph = dfg_graph.into_hugr();
 
-        let parent = dfg_graph.root();
+        let parent = HugrView::entrypoint(&dfg_graph);
         let nodes = dfg_graph.children(parent).skip(2).collect_vec();
         let (inputs, outputs) = get_input_output_ports(dfg_graph);
 
@@ -293,8 +283,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 // accept linked outputs or unlinked value outputs
                 {
                     hugr.is_linked(node, p)
-                        || hugr
-                            .get_optype(node)
+                        || HugrView::get_optype(&hugr, node)
                             .port_kind(p)
                             .is_some_and(|k| k.is_value())
                 }
@@ -376,7 +365,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &impl HugrView<Node = N>,
         replacement: Hugr,
     ) -> Result<SimpleReplacement<N>, InvalidReplacement> {
-        let rep_root = replacement.root();
+        let rep_root = replacement.entrypoint();
         let dfg_optype = replacement.get_optype(rep_root);
         if !OpTag::Dfg.is_superset(dfg_optype.tag()) {
             return Err(InvalidReplacement::InvalidDataflowGraph {
@@ -461,10 +450,10 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
-        let node_map = extracted.insert_subgraph(extracted.root(), hugr, self);
+        let node_map = extracted.insert_subgraph(extracted.entrypoint(), hugr, self);
 
         // Connect the inserted nodes in-between the input and output nodes.
-        let [inp, out] = extracted.get_io(extracted.root()).unwrap();
+        let [inp, out] = extracted.get_io(extracted.entrypoint()).unwrap();
         let inputs = extracted.node_outputs(inp).zip(self.inputs.iter());
         let outputs = extracted.node_inputs(out).zip(self.outputs.iter());
         let mut connections = Vec::with_capacity(inputs.size_hint().0 + outputs.size_hint().0);
@@ -690,12 +679,13 @@ fn validate_subgraph<H: HugrView>(
 fn get_input_output_ports<H: HugrView>(
     hugr: &H,
 ) -> (IncomingPorts<H::Node>, OutgoingPorts<H::Node>) {
-    let [inp, out] = hugr.get_io(hugr.root()).expect("invalid DFG");
+    let [inp, out] = hugr
+        .get_io(HugrView::entrypoint(&hugr))
+        .expect("invalid DFG");
     if has_other_edge(hugr, inp, Direction::Outgoing) {
         unimplemented!("Non-dataflow output not supported at input node")
     }
-    let dfg_inputs = hugr
-        .get_optype(inp)
+    let dfg_inputs = HugrView::get_optype(&hugr, inp)
         .as_input()
         .unwrap()
         .signature()
@@ -703,8 +693,7 @@ fn get_input_output_ports<H: HugrView>(
     if has_other_edge(hugr, out, Direction::Incoming) {
         unimplemented!("Non-dataflow input not supported at output node")
     }
-    let dfg_outputs = hugr
-        .get_optype(out)
+    let dfg_outputs = HugrView::get_optype(&hugr, out)
         .as_output()
         .unwrap()
         .signature()
@@ -842,7 +831,6 @@ mod tests {
             ModuleBuilder,
         },
         extension::prelude::{bool_t, qb_t},
-        hugr::views::{HierarchyView, SiblingGraph},
         ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::test::and_op,
     };
@@ -850,19 +838,15 @@ mod tests {
     use super::*;
 
     impl<N: HugrNode> SiblingSubgraph<N> {
-        /// A sibling subgraph from a HUGR.
-        ///
-        /// The subgraph is given by the sibling graph of the root. If you wish to
-        /// create a subgraph from another root, wrap the argument `region` in a
-        /// [`super::SiblingGraph`].
+        /// Create a sibling subgraph containing every node in a HUGR region.
         ///
         /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
         /// subgraph is empty.
         fn from_sibling_graph(
-            sibling_graph: &impl HugrView<Node = N>,
+            hugr: &impl HugrView<Node = N>,
+            parent: N,
         ) -> Result<Self, InvalidSubgraph<N>> {
-            let root = sibling_graph.root();
-            let nodes = sibling_graph.children(root).collect_vec();
+            let nodes = hugr.children(parent).collect_vec();
             if nodes.is_empty() {
                 Err(InvalidSubgraph::EmptySubgraph)
             } else {
@@ -951,27 +935,9 @@ mod tests {
     }
 
     #[test]
-    fn construct_subgraph() -> Result<(), InvalidSubgraph> {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let sibling_graph: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let from_root = SiblingSubgraph::from_sibling_graph(&sibling_graph)?;
-        let region: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let from_region = SiblingSubgraph::from_sibling_graph(&region)?;
-        assert_eq!(
-            from_root.get_parent(&sibling_graph),
-            from_region.get_parent(&sibling_graph)
-        );
-        assert_eq!(
-            from_root.signature(&sibling_graph),
-            from_region.signature(&sibling_graph)
-        );
-        Ok(())
-    }
-
-    #[test]
     fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
         let (mut hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func = hugr.with_entrypoint(func_root);
         let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)?;
 
         let empty_dfg = {
@@ -995,7 +961,7 @@ mod tests {
     #[test]
     fn test_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
-        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, dfg).unwrap();
+        let func = hugr.with_entrypoint(dfg);
         let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)?;
         assert_eq!(
             sub.signature(&func),
@@ -1007,8 +973,8 @@ mod tests {
     #[test]
     fn construct_simple_replacement_invalid_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, dfg).unwrap();
-        let sub = SiblingSubgraph::from_sibling_graph(&func)?;
+        let func = hugr.with_entrypoint(dfg);
+        let sub = SiblingSubgraph::from_sibling_graph(&hugr, dfg)?;
 
         let empty_dfg = {
             let builder = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
@@ -1026,7 +992,7 @@ mod tests {
     #[test]
     fn convex_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func = hugr.with_entrypoint(func_root);
         assert_eq!(
             SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)
                 .unwrap()
@@ -1040,7 +1006,7 @@ mod tests {
     fn convex_subgraph_2() {
         let (hugr, func_root) = build_hugr().unwrap();
         let [inp, out] = hugr.get_io(func_root).unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func = hugr.with_entrypoint(func_root);
         // All graph except input/output nodes
         SiblingSubgraph::try_new(
             hugr.node_outputs(inp)
@@ -1060,7 +1026,7 @@ mod tests {
     #[test]
     fn degen_boundary() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func = hugr.with_entrypoint(func_root);
         let [inp, _] = hugr.get_io(func_root).unwrap();
         let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
         // All graph but one edge
@@ -1082,7 +1048,7 @@ mod tests {
     #[test]
     fn non_convex_subgraph() {
         let (hugr, func_root) = build_3not_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func = hugr.with_entrypoint(func_root);
         let [inp, _out] = hugr.get_io(func_root).unwrap();
         let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
         let not2 = hugr.output_neighbours(not1).exactly_one().ok().unwrap();
@@ -1122,7 +1088,7 @@ mod tests {
     #[test]
     fn invalid_boundary() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func = hugr.with_entrypoint(func_root);
         let [inp, out] = hugr.get_io(func_root).unwrap();
         let cx_edges_in = hugr.node_outputs(inp);
         let cx_edges_out = hugr.node_inputs(out);
@@ -1142,8 +1108,7 @@ mod tests {
     #[test]
     fn preserve_signature() {
         let (hugr, func_root) = build_hugr_classical().unwrap();
-        let func_graph: SiblingGraph<'_, FuncID<true>> =
-            SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func_graph = hugr.with_entrypoint(func_root);
         let func =
             SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func_graph).unwrap();
         let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
@@ -1153,8 +1118,7 @@ mod tests {
     #[test]
     fn extract_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func_graph: SiblingGraph<'_, FuncID<true>> =
-            SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let func_graph = hugr.with_entrypoint(func_root);
         let subgraph =
             SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func_graph).unwrap();
         let extracted = subgraph.extract_subgraph(&hugr, "region");
@@ -1180,8 +1144,7 @@ mod tests {
             .outputs();
         let outw = [outw1].into_iter().chain(outw2);
         let h = builder.finish_hugr_with_outputs(outw).unwrap();
-        let view = SiblingGraph::<DfgID>::try_new(&h, h.root()).unwrap();
-        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DfgID>(&view).unwrap();
+        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DfgID>(&h).unwrap();
         assert_eq!(subg.nodes().len(), 2);
     }
 

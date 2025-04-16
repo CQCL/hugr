@@ -7,18 +7,18 @@ use crate::{Hugr, Node};
 
 use super::HugrView;
 
-/// A wrapper over a Hugr that ensures the root node optype is of the required
+/// A wrapper over a Hugr that ensures the entrypoint optype is of the required
 /// [`OpTag`].
 #[derive(Clone)]
 pub struct RootChecked<H, Handle = Node>(H, PhantomData<Handle>);
 
 impl<H: HugrView, Handle: NodeHandle<H::Node>> RootChecked<H, Handle> {
-    /// A tag that can contain the operation of the hugr root node.
+    /// A tag that can contain the operation of the hugr entrypoint node.
     const TAG: OpTag = Handle::TAG;
 
-    /// Returns the most specific tag that can be applied to the root node.
+    /// Returns the most specific tag that can be applied to the entrypoint node.
     pub fn tag(&self) -> OpTag {
-        let tag = self.0.get_optype(self.0.root()).tag();
+        let tag = self.0.get_optype(self.0.entrypoint()).tag();
         debug_assert!(Self::TAG.is_superset(tag));
         tag
     }
@@ -26,7 +26,7 @@ impl<H: HugrView, Handle: NodeHandle<H::Node>> RootChecked<H, Handle> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
-    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [`OpTag`]
+    /// Returns [`HugrError::InvalidTag`] if the entrypoint isn't a node of the required [`OpTag`]
     ///
     /// [`OpTag`]: crate::ops::OpTag
     pub fn try_new(hugr: H) -> Result<Self, HugrError> {
@@ -38,7 +38,7 @@ impl<H: HugrView, Handle: NodeHandle<H::Node>> RootChecked<H, Handle> {
     ///
     /// To check arbitrary nodes, use [`check_tag`].
     pub fn check(hugr: &H) -> Result<(), HugrError> {
-        check_tag::<Handle, _>(hugr, hugr.root())?;
+        check_tag::<Handle, _>(hugr, hugr.entrypoint())?;
         Ok(())
     }
 
@@ -64,7 +64,7 @@ impl<H: AsRef<Hugr>, Handle> AsRef<Hugr> for RootChecked<H, Handle> {
     }
 }
 
-/// A trait for types that can be checked for a specific [`OpTag`] at their root node.
+/// A trait for types that can be checked for a specific [`OpTag`] at their entrypoint node.
 ///
 /// This is used mainly specifying function inputs that may either be a [`HugrView`] or an already checked [`RootChecked`].
 pub trait RootCheckable<H: HugrView, Handle: NodeHandle<H::Node>>: Sized {

@@ -197,7 +197,8 @@ pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
     let mut h_canon = lhs.clone();
     h_canon.canonicalize_nodes(|_, _| {});
 
-    assert_eq!(rhs.root, h_canon.root);
+    assert_eq!(rhs.module_root(), h_canon.module_root());
+    assert_eq!(rhs.entrypoint(), h_canon.entrypoint());
     assert_eq!(rhs.hierarchy, h_canon.hierarchy);
     assert_eq!(rhs.metadata, h_canon.metadata);
 
@@ -258,7 +259,7 @@ fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
 fn simpleser() {
     let mut g = MultiPortGraph::new();
 
-    let root = g.add_node(0, 0);
+    let entrypoint = g.add_node(0, 0);
     let a = g.add_node(1, 1);
     let b = g.add_node(3, 2);
     let c = g.add_node(1, 1);
@@ -273,17 +274,18 @@ fn simpleser() {
     let mut h = Hierarchy::new();
     let mut op_types = UnmanagedDenseMap::new();
 
-    op_types[root] = gen_optype(&g, root);
+    op_types[entrypoint] = gen_optype(&g, entrypoint);
 
     for n in [a, b, c] {
-        h.push_child(n, root).unwrap();
+        h.push_child(n, entrypoint).unwrap();
         op_types[n] = gen_optype(&g, n);
     }
 
     let hugr = Hugr {
         graph: g,
         hierarchy: h,
-        root,
+        module_root: entrypoint,
+        entrypoint,
         op_types,
         metadata: Default::default(),
         extensions: ExtensionRegistry::default(),
@@ -402,7 +404,7 @@ fn function_type() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     let mut hugr = closed_dfg_root_hugr(Signature::new(vec![qb_t()], vec![qb_t()]));
-    let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
+    let [old_in, out] = hugr.get_io(hugr.entrypoint()).unwrap();
     hugr.connect(old_in, 0, out, 0);
 
     // Now add a new input

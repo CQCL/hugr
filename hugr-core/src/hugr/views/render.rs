@@ -1,7 +1,7 @@
 //! Helper methods to compute the node/edge/port style when rendering a HUGR
 //! into dot or mermaid format.
 
-use portgraph::render::{EdgeStyle, NodeStyle, PortStyle};
+use portgraph::render::{EdgeStyle, NodeStyle, PortStyle, PresentationStyle};
 use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
 
 use crate::ops::{NamedOp, OpType};
@@ -18,6 +18,8 @@ pub struct RenderConfig {
     pub port_offsets_in_edges: bool,
     /// Show type labels on edges.
     pub type_labels_in_edges: bool,
+    /// A node to highlight as the graph entrypoint.
+    pub entrypoint: Option<NodeIndex>,
 }
 
 impl Default for RenderConfig {
@@ -26,6 +28,7 @@ impl Default for RenderConfig {
             node_indices: true,
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
+            entrypoint: None,
         }
     }
 }
@@ -43,16 +46,30 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
         }
     }
 
+    let mut entrypoint_style = PresentationStyle::default();
+    entrypoint_style.stroke = Some("#832561".to_string());
+    entrypoint_style.stroke_width = Some("3px".to_string());
+
     if config.node_indices {
-        Box::new(move |n| {
-            NodeStyle::boxed(format!(
-                "({ni}) {name}",
+        Box::new(move |n| match Some(n) == config.entrypoint {
+            true => NodeStyle::boxed(format!(
+                "({ni}) [**{name}**]",
                 ni = n.index(),
                 name = node_name(h, n)
             ))
+            .with_attrs(entrypoint_style.clone()),
+            false => NodeStyle::boxed(format!(
+                "({ni}) {name}",
+                ni = n.index(),
+                name = node_name(h, n)
+            )),
         })
     } else {
-        Box::new(move |n| NodeStyle::boxed(node_name(h, n)))
+        Box::new(move |n| match Some(n) == config.entrypoint {
+            true => NodeStyle::boxed(format!("[**{name}**]", name = node_name(h, n)))
+                .with_attrs(entrypoint_style.clone()),
+            false => NodeStyle::boxed(node_name(h, n)),
+        })
     }
 }
 

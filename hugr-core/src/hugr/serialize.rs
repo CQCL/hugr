@@ -96,6 +96,12 @@ struct SerHugrLatest {
     /// A metadata field with the package identifier that encoded the HUGR.
     #[serde(default)]
     encoder: Option<String>,
+    /// The entrypoint of the HUGR.
+    ///
+    /// For backwards compatibility, if `None` the entrypoint is set to the root
+    /// of the node hierarchy.
+    #[serde(default)]
+    entrypoint: Option<Node>,
 }
 
 /// Errors that can occur while serializing a HUGR.
@@ -158,7 +164,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
-        for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
+        for (order, node) in hugr.canonical_order(hugr.module_root()).enumerate() {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
@@ -209,6 +215,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             edges,
             metadata: Some(metadata),
             encoder,
+            entrypoint: Some(node_rekey[&hugr.entrypoint()]),
         })
     }
 }
@@ -221,6 +228,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
             edges,
             metadata,
             encoder: _,
+            entrypoint,
         }: SerHugrLatest,
     ) -> Result<Self, Self::Error> {
         // Root must be first node
@@ -239,6 +247,10 @@ impl TryFrom<SerHugrLatest> for Hugr {
 
         for node_ser in nodes {
             hugr.add_node_with_parent(node_ser.parent, node_ser.op);
+        }
+
+        if let Some(entrypoint) = entrypoint {
+            hugr.set_entrypoint(entrypoint);
         }
 
         if let Some(metadata) = metadata {

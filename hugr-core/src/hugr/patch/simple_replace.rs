@@ -209,7 +209,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Get the input and output nodes of the replacement hugr.
     pub fn get_replacement_io(&self) -> Result<[Node; 2], SimpleReplacementError> {
         self.replacement
-            .get_io(self.replacement.root())
+            .get_io(self.replacement.entrypoint())
             .ok_or(SimpleReplacementError::InvalidParentNode())
     }
 
@@ -448,10 +448,13 @@ impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
         } = self;
 
         // 2. Insert the replacement as a whole.
-        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, replacement);
+        let InsertionResult {
+            inserted_entrypoint: new_entrypoint,
+            node_map,
+        } = h.insert_hugr(parent, replacement);
 
         // remove the Input and Output nodes from the replacement graph
-        let replace_children = h.children(new_root).collect::<Vec<N>>();
+        let replace_children = h.children(new_entrypoint).collect::<Vec<N>>();
         for &io in &replace_children[..2] {
             h.remove_node(io);
         }
@@ -460,7 +463,7 @@ impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
             h.set_parent(child, parent);
         }
         // remove the replacement root (which now has no children and no edges)
-        h.remove_node(new_root);
+        h.remove_node(new_entrypoint);
 
         // 3. Insert all boundary edges.
         for (src, tgt) in boundary_edges {
@@ -970,7 +973,7 @@ pub(in crate::hugr::patch) mod test {
         let (mut hugr, nodes) = dfg_hugr_copy_bools;
         let (input_not, output_not_0, output_not_1) = nodes.into_iter().collect_tuple().unwrap();
 
-        let [_input, output] = hugr.get_io(hugr.root()).unwrap();
+        let [_input, output] = hugr.get_io(hugr.entrypoint()).unwrap();
 
         let replacement = {
             let b =
@@ -978,7 +981,7 @@ pub(in crate::hugr::patch) mod test {
             let [w] = b.input_wires_arr();
             b.finish_hugr_with_outputs([w, w]).unwrap()
         };
-        let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
+        let [_repl_input, repl_output] = replacement.get_io(replacement.entrypoint()).unwrap();
 
         let subgraph =
             SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0, output_not_1], &hugr)
@@ -1028,7 +1031,7 @@ pub(in crate::hugr::patch) mod test {
         let (mut hugr, nodes) = dfg_hugr_half_not_bools;
         let (input_not, output_not_0) = nodes.into_iter().collect_tuple().unwrap();
 
-        let [_input, output] = hugr.get_io(hugr.root()).unwrap();
+        let [_input, output] = hugr.get_io(hugr.entrypoint()).unwrap();
 
         let (replacement, repl_not) = {
             let mut b =
@@ -1038,7 +1041,7 @@ pub(in crate::hugr::patch) mod test {
             let [w_not] = not.outputs_arr();
             (b.finish_hugr_with_outputs([w, w_not]).unwrap(), not.node())
         };
-        let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
+        let [_repl_input, repl_output] = replacement.get_io(replacement.entrypoint()).unwrap();
 
         let subgraph =
             SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0], &hugr).unwrap();
@@ -1106,7 +1109,7 @@ pub(in crate::hugr::patch) mod test {
         .collect();
 
         let nu_out: HashMap<_, _> = vec![(
-            (h.get_io(h.root()).unwrap()[1], IncomingPort::from(1)),
+            (h.get_io(h.entrypoint()).unwrap()[1], IncomingPort::from(1)),
             IncomingPort::from(0),
         )]
         .into_iter()
@@ -1232,7 +1235,7 @@ pub(in crate::hugr::patch) mod test {
 
         let mut replacement = s.replacement;
         let (in_, out) = replacement
-            .children(replacement.root())
+            .children(replacement.entrypoint())
             .take(2)
             .collect_tuple()
             .unwrap();

@@ -229,9 +229,9 @@ mod test {
         let (hugr, cx1, cx2) = sample_hugr();
         let wrapper = PetgraphWrapper::from(&hugr);
 
-        assert_eq!(wrapper.node_count(), 5);
-        assert_eq!(wrapper.node_bound(), 5);
-        assert_eq!(wrapper.edge_count(), 7);
+        assert_eq!(wrapper.node_count(), 9);
+        assert_eq!(wrapper.node_bound(), 9);
+        assert_eq!(wrapper.edge_count(), 11);
 
         let cx1_index = cx1.node().into_portgraph().index();
         assert_eq!(wrapper.to_index(cx1.node()), cx1_index);

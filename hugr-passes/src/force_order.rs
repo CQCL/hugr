@@ -268,7 +268,10 @@ mod test {
     type RankMap = HashMap<Node, i64>;
 
     fn force_order_test_impl(hugr: &mut Hugr, rank_map: RankMap) -> Vec<Node> {
-        force_order(hugr, hugr.root(), |_, n| *rank_map.get(&n).unwrap_or(&0)).unwrap();
+        force_order(hugr, hugr.entrypoint(), |_, n| {
+            *rank_map.get(&n).unwrap_or(&0)
+        })
+        .unwrap();
 
         let topo_sorted = Topo::new(&hugr.as_petgraph())
             .iter(&hugr.as_petgraph())
@@ -322,7 +325,7 @@ mod test {
             let unit = builder.add_load_value(Value::unary_unit_sum());
             builder.finish_hugr_with_outputs([unit]).unwrap()
         };
-        let root = hugr.root();
+        let root = hugr.entrypoint();
         force_order(&mut hugr, root, |_, _| 0).unwrap();
     }
 
@@ -347,7 +350,7 @@ mod test {
             let other_unit = builder.add_load_value(Value::unary_unit_sum());
             builder.finish_hugr_with_outputs([out, other_unit]).unwrap()
         };
-        let root = hugr.root();
+        let root = hugr.entrypoint();
 
         force_order(&mut hugr, root, |_, _| 0).unwrap();
     }

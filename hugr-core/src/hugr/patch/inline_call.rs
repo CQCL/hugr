@@ -238,7 +238,7 @@ mod test {
                 assert!(hugr.get_optype(ancestors.next().unwrap()).is_dfg());
             }
             assert_eq!(ancestors.next(), Some(main.node()));
-            assert_eq!(ancestors.next(), Some(hugr.root()));
+            assert_eq!(ancestors.next(), Some(hugr.entrypoint()));
             assert_eq!(ancestors.next(), None);
         }
         Ok(())

@@ -74,7 +74,9 @@ impl NodeTemplate {
     ) -> Result<Node, BuildError> {
         match self {
             NodeTemplate::SingleOp(op_type) => Ok(hugr.add_node_with_parent(parent, op_type)),
-            NodeTemplate::CompoundOp(new_h) => Ok(hugr.insert_hugr(parent, *new_h).new_root),
+            NodeTemplate::CompoundOp(new_h) => {
+                Ok(hugr.insert_hugr(parent, *new_h).inserted_entrypoint)
+            }
             NodeTemplate::Call(target, type_args) => {
                 let c = call(hugr, target, type_args)?;
                 let tgt_port = c.called_function_port();
@@ -107,7 +109,7 @@ impl NodeTemplate {
         let new_optype = match self.clone() {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(new_h) => {
-                let new_root = hugr.insert_hugr(n, *new_h).new_root;
+                let new_root = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
                 let children = hugr.children(new_root).collect::<Vec<_>>();
                 let root_opty = hugr.remove_node(new_root);
                 for ch in children {
@@ -136,7 +138,7 @@ impl NodeTemplate {
     ) -> Result<(), Option<Signature>> {
         let sig = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
-            NodeTemplate::CompoundOp(hugr) => hugr.root_optype(),
+            NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype(),
             NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
@@ -525,7 +527,7 @@ impl ComposablePass for ReplaceTypes {
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             if let Some(new_sig) = new_dfsig
-                .filter(|_| changed && n != hugr.root())
+                .filter(|_| changed && n != hugr.entrypoint())
                 .map(Cow::into_owned)
             {
                 for outp in new_sig.output_ports() {
@@ -882,7 +884,7 @@ mod test {
         {
             let mut h = backup.clone();
             assert_eq!(lowerer.run(&mut h), Ok(true));
-            let sig = h.signature(h.root()).unwrap();
+            let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
                 &TypeRow::from(vec![list_type(usize_t()), value_array_type(10, bool_t())])
@@ -904,7 +906,7 @@ mod test {
         {
             let mut h = backup.clone();
             assert_eq!(lowerer.run(&mut h), Ok(true));
-            let sig = h.signature(h.root()).unwrap();
+            let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
                 &TypeRow::from(vec![list_type(i64_t()), value_array_type(10, bool_t())])
@@ -1018,7 +1020,7 @@ mod test {
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
         // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
         assert_eq!(
-            h.root_optype().dataflow_signature().unwrap().io(),
+            h.entrypoint_optype().dataflow_signature().unwrap().io(),
             (
                 &vec![list_type(qb_t()); 2].into(),
                 &vec![qb_t(), option_type(qb_t()).into()].into()
@@ -1093,7 +1095,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
         let read_func = h
             .insert_hugr(
-                h.root(),
+                h.entrypoint(),
                 lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
                     FunctionBuilder::new(
                         "lowered_read",
@@ -1103,7 +1105,7 @@ mod test {
                 .finish_hugr()
                 .unwrap(),
             )
-            .new_root;
+            .inserted_entrypoint;
 
         let mut lw = lowerer(&e);
         lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {

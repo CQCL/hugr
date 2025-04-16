@@ -142,7 +142,7 @@ impl PatchHugrMut for OutlineCfg {
                 .unwrap();
             let ins_res = h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone());
             (
-                ins_res.new_root,
+                ins_res.inserted_entrypoint,
                 *ins_res.node_map.get(&cfg.node()).unwrap(),
             )
         };
@@ -331,7 +331,7 @@ mod test {
         }
         fn entry_exit(&self) -> (Node, Node) {
             self.h
-                .children(self.h.root())
+                .children(self.h.entrypoint())
                 .take(2)
                 .collect_tuple()
                 .unwrap()
@@ -391,7 +391,7 @@ mod test {
             tail,
             ..
         } = cond_then_loop_cfg;
-        let root = h.root();
+        let root = h.entrypoint();
         let (new_block, _, exit_block) = outline_cfg_check_parents(&mut h, root, vec![head, tail]);
         assert_eq!(h.output_neighbours(merge).collect_vec(), vec![new_block]);
         assert_eq!(h.input_neighbours(exit).collect_vec(), vec![new_block]);
@@ -417,7 +417,7 @@ mod test {
             tail,
         } = cond_then_loop_cfg;
 
-        let root = h.root();
+        let root = h.entrypoint();
         let (new_block, _, inner_exit) =
             outline_cfg_check_parents(&mut h, root, vec![merge, head, tail]);
         assert_eq!(h.input_neighbours(exit).collect_vec(), vec![new_block]);
@@ -477,11 +477,11 @@ mod test {
             ..
         } = cond_then_loop_cfg;
 
-        let root = h.root();
+        let root = h.entrypoint();
         let (new_block, _, _) =
             outline_cfg_check_parents(&mut h, root, vec![entry, left, right, merge]);
         h.validate().unwrap();
-        assert_eq!(new_block, h.children(h.root()).next().unwrap());
+        assert_eq!(new_block, h.children(h.entrypoint()).next().unwrap());
         assert_eq!(h.output_neighbours(new_block).collect_vec(), [head]);
     }
 

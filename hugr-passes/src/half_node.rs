@@ -37,7 +37,7 @@ impl<H: HugrView> HalfNodeView<H> {
         let h = checked.into_hugr();
 
         let (entry, exit) = {
-            let mut children = h.children(h.root());
+            let mut children = h.children(h.entrypoint());
             (children.next().unwrap(), children.next().unwrap())
         };
         assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);

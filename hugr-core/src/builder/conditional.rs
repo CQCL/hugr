@@ -164,7 +164,7 @@ impl ConditionalBuilder<Hugr> {
             outputs,
         };
         let base = Hugr::new(op);
-        let conditional_node = base.root();
+        let conditional_node = base.entrypoint();
 
         Ok(ConditionalBuilder {
             base,
@@ -182,7 +182,7 @@ impl CaseBuilder<Hugr> {
             signature: signature.clone(),
         };
         let base = Hugr::new(op);
-        let root = base.root();
+        let root = base.entrypoint();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))

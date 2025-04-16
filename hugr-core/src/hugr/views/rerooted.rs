@@ -1,0 +1,200 @@
+//! A HUGR wrapper with a modified entrypoint node, returned by
+//! [`HugrView::with_entrypoint`] and [`HugrMut::with_entrypoint_mut`].
+
+use crate::hugr::internal::{HugrInternals, HugrMutInternals};
+use crate::hugr::HugrMut;
+
+use super::render::RenderConfig;
+use super::{panic_invalid_node, HugrView};
+
+/// A HUGR wrapper with a modified entrypoint node.
+///
+/// All nodes from the original are still present, but the main entrypoint used
+/// for traversals and optimizations is altered.
+#[derive(Clone)]
+pub struct Rerooted<H: HugrView> {
+    hugr: H,
+    entrypoint: H::Node,
+}
+
+impl<H: HugrView> Rerooted<H> {
+    /// Create a hierarchical view of a whole HUGR
+    ///
+    /// # Panics
+    ///
+    /// If the new entrypoint is in the HUGR.
+    ///
+    /// [`OpTag`]: crate::ops::OpTag
+    pub fn new(hugr: H, entrypoint: H::Node) -> Self {
+        panic_invalid_node(&hugr, entrypoint);
+        Self { hugr, entrypoint }
+    }
+
+    /// Returns the HUGR wrapped in this view.
+    pub fn into_unwrapped(self) -> H {
+        self.hugr
+    }
+}
+
+impl<H: HugrView> HugrInternals for Rerooted<H> {
+    type Portgraph<'p>
+        = H::Portgraph<'p>
+    where
+        Self: 'p;
+    type Node = H::Node;
+
+    super::impls::hugr_internal_methods! {this, &this.hugr}
+}
+
+impl<H: HugrView> HugrView for Rerooted<H> {
+    #[inline]
+    fn entrypoint(&self) -> Self::Node {
+        self.entrypoint
+    }
+
+    #[inline]
+    fn entrypoint_optype(&self) -> &crate::ops::OpType {
+        self.hugr.get_optype(self.entrypoint)
+    }
+
+    #[inline]
+    fn mermaid_string(&self) -> String {
+        self.mermaid_string_with_config(RenderConfig {
+            node_indices: true,
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+            entrypoint: Some(self.to_portgraph_node(self.entrypoint())),
+        })
+    }
+
+    delegate::delegate! {
+        to (&self.hugr) {
+                fn module_root(&self) -> Self::Node;
+                fn contains_node(&self, node: Self::Node) -> bool;
+                fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
+                fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::hugr::NodeMetadata>;
+                fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
+                fn num_nodes(&self) -> usize;
+                fn num_edges(&self) -> usize;
+                fn num_ports(&self, node: Self::Node, dir: crate::Direction) -> usize;
+                fn num_inputs(&self, node: Self::Node) -> usize;
+                fn num_outputs(&self, node: Self::Node) -> usize;
+                fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
+                fn node_ports(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = crate::Port> + Clone;
+                fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = crate::OutgoingPort> + Clone;
+                fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = crate::IncomingPort> + Clone;
+                fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = crate::Port> + Clone;
+                fn linked_ports(&self, node: Self::Node, port: impl Into<crate::Port>) -> impl Iterator<Item = (Self::Node, crate::Port)> + Clone;
+                fn all_linked_ports(&self, node: Self::Node, dir: crate::Direction) -> itertools::Either<impl Iterator<Item = (Self::Node, crate::OutgoingPort)>, impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
+                fn all_linked_outputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
+                fn all_linked_inputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
+                fn single_linked_port(&self, node: Self::Node, port: impl Into<crate::Port>) -> Option<(Self::Node, crate::Port)>;
+                fn single_linked_output(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> Option<(Self::Node, crate::OutgoingPort)>;
+                fn single_linked_input(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> Option<(Self::Node, crate::IncomingPort)>;
+                fn linked_outputs(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
+                fn linked_inputs(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
+                fn node_connections(&self, node: Self::Node, other: Self::Node) -> impl Iterator<Item = [crate::Port; 2]> + Clone;
+                fn is_linked(&self, node: Self::Node, port: impl Into<crate::Port>) -> bool;
+                fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
+                fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
+                fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
+                fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig) -> String;
+                fn dot_string(&self) -> String;
+                fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
+                fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
+                fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
+                fn extensions(&self) -> &crate::extension::ExtensionRegistry;
+                fn validate(&self) -> Result<(), crate::hugr::ValidationError>;
+                fn validate_no_extensions(&self) -> Result<(), crate::hugr::ValidationError>;
+                fn extract_hugr(&self) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
+        }
+    }
+}
+
+impl<H: HugrMutInternals> HugrMutInternals for Rerooted<H> {
+    super::impls::hugr_mut_internal_methods! {this, &mut this.hugr}
+}
+
+impl<H: HugrMut> HugrMut for Rerooted<H> {
+    fn set_entrypoint(&mut self, root: Self::Node) {
+        self.entrypoint = root;
+        self.hugr.set_entrypoint(root);
+    }
+
+    delegate::delegate! {
+        to (&mut self.hugr) {
+                fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::hugr::NodeMetadata;
+                fn set_metadata(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::hugr::NodeMetadata>);
+                fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
+                fn add_node_with_parent(&mut self, parent: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
+                fn add_node_before(&mut self, sibling: Self::Node, nodetype: impl Into<crate::ops::OpType>) -> Self::Node;
+                fn add_node_after(&mut self, sibling: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
+                fn remove_node(&mut self, node: Self::Node) -> crate::ops::OpType;
+                fn remove_subtree(&mut self, node: Self::Node);
+                fn copy_descendants(&mut self, root: Self::Node, new_parent: Self::Node, subst: Option<crate::types::Substitution>) -> std::collections::BTreeMap<Self::Node, Self::Node>;
+                fn connect(&mut self, src: Self::Node, src_port: impl Into<crate::OutgoingPort>, dst: Self::Node, dst_port: impl Into<crate::IncomingPort>);
+                fn disconnect(&mut self, node: Self::Node, port: impl Into<crate::Port>);
+                fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (crate::OutgoingPort, crate::IncomingPort);
+                fn insert_hugr(&mut self, root: Self::Node, other: crate::Hugr) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
+                fn insert_from_view<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other) -> crate::hugr::hugrmut::InsertionResult<Other::Node, Self::Node>;
+                fn insert_subgraph<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, subgraph: &crate::hugr::views::SiblingSubgraph<Other::Node>) -> std::collections::HashMap<Other::Node, Self::Node>;
+                fn use_extension(&mut self, extension: impl Into<std::sync::Arc<crate::extension::Extension>>);
+                fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>) where crate::extension::ExtensionRegistry: Extend<Reg>;
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::builder::{Dataflow, FunctionBuilder, HugrBuilder, SubContainer};
+    use crate::extension::ExtensionSet;
+    use crate::hugr::internal::HugrMutInternals;
+    use crate::hugr::HugrMut;
+    use crate::ops::handle::NodeHandle;
+    use crate::ops::{DataflowBlock, OpType};
+    use crate::{type_row, types::Signature, HugrView};
+
+    #[test]
+    fn rerooted() {
+        let mut builder = FunctionBuilder::new("main", Signature::new(vec![], vec![])).unwrap();
+        let dfg = builder
+            .dfg_builder_endo([])
+            .unwrap()
+            .finish_sub_container()
+            .unwrap()
+            .node();
+        let mut h = builder.finish_hugr().unwrap();
+        let _func = h.entrypoint();
+
+        // Immutable wrappers
+        let dfg_v = h.with_entrypoint(dfg);
+        assert_eq!(dfg_v.module_root(), h.module_root());
+        assert_eq!(dfg_v.entrypoint(), dfg);
+        assert!(dfg_v.entrypoint_optype().is_dfg());
+        assert!(dfg_v.get_optype(dfg_v.module_root().node()).is_module());
+
+        // Mutable wrappers
+        let mut dfg_v = h.with_entrypoint_mut(dfg);
+        {
+            // That is a HugrMutInternal, so we can try:
+            let root = dfg_v.entrypoint();
+            let bb: OpType = DataflowBlock {
+                inputs: type_row![],
+                other_outputs: type_row![],
+                sum_rows: vec![type_row![]],
+                extension_delta: ExtensionSet::new(),
+            }
+            .into();
+            dfg_v.replace_op(root, bb.clone());
+
+            assert!(dfg_v.entrypoint_optype().is_dataflow_block());
+            assert!(dfg_v.get_optype(dfg_v.module_root().node()).is_module());
+        }
+        // That modified the original HUGR
+        assert!(h.get_optype(dfg).is_dataflow_block());
+        assert!(h.entrypoint_optype().is_func_defn());
+        assert!(h.get_optype(h.module_root().node()).is_module());
+    }
+}

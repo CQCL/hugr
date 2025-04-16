@@ -104,7 +104,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         context: impl DFContext<V, Node = H::Node>,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> AnalysisResults<V, H> {
-        let root = self.0.root();
+        let root = self.0.entrypoint();
         if self.0.get_optype(root).is_module() {
             assert!(
                 in_values.into_iter().next().is_none(),

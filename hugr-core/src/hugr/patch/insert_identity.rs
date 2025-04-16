@@ -48,7 +48,7 @@ pub enum IdentityInsertionError {
     InvalidPortKind(Option<EdgeKind>),
 }
 
-impl<N: Copy> PatchVerification for IdentityInsertion<N> {
+impl<N: HugrNode> PatchVerification for IdentityInsertion<N> {
     type Error = IdentityInsertionError;
     type Node = N;
 
@@ -121,7 +121,7 @@ mod tests {
         assert_eq!(h.num_nodes(), 6);
 
         let final_node = h
-            .input_neighbours(h.get_io(h.root()).unwrap()[1])
+            .input_neighbours(h.get_io(h.entrypoint()).unwrap()[1])
             .next()
             .unwrap();
 

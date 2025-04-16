@@ -280,13 +280,13 @@ mod test {
             signature: Signature::new(usize_t(), bool_t()),
         });
         let inp = h.add_node_with_parent(
-            h.root(),
+            h.entrypoint(),
             Input {
                 types: usize_t().into(),
             },
         );
         let outp = h.add_node_with_parent(
-            h.root(),
+            h.entrypoint(),
             Output {
                 types: bool_t().into(),
             },
@@ -296,7 +296,7 @@ mod test {
         let err = backup.validate().unwrap_err();
 
         let no_inputs: [(IncomingPort, _); 0] = [];
-        let cfold = ConstantFoldPass::default().with_inputs(backup.root(), no_inputs);
+        let cfold = ConstantFoldPass::default().with_inputs(backup.entrypoint(), no_inputs);
         cfold.run(&mut h).unwrap();
         assert_eq!(h, backup); // Did nothing
 
@@ -337,7 +337,7 @@ mod test {
                     rewrites_applied: 1
                 })
             );
-            let [tuple_in, tuple_out] = h.children(h.root()).collect_array().unwrap();
+            let [tuple_in, tuple_out] = h.children(h.entrypoint()).collect_array().unwrap();
             assert_eq!(h.output_neighbours(tuple_in).collect_vec(), [tuple_out; 2]);
         }
 
@@ -349,9 +349,9 @@ mod test {
         let mut h = h;
         let r = validate_if_test(ifthen, &mut h).unwrap();
         assert_eq!(r, None);
-        assert_eq!(h.children(h.root()).count(), 4);
+        assert_eq!(h.children(h.entrypoint()).count(), 4);
         let mktup = h
-            .output_neighbours(h.first_child(h.root()).unwrap())
+            .output_neighbours(h.first_child(h.entrypoint()).unwrap())
             .next()
             .unwrap();
         assert_eq!(h.get_optype(mktup), &OpType::from(MakeTuple::new(tr)));

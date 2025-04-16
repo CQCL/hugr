@@ -76,7 +76,7 @@ impl DFGBuilder<Hugr> {
             signature: signature.clone(),
         };
         let base = Hugr::new(dfg_op);
-        let root = base.root();
+        let root = base.entrypoint();
         DFGBuilder::create_with_io(base, root, signature)
     }
 }
@@ -151,7 +151,7 @@ impl FunctionBuilder<Hugr> {
         };
 
         let base = Hugr::new(op);
-        let root = base.root();
+        let root = base.entrypoint();
 
         let db = DFGBuilder::create_with_io(base, root, body)?;
         Ok(Self::from_dfg_builder(db))
@@ -497,8 +497,14 @@ pub(crate) mod test {
 
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
-        assert_eq!(simple_dfg_hugr.num_nodes(), 3);
-        assert_matches!(simple_dfg_hugr.root_optype().tag(), OpTag::Dfg);
+        assert_eq!(simple_dfg_hugr.num_nodes(), 7);
+        assert_eq!(
+            simple_dfg_hugr
+                .descendants(simple_dfg_hugr.entrypoint())
+                .count(),
+            3
+        );
+        assert_matches!(simple_dfg_hugr.entrypoint_optype().tag(), OpTag::Dfg);
     }
 
     #[test]
@@ -526,7 +532,7 @@ pub(crate) mod test {
         let hugr = module_builder.finish_hugr()?;
         assert_eq!(hugr.num_nodes(), 7);
 
-        assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
+        assert_eq!(hugr.get_metadata(hugr.entrypoint(), "x"), None);
         assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));
         assert_eq!(hugr.get_metadata(f_node, "x").cloned(), Some(json!("hi")));
 

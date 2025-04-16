@@ -9,10 +9,13 @@ mod port_types;
 pub mod replace;
 pub mod simple_replace;
 
-use crate::{Hugr, HugrView};
+use crate::core::HugrNode;
+use crate::HugrView;
+use itertools::Itertools;
 pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
+use super::views::ExtractionResult;
 use super::HugrMut;
 
 /// Verify that a patch application would succeed.
@@ -21,7 +24,7 @@ pub trait PatchVerification {
     type Error: std::error::Error;
 
     /// The node type of the HugrView that this patch applies to.
-    type Node;
+    type Node: HugrNode;
 
     /// Checks whether the rewrite would succeed on the specified Hugr.
     /// If this call succeeds, [Patch::apply] should also succeed on the same
@@ -59,15 +62,16 @@ pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
 
     /// Mutate the specified Hugr, or fail with an error.
     ///
-    /// Returns [`Self::Outcome`] if successful.
-    /// If [Patch::UNCHANGED_ON_FAILURE] is true, then `h` must be unchanged if
-    /// Err is returned. See also [PatchVerification::verify]
+    /// Returns [`Self::Outcome`] if successful. If
+    /// [Patch::UNCHANGED_ON_FAILURE] is true, then `h` must be unchanged if Err
+    /// is returned. See also [PatchVerification::verify]
     ///
     /// # Panics
     ///
-    /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that
-    /// is, implementations may begin with `assert!(h.validate())`, with
-    /// `debug_assert!(h.validate())` being preferred.
+    /// May panic if-and-only-if `h` would have failed
+    /// [Hugr::validate][crate::Hugr::validate]; that is, implementations may
+    /// begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
+    /// being preferred.
     fn apply(self, h: &mut H) -> Result<Self::Outcome, Self::Error>;
 }
 
@@ -98,13 +102,16 @@ pub trait PatchHugrMut: PatchVerification {
 
     /// Mutate the specified Hugr, or fail with an error.
     ///
-    /// Returns [`Self::Outcome`] if successful.
-    /// If [self.unchanged_on_failure] is true, then `h` must be unchanged if
-    /// Err is returned. See also [self.verify]
+    /// Returns [`Self::Outcome`] if successful. If [self.unchanged_on_failure]
+    /// is true, then `h` must be unchanged if Err is returned. See also
+    /// [self.verify]
+    ///
     /// # Panics
-    /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that
-    /// is, implementations may begin with `assert!(h.validate())`, with
-    /// `debug_assert!(h.validate())` being preferred.
+    ///
+    /// May panic if-and-only-if `h` would have failed
+    /// [Hugr::validate][crate::Hugr::validate]; that is, implementations may
+    /// begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
+    /// being preferred.
     fn apply_hugr_mut(
         self,
         h: &mut impl HugrMut<Node = Self::Node>,
@@ -152,17 +159,29 @@ impl<R: PatchHugrMut> PatchHugrMut for Transactional<R> {
         if R::UNCHANGED_ON_FAILURE {
             return self.underlying.apply_hugr_mut(h);
         }
-        // Try to backup just the contents of this HugrMut.
-        let mut backup = Hugr::new(h.root_optype().clone());
-        backup.insert_from_view(backup.root(), h);
+        // Backup the whole Hugr.
+        // Temporarily move the entrypoint so every node gets copied.
+        //
+        // TODO: This requires a full graph copy on each application.
+        // Ideally we'd be able to just restore modified nodes, perhaps using a `HugrMut` wrapper
+        // that keeps track of them.
+        let (backup, backup_map) = h.with_entrypoint(h.module_root()).extract_hugr();
+        let backup_root = backup_map.extracted_node(h.module_root());
+        let backup_entrypoint = backup_map.extracted_node(h.entrypoint());
+
         let r = self.underlying.apply_hugr_mut(h);
         if r.is_err() {
-            // Try to restore backup.
-            h.replace_op(h.root(), backup.root_optype().clone());
-            while let Some(child) = h.first_child(h.root()) {
-                h.remove_node(child);
+            // Restore the backup.
+            let h_root = h.module_root();
+            for f in h.children(h_root).collect_vec() {
+                h.remove_subtree(f);
             }
-            h.insert_hugr(h.root(), backup);
+            let insert_map = h.insert_hugr(h_root, backup).node_map;
+            let inserted_root = insert_map[&backup_root];
+            let inserted_entrypoint = insert_map[&backup_entrypoint];
+            h.remove_node(h_root);
+            h.set_module_root(inserted_root);
+            h.set_entrypoint(inserted_entrypoint);
         }
         r
     }

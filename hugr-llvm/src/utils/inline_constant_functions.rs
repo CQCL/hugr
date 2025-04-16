@@ -27,11 +27,11 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
             let Value::Function { hugr } = konst.value() else {
                 continue;
             };
-            let optype = hugr.get_optype(hugr.root());
+            let optype = hugr.get_optype(hugr.entrypoint());
             if !optype.is_dfg() && !optype.is_func_defn() {
                 bail!(
                     "Constant function has unsupported root: {:?}",
-                    hugr.get_optype(hugr.root())
+                    hugr.get_optype(hugr.entrypoint())
                 )
             }
             hugr.clone()
@@ -65,7 +65,7 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
                 name: const_fn_name(konst_n),
                 signature: polysignature.clone(),
             };
-            let func_node = hugr.add_node_with_parent(hugr.root(), func_defn);
+            let func_node = hugr.add_node_with_parent(hugr.entrypoint(), func_defn);
             hugr.insert_hugr(func_node, func_hugr);
 
             for lcn in load_constant_ns {

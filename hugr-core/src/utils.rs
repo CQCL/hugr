@@ -291,7 +291,7 @@ pub(crate) mod test {
     pub(crate) fn assert_fully_folded_with(h: &Hugr, check_value: impl Fn(&Value) -> bool) {
         let mut node_count = 0;
 
-        for node in h.children(h.root()) {
+        for node in h.children(h.entrypoint()) {
             let op = h.get_optype(node);
             match op {
                 OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,

@@ -193,7 +193,7 @@ mod test {
         let reported_con_node = h.apply_patch(remove_2)?;
         assert_eq!(reported_con_node, con_node);
         // remove const
-        assert_eq!(h.apply_patch(remove_con)?, h.root());
+        assert_eq!(h.apply_patch(remove_con)?, h.entrypoint());
 
         assert_eq!(h.num_nodes(), 4);
         assert!(h.validate().is_ok());

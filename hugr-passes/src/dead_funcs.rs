@@ -38,11 +38,11 @@ fn reachable_funcs<'a, H: HugrView>(
 ) -> Result<impl Iterator<Item = H::Node> + 'a, RemoveDeadFuncsError<H::Node>> {
     let g = cg.graph();
     let mut entry_points = entry_points.into_iter();
-    let searcher = if h.get_optype(h.root()).is_module() {
+    let searcher = if h.get_optype(h.entrypoint()).is_module() {
         let mut d = Dfs::new(g, 0.into());
         d.stack.clear();
         for n in entry_points {
-            if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.root()) {
+            if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.entrypoint()) {
                 return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
             }
             d.stack.push(cg.node_index(n).unwrap())
@@ -53,11 +53,11 @@ fn reachable_funcs<'a, H: HugrView>(
             // Can't be a child of the module root as there isn't a module root!
             return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
         }
-        Dfs::new(g, cg.node_index(h.root()).unwrap())
+        Dfs::new(g, cg.node_index(h.entrypoint()).unwrap())
     };
     Ok(searcher.iter(g).map(|i| match g.node_weight(i).unwrap() {
         CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
-        CallGraphNode::NonFuncRoot => h.root(),
+        CallGraphNode::NonFuncRoot => h.entrypoint(),
     }))
 }
 

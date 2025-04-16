@@ -110,13 +110,13 @@ impl ComposablePass for ConstantFoldPass {
         }
 
         let results = m.run(ConstFoldContext, []);
-        let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
+        let mb_root_inp = hugr.get_io(hugr.entrypoint()).map(|[i, _]| i);
 
         let wires_to_break = hugr
             .nodes()
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
             .filter(|(n, ip)| {
-                *n != hugr.root()
+                *n != hugr.entrypoint()
                     && matches!(hugr.get_optype(*n).port_kind(*ip), Some(EdgeKind::Value(_)))
             })
             .filter_map(|(n, ip)| {
@@ -178,9 +178,9 @@ impl ComposablePass for ConstantFoldPass {
 /// [Module]: hugr_core::ops::OpType::Module
 pub fn constant_fold_pass<H: HugrMut<Node = Node>>(h: &mut H) {
     let c = ConstantFoldPass::default();
-    let c = if h.get_optype(h.root()).is_module() {
+    let c = if h.get_optype(h.entrypoint()).is_module() {
         let no_inputs: [(IncomingPort, _); 0] = [];
-        h.children(h.root())
+        h.children(h.entrypoint())
             .filter(|n| h.get_optype(*n).is_func_defn())
             .fold(c, |c, n| c.with_inputs(n, no_inputs.iter().cloned()))
     } else {

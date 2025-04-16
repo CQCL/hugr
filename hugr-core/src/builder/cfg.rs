@@ -149,7 +149,7 @@ impl CFGBuilder<Hugr> {
         };
 
         let base = Hugr::new(cfg_op);
-        let cfg_node = base.root();
+        let cfg_node = base.entrypoint();
         CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }
 }
@@ -356,7 +356,7 @@ impl BlockBuilder<Hugr> {
         };
 
         let base = Hugr::new(op);
-        let root = base.root();
+        let root = base.entrypoint();
         Self::create(base, root)
     }
 

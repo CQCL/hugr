@@ -104,7 +104,7 @@ impl DeadCodeElimPass {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
-        q.push_front(h.root());
+        q.push_front(h.entrypoint());
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
@@ -224,7 +224,7 @@ mod test {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [block.node(), exit.node(), cst_used.node()]
             );
             assert_eq!(
@@ -265,7 +265,7 @@ mod test {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [
                     block.node(),
                     exit.node(),
@@ -294,7 +294,7 @@ mod test {
                 .run(&mut h)
                 .unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [block.node(), exit.node(), cst_unused, cst_used.node()]
             );
             assert_eq!(

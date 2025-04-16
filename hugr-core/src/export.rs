@@ -120,7 +120,7 @@ impl<'a> Context<'a> {
         self.symbols.enter(self.module.root);
         self.links.enter(self.module.root);
 
-        let hugr_children = self.hugr.children(self.hugr.root());
+        let hugr_children = self.hugr.children(self.hugr.entrypoint());
         let mut children = Vec::with_capacity(hugr_children.size_hint().0);
 
         for child in hugr_children.clone() {
@@ -998,8 +998,10 @@ impl<'a> Context<'a> {
                 let outer_hugr = std::mem::replace(&mut self.hugr, hugr);
                 let outer_node_to_id = std::mem::take(&mut self.node_to_id);
 
-                let region = match hugr.root_optype() {
-                    OpType::DFG(_) => self.export_dfg(hugr.root(), model::ScopeClosure::Closed),
+                let region = match hugr.entrypoint_optype() {
+                    OpType::DFG(_) => {
+                        self.export_dfg(hugr.entrypoint(), model::ScopeClosure::Closed)
+                    }
                     _ => panic!("Value::Function root must be a DFG"),
                 };
 
