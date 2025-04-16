@@ -323,22 +323,16 @@ mod test {
             fb.finish_hugr_with_outputs(untup.outputs()).unwrap()
         };
 
-        fn change_type_then_untup(
-            t: CustomType,
-        ) -> impl ComposablePass<Result = Option<UntupleResult>> {
-            let mut repl = ReplaceTypes::default();
-            repl.replace_type(t, INT_TYPES[6].clone());
-            IfThen::<Either<_, _>, _, _>::new(repl, UntuplePass::new(UntupleRecursive::Recursive))
-        }
-
+        let untup = UntuplePass::new(UntupleRecursive::Recursive);
         {
             // Change usize_t to INT_TYPES[6], and if that did anything (it will!), then Untuple
+            let mut repl = ReplaceTypes::default();
+            let usize_custom_t = usize_t().as_extension().unwrap().clone();
+            repl.replace_type(usize_custom_t, INT_TYPES[6].clone());
+            let ifthen = IfThen::<Either<_, _>, _, _>::new(repl, untup.clone());
+
             let mut h = h.clone();
-            let r = validate_if_test(
-                change_type_then_untup(usize_t().as_extension().unwrap().clone()),
-                &mut h,
-            )
-            .unwrap();
+            let r = validate_if_test(ifthen, &mut h).unwrap();
             assert_eq!(
                 r,
                 Some(UntupleResult {
@@ -350,12 +344,12 @@ mod test {
         }
 
         // Change INT_TYPES[5] to INT_TYPES[6]; that won't do anything, so don't Untuple
+        let mut repl = ReplaceTypes::default();
+        let i32_custom_t = INT_TYPES[5].as_extension().unwrap().clone();
+        repl.replace_type(i32_custom_t, INT_TYPES[6].clone());
+        let ifthen = IfThen::<Either<_, _>, _, _>::new(repl, untup);
         let mut h = h;
-        let r = validate_if_test(
-            change_type_then_untup(INT_TYPES[5].as_extension().unwrap().clone()),
-            &mut h,
-        )
-        .unwrap();
+        let r = validate_if_test(ifthen, &mut h).unwrap();
         assert_eq!(r, None);
         assert_eq!(h.children(h.root()).count(), 4);
         let mktup = h
