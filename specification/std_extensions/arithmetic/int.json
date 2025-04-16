@@ -5,7 +5,6 @@
     "arithmetic.int.types"
   ],
   "types": {},
-  "values": {},
   "operations": {
     "iabs": {
       "extension": "arithmetic.int",

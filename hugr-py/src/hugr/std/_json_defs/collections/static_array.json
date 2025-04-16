@@ -19,7 +19,6 @@
       }
     }
   },
-  "values": {},
   "operations": {
     "get": {
       "extension": "collections.static_array",
