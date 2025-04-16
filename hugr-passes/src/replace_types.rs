@@ -575,7 +575,7 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
     use hugr_core::extension::prelude::{
@@ -595,10 +595,9 @@ mod test {
         list_type, list_type_def, ListOp, ListValue,
     };
 
-    use hugr_core::hugr::ValidationError;
+    use hugr_core::hugr::{IdentList, ValidationError};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
-    use hugr_core::Hugr;
-    use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
+    use hugr_core::{type_row, Extension, HugrView};
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -665,11 +664,13 @@ mod test {
         )
     }
 
-    fn lowered_read(args: &[TypeArg]) -> Hugr {
-        let ty = just_elem_type(args);
-        let mut dfb = DFGBuilder::new(inout_sig(
-            vec![array_type(64, ty.clone()), i64_t()],
-            ty.clone(),
+    fn lowered_read<T: Container + Dataflow>(
+        elem_ty: Type,
+        new: impl Fn(Signature) -> Result<T, BuildError>,
+    ) -> T {
+        let mut dfb = new(inout_sig(
+            vec![array_type(64, elem_ty.clone()), i64_t()],
+            elem_ty.clone(),
         ))
         .unwrap();
         let [val, idx] = dfb.input_wires_arr();
@@ -678,13 +679,14 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [opt] = dfb
-            .add_dataflow_op(ArrayOpDef::get.to_concrete(ty.clone(), 64), [val, idx])
+            .add_dataflow_op(ArrayOpDef::get.to_concrete(elem_ty.clone(), 64), [val, idx])
             .unwrap()
             .outputs_arr();
         let [res] = dfb
-            .build_unwrap_sum(1, option_type(Type::from(ty.clone())), opt)
+            .build_unwrap_sum(1, option_type(Type::from(elem_ty)), opt)
             .unwrap();
-        dfb.finish_hugr_with_outputs([res]).unwrap()
+        dfb.set_outputs([res]).unwrap();
+        dfb
     }
 
     fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
@@ -704,7 +706,11 @@ mod test {
             ),
         );
         lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args| {
-            Some(NodeTemplate::CompoundOp(Box::new(lowered_read(type_args))))
+            Some(NodeTemplate::CompoundOp(Box::new(
+                lowered_read(just_elem_type(type_args).clone(), DFGBuilder::new)
+                    .finish_hugr()
+                    .unwrap(),
+            )))
         });
         lw
     }
