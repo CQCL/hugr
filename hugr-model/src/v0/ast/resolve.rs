@@ -362,6 +362,7 @@ impl<'a> Context<'a> {
 
 /// Error that may occur in [`Module::resolve`].
 #[derive(Debug, Clone, Error)]
+#[non_exhaustive]
 pub enum ResolveError {
     /// Unknown variable.
     #[error("unknown var: {0}")]
