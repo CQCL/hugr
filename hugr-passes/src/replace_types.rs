@@ -6,6 +6,9 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use handlers::list_const;
+use hugr_core::std_extensions::collections::array::array_type_def;
+use hugr_core::std_extensions::collections::list::list_type_def;
 use thiserror::Error;
 
 use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
@@ -19,7 +22,7 @@ use hugr_core::ops::{
     Value, CFG, DFG,
 };
 use hugr_core::types::{
-    CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeTransformer,
 };
 use hugr_core::{Hugr, HugrView, Node, Wire};
 
@@ -125,7 +128,7 @@ impl NodeTemplate {
 /// * See also limitations noted for [Linearizer].
 ///
 /// [monomorphization]: super::monomorphize()
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
@@ -141,6 +144,16 @@ pub struct ReplaceTypes {
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
     validation: ValidationLevel,
+}
+
+impl Default for ReplaceTypes {
+    fn default() -> Self {
+        let mut res = Self::new_empty();
+        res.linearize = DelegatingLinearizer::default();
+        res.replace_consts_parametrized(array_type_def(), handlers::array_const);
+        res.replace_consts_parametrized(list_type_def(), list_const);
+        res
+    }
 }
 
 impl TypeTransformer for ReplaceTypes {
@@ -173,10 +186,27 @@ pub enum ReplaceTypesError {
     #[error(transparent)]
     ValidationError(#[from] ValidatePassError),
     #[error(transparent)]
+    ConstError(#[from] ConstTypeError),
+    #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
 }
 
 impl ReplaceTypes {
+    /// Makes a new instance. Unlike [Self::default], this does not understand
+    /// any extension types, even those in the prelude.
+    pub fn new_empty() -> Self {
+        Self {
+            type_map: Default::default(),
+            param_types: Default::default(),
+            linearize: DelegatingLinearizer::new_empty(),
+            op_map: Default::default(),
+            param_ops: Default::default(),
+            consts: Default::default(),
+            param_consts: Default::default(),
+            validation: Default::default(),
+        }
+    }
+
     /// Sets the validation level used before and after the pass is run.
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
@@ -447,38 +477,7 @@ impl ReplaceTypes {
     }
 }
 
-pub mod handlers {
-    //! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
-    use hugr_core::ops::{constant::OpaqueValue, Value};
-    use hugr_core::std_extensions::collections::list::ListValue;
-    use hugr_core::types::Transformable;
-
-    use super::{ReplaceTypes, ReplaceTypesError};
-
-    /// Handler for [ListValue] constants that recursively [ReplaceTypes::change_value]s
-    /// the elements of the list
-    pub fn list_const(
-        val: &OpaqueValue,
-        repl: &ReplaceTypes,
-    ) -> Result<Option<Value>, ReplaceTypesError> {
-        let Some(lv) = val.value().downcast_ref::<ListValue>() else {
-            return Ok(None);
-        };
-        let mut vals: Vec<Value> = lv.get_contents().to_vec();
-        let mut ch = false;
-        for v in vals.iter_mut() {
-            ch |= repl.change_value(v)?;
-        }
-        // If none of the values has changed, assume the Type hasn't (Values have a single known type)
-        if !ch {
-            return Ok(None);
-        };
-
-        let mut elem_t = lv.get_element_type().clone();
-        elem_t.transform(repl)?;
-        Ok(Some(ListValue::new(elem_t, vals).into()))
-    }
-}
+pub mod handlers;
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
@@ -536,20 +535,26 @@ mod test {
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{TypeDefBound, Version};
 
+    use hugr_core::ops::constant::OpaqueValue;
     use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
-        array_type, ArrayOp, ArrayOpDef, ArrayValue,
+        array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue,
     };
     use hugr_core::std_extensions::collections::list::{
         list_type, list_type_def, ListOp, ListValue,
     };
 
+    use hugr_core::hugr::ValidationError;
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
+    use rstest::rstest;
 
+    use crate::validation::ValidatePassError;
+
+    use super::ReplaceTypesError;
     use super::{handlers::list_const, NodeTemplate, ReplaceTypes};
 
     const PACKED_VEC: &str = "PackedVec";
@@ -792,8 +797,6 @@ mod test {
         let backup = tl.finish_hugr().unwrap();
 
         let mut lowerer = ReplaceTypes::default();
-        // Recursively descend into lists
-        lowerer.replace_consts_parametrized(list_type_def(), list_const);
 
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
         lowerer.replace_parametrized_type(list_type_def(), |args| {
@@ -950,5 +953,39 @@ mod test {
                 .collect_vec(),
             ["NoBoundsCheck.read", "collections.list.get"]
         );
+    }
+
+    #[rstest]
+    #[case(&[])]
+    #[case(&[3])]
+    #[case(&[5,7,11,13,17,19])]
+    fn array_const(#[case] vals: &[u64]) {
+        use super::handlers::array_const;
+        let mut dfb = DFGBuilder::new(inout_sig(
+            type_row![],
+            array_type(vals.len() as _, usize_t()),
+        ))
+        .unwrap();
+        let c = dfb.add_load_value(ArrayValue::new(
+            usize_t(),
+            vals.iter().map(|u| ConstUsize::new(*u).into()),
+        ));
+        let backup = dfb.finish_hugr_with_outputs([c]).unwrap();
+
+        let mut repl = ReplaceTypes::new_empty();
+        let usize_custom_t = usize_t().as_extension().unwrap().clone();
+        repl.replace_type(usize_custom_t.clone(), INT_TYPES[6].clone());
+        repl.replace_consts(usize_custom_t, |cst: &OpaqueValue, _| {
+            let cu = cst.value().downcast_ref::<ConstUsize>().unwrap();
+            Ok(ConstInt::new_u(6, cu.value())?.into())
+        });
+        assert!(
+            matches!(repl.run(&mut backup.clone()), Err(ReplaceTypesError::ValidationError(ValidatePassError::OutputError {
+                err: ValidationError::IncompatiblePorts {from, to, ..}, ..
+            })) if backup.get_optype(from).is_const() && to == c.node())
+        );
+        repl.replace_consts_parametrized(array_type_def(), array_const);
+        let mut h = backup;
+        repl.run(&mut h).unwrap(); // Includes validation
     }
 }
