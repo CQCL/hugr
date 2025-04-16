@@ -7,15 +7,11 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
-    hugr::{
-        hugrmut::HugrMut,
-        views::{DescendantsGraph, ExtractHugr, HierarchyView},
-    },
+    hugr::hugrmut::HugrMut,
     ops::{
-        constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-        OpType, Value,
+        constant::OpaqueValue, Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value,
     },
-    types::{EdgeKind, TypeArg},
+    types::EdgeKind,
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
 };
 use value_handle::ValueHandle;
@@ -102,7 +98,7 @@ impl ConstantFoldPass {
                 n,
                 in_vals.iter().map(|(p, v)| {
                     let const_with_dummy_loc = partial_from_const(
-                        &ConstFoldContext(hugr),
+                        &ConstFoldContext,
                         ConstLocation::Field(p.index(), &fresh_node.into()),
                         v,
                     );
@@ -112,7 +108,7 @@ impl ConstantFoldPass {
             .map_err(|opty| ConstFoldError::InvalidEntryPoint(n, opty))?;
         }
 
-        let results = m.run(ConstFoldContext(hugr), []);
+        let results = m.run(ConstFoldContext, []);
         let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
         let wires_to_break = hugr
@@ -131,7 +127,7 @@ impl ConstantFoldPass {
                     n,
                     ip,
                     results
-                        .try_read_wire_concrete::<Value, _, _>(Wire::new(src, outp))
+                        .try_read_wire_concrete::<Value>(Wire::new(src, outp))
                         .ok()?,
                 ))
             })
@@ -205,60 +201,35 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
     c.run(h).unwrap()
 }
 
-struct ConstFoldContext<'a, H>(&'a H);
+struct ConstFoldContext;
 
-impl<H: HugrView> std::ops::Deref for ConstFoldContext<'_, H> {
-    type Target = H;
-    fn deref(&self) -> &H {
-        self.0
-    }
-}
-
-impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
-    type Node = H::Node;
+impl ConstLoader<ValueHandle<Node>> for ConstFoldContext {
+    type Node = Node;
 
     fn value_from_opaque(
         &self,
-        loc: ConstLocation<H::Node>,
+        loc: ConstLocation<Node>,
         val: &OpaqueValue,
-    ) -> Option<ValueHandle<H::Node>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
 
     fn value_from_const_hugr(
         &self,
-        loc: ConstLocation<H::Node>,
+        loc: ConstLocation<Node>,
         h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle<H::Node>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
-    }
-
-    fn value_from_function(
-        &self,
-        node: H::Node,
-        type_args: &[TypeArg],
-    ) -> Option<ValueHandle<H::Node>> {
-        if !type_args.is_empty() {
-            // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
-            return None;
-        };
-        // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
-        // but not for transforming to a direct Call.
-        let func = DescendantsGraph::<FuncID<true>>::try_new(&**self, node).ok()?;
-        Some(ValueHandle::new_const_hugr(
-            ConstLocation::Node(node),
-            Box::new(func.extract_hugr()),
-        ))
     }
 }
 
-impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+impl DFContext<ValueHandle<Node>> for ConstFoldContext {
     fn interpret_leaf_op(
         &mut self,
-        node: H::Node,
+        node: Node,
         op: &ExtensionOp,
-        ins: &[PartialValue<ValueHandle<H::Node>>],
-        outs: &mut [PartialValue<ValueHandle<H::Node>>],
+        ins: &[PartialValue<ValueHandle<Node>>],
+        outs: &mut [PartialValue<ValueHandle<Node>>],
     ) {
         let sig = op.signature();
         let known_ins = sig
