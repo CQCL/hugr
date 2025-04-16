@@ -22,7 +22,7 @@ pub trait ComposablePass: Sized {
     }
 
     /// Returns a [ComposablePass] that does "`self` then `other`", so long as
-    /// `other::Err` maps into ours.
+    /// `other::Err` can be combined with ours.
     fn then<P: ComposablePass, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,

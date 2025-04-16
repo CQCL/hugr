@@ -16,15 +16,12 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::dead_code::{DeadCodeElimPass, PreserveNode};
-use crate::ComposablePass;
-use crate::{
-    composable::validate_if_test,
-    dataflow::{
-        partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
-        TailLoopTermination,
-    },
+use crate::dataflow::{
+    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
+    TailLoopTermination,
 };
+use crate::dead_code::{DeadCodeElimPass, PreserveNode};
+use crate::{composable::validate_if_test, ComposablePass};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
