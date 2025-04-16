@@ -24,7 +24,7 @@ use itertools::Itertools;
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
 
-use super::internal::HugrInternals;
+use super::internal::{HugrInternals, HugrMutInternals};
 use super::{
     Hugr, HugrError, HugrMut, Node, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
 };
@@ -64,12 +64,13 @@ pub trait HugrView: HugrInternals {
         self.contains_node(node)
     }
 
-    /// Validates that a node is a valid root descendant in the graph.
+    /// Validates that a node is valid in the graph, and is not the root of the
+    /// hierarchy.
     ///
     /// To include the root node use [`HugrView::valid_node`] instead.
     #[inline]
     fn valid_non_root(&self, node: Self::Node) -> bool {
-        self.root() != node && self.valid_node(node)
+        self.module_root() != node && self.valid_node(node)
     }
 
     /// Returns the parent of a node.
@@ -479,27 +480,6 @@ pub trait HugrView: HugrInternals {
     }
 }
 
-/// Trait for views that provides a guaranteed bound on the type of the root node.
-pub trait RootTagged: HugrView {
-    /// The kind of handle that can be used to refer to the root node.
-    ///
-    /// The handle is guaranteed to be able to contain the operation returned by
-    /// [`HugrView::root_type`].
-    type RootHandle: NodeHandle;
-}
-
-/// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: RootTagged + Sized {
-    /// Create a hierarchical view of a HUGR given a root node.
-    ///
-    /// # Errors
-    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [OpTag]
-    fn try_new(
-        hugr: &'a impl HugrView<Node = Self::Node>,
-        root: Self::Node,
-    ) -> Result<Self, HugrError>;
-}
-
 /// A trait for [`HugrView`]s that can be extracted into a valid HUGR containing
 /// only the nodes and edges of the view.
 pub trait ExtractHugr: HugrView + Sized {
@@ -525,18 +505,6 @@ fn check_tag<Required: NodeHandle, N>(
         return Err(HugrError::InvalidTag { required, actual });
     }
     Ok(())
-}
-
-impl RootTagged for Hugr {
-    type RootHandle = Node;
-}
-
-impl RootTagged for &Hugr {
-    type RootHandle = Node;
-}
-
-impl RootTagged for &mut Hugr {
-    type RootHandle = Node;
 }
 
 // Explicit implementation to avoid cloning the Hugr.

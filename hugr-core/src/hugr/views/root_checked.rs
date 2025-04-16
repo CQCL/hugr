@@ -1,22 +1,19 @@
-use std::borrow::Cow;
+use std::borrow::Borrow;
 use std::marker::PhantomData;
 
-use delegate::delegate;
-use portgraph::MultiPortGraph;
-
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
-use crate::hugr::{HugrError, HugrMut};
+use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
-use crate::{Hugr, Node};
+use crate::Hugr;
 
-use super::{check_tag, RootTagged};
+use super::HugrView;
 
-/// A view of the whole Hugr.
-/// (Just provides static checking of the type of the root node)
+/// A container for a Hugr providing a static assurance that the root node is of
+/// a specific type.
 #[derive(Clone)]
-pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
+pub struct RootChecked<H, Handle>(H, PhantomData<Handle>);
 
-impl<H: RootTagged + AsRef<Hugr>, Root: NodeHandle> RootChecked<H, Root> {
+impl<H: HugrView, Handle: NodeHandle> RootChecked<H, Handle> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
@@ -24,71 +21,42 @@ impl<H: RootTagged + AsRef<Hugr>, Root: NodeHandle> RootChecked<H, Root> {
     ///
     /// [`OpTag`]: crate::ops::OpTag
     pub fn try_new(hugr: H) -> Result<Self, HugrError> {
-        if !H::RootHandle::TAG.is_superset(Root::TAG) {
+        if !Handle::TAG.is_superset(hugr.root_tag()) {
             return Err(HugrError::InvalidTag {
-                required: H::RootHandle::TAG,
-                actual: Root::TAG,
+                required: Handle::TAG,
+                actual: hugr.root_tag(),
             });
         }
-        check_tag::<Root, _>(&hugr, hugr.root())?;
         Ok(Self(hugr, PhantomData))
     }
 }
 
-impl<Root> RootChecked<Hugr, Root> {
+impl<H, Handle> RootChecked<H, Handle> {
     /// Extracts the underlying (owned) Hugr
-    pub fn into_hugr(self) -> Hugr {
+    pub fn into_hugr(self) -> H {
         self.0
     }
 }
 
-impl<Root> RootChecked<&mut Hugr, Root> {
-    /// Allows immutably borrowing the underlying mutable reference
-    pub fn borrow(&self) -> RootChecked<&Hugr, Root> {
-        RootChecked(&*self.0, PhantomData)
+impl<H: HugrView, Handle: NodeHandle> TryFrom<H> for RootChecked<H, Handle> {
+    type Error = HugrError;
+
+    fn try_from(hugr: H) -> Result<Self, Self::Error> {
+        Self::try_new(hugr)
     }
 }
 
-impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
-    type Portgraph<'p>
-        = &'p MultiPortGraph
-    where
-        Self: 'p;
-    type Node = Node;
-
-    delegate! {
-        to self.as_ref() {
-            fn portgraph(&self) -> Self::Portgraph<'_>;
-            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
-            fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
-            fn get_pg_index(&self, node: Node) -> portgraph::NodeIndex;
-            fn get_node(&self, index: portgraph::NodeIndex) -> Node;
-        }
+impl<H, Handle> Borrow<H> for RootChecked<H, Handle> {
+    fn borrow(&self) -> &H {
+        &self.0
     }
 }
 
-impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
-    type RootHandle = Root;
-}
-
-impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
+impl<H: AsRef<Hugr>, Handle> AsRef<Hugr> for RootChecked<H, Handle> {
     fn as_ref(&self) -> &Hugr {
         self.0.as_ref()
     }
 }
-
-impl<H: HugrMutInternals + AsRef<Hugr>, Root> HugrMutInternals for RootChecked<H, Root>
-where
-    Root: NodeHandle,
-{
-    #[inline(always)]
-    fn hugr_mut(&mut self) -> &mut Hugr {
-        self.0.hugr_mut()
-    }
-}
-
-impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecked<H, Root> {}
 
 #[cfg(test)]
 mod test {

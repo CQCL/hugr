@@ -112,10 +112,6 @@ impl<T: HugrView + ToOwned> HugrView for Cow<'_, T> {
     hugr_view_methods! {this, this.as_ref()}
 }
 
-impl<H: AsRef<Hugr>, Root> HugrView for RootChecked<H, Root> {
-    hugr_view_methods! {this, this.as_ref()}
-}
-
 #[cfg(test)]
 mod test {
     use std::{rc::Rc, sync::Arc};

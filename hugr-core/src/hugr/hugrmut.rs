@@ -11,7 +11,7 @@ use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrView, Node, OpType, RootTagged};
+use crate::hugr::{HugrView, Node, OpType};
 use crate::hugr::{NodeMetadata, Rewrite};
 use crate::ops::OpTrait;
 use crate::types::Substitution;
@@ -342,8 +342,8 @@ fn translate_indices<N: HugrNode>(
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T {
-    fn add_node_with_parent(&mut self, parent: Node, node: impl Into<OpType>) -> Node {
+impl<T: HugrView + AsMut<Hugr>> HugrMut for T {
+    fn add_node_with_parent(&mut self, parent: T::Node, node: impl Into<OpType>) -> T::Node {
         let node = self.as_mut().add_node(node.into());
         self.as_mut()
             .hierarchy
