@@ -1,4 +1,4 @@
-r"""Quantinuum system results and utilities.
+r"""Quantinuum system results.
 
 Includes conversions to traditional distributions over bitstrings if a tagging
 convention is used, including conversion to a pytket BackendResult.

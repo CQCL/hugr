@@ -4,7 +4,7 @@ from collections import Counter
 import pytest
 
 # test deprecated module
-from hugr.qsys_result import REG_INDEX_PATTERN, QsysResult, QsysShot
+from hugr.qsystem.result import REG_INDEX_PATTERN, QsysResult, QsysShot
 
 
 @pytest.mark.parametrize(
