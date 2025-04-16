@@ -230,7 +230,7 @@ mod test {
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DEFAULT_OPTYPE, DFG};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
-    use hugr_core::types::{CustomType, Signature, TypeRow};
+    use hugr_core::types::{Signature, TypeRow};
     use hugr_core::{Hugr, HugrView, IncomingPort};
 
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
