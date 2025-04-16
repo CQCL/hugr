@@ -26,7 +26,7 @@ use hugr_core::types::{
 };
 use hugr_core::{Hugr, HugrView, Node, Wire};
 
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::ComposablePass;
 
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
@@ -143,7 +143,6 @@ pub struct ReplaceTypes {
         ParametricType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
-    validation: ValidationLevel,
 }
 
 impl Default for ReplaceTypes {
@@ -184,8 +183,6 @@ pub enum ReplaceTypesError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     #[error(transparent)]
-    ValidationError(#[from] ValidatePassError),
-    #[error(transparent)]
     ConstError(#[from] ConstTypeError),
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
@@ -203,14 +200,7 @@ impl ReplaceTypes {
             param_ops: Default::default(),
             consts: Default::default(),
             param_consts: Default::default(),
-            validation: Default::default(),
         }
-    }
-
-    /// Sets the validation level used before and after the pass is run.
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
     }
 
     /// Configures this instance to replace occurrences of type `src` with `dest`.
@@ -321,36 +311,6 @@ impl ReplaceTypes {
             + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
-    }
-
-    /// Run the pass using specified configuration.
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
-    }
-
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
-        let mut changed = false;
-        for n in hugr.nodes().collect::<Vec<_>>() {
-            changed |= self.change_node(hugr, n)?;
-            let new_dfsig = hugr.get_optype(n).dataflow_signature();
-            if let Some(new_sig) = new_dfsig
-                .filter(|_| changed && n != hugr.root())
-                .map(Cow::into_owned)
-            {
-                for outp in new_sig.output_ports() {
-                    if !new_sig.out_port_type(outp).unwrap().copyable() {
-                        let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
-                        if targets.len() != 1 {
-                            hugr.disconnect(n, outp);
-                            let src = Wire::new(n, outp);
-                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
-                        }
-                    }
-                }
-            }
-        }
-        Ok(changed)
     }
 
     fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ReplaceTypesError> {
@@ -472,8 +432,37 @@ impl ReplaceTypes {
                     false
                 }
             }),
-            Value::Function { hugr } => self.run_no_validate(&mut **hugr),
+            Value::Function { hugr } => self.run(&mut **hugr),
         }
+    }
+}
+
+impl ComposablePass for ReplaceTypes {
+    type Error = ReplaceTypesError;
+    type Result = bool;
+
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
+        let mut changed = false;
+        for n in hugr.nodes().collect::<Vec<_>>() {
+            changed |= self.change_node(hugr, n)?;
+            let new_dfsig = hugr.get_optype(n).dataflow_signature();
+            if let Some(new_sig) = new_dfsig
+                .filter(|_| changed && n != hugr.root())
+                .map(Cow::into_owned)
+            {
+                for outp in new_sig.output_ports() {
+                    if !new_sig.out_port_type(outp).unwrap().copyable() {
+                        let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
+                        if targets.len() != 1 {
+                            hugr.disconnect(n, outp);
+                            let src = Wire::new(n, outp);
+                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(changed)
     }
 }
 
@@ -532,29 +521,26 @@ mod test {
     use hugr_core::extension::prelude::{
         bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
     };
-    use hugr_core::extension::simple_op::MakeExtensionOp;
-    use hugr_core::extension::{TypeDefBound, Version};
-
-    use hugr_core::ops::constant::OpaqueValue;
-    use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
-    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
-    use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
+    use hugr_core::extension::{simple_op::MakeExtensionOp, TypeDefBound, Version};
+    use hugr_core::hugr::{IdentList, ValidationError};
+    use hugr_core::ops::{
+        constant::OpaqueValue, ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value,
+    };
+    use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
+    use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
         array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue,
     };
     use hugr_core::std_extensions::collections::list::{
         list_type, list_type_def, ListOp, ListValue,
     };
-
-    use hugr_core::hugr::ValidationError;
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
-    use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
+    use hugr_core::{type_row, Extension, HugrView};
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::validation::ValidatePassError;
+    use crate::ComposablePass;
 
-    use super::ReplaceTypesError;
     use super::{handlers::list_const, NodeTemplate, ReplaceTypes};
 
     const PACKED_VEC: &str = "PackedVec";
@@ -979,13 +965,16 @@ mod test {
             let cu = cst.value().downcast_ref::<ConstUsize>().unwrap();
             Ok(ConstInt::new_u(6, cu.value())?.into())
         });
+
+        let mut h = backup.clone();
+        repl.run(&mut h).unwrap(); // No validation here
         assert!(
-            matches!(repl.run(&mut backup.clone()), Err(ReplaceTypesError::ValidationError(ValidatePassError::OutputError {
-                err: ValidationError::IncompatiblePorts {from, to, ..}, ..
-            })) if backup.get_optype(from).is_const() && to == c.node())
+            matches!(h.validate(), Err(ValidationError::IncompatiblePorts {from, to, ..})
+             if backup.get_optype(from).is_const() && to == c.node())
         );
         repl.replace_consts_parametrized(array_type_def(), array_const);
         let mut h = backup;
-        repl.run(&mut h).unwrap(); // Includes validation
+        repl.run(&mut h).unwrap();
+        h.validate_no_extensions().unwrap();
     }
 }

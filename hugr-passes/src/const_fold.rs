@@ -21,12 +21,11 @@ use crate::dataflow::{
     TailLoopTermination,
 };
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::{composable::validate_if_test, ComposablePass};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
-    validation: ValidationLevel,
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
     ///   - a FuncDefn child of the root, if the root is a module; or
@@ -34,13 +33,10 @@ pub struct ConstantFoldPass {
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 /// Errors produced by [ConstantFoldPass].
 pub enum ConstFoldError {
-    #[error(transparent)]
-    #[allow(missing_docs)]
-    ValidationError(#[from] ValidatePassError),
     /// Error raised when a Node is specified as an entry-point but
     /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
     /// a [Conditional](OpType::Conditional).
@@ -49,12 +45,6 @@ pub enum ConstFoldError {
 }
 
 impl ConstantFoldPass {
-    /// Sets the validation level used before and after the pass is run
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
     /// Allows the pass to remove potentially-non-terminating [TailLoop]s and [CFG] if their
     /// result (if/when they do terminate) is either known or not needed.
     ///
@@ -86,9 +76,19 @@ impl ConstantFoldPass {
             .extend(inputs.into_iter().map(|(p, v)| (p.into(), v)));
         self
     }
+}
+
+impl ComposablePass for ConstantFoldPass {
+    type Error = ConstFoldError;
+    type Result = ();
 
     /// Run the Constant Folding pass.
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
+    ///
+    /// # Errors
+    ///
+    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
+    /// was of an invalid [OpType]
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
@@ -164,22 +164,9 @@ impl ConstantFoldPass {
                     }
                 })
             })
-            .run(hugr)?;
+            .run(hugr)
+            .map_err(|inf| match inf {})?; // TODO use into_ok when available
         Ok(())
-    }
-
-    /// Run the pass using this configuration.
-    ///
-    /// # Errors
-    ///
-    /// [ConstFoldError::ValidationError] if the Hugr does not validate before/afnerwards
-    /// (if [Self::validation_level] is set, or in tests)
-    ///
-    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
-    /// was of an invalid OpType
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 }
 
@@ -198,7 +185,7 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
     } else {
         c
     };
-    c.run(h).unwrap()
+    validate_if_test(c, h).unwrap()
 }
 
 struct ConstFoldContext;
