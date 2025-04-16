@@ -1088,7 +1088,7 @@ checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
 name = "hugr"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "bumpalo",
  "criterion",
@@ -1102,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "assert_cmd",
  "assert_fs",
@@ -1118,7 +1118,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "cgmath",
  "cool_asserts",
@@ -1156,7 +1156,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "anyhow",
  "delegate",
@@ -1175,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1199,7 +1199,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "ascent",
  "derive_more",
