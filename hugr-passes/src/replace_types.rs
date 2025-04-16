@@ -975,6 +975,6 @@ mod test {
         repl.replace_consts_parametrized(array_type_def(), array_const);
         let mut h = backup;
         repl.run(&mut h).unwrap();
-        h.validate().unwrap();
+        h.validate_no_extensions().unwrap();
     }
 }
