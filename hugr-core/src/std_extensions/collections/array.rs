@@ -178,7 +178,9 @@ lazy_static! {
     };
 }
 
-fn array_type_def() -> &'static TypeDef {
+/// Gets the [TypeDef] for arrays. Note that instantiations are more easily
+/// created via [array_type] and [array_type_parametric]
+pub fn array_type_def() -> &'static TypeDef {
     EXTENSION.get_type(&ARRAY_TYPENAME).unwrap()
 }
 
