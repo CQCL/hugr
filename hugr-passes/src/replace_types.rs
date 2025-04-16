@@ -597,6 +597,7 @@ mod test {
 
     use hugr_core::hugr::ValidationError;
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
+    use hugr_core::Hugr;
     use hugr_core::{hugr::IdentList, type_row, Extension, HugrView};
     use itertools::Itertools;
     use rstest::rstest;
@@ -664,30 +665,29 @@ mod test {
         )
     }
 
-    fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
-        fn lowered_read(args: &[TypeArg]) -> Option<NodeTemplate> {
-            let ty = just_elem_type(args);
-            let mut dfb = DFGBuilder::new(inout_sig(
-                vec![array_type(64, ty.clone()), i64_t()],
-                ty.clone(),
-            ))
+    fn lowered_read(args: &[TypeArg]) -> Hugr {
+        let ty = just_elem_type(args);
+        let mut dfb = DFGBuilder::new(inout_sig(
+            vec![array_type(64, ty.clone()), i64_t()],
+            ty.clone(),
+        ))
+        .unwrap();
+        let [val, idx] = dfb.input_wires_arr();
+        let [idx] = dfb
+            .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
+            .unwrap()
+            .outputs_arr();
+        let [opt] = dfb
+            .add_dataflow_op(ArrayOpDef::get.to_concrete(ty.clone(), 64), [val, idx])
+            .unwrap()
+            .outputs_arr();
+        let [res] = dfb
+            .build_unwrap_sum(1, option_type(Type::from(ty.clone())), opt)
             .unwrap();
-            let [val, idx] = dfb.input_wires_arr();
-            let [idx] = dfb
-                .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
-                .unwrap()
-                .outputs_arr();
-            let [opt] = dfb
-                .add_dataflow_op(ArrayOpDef::get.to_concrete(ty.clone(), 64), [val, idx])
-                .unwrap()
-                .outputs_arr();
-            let [res] = dfb
-                .build_unwrap_sum(1, option_type(Type::from(ty.clone())), opt)
-                .unwrap();
-            Some(NodeTemplate::CompoundOp(Box::new(
-                dfb.finish_hugr_with_outputs([res]).unwrap(),
-            )))
-        }
+        dfb.finish_hugr_with_outputs([res]).unwrap()
+    }
+
+    fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
         let pv = ext.get_type(PACKED_VEC).unwrap();
         let mut lw = ReplaceTypes::default();
         lw.replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
@@ -703,7 +703,9 @@ mod test {
                     .into(),
             ),
         );
-        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), Box::new(lowered_read));
+        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args| {
+            Some(NodeTemplate::CompoundOp(Box::new(lowered_read(type_args))))
+        });
         lw
     }
 
