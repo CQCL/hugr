@@ -579,18 +579,17 @@ mod test {
         FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
     use hugr_core::extension::prelude::{
-        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
+        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder, PRELUDE_ID,
     };
-    use hugr_core::extension::simple_op::MakeExtensionOp;
-    use hugr_core::extension::{TypeDefBound, Version};
+    use hugr_core::extension::{simple_op::MakeExtensionOp, ExtensionSet, TypeDefBound, Version};
 
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::constant::OpaqueValue;
     use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
-    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
-    use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
+    use hugr_core::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
+    use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
-        array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue,
+        self, array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue,
     };
     use hugr_core::std_extensions::collections::list::{
         list_type, list_type_def, ListOp, ListValue,
@@ -669,10 +668,15 @@ mod test {
         elem_ty: Type,
         new: impl Fn(Signature) -> Result<T, BuildError>,
     ) -> T {
-        let mut dfb = new(inout_sig(
+        let mut dfb = new(Signature::new(
             vec![array_type(64, elem_ty.clone()), i64_t()],
             elem_ty.clone(),
-        ))
+        )
+        .with_extension_delta(ExtensionSet::from_iter([
+            PRELUDE_ID,
+            array::EXTENSION_ID,
+            conversions::EXTENSION_ID,
+        ])))
         .unwrap();
         let [val, idx] = dfb.input_wires_arr();
         let [idx] = dfb
