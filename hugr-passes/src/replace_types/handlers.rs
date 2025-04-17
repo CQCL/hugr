@@ -4,15 +4,17 @@
 use hugr_core::builder::{endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{option_type, UnwrapBuilder};
 use hugr_core::extension::ExtensionSet;
+use hugr_core::ops::constant::CustomConst;
 use hugr_core::ops::{constant::OpaqueValue, Value};
 use hugr_core::ops::{OpTrait, OpType, Tag};
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use hugr_core::std_extensions::collections::array::{
-    array_type, ArrayOpDef, ArrayRepeat, ArrayScan, ArrayValue,
-};
+use hugr_core::std_extensions::collections::array::{Array, ArrayKind, GenericArrayValue};
 use hugr_core::std_extensions::collections::list::ListValue;
+use hugr_core::std_extensions::collections::value_array::{
+    value_array_type, VArrayOpDef, VArrayRepeat, VArrayScan, ValueArray,
+};
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{type_row, Hugr, HugrView};
 use itertools::Itertools;
@@ -44,14 +46,17 @@ pub fn list_const(
     Ok(Some(ListValue::new(elem_t, vals).into()))
 }
 
-/// Handler for [ArrayValue] constants that recursively
+/// Handler for [GenericArrayValue] constants that recursively
 /// [ReplaceTypes::change_value]s the elements of the list.
 /// Included in [ReplaceTypes::default].
-pub fn array_const(
+pub fn generic_array_const<AK: ArrayKind>(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
-) -> Result<Option<Value>, ReplaceTypesError> {
-    let Some(av) = val.value().downcast_ref::<ArrayValue>() else {
+) -> Result<Option<Value>, ReplaceTypesError>
+where
+    GenericArrayValue<AK>: CustomConst,
+{
+    let Some(av) = val.value().downcast_ref::<GenericArrayValue<AK>>() else {
         return Ok(None);
     };
     let mut elem_t = av.get_element_type().clone();
@@ -64,18 +69,42 @@ pub fn array_const(
     for v in vals.iter_mut() {
         repl.change_value(v)?;
     }
-    Ok(Some(ArrayValue::new(elem_t, vals).into()))
+    Ok(Some(GenericArrayValue::<AK>::new(elem_t, vals).into()))
+}
+
+/// Handler for [ArrayValue] constants that recursively
+/// [ReplaceTypes::change_value]s the elements of the list.
+/// Included in [ReplaceTypes::default].
+///
+/// [ArrayValue]: hugr_core::std_extensions::collections::array::ArrayValue
+pub fn array_const(
+    val: &OpaqueValue,
+    repl: &ReplaceTypes,
+) -> Result<Option<Value>, ReplaceTypesError> {
+    generic_array_const::<Array>(val, repl)
+}
+
+/// Handler for [VArrayValue] constants that recursively
+/// [ReplaceTypes::change_value]s the elements of the list.
+/// Included in [ReplaceTypes::default].
+///
+/// [VArrayValue]: hugr_core::std_extensions::collections::value_array::VArrayValue
+pub fn value_array_const(
+    val: &OpaqueValue,
+    repl: &ReplaceTypes,
+) -> Result<Option<Value>, ReplaceTypesError> {
+    generic_array_const::<ValueArray>(val, repl)
 }
 
 fn runtime_reqs(h: &Hugr) -> ExtensionSet {
     h.signature(h.root()).unwrap().runtime_reqs.clone()
 }
 
-/// Handler for copying/discarding arrays if their elements have become linear.
+/// Handler for copying/discarding value arrays if their elements have become linear.
 /// Included in [ReplaceTypes::default] and [DelegatingLinearizer::default].
 ///
 /// [DelegatingLinearizer::default]: super::DelegatingLinearizer::default
-pub fn linearize_array(
+pub fn linearize_value_array(
     args: &[TypeArg],
     num_outports: usize,
     lin: &CallbackHandler,
@@ -97,8 +126,8 @@ pub fn linearize_array(
             dfb.finish_hugr_with_outputs([ret]).unwrap()
         };
         // Now array.scan that over the input array to get an array of unit (which can be discarded)
-        let array_scan = ArrayScan::new(ty.clone(), Type::UNIT, vec![], *n, runtime_reqs(&map_fn));
-        let in_type = array_type(*n, ty.clone());
+        let array_scan = VArrayScan::new(ty.clone(), Type::UNIT, vec![], *n, runtime_reqs(&map_fn));
+        let in_type = value_array_type(*n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
             let [in_array] = dfb.input_wires_arr();
@@ -113,7 +142,7 @@ pub fn linearize_array(
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
     let num_new = num_outports - 1;
-    let array_ty = array_type(*n, ty.clone());
+    let array_ty = value_array_type(*n, ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
         array_ty.clone(),
         vec![array_ty.clone(); num_outports],
@@ -132,7 +161,7 @@ pub fn linearize_array(
             dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
         };
         let repeats =
-            vec![ArrayRepeat::new(option_ty.clone(), *n, runtime_reqs(&fn_none)); num_new];
+            vec![VArrayRepeat::new(option_ty.clone(), *n, runtime_reqs(&fn_none)); num_new];
         let fn_none = dfb.add_load_value(Value::function(fn_none).unwrap());
         repeats
             .into_iter()
@@ -146,7 +175,7 @@ pub fn linearize_array(
     // 2. use a scan through the input array, copying the element num_outputs times;
     // return the first copy, and put each of the other copies into one of the array<option>
     let i64_t = INT_TYPES[6].to_owned();
-    let option_array = array_type(*n, option_ty.clone());
+    let option_array = value_array_type(*n, option_ty.clone());
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];
         io.extend(vec![option_array.clone(); num_new]);
@@ -167,7 +196,7 @@ pub fn linearize_array(
         let copy0 = copies.next().unwrap(); // We'll return this directly
 
         // Wrap each remaining copy into an option
-        let set_op = OpType::from(ArrayOpDef::set.to_concrete(option_ty.clone(), *n));
+        let set_op = OpType::from(VArrayOpDef::set.to_concrete(option_ty.clone(), *n));
         let either_st = set_op.dataflow_signature().unwrap().output[0]
             .as_sum()
             .unwrap()
@@ -205,7 +234,7 @@ pub fn linearize_array(
             .unwrap()
     };
     let [in_array] = dfb.input_wires_arr();
-    let scan1 = ArrayScan::new(
+    let scan1 = VArrayScan::new(
         ty.clone(),
         ty.clone(),
         std::iter::once(i64_t)
@@ -240,7 +269,7 @@ pub fn linearize_array(
         dfb.finish_hugr_with_outputs([val]).unwrap()
     };
 
-    let unwrap_scan = ArrayScan::new(
+    let unwrap_scan = VArrayScan::new(
         option_ty.clone(),
         ty.clone(),
         vec![],

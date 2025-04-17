@@ -101,6 +101,18 @@ pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     *t == Default::default()
 }
 
+/// An empty type.
+///
+/// # Example
+///
+/// ```ignore
+/// fn foo(never: Never) -> ! {
+///     match never {}
+/// }
+/// ```
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum Never {}
+
 #[cfg(test)]
 pub(crate) mod test_quantum_extension {
     use std::sync::Arc;
