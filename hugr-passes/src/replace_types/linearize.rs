@@ -135,6 +135,7 @@ pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum LinearizeError {
     #[error("Need copy/discard op for {_0}")]
     NeedCopyDiscard(Type),

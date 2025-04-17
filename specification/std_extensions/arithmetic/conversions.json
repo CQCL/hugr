@@ -6,7 +6,6 @@
     "arithmetic.int.types"
   ],
   "types": {},
-  "values": {},
   "operations": {
     "bytecast_float64_to_int64": {
       "extension": "arithmetic.conversions",

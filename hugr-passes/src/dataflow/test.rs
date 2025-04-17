@@ -1,10 +1,12 @@
+use std::convert::Infallible;
+
 use ascent::{lattice::BoundedLattice, Lattice};
 
-use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder};
+use hugr_core::builder::{inout_sig, CFGBuilder, Container, DataflowHugr, ModuleBuilder};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::handle::DfgID;
-use hugr_core::ops::TailLoop;
-use hugr_core::types::TypeRow;
+use hugr_core::ops::{CallIndirect, TailLoop};
+use hugr_core::types::{ConstTypeError, TypeRow};
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -19,7 +21,10 @@ use hugr_core::{
 use hugr_core::{Hugr, Node, Wire};
 use rstest::{fixture, rstest};
 
-use super::{AbstractValue, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination};
+use super::{
+    AbstractValue, AsConcrete, ConstLoader, DFContext, LoadedFunction, Machine, PartialValue, Sum,
+    TailLoopTermination,
+};
 
 // ------- Minimal implementation of DFContext and AbstractValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -35,9 +40,21 @@ impl ConstLoader<Void> for TestContext {
 impl DFContext<Void> for TestContext {}
 
 // This allows testing creation of tuple/sum Values (only)
-impl From<Void> for Value {
-    fn from(v: Void) -> Self {
+impl<N> AsConcrete<Void, N> for Value {
+    type ValErr = Infallible;
+
+    type SumErr = ConstTypeError;
+
+    fn from_value(v: Void) -> Result<Self, Infallible> {
         match v {}
+    }
+
+    fn from_sum(value: Sum<Self>) -> Result<Self, Self::SumErr> {
+        Self::sum(value.tag, value.values, value.st)
+    }
+
+    fn from_func(func: LoadedFunction<N>) -> Result<Self, crate::dataflow::LoadedFunction<N>> {
+        Err(func)
     }
 }
 
@@ -295,9 +312,7 @@ fn test_conditional() {
 
     let cond_r1: Value = results.try_read_wire_concrete(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
-    assert!(results
-        .try_read_wire_concrete::<Value, _, _>(cond_o2)
-        .is_err());
+    assert!(results.try_read_wire_concrete::<Value>(cond_o2).is_err());
 
     assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
     assert_eq!(results.case_reachable(case2.node()), Some(true));
@@ -546,4 +561,79 @@ fn test_module() {
             Some(pv_true_or_false())
         );
     }
+}
+
+#[rstest]
+#[case(pv_false(), pv_false())]
+#[case(pv_false(), pv_true())]
+#[case(pv_true(), pv_false())]
+#[case(pv_true(), pv_true())]
+fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
+    let b2b = || Signature::new_endo(bool_t());
+    let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
+
+    let [id1, id2] = ["id1", "[id2]"].map(|name| {
+        let fb = dfb.define_function(name, b2b()).unwrap();
+        let [inp] = fb.input_wires_arr();
+        fb.finish_with_outputs([inp]).unwrap()
+    });
+
+    let [inp_direct, which, inp_indirect] = dfb.input_wires_arr();
+    let [res1] = dfb
+        .call(id1.handle(), &[], [inp_direct])
+        .unwrap()
+        .outputs_arr();
+
+    // We'll unconditionally load both functions, to demonstrate that it's
+    // the CallIndirect that matters, not just which functions are loaded.
+    let lf1 = dfb.load_func(id1.handle(), &[]).unwrap();
+    let lf2 = dfb.load_func(id2.handle(), &[]).unwrap();
+    let bool_func = || Type::new_function(b2b());
+    let mut cond = dfb
+        .conditional_builder(
+            (vec![type_row![]; 2], which),
+            [(bool_func(), lf1), (bool_func(), lf2)],
+            bool_func().into(),
+        )
+        .unwrap();
+    let case_false = cond.case_builder(0).unwrap();
+    let [f0, _f1] = case_false.input_wires_arr();
+    case_false.finish_with_outputs([f0]).unwrap();
+    let case_true = cond.case_builder(1).unwrap();
+    let [_f0, f1] = case_true.input_wires_arr();
+    case_true.finish_with_outputs([f1]).unwrap();
+    let [tgt] = cond.finish_sub_container().unwrap().outputs_arr();
+    let [res2] = dfb
+        .add_dataflow_op(CallIndirect { signature: b2b() }, [tgt, inp_indirect])
+        .unwrap()
+        .outputs_arr();
+    let h = dfb.finish_hugr_with_outputs([res1, res2]).unwrap();
+
+    let run = |which| {
+        Machine::new(&h).run(
+            TestContext,
+            [
+                (0.into(), inp1.clone()),
+                (1.into(), which),
+                (2.into(), inp2.clone()),
+            ],
+        )
+    };
+    let (w1, w2) = (Wire::new(h.root(), 0), Wire::new(h.root(), 1));
+
+    // 1. Test with `which` unknown -> second output unknown
+    let results = run(PartialValue::Top);
+    assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+    assert_eq!(results.read_out_wire(w2), Some(PartialValue::Top));
+
+    // 2. Test with `which` selecting second function -> both passthrough
+    let results = run(pv_true());
+    assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+    assert_eq!(results.read_out_wire(w2), Some(inp2.clone()));
+
+    //3. Test with `which` selecting first function -> alias
+    let results = run(pv_false());
+    let out = Some(inp1.join(inp2));
+    assert_eq!(results.read_out_wire(w1), out);
+    assert_eq!(results.read_out_wire(w2), out);
 }
