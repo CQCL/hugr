@@ -1,11 +1,11 @@
 {
   "version": "0.1.0",
-  "name": "collections.array",
+  "name": "collections.value_array",
   "runtime_reqs": [],
   "types": {
-    "array": {
-      "extension": "collections.array",
-      "name": "array",
+    "value_array": {
+      "extension": "collections.value_array",
+      "name": "value_array",
       "params": [
         {
           "tp": "BoundedNat",
@@ -16,162 +16,19 @@
           "b": "A"
         }
       ],
-      "description": "Fixed-length array",
+      "description": "Fixed-length value array",
       "bound": {
-        "b": "Explicit",
-        "bound": "A"
+        "b": "FromParams",
+        "indices": [
+          1
+        ]
       }
     }
   },
   "values": {},
   "operations": {
-    "clone": {
-      "extension": "collections.array",
-      "name": "clone",
-      "description": "Clones an array with copyable elements",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "C"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "C"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "C"
-                  }
-                }
-              ],
-              "bound": "A"
-            },
-            {
-              "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "C"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ],
-          "runtime_reqs": []
-        }
-      },
-      "binary": false
-    },
-    "discard": {
-      "extension": "collections.array",
-      "name": "discard",
-      "description": "Discards an array with copyable elements",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "C"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "C"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ],
-          "output": [],
-          "runtime_reqs": []
-        }
-      },
-      "binary": false
-    },
     "discard_empty": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "discard_empty",
       "description": "Discard an empty array",
       "signature": {
@@ -185,8 +42,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "BoundedNat",
@@ -210,10 +67,10 @@
       },
       "binary": false
     },
-    "get": {
-      "extension": "collections.array",
-      "name": "get",
-      "description": "Get an element from an array",
+    "from_array": {
+      "extension": "collections.value_array",
+      "name": "from_array",
+      "description": "Turns `array` into `value_array`",
       "signature": {
         "params": [
           {
@@ -222,7 +79,7 @@
           },
           {
             "tp": "Type",
-            "b": "C"
+            "b": "A"
           }
         ],
         "body": {
@@ -245,11 +102,84 @@
                   "ty": {
                     "t": "V",
                     "i": 1,
-                    "b": "C"
+                    "b": "A"
                   }
                 }
               ],
               "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "get": {
+      "extension": "collections.value_array",
+      "name": "get",
+      "description": "Get an element from an array",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
             },
             {
               "t": "I"
@@ -277,28 +207,28 @@
       "binary": false
     },
     "new_array": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "new_array",
       "description": "Create a new array from elements",
       "signature": null,
       "binary": true
     },
     "pop_left": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "pop_left",
       "description": "Pop an element from the left of an array",
       "signature": null,
       "binary": true
     },
     "pop_right": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "pop_right",
       "description": "Pop an element from the right of an array",
       "signature": null,
       "binary": true
     },
     "repeat": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "repeat",
       "description": "Creates a new array whose elements are initialised by calling the given function n times",
       "signature": {
@@ -335,8 +265,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -364,7 +294,7 @@
       "binary": false
     },
     "scan": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "scan",
       "description": "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.",
       "signature": {
@@ -396,8 +326,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -457,8 +387,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -491,7 +421,7 @@
       "binary": false
     },
     "set": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "set",
       "description": "Set an element in an array",
       "signature": {
@@ -509,8 +439,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -553,8 +483,8 @@
                   },
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -584,8 +514,8 @@
                   },
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -616,7 +546,7 @@
       "binary": false
     },
     "swap": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "swap",
       "description": "Swap two elements in an array",
       "signature": {
@@ -634,8 +564,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -671,8 +601,8 @@
                 [
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -697,8 +627,8 @@
                 [
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -721,6 +651,79 @@
                   }
                 ]
               ]
+            }
+          ],
+          "runtime_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "to_array": {
+      "extension": "collections.value_array",
+      "name": "to_array",
+      "description": "Turns `value_array` into `array`",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
             }
           ],
           "runtime_reqs": []
