@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::iter::repeat;
 use std::{collections::HashMap, sync::Arc};
 
@@ -185,8 +184,10 @@ impl DelegatingLinearizer {
     ///
     /// * [LinearizeError::CopyableType] If `typ` is
     ///   [Copyable](hugr_core::types::TypeBound::Copyable)
-    /// * [LinearizeError::WrongSignature] if `copy` or `discard` do not have the
-    ///   expected inputs or outputs
+    /// * [LinearizeError::WrongSignature] if `copy` or `discard` do not have the expected
+    ///   inputs or outputs (for [NodeTemplate::SingleOp] and [NodeTemplate::CompoundOp]
+    ///   only: the signature for a [NodeTemplate::Call] cannot be checked until it is used
+    ///   in a Hugr).
     pub fn register_simple(
         &mut self,
         cty: CustomType,
@@ -230,18 +231,12 @@ impl DelegatingLinearizer {
 }
 
 fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(), LinearizeError> {
-    let sig = tmpl.signature();
-    if sig.as_ref().is_some_and(|sig| {
-        sig.io() == (&typ.clone().into(), &vec![typ.clone(); num_outports].into())
-    }) {
-        Ok(())
-    } else {
-        Err(LinearizeError::WrongSignature {
+    tmpl.check_signature(&typ.clone().into(), &vec![typ.clone(); num_outports].into())
+        .map_err(|sig| LinearizeError::WrongSignature {
             typ: typ.clone(),
             num_outports,
-            sig: sig.map(Cow::into_owned),
+            sig,
         })
-    }
 }
 
 impl Linearizer for DelegatingLinearizer {
