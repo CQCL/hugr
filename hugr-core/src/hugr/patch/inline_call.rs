@@ -2,40 +2,41 @@
 //! into a DFG which replaces the Call node.
 use derive_more::{Display, Error};
 
+use crate::core::HugrNode;
 use crate::ops::{DataflowParent, OpType, DFG};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
 
-use super::{HugrMut, Rewrite};
+use super::{ApplyPatchHugrMut, HugrMut, VerifyPatch};
 
 /// Rewrite to inline a [Call](OpType::Call) to a known [FuncDefn](OpType::FuncDefn)
-pub struct InlineCall(Node);
+pub struct InlineCall<N = Node>(N);
 
 /// Error in performing [InlineCall] rewrite.
 #[derive(Clone, Debug, Display, Error, PartialEq)]
 #[non_exhaustive]
-pub enum InlineCallError {
+pub enum InlineCallError<N = Node> {
     /// The specified Node was not a [Call](OpType::Call)
     #[display("Node to inline {_0} expected to be a Call but actually {_1}")]
-    NotCallNode(Node, OpType),
+    NotCallNode(N, OpType),
     /// The node was a Call, but the target was not a [FuncDefn](OpType::FuncDefn)
     /// - presumably a [FuncDecl](OpType::FuncDecl), if the Hugr is valid.
     #[display("Call targetted node {_0} which must be a FuncDefn but was {_1}")]
-    CallTargetNotFuncDefn(Node, OpType),
+    CallTargetNotFuncDefn(N, OpType),
 }
 
-impl InlineCall {
+impl<N> InlineCall<N> {
     /// Create a new instance that will inline the specified node
     /// (i.e. that should be a [Call](OpType::Call))
-    pub fn new(node: Node) -> Self {
+    pub fn new(node: N) -> Self {
         Self(node)
     }
 }
 
-impl Rewrite for InlineCall {
-    type ApplyResult = ();
-    type Error = InlineCallError;
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
+impl<N: HugrNode> VerifyPatch for InlineCall<N> {
+    type Error = InlineCallError<N>;
+    type Node = N;
+    fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
         let call_ty = h.get_optype(self.0);
         if !call_ty.is_call() {
             return Err(InlineCallError::NotCallNode(self.0, call_ty.clone()));
@@ -51,7 +52,14 @@ impl Rewrite for InlineCall {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+        Some(self.0).into_iter()
+    }
+}
+
+impl ApplyPatchHugrMut for InlineCall {
+    type Outcome = ();
+    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
 
@@ -99,10 +107,6 @@ impl Rewrite for InlineCall {
     /// Failure only occurs if the node is not a Call, or the target not a FuncDefn.
     /// (Any later failure means an invalid Hugr and `panic`.)
     const UNCHANGED_ON_FAILURE: bool = true;
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        Some(self.0).into_iter()
-    }
 }
 
 #[cfg(test)]

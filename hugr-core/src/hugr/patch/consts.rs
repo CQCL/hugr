@@ -2,11 +2,11 @@
 
 use std::iter;
 
-use crate::{hugr::HugrMut, HugrView, Node};
+use crate::{core::HugrNode, hugr::HugrMut, HugrView, Node};
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::Rewrite;
+use super::{ApplyPatchHugrMut, VerifyPatch};
 
 /// Remove a [`crate::ops::LoadConstant`] node with no consumers.
 #[derive(Debug, Clone)]
@@ -15,24 +15,20 @@ pub struct RemoveLoadConstant<N = Node>(pub N);
 /// Error from an [`RemoveConst`] or [`RemoveLoadConstant`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum RemoveError {
+pub enum RemoveError<N = Node> {
     /// Invalid node.
     #[error("Node is invalid (either not in HUGR or not correct operation).")]
-    InvalidNode(Node),
+    InvalidNode(N),
     /// Node in use.
     #[error("Node: {0} has non-zero outgoing connections.")]
-    ValueUsed(Node),
+    ValueUsed(N),
 }
 
-impl Rewrite for RemoveLoadConstant {
-    type Error = RemoveError;
+impl<N: HugrNode> VerifyPatch for RemoveLoadConstant<N> {
+    type Error = RemoveError<N>;
+    type Node = N;
 
-    // The Const node the LoadConstant was connected to.
-    type ApplyResult = Node;
-
-    const UNCHANGED_ON_FAILURE: bool = true;
-
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
         let node = self.0;
 
         if (!h.contains_node(node)) || (!h.get_optype(node).is_load_constant()) {
@@ -50,7 +46,17 @@ impl Rewrite for RemoveLoadConstant {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+        iter::once(self.0)
+    }
+}
+
+impl ApplyPatchHugrMut for RemoveLoadConstant {
+    // The Const node the LoadConstant was connected to.
+    type Outcome = Node;
+
+    const UNCHANGED_ON_FAILURE: bool = true;
+    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let node = self.0;
         let source = h
@@ -62,25 +68,17 @@ impl Rewrite for RemoveLoadConstant {
 
         Ok(source)
     }
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        iter::once(self.0)
-    }
 }
 
 /// Remove a [`crate::ops::Const`] node with no outputs.
 #[derive(Debug, Clone)]
-pub struct RemoveConst(pub Node);
+pub struct RemoveConst<N = Node>(pub N);
 
-impl Rewrite for RemoveConst {
-    type Error = RemoveError;
+impl<N: HugrNode> VerifyPatch for RemoveConst<N> {
+    type Node = N;
+    type Error = RemoveError<N>;
 
-    // The parent of the Const node.
-    type ApplyResult = Node;
-
-    const UNCHANGED_ON_FAILURE: bool = true;
-
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
         let node = self.0;
 
         if (!h.contains_node(node)) || (!h.get_optype(node).is_const()) {
@@ -94,7 +92,18 @@ impl Rewrite for RemoveConst {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+        iter::once(self.0)
+    }
+}
+
+impl ApplyPatchHugrMut for RemoveConst {
+    // The parent of the Const node.
+    type Outcome = Node;
+
+    const UNCHANGED_ON_FAILURE: bool = true;
+
+    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let node = self.0;
         let parent = h
@@ -103,10 +112,6 @@ impl Rewrite for RemoveConst {
         h.remove_node(node);
 
         Ok(parent)
-    }
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        iter::once(self.0)
     }
 }
 

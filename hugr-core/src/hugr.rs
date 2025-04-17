@@ -4,7 +4,7 @@ pub mod hugrmut;
 
 pub(crate) mod ident;
 pub mod internal;
-pub mod rewrite;
+pub mod patch;
 pub mod serialize;
 pub mod validate;
 pub mod views;
@@ -17,7 +17,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 pub use ident::{IdentList, InvalidIdentifier};
-pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
+pub use patch::{ApplyPatch, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
 use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};

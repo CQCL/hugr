@@ -9,22 +9,22 @@ use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{HugrView, IncomingPort};
 
-use super::Rewrite;
+use super::{ApplyPatchHugrMut, VerifyPatch};
 
 use thiserror::Error;
 
 /// Specification of a identity-insertion operation.
 #[derive(Debug, Clone)]
-pub struct IdentityInsertion {
+pub struct IdentityInsertion<N = Node> {
     /// The node following the identity to be inserted.
-    pub post_node: Node,
+    pub post_node: N,
     /// The port following the identity to be inserted.
     pub post_port: IncomingPort,
 }
 
-impl IdentityInsertion {
+impl<N> IdentityInsertion<N> {
     /// Create a new [`IdentityInsertion`] specification.
-    pub fn new(post_node: Node, post_port: IncomingPort) -> Self {
+    pub fn new(post_node: N, post_port: IncomingPort) -> Self {
         Self {
             post_node,
             post_port,
@@ -47,11 +47,10 @@ pub enum IdentityInsertionError {
     InvalidPortKind(Option<EdgeKind>),
 }
 
-impl Rewrite for IdentityInsertion {
+impl<N: Copy> VerifyPatch for IdentityInsertion<N> {
     type Error = IdentityInsertionError;
-    /// The inserted node.
-    type ApplyResult = Node;
-    const UNCHANGED_ON_FAILURE: bool = true;
+    type Node = N;
+
     fn verify(&self, _h: &impl HugrView) -> Result<(), IdentityInsertionError> {
         /*
         Assumptions:
@@ -65,7 +64,20 @@ impl Rewrite for IdentityInsertion {
 
         unimplemented!()
     }
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, IdentityInsertionError> {
+
+    #[inline]
+    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+        iter::once(self.post_node)
+    }
+}
+
+impl ApplyPatchHugrMut for IdentityInsertion {
+    /// The inserted node.
+    type Outcome = Node;
+
+    const UNCHANGED_ON_FAILURE: bool = true;
+
+    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, IdentityInsertionError> {
         let kind = h.get_optype(self.post_node).port_kind(self.post_port);
         let Some(EdgeKind::Value(ty)) = kind else {
             return Err(IdentityInsertionError::InvalidPortKind(kind));
@@ -87,11 +99,6 @@ impl Rewrite for IdentityInsertion {
 
         h.connect(new_node, 0, self.post_node, self.post_port);
         Ok(new_node)
-    }
-
-    #[inline]
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        iter::once(self.post_node)
     }
 }
 

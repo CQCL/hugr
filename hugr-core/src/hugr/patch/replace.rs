@@ -5,29 +5,30 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use itertools::Itertools;
 use thiserror::Error;
 
+use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::HugrMut;
 use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
-use super::Rewrite;
+use super::{ApplyPatchHugrMut, VerifyPatch};
 
 /// Specifies how to create a new edge.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NewEdgeSpec {
+pub struct NewEdgeSpec<SrcNode, TgtNode> {
     /// The source of the new edge. For [Replacement::mu_inp] and [Replacement::mu_new], this is in the
     /// existing Hugr; for edges in [Replacement::mu_out] this is in the [Replacement::replacement]
-    pub src: Node,
+    pub src: SrcNode,
     /// The target of the new edge. For [Replacement::mu_inp], this is in the [Replacement::replacement];
     /// for edges in [Replacement::mu_out] and [Replacement::mu_new], this is in the existing Hugr.
-    pub tgt: Node,
+    pub tgt: TgtNode,
     /// The kind of edge to create, and any port specifiers required
     pub kind: NewEdgeKind,
 }
 
 /// Describes an edge that should be created between two nodes already given
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NewEdgeKind {
     /// An [EdgeKind::StateOrder] edge (between DFG nodes only)
     Order,
@@ -54,12 +55,12 @@ pub enum NewEdgeKind {
 
 /// Specification of a `Replace` operation
 #[derive(Debug, Clone, PartialEq)]
-pub struct Replacement {
+pub struct Replacement<HostNode = Node> {
     /// The nodes to remove from the existing Hugr (known as Gamma).
     /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
     /// Must be non-empty - otherwise there is no parent under which to place [Self::replacement],
     /// and there would be no possible [Self::mu_inp], [Self::mu_out] or [Self::adoptions].
-    pub removal: Vec<Node>,
+    pub removal: Vec<HostNode>,
     /// A hugr (not necessarily valid, as it may be missing edges and/or nodes), whose root
     /// is the same type as the root of [Self::replacement].  "G" in the spec.
     pub replacement: Hugr,
@@ -69,25 +70,25 @@ pub struct Replacement {
     /// The keys are the new parents for the children of the values.  Note no value may be ancestor or
     /// descendant of another.  This is "B" in the spec; "R" is the set of descendants of [Self::removal]
     ///  that are not descendants of values here.
-    pub adoptions: HashMap<Node, Node>,
+    pub adoptions: HashMap<Node, HostNode>,
     /// Edges from nodes in the existing Hugr that are not removed ([NewEdgeSpec::src] in Gamma\R)
     /// to inserted nodes ([NewEdgeSpec::tgt] in [Self::replacement]).
-    pub mu_inp: Vec<NewEdgeSpec>,
+    pub mu_inp: Vec<NewEdgeSpec<HostNode, Node>>,
     /// Edges from inserted nodes ([NewEdgeSpec::src] in [Self::replacement]) to existing nodes not removed
     /// ([NewEdgeSpec::tgt] in Gamma \ R).
-    pub mu_out: Vec<NewEdgeSpec>,
+    pub mu_out: Vec<NewEdgeSpec<Node, HostNode>>,
     /// Edges to add between existing nodes (both [NewEdgeSpec::src] and [NewEdgeSpec::tgt] in Gamma \ R).
     /// For example, in cases where the source had an edge to a removed node, and the target had an
     /// edge from a removed node, this would allow source to be directly connected to target.
-    pub mu_new: Vec<NewEdgeSpec>,
+    pub mu_new: Vec<NewEdgeSpec<HostNode, HostNode>>,
 }
 
-impl NewEdgeSpec {
-    fn check_src(
+impl<SrcNode: Copy, TgtNode: Copy> NewEdgeSpec<SrcNode, TgtNode> {
+    fn check_src<HostNode>(
         &self,
-        h: &impl HugrView<Node = Node>,
-        err_spec: &NewEdgeSpec,
-    ) -> Result<(), ReplaceError> {
+        h: &impl HugrView<Node = SrcNode>,
+        err_spec: NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
+    ) -> Result<(), ReplaceError<HostNode>> {
         let optype = h.get_optype(self.src);
         let ok = match self.kind {
             NewEdgeKind::Order => optype.other_output() == Some(EdgeKind::StateOrder),
@@ -103,13 +104,14 @@ impl NewEdgeSpec {
             }
         };
         ok.then_some(())
-            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Outgoing, err_spec.clone()))
+            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Outgoing, err_spec))
     }
-    fn check_tgt(
+
+    fn check_tgt<HostNode>(
         &self,
-        h: &impl HugrView<Node = Node>,
-        err_spec: &NewEdgeSpec,
-    ) -> Result<(), ReplaceError> {
+        h: &impl HugrView<Node = TgtNode>,
+        err_spec: NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
+    ) -> Result<(), ReplaceError<HostNode>> {
         let optype = h.get_optype(self.tgt);
         let ok = match self.kind {
             NewEdgeKind::Order => optype.other_input() == Some(EdgeKind::StateOrder),
@@ -126,18 +128,20 @@ impl NewEdgeSpec {
             ),
         };
         ok.then_some(())
-            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Incoming, err_spec.clone()))
+            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Incoming, err_spec))
     }
+}
 
+impl<HostNode: HugrNode, N> NewEdgeSpec<N, HostNode> {
     fn check_existing_edge(
         &self,
-        h: &impl HugrView<Node = Node>,
-        legal_src_ancestors: &HashSet<Node>,
-        err_edge: impl Fn() -> NewEdgeSpec,
-    ) -> Result<(), ReplaceError> {
+        h: &impl HugrView<Node = HostNode>,
+        legal_src_ancestors: &HashSet<HostNode>,
+        err_edge: impl Fn() -> NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
+    ) -> Result<(), ReplaceError<HostNode>> {
         if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
         {
-            let descends_from_legal = |mut descendant: Node| -> bool {
+            let descends_from_legal = |mut descendant: HostNode| -> bool {
                 while !legal_src_ancestors.contains(&descendant) {
                     let Some(p) = h.get_parent(descendant) else {
                         return false;
@@ -157,8 +161,11 @@ impl NewEdgeSpec {
     }
 }
 
-impl Replacement {
-    fn check_parent(&self, h: &impl HugrView<Node = Node>) -> Result<Node, ReplaceError> {
+impl<HostNode: HugrNode> Replacement<HostNode> {
+    fn check_parent(
+        &self,
+        h: &impl HugrView<Node = HostNode>,
+    ) -> Result<HostNode, ReplaceError<HostNode>> {
         let parent = self
             .removal
             .iter()
@@ -183,8 +190,8 @@ impl Replacement {
 
     fn get_removed_nodes(
         &self,
-        h: &impl HugrView<Node = Node>,
-    ) -> Result<HashSet<Node>, ReplaceError> {
+        h: &impl HugrView<Node = HostNode>,
+    ) -> Result<HashSet<HostNode>, ReplaceError<HostNode>> {
         // Check the keys of the transfer map too, the values we'll use imminently
         self.adoptions.keys().try_for_each(|&n| {
             (self.replacement.contains_node(n)
@@ -193,7 +200,7 @@ impl Replacement {
             .then_some(())
             .ok_or(ReplaceError::InvalidAdoptingParent(n))
         })?;
-        let mut transferred: HashSet<Node> = self.adoptions.values().copied().collect();
+        let mut transferred: HashSet<_> = self.adoptions.values().copied().collect();
         if transferred.len() != self.adoptions.values().len() {
             return Err(ReplaceError::AdopteesNotSeparateDescendants(
                 self.adoptions
@@ -221,68 +228,101 @@ impl Replacement {
         Ok(removed)
     }
 }
-impl Rewrite for Replacement {
-    type Error = ReplaceError;
 
-    /// Map from Node in replacement to corresponding Node in the result Hugr
-    type ApplyResult = HashMap<Node, Node>;
+impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
+    type Error = ReplaceError<HostNode>;
+    type Node = HostNode;
 
-    const UNCHANGED_ON_FAILURE: bool = false;
-
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = HostNode>) -> Result<(), Self::Error> {
         self.check_parent(h)?;
         let removed = self.get_removed_nodes(h)?;
         // Edge sources...
-        for e in self.mu_inp.iter().chain(self.mu_new.iter()) {
+        for e in self.mu_inp.iter() {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
                 return Err(ReplaceError::BadEdgeSpec(
                     Direction::Outgoing,
                     WhichHugr::Retained,
-                    e.clone(),
+                    e.src_host_to_dyn(),
                 ));
             }
-            e.check_src(h, e)?;
+            e.check_src(h, e.src_host_to_dyn())?;
+        }
+        for e in self.mu_new.iter() {
+            if !h.contains_node(e.src) || removed.contains(&e.src) {
+                return Err(ReplaceError::BadEdgeSpec(
+                    Direction::Outgoing,
+                    WhichHugr::Retained,
+                    e.src_tgt_host_to_dyn(),
+                ));
+            }
+            e.check_src(h, e.src_tgt_host_to_dyn())?;
         }
         self.mu_out
             .iter()
             .try_for_each(|e| match self.replacement.valid_non_root(e.src) {
-                true => e.check_src(&self.replacement, e),
+                true => e.check_src(&self.replacement, e.tgt_host_to_dyn()),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Outgoing,
                     WhichHugr::Replacement,
-                    e.clone(),
+                    e.tgt_host_to_dyn(),
                 )),
             })?;
         // Edge targets...
         self.mu_inp
             .iter()
             .try_for_each(|e| match self.replacement.valid_non_root(e.tgt) {
-                true => e.check_tgt(&self.replacement, e),
+                true => e.check_tgt(&self.replacement, e.src_host_to_dyn()),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Incoming,
                     WhichHugr::Replacement,
-                    e.clone(),
+                    e.src_host_to_dyn(),
                 )),
             })?;
-        for e in self.mu_out.iter().chain(self.mu_new.iter()) {
+        for e in self.mu_out.iter() {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
                 return Err(ReplaceError::BadEdgeSpec(
                     Direction::Incoming,
                     WhichHugr::Retained,
-                    e.clone(),
+                    e.tgt_host_to_dyn(),
                 ));
             }
-            e.check_tgt(h, e)?;
+            e.check_tgt(h, e.tgt_host_to_dyn())?;
             // The descendant check is to allow the case where the old edge is nonlocal
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
             // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-            e.check_existing_edge(h, &removed, || e.clone())?;
+            e.check_existing_edge(h, &removed, || e.tgt_host_to_dyn())?;
+        }
+        for e in self.mu_new.iter() {
+            if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
+                return Err(ReplaceError::BadEdgeSpec(
+                    Direction::Incoming,
+                    WhichHugr::Retained,
+                    e.src_tgt_host_to_dyn(),
+                ));
+            }
+            e.check_tgt(h, e.src_tgt_host_to_dyn())?;
+            // The descendant check is to allow the case where the old edge is nonlocal
+            // from a part of the Hugr being moved (which may require changing source,
+            // depending on where the transplanted portion ends up). While this subsumes
+            // the first "removed.contains" check, we'll keep that as a common-case fast-path.
+            e.check_existing_edge(h, &removed, || e.src_tgt_host_to_dyn())?;
         }
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn invalidation_set(&self) -> impl Iterator<Item = HostNode> {
+        self.removal.iter().copied()
+    }
+}
+
+impl ApplyPatchHugrMut for Replacement {
+    /// Map from Node in replacement to corresponding Node in the result Hugr
+    type Outcome = HashMap<Node, Node>;
+
+    const UNCHANGED_ON_FAILURE: bool = false;
+
+    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
         let parent = self.check_parent(h)?;
         // Calculate removed nodes here. (Does not include transfers, so enumerates only
         // nodes we are going to remove, individually, anyway; so no *asymptotic* speed penalty)
@@ -293,20 +333,40 @@ impl Rewrite for Replacement {
         let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement);
 
         // 2. Add new edges from existing to copied nodes according to mu_in
-        let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
-        let kept = |n| {
-            let keep = !to_remove.contains(&n);
-            keep.then_some(n).ok_or(WhichHugr::Retained)
+        let translate_idx = |n: DynNode<Node>| match n {
+            DynNode::Host(host_node) => {
+                let keep = !to_remove.contains(&host_node);
+                keep.then_some(host_node).ok_or(WhichHugr::Retained)
+            }
+            DynNode::Repl(repl_node) => node_map
+                .get(&repl_node)
+                .copied()
+                .ok_or(WhichHugr::Replacement),
         };
-        transfer_edges(h, self.mu_inp.iter(), kept, translate_idx, None)?;
+        transfer_edges(
+            h,
+            self.mu_inp.iter().map(|e| e.src_host_to_dyn()),
+            translate_idx,
+            None,
+        )?;
 
         // 3. Add new edges from copied to existing nodes according to mu_out,
         // replacing existing value/static edges incoming to targets
-        transfer_edges(h, self.mu_out.iter(), translate_idx, kept, Some(&to_remove))?;
+        transfer_edges(
+            h,
+            self.mu_out.iter().map(|e| e.tgt_host_to_dyn()),
+            translate_idx,
+            Some(&to_remove),
+        )?;
 
         // 4. Add new edges between existing nodes according to mu_new,
         // replacing existing value/static edges incoming to targets.
-        transfer_edges(h, self.mu_new.iter(), kept, kept, Some(&to_remove))?;
+        transfer_edges(
+            h,
+            self.mu_new.iter().map(|e| e.src_tgt_host_to_dyn()),
+            translate_idx,
+            Some(&to_remove),
+        )?;
 
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
@@ -336,27 +396,22 @@ impl Rewrite for Replacement {
         });
         Ok(node_map)
     }
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        self.removal.iter().copied()
-    }
 }
 
-fn transfer_edges<'a>(
+fn transfer_edges(
     h: &mut impl HugrMut,
-    edges: impl Iterator<Item = &'a NewEdgeSpec>,
-    trans_src: impl Fn(Node) -> Result<Node, WhichHugr>,
-    trans_tgt: impl Fn(Node) -> Result<Node, WhichHugr>,
+    edges: impl Iterator<Item = NewEdgeSpec<DynNode<Node>, DynNode<Node>>>,
+    translate_idx: impl Fn(DynNode<Node>) -> Result<Node, WhichHugr>,
     legal_src_ancestors: Option<&HashSet<Node>>,
 ) -> Result<(), ReplaceError> {
     for oe in edges {
         let e = NewEdgeSpec {
             // Translation can only fail for Nodes that are supposed to be in the replacement
-            src: trans_src(oe.src)
+            src: translate_idx(oe.src)
                 .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Outgoing, h, oe.clone()))?,
-            tgt: trans_tgt(oe.tgt)
+            tgt: translate_idx(oe.tgt)
                 .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, oe.clone()))?,
-            ..oe.clone()
+            kind: oe.kind,
         };
         if !h.valid_node(e.src) {
             return Err(ReplaceError::BadEdgeSpec(
@@ -372,8 +427,8 @@ fn transfer_edges<'a>(
                 oe.clone(),
             ));
         };
-        e.check_src(h, oe)?;
-        e.check_tgt(h, oe)?;
+        e.check_src(h, oe.clone())?;
+        e.check_tgt(h, oe.clone())?;
         match e.kind {
             NewEdgeKind::Order => {
                 h.add_other_edge(e.src, e.tgt);
@@ -391,17 +446,65 @@ fn transfer_edges<'a>(
     Ok(())
 }
 
+/// A node in either the replacement graph or the host graph.
+///
+/// Only used in the error type [`ReplaceError`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+pub enum DynNode<HostNode> {
+    /// A node in the host graph
+    #[error("Host node")]
+    Host(HostNode),
+    /// A node in the replacement graph
+    #[error("Replacement node")]
+    Repl(Node),
+}
+
+impl<TgtNode: Copy> NewEdgeSpec<Node, TgtNode> {
+    /// Convert nodes to [`DynNode`]s, interpreting the source as replacement
+    /// node and the target as host node.
+    fn tgt_host_to_dyn(&self) -> NewEdgeSpec<DynNode<TgtNode>, DynNode<TgtNode>> {
+        NewEdgeSpec {
+            src: DynNode::Repl(self.src),
+            tgt: DynNode::Host(self.tgt),
+            kind: self.kind,
+        }
+    }
+}
+
+impl<SrcNode: Copy> NewEdgeSpec<SrcNode, Node> {
+    /// Convert nodes to [`DynNode`]s, interpreting the source as host node and
+    /// the target as replacement node.
+    fn src_host_to_dyn(&self) -> NewEdgeSpec<DynNode<SrcNode>, DynNode<SrcNode>> {
+        NewEdgeSpec {
+            src: DynNode::Host(self.src),
+            tgt: DynNode::Repl(self.tgt),
+            kind: self.kind,
+        }
+    }
+}
+
+impl<N: Copy> NewEdgeSpec<N, N> {
+    /// Convert nodes to [`DynNode`]s, interpreting both as host nodes.
+    fn src_tgt_host_to_dyn(&self) -> NewEdgeSpec<DynNode<N>, DynNode<N>> {
+        NewEdgeSpec {
+            src: DynNode::Host(self.src),
+            tgt: DynNode::Host(self.tgt),
+            kind: self.kind,
+        }
+    }
+}
+
 /// Error in a [`Replacement`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]
-pub enum ReplaceError {
+pub enum ReplaceError<HostNode = Node> {
     /// The node(s) to replace had no parent i.e. were root(s).
     // (Perhaps if there is only one node to replace we should be able to?)
     #[error("Cannot replace the root node of the Hugr")]
     CantReplaceRoot,
     /// The nodes to replace did not have a unique common parent
     #[error("Removed nodes had different parents {0:?}")]
-    MultipleParents(Vec<Node>),
+    MultipleParents(Vec<HostNode>),
     /// Replacement root node had different tag from parent of removed nodes
     #[error("Expected replacement root with tag {removed} but found {replacement}")]
     WrongRootNodeTag {
@@ -416,16 +519,20 @@ pub enum ReplaceError {
     /// Some values in [Replacement::adoptions] were either descendants of other values, or not
     /// descendants of the [Replacement::removal]. The nodes are indicated on a best-effort basis.
     #[error("Nodes not free to be moved into new locations: {0:?}")]
-    AdopteesNotSeparateDescendants(Vec<Node>),
+    AdopteesNotSeparateDescendants(Vec<HostNode>),
     /// A node at one end of a [NewEdgeSpec] was not found
     #[error("{0:?} end of edge {2:?} not found in {1}")]
-    BadEdgeSpec(Direction, WhichHugr, NewEdgeSpec),
+    BadEdgeSpec(
+        Direction,
+        WhichHugr,
+        NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
+    ),
     /// The target of the edge was found, but there was no existing edge to replace
     #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
-    NoRemovedEdge(NewEdgeSpec),
+    NoRemovedEdge(NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>),
     /// The [NewEdgeKind] was not applicable for the source/target node(s)
     #[error("The edge kind was not applicable to the {0:?} node: {1:?}")]
-    BadEdgeKind(Direction, NewEdgeSpec),
+    BadEdgeKind(Direction, NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>),
 }
 
 /// A Hugr or portion thereof that is part of the [Replacement]
@@ -461,8 +568,9 @@ mod test {
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::hugr::internal::HugrMutInternals;
-    use crate::hugr::rewrite::replace::WhichHugr;
-    use crate::hugr::{HugrMut, Rewrite};
+    use crate::hugr::patch::replace::WhichHugr;
+    use crate::hugr::patch::VerifyPatch;
+    use crate::hugr::{ApplyPatch, HugrMut};
     use crate::ops::custom::ExtensionOp;
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
@@ -788,7 +896,11 @@ mod test {
                 mu_inp: vec![edge_from_removed.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Retained, edge_from_removed)
+            ReplaceError::BadEdgeSpec(
+                Direction::Outgoing,
+                WhichHugr::Retained,
+                edge_from_removed.src_host_to_dyn()
+            )
         );
         let bad_out_edge = NewEdgeSpec {
             src: h.nodes().max().unwrap(), // not valid in replacement
@@ -800,7 +912,11 @@ mod test {
                 mu_out: vec![bad_out_edge.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Replacement, bad_out_edge)
+            ReplaceError::BadEdgeSpec(
+                Direction::Outgoing,
+                WhichHugr::Replacement,
+                bad_out_edge.tgt_host_to_dyn()
+            )
         );
         let bad_order_edge = NewEdgeSpec {
             src: cond.node(),
@@ -812,7 +928,7 @@ mod test {
                 mu_new: vec![bad_order_edge.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeKind(_, e) => assert_eq!(e, bad_order_edge)
+            ReplaceError::BadEdgeKind(_, e) => assert_eq!(e, bad_order_edge.src_tgt_host_to_dyn())
         );
         let op = OutgoingPort::from(0);
         let (tgt, ip) = h.linked_inputs(cond.node(), op).next().unwrap();
@@ -829,7 +945,7 @@ mod test {
                 mu_out: vec![new_out_edge.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge)
+            ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge.tgt_host_to_dyn())
         );
     }
 }

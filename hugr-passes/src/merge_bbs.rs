@@ -6,8 +6,8 @@ use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
 use itertools::Itertools;
 
-use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
-use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
+use hugr_core::hugr::patch::inline_dfg::InlineDFG;
+use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::hugr::RootTagged;
 use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};

@@ -6,7 +6,7 @@ use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
 pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrMut, HugrView, Rewrite};
+use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort};
 
@@ -15,7 +15,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use super::inline_dfg::InlineDFGError;
-use super::{BoundaryPort, HostPort, ReplacementPort};
+use super::{ApplyPatchHugrMut, BoundaryPort, HostPort, ReplacementPort, VerifyPatch};
 
 /// Specification of a simple replacement operation.
 ///
@@ -275,16 +275,27 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     }
 }
 
-impl Rewrite for SimpleReplacement {
+impl<HostNode: HugrNode> VerifyPatch for SimpleReplacement<HostNode> {
     type Error = SimpleReplacementError;
-    type ApplyResult = Vec<(Node, OpType)>;
-    const UNCHANGED_ON_FAILURE: bool = true;
+    type Node = HostNode;
 
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), SimpleReplacementError> {
+    fn verify(&self, h: &impl HugrView<Node = HostNode>) -> Result<(), SimpleReplacementError> {
         self.is_valid_rewrite(h)
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    #[inline]
+    fn invalidation_set(&self) -> impl Iterator<Item = HostNode> {
+        let subcirc = self.subgraph.nodes().iter().copied();
+        let out_neighs = self.nu_out.keys().map(|key| key.0);
+        subcirc.chain(out_neighs)
+    }
+}
+
+impl ApplyPatchHugrMut for SimpleReplacement<Node> {
+    type Outcome = Vec<(Node, OpType)>;
+    const UNCHANGED_ON_FAILURE: bool = true;
+
+    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
         self.is_valid_rewrite(h)?;
 
         let parent = self.subgraph.get_parent(h);
@@ -336,13 +347,6 @@ impl Rewrite for SimpleReplacement {
             .map(|&node| (node, h.remove_node(node)))
             .collect())
     }
-
-    #[inline]
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        let subcirc = self.subgraph.nodes().iter().copied();
-        let out_neighs = self.nu_out.keys().map(|key| key.0);
-        subcirc.chain(out_neighs)
-    }
 }
 
 /// Error from a [`SimpleReplacement`] operation.
@@ -364,7 +368,7 @@ pub enum SimpleReplacementError {
 }
 
 #[cfg(test)]
-pub(in crate::hugr::rewrite) mod test {
+pub(in crate::hugr::patch) mod test {
     use itertools::Itertools;
     use rstest::{fixture, rstest};
     use std::collections::{HashMap, HashSet};
@@ -377,7 +381,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::extension::ExtensionSet;
     use crate::hugr::views::{HugrView, SiblingSubgraph};
-    use crate::hugr::{Hugr, HugrMut, Rewrite};
+    use crate::hugr::{ApplyPatch, Hugr, HugrMut};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
@@ -433,7 +437,7 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     #[fixture]
-    pub(in crate::hugr::rewrite) fn simple_hugr() -> Hugr {
+    pub(in crate::hugr::patch) fn simple_hugr() -> Hugr {
         make_hugr().unwrap()
     }
     /// Creates a hugr with a DFG root like the following:
@@ -453,7 +457,7 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     #[fixture]
-    pub(in crate::hugr::rewrite) fn dfg_hugr() -> Hugr {
+    pub(in crate::hugr::patch) fn dfg_hugr() -> Hugr {
         make_dfg_hugr().unwrap()
     }
 
@@ -473,7 +477,7 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     #[fixture]
-    pub(in crate::hugr::rewrite) fn dfg_hugr2() -> Hugr {
+    pub(in crate::hugr::patch) fn dfg_hugr2() -> Hugr {
         make_dfg_hugr2().unwrap()
     }
 
@@ -489,7 +493,7 @@ pub(in crate::hugr::rewrite) mod test {
     ///
     /// Returns the hugr and the nodes of the NOT gates, in order.
     #[fixture]
-    pub(in crate::hugr::rewrite) fn dfg_hugr_copy_bools() -> (Hugr, Vec<Node>) {
+    pub(in crate::hugr::patch) fn dfg_hugr_copy_bools() -> (Hugr, Vec<Node>) {
         let mut dfg_builder =
             DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t(), bool_t()])).unwrap();
         let [b] = dfg_builder.input_wires_arr();
@@ -520,7 +524,7 @@ pub(in crate::hugr::rewrite) mod test {
     ///
     /// Returns the hugr and the nodes of the NOT ops, in order.
     #[fixture]
-    pub(in crate::hugr::rewrite) fn dfg_hugr_half_not_bools() -> (Hugr, Vec<Node>) {
+    pub(in crate::hugr::patch) fn dfg_hugr_half_not_bools() -> (Hugr, Vec<Node>) {
         let mut dfg_builder =
             DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t(), bool_t()])).unwrap();
         let [b] = dfg_builder.input_wires_arr();
@@ -562,6 +566,8 @@ pub(in crate::hugr::rewrite) mod test {
         dfg_hugr: Hugr,
         #[values(apply_simple, apply_replace)] applicator: impl Fn(&mut Hugr, SimpleReplacement),
     ) {
+        use crate::hugr::patch::VerifyPatch;
+
         let mut h: Hugr = simple_hugr;
         // 1. Locate the CX and its successor H's in h
         let h_node_cx: Node = h
@@ -959,9 +965,9 @@ pub(in crate::hugr::rewrite) mod test {
         assert_eq!(h.node_count(), 6);
     }
 
-    use crate::hugr::rewrite::replace::Replacement;
+    use crate::hugr::patch::replace::Replacement;
     fn to_replace(h: &impl HugrView<Node = Node>, s: SimpleReplacement) -> Replacement {
-        use crate::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec};
+        use crate::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec};
 
         let mut replacement = s.replacement;
         let (in_, out) = replacement

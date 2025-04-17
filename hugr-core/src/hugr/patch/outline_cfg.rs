@@ -7,7 +7,6 @@ use thiserror::Error;
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::extension::ExtensionSet;
 use crate::hugr::internal::HugrMutInternals;
-use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
@@ -17,6 +16,8 @@ use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
 use crate::ops::{DataflowBlock, OpType};
 use crate::PortIndex;
 use crate::{type_row, Node};
+
+use super::{ApplyPatchHugrMut, VerifyPatch};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.
@@ -94,19 +95,30 @@ impl OutlineCfg {
     }
 }
 
-impl Rewrite for OutlineCfg {
+impl VerifyPatch for OutlineCfg {
     type Error = OutlineCfgError;
-    /// The newly-created basic block, and the [CFG] node inside it
-    ///
-    /// [CFG]: OpType::CFG
-    type ApplyResult = (Node, Node);
-
-    const UNCHANGED_ON_FAILURE: bool = true;
+    type Node = Node;
     fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), OutlineCfgError> {
         self.compute_entry_exit_outside_extensions(h)?;
         Ok(())
     }
-    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<(Node, Node), OutlineCfgError> {
+
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+        self.blocks.iter().copied()
+    }
+}
+
+impl ApplyPatchHugrMut for OutlineCfg {
+    /// The newly-created basic block, and the [CFG] node inside it
+    ///
+    /// [CFG]: OpType::CFG
+    type Outcome = (Node, Node);
+
+    const UNCHANGED_ON_FAILURE: bool = true;
+    fn apply_hugr_mut(
+        self,
+        h: &mut impl HugrMut<Node = Node>,
+    ) -> Result<(Node, Node), OutlineCfgError> {
         let (entry, exit, outside, extension_delta) =
             self.compute_entry_exit_outside_extensions(h)?;
         // 1. Compute signature
@@ -208,10 +220,6 @@ impl Rewrite for OutlineCfg {
         in_cfg_view.connect(exit, exit_port, inner_exit, 0);
 
         Ok((new_block, cfg_node))
-    }
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        self.blocks.iter().copied()
     }
 }
 
