@@ -106,14 +106,6 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     }
 
     /// Returns a registry with the concrete extensions used by this signature.
-    ///
-    /// Note that extension type parameters are not included, as they have not
-    /// been instantiated yet.
-    ///
-    /// This method only returns extensions actually used by the types in the
-    /// signature. The extension deltas added via [`Self::with_extension_delta`]
-    /// refer to _runtime_ extensions, which may not be in all places that
-    /// manipulate a HUGR.
     pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
         let mut used = WeakExtensionRegistry::default();
         let mut missing = ExtensionSet::new();

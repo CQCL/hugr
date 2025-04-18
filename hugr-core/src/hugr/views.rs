@@ -460,11 +460,6 @@ pub trait HugrView: HugrInternals {
     }
 
     /// Check the validity of the underlying HUGR.
-    ///
-    /// This includes checking consistency of extension requirements between
-    /// connected nodes and between parents and children.
-    /// See [`HugrView::validate_no_extensions`] for a version that doesn't check
-    /// extension requirements.
     fn validate(&self) -> Result<(), ValidationError> {
         self.base_hugr().validate()
     }

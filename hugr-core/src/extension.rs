@@ -806,14 +806,6 @@ impl ExtensionSet {
         self.0.insert(extension.clone());
     }
 
-    /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
-    pub fn insert_type_var(&mut self, idx: usize) {
-        // Represent type vars as string representation of variable index.
-        // This is not a legal IdentList or ExtensionId so should not conflict.
-        self.0
-            .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));
-    }
-
     /// Returns `true` if the set contains the given extension.
     pub fn contains(&self, extension: &ExtensionId) -> bool {
         self.0.contains(extension)
@@ -833,14 +825,6 @@ impl ExtensionSet {
     pub fn singleton(extension: ExtensionId) -> Self {
         let mut set = Self::new();
         set.insert(extension);
-        set
-    }
-
-    /// An ExtensionSet containing a single type variable
-    /// (which must have been declared as a [TypeParam::Extensions])
-    pub fn type_var(idx: usize) -> Self {
-        let mut set = Self::new();
-        set.insert_type_var(idx);
         set
     }
 
@@ -994,16 +978,8 @@ pub mod test {
             type Strategy = BoxedStrategy<Self>;
 
             fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-                (
-                    hash_set(0..10usize, 0..3),
-                    hash_set(any::<ExtensionId>(), 0..3),
-                )
-                    .prop_map(|(vars, extensions)| {
-                        ExtensionSet::union_over(
-                            std::iter::once(extensions.into_iter().collect::<ExtensionSet>())
-                                .chain(vars.into_iter().map(ExtensionSet::type_var)),
-                        )
-                    })
+                hash_set(any::<ExtensionId>(), 0..3)
+                    .prop_map(|extensions| extensions.into_iter().collect::<ExtensionSet>())
                     .boxed()
             }
         }

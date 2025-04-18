@@ -180,7 +180,7 @@ pub enum TypeArg {
     },
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [TypeArg::Type] (not even a row variable i.e. [TypeParam::List] of type)
-    /// nor [TypeArg::Extensions] - see [TypeArg::new_var_use]
+    /// - see [TypeArg::new_var_use]
     #[display("{v}")]
     Variable {
         #[allow(missing_docs)]
@@ -224,8 +224,7 @@ impl From<Vec<TypeArg>> for TypeArg {
     }
 }
 
-/// Variable in a TypeArg, that is neither a [TypeArg::Extensions]
-/// nor a single [TypeArg::Type] (i.e. not a [Type::new_var_use]
+/// Variable in a TypeArg, that is not a single [TypeArg::Type] (i.e. not a [Type::new_var_use]
 /// - it might be a [Type::new_row_var_use]).
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
