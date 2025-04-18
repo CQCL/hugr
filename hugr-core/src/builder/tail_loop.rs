@@ -1,4 +1,3 @@
-use crate::extension::{ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{self, DataflowOpTrait};
 
 use crate::hugr::views::HugrView;
@@ -72,29 +71,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
 
 impl TailLoopBuilder<Hugr> {
     /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
-    /// Extension delta will be inferred.
     pub fn new(
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,
         just_outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
-        Self::new_exts(just_inputs, inputs_outputs, just_outputs, TO_BE_INFERRED)
-    }
-
-    /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
-    /// `extension_delta` is explicitly specified; alternatively, [new](Self::new)
-    /// may be used to infer it.
-    pub fn new_exts(
-        just_inputs: impl Into<TypeRow>,
-        inputs_outputs: impl Into<TypeRow>,
-        just_outputs: impl Into<TypeRow>,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
-            extension_delta: extension_delta.into(),
         };
         let base = Hugr::new(tail_loop.clone());
         let root = base.root();
@@ -109,7 +94,7 @@ mod test {
     use crate::extension::prelude::bool_t;
     use crate::{
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{usize_t, ConstUsize, PRELUDE_ID},
+        extension::prelude::{usize_t, ConstUsize},
         hugr::ValidationError,
         ops::Value,
         type_row,
@@ -120,8 +105,7 @@ mod test {
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
-            let mut loop_b =
-                TailLoopBuilder::new_exts(vec![], vec![bool_t()], vec![usize_t()], PRELUDE_ID)?;
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![bool_t()], vec![usize_t()])?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_value(ConstUsize::new(1));
 
@@ -138,10 +122,8 @@ mod test {
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut fbuild = module_builder.define_function(
-                "main",
-                Signature::new(vec![bool_t()], vec![usize_t()]).with_prelude(),
-            )?;
+            let mut fbuild = module_builder
+                .define_function("main", Signature::new(vec![bool_t()], vec![usize_t()]))?;
             let _fdef = {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {

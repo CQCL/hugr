@@ -277,7 +277,6 @@ pub(crate) mod test {
         let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         let body_type = Signature::new_endo(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
-            TypeParam::Extensions,
             TypeParam::List {
                 param: Box::new(TypeParam::max_nat()),
             },

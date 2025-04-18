@@ -21,7 +21,6 @@ use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
 use crate::core::HugrNode;
-use crate::extension::ExtensionSet;
 use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
@@ -340,11 +339,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        Signature::new(input, output).with_extension_delta(ExtensionSet::union_over(
-            self.nodes
-                .iter()
-                .map(|n| hugr.get_optype(*n).extension_delta()),
-        ))
+        Signature::new(input, output)
     }
 
     /// The parent of the sibling subgraph.
@@ -830,10 +825,10 @@ mod tests {
     use crate::builder::inout_sig;
     use crate::hugr::Rewrite;
     use crate::ops::Const;
-    use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
-    use crate::std_extensions::logic::{self, LogicOp};
+    use crate::std_extensions::arithmetic::float_types::ConstF64;
+    use crate::std_extensions::logic::LogicOp;
     use crate::type_row;
-    use crate::utils::test_quantum_extension::{self, cx_gate, rz_f64};
+    use crate::utils::test_quantum_extension::{cx_gate, rz_f64};
     use crate::{
         builder::{
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
@@ -879,12 +874,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
-                .with_extension_delta(ExtensionSet::from_iter([
-                    test_quantum_extension::EXTENSION_ID,
-                    float_types::EXTENSION_ID,
-                ]))
-                .into(),
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -903,12 +893,7 @@ mod tests {
     /// A bool to bool hugr with three subsequent NOT gates.
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare(
-            "test",
-            Signature::new_endo(vec![bool_t()])
-                .with_extension_delta(logic::EXTENSION_ID)
-                .into(),
-        )?;
+        let func = mod_builder.declare("test", Signature::new_endo(vec![bool_t()]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(LogicOp::Not, dfg.input_wires())?;
@@ -927,9 +912,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new(bool_t(), vec![bool_t(), bool_t()])
-                .with_extension_delta(logic::EXTENSION_ID)
-                .into(),
+            Signature::new(bool_t(), vec![bool_t(), bool_t()]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -947,12 +930,7 @@ mod tests {
     /// A HUGR with a copy
     fn build_hugr_classical() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare(
-            "test",
-            Signature::new_endo(bool_t())
-                .with_extension_delta(logic::EXTENSION_ID)
-                .into(),
-        )?;
+        let func = mod_builder.declare("test", Signature::new_endo(bool_t()).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let in_wire = dfg.input_wires().exactly_one().unwrap();
@@ -1014,12 +992,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
         assert_eq!(
             sub.signature(&func),
-            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).with_extension_delta(
-                ExtensionSet::from_iter([
-                    test_quantum_extension::EXTENSION_ID,
-                    float_types::EXTENSION_ID,
-                ])
-            )
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
         );
         Ok(())
     }
@@ -1206,12 +1179,7 @@ mod tests {
     #[test]
     fn test_unconnected() {
         // test a replacement on a subgraph with a discarded output
-        let mut b = DFGBuilder::new(
-            Signature::new(bool_t(), type_row![])
-                // .with_prelude()
-                .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
-        )
-        .unwrap();
+        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded
@@ -1222,11 +1190,7 @@ mod tests {
         assert_eq!(subg.nodes().len(), 1);
         //  TODO create a valid replacement
         let replacement = {
-            let mut rep_b = DFGBuilder::new(
-                Signature::new_endo(bool_t())
-                    .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
-            )
-            .unwrap();
+            let mut rep_b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
             let inw = rep_b.input_wires().exactly_one().unwrap();
 
             let not_n = rep_b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
@@ -1241,11 +1205,7 @@ mod tests {
     #[test]
     fn single_node_subgraph() {
         // A hugr with a single NOT operation, with disconnected output.
-        let mut b = DFGBuilder::new(
-            Signature::new(bool_t(), type_row![])
-                .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
-        )
-        .unwrap();
+        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded

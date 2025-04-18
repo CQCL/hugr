@@ -707,7 +707,6 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::Container as _;
-    use hugr_core::extension::ExtensionSet;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::collections::array::{self, array_type, ArrayRepeat, ArrayScan};
     use hugr_core::std_extensions::STD_REG;
@@ -798,16 +797,6 @@ mod test {
             logic::EXTENSION.to_owned(),
             prelude::PRELUDE.to_owned(),
             array::EXTENSION.to_owned(),
-        ])
-    }
-
-    fn exec_extension_set() -> ExtensionSet {
-        ExtensionSet::from_iter([
-            int_types::EXTENSION_ID,
-            int_ops::EXTENSION_ID,
-            logic::EXTENSION_ID,
-            prelude::PRELUDE_ID,
-            array::EXTENSION_ID,
         ])
     }
 
@@ -1170,16 +1159,12 @@ mod test {
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let mut func = builder
-                    .define_function(
-                        "foo",
-                        Signature::new(vec![], vec![int_ty.clone()])
-                            .with_extension_delta(exec_extension_set()),
-                    )
+                    .define_function("foo", Signature::new(vec![], vec![int_ty.clone()]))
                     .unwrap();
                 let v = func.add_load_value(ConstInt::new_u(6, value).unwrap());
                 let func_id = func.finish_with_outputs(vec![v]).unwrap();
                 let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
-                let repeat = ArrayRepeat::new(int_ty.clone(), size, exec_extension_set());
+                let repeat = ArrayRepeat::new(int_ty.clone(), size);
                 let arr = builder
                     .add_dataflow_op(repeat, vec![func_v])
                     .unwrap()
@@ -1227,8 +1212,7 @@ mod test {
                 let mut func = builder
                     .define_function(
                         "foo",
-                        Signature::new(vec![int_ty.clone()], vec![int_ty.clone()])
-                            .with_extension_delta(exec_extension_set()),
+                        Signature::new(vec![int_ty.clone()], vec![int_ty.clone()]),
                     )
                     .unwrap();
                 let [elem] = func.input_wires_arr();
@@ -1236,13 +1220,7 @@ mod test {
                 let out = func.add_iadd(6, elem, delta).unwrap();
                 let func_id = func.finish_with_outputs(vec![out]).unwrap();
                 let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
-                let scan = ArrayScan::new(
-                    int_ty.clone(),
-                    int_ty.clone(),
-                    vec![],
-                    size,
-                    exec_extension_set(),
-                );
+                let scan = ArrayScan::new(int_ty.clone(), int_ty.clone(), vec![], size);
                 let mut arr = builder
                     .add_dataflow_op(scan, [arr, func_v])
                     .unwrap()
@@ -1304,8 +1282,7 @@ mod test {
                         Signature::new(
                             vec![int_ty.clone(), int_ty.clone()],
                             vec![Type::UNIT, int_ty.clone()],
-                        )
-                        .with_extension_delta(exec_extension_set()),
+                        ),
                     )
                     .unwrap();
                 let [elem, acc] = func.input_wires_arr();
@@ -1316,13 +1293,7 @@ mod test {
                     .out_wire(0);
                 let func_id = func.finish_with_outputs(vec![unit, acc]).unwrap();
                 let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
-                let scan = ArrayScan::new(
-                    int_ty.clone(),
-                    Type::UNIT,
-                    vec![int_ty.clone()],
-                    size,
-                    exec_extension_set(),
-                );
+                let scan = ArrayScan::new(int_ty.clone(), Type::UNIT, vec![int_ty.clone()], size);
                 let zero = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 let sum = builder
                     .add_dataflow_op(scan, [arr, func_v, zero])

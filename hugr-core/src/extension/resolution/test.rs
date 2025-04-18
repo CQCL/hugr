@@ -11,7 +11,7 @@ use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
     HugrBuilder, ModuleBuilder,
 };
-use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize, PRELUDE_ID};
+use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize};
 use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
@@ -28,7 +28,7 @@ use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
 use crate::types::type_param::TypeParam;
 use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
-use crate::{std_extensions, type_row, Extension, Hugr, HugrView};
+use crate::{type_row, Extension, Hugr, HugrView};
 
 #[rstest]
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
@@ -158,17 +158,7 @@ fn check_extension_resolution(mut hugr: Hugr) {
 /// Build a small hugr using the float types extension and check that the extensions are resolved.
 #[rstest]
 fn resolve_hugr_extensions_simple() {
-    let mut build = DFGBuilder::new(
-        Signature::new(vec![], vec![float64_type()]).with_extension_delta(
-            [
-                PRELUDE_ID.to_owned(),
-                std_extensions::arithmetic::float_types::EXTENSION_ID.to_owned(),
-            ]
-            .into_iter()
-            .collect::<ExtensionSet>(),
-        ),
-    )
-    .unwrap();
+    let mut build = DFGBuilder::new(Signature::new(vec![], vec![float64_type()])).unwrap();
 
     // A constant op using a non-prelude extension.
     let f_const = build.add_load_const(Value::extension(ConstF64::new(f64::consts::PI)));
@@ -218,7 +208,7 @@ fn resolve_hugr_extensions() {
     let (ext_b, op_b) = make_extension("dummy.b", "op_b");
     let (ext_c, op_c) = make_extension("dummy.c", "op_c");
     let (ext_d, op_d) = make_extension("dummy.d", "op_d");
-    let (ext_e, op_e) = make_extension("dummy.e", "op_e");
+    let (_ext_e, op_e) = make_extension("dummy.e", "op_e");
 
     let mut module = ModuleBuilder::new();
 
@@ -234,18 +224,7 @@ fn resolve_hugr_extensions() {
     let mut func = module
         .define_function(
             "dummy_fn",
-            Signature::new(vec![float64_type(), bool_t()], vec![]).with_extension_delta(
-                [
-                    ext_a.name(),
-                    ext_b.name(),
-                    ext_c.name(),
-                    ext_d.name(),
-                    ext_e.name(),
-                ]
-                .into_iter()
-                .cloned()
-                .collect::<ExtensionSet>(),
-            ),
+            Signature::new(vec![float64_type(), bool_t()], vec![]),
         )
         .unwrap();
     let [func_i0, func_i1] = func.input_wires_arr();
@@ -368,11 +347,7 @@ fn resolve_call() {
     let dummy_fn = module.declare("called_fn", dummy_fn_sig).unwrap();
 
     let mut func = module
-        .define_function(
-            "caller_fn",
-            Signature::new(vec![], vec![bool_t()])
-                .with_extension_delta(ExtensionSet::from_iter(expected_exts.clone())),
-        )
+        .define_function("caller_fn", Signature::new(vec![], vec![bool_t()]))
         .unwrap();
     let _load_func = func.load_func(&dummy_fn, &[generic_type_1]).unwrap();
     let call = func.call(&dummy_fn, &[generic_type_2], vec![]).unwrap();
@@ -390,15 +365,10 @@ fn resolve_call() {
 /// Fail when collecting extensions but the weak pointers are not resolved.
 #[rstest]
 fn dropped_weak_extensions() {
-    let (ext_a, op_a) = make_extension("dummy.a", "op_a");
+    let (_ext_a, op_a) = make_extension("dummy.a", "op_a");
     let mut func = FunctionBuilder::new(
         "dummy_fn",
-        Signature::new(vec![float64_type(), bool_t()], vec![]).with_extension_delta(
-            [ext_a.name()]
-                .into_iter()
-                .cloned()
-                .collect::<ExtensionSet>(),
-        ),
+        Signature::new(vec![float64_type(), bool_t()], vec![]),
     )
     .unwrap();
     let [_func_i0, func_i1] = func.input_wires_arr();

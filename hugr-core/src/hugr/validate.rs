@@ -9,12 +9,12 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{SignatureError, TO_BE_INFERRED};
+use crate::extension::SignatureError;
 
 use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, NamedOp, OpName, OpParent, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
@@ -35,68 +35,15 @@ struct ValidationContext<'a> {
 }
 
 impl Hugr {
-    /// Check the validity of the HUGR, assuming that it has no open extension
-    /// variables.
-    /// TODO: Add a version of validation which allows for open extension
-    /// variables (see github issue #457)
+    /// Check the validity of the HUGR.
     pub fn validate(&self) -> Result<(), ValidationError> {
-        self.validate_no_extensions()?;
-        if cfg!(feature = "extension_inference") {
-            self.validate_extensions()?;
-        }
-        Ok(())
-    }
-
-    /// Check the validity of the HUGR, but don't check consistency of extension
-    /// requirements between connected nodes or between parents and children.
-    pub fn validate_no_extensions(&self) -> Result<(), ValidationError> {
         let mut validator = ValidationContext::new(self);
         validator.validate()
-    }
-
-    /// Validate extensions, i.e. that extension deltas from parent nodes are reflected in their children.
-    pub fn validate_extensions(&self) -> Result<(), ValidationError> {
-        for parent in self.nodes() {
-            let parent_op = self.get_optype(parent);
-            if parent_op.extension_delta().contains(&TO_BE_INFERRED) {
-                return Err(ValidationError::ExtensionsNotInferred { node: parent });
-            }
-            let parent_extensions = match parent_op.inner_function_type() {
-                Some(s) => s.runtime_reqs.clone(),
-                None => match parent_op.tag() {
-                    OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
-                    // ModuleRoot holds but does not execute its children, so allow any extensions
-                    OpTag::ModuleRoot => continue,
-                    _ => {
-                        assert!(self.children(parent).next().is_none(),
-                            "Unknown parent node type {} - not a DataflowParent, Module, Cfg or Conditional",
-                            parent_op);
-                        continue;
-                    }
-                },
-            };
-            for child in self.children(parent) {
-                let child_extensions = self.get_optype(child).extension_delta();
-                if !parent_extensions.is_superset(&child_extensions) {
-                    return Err(ExtensionError {
-                        parent,
-                        parent_extensions,
-                        child,
-                        child_extensions,
-                    }
-                    .into());
-                }
-            }
-        }
-        Ok(())
     }
 }
 
 impl<'a> ValidationContext<'a> {
     /// Create a new validation context.
-    // Allow unused "extension_closure" variable for when
-    // the "extension_inference" feature is disabled.
-    #[allow(unused_variables)]
     pub fn new(hugr: &'a Hugr) -> Self {
         let dominators = HashMap::new();
         Self { hugr, dominators }

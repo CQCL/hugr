@@ -289,9 +289,7 @@ mod test {
     /// These can be removed entirely.
     #[fixture]
     fn unused_pack() -> Hugr {
-        let mut h =
-            DFGBuilder::new(Signature::new(vec![bool_t(), bool_t()], vec![]).with_prelude())
-                .unwrap();
+        let mut h = DFGBuilder::new(Signature::new(vec![bool_t(), bool_t()], vec![])).unwrap();
         let mut inps = h.input_wires();
         let b1 = inps.next().unwrap();
         let b2 = inps.next().unwrap();
@@ -306,8 +304,7 @@ mod test {
     /// These can be removed entirely.
     #[fixture]
     fn simple_pack_unpack() -> Hugr {
-        let mut h =
-            DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()]).with_prelude()).unwrap();
+        let mut h = DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()])).unwrap();
         let mut inps = h.input_wires();
         let qb1 = inps.next().unwrap();
         let b2 = inps.next().unwrap();
@@ -326,8 +323,7 @@ mod test {
     /// we just remove everything.
     #[fixture]
     fn ordered_pack_unpack() -> Hugr {
-        let mut h =
-            DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()]).with_prelude()).unwrap();
+        let mut h = DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()])).unwrap();
         let mut inps = h.input_wires();
         let qb1 = inps.next().unwrap();
         let b2 = inps.next().unwrap();
@@ -349,13 +345,10 @@ mod test {
     /// These can be removed entirely.
     #[fixture]
     fn multi_unpack() -> Hugr {
-        let mut h = DFGBuilder::new(
-            Signature::new(
-                vec![bool_t(), bool_t()],
-                vec![bool_t(), bool_t(), bool_t(), bool_t()],
-            )
-            .with_prelude(),
-        )
+        let mut h = DFGBuilder::new(Signature::new(
+            vec![bool_t(), bool_t()],
+            vec![bool_t(), bool_t(), bool_t(), bool_t()],
+        ))
         .unwrap();
         let mut inps = h.input_wires();
         let b1 = inps.next().unwrap();
@@ -380,17 +373,14 @@ mod test {
     /// The unpack operation can be removed, but the pack operation cannot.
     #[fixture]
     fn partial_unpack() -> Hugr {
-        let mut h = DFGBuilder::new(
-            Signature::new(
-                vec![bool_t(), bool_t()],
-                vec![
-                    bool_t(),
-                    bool_t(),
-                    Type::new_tuple(vec![bool_t(), bool_t()]),
-                ],
-            )
-            .with_prelude(),
-        )
+        let mut h = DFGBuilder::new(Signature::new(
+            vec![bool_t(), bool_t()],
+            vec![
+                bool_t(),
+                bool_t(),
+                Type::new_tuple(vec![bool_t(), bool_t()]),
+            ],
+        ))
         .unwrap();
         let mut inps = h.input_wires();
         let b1 = inps.next().unwrap();

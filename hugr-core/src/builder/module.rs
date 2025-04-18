@@ -50,10 +50,7 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.0.infer_extensions(false)?;
-        }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.0.validate()?;
         Ok(self.0)
     }

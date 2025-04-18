@@ -377,7 +377,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
+            &Signature::new(int_type(3), int_type(4))
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -386,7 +386,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
+            &Signature::new_endo(int_type(3))
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -396,7 +396,6 @@ mod test {
                 .signature()
                 .as_ref(),
             &Signature::new(int_type(3), sum_ty_with_err(int_type(3)))
-                .with_extension_delta(EXTENSION_ID)
         );
         assert!(
             IntOpDef::iwiden_u
@@ -414,7 +413,6 @@ mod test {
                 .signature()
                 .as_ref(),
             &Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
-                .with_extension_delta(EXTENSION_ID)
         );
 
         assert!(IntOpDef::inarrow_u

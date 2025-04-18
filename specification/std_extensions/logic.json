@@ -57,8 +57,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -88,8 +87,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -114,8 +112,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -145,8 +142,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -176,8 +172,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

@@ -611,42 +611,6 @@
             "title": "ExtensionValue",
             "type": "object"
         },
-        "ExtensionsArg": {
-            "additionalProperties": true,
-            "properties": {
-                "tya": {
-                    "const": "Extensions",
-                    "default": "Extensions",
-                    "title": "Tya",
-                    "type": "string"
-                },
-                "es": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Es",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "es"
-            ],
-            "title": "ExtensionsArg",
-            "type": "object"
-        },
-        "ExtensionsParam": {
-            "additionalProperties": true,
-            "properties": {
-                "tp": {
-                    "const": "Extensions",
-                    "default": "Extensions",
-                    "title": "Tp",
-                    "type": "string"
-                }
-            },
-            "title": "ExtensionsParam",
-            "type": "object"
-        },
         "FixedHugr": {
             "properties": {
                 "extensions": {
@@ -1762,7 +1726,6 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
-                    "Extensions": "#/$defs/ExtensionsArg",
                     "Sequence": "#/$defs/SequenceArg",
                     "String": "#/$defs/StringArg",
                     "Type": "#/$defs/TypeTypeArg",
@@ -1782,9 +1745,6 @@
                 },
                 {
                     "$ref": "#/$defs/SequenceArg"
-                },
-                {
-                    "$ref": "#/$defs/ExtensionsArg"
                 },
                 {
                     "$ref": "#/$defs/VariableArg"
@@ -1861,7 +1821,6 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
-                    "Extensions": "#/$defs/ExtensionsParam",
                     "List": "#/$defs/ListParam",
                     "String": "#/$defs/StringParam",
                     "Tuple": "#/$defs/TupleParam",
@@ -1884,9 +1843,6 @@
                 },
                 {
                     "$ref": "#/$defs/TupleParam"
-                },
-                {
-                    "$ref": "#/$defs/ExtensionsParam"
                 }
             ],
             "required": [

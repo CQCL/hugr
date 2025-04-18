@@ -28,7 +28,7 @@ use crate::{
             try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
             OpLoadError,
         },
-        ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef,
+        ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef,
     },
     ops::{
         constant::{maybe_hash_values, CustomConst, TryHash, ValueName},
@@ -126,11 +126,6 @@ impl CustomConst for StaticArrayValue {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.get_contents().iter().map(Value::extension_reqs))
-            .union(EXTENSION_ID.into())
     }
 
     fn update_extensions(
@@ -404,7 +399,7 @@ impl<T: Dataflow> StaticArrayOpBuilder for T {}
 mod test {
     use crate::{
         builder::{DFGBuilder, DataflowHugr as _},
-        extension::prelude::{qb_t, ConstUsize, PRELUDE_ID},
+        extension::prelude::{qb_t, ConstUsize},
         type_row,
     };
 
@@ -419,10 +414,10 @@ mod test {
     #[test]
     fn all_ops() {
         let _ = {
-            let mut builder = DFGBuilder::new(
-                Signature::new(type_row![], Type::from(option_type(usize_t())))
-                    .with_extension_delta(ExtensionSet::from_iter([PRELUDE_ID, EXTENSION_ID])),
-            )
+            let mut builder = DFGBuilder::new(Signature::new(
+                type_row![],
+                Type::from(option_type(usize_t())),
+            ))
             .unwrap();
             let array = builder.add_load_value(
                 StaticArrayValue::try_new(

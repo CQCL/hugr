@@ -618,10 +618,7 @@ mod test {
             NodeTemplate::SingleOp(copy3.clone()),
             NodeTemplate::SingleOp(discard.clone().into()),
         );
-        let sig3 = Some(
-            Signature::new(lin_t.clone(), vec![lin_t.clone(); 3])
-                .with_extension_delta(ext.name().clone()),
-        );
+        let sig3 = Some(Signature::new(lin_t.clone(), vec![lin_t.clone(); 3]));
         assert_eq!(
             bad_copy,
             Err(LinearizeError::WrongSignature {

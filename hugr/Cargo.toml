@@ -24,7 +24,6 @@ path = "src/lib.rs"
 [features]
 default = ["zstd"]
 
-extension_inference = ["hugr-core/extension_inference"]
 declarative = ["hugr-core/declarative"]
 model_unstable = ["hugr-core/model_unstable", "hugr-model"]
 llvm = ["hugr-llvm/llvm14-0"]

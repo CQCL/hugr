@@ -188,21 +188,6 @@ class TupleParam(TypeParam):
         return model.Apply("core.tuple", [item_types])
 
 
-@dataclass(frozen=True)
-class ExtensionsParam(TypeParam):
-    """An extension set parameter."""
-
-    def _to_serial(self) -> stys.ExtensionsParam:
-        return stys.ExtensionsParam()
-
-    def __str__(self) -> str:
-        return "Extensions"
-
-    def to_model(self) -> model.Term:
-        # Since extension sets will be deprecated, this is just a placeholder.
-        return model.Apply("compat.ext_set_type")
-
-
 # ------------------------------------------
 # --------------- TypeArg ------------------
 # ------------------------------------------
@@ -278,23 +263,6 @@ class SequenceArg(TypeArg):
         # TODO: We should separate lists and tuples.
         # For now we assume that this is a list.
         return model.List([elem.to_model() for elem in self.elems])
-
-
-@dataclass(frozen=True)
-class ExtensionsArg(TypeArg):
-    """Type argument for an :class:`ExtensionsParam`."""
-
-    extensions: ExtensionSet
-
-    def _to_serial(self) -> stys.ExtensionsArg:
-        return stys.ExtensionsArg(es=self.extensions)
-
-    def __str__(self) -> str:
-        return f"Extensions({comma_sep_str(self.extensions)})"
-
-    def to_model(self) -> model.Term:
-        # Since extension sets will be deprecated, this is just a placeholder.
-        return model.Apply("compat.ext_set")
 
 
 @dataclass(frozen=True)

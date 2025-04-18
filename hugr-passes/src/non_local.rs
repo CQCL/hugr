@@ -53,8 +53,7 @@ mod test {
     #[test]
     fn ensures_no_nonlocal_edges() {
         let hugr = {
-            let mut builder =
-                DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
             let [in_w] = builder.input_wires_arr();
             let [out_w] = builder
                 .add_dataflow_op(Noop::new(bool_t()), [in_w])
@@ -68,12 +67,11 @@ mod test {
     #[test]
     fn find_nonlocal_edges() {
         let (hugr, edge) = {
-            let mut builder =
-                DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
             let [in_w] = builder.input_wires_arr();
             let ([out_w], edge) = {
                 let mut dfg_builder = builder
-                    .dfg_builder(Signature::new(type_row![], bool_t()).with_prelude(), [])
+                    .dfg_builder(Signature::new(type_row![], bool_t()), [])
                     .unwrap();
                 let noop = dfg_builder
                     .add_dataflow_op(Noop::new(bool_t()), [in_w])
