@@ -333,20 +333,17 @@ impl ApplyPatchHugrMut for Replacement {
         let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement);
 
         // 2. Add new edges from existing to copied nodes according to mu_in
-        let translate_idx = |n: DynNode<Node>| match n {
-            DynNode::Host(host_node) => {
-                let keep = !to_remove.contains(&host_node);
-                keep.then_some(host_node).ok_or(WhichHugr::Retained)
-            }
-            DynNode::Repl(repl_node) => node_map
-                .get(&repl_node)
-                .copied()
-                .ok_or(WhichHugr::Replacement),
+        let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
+        let kept = |n| {
+            let keep = !to_remove.contains(&n);
+            keep.then_some(n).ok_or(WhichHugr::Retained)
         };
         transfer_edges(
             h,
-            self.mu_inp.iter().map(|e| e.src_host_to_dyn()),
+            self.mu_inp.iter(),
+            kept,
             translate_idx,
+            DynEdgeSpec::HostToRepl,
             None,
         )?;
 
@@ -354,8 +351,10 @@ impl ApplyPatchHugrMut for Replacement {
         // replacing existing value/static edges incoming to targets
         transfer_edges(
             h,
-            self.mu_out.iter().map(|e| e.tgt_host_to_dyn()),
+            self.mu_out.iter(),
             translate_idx,
+            kept,
+            DynEdgeSpec::ReplToHost,
             Some(&to_remove),
         )?;
 
@@ -363,8 +362,10 @@ impl ApplyPatchHugrMut for Replacement {
         // replacing existing value/static edges incoming to targets.
         transfer_edges(
             h,
-            self.mu_new.iter().map(|e| e.src_tgt_host_to_dyn()),
-            translate_idx,
+            self.mu_new.iter(),
+            kept,
+            kept,
+            DynEdgeSpec::HostToHost,
             Some(&to_remove),
         )?;
 
@@ -398,44 +399,48 @@ impl ApplyPatchHugrMut for Replacement {
     }
 }
 
-fn transfer_edges(
+fn transfer_edges<'a, SrcNode: 'a + Copy, TgtNode: 'a + Copy>(
     h: &mut impl HugrMut,
-    edges: impl Iterator<Item = NewEdgeSpec<DynNode<Node>, DynNode<Node>>>,
-    translate_idx: impl Fn(DynNode<Node>) -> Result<Node, WhichHugr>,
+    edges: impl Iterator<Item = &'a NewEdgeSpec<SrcNode, TgtNode>>,
+    trans_src: impl Fn(SrcNode) -> Result<Node, WhichHugr>,
+    trans_tgt: impl Fn(TgtNode) -> Result<Node, WhichHugr>,
+    err_spec: impl Fn(NewEdgeSpec<SrcNode, TgtNode>) -> DynEdgeSpec<Node>,
     legal_src_ancestors: Option<&HashSet<Node>>,
 ) -> Result<(), ReplaceError> {
     for oe in edges {
+        let err_spec = err_spec(oe.clone());
         let e = NewEdgeSpec {
             // Translation can only fail for Nodes that are supposed to be in the replacement
-            src: translate_idx(oe.src)
-                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Outgoing, h, oe.clone()))?,
-            tgt: translate_idx(oe.tgt)
-                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, oe.clone()))?,
+            src: trans_src(oe.src)
+                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Outgoing, h, err_spec.clone()))?,
+            tgt: trans_tgt(oe.tgt)
+                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, err_spec.clone()))?,
             kind: oe.kind,
         };
         if !h.valid_node(e.src) {
             return Err(ReplaceError::BadEdgeSpec(
                 Direction::Outgoing,
                 WhichHugr::Retained,
-                oe.clone(),
+                err_spec.clone(),
             ));
         }
         if !h.valid_node(e.tgt) {
             return Err(ReplaceError::BadEdgeSpec(
                 Direction::Incoming,
                 WhichHugr::Retained,
-                oe.clone(),
+                err_spec.clone(),
             ));
         };
-        e.check_src(h, oe.clone())?;
-        e.check_tgt(h, oe.clone())?;
+        let err_spec = |_| err_spec.clone();
+        e.check_src(h, err_spec)?;
+        e.check_tgt(h, err_spec)?;
         match e.kind {
             NewEdgeKind::Order => {
                 h.add_other_edge(e.src, e.tgt);
             }
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
                 if let Some(legal_src_ancestors) = legal_src_ancestors {
-                    e.check_existing_edge(h, legal_src_ancestors, || oe.clone())?;
+                    e.check_existing_edge(h, legal_src_ancestors, err_spec)?;
                     h.disconnect(e.tgt, tgt_pos);
                 }
                 h.connect(e.src, src_pos, e.tgt, tgt_pos);
