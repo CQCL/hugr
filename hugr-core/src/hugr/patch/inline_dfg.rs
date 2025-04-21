@@ -2,7 +2,7 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
-use super::{ApplyPatchHugrMut, VerifyPatch};
+use super::{PatchHugrMut, PatchVerification};
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{IncomingPort, Node, OutgoingPort, PortIndex};
 
@@ -13,7 +13,8 @@ pub struct InlineDFG(pub DfgID);
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum InlineDFGError {
-    /// Node to inline was not a DFG. (E.g. node has been overwritten since the DfgID originated.)
+    /// Node to inline was not a DFG. (E.g. node has been overwritten since the
+    /// DfgID originated.)
     #[error("Node {0} was not a DFG")]
     NotDFG(Node),
     /// DFG has no parent (is the root).
@@ -21,8 +22,7 @@ pub enum InlineDFGError {
     NoParent,
 }
 
-impl VerifyPatch for InlineDFG {
-    /// Returns the removed nodes: the DFG, and its Input and Output children.
+impl PatchVerification for InlineDFG {
     type Error = InlineDFGError;
 
     type Node = Node;
@@ -43,7 +43,8 @@ impl VerifyPatch for InlineDFG {
     }
 }
 
-impl ApplyPatchHugrMut for InlineDFG {
+impl PatchHugrMut for InlineDFG {
+    /// The removed nodes: the DFG, and its Input and Output children.
     type Outcome = [Node; 3];
 
     const UNCHANGED_ON_FAILURE: bool = true;
@@ -68,7 +69,8 @@ impl ApplyPatchHugrMut for InlineDFG {
         }
         // DFG Inputs. Deal with Order inputs first
         for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
-            // Order edge from src_n to DFG => add order edge to each successor of Input node
+            // Order edge from src_n to DFG => add order edge to each successor of Input
+            // node
             debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
             for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
                 h.add_other_edge(src_n, tgt_n);

@@ -47,7 +47,7 @@ use thiserror::Error;
 use hugr_core::hugr::patch::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::sibling::SiblingMut;
 use hugr_core::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use hugr_core::hugr::{hugrmut::HugrMut, ApplyPatch, RootTagged};
+use hugr_core::hugr::{hugrmut::HugrMut, Patch, RootTagged};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
@@ -257,7 +257,7 @@ impl<H: HugrMut> CfgNester<H::Node> for IdentityCfgMap<H> {
         assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
-        let (new_block, new_cfg) = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
+        let [new_block, new_cfg] = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
         debug_assert!([entry_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));

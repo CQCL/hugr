@@ -15,7 +15,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use super::inline_dfg::InlineDFGError;
-use super::{ApplyPatchHugrMut, BoundaryPort, HostPort, ReplacementPort, VerifyPatch};
+use super::{BoundaryPort, HostPort, PatchHugrMut, PatchVerification, ReplacementPort};
 
 /// Specification of a simple replacement operation.
 ///
@@ -279,7 +279,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     }
 }
 
-impl<HostNode: HugrNode> VerifyPatch for SimpleReplacement<HostNode> {
+impl<HostNode: HugrNode> PatchVerification for SimpleReplacement<HostNode> {
     type Error = SimpleReplacementError;
     type Node = HostNode;
 
@@ -303,7 +303,7 @@ pub struct SimpleReplacementOutcome {
     pub removed_nodes: HashMap<Node, OpType>,
 }
 
-impl ApplyPatchHugrMut for SimpleReplacement<Node> {
+impl PatchHugrMut for SimpleReplacement<Node> {
     type Outcome = SimpleReplacementOutcome;
     const UNCHANGED_ON_FAILURE: bool = true;
 
@@ -385,6 +385,7 @@ pub enum SimpleReplacementError {
 pub(in crate::hugr::patch) mod test {
     use itertools::Itertools;
     use rstest::{fixture, rstest};
+
     use std::collections::{HashMap, HashSet};
 
     use crate::builder::test::n_identity;
@@ -394,8 +395,9 @@ pub(in crate::hugr::patch) mod test {
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::extension::ExtensionSet;
+    use crate::hugr::patch::PatchVerification;
     use crate::hugr::views::{HugrView, SiblingSubgraph};
-    use crate::hugr::{ApplyPatch, Hugr, HugrMut};
+    use crate::hugr::{Hugr, HugrMut, Patch};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
@@ -582,8 +584,6 @@ pub(in crate::hugr::patch) mod test {
         dfg_hugr: Hugr,
         #[values(apply_simple, apply_replace)] applicator: impl Fn(&mut Hugr, SimpleReplacement),
     ) {
-        use crate::hugr::patch::VerifyPatch;
-
         let mut h: Hugr = simple_hugr;
         // 1. Locate the CX and its successor H's in h
         let h_node_cx: Node = h

@@ -7,7 +7,7 @@ use crate::ops::{DataflowParent, OpType, DFG};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
 
-use super::{ApplyPatchHugrMut, HugrMut, VerifyPatch};
+use super::{PatchHugrMut, HugrMut, PatchVerification};
 
 /// Rewrite to inline a [Call](OpType::Call) to a known [FuncDefn](OpType::FuncDefn)
 pub struct InlineCall<N = Node>(N);
@@ -33,7 +33,7 @@ impl<N> InlineCall<N> {
     }
 }
 
-impl<N: HugrNode> VerifyPatch for InlineCall<N> {
+impl<N: HugrNode> PatchVerification for InlineCall<N> {
     type Error = InlineCallError<N>;
     type Node = N;
     fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
@@ -57,7 +57,7 @@ impl<N: HugrNode> VerifyPatch for InlineCall<N> {
     }
 }
 
-impl ApplyPatchHugrMut for InlineCall {
+impl PatchHugrMut for InlineCall {
     type Outcome = ();
     fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.

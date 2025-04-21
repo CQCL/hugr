@@ -9,7 +9,7 @@ use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{HugrView, IncomingPort};
 
-use super::{ApplyPatchHugrMut, VerifyPatch};
+use super::{PatchHugrMut, PatchVerification};
 
 use thiserror::Error;
 
@@ -47,7 +47,7 @@ pub enum IdentityInsertionError {
     InvalidPortKind(Option<EdgeKind>),
 }
 
-impl<N: Copy> VerifyPatch for IdentityInsertion<N> {
+impl<N: Copy> PatchVerification for IdentityInsertion<N> {
     type Error = IdentityInsertionError;
     type Node = N;
 
@@ -71,7 +71,7 @@ impl<N: Copy> VerifyPatch for IdentityInsertion<N> {
     }
 }
 
-impl ApplyPatchHugrMut for IdentityInsertion {
+impl PatchHugrMut for IdentityInsertion {
     /// The inserted node.
     type Outcome = Node;
 

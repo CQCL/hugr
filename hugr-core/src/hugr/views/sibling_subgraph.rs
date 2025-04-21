@@ -828,7 +828,7 @@ mod tests {
     use cool_asserts::assert_matches;
 
     use crate::builder::inout_sig;
-    use crate::hugr::ApplyPatch;
+    use crate::hugr::Patch;
     use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::std_extensions::logic::{self, LogicOp};

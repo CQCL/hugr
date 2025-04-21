@@ -12,7 +12,7 @@ use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
-use super::{ApplyPatchHugrMut, VerifyPatch};
+use super::{PatchHugrMut, VerifyPatch};
 
 /// Specifies how to create a new edge.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -200,7 +200,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
             .then_some(())
             .ok_or(ReplaceError::InvalidAdoptingParent(n))
         })?;
-        let mut transferred: HashSet<_> = self.adoptions.values().copied().collect();
+        let mut transferred: HashSet<HostNode> = self.adoptions.values().copied().collect();
         if transferred.len() != self.adoptions.values().len() {
             return Err(ReplaceError::AdopteesNotSeparateDescendants(
                 self.adoptions
@@ -229,7 +229,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
     }
 }
 
-impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
+impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
     type Error = ReplaceError<HostNode>;
     type Node = HostNode;
 
@@ -310,7 +310,7 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
     }
 }
 
-impl ApplyPatchHugrMut for Replacement {
+impl PatchHugrMut for Replacement {
     /// Map from Node in replacement to corresponding Node in the result Hugr
     type Outcome = HashMap<Node, Node>;
 
@@ -513,8 +513,8 @@ mod test {
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::hugr::internal::HugrMutInternals;
-    use crate::hugr::patch::VerifyPatch;
-    use crate::hugr::{ApplyPatch, HugrMut};
+    use crate::hugr::patch::PatchVerification;
+    use crate::hugr::{HugrMut, Patch};
     use crate::ops::custom::ExtensionOp;
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};

@@ -1,4 +1,5 @@
-//! Rewrite for inserting a CFG-node into the hierarchy containing a subsection of an existing CFG
+//! Rewrite for inserting a CFG-node into the hierarchy containing a subsection
+//! of an existing CFG
 use std::collections::HashSet;
 
 use itertools::Itertools;
@@ -17,7 +18,7 @@ use crate::ops::{DataflowBlock, OpType};
 use crate::PortIndex;
 use crate::{type_row, Node};
 
-use super::{ApplyPatchHugrMut, VerifyPatch};
+use super::{PatchHugrMut, PatchVerification};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.
@@ -95,7 +96,7 @@ impl OutlineCfg {
     }
 }
 
-impl VerifyPatch for OutlineCfg {
+impl PatchVerification for OutlineCfg {
     type Error = OutlineCfgError;
     type Node = Node;
     fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), OutlineCfgError> {
@@ -108,17 +109,17 @@ impl VerifyPatch for OutlineCfg {
     }
 }
 
-impl ApplyPatchHugrMut for OutlineCfg {
+impl PatchHugrMut for OutlineCfg {
     /// The newly-created basic block, and the [CFG] node inside it
     ///
     /// [CFG]: OpType::CFG
-    type Outcome = (Node, Node);
+    type Outcome = [Node; 2];
 
     const UNCHANGED_ON_FAILURE: bool = true;
     fn apply_hugr_mut(
         self,
         h: &mut impl HugrMut<Node = Node>,
-    ) -> Result<(Node, Node), OutlineCfgError> {
+    ) -> Result<[Node; 2], OutlineCfgError> {
         let (entry, exit, outside, extension_delta) =
             self.compute_entry_exit_outside_extensions(h)?;
         // 1. Compute signature
@@ -161,7 +162,8 @@ impl ApplyPatchHugrMut for OutlineCfg {
             )
         };
 
-        // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
+        // 3. Entry edges. Change any edges into entry_block from outside, to target
+        //    new_block
         let preds: Vec<_> = h
             .linked_outputs(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
@@ -219,7 +221,7 @@ impl ApplyPatchHugrMut for OutlineCfg {
             SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
         in_cfg_view.connect(exit, exit_port, inner_exit, 0);
 
-        Ok((new_block, cfg_node))
+        Ok([new_block, cfg_node])
     }
 }
 
@@ -246,7 +248,8 @@ pub enum OutlineCfgError {
     /// No block was identified as an entry block
     #[error("No block had predecessors outside the set")]
     NoEntryNode,
-    /// No block was found with an edge leaving the set (so, must be an infinite loop)
+    /// No block was found with an edge leaving the set (so, must be an infinite
+    /// loop)
     #[error("No block had a successor outside the set")]
     NoExitNode,
 }
@@ -454,7 +457,8 @@ mod test {
             .unwrap();
         fbuild.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = module_builder.finish_hugr().unwrap();
-        // `add_hugr_with_wires` does not return an InsertionResult, so recover the nodes manually:
+        // `add_hugr_with_wires` does not return an InsertionResult, so recover the
+        // nodes manually:
         let cfg = cfg.node();
         let exit_node = h.children(cfg).nth(1).unwrap();
         let tail = h.input_neighbours(exit_node).exactly_one().ok().unwrap();
@@ -505,7 +509,7 @@ mod test {
     ) -> (Node, Node, Node) {
         let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
         assert!(blocks.iter().all(|b| other_blocks.remove(b)));
-        let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
+        let [new_block, new_cfg] = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
 
         for n in other_blocks {
             assert_eq!(h.get_parent(n), Some(cfg))

@@ -6,7 +6,7 @@ use crate::{core::HugrNode, hugr::HugrMut, HugrView, Node};
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{ApplyPatchHugrMut, VerifyPatch};
+use super::{PatchHugrMut, PatchVerification};
 
 /// Remove a [`crate::ops::LoadConstant`] node with no consumers.
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub enum RemoveError<N = Node> {
     ValueUsed(N),
 }
 
-impl<N: HugrNode> VerifyPatch for RemoveLoadConstant<N> {
+impl<N: HugrNode> PatchVerification for RemoveLoadConstant<N> {
     type Error = RemoveError<N>;
     type Node = N;
 
@@ -51,8 +51,9 @@ impl<N: HugrNode> VerifyPatch for RemoveLoadConstant<N> {
     }
 }
 
-impl ApplyPatchHugrMut for RemoveLoadConstant {
-    // The Const node the LoadConstant was connected to.
+impl PatchHugrMut for RemoveLoadConstant {
+    /// The [`crate::ops::Const`] node the [`crate::ops::LoadConstant`] was
+    /// connected to.
     type Outcome = Node;
 
     const UNCHANGED_ON_FAILURE: bool = true;
@@ -74,7 +75,7 @@ impl ApplyPatchHugrMut for RemoveLoadConstant {
 #[derive(Debug, Clone)]
 pub struct RemoveConst<N = Node>(pub N);
 
-impl<N: HugrNode> VerifyPatch for RemoveConst<N> {
+impl<N: HugrNode> PatchVerification for RemoveConst<N> {
     type Node = N;
     type Error = RemoveError<N>;
 
@@ -97,7 +98,7 @@ impl<N: HugrNode> VerifyPatch for RemoveConst<N> {
     }
 }
 
-impl ApplyPatchHugrMut for RemoveConst {
+impl PatchHugrMut for RemoveConst {
     // The parent of the Const node.
     type Outcome = Node;
 

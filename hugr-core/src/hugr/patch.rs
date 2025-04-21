@@ -16,7 +16,7 @@ pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 use super::HugrMut;
 
 /// Verify that a patch application would succeed.
-pub trait VerifyPatch {
+pub trait PatchVerification {
     /// The type of Error with which this Rewrite may fail
     type Error: std::error::Error;
 
@@ -24,8 +24,9 @@ pub trait VerifyPatch {
     type Node;
 
     /// Checks whether the rewrite would succeed on the specified Hugr.
-    /// If this call succeeds, [self.apply] should also succeed on the same `h`
-    /// If this calls fails, [self.apply] would fail with the same error.
+    /// If this call succeeds, [Patch::apply] should also succeed on the same
+    /// `h` If this calls fails, [Patch::apply] would fail with the same
+    /// error.
     fn verify(&self, h: &impl HugrView<Node = Self::Node>) -> Result<(), Self::Error>;
 
     /// Returns a set of nodes referenced by the rewrite. Modifying any of these
@@ -36,45 +37,48 @@ pub trait VerifyPatch {
     fn invalidation_set(&self) -> impl Iterator<Item = Self::Node>;
 }
 
-/// A patch that can be applied to a Hugr of type `H`.
+/// A patch that can be applied to a mutable Hugr of type `H`.
 ///
 /// ### When to use
 ///
 /// Use this trait whenever possible in bounds for the most generality. Note
-/// that this will require specifying which types `H` the patch applies to.
+/// that this will require specifying which type `H` the patch applies to.
 ///
 /// ### When to implement
 ///
-/// For `H: HugrMut`, prefer implementing [`ApplyPatchHugrMut`] instead. This
+/// For `H: HugrMut`, prefer implementing [`PatchHugrMut`] instead. This
 /// will automatically implement this trait.
-pub trait ApplyPatch<H: HugrView>: VerifyPatch<Node = H::Node> {
+pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
     /// The type returned on successful application of the rewrite.
     type Outcome;
 
-    /// If `true`, [self.apply]'s of this rewrite guarantee that they do not mutate the Hugr when they return an Err.
-    /// If `false`, there is no guarantee; the Hugr should be assumed invalid when Err is returned.
+    /// If `true`, [Patch::apply]'s of this rewrite guarantee that they do not
+    /// mutate the Hugr when they return an Err. If `false`, there is no
+    /// guarantee; the Hugr should be assumed invalid when Err is returned.
     const UNCHANGED_ON_FAILURE: bool;
 
     /// Mutate the specified Hugr, or fail with an error.
     ///
     /// Returns [`Self::Outcome`] if successful.
-    /// If [self.unchanged_on_failure] is true, then `h` must be unchanged if Err is returned.
-    /// See also [self.verify]
+    /// If [Patch::UNCHANGED_ON_FAILURE] is true, then `h` must be unchanged if
+    /// Err is returned. See also [Patch::verify]
+    ///
     /// # Panics
-    /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that is,
-    /// implementations may begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
-    /// being preferred.
+    ///
+    /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that
+    /// is, implementations may begin with `assert!(h.validate())`, with
+    /// `debug_assert!(h.validate())` being preferred.
     fn apply(self, h: &mut H) -> Result<Self::Outcome, Self::Error>;
 }
 
-/// A patch that can be applied to any HugrMut.
+/// A patch that can be applied to any [`HugrMut`].
 ///
-/// This trait is a generalisation of [`ApplyPatch`] in that it guarantees that
+/// This trait is a generalisation of [`Patch`] in that it guarantees that
 /// the patch can be applied to any type implementing [`HugrMut`].
 ///
 /// ### When to use
 ///
-/// Prefer using the more general [`ApplyPatch`] trait in bounds where the
+/// Prefer using the more general [`Patch`] trait in bounds where the
 /// type `H` is known. Resort to this trait if patches must be applicable to
 /// any [`HugrMut`] instance.
 ///
@@ -82,28 +86,29 @@ pub trait ApplyPatch<H: HugrView>: VerifyPatch<Node = H::Node> {
 ///
 /// Always implement this trait when possible, to define how a patch is applied
 /// to any type implementing [`HugrMut`]. A blanket implementation ensures that
-/// any type implementing this trait also implements [`ApplyPatch`].
-pub trait ApplyPatchHugrMut: VerifyPatch<Node = Node> {
+/// any type implementing this trait also implements [`Patch`].
+pub trait PatchHugrMut: PatchVerification<Node = Node> {
     /// The type returned on successful application of the rewrite.
     type Outcome;
 
-    /// If `true`, [self.apply]'s of this rewrite guarantee that they do not mutate the Hugr when they return an Err.
-    /// If `false`, there is no guarantee; the Hugr should be assumed invalid when Err is returned.
+    /// If `true`, [self.apply]'s of this rewrite guarantee that they do not
+    /// mutate the Hugr when they return an Err. If `false`, there is no
+    /// guarantee; the Hugr should be assumed invalid when Err is returned.
     const UNCHANGED_ON_FAILURE: bool;
 
     /// Mutate the specified Hugr, or fail with an error.
     ///
     /// Returns [`Self::Outcome`] if successful.
-    /// If [self.unchanged_on_failure] is true, then `h` must be unchanged if Err is returned.
-    /// See also [self.verify]
+    /// If [self.unchanged_on_failure] is true, then `h` must be unchanged if
+    /// Err is returned. See also [self.verify]
     /// # Panics
-    /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that is,
-    /// implementations may begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
-    /// being preferred.
+    /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that
+    /// is, implementations may begin with `assert!(h.validate())`, with
+    /// `debug_assert!(h.validate())` being preferred.
     fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error>;
 }
 
-impl<H: HugrMut, R: ApplyPatchHugrMut> ApplyPatch<H> for R {
+impl<H: HugrMut, R: PatchHugrMut> Patch<H> for R {
     type Outcome = R::Outcome;
     const UNCHANGED_ON_FAILURE: bool = R::UNCHANGED_ON_FAILURE;
 
@@ -117,7 +122,7 @@ pub struct Transactional<R> {
     underlying: R,
 }
 
-impl<R: VerifyPatch> VerifyPatch for Transactional<R> {
+impl<R: PatchVerification> PatchVerification for Transactional<R> {
     type Error = R::Error;
     type Node = R::Node;
 
@@ -131,9 +136,9 @@ impl<R: VerifyPatch> VerifyPatch for Transactional<R> {
     }
 }
 
-// Note we might like to constrain R to Rewrite<unchanged_on_failure=false> but this
-// is not yet supported, https://github.com/rust-lang/rust/issues/92827
-impl<R: ApplyPatchHugrMut> ApplyPatchHugrMut for Transactional<R> {
+// Note we might like to constrain R to Rewrite<unchanged_on_failure=false> but
+// this is not yet supported, https://github.com/rust-lang/rust/issues/92827
+impl<R: PatchHugrMut> PatchHugrMut for Transactional<R> {
     type Outcome = R::Outcome;
     const UNCHANGED_ON_FAILURE: bool = true;
 
@@ -155,7 +160,7 @@ impl<R: ApplyPatchHugrMut> ApplyPatchHugrMut for Transactional<R> {
             while let Some(child) = h.first_child(h.root()) {
                 h.remove_node(child);
             }
-            h.insert_from_view(h.root(), &backup);
+            h.insert_hugr(h.root(), backup);
         }
         r
     }

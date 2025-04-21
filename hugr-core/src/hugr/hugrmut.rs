@@ -9,7 +9,7 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::extension::ExtensionRegistry;
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{ApplyPatch, NodeMetadata};
+use crate::hugr::{Patch, NodeMetadata};
 use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::ops::OpTrait;
 use crate::types::Substitution;
@@ -268,7 +268,7 @@ pub trait HugrMut: HugrMutInternals {
     /// Applies a rewrite to the graph.
     fn apply_rewrite<R, E>(
         &mut self,
-        rw: impl ApplyPatch<Self, Outcome = R, Error = E>,
+        rw: impl Patch<Self, Outcome = R, Error = E>,
     ) -> Result<R, E>
     where
         Self: Sized,
