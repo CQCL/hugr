@@ -60,6 +60,9 @@ impl NodeTemplate {
     /// # Panics
     ///
     /// * If `parent` is not in the `hugr`
+    ///
+    /// # Errors
+    ///
     /// * If `self` is a [Self::Call] and the target Node either
     ///    * is neither a [FuncDefn] nor a [FuncDecl]
     ///    * has a [`signature`] which the type-args of the [Self::Call] do not match
