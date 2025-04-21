@@ -65,16 +65,16 @@ impl NodeTemplate {
     ///    * has a [`signature`] which the type-args of the [Self::Call] do not match
     ///
     /// [`signature`]: hugr_core::types::PolyFuncType
-    pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Node {
+    pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Result<Node, AddTemplateError> {
         match self {
-            NodeTemplate::SingleOp(op_type) => hugr.add_node_with_parent(parent, op_type),
-            NodeTemplate::CompoundOp(new_h) => hugr.insert_hugr(parent, *new_h).new_root,
+            NodeTemplate::SingleOp(op_type) => Ok(hugr.add_node_with_parent(parent, op_type)),
+            NodeTemplate::CompoundOp(new_h) => Ok(hugr.insert_hugr(parent, *new_h).new_root),
             NodeTemplate::Call(target, type_args) => {
-                let c = call(hugr, target, type_args);
+                let c = call(hugr, target, type_args)?;
                 let tgt_port = c.called_function_port();
                 let n = hugr.add_node_with_parent(parent, c);
                 hugr.connect(target, 0, n, tgt_port);
-                n
+                Ok(n)
             }
         }
     }
@@ -96,7 +96,7 @@ impl NodeTemplate {
         }
     }
 
-    fn replace(&self, hugr: &mut impl HugrMut, n: Node) {
+    fn replace(&self, hugr: &mut impl HugrMut, n: Node) -> Result<(), AddTemplateError> {
         assert_eq!(hugr.children(n).count(), 0);
         let new_optype = match self.clone() {
             NodeTemplate::SingleOp(op_type) => op_type,
@@ -110,7 +110,7 @@ impl NodeTemplate {
                 root_opty
             }
             NodeTemplate::Call(func, type_args) => {
-                let c = call(hugr, func, type_args);
+                let c = call(hugr, func, type_args)?;
                 let static_inport = c.called_function_port();
                 // insert an input for the Call static input
                 hugr.insert_ports(n, Direction::Incoming, static_inport.index(), 1);
@@ -120,6 +120,7 @@ impl NodeTemplate {
             }
         };
         *hugr.optype_mut(n) = new_optype;
+        Ok(())
     }
 
     fn check_signature(
@@ -141,13 +142,31 @@ impl NodeTemplate {
     }
 }
 
-fn call<H: HugrView>(h: &H, func: H::Node, type_args: Vec<TypeArg>) -> Call {
+fn call<H: HugrView<Node = Node>>(
+    h: &H,
+    func: Node,
+    type_args: Vec<TypeArg>,
+) -> Result<Call, AddTemplateError> {
+    if !h.contains_node(func) {
+        return Err(AddTemplateError::NotFunction(func, "absent".to_string()));
+    }
     let func_sig = match h.get_optype(func) {
         OpType::FuncDecl(fd) => fd.signature.clone(),
         OpType::FuncDefn(fd) => fd.signature.clone(),
-        o => panic!("Node {func}: expected FuncDecl or FuncDefn, got {o:?}"),
+        o => return Err(AddTemplateError::NotFunction(func, o.to_string())),
     };
-    Call::try_new(func_sig, type_args).unwrap()
+    Ok(Call::try_new(func_sig, type_args)?)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
+#[allow(missing_docs)]
+/// An error from [NodeTemplate::add_hugr], currently only from [NodeTemplate::Call]s
+pub enum AddTemplateError {
+    #[error("Target {0} of call was not a function but was {1}")]
+    NotFunction(Node, String),
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
 }
 
 /// A configuration of what types, ops, and constants should be replaced with what.
@@ -238,6 +257,8 @@ pub enum ReplaceTypesError {
     ConstError(#[from] ConstTypeError),
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
+    #[error("Replacement op for {0} could not be added because {1}")]
+    AddTemplateError(Node, AddTemplateError),
 }
 
 impl ReplaceTypes {
@@ -459,8 +480,11 @@ impl ReplaceTypes {
 
             OpType::Const(Const { value, .. }) => self.change_value(value),
             OpType::ExtensionOp(ext_op) => Ok(
+                // Copy/discard insertion done by caller
                 if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
-                    replacement.replace(hugr, n); // Copy/discard insertion done by caller
+                    replacement
+                        .replace(hugr, n)
+                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
                     true
                 } else {
                     let def = ext_op.def_arc();
@@ -471,7 +495,9 @@ impl ReplaceTypes {
                         .get(&def.as_ref().into())
                         .and_then(|rep_fn| rep_fn(&args))
                     {
-                        replacement.replace(hugr, n);
+                        replacement
+                            .replace(hugr, n)
+                            .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
                         true
                     } else {
                         if ch {

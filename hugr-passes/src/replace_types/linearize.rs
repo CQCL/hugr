@@ -11,6 +11,7 @@ use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
+use super::AddTemplateError;
 use super::{handlers::linearize_array, NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
@@ -75,9 +76,11 @@ pub trait Linearizer {
                     tgt_parent,
                 });
             }
+            let typ = typ.clone(); // Stop borrowing hugr in order to add_hugr to it
             let copy_discard_op = self
-                .copy_discard_op(typ, targets.len())?
-                .add_hugr(hugr, src_parent);
+                .copy_discard_op(&typ, targets.len())?
+                .add_hugr(hugr, src_parent)
+                .map_err(|e| LinearizeError::NestedTemplateError(typ, e))?;
             for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
                 hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
             }
@@ -162,6 +165,8 @@ pub enum LinearizeError {
     /// Neither does linearization make sense for copyable types
     #[error("Type {_0} is copyable")]
     CopyableType(Type),
+    #[error("Could not add operation for contained type {0} because {1}")]
+    NestedTemplateError(Type, AddTemplateError),
 }
 
 impl DelegatingLinearizer {
