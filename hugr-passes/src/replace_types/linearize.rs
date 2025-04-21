@@ -353,7 +353,9 @@ mod test {
     use std::iter::successors;
     use std::sync::Arc;
 
-    use hugr_core::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
+    use hugr_core::builder::{
+        inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
     use hugr_core::extension::simple_op::MakeExtensionOp;
@@ -376,7 +378,7 @@ mod test {
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_array;
-    use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
+    use crate::replace_types::{AddTemplateError, LinearizeError, NodeTemplate, ReplaceTypesError};
     use crate::ReplaceTypes;
 
     const LIN_T: &str = "Lin";
@@ -767,5 +769,65 @@ mod test {
             TypeEnum::Function(_)
         ));
         assert_eq!(copy_sig.input[2..], copy_sig.output[1..]);
+    }
+
+    #[test]
+    fn call_ok_except_in_array() {
+        let (e, _) = ext_lowerer();
+        let lin_ct = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
+        let lin_t: Type = lin_ct.clone().into();
+
+        // A simple Hugr that discards a usize_t, with a "drop" function
+        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
+        let discard_fn = {
+            let mut fb = dfb
+                .define_function("drop", inout_sig(lin_t.clone(), type_row![]))
+                .unwrap();
+            let ins = fb.input_wires();
+            fb.add_dataflow_op(
+                ExtensionOp::new(e.get_op("discard").unwrap().clone(), []).unwrap(),
+                ins,
+            )
+            .unwrap();
+            fb.finish_with_outputs([]).unwrap()
+        }
+        .node();
+        let backup = dfb.finish_hugr().unwrap();
+
+        let mut lower_discard_to_call = ReplaceTypes::default();
+        // The `copy_fn` here will break completely, but we don't use it
+        lower_discard_to_call
+            .linearizer()
+            .register_simple(
+                lin_ct.clone(),
+                NodeTemplate::Call(backup.root(), vec![]),
+                NodeTemplate::Call(discard_fn, vec![]),
+            )
+            .unwrap();
+
+        // Ok to lower usize_t to lin_t and call that function
+        {
+            let mut lowerer = lower_discard_to_call.clone();
+            lowerer.replace_type(usize_t().as_extension().unwrap().clone(), lin_t.clone());
+            let mut h = backup.clone();
+            lowerer.run(&mut h).unwrap();
+            assert_eq!(h.output_neighbours(discard_fn).count(), 1);
+        }
+
+        // But if we lower usize_t to array<lin_t>, the call will fail
+        lower_discard_to_call.replace_type(
+            usize_t().as_extension().unwrap().clone(),
+            array_type(4, lin_ct.into()),
+        );
+        let r = lower_discard_to_call.run(&mut backup.clone());
+        assert!(matches!(
+            r,
+            Err(ReplaceTypesError::LinearizeError(
+                LinearizeError::NestedTemplateError(
+                    nested_t,
+                    AddTemplateError::NotFunction(tgt, _)
+                )
+            )) if nested_t == lin_t && tgt == discard_fn
+        ));
     }
 }
