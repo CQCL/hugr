@@ -239,7 +239,7 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
         // Edge sources...
         for e in self.mu_inp.iter() {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
-                return Err(ReplaceError::BadEdgeSpec(
+                return Err(mk_bad_edge_spec(
                     Direction::Outgoing,
                     WhichHugr::Retained,
                     DynEdgeSpec::HostToRepl(e.clone()),
@@ -249,7 +249,7 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
         }
         for e in self.mu_new.iter() {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
-                return Err(ReplaceError::BadEdgeSpec(
+                return Err(mk_bad_edge_spec(
                     Direction::Outgoing,
                     WhichHugr::Retained,
                     DynEdgeSpec::HostToHost(e.clone()),
@@ -261,7 +261,7 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
             .iter()
             .try_for_each(|e| match self.replacement.valid_non_root(e.src) {
                 true => e.check_src(&self.replacement, DynEdgeSpec::ReplToHost),
-                false => Err(ReplaceError::BadEdgeSpec(
+                false => Err(mk_bad_edge_spec(
                     Direction::Outgoing,
                     WhichHugr::Replacement,
                     DynEdgeSpec::ReplToHost(e.clone()),
@@ -272,7 +272,7 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
             .iter()
             .try_for_each(|e| match self.replacement.valid_non_root(e.tgt) {
                 true => e.check_tgt(&self.replacement, DynEdgeSpec::HostToRepl),
-                false => Err(ReplaceError::BadEdgeSpec(
+                false => Err(mk_bad_edge_spec(
                     Direction::Incoming,
                     WhichHugr::Replacement,
                     DynEdgeSpec::HostToRepl(e.clone()),
@@ -280,7 +280,7 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
             })?;
         for e in self.mu_out.iter() {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
-                return Err(ReplaceError::BadEdgeSpec(
+                return Err(mk_bad_edge_spec(
                     Direction::Incoming,
                     WhichHugr::Retained,
                     DynEdgeSpec::ReplToHost(e.clone()),
@@ -295,7 +295,7 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
         }
         for e in self.mu_new.iter() {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
-                return Err(ReplaceError::BadEdgeSpec(
+                return Err(mk_bad_edge_spec(
                     Direction::Incoming,
                     WhichHugr::Retained,
                     DynEdgeSpec::HostToHost(e.clone()),
@@ -412,20 +412,20 @@ fn transfer_edges<'a, SrcNode: 'a + Copy, TgtNode: 'a + Copy>(
         let e = NewEdgeSpec {
             // Translation can only fail for Nodes that are supposed to be in the replacement
             src: trans_src(oe.src)
-                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Outgoing, h, err_spec.clone()))?,
+                .map_err(|h| mk_bad_edge_spec(Direction::Outgoing, h, err_spec.clone()))?,
             tgt: trans_tgt(oe.tgt)
-                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, err_spec.clone()))?,
+                .map_err(|h| mk_bad_edge_spec(Direction::Incoming, h, err_spec.clone()))?,
             kind: oe.kind,
         };
         if !h.valid_node(e.src) {
-            return Err(ReplaceError::BadEdgeSpec(
+            return Err(mk_bad_edge_spec(
                 Direction::Outgoing,
                 WhichHugr::Retained,
                 err_spec.clone(),
             ));
         }
         if !h.valid_node(e.tgt) {
-            return Err(ReplaceError::BadEdgeSpec(
+            return Err(mk_bad_edge_spec(
                 Direction::Incoming,
                 WhichHugr::Retained,
                 err_spec.clone(),
@@ -478,7 +478,7 @@ pub enum ReplaceError<HostNode = Node> {
     #[error("Nodes not free to be moved into new locations: {0:?}")]
     AdopteesNotSeparateDescendants(Vec<HostNode>),
     /// A node at one end of a [NewEdgeSpec] was not found
-    #[error("{0:?} end of edge {2:?} not found in {1}")]
+    #[error("{0:?} end of edge {2:?} not found in {1:?}")]
     BadEdgeSpec(Direction, WhichHugr, DynEdgeSpec<HostNode>),
     /// The target of the edge was found, but there was no existing edge to replace
     #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
@@ -486,6 +486,11 @@ pub enum ReplaceError<HostNode = Node> {
     /// The [NewEdgeKind] was not applicable for the source/target node(s)
     #[error("The edge kind was not applicable to the {0:?} node: {1:?}")]
     BadEdgeKind(Direction, DynEdgeSpec<HostNode>),
+}
+
+fn mk_bad_edge_spec<N>(d: Direction, h: WhichHugr, e: DynEdgeSpec<N>) -> ReplaceError<N> {
+    assert_eq!(e.which_hugr(d), h);
+    ReplaceError::BadEdgeSpec(d, h, e)
 }
 
 /// A Hugr or portion thereof that is part of the [Replacement]
@@ -508,6 +513,16 @@ pub enum DynEdgeSpec<HostNode> {
     /// An edge between two nodes in the host (bypassing the replacement),
     /// i.e. [Replacement::mu_new]
     HostToHost(NewEdgeSpec<HostNode, HostNode>),
+}
+
+impl<HostNode> DynEdgeSpec<HostNode> {
+    fn which_hugr(&self, d: Direction) -> WhichHugr {
+        match (self, d) {
+            (Self::HostToRepl(_), Direction::Incoming)
+            | (Self::ReplToHost(_), Direction::Outgoing) => WhichHugr::Replacement,
+            _ => WhichHugr::Retained,
+        }
+    }
 }
 
 impl std::fmt::Display for WhichHugr {
@@ -861,7 +876,7 @@ mod test {
                 mu_inp: vec![edge_from_removed.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeSpec(
+            super::mk_bad_edge_spec(
                 Direction::Outgoing,
                 WhichHugr::Retained,
                 DynEdgeSpec::HostToRepl(edge_from_removed)
@@ -877,7 +892,7 @@ mod test {
                 mu_out: vec![bad_out_edge.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeSpec(
+            super::mk_bad_edge_spec(
                 Direction::Outgoing,
                 WhichHugr::Replacement,
                 DynEdgeSpec::ReplToHost(bad_out_edge),
