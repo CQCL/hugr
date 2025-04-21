@@ -477,16 +477,6 @@ pub enum ReplaceError<HostNode = Node> {
     BadEdgeKind(Direction, DynEdgeSpec<HostNode>),
 }
 
-/// A Hugr or portion thereof that is part of the [Replacement]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum WhichHugr {
-    /// The newly-inserted nodes, i.e. the [Replacement::replacement]
-    Replacement,
-    /// Nodes in the existing Hugr that are not [Replacement::removal]
-    /// (or are on the RHS of an entry in [Replacement::adoptions])
-    Retained,
-}
-
 /// The three kinds of edge that may appear in a [ReplaceError]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DynEdgeSpec<HostNode> {
@@ -500,21 +490,12 @@ pub enum DynEdgeSpec<HostNode> {
 }
 
 impl<HostNode> DynEdgeSpec<HostNode> {
-    fn which_hugr(&self, d: Direction) -> WhichHugr {
+    fn which_hugr(&self, d: Direction) -> &str {
         match (self, d) {
             (Self::HostToRepl(_), Direction::Incoming)
-            | (Self::ReplToHost(_), Direction::Outgoing) => WhichHugr::Replacement,
-            _ => WhichHugr::Retained,
+            | (Self::ReplToHost(_), Direction::Outgoing) => "replacement Hugr",
+            _ => "retained portion of Hugr",
         }
-    }
-}
-
-impl std::fmt::Display for WhichHugr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Replacement => "replacement Hugr",
-            Self::Retained => "retained portion of Hugr",
-        })
     }
 }
 
