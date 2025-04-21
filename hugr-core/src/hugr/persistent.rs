@@ -64,6 +64,9 @@
 mod resolver;
 mod state_space;
 mod trait_impls;
+pub mod walker;
+
+pub use walker::{PinnedWire, Walker};
 
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
