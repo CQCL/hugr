@@ -296,15 +296,15 @@ impl<HostNode: HugrNode> VerifyPatch for SimpleReplacement<HostNode> {
 }
 
 /// Result of applying a [`SimpleReplacement`].
-pub struct ApplyOutcome {
+pub struct SimpleReplacementOutcome {
     /// Map from Node in replacement to corresponding Node in the result Hugr
     pub node_map: HashMap<Node, Node>,
     /// Nodes removed from the result Hugr and their weights
-    pub removed_nodes: Vec<(Node, OpType)>,
+    pub removed_nodes: HashMap<Node, OpType>,
 }
 
 impl ApplyPatchHugrMut for SimpleReplacement<Node> {
-    type Outcome = ApplyOutcome;
+    type Outcome = SimpleReplacementOutcome;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
@@ -356,7 +356,7 @@ impl ApplyPatchHugrMut for SimpleReplacement<Node> {
             .map(|&node| (node, h.remove_node(node)))
             .collect();
 
-        Ok(ApplyOutcome {
+        Ok(SimpleReplacementOutcome {
             node_map,
             removed_nodes,
         })
