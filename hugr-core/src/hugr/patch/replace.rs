@@ -327,11 +327,8 @@ impl ApplyPatchHugrMut for Replacement {
         let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement);
 
         // 2. Add new edges from existing to copied nodes according to mu_in
-        let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
-        let kept = |n| {
-            let keep = !to_remove.contains(&n);
-            keep.then_some(n).ok_or(WhichHugr::Retained)
-        };
+        let translate_idx = |n| node_map.get(&n).copied();
+        let kept = |n| (!to_remove.contains(&n)).then_some(n);
         transfer_edges(
             h,
             self.mu_inp.iter(),
@@ -396,8 +393,8 @@ impl ApplyPatchHugrMut for Replacement {
 fn transfer_edges<'a, SrcNode: 'a + Copy, TgtNode: 'a + Copy>(
     h: &mut impl HugrMut,
     edges: impl Iterator<Item = &'a NewEdgeSpec<SrcNode, TgtNode>>,
-    trans_src: impl Fn(SrcNode) -> Result<Node, WhichHugr>,
-    trans_tgt: impl Fn(TgtNode) -> Result<Node, WhichHugr>,
+    trans_src: impl Fn(SrcNode) -> Option<Node>,
+    trans_tgt: impl Fn(TgtNode) -> Option<Node>,
     err_spec: impl Fn(NewEdgeSpec<SrcNode, TgtNode>) -> DynEdgeSpec<Node>,
     legal_src_ancestors: Option<&HashSet<Node>>,
 ) -> Result<(), ReplaceError> {
@@ -406,9 +403,9 @@ fn transfer_edges<'a, SrcNode: 'a + Copy, TgtNode: 'a + Copy>(
         let e = NewEdgeSpec {
             // Translation can only fail for Nodes that are supposed to be in the replacement
             src: trans_src(oe.src)
-                .map_err(|_h| ReplaceError::BadEdgeSpec(Direction::Outgoing, err_spec.clone()))?,
+                .ok_or_else(|| ReplaceError::BadEdgeSpec(Direction::Outgoing, err_spec.clone()))?,
             tgt: trans_tgt(oe.tgt)
-                .map_err(|_h| ReplaceError::BadEdgeSpec(Direction::Incoming, err_spec.clone()))?,
+                .ok_or_else(|| ReplaceError::BadEdgeSpec(Direction::Incoming, err_spec.clone()))?,
             kind: oe.kind,
         };
         if !h.valid_node(e.src) {
