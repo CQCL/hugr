@@ -65,7 +65,7 @@ impl NodeTemplate {
     ///    * has a [`signature`] which the type-args of the [Self::Call] do not match
     ///
     /// [`signature`]: hugr_core::types::PolyFuncType
-    pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Result<Node, AddTemplateError> {
+    pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Result<Node, BuildError> {
         match self {
             NodeTemplate::SingleOp(op_type) => Ok(hugr.add_node_with_parent(parent, op_type)),
             NodeTemplate::CompoundOp(new_h) => Ok(hugr.insert_hugr(parent, *new_h).new_root),
@@ -96,7 +96,7 @@ impl NodeTemplate {
         }
     }
 
-    fn replace(&self, hugr: &mut impl HugrMut, n: Node) -> Result<(), AddTemplateError> {
+    fn replace(&self, hugr: &mut impl HugrMut, n: Node) -> Result<(), BuildError> {
         assert_eq!(hugr.children(n).count(), 0);
         let new_optype = match self.clone() {
             NodeTemplate::SingleOp(op_type) => op_type,
@@ -146,27 +146,18 @@ fn call<H: HugrView<Node = Node>>(
     h: &H,
     func: Node,
     type_args: Vec<TypeArg>,
-) -> Result<Call, AddTemplateError> {
-    if !h.contains_node(func) {
-        return Err(AddTemplateError::NotFunction(func, "absent".to_string()));
-    }
+) -> Result<Call, BuildError> {
     let func_sig = match h.get_optype(func) {
         OpType::FuncDecl(fd) => fd.signature.clone(),
         OpType::FuncDefn(fd) => fd.signature.clone(),
-        o => return Err(AddTemplateError::NotFunction(func, o.to_string())),
+        _ => {
+            return Err(BuildError::UnexpectedType {
+                node: func,
+                op_desc: "func defn/decl",
+            })
+        }
     };
     Ok(Call::try_new(func_sig, type_args)?)
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
-#[non_exhaustive]
-#[allow(missing_docs)]
-/// An error from [NodeTemplate::add_hugr], currently only from [NodeTemplate::Call]s
-pub enum AddTemplateError {
-    #[error("Target {0} of call was not a function but was {1}")]
-    NotFunction(Node, String),
-    #[error(transparent)]
-    SignatureError(#[from] SignatureError),
 }
 
 /// A configuration of what types, ops, and constants should be replaced with what.
@@ -258,7 +249,7 @@ pub enum ReplaceTypesError {
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
     #[error("Replacement op for {0} could not be added because {1}")]
-    AddTemplateError(Node, AddTemplateError),
+    AddTemplateError(Node, BuildError),
 }
 
 impl ReplaceTypes {

@@ -2,8 +2,8 @@ use std::iter::repeat;
 use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::builder::{
-    inout_sig, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    HugrBuilder,
+    inout_sig, BuildError, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr,
+    DataflowSubContainer, HugrBuilder,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
@@ -11,7 +11,6 @@ use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
-use super::AddTemplateError;
 use super::{handlers::linearize_array, NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
@@ -135,7 +134,7 @@ impl Default for DelegatingLinearizer {
 // rather than passing a &DelegatingLinearizer directly)
 pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 
-#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[allow(missing_docs)]
 #[non_exhaustive]
 pub enum LinearizeError {
@@ -165,8 +164,10 @@ pub enum LinearizeError {
     /// Neither does linearization make sense for copyable types
     #[error("Type {_0} is copyable")]
     CopyableType(Type),
-    #[error("Could not add operation for contained type {0} because {1}")]
-    NestedTemplateError(Type, AddTemplateError),
+    /// Error may be returned by a callback for e.g. a container because it could
+    /// not generate a [NodeTemplate] because of a problem with an element
+    #[error("Could not generate NodeTemplate for contained type {0} because {1}")]
+    NestedTemplateError(Type, BuildError),
 }
 
 impl DelegatingLinearizer {
@@ -354,7 +355,8 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder,
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
@@ -378,7 +380,7 @@ mod test {
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_array;
-    use crate::replace_types::{AddTemplateError, LinearizeError, NodeTemplate, ReplaceTypesError};
+    use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
     use crate::ReplaceTypes;
 
     const LIN_T: &str = "Lin";
@@ -825,9 +827,9 @@ mod test {
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::NestedTemplateError(
                     nested_t,
-                    AddTemplateError::NotFunction(tgt, _)
+                    BuildError::UnexpectedType { node, .. }
                 )
-            )) if nested_t == lin_t && tgt == discard_fn
+            )) if nested_t == lin_t && node == discard_fn
         ));
     }
 }

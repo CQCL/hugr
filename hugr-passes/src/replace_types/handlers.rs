@@ -92,7 +92,7 @@ pub fn linearize_array(
             let [to_discard] = dfb.input_wires_arr();
             lin.copy_discard_op(ty, 0)?
                 .add(&mut dfb, [to_discard])
-                .unwrap();
+                .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?;
             let ret = dfb.add_load_value(Value::unary_unit_sum());
             dfb.finish_hugr_with_outputs([ret]).unwrap()
         };
@@ -162,7 +162,7 @@ pub fn linearize_array(
         let mut copies = lin
             .copy_discard_op(ty, num_outports)?
             .add(&mut dfb, [elem])
-            .unwrap()
+            .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?
             .outputs();
         let copy0 = copies.next().unwrap(); // We'll return this directly
 
