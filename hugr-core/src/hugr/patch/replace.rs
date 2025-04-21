@@ -87,7 +87,7 @@ impl<SrcNode: Copy, TgtNode: Copy> NewEdgeSpec<SrcNode, TgtNode> {
     fn check_src<HostNode>(
         &self,
         h: &impl HugrView<Node = SrcNode>,
-        err_spec: NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
+        err_spec: impl Fn(Self) -> DynEdgeSpec<HostNode>,
     ) -> Result<(), ReplaceError<HostNode>> {
         let optype = h.get_optype(self.src);
         let ok = match self.kind {
@@ -104,13 +104,13 @@ impl<SrcNode: Copy, TgtNode: Copy> NewEdgeSpec<SrcNode, TgtNode> {
             }
         };
         ok.then_some(())
-            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Outgoing, err_spec))
+            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Outgoing, err_spec(self.clone())))
     }
 
     fn check_tgt<HostNode>(
         &self,
         h: &impl HugrView<Node = TgtNode>,
-        err_spec: NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
+        err_spec: impl Fn(Self) -> DynEdgeSpec<HostNode>,
     ) -> Result<(), ReplaceError<HostNode>> {
         let optype = h.get_optype(self.tgt);
         let ok = match self.kind {
@@ -128,16 +128,16 @@ impl<SrcNode: Copy, TgtNode: Copy> NewEdgeSpec<SrcNode, TgtNode> {
             ),
         };
         ok.then_some(())
-            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Incoming, err_spec))
+            .ok_or_else(|| ReplaceError::BadEdgeKind(Direction::Incoming, err_spec(self.clone())))
     }
 }
 
-impl<HostNode: HugrNode, N> NewEdgeSpec<N, HostNode> {
+impl<HostNode: HugrNode, N: Clone> NewEdgeSpec<N, HostNode> {
     fn check_existing_edge(
         &self,
         h: &impl HugrView<Node = HostNode>,
         legal_src_ancestors: &HashSet<HostNode>,
-        err_edge: impl Fn() -> NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
+        err_edge: impl Fn(Self) -> DynEdgeSpec<HostNode>,
     ) -> Result<(), ReplaceError<HostNode>> {
         if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
         {
@@ -154,7 +154,7 @@ impl<HostNode: HugrNode, N> NewEdgeSpec<N, HostNode> {
                 .single_linked_output(self.tgt, tgt_pos)
                 .is_some_and(|(src_n, _)| descends_from_legal(src_n));
             if !found_incoming {
-                return Err(ReplaceError::NoRemovedEdge(err_edge()));
+                return Err(ReplaceError::NoRemovedEdge(err_edge(self.clone())));
             };
         };
         Ok(())
@@ -242,40 +242,40 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
                 return Err(ReplaceError::BadEdgeSpec(
                     Direction::Outgoing,
                     WhichHugr::Retained,
-                    e.src_host_to_dyn(),
+                    DynEdgeSpec::HostToRepl(e.clone()),
                 ));
             }
-            e.check_src(h, e.src_host_to_dyn())?;
+            e.check_src(h, DynEdgeSpec::HostToRepl)?;
         }
         for e in self.mu_new.iter() {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
                 return Err(ReplaceError::BadEdgeSpec(
                     Direction::Outgoing,
                     WhichHugr::Retained,
-                    e.src_tgt_host_to_dyn(),
+                    DynEdgeSpec::HostToHost(e.clone()),
                 ));
             }
-            e.check_src(h, e.src_tgt_host_to_dyn())?;
+            e.check_src(h, DynEdgeSpec::HostToHost)?;
         }
         self.mu_out
             .iter()
             .try_for_each(|e| match self.replacement.valid_non_root(e.src) {
-                true => e.check_src(&self.replacement, e.tgt_host_to_dyn()),
+                true => e.check_src(&self.replacement, DynEdgeSpec::ReplToHost),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Outgoing,
                     WhichHugr::Replacement,
-                    e.tgt_host_to_dyn(),
+                    DynEdgeSpec::ReplToHost(e.clone()),
                 )),
             })?;
         // Edge targets...
         self.mu_inp
             .iter()
             .try_for_each(|e| match self.replacement.valid_non_root(e.tgt) {
-                true => e.check_tgt(&self.replacement, e.src_host_to_dyn()),
+                true => e.check_tgt(&self.replacement, DynEdgeSpec::HostToRepl),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Incoming,
                     WhichHugr::Replacement,
-                    e.src_host_to_dyn(),
+                    DynEdgeSpec::HostToRepl(e.clone()),
                 )),
             })?;
         for e in self.mu_out.iter() {
@@ -283,30 +283,30 @@ impl<HostNode: HugrNode> VerifyPatch for Replacement<HostNode> {
                 return Err(ReplaceError::BadEdgeSpec(
                     Direction::Incoming,
                     WhichHugr::Retained,
-                    e.tgt_host_to_dyn(),
+                    DynEdgeSpec::ReplToHost(e.clone()),
                 ));
             }
-            e.check_tgt(h, e.tgt_host_to_dyn())?;
+            e.check_tgt(h, DynEdgeSpec::ReplToHost)?;
             // The descendant check is to allow the case where the old edge is nonlocal
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
             // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-            e.check_existing_edge(h, &removed, || e.tgt_host_to_dyn())?;
+            e.check_existing_edge(h, &removed, DynEdgeSpec::ReplToHost)?;
         }
         for e in self.mu_new.iter() {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
                 return Err(ReplaceError::BadEdgeSpec(
                     Direction::Incoming,
                     WhichHugr::Retained,
-                    e.src_tgt_host_to_dyn(),
+                    DynEdgeSpec::HostToHost(e.clone()),
                 ));
             }
-            e.check_tgt(h, e.src_tgt_host_to_dyn())?;
+            e.check_tgt(h, DynEdgeSpec::HostToHost)?;
             // The descendant check is to allow the case where the old edge is nonlocal
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
             // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-            e.check_existing_edge(h, &removed, || e.src_tgt_host_to_dyn())?;
+            e.check_existing_edge(h, &removed, DynEdgeSpec::HostToHost)?;
         }
         Ok(())
     }
@@ -522,17 +522,13 @@ pub enum ReplaceError<HostNode = Node> {
     AdopteesNotSeparateDescendants(Vec<HostNode>),
     /// A node at one end of a [NewEdgeSpec] was not found
     #[error("{0:?} end of edge {2:?} not found in {1}")]
-    BadEdgeSpec(
-        Direction,
-        WhichHugr,
-        NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>,
-    ),
+    BadEdgeSpec(Direction, WhichHugr, DynEdgeSpec<HostNode>),
     /// The target of the edge was found, but there was no existing edge to replace
     #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
-    NoRemovedEdge(NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>),
+    NoRemovedEdge(DynEdgeSpec<HostNode>),
     /// The [NewEdgeKind] was not applicable for the source/target node(s)
     #[error("The edge kind was not applicable to the {0:?} node: {1:?}")]
-    BadEdgeKind(Direction, NewEdgeSpec<DynNode<HostNode>, DynNode<HostNode>>),
+    BadEdgeKind(Direction, DynEdgeSpec<HostNode>),
 }
 
 /// A Hugr or portion thereof that is part of the [Replacement]
@@ -543,6 +539,18 @@ pub enum WhichHugr {
     /// Nodes in the existing Hugr that are not [Replacement::removal]
     /// (or are on the RHS of an entry in [Replacement::adoptions])
     Retained,
+}
+
+/// The three kinds of edge that may appear in a [ReplaceError]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DynEdgeSpec<HostNode> {
+    /// An edge from the host Hugr into the replacement, i.e. [Replacement::mu_inp]
+    HostToRepl(NewEdgeSpec<HostNode, Node>),
+    /// An edge from the replacement to the host, i.e. [Replacement::mu_out]
+    ReplToHost(NewEdgeSpec<Node, HostNode>),
+    /// An edge between two nodes in the host (bypassing the replacement),
+    /// i.e. [Replacement::mu_new]
+    HostToHost(NewEdgeSpec<HostNode, HostNode>),
 }
 
 impl std::fmt::Display for WhichHugr {
