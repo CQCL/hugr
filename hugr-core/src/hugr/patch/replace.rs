@@ -593,7 +593,7 @@ mod test {
     use crate::utils::{depth, test_quantum_extension};
     use crate::{type_row, Direction, Extension, Hugr, HugrView, OutgoingPort};
 
-    use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
+    use super::{DynEdgeSpec, NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
 
     #[test]
     #[ignore] // FIXME: This needs a rewrite now that `pop` returns an optional value -.-'
@@ -912,7 +912,7 @@ mod test {
             ReplaceError::BadEdgeSpec(
                 Direction::Outgoing,
                 WhichHugr::Retained,
-                edge_from_removed.src_host_to_dyn()
+                DynEdgeSpec::HostToRepl(edge_from_removed)
             )
         );
         let bad_out_edge = NewEdgeSpec {
@@ -928,7 +928,7 @@ mod test {
             ReplaceError::BadEdgeSpec(
                 Direction::Outgoing,
                 WhichHugr::Replacement,
-                bad_out_edge.tgt_host_to_dyn()
+                DynEdgeSpec::ReplToHost(bad_out_edge),
             )
         );
         let bad_order_edge = NewEdgeSpec {
@@ -941,7 +941,7 @@ mod test {
                 mu_new: vec![bad_order_edge.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeKind(_, e) => assert_eq!(e, bad_order_edge.src_tgt_host_to_dyn())
+            ReplaceError::BadEdgeKind(_, e) => assert_eq!(e, DynEdgeSpec::HostToHost(bad_order_edge))
         );
         let op = OutgoingPort::from(0);
         let (tgt, ip) = h.linked_inputs(cond.node(), op).next().unwrap();
@@ -958,7 +958,7 @@ mod test {
                 mu_out: vec![new_out_edge.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge.tgt_host_to_dyn())
+            ReplaceError::BadEdgeKind(Direction::Outgoing, DynEdgeSpec::ReplToHost(new_out_edge))
         );
     }
 }
