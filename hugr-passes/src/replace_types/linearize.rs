@@ -783,7 +783,11 @@ mod test {
         let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
         let discard_fn = {
             let mut fb = dfb
-                .define_function("drop", inout_sig(lin_t.clone(), type_row![]))
+                .define_function(
+                    "drop",
+                    Signature::new(lin_t.clone(), type_row![])
+                        .with_extension_delta(e.name().clone()),
+                )
                 .unwrap();
             let ins = fb.input_wires();
             fb.add_dataflow_op(
