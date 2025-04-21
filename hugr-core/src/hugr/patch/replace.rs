@@ -478,8 +478,8 @@ pub enum ReplaceError<HostNode = Node> {
     #[error("Nodes not free to be moved into new locations: {0:?}")]
     AdopteesNotSeparateDescendants(Vec<HostNode>),
     /// A node at one end of a [NewEdgeSpec] was not found
-    #[error("{0:?} end of edge {2:?} not found in {1:?}")]
-    BadEdgeSpec(Direction, WhichHugr, DynEdgeSpec<HostNode>),
+    #[error("{0:?} end of edge {1:?} not found in {which_hugr}", which_hugr = .1.which_hugr(*.0))]
+    BadEdgeSpec(Direction, DynEdgeSpec<HostNode>),
     /// The target of the edge was found, but there was no existing edge to replace
     #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
     NoRemovedEdge(DynEdgeSpec<HostNode>),
@@ -490,7 +490,7 @@ pub enum ReplaceError<HostNode = Node> {
 
 fn mk_bad_edge_spec<N>(d: Direction, h: WhichHugr, e: DynEdgeSpec<N>) -> ReplaceError<N> {
     assert_eq!(e.which_hugr(d), h);
-    ReplaceError::BadEdgeSpec(d, h, e)
+    ReplaceError::BadEdgeSpec(d, e)
 }
 
 /// A Hugr or portion thereof that is part of the [Replacement]
