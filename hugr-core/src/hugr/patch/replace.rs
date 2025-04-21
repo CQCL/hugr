@@ -451,54 +451,6 @@ fn transfer_edges<'a, SrcNode: 'a + Copy, TgtNode: 'a + Copy>(
     Ok(())
 }
 
-/// A node in either the replacement graph or the host graph.
-///
-/// Only used in the error type [`ReplaceError`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
-pub enum DynNode<HostNode> {
-    /// A node in the host graph
-    #[error("Host node")]
-    Host(HostNode),
-    /// A node in the replacement graph
-    #[error("Replacement node")]
-    Repl(Node),
-}
-
-impl<TgtNode: Copy> NewEdgeSpec<Node, TgtNode> {
-    /// Convert nodes to [`DynNode`]s, interpreting the source as replacement
-    /// node and the target as host node.
-    fn tgt_host_to_dyn(&self) -> NewEdgeSpec<DynNode<TgtNode>, DynNode<TgtNode>> {
-        NewEdgeSpec {
-            src: DynNode::Repl(self.src),
-            tgt: DynNode::Host(self.tgt),
-            kind: self.kind,
-        }
-    }
-}
-
-impl<SrcNode: Copy> NewEdgeSpec<SrcNode, Node> {
-    /// Convert nodes to [`DynNode`]s, interpreting the source as host node and
-    /// the target as replacement node.
-    fn src_host_to_dyn(&self) -> NewEdgeSpec<DynNode<SrcNode>, DynNode<SrcNode>> {
-        NewEdgeSpec {
-            src: DynNode::Host(self.src),
-            tgt: DynNode::Repl(self.tgt),
-            kind: self.kind,
-        }
-    }
-}
-
-impl<N: Copy> NewEdgeSpec<N, N> {
-    /// Convert nodes to [`DynNode`]s, interpreting both as host nodes.
-    fn src_tgt_host_to_dyn(&self) -> NewEdgeSpec<DynNode<N>, DynNode<N>> {
-        NewEdgeSpec {
-            src: DynNode::Host(self.src),
-            tgt: DynNode::Host(self.tgt),
-            kind: self.kind,
-        }
-    }
-}
-
 /// Error in a [`Replacement`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]
