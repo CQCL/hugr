@@ -76,7 +76,7 @@ impl<A: Error, B: Error> ErrorCombiner<A, B> for Either<A, B> {
     }
 }
 
-// Note: in the short term two we could wish for more impls:
+// Note: in the short term we could wish for two more impls:
 //   impl<E:Error> ErrorCombiner<Infallible, E> for E
 //   impl<E:Error> ErrorCombiner<E, Infallible> for E
 // however, these aren't possible as they conflict with
