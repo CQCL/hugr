@@ -1,7 +1,7 @@
 //! Low-level interface for modifying a HUGR.
 
 use core::panic;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
@@ -11,14 +11,13 @@ use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrView, Node, OpType, RootTagged};
+use crate::hugr::{HugrView, Node, OpType};
 use crate::hugr::{NodeMetadata, Rewrite};
 use crate::ops::OpTrait;
 use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
-use super::NodeMetadataMap;
 
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrMutInternals {
@@ -27,14 +26,9 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn get_metadata_mut(&mut self, node: Node, key: impl AsRef<str>) -> &mut NodeMetadata {
+    fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata {
         panic_invalid_node(self, node);
-        let node_meta = self
-            .hugr_mut()
-            .metadata
-            .get_mut(node.pg_index())
-            .get_or_insert_with(Default::default);
-        node_meta
+        self.node_metadata_map_mut(node)
             .entry(key.as_ref())
             .or_insert(serde_json::Value::Null)
     }
@@ -46,7 +40,7 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph.
     fn set_metadata(
         &mut self,
-        node: Node,
+        node: Self::Node,
         key: impl AsRef<str>,
         metadata: impl Into<NodeMetadata>,
     ) {
@@ -59,30 +53,10 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn remove_metadata(&mut self, node: Node, key: impl AsRef<str>) {
+    fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>) {
         panic_invalid_node(self, node);
-        let node_meta = self.hugr_mut().metadata.get_mut(node.pg_index());
-        if let Some(node_meta) = node_meta {
-            node_meta.remove(key.as_ref());
-        }
-    }
-
-    /// Retrieve the complete metadata map for a node.
-    fn take_node_metadata(&mut self, node: Self::Node) -> Option<NodeMetadataMap> {
-        if !self.valid_node(node) {
-            return None;
-        }
-        self.hugr_mut().metadata.take(node.pg_index())
-    }
-
-    /// Overwrite the complete metadata map for a node.
-    ///
-    /// # Panics
-    ///
-    /// If the node is not in the graph.
-    fn overwrite_node_metadata(&mut self, node: Node, metadata: Option<NodeMetadataMap>) {
-        panic_invalid_node(self, node);
-        self.hugr_mut().metadata.set(node.pg_index(), metadata);
+        let node_meta = self.node_metadata_map_mut(node);
+        node_meta.remove(key.as_ref());
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -92,11 +66,7 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the parent is not in the graph.
-    #[inline]
-    fn add_node_with_parent(&mut self, parent: Node, op: impl Into<OpType>) -> Node {
-        panic_invalid_node(self, parent);
-        self.hugr_mut().add_node_with_parent(parent, op)
-    }
+    fn add_node_with_parent(&mut self, parent: Self::Node, op: impl Into<OpType>) -> Self::Node;
 
     /// Add a node to the graph as the previous sibling of another node.
     ///
@@ -105,11 +75,7 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the sibling is not in the graph, or if the sibling is the root node.
-    #[inline]
-    fn add_node_before(&mut self, sibling: Node, nodetype: impl Into<OpType>) -> Node {
-        panic_invalid_non_root(self, sibling);
-        self.hugr_mut().add_node_before(sibling, nodetype)
-    }
+    fn add_node_before(&mut self, sibling: Self::Node, nodetype: impl Into<OpType>) -> Self::Node;
 
     /// Add a node to the graph as the next sibling of another node.
     ///
@@ -118,11 +84,7 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the sibling is not in the graph, or if the sibling is the root node.
-    #[inline]
-    fn add_node_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Node {
-        panic_invalid_non_root(self, sibling);
-        self.hugr_mut().add_node_after(sibling, op)
-    }
+    fn add_node_after(&mut self, sibling: Self::Node, op: impl Into<OpType>) -> Self::Node;
 
     /// Remove a node from the graph and return the node weight.
     /// Note that if the node has children, they are not removed; this leaves
@@ -131,24 +93,14 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the node is not in the graph, or if the node is the root node.
-    #[inline]
-    fn remove_node(&mut self, node: Node) -> OpType {
-        panic_invalid_non_root(self, node);
-        self.hugr_mut().remove_node(node)
-    }
+    fn remove_node(&mut self, node: Self::Node) -> OpType;
 
     /// Remove a node from the graph, along with all its descendants in the hierarchy.
     ///
     /// # Panics
     ///
     /// If the node is not in the graph, or is the root (this would leave an empty Hugr).
-    fn remove_subtree(&mut self, node: Node) {
-        panic_invalid_non_root(self, node);
-        while let Some(ch) = self.first_child(node) {
-            self.remove_subtree(ch)
-        }
-        self.hugr_mut().remove_node(node);
-    }
+    fn remove_subtree(&mut self, node: Self::Node);
 
     /// Copies the strict descendants of `root` to under the `new_parent`, optionally applying a
     /// [Substitution] to the [OpType]s of the copied nodes.
@@ -167,29 +119,20 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         new_parent: Self::Node,
         subst: Option<Substitution>,
-    ) -> BTreeMap<Self::Node, Self::Node> {
-        panic_invalid_node(self, root);
-        panic_invalid_node(self, new_parent);
-        self.hugr_mut().copy_descendants(root, new_parent, subst)
-    }
+    ) -> BTreeMap<Self::Node, Self::Node>;
 
     /// Connect two nodes at the given ports.
     ///
     /// # Panics
     ///
     /// If either node is not in the graph or if the ports are invalid.
-    #[inline]
     fn connect(
         &mut self,
-        src: Node,
+        src: Self::Node,
         src_port: impl Into<OutgoingPort>,
-        dst: Node,
+        dst: Self::Node,
         dst_port: impl Into<IncomingPort>,
-    ) {
-        panic_invalid_node(self, src);
-        panic_invalid_node(self, dst);
-        self.hugr_mut().connect(src, src_port, dst, dst_port);
-    }
+    );
 
     /// Disconnects all edges from the given port.
     ///
@@ -198,11 +141,7 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the node is not in the graph, or if the port is invalid.
-    #[inline]
-    fn disconnect(&mut self, node: Node, port: impl Into<Port>) {
-        panic_invalid_node(self, node);
-        self.hugr_mut().disconnect(node, port);
-    }
+    fn disconnect(&mut self, node: Self::Node, port: impl Into<Port>);
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the
     /// operation's [`OpTrait::other_input`] or [`OpTrait::other_output`].
@@ -215,37 +154,25 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the node is not in the graph, or if the port is invalid.
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> (OutgoingPort, IncomingPort) {
-        panic_invalid_node(self, src);
-        panic_invalid_node(self, dst);
-        self.hugr_mut().add_other_edge(src, dst)
-    }
+    fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
     /// Insert another hugr into this one, under a given root node.
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
-    #[inline]
-    fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
-        panic_invalid_node(self, root);
-        self.hugr_mut().insert_hugr(root, other)
-    }
+    fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node>;
 
     /// Copy another hugr into this one, under a given root node.
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
-    #[inline]
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
         other: &H,
-    ) -> InsertionResult<H::Node, Self::Node> {
-        panic_invalid_node(self, root);
-        self.hugr_mut().insert_from_view(root, other)
-    }
+    ) -> InsertionResult<H::Node, Self::Node>;
 
     /// Copy a subgraph from another hugr into this one, under a given root node.
     ///
@@ -266,13 +193,13 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
-    ) -> HashMap<H::Node, Self::Node> {
-        panic_invalid_node(self, root);
-        self.hugr_mut().insert_subgraph(root, other, subgraph)
-    }
+    ) -> HashMap<H::Node, Self::Node>;
 
     /// Applies a rewrite to the graph.
-    fn apply_rewrite<R, E>(&mut self, rw: impl Rewrite<ApplyResult = R, Error = E>) -> Result<R, E>
+    fn apply_rewrite<R, E>(
+        &mut self,
+        rw: impl Rewrite<Node = Self::Node, ApplyResult = R, Error = E>,
+    ) -> Result<R, E>
     where
         Self: Sized,
     {
@@ -286,7 +213,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// See [`ExtensionRegistry::register_updated`] for more information.
     fn use_extension(&mut self, extension: impl Into<Arc<Extension>>) {
-        self.hugr_mut().extensions.register_updated(extension);
+        self.extensions_mut().register_updated(extension);
     }
 
     /// Extend the set of extensions used by the hugr with the extensions in the
@@ -302,12 +229,7 @@ pub trait HugrMut: HugrMutInternals {
     where
         ExtensionRegistry: Extend<Reg>,
     {
-        self.hugr_mut().extensions.extend(registry);
-    }
-
-    /// Returns a mutable reference to the extension registry for this hugr.
-    fn extensions_mut(&mut self) -> &mut ExtensionRegistry {
-        &mut self.hugr_mut().extensions
+        self.extensions_mut().extend(registry);
     }
 }
 
@@ -342,11 +264,10 @@ fn translate_indices<N: HugrNode>(
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T {
+impl HugrMut for Hugr {
     fn add_node_with_parent(&mut self, parent: Node, node: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(node.into());
-        self.as_mut()
-            .hierarchy
+        self.hierarchy
             .push_child(node.pg_index(), parent.pg_index())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
         node
@@ -354,8 +275,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
 
     fn add_node_before(&mut self, sibling: Node, nodetype: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(nodetype.into());
-        self.as_mut()
-            .hierarchy
+        self.hierarchy
             .insert_before(node.pg_index(), sibling.pg_index())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
         node
@@ -363,8 +283,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
 
     fn add_node_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(op.into());
-        self.as_mut()
-            .hierarchy
+        self.hierarchy
             .insert_after(node.pg_index(), sibling.pg_index())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
         node
@@ -372,9 +291,19 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
 
     fn remove_node(&mut self, node: Node) -> OpType {
         panic_invalid_non_root(self, node);
-        self.as_mut().hierarchy.remove(node.pg_index());
-        self.as_mut().graph.remove_node(node.pg_index());
-        self.as_mut().op_types.take(node.pg_index())
+        self.hierarchy.remove(node.pg_index());
+        self.graph.remove_node(node.pg_index());
+        self.op_types.take(node.pg_index())
+    }
+
+    fn remove_subtree(&mut self, node: Node) {
+        panic_invalid_non_root(self, node);
+        let mut queue = VecDeque::new();
+        queue.push_back(node);
+        while let Some(n) = queue.pop_front() {
+            queue.extend(self.children(n));
+            self.remove_node(n);
+        }
     }
 
     fn connect(
@@ -388,8 +317,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         let dst_port = dst_port.into();
         panic_invalid_port(self, src, src_port);
         panic_invalid_port(self, dst, dst_port);
-        self.as_mut()
-            .graph
+        self.graph
             .link_nodes(
                 src.pg_index(),
                 src_port.index(),
@@ -404,11 +332,10 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         let offset = port.pg_offset();
         panic_invalid_port(self, node, port);
         let port = self
-            .as_mut()
             .graph
             .port_index(node.pg_index(), offset)
             .expect("The port should exist at this point.");
-        self.as_mut().graph.unlink_port(port);
+        self.graph.unlink_port(port);
     }
 
     fn add_other_edge(&mut self, src: Node, dst: Node) -> (OutgoingPort, IncomingPort) {
@@ -429,15 +356,15 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         root: Self::Node,
         mut other: Hugr,
     ) -> InsertionResult<Node, Self::Node> {
-        let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other);
+        let (new_root, node_map) = insert_hugr_internal(self, root, &other);
         // Update the optypes and metadata, taking them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
-            self.as_mut().op_types.set(new_node, optype);
+            self.op_types.set(new_node, optype);
             let meta = other.metadata.take(node);
-            self.as_mut().metadata.set(new_node, meta);
+            self.metadata.set(new_node, meta);
         }
         debug_assert_eq!(
             Some(&new_root.pg_index()),
@@ -455,15 +382,15 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, other);
+        let (new_root, node_map) = insert_hugr_internal(self, root, other);
         // Update the optypes and metadata, copying them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
             let nodetype = other.get_optype(other.get_node(node));
-            self.as_mut().op_types.set(new_node, nodetype.clone());
+            self.op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
-            self.as_mut().metadata.set(new_node, meta.clone());
+            self.metadata.set(new_node, meta.clone());
         }
         debug_assert_eq!(
             Some(&new_root.pg_index()),
@@ -494,13 +421,13 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
                 |node, ctx| ctx.contains(&node),
                 context,
             );
-        let node_map = insert_subgraph_internal(self.as_mut(), root, other, &portgraph);
+        let node_map = insert_subgraph_internal(self, root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let nodetype = other.get_optype(other.get_node(node));
-            self.as_mut().op_types.set(new_node, nodetype.clone());
+            self.op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
-            self.as_mut().metadata.set(new_node, meta.clone());
+            self.metadata.set(new_node, meta.clone());
             // Add the required extensions to the registry.
             if let Ok(exts) = nodetype.used_extensions() {
                 self.use_extensions(exts);
@@ -519,7 +446,7 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         let root2 = descendants.next();
         debug_assert_eq!(root2, Some(root.pg_index()));
         let nodes = Vec::from_iter(descendants);
-        let node_map = portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
+        let node_map = portgraph::view::Subgraph::with_nodes(&mut self.graph, nodes)
             .copy_in_parent()
             .expect("Is a MultiPortGraph");
         let node_map = translate_indices(|n| self.get_node(n), |n| self.get_node(n), node_map)
@@ -538,9 +465,9 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
                 (None, op) => op.clone(),
                 (Some(subst), op) => op.substitute(subst),
             };
-            self.as_mut().op_types.set(new_node.pg_index(), new_optype);
+            self.op_types.set(new_node.pg_index(), new_optype);
             let meta = self.base_hugr().metadata.get(node.pg_index()).clone();
-            self.as_mut().metadata.set(new_node.pg_index(), meta);
+            self.metadata.set(new_node.pg_index(), meta);
         }
         node_map
     }
@@ -624,22 +551,16 @@ fn insert_subgraph_internal<N: HugrNode>(
 /// Panic if [`HugrView::valid_node`] fails.
 #[track_caller]
 pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    if !hugr.valid_node(node) {
-        panic!(
-            "Received an invalid node {node} while mutating a HUGR:\n\n {}",
-            hugr.mermaid_string()
-        );
+    if cfg!(debug_assertions) && !hugr.valid_node(node) {
+        panic!("Received an invalid node {node} while mutating a HUGR.",);
     }
 }
 
 /// Panic if [`HugrView::valid_non_root`] fails.
 #[track_caller]
 pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    if !hugr.valid_non_root(node) {
-        panic!(
-            "Received an invalid non-root node {node} while mutating a HUGR:\n\n {}",
-            hugr.mermaid_string()
-        );
+    if cfg!(debug_assertions) && !hugr.valid_non_root(node) {
+        panic!("Received an invalid non-root node {node} while mutating a HUGR.",);
     }
 }
 
@@ -651,15 +572,13 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
     port: impl Into<Port>,
 ) {
     let port = port.into();
-    if hugr
-        .portgraph()
-        .port_index(node.pg_index(), port.pg_offset())
-        .is_none()
+    if cfg!(debug_assertions)
+        && hugr
+            .portgraph()
+            .port_index(node.pg_index(), port.pg_offset())
+            .is_none()
     {
-        panic!(
-            "Received an invalid port {port} for node {node} while mutating a HUGR:\n\n {}",
-            hugr.mermaid_string()
-        );
+        panic!("Received an invalid port {port} for node {node} while mutating a HUGR");
     }
 }
 

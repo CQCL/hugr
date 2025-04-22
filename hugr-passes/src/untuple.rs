@@ -126,7 +126,7 @@ impl ComposablePass for UntuplePass {
 
     type Result = UntupleResult;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
+    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<Self::Result, Self::Error> {
         let rewrites = self.find_rewrites(hugr, self.parent.unwrap_or(hugr.root()));
         let rewrites_applied = rewrites.len();
         // The rewrites are independent, so we can always apply them all.

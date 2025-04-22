@@ -66,7 +66,11 @@ impl NodeTemplate {
     ///    * has a [`signature`] which the type-args of the [Self::Call] do not match
     ///
     /// [`signature`]: hugr_core::types::PolyFuncType
-    pub fn add_hugr(self, hugr: &mut impl HugrMut, parent: Node) -> Result<Node, BuildError> {
+    pub fn add_hugr(
+        self,
+        hugr: &mut impl HugrMut<Node = Node>,
+        parent: Node,
+    ) -> Result<Node, BuildError> {
         match self {
             NodeTemplate::SingleOp(op_type) => Ok(hugr.add_node_with_parent(parent, op_type)),
             NodeTemplate::CompoundOp(new_h) => Ok(hugr.insert_hugr(parent, *new_h).new_root),
@@ -97,7 +101,7 @@ impl NodeTemplate {
         }
     }
 
-    fn replace(&self, hugr: &mut impl HugrMut, n: Node) -> Result<(), BuildError> {
+    fn replace(&self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
         assert_eq!(hugr.children(n).count(), 0);
         let new_optype = match self.clone() {
             NodeTemplate::SingleOp(op_type) => op_type,
@@ -375,7 +379,11 @@ impl ReplaceTypes {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
     }
 
-    fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ReplaceTypesError> {
+    fn change_node(
+        &self,
+        hugr: &mut impl HugrMut<Node = Node>,
+        n: Node,
+    ) -> Result<bool, ReplaceTypesError> {
         match hugr.optype_mut(n) {
             OpType::FuncDefn(FuncDefn { signature, .. })
             | OpType::FuncDecl(FuncDecl { signature, .. }) => signature.body_mut().transform(self),

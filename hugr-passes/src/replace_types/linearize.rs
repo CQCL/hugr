@@ -49,7 +49,7 @@ pub trait Linearizer {
     /// if `src` is not a valid Wire (does not identify a dataflow out-port)
     fn insert_copy_discard(
         &self,
-        hugr: &mut impl HugrMut,
+        hugr: &mut impl HugrMut<Node = Node>,
         src: Wire,
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {

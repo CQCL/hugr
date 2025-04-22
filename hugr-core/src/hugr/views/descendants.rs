@@ -179,13 +179,17 @@ where
     }
 
     #[inline]
-    fn get_pg_index(&self, node: Node) -> portgraph::NodeIndex {
+    fn get_pg_index(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
         self.hugr.get_pg_index(node)
     }
 
     #[inline]
     fn get_node(&self, index: portgraph::NodeIndex) -> Node {
         self.hugr.get_node(index)
+    }
+
+    fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap {
+        self.hugr.node_metadata_map(node)
     }
 }
 

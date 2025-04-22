@@ -36,7 +36,7 @@ use petgraph::{
 /// there is no path from `n2` to `n1` (otherwise this would invalidate `hugr`).
 /// Nodes of equal rank will be ordered arbitrarily, although that arbitrary
 /// order is deterministic.
-pub fn force_order<H: HugrMut>(
+pub fn force_order<H: HugrMut<Node = Node>>(
     hugr: &mut H,
     root: Node,
     rank: impl Fn(&H, Node) -> i64,
@@ -46,7 +46,7 @@ pub fn force_order<H: HugrMut>(
 
 /// As [force_order], but allows a generic [Ord] choice for the result of the
 /// `rank` function.
-pub fn force_order_by_key<H: HugrMut, K: Ord>(
+pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     hugr: &mut H,
     root: Node,
     rank: impl Fn(&H, Node) -> K,

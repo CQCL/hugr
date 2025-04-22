@@ -9,7 +9,8 @@ mod port_types;
 pub mod replace;
 pub mod simple_replace;
 
-use crate::{Hugr, HugrView, Node};
+use crate::core::HugrNode;
+use crate::{Hugr, HugrView};
 pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
@@ -17,6 +18,8 @@ use super::HugrMut;
 
 /// An operation that can be applied to mutate a Hugr
 pub trait Rewrite {
+    /// The node type used by the target Hugr.
+    type Node: HugrNode;
     /// The type of Error with which this Rewrite may fail
     type Error: std::error::Error;
     /// The type returned on successful application of the rewrite.
@@ -29,7 +32,7 @@ pub trait Rewrite {
     /// Checks whether the rewrite would succeed on the specified Hugr.
     /// If this call succeeds, [self.apply] should also succeed on the same `h`
     /// If this calls fails, [self.apply] would fail with the same error.
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error>;
+    fn verify(&self, h: &impl HugrView<Node = Self::Node>) -> Result<(), Self::Error>;
 
     /// Mutate the specified Hugr, or fail with an error.
     /// Returns [`Self::ApplyResult`] if successful.
@@ -39,14 +42,17 @@ pub trait Rewrite {
     /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that is,
     /// implementations may begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
     /// being preferred.
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error>;
+    fn apply(
+        self,
+        h: &mut impl HugrMut<Node = Self::Node>,
+    ) -> Result<Self::ApplyResult, Self::Error>;
 
     /// Returns a set of nodes referenced by the rewrite. Modifying any of these
     /// nodes will invalidate it.
     ///
     /// Two `impl Rewrite`s can be composed if their invalidation sets are
     /// disjoint.
-    fn invalidation_set(&self) -> impl Iterator<Item = Node>;
+    fn invalidation_set(&self) -> impl Iterator<Item = Self::Node>;
 }
 
 /// Wraps any rewrite into a transaction (i.e. that has no effect upon failure)
@@ -57,15 +63,16 @@ pub struct Transactional<R> {
 // Note we might like to constrain R to Rewrite<unchanged_on_failure=false> but this
 // is not yet supported, https://github.com/rust-lang/rust/issues/92827
 impl<R: Rewrite> Rewrite for Transactional<R> {
+    type Node = R::Node;
     type Error = R::Error;
     type ApplyResult = R::ApplyResult;
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl HugrView<Node = R::Node>) -> Result<(), Self::Error> {
         self.underlying.verify(h)
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn apply(self, h: &mut impl HugrMut<Node = R::Node>) -> Result<Self::ApplyResult, Self::Error> {
         if R::UNCHANGED_ON_FAILURE {
             return self.underlying.apply(h);
         }
@@ -86,7 +93,7 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+    fn invalidation_set(&self) -> impl Iterator<Item = R::Node> {
         self.underlying.invalidation_set()
     }
 }
