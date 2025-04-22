@@ -164,6 +164,7 @@ impl SimpleHugrConfig {
                         collections::array::EXTENSION_ID,
                         collections::list::EXTENSION_ID,
                         collections::static_array::EXTENSION_ID,
+                        collections::value_array::EXTENSION_ID,
                     ]),
                 ),
             )
