@@ -17,8 +17,9 @@ use crate::types::{CustomCheckFailure, Type, TypeBound, TypeName};
 use crate::Extension;
 
 use super::array::{
-    ArrayKind, GenericArrayOp, GenericArrayOpDef, GenericArrayRepeat, GenericArrayRepeatDef,
-    GenericArrayScan, GenericArrayScanDef, GenericArrayValue,
+    Array, ArrayKind, GenericArrayConvert, GenericArrayConvertDef, GenericArrayOp,
+    GenericArrayOpDef, GenericArrayRepeat, GenericArrayRepeatDef, GenericArrayScan,
+    GenericArrayScanDef, GenericArrayValue, FROM, INTO,
 };
 
 /// Reported unique name of the value array type.
@@ -56,6 +57,10 @@ pub type VArrayOpDef = GenericArrayOpDef<ValueArray>;
 pub type VArrayRepeatDef = GenericArrayRepeatDef<ValueArray>;
 /// Value array scan operation definition.
 pub type VArrayScanDef = GenericArrayScanDef<ValueArray>;
+/// Value array to default array conversion operation definition.
+pub type VArrayToArrayDef = GenericArrayConvertDef<ValueArray, INTO, Array>;
+/// Value array from default array conversion operation definition.
+pub type VArrayFromArrayDef = GenericArrayConvertDef<ValueArray, FROM, Array>;
 
 /// Value array operations.
 pub type VArrayOp = GenericArrayOp<ValueArray>;
@@ -63,6 +68,10 @@ pub type VArrayOp = GenericArrayOp<ValueArray>;
 pub type VArrayRepeat = GenericArrayRepeat<ValueArray>;
 /// The value array scan operation.
 pub type VArrayScan = GenericArrayScan<ValueArray>;
+/// The value array to default array conversion operation.
+pub type VArrayToArray = GenericArrayConvert<ValueArray, INTO, Array>;
+/// The value array from default array conversion operation.
+pub type VArrayFromArray = GenericArrayConvert<ValueArray, FROM, Array>;
 
 /// A value array extension value.
 pub type VArrayValue = GenericArrayValue<ValueArray>;
@@ -84,6 +93,8 @@ lazy_static! {
             VArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
             VArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
             VArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
+            VArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
+            VArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
         })
     };
 }
