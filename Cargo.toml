@@ -66,10 +66,10 @@ static_assertions = "1.1.0"
 strum = "0.27.0"
 thiserror = "2.0.12"
 typetag = "0.2.20"
-clap = { version = "4.5.36" }
+clap = { version = "4.5.37" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.1"
-assert_cmd = "2.0.14"
+assert_cmd = "2.0.17"
 assert_fs = "1.1.1"
 predicates = "3.1.0"
 indexmap = "2.9.0"
