@@ -10,7 +10,10 @@ use hugr_core::{
 };
 use petgraph::visit::{Dfs, Walker};
 
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::{
+    composable::{validate_if_test, ValidatePassError},
+    ComposablePass,
+};
 
 use super::call_graph::{CallGraph, CallGraphNode};
 
@@ -26,9 +29,6 @@ pub enum RemoveDeadFuncsError<N = Node> {
         /// The invalid node.
         node: N,
     },
-    #[error(transparent)]
-    #[allow(missing_docs)]
-    ValidationError(#[from] ValidatePassError),
 }
 
 fn reachable_funcs<'a, H: HugrView>(
@@ -64,17 +64,10 @@ fn reachable_funcs<'a, H: HugrView>(
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Dead Function Removal pass.
 pub struct RemoveDeadFuncsPass {
-    validation: ValidationLevel,
     entry_points: Vec<Node>,
 }
 
 impl RemoveDeadFuncsPass {
-    /// Sets the validation level used before and after the pass is run
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
     /// Adds new entry points - these must be [FuncDefn] nodes
     /// that are children of the [Module] at the root of the Hugr.
     ///
@@ -87,16 +80,32 @@ impl RemoveDeadFuncsPass {
         self.entry_points.extend(entry_points);
         self
     }
+}
 
-    /// Runs the pass (see [remove_dead_funcs]) with this configuration
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
-        self.validation.run_validated_pass(hugr, |hugr: &mut H, _| {
-            remove_dead_funcs(hugr, self.entry_points.iter().cloned())
-        })
+impl ComposablePass for RemoveDeadFuncsPass {
+    type Error = RemoveDeadFuncsError;
+    type Result = ();
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), RemoveDeadFuncsError> {
+        let reachable = reachable_funcs(
+            &CallGraph::new(hugr),
+            hugr,
+            self.entry_points.iter().cloned(),
+        )?
+        .collect::<HashSet<_>>();
+        let unreachable = hugr
+            .nodes()
+            .filter(|n| {
+                OpTag::Function.is_superset(hugr.get_optype(*n).tag()) && !reachable.contains(n)
+            })
+            .collect::<Vec<_>>();
+        for n in unreachable {
+            hugr.remove_subtree(n);
+        }
+        Ok(())
     }
 }
 
-/// Delete from the Hugr any functions that are not used by either [Call] or
+/// Deletes from the Hugr any functions that are not used by either [Call] or
 /// [LoadFunction] nodes in reachable parts.
 ///
 /// For [Module]-rooted Hugrs, `entry_points` may provide a list of entry points,
@@ -118,16 +127,11 @@ impl RemoveDeadFuncsPass {
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut,
     entry_points: impl IntoIterator<Item = Node>,
-) -> Result<(), RemoveDeadFuncsError> {
-    let reachable = reachable_funcs(&CallGraph::new(h), h, entry_points)?.collect::<HashSet<_>>();
-    let unreachable = h
-        .nodes()
-        .filter(|n| OpTag::Function.is_superset(h.get_optype(*n).tag()) && !reachable.contains(n))
-        .collect::<Vec<_>>();
-    for n in unreachable {
-        h.remove_subtree(n);
-    }
-    Ok(())
+) -> Result<(), ValidatePassError<RemoveDeadFuncsError>> {
+    validate_if_test(
+        RemoveDeadFuncsPass::default().with_module_entry_points(entry_points),
+        h,
+    )
 }
 
 #[cfg(test)]
@@ -142,7 +146,7 @@ mod test {
     };
     use hugr_core::{extension::prelude::usize_t, types::Signature, HugrView};
 
-    use super::RemoveDeadFuncsPass;
+    use super::remove_dead_funcs;
 
     #[rstest]
     #[case([], vec![])] // No entry_points removes everything!
@@ -182,15 +186,14 @@ mod test {
             })
             .collect::<HashMap<_, _>>();
 
-        RemoveDeadFuncsPass::default()
-            .with_module_entry_points(
-                entry_points
-                    .into_iter()
-                    .map(|name| *avail_funcs.get(name).unwrap())
-                    .collect::<Vec<_>>(),
-            )
-            .run(&mut hugr)
-            .unwrap();
+        remove_dead_funcs(
+            &mut hugr,
+            entry_points
+                .into_iter()
+                .map(|name| *avail_funcs.get(name).unwrap())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
 
         let remaining_funcs = hugr
             .nodes()
