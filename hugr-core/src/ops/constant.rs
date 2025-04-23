@@ -197,28 +197,35 @@ impl From<Sum> for SerialSum {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "v")]
-/// A value that can be stored as a static constant. Representing core types and
-/// extension types.
-pub enum Value {
-    /// An extension constant value, that can check it is of a given [CustomType].
-    Extension {
-        #[serde(flatten)]
-        /// The custom constant value.
-        e: OpaqueValue,
-    },
-    /// A higher-order function value.
-    // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
-    Function {
-        /// A Hugr defining the function.
-        hugr: Box<Hugr>,
-    },
-    /// A Sum variant, with a tag indicating the index of the variant and its
-    /// value.
-    #[serde(alias = "Tuple")]
-    Sum(Sum),
+mod inner {
+    #![allow(deprecated)] // serde-generated code refers to the deprecated Value::Function
+
+    use super::{Hugr, OpaqueValue, Sum};
+    #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[serde(tag = "v")]
+    /// A value that can be stored as a static constant. Representing core types and
+    /// extension types.
+    pub enum Value {
+        /// An extension constant value, that can check it is of a given [CustomType].
+        Extension {
+            #[serde(flatten)]
+            /// The custom constant value.
+            e: OpaqueValue,
+        },
+        /// A higher-order function value.
+        // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
+        #[deprecated(note = "Flatten and lift contents to a FuncDefn")]
+        Function {
+            /// A Hugr defining the function.
+            hugr: Box<Hugr>,
+        },
+        /// A Sum variant, with a tag indicating the index of the variant and its
+        /// value.
+        #[serde(alias = "Tuple")]
+        Sum(Sum),
+    }
 }
+pub use inner::Value;
 
 /// An opaque newtype around a [`Box<dyn CustomConst>`](CustomConst).
 ///
@@ -382,6 +389,7 @@ impl Value {
         match self {
             Self::Extension { e } => e.get_type(),
             Self::Sum(Sum { sum_type, .. }) => sum_type.clone().into(),
+            #[allow(deprecated)] // remove when Value::Function removed
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
                 Type::new_function(func_type.into_owned())
@@ -419,9 +427,11 @@ impl Value {
     /// # Errors
     ///
     /// Returns an error if the Hugr root node does not define a function.
+    #[deprecated(note = "Flatten and lift contents to a FuncDefn")]
     pub fn function(hugr: impl Into<Hugr>) -> Result<Self, ConstTypeError> {
         let hugr = hugr.into();
         mono_fn_type(&hugr)?;
+        #[allow(deprecated)] // In deprecated function, remove at same time
         Ok(Self::Function {
             hugr: Box::new(hugr),
         })
@@ -501,6 +511,7 @@ impl Value {
     fn name(&self) -> OpName {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.name()),
+            #[allow(deprecated)] // remove when Value::Function removed
             Self::Function { hugr: h } => {
                 let Ok(t) = mono_fn_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
@@ -527,6 +538,7 @@ impl Value {
     pub fn extension_reqs(&self) -> ExtensionSet {
         match self {
             Self::Extension { e } => e.extension_reqs().clone(),
+            #[allow(deprecated)] // remove when Value::Function removed
             Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
             Self::Sum(Sum { values, .. }) => {
                 ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
@@ -538,6 +550,7 @@ impl Value {
     pub fn validate(&self) -> Result<(), ConstTypeError> {
         match self {
             Self::Extension { e } => Ok(e.value().validate()?),
+            #[allow(deprecated)] // remove when Value::Function removed
             Self::Function { hugr } => {
                 mono_fn_type(hugr)?;
                 Ok(())
@@ -568,6 +581,7 @@ impl Value {
     pub fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
         match self {
             Value::Extension { e } => e.value().try_hash(&mut *st),
+            #[allow(deprecated)] // remove when Value::Function removed
             Value::Function { .. } => false,
             Value::Sum(s) => s.try_hash(st),
         }
@@ -740,6 +754,7 @@ pub(crate) mod test {
         );
     }
 
+    #[allow(deprecated)] // remove when Value::Function removed
     #[rstest]
     fn function_value(simple_dfg_hugr: Hugr) {
         let v = Value::function(simple_dfg_hugr).unwrap();
@@ -944,10 +959,8 @@ pub(crate) mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 use ::proptest::collection::vec;
-                let leaf_strat = prop_oneof![
-                    any::<OpaqueValue>().prop_map(|e| Self::Extension { e }),
-                    crate::proptest::any_hugr().prop_map(|x| Value::function(x).unwrap())
-                ];
+                let leaf_strat = any::<OpaqueValue>().prop_map(|e| Self::Extension { e });
+
                 leaf_strat
                     .prop_recursive(
                         3,  // No more than 3 branch levels deep

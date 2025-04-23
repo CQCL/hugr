@@ -3,10 +3,12 @@
 //! An (example) use of the [dataflow analysis framework](super::dataflow).
 
 pub mod value_handle;
+use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
+    extension::FoldVal,
     hugr::hugrmut::HugrMut,
     ops::{
         constant::OpaqueValue, Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value,
@@ -17,7 +19,7 @@ use hugr_core::{
 use value_handle::ValueHandle;
 
 use crate::dataflow::{
-    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
+    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialSum, PartialValue,
     TailLoopTermination,
 };
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
@@ -126,6 +128,9 @@ impl ComposablePass for ConstantFoldPass {
                 (!hugr.get_optype(src).is_load_constant() && Some(src) != mb_root_inp).then_some((
                     n,
                     ip,
+                    // TODO switch to using FoldVal rather than Value here, thus enabling turning CallIndirect
+                    // into Call when the function input is known. (This will mean we will be unable to handle
+                    // Value::Function's, so best to wait until those are removed.)
                     results
                         .try_read_wire_concrete::<Value>(Wire::new(src, outp))
                         .ok()?,
@@ -215,26 +220,66 @@ impl DFContext<ValueHandle<Node>> for ConstFoldContext {
         &mut self,
         node: Node,
         op: &ExtensionOp,
-        ins: &[PartialValue<ValueHandle<Node>>],
-        outs: &mut [PartialValue<ValueHandle<Node>>],
+        ins: &[PartialValue<ValueHandle<Node>, Node>],
+        outs: &mut [PartialValue<ValueHandle<Node>, Node>],
     ) {
         let sig = op.signature();
-        let known_ins = sig
+        let inp_fvs = sig
             .input_types()
             .iter()
-            .enumerate()
-            .zip(ins.iter())
-            .filter_map(|((i, ty), pv)| {
-                pv.clone()
-                    .try_into_concrete(ty)
-                    .ok()
-                    .map(|v| (IncomingPort::from(i), v))
-            })
+            .zip_eq(ins.iter())
+            //.map(|(ty, pv)| fold_val_from_pv(pv, ty))
+            .map(|(ty, pv)| pv.clone().try_into_concrete(ty).unwrap_or_default())
             .collect::<Vec<_>>();
-        for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
-            outs[p.index()] =
-                partial_from_const(self, ConstLocation::Field(p.index(), &node.into()), &v);
+        let mut out_fvs = vec![FoldVal::Unknown; outs.len()];
+        op.constant_fold2(&inp_fvs, &mut out_fvs);
+        for ((p, out), out_fv) in outs.iter_mut().enumerate().zip(out_fvs) {
+            // UGH. Need a partial_from_const for FoldVal, *as well* as the one from Value
+            // 'coz we need to keep the latter for constants!!
+            *out = pv_from_fold_val(ConstLocation::Field(p, &node.into()), out_fv);
         }
+    }
+}
+
+/*fn fold_val_from_pv(value: &PartialValue<ValueHandle<Node>, Node>, ty: &Type) -> Option<FoldVal> {
+    Some(match value {
+        PartialValue::Bottom => return None,
+        PartialValue::Top => FoldVal::Unknown,
+        PartialValue::PartialSum(ps) => match ps.0.iter().exactly_one() {
+            Err(_) => FoldVal::Unknown,
+            Ok((&tag, vals)) => {
+                let sum_type = ty.as_sum()?.clone();
+                let items = vals.into_iter().zip_eq(sum_type.get_variant(tag)?.iter()).map(|(pv, t)| fold_val_from_pv(pv, &t.clone().try_into_type().unwrap())).collect::<Option<Vec<_>>>()?;
+                FoldVal::Sum { tag, sum_type, items }
+            }
+        }
+        PartialValue::LoadedFunction(LoadedFunction { func_node, args }) => FoldVal::LoadedFunction(*func_node, args.clone()),
+        // return None for nested Hugr, not representable
+        PartialValue::Value(v) => FoldVal::Extension(v.as_opaque()?.clone())
+    })
+}*/
+
+fn pv_from_fold_val(
+    loc: ConstLocation<Node>,
+    value: FoldVal,
+) -> PartialValue<ValueHandle<Node>, Node> {
+    match value {
+        FoldVal::Unknown => PartialValue::Top,
+        FoldVal::Sum {
+            tag,
+            sum_type: _,
+            items,
+        } => PartialValue::PartialSum(PartialSum::new_variant(
+            tag,
+            items
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| pv_from_fold_val(ConstLocation::Field(i, &loc), v)),
+        )),
+        FoldVal::Extension(opaque_value) => {
+            PartialValue::Value(ValueHandle::new_opaque(loc, opaque_value))
+        }
+        FoldVal::LoadedFunction(node, args) => PartialValue::new_load(node, args),
     }
 }
 
