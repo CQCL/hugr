@@ -17,7 +17,7 @@ use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{type_row, Hugr, HugrView};
 use itertools::Itertools;
 
-use super::{CallbackHandler, LinearizeError, NodeTemplate, ReplaceTypes, ReplaceTypesError};
+use super::{linearize, LinearizeError, NodeTemplate, ReplaceTypes, ReplaceTypesError};
 
 /// Handler for [ListValue] constants that updates the element type and
 /// recursively [ReplaceTypes::change_value]s the elements of the list.
@@ -76,7 +76,7 @@ fn runtime_reqs(h: &Hugr) -> ExtensionSet {
 pub fn linearize_array(
     args: &[TypeArg],
     num_outports: usize,
-    lin: &mut CallbackHandler,
+    lin: &mut linearize::CallbackHandler,
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp

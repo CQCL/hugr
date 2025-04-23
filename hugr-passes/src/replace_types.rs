@@ -30,7 +30,11 @@ use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
 use crate::ComposablePass;
 
 mod linearize;
-pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError};
+pub use linearize::{DelegatingLinearizer, LinearizeError};
+
+/// Key passed to [CallbackHandler::makee_function] to de-duplicate
+/// attempts to add the same function
+pub type FuncId = String;
 
 /// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
 /// or in order to replace an existing node.
@@ -194,7 +198,10 @@ pub struct ReplaceTypes {
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, NodeTemplate>,
-    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>>,
+    param_ops: HashMap<
+        ParametricOp,
+        Arc<dyn Fn(&[TypeArg], &mut CallbackHandler) -> Option<NodeTemplate>>,
+    >,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -343,7 +350,7 @@ impl ReplaceTypes {
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
+        dest_fn: impl Fn(&[TypeArg], &mut CallbackHandler) -> Option<NodeTemplate> + 'static,
     ) {
         self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
@@ -375,7 +382,12 @@ impl ReplaceTypes {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
     }
 
-    fn change_node(&self, hugr: &mut impl HugrMut, n: Node) -> Result<bool, ReplaceTypesError> {
+    fn change_node(
+        &self,
+        hugr: &mut impl HugrMut,
+        cache: &mut HashMap<FuncId, Node>,
+        n: Node,
+    ) -> Result<bool, ReplaceTypesError> {
         match hugr.optype_mut(n) {
             OpType::FuncDefn(FuncDefn { signature, .. })
             | OpType::FuncDecl(FuncDecl { signature, .. }) => signature.body_mut().transform(self),
@@ -439,13 +451,13 @@ impl ReplaceTypes {
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
                     true
                 } else {
-                    let def = ext_op.def_arc();
+                    let def = ext_op.def_arc().clone();
                     let mut args = ext_op.args().to_vec();
                     let ch = args.transform(self)?;
                     if let Some(replacement) = self
                         .param_ops
                         .get(&def.as_ref().into())
-                        .and_then(|rep_fn| rep_fn(&args))
+                        .and_then(|rep_fn| rep_fn(&args, &mut self.handler(hugr, cache)))
                     {
                         replacement
                             .replace(hugr, n)
@@ -453,7 +465,8 @@ impl ReplaceTypes {
                         true
                     } else {
                         if ch {
-                            *ext_op = ExtensionOp::new(def.clone(), args)?;
+                            // can't use ext_op here, as it can't be borrowed while passing self to `rep_fn`
+                            hugr.replace_op(n, ExtensionOp::new(def, args)?).unwrap();
                         }
                         ch
                     }
@@ -464,6 +477,20 @@ impl ReplaceTypes {
 
             OpType::AliasDecl(_) | OpType::Module(_) => Ok(false),
             _ => todo!(),
+        }
+    }
+
+    fn handler<'a>(
+        &'a self,
+        hugr: &'a mut impl HugrMut,
+        cache: &'a mut HashMap<FuncId, Node>,
+    ) -> CallbackHandler<'a> {
+        // ALAN ugh, can we avoid hugr_mut() here? Maybe by *not* storing the hugr-mut in the
+        // CallbackHandler (==> NodeTemplate::Call contains FuncID *or* Node) ?
+        CallbackHandler {
+            hugr: hugr.hugr_mut(),
+            cache,
+            repl: self,
         }
     }
 
@@ -504,6 +531,39 @@ impl ReplaceTypes {
     }
 }
 
+/// struct passed to callbacks registered via [ReplaceTypes::replace_parametrized_op].
+/// The callbacks may use this to create functions to be called via [NodeTemplate::Call].
+pub struct CallbackHandler<'a> {
+    hugr: &'a mut Hugr,
+    cache: &'a mut HashMap<FuncId, Node>,
+    repl: &'a ReplaceTypes,
+}
+
+impl CallbackHandler<'_> {
+    /// Callbacks can use this to make a function in the Hugr.
+    /// The first call for a given `id` will call `body`, which must return
+    /// a [FuncDefn]-rooted Hugr, and insert that into the underlying Hugr;
+    /// the node containing the newly-inserted FuncDefn is returned.
+    ///
+    /// A second call with the same `id` will return the node from the first
+    /// call, without executing `body`.
+    pub fn make_function(&mut self, id: FuncId, body: impl Fn() -> Hugr) -> Node {
+        if let Some(n) = self.cache.get(&id) {
+            return *n;
+        }
+        let h = body();
+        let n = self.hugr.insert_hugr(self.hugr.root(), h).new_root;
+        self.cache.insert(id, n);
+        n
+    }
+
+    /// Allows access to the [ReplaceTypes] i.e. which implements [TypeTransformer]
+    /// to pass to [Type::transform]
+    pub fn replace_types(&self) -> &ReplaceTypes {
+        &self.repl
+    }
+}
+
 impl ComposablePass for ReplaceTypes {
     type Error = ReplaceTypesError;
     type Result = bool;
@@ -512,7 +572,7 @@ impl ComposablePass for ReplaceTypes {
         let mut changed = false;
         let mut cache = HashMap::new();
         for n in hugr.nodes().collect::<Vec<_>>() {
-            changed |= self.change_node(hugr, n)?;
+            changed |= self.change_node(hugr, &mut cache, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             if let Some(new_sig) = new_dfsig
                 .filter(|_| changed && n != hugr.root())
@@ -715,7 +775,7 @@ mod test {
                     .into(),
             ),
         );
-        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args| {
+        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args, _| {
             Some(NodeTemplate::CompoundOp(Box::new(
                 lowered_read(just_elem_type(type_args).clone(), DFGBuilder::new)
                     .finish_hugr()
@@ -988,20 +1048,17 @@ mod test {
             option_contents(just_elem_type(args)).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
-        lowerer.replace_parametrized_op(
-            e.get_op(READ).unwrap().as_ref(),
-            Box::new(|args: &[TypeArg]| {
-                option_contents(just_elem_type(args)).map(|elem| {
-                    NodeTemplate::SingleOp(
-                        ListOp::get
-                            .with_type(elem)
-                            .to_extension_op()
-                            .unwrap()
-                            .into(),
-                    )
-                })
-            }),
-        );
+        lowerer.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), |args, _| {
+            option_contents(just_elem_type(args)).map(|elem| {
+                NodeTemplate::SingleOp(
+                    ListOp::get
+                        .with_type(elem)
+                        .to_extension_op()
+                        .unwrap()
+                        .into(),
+                )
+            })
+        });
         assert!(lowerer.run(&mut h).unwrap());
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
         // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
@@ -1092,7 +1149,7 @@ mod test {
             .new_root;
 
         let mut lw = lowerer(&e);
-        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {
+        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
             Some(NodeTemplate::Call(read_func, args.to_owned()))
         });
         lw.run(&mut h).unwrap();

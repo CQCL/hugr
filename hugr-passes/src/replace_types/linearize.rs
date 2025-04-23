@@ -11,7 +11,7 @@ use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, Hugr, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
-use super::{handlers::linearize_array, NodeTemplate, ParametricType};
+use super::{handlers::linearize_array, FuncId, NodeTemplate, ParametricType};
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
@@ -40,8 +40,6 @@ impl Default for DelegatingLinearizer {
         res
     }
 }
-
-type FuncId = String;
 
 /// Implementation of [Linearizer] passed to callbacks, (e.g.) so that callbacks for
 /// handling collection types can use it to generate copy/discards of elements.
