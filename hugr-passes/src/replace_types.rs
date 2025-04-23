@@ -560,7 +560,7 @@ impl CallbackHandler<'_> {
     /// Allows access to the [ReplaceTypes] i.e. which implements [TypeTransformer]
     /// to pass to [Type::transform]
     pub fn replace_types(&self) -> &ReplaceTypes {
-        &self.repl
+        self.repl
     }
 }
 

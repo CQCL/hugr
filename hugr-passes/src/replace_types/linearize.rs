@@ -152,6 +152,9 @@ impl DelegatingLinearizer {
             .insert(src.into(), Arc::new(copy_discard_fn));
     }
 
+    /// Obtains a [CallbackHandler] as would be passed to a callback registered with
+    /// [Self::register_callback] allowing to insert copy/discard ops and call
+    /// [CallbackHandler::make_function]
     pub fn handler<'a>(
         &'a self,
         hugr: &'a mut impl HugrMut,
