@@ -23,9 +23,9 @@ use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{CustomCheckFailure, Type, TypeBound, TypeName};
 use crate::Extension;
 
-pub use array_clone::{GenericArrayClone, GenericArrayCloneDef};
+pub use array_clone::{GenericArrayClone, GenericArrayCloneDef, ARRAY_CLONE_OP_ID};
 pub use array_conversion::{Direction, GenericArrayConvert, GenericArrayConvertDef, FROM, INTO};
-pub use array_discard::{GenericArrayDiscard, GenericArrayDiscardDef};
+pub use array_discard::{GenericArrayDiscard, GenericArrayDiscardDef, ARRAY_DISCARD_OP_ID};
 pub use array_kind::ArrayKind;
 pub use array_op::{GenericArrayOp, GenericArrayOpDef};
 pub use array_repeat::{GenericArrayRepeat, GenericArrayRepeatDef, ARRAY_REPEAT_OP_ID};
@@ -75,9 +75,9 @@ pub type ArrayScanDef = GenericArrayScanDef<Array>;
 /// Array operations.
 pub type ArrayOp = GenericArrayOp<Array>;
 /// The array clone operation.
-pub type ArrayClone = GenericArrayRepeat<Array>;
+pub type ArrayClone = GenericArrayClone<Array>;
 /// The array discard operation.
-pub type ArrayDiscard = GenericArrayRepeat<Array>;
+pub type ArrayDiscard = GenericArrayDiscard<Array>;
 /// The array repeat operation.
 pub type ArrayRepeat = GenericArrayRepeat<Array>;
 /// The array scan operation.

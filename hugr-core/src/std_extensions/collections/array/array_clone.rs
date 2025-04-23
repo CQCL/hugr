@@ -122,12 +122,17 @@ pub struct GenericArrayClone<AK: ArrayKind> {
 
 impl<AK: ArrayKind> GenericArrayClone<AK> {
     /// Creates a new array clone op.
-    pub fn new(elem_ty: Type, size: u64) -> Option<Self> {
-        elem_ty.copyable().then_some(GenericArrayClone {
-            elem_ty,
-            size,
-            _kind: PhantomData,
-        })
+    ///
+    /// Returns an error if the proveded element type is not copyable.
+    pub fn new(elem_ty: Type, size: u64) -> Result<Self, OpLoadError> {
+        elem_ty
+            .copyable()
+            .then_some(GenericArrayClone {
+                elem_ty,
+                size,
+                _kind: PhantomData,
+            })
+            .ok_or(SignatureError::InvalidTypeArgs.into())
     }
 }
 
@@ -202,7 +207,10 @@ mod tests {
         let new_op: GenericArrayClone<AK> = optype.cast().unwrap();
         assert_eq!(new_op, op);
 
-        assert_eq!(GenericArrayClone::<AK>::new(qb_t(), 2), None);
+        assert_eq!(
+            GenericArrayClone::<AK>::new(qb_t(), 2),
+            Err(OpLoadError::InvalidArgs(SignatureError::InvalidTypeArgs))
+        );
     }
 
     #[rstest]
