@@ -124,13 +124,6 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 fn extension() -> Arc<Extension> {
     Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
         LogicOp::load_all_ops(extension, extension_ref).unwrap();
-
-        extension
-            .add_value(FALSE_NAME, ops::Value::false_val())
-            .unwrap();
-        extension
-            .add_value(TRUE_NAME, ops::Value::true_val())
-            .unwrap();
     })
 }
 
@@ -172,12 +165,9 @@ fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
 pub(crate) mod test {
     use std::sync::Arc;
 
-    use super::{extension, LogicOp, FALSE_NAME, TRUE_NAME};
+    use super::{extension, LogicOp};
     use crate::{
-        extension::{
-            prelude::bool_t,
-            simple_op::{MakeOpDef, MakeRegisteredOp},
-        },
+        extension::simple_op::{MakeOpDef, MakeRegisteredOp},
         ops::{NamedOp, Value},
         Extension,
     };
@@ -204,18 +194,6 @@ pub(crate) mod test {
         for o in LogicOp::iter() {
             let ext_op = o.to_extension_op().unwrap();
             assert_eq!(LogicOp::from_op(&ext_op).unwrap(), o);
-        }
-    }
-
-    #[test]
-    fn test_values() {
-        let r: Arc<Extension> = extension();
-        let false_val = r.get_value(&FALSE_NAME).unwrap();
-        let true_val = r.get_value(&TRUE_NAME).unwrap();
-
-        for v in [false_val, true_val] {
-            let simpl = v.typed_value().get_type();
-            assert_eq!(simpl, bool_t());
         }
     }
 

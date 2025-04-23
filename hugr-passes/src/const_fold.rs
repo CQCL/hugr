@@ -7,15 +7,11 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
-    hugr::{
-        hugrmut::HugrMut,
-        views::{DescendantsGraph, ExtractHugr, HierarchyView},
-    },
+    hugr::hugrmut::HugrMut,
     ops::{
-        constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-        OpType, Value,
+        constant::OpaqueValue, Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value,
     },
-    types::{EdgeKind, TypeArg},
+    types::EdgeKind,
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
 };
 use value_handle::ValueHandle;
@@ -25,12 +21,11 @@ use crate::dataflow::{
     TailLoopTermination,
 };
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::{composable::validate_if_test, ComposablePass};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
-    validation: ValidationLevel,
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
     ///   - a FuncDefn child of the root, if the root is a module; or
@@ -38,13 +33,10 @@ pub struct ConstantFoldPass {
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 /// Errors produced by [ConstantFoldPass].
 pub enum ConstFoldError {
-    #[error(transparent)]
-    #[allow(missing_docs)]
-    ValidationError(#[from] ValidatePassError),
     /// Error raised when a Node is specified as an entry-point but
     /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
     /// a [Conditional](OpType::Conditional).
@@ -53,12 +45,6 @@ pub enum ConstFoldError {
 }
 
 impl ConstantFoldPass {
-    /// Sets the validation level used before and after the pass is run
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
     /// Allows the pass to remove potentially-non-terminating [TailLoop]s and [CFG] if their
     /// result (if/when they do terminate) is either known or not needed.
     ///
@@ -90,9 +76,19 @@ impl ConstantFoldPass {
             .extend(inputs.into_iter().map(|(p, v)| (p.into(), v)));
         self
     }
+}
+
+impl ComposablePass for ConstantFoldPass {
+    type Error = ConstFoldError;
+    type Result = ();
 
     /// Run the Constant Folding pass.
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
+    ///
+    /// # Errors
+    ///
+    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
+    /// was of an invalid [OpType]
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
@@ -102,7 +98,7 @@ impl ConstantFoldPass {
                 n,
                 in_vals.iter().map(|(p, v)| {
                     let const_with_dummy_loc = partial_from_const(
-                        &ConstFoldContext(hugr),
+                        &ConstFoldContext,
                         ConstLocation::Field(p.index(), &fresh_node.into()),
                         v,
                     );
@@ -112,7 +108,7 @@ impl ConstantFoldPass {
             .map_err(|opty| ConstFoldError::InvalidEntryPoint(n, opty))?;
         }
 
-        let results = m.run(ConstFoldContext(hugr), []);
+        let results = m.run(ConstFoldContext, []);
         let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
 
         let wires_to_break = hugr
@@ -131,7 +127,7 @@ impl ConstantFoldPass {
                     n,
                     ip,
                     results
-                        .try_read_wire_concrete::<Value, _, _>(Wire::new(src, outp))
+                        .try_read_wire_concrete::<Value>(Wire::new(src, outp))
                         .ok()?,
                 ))
             })
@@ -168,22 +164,9 @@ impl ConstantFoldPass {
                     }
                 })
             })
-            .run(hugr)?;
+            .run(hugr)
+            .map_err(|inf| match inf {})?; // TODO use into_ok when available
         Ok(())
-    }
-
-    /// Run the pass using this configuration.
-    ///
-    /// # Errors
-    ///
-    /// [ConstFoldError::ValidationError] if the Hugr does not validate before/afnerwards
-    /// (if [Self::validation_level] is set, or in tests)
-    ///
-    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
-    /// was of an invalid OpType
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 }
 
@@ -202,63 +185,38 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
     } else {
         c
     };
-    c.run(h).unwrap()
+    validate_if_test(c, h).unwrap()
 }
 
-struct ConstFoldContext<'a, H>(&'a H);
+struct ConstFoldContext;
 
-impl<H: HugrView> std::ops::Deref for ConstFoldContext<'_, H> {
-    type Target = H;
-    fn deref(&self) -> &H {
-        self.0
-    }
-}
-
-impl<H: HugrView<Node = Node>> ConstLoader<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
-    type Node = H::Node;
+impl ConstLoader<ValueHandle<Node>> for ConstFoldContext {
+    type Node = Node;
 
     fn value_from_opaque(
         &self,
-        loc: ConstLocation<H::Node>,
+        loc: ConstLocation<Node>,
         val: &OpaqueValue,
-    ) -> Option<ValueHandle<H::Node>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
 
     fn value_from_const_hugr(
         &self,
-        loc: ConstLocation<H::Node>,
+        loc: ConstLocation<Node>,
         h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle<H::Node>> {
+    ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
-    }
-
-    fn value_from_function(
-        &self,
-        node: H::Node,
-        type_args: &[TypeArg],
-    ) -> Option<ValueHandle<H::Node>> {
-        if !type_args.is_empty() {
-            // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
-            return None;
-        };
-        // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
-        // but not for transforming to a direct Call.
-        let func = DescendantsGraph::<FuncID<true>>::try_new(&**self, node).ok()?;
-        Some(ValueHandle::new_const_hugr(
-            ConstLocation::Node(node),
-            Box::new(func.extract_hugr()),
-        ))
     }
 }
 
-impl<H: HugrView<Node = Node>> DFContext<ValueHandle<H::Node>> for ConstFoldContext<'_, H> {
+impl DFContext<ValueHandle<Node>> for ConstFoldContext {
     fn interpret_leaf_op(
         &mut self,
-        node: H::Node,
+        node: Node,
         op: &ExtensionOp,
-        ins: &[PartialValue<ValueHandle<H::Node>>],
-        outs: &mut [PartialValue<ValueHandle<H::Node>>],
+        ins: &[PartialValue<ValueHandle<Node>>],
+        outs: &mut [PartialValue<ValueHandle<Node>>],
     ) {
         let sig = op.signature();
         let known_ins = sig
