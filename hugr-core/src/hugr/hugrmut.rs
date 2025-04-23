@@ -551,7 +551,9 @@ fn insert_subgraph_internal<N: HugrNode>(
 /// Panic if [`HugrView::valid_node`] fails.
 #[track_caller]
 pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    if cfg!(debug_assertions) && !hugr.valid_node(node) {
+    // TODO: When stacking hugr wrappers, this gets called for every layer.
+    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
+    if !hugr.valid_node(node) {
         panic!("Received an invalid node {node} while mutating a HUGR.",);
     }
 }
@@ -559,7 +561,9 @@ pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) 
 /// Panic if [`HugrView::valid_non_root`] fails.
 #[track_caller]
 pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    if cfg!(debug_assertions) && !hugr.valid_non_root(node) {
+    // TODO: When stacking hugr wrappers, this gets called for every layer.
+    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
+    if !hugr.valid_non_root(node) {
         panic!("Received an invalid non-root node {node} while mutating a HUGR.",);
     }
 }
@@ -572,11 +576,12 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
     port: impl Into<Port>,
 ) {
     let port = port.into();
-    if cfg!(debug_assertions)
-        && hugr
-            .portgraph()
-            .port_index(node.pg_index(), port.pg_offset())
-            .is_none()
+    // TODO: When stacking hugr wrappers, this gets called for every layer.
+    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
+    if hugr
+        .portgraph()
+        .port_index(node.pg_index(), port.pg_offset())
+        .is_none()
     {
         panic!("Received an invalid port {port} for node {node} while mutating a HUGR");
     }

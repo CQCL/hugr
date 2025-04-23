@@ -192,6 +192,11 @@ pub trait HugrMutInternals: RootTagged {
     /// If the module root is set to a non-module operation the hugr will
     /// become invalid.
     ///
+    /// # Errors
+    ///
+    /// Returns a [`HugrError::InvalidTag`] if this would break the bound
+    /// (`Self::RootHandle`) on the root node's OpTag.
+    ///
     /// # Panics
     ///
     /// If the node is not in the graph.
