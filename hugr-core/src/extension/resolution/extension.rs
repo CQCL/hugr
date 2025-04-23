@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::extension::{Extension, ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, TypeDef};
 
-use super::types_mut::{resolve_signature_exts, resolve_value_exts};
+use super::types_mut::resolve_signature_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 
 impl ExtensionRegistry {
@@ -59,14 +59,7 @@ impl Extension {
         for type_def in self.types.values_mut() {
             resolve_typedef_exts(&self.name, type_def, extensions, &mut used_extensions)?;
         }
-        for val in self.values.values_mut() {
-            resolve_value_exts(
-                None,
-                val.typed_value_mut(),
-                extensions,
-                &mut used_extensions,
-            )?;
-        }
+
         let ops = mem::take(&mut self.operations);
         for (op_id, mut op_def) in ops {
             // TODO: We should be able to clone the definition if needed by using `make_mut`,
