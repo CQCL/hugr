@@ -1,11 +1,11 @@
 {
   "version": "0.1.0",
-  "name": "collections.array",
+  "name": "collections.value_array",
   "runtime_reqs": [],
   "types": {
-    "array": {
-      "extension": "collections.array",
-      "name": "array",
+    "value_array": {
+      "extension": "collections.value_array",
+      "name": "value_array",
       "params": [
         {
           "tp": "BoundedNat",
@@ -16,17 +16,19 @@
           "b": "A"
         }
       ],
-      "description": "Fixed-length array",
+      "description": "Fixed-length value array",
       "bound": {
-        "b": "Explicit",
-        "bound": "A"
+        "b": "FromParams",
+        "indices": [
+          1
+        ]
       }
     }
   },
   "values": {},
   "operations": {
     "discard_empty": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "discard_empty",
       "description": "Discard an empty array",
       "signature": {
@@ -40,8 +42,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "BoundedNat",
@@ -66,7 +68,7 @@
       "binary": false
     },
     "get": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "get",
       "description": "Get an element from an array",
       "signature": {
@@ -84,8 +86,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -104,7 +106,7 @@
                   }
                 }
               ],
-              "bound": "A"
+              "bound": "C"
             },
             {
               "t": "I"
@@ -132,28 +134,28 @@
       "binary": false
     },
     "new_array": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "new_array",
       "description": "Create a new array from elements",
       "signature": null,
       "binary": true
     },
     "pop_left": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "pop_left",
       "description": "Pop an element from the left of an array",
       "signature": null,
       "binary": true
     },
     "pop_right": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "pop_right",
       "description": "Pop an element from the right of an array",
       "signature": null,
       "binary": true
     },
     "repeat": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "repeat",
       "description": "Creates a new array whose elements are initialised by calling the given function n times",
       "signature": {
@@ -190,8 +192,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -219,7 +221,7 @@
       "binary": false
     },
     "scan": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "scan",
       "description": "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.",
       "signature": {
@@ -251,8 +253,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -312,8 +314,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -346,7 +348,7 @@
       "binary": false
     },
     "set": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "set",
       "description": "Set an element in an array",
       "signature": {
@@ -364,8 +366,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -408,8 +410,8 @@
                   },
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -439,8 +441,8 @@
                   },
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -471,7 +473,7 @@
       "binary": false
     },
     "swap": {
-      "extension": "collections.array",
+      "extension": "collections.value_array",
       "name": "swap",
       "description": "Swap two elements in an array",
       "signature": {
@@ -489,8 +491,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.array",
-              "id": "array",
+              "extension": "collections.value_array",
+              "id": "value_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -526,8 +528,8 @@
                 [
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -552,8 +554,8 @@
                 [
                   {
                     "t": "Opaque",
-                    "extension": "collections.array",
-                    "id": "array",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
                     "args": [
                       {
                         "tya": "Variable",
