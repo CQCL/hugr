@@ -57,7 +57,14 @@ impl Extension {
         let mut used_extensions = WeakExtensionRegistry::default();
 
         for type_def in self.types.values_mut() {
-            resolve_typedef_exts(&self.name, type_def, extensions, &mut used_extensions)?;
+            // If there are other pointers to the same TypeDef (from CustomTypes),
+            // this will disasssociate them rather than update them.
+            resolve_typedef_exts(
+                &self.name,
+                Arc::make_mut(type_def),
+                extensions,
+                &mut used_extensions,
+            )?;
         }
         for val in self.values.values_mut() {
             resolve_value_exts(

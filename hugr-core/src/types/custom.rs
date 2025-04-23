@@ -95,6 +95,7 @@ impl CustomType {
                 exn: self.extension.clone(),
                 typ: self.id.clone(),
             })
+            .map(Arc::as_ref)
     }
 
     pub(super) fn get_extension(&self) -> Result<Arc<Extension>, SignatureError> {

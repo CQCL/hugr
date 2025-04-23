@@ -581,7 +581,7 @@ pub struct Extension {
     /// Runtime dependencies this extension has on other extensions.
     pub runtime_reqs: ExtensionSet,
     /// Types defined by this extension.
-    types: BTreeMap<TypeName, TypeDef>,
+    types: BTreeMap<TypeName, Arc<TypeDef>>,
     /// Static values defined by this extension.
     values: BTreeMap<ValueName, ExtensionValue>,
     /// Operation declarations with serializable definitions.
@@ -675,7 +675,7 @@ impl Extension {
     }
 
     /// Allows read-only access to the types in this Extension
-    pub fn get_type(&self, type_name: &TypeNameRef) -> Option<&type_def::TypeDef> {
+    pub fn get_type(&self, type_name: &TypeNameRef) -> Option<&Arc<TypeDef>> {
         self.types.get(type_name)
     }
 
@@ -700,7 +700,7 @@ impl Extension {
     }
 
     /// Iterator over the types of this [`Extension`].
-    pub fn types(&self) -> impl Iterator<Item = (&TypeName, &TypeDef)> {
+    pub fn types(&self) -> impl Iterator<Item = (&TypeName, &Arc<TypeDef>)> {
         self.types.iter()
     }
 

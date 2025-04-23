@@ -1,5 +1,5 @@
 use std::collections::btree_map::Entry;
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
 use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError};
@@ -212,7 +212,7 @@ impl Extension {
         description: String,
         bound: TypeDefBound,
         extension_ref: &Weak<Extension>,
-    ) -> Result<&TypeDef, ExtensionBuildError> {
+    ) -> Result<&Arc<TypeDef>, ExtensionBuildError> {
         let ty = TypeDef {
             extension: self.name.clone(),
             extension_ref: extension_ref.clone(),
@@ -223,7 +223,7 @@ impl Extension {
         };
         match self.types.entry(ty.name.clone()) {
             Entry::Occupied(_) => Err(ExtensionBuildError::TypeDefExists(ty.name)),
-            Entry::Vacant(ve) => Ok(ve.insert(ty)),
+            Entry::Vacant(ve) => Ok(ve.insert(Arc::new(ty))),
         }
     }
 }
