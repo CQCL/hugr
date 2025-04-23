@@ -46,10 +46,8 @@ pub enum NodeTemplate {
     /// Note this will be of limited use before [monomorphization](super::monomorphize())
     /// because the new subtree will not be able to use type variables present in the
     /// parent Hugr or previous op.
-    // TODO: store also a vec<TypeParam>, and update Hugr::validate to take &[TypeParam]s
-    // (defaulting to empty list) - see https://github.com/CQCL/hugr/issues/709
     CompoundOp(Box<Hugr>),
-    /// A Call to a function (already) existing in the Hugr.
+    /// A Call to an existing function.
     Call(Node, Vec<TypeArg>),
 }
 
