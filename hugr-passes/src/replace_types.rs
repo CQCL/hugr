@@ -345,7 +345,9 @@ impl ReplaceTypes {
                         if targets.len() != 1 {
                             hugr.disconnect(n, outp);
                             let src = Wire::new(n, outp);
-                            self.linearize.handler(hugr, &mut cache).insert_copy_discard(src, &targets)?;
+                            self.linearize
+                                .handler(hugr, &mut cache)
+                                .insert_copy_discard(src, &targets)?;
                         }
                     }
                 }

@@ -9,7 +9,7 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, Hugr, ops::Tag, HugrView, IncomingPort, Node, Wire};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, Hugr, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
 use super::{handlers::linearize_array, NodeTemplate, ParametricType};
@@ -51,7 +51,7 @@ type FuncId = String;
 pub struct CallbackHandler<'a> {
     hugr: &'a mut Hugr,
     cache: &'a mut HashMap<FuncId, Node>,
-    lin: &'a DelegatingLinearizer
+    lin: &'a DelegatingLinearizer,
 }
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
@@ -147,6 +147,20 @@ impl DelegatingLinearizer {
         self.copy_discard_parametric
             .insert(src.into(), Arc::new(copy_discard_fn));
     }
+
+    pub fn handler<'a>(
+        &'a self,
+        hugr: &'a mut impl HugrMut,
+        cache: &'a mut HashMap<FuncId, Node>,
+    ) -> CallbackHandler<'a> {
+        // ALAN ugh, can we avoid hugr_mut() here? Maybe by *not* storing the hugr-mut in the
+        // CallbackHandler (==> NodeTemplate::Call contains FuncID *or* Node) ?
+        CallbackHandler {
+            hugr: hugr.hugr_mut(),
+            cache,
+            lin: self,
+        }
+    }
 }
 
 fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(), LinearizeError> {
@@ -161,108 +175,6 @@ fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(),
             num_outports,
             sig: sig.map(Cow::into_owned),
         })
-    }
-}
-
-impl DelegatingLinearizer {
-    pub fn handler<'a>(&'a self, hugr: &'a mut impl HugrMut,  cache: &'a mut HashMap<FuncId, Node>) -> CallbackHandler<'a> {
-        // ALAN ugh, can we avoid hugr_mut() here? Maybe by *not* storing the hugr-mut in the
-        // CallbackHandler (==> NodeTemplate::Call contains FuncID *or* Node) ?
-        CallbackHandler { hugr: hugr.hugr_mut(), cache, lin: self}
-    }
-
-    fn copy_discard_op(
-        &self,
-        typ: &Type,
-        num_outports: usize,
-        hugr: &mut impl HugrMut,
-        cache: &mut HashMap<FuncId, Node>,
-    ) -> Result<NodeTemplate, LinearizeError> {
-        if typ.copyable() {
-            return Err(LinearizeError::CopyableType(typ.clone()));
-        };
-        assert!(num_outports != 1);
-
-        match typ.as_type_enum() {
-            TypeEnum::Sum(sum_type) => {
-                let variants = sum_type
-                    .variants()
-                    .map(|trv| trv.clone().try_into())
-                    .collect::<Result<Vec<TypeRow>, _>>()?;
-                let mut cb = ConditionalBuilder::new(
-                    variants.clone(),
-                    vec![],
-                    vec![sum_type.clone().into(); num_outports],
-                )
-                .unwrap();
-                for (tag, variant) in variants.iter().enumerate() {
-                    let mut case_b = cb.case_builder(tag).unwrap();
-                    let mut elems_for_copy = vec![vec![]; num_outports];
-                    for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
-                        let inp_copies = if ty.copyable() {
-                            repeat(inp).take(num_outports).collect::<Vec<_>>()
-                        } else {
-                            self.copy_discard_op(ty, num_outports, hugr, cache)?
-                                .add(&mut case_b, [inp])
-                                .unwrap()
-                                .outputs()
-                                .collect()
-                        };
-                        for (src, elems) in inp_copies.into_iter().zip_eq(elems_for_copy.iter_mut())
-                        {
-                            elems.push(src)
-                        }
-                    }
-                    let t = Tag::new(tag, variants.clone());
-                    let outputs = elems_for_copy
-                        .into_iter()
-                        .map(|elems| {
-                            let [copy] = case_b
-                                .add_dataflow_op(t.clone(), elems)
-                                .unwrap()
-                                .outputs_arr();
-                            copy
-                        })
-                        .collect::<Vec<_>>(); // must collect to end borrow of `case_b` by closure
-                    case_b.finish_with_outputs(outputs).unwrap();
-                }
-                Ok(NodeTemplate::CompoundOp(Box::new(
-                    cb.finish_hugr().unwrap(),
-                )))
-            }
-            TypeEnum::Extension(cty) => match self.copy_discard.get(cty) {
-                Some((copy, discard)) => Ok(if num_outports == 0 {
-                    discard.clone()
-                } else {
-                    let mut dfb =
-                        DFGBuilder::new(inout_sig(typ.clone(), vec![typ.clone(); num_outports]))
-                            .unwrap();
-                    let [mut src] = dfb.input_wires_arr();
-                    let mut outputs = vec![];
-                    for _ in 0..num_outports - 1 {
-                        let [out0, out1] = copy.clone().add(&mut dfb, [src]).unwrap().outputs_arr();
-                        outputs.push(out0);
-                        src = out1;
-                    }
-                    outputs.push(src);
-                    NodeTemplate::CompoundOp(Box::new(
-                        dfb.finish_hugr_with_outputs(outputs).unwrap(),
-                    ))
-                }),
-                None => {
-                    let copy_discard_fn = self
-                        .copy_discard_parametric
-                        .get(&cty.into())
-                        .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
-                    let tmpl =
-                        copy_discard_fn(cty.args(), num_outports, &mut self.handler(hugr, cache))?;
-                    check_sig(&tmpl, typ, num_outports)?;
-                    Ok(tmpl)
-                }
-            },
-            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
-            _ => Err(LinearizeError::UnsupportedType(typ.clone())),
-        }
     }
 }
 
@@ -285,11 +197,13 @@ impl CallbackHandler<'_> {
     /// The first call for a given `id` will call `body`, which must return
     /// a [FuncDefn]-rooted Hugr, and insert that into the underlying Hugr;
     /// the node containing the newly-inserted FuncDefn is returned.
-    /// 
+    ///
     /// A second call with the same `id` will return the node from the first
     /// call, without executing `body`.
     pub fn make_function(&mut self, id: FuncId, body: impl Fn() -> Hugr) -> Node {
-        if let Some(n) = self.cache.get(&id) {return *n;}
+        if let Some(n) = self.cache.get(&id) {
+            return *n;
+        }
         let h = body();
         let n = self.hugr.insert_hugr(self.hugr.root(), h).new_root;
         self.cache.insert(id, n);
@@ -327,11 +241,13 @@ impl CallbackHandler<'_> {
             *targets.first().unwrap()
         } else {
             // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
-            let src_parent = self.hugr
+            let src_parent = self
+                .hugr
                 .get_parent(src.node())
                 .expect("Root node cannot have out edges");
             if let Some((tgt, tgt_parent)) = targets.iter().find_map(|(tgt, _)| {
-                let tgt_parent = self.hugr
+                let tgt_parent = self
+                    .hugr
                     .get_parent(*tgt)
                     .expect("Root node cannot have incoming edges");
                 (tgt_parent != src_parent).then_some((*tgt, tgt_parent))
@@ -351,7 +267,8 @@ impl CallbackHandler<'_> {
             }
             (copy_discard_op, 0.into())
         };
-        self.hugr.connect(src.node(), src.source(), tgt_node, tgt_inport);
+        self.hugr
+            .connect(src.node(), src.source(), tgt_node, tgt_inport);
         Ok(())
     }
 
@@ -366,7 +283,91 @@ impl CallbackHandler<'_> {
         typ: &Type,
         num_outports: usize,
     ) -> Result<NodeTemplate, LinearizeError> {
-        self.lin.copy_discard_op(typ, num_outports, self.hugr, self.cache)
+        if typ.copyable() {
+            return Err(LinearizeError::CopyableType(typ.clone()));
+        };
+        assert!(num_outports != 1);
+
+        match typ.as_type_enum() {
+            TypeEnum::Sum(sum_type) => {
+                let variants = sum_type
+                    .variants()
+                    .map(|trv| trv.clone().try_into())
+                    .collect::<Result<Vec<TypeRow>, _>>()?;
+                let mut cb = ConditionalBuilder::new(
+                    variants.clone(),
+                    vec![],
+                    vec![sum_type.clone().into(); num_outports],
+                )
+                .unwrap();
+                for (tag, variant) in variants.iter().enumerate() {
+                    let mut case_b = cb.case_builder(tag).unwrap();
+                    let mut elems_for_copy = vec![vec![]; num_outports];
+                    for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
+                        let inp_copies = if ty.copyable() {
+                            repeat(inp).take(num_outports).collect::<Vec<_>>()
+                        } else {
+                            self.copy_discard_op(ty, num_outports)?
+                                .add(&mut case_b, [inp])
+                                .unwrap()
+                                .outputs()
+                                .collect()
+                        };
+                        for (src, elems) in inp_copies.into_iter().zip_eq(elems_for_copy.iter_mut())
+                        {
+                            elems.push(src)
+                        }
+                    }
+                    let t = Tag::new(tag, variants.clone());
+                    let outputs = elems_for_copy
+                        .into_iter()
+                        .map(|elems| {
+                            let [copy] = case_b
+                                .add_dataflow_op(t.clone(), elems)
+                                .unwrap()
+                                .outputs_arr();
+                            copy
+                        })
+                        .collect::<Vec<_>>(); // must collect to end borrow of `case_b` by closure
+                    case_b.finish_with_outputs(outputs).unwrap();
+                }
+                Ok(NodeTemplate::CompoundOp(Box::new(
+                    cb.finish_hugr().unwrap(),
+                )))
+            }
+            TypeEnum::Extension(cty) => match self.lin.copy_discard.get(cty) {
+                Some((copy, discard)) => Ok(if num_outports == 0 {
+                    discard.clone()
+                } else {
+                    let mut dfb =
+                        DFGBuilder::new(inout_sig(typ.clone(), vec![typ.clone(); num_outports]))
+                            .unwrap();
+                    let [mut src] = dfb.input_wires_arr();
+                    let mut outputs = vec![];
+                    for _ in 0..num_outports - 1 {
+                        let [out0, out1] = copy.clone().add(&mut dfb, [src]).unwrap().outputs_arr();
+                        outputs.push(out0);
+                        src = out1;
+                    }
+                    outputs.push(src);
+                    NodeTemplate::CompoundOp(Box::new(
+                        dfb.finish_hugr_with_outputs(outputs).unwrap(),
+                    ))
+                }),
+                None => {
+                    let copy_discard_fn = self
+                        .lin
+                        .copy_discard_parametric
+                        .get(&cty.into())
+                        .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
+                    let tmpl = copy_discard_fn(cty.args(), num_outports, self)?;
+                    check_sig(&tmpl, typ, num_outports)?;
+                    Ok(tmpl)
+                }
+            },
+            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
+            _ => Err(LinearizeError::UnsupportedType(typ.clone())),
+        }
     }
 }
 

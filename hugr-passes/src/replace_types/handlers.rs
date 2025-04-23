@@ -17,9 +17,7 @@ use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{type_row, Hugr, HugrView};
 use itertools::Itertools;
 
-use super::{
-    CallbackHandler, LinearizeError, NodeTemplate, ReplaceTypes, ReplaceTypesError,
-};
+use super::{CallbackHandler, LinearizeError, NodeTemplate, ReplaceTypes, ReplaceTypesError};
 
 /// Handler for [ListValue] constants that updates the element type and
 /// recursively [ReplaceTypes::change_value]s the elements of the list.
