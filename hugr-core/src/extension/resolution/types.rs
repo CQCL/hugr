@@ -6,6 +6,8 @@
 //! See [`super::resolve_op_types_extensions`] for a mutating version that
 //! updates the weak links to point to the correct extensions.
 
+use std::sync::Arc;
+
 use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
@@ -173,11 +175,14 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
             for arg in custom.args() {
                 collect_typearg_exts(arg, used_extensions, missing_extensions);
             }
-            let ext_ref = custom.extension_ref();
+            let ext_ref = custom
+                .def()
+                .ok()
+                .and_then(|type_def| type_def.extension().upgrade());
             // Check if the extension reference is still valid.
-            match ext_ref.upgrade() {
+            match ext_ref {
                 Some(ext) => {
-                    used_extensions.register(ext.name().clone(), ext_ref);
+                    used_extensions.register(ext.name().clone(), Arc::downgrade(&ext));
                 }
                 None => {
                     missing_extensions.insert(custom.extension().clone());

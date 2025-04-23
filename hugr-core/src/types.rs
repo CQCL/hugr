@@ -559,9 +559,7 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
                     let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
                         *self = Self::new_extension(
-                            custom_type
-                                .get_type_def(&custom_type.get_extension()?)?
-                                .instantiate(custom_type.args())?,
+                            custom_type.def()?.instantiate(custom_type.args())?,
                         );
                     }
                     args_changed

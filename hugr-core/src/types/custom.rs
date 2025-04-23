@@ -18,9 +18,9 @@ use super::{Type, TypeName};
 pub struct CustomType {
     /// The identifier for the extension owning this type.
     extension: ExtensionId,
-    /// A weak reference to the extension defining this type.
+    /// A reference to the TypeDef, as soon as it's available
     #[serde(skip)]
-    extension_ref: Weak<Extension>,
+    type_def: Option<Arc<TypeDef>>,
     /// Unique identifier of the opaque type.
     /// Same as the corresponding [`TypeDef`]
     ///
@@ -63,12 +63,16 @@ impl CustomType {
         bound: TypeBound,
         extension_ref: &Weak<Extension>,
     ) -> Self {
+        let id = id.into();
+        let type_def = extension_ref
+            .upgrade()
+            .map(|ext| ext.get_type(&id).unwrap().clone());
         Self {
-            id: id.into(),
+            id,
             args: args.into(),
             extension,
             bound,
-            extension_ref: extension_ref.clone(),
+            type_def,
         }
     }
 
@@ -80,31 +84,16 @@ impl CustomType {
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         // Check the args are individually ok
         self.args.iter().try_for_each(|a| a.validate(var_decls))?;
-        // And check they fit into the TypeParams declared by the TypeDef
-        let ext = self.get_extension()?;
-        let def = self.get_type_def(&ext)?;
-        def.check_custom(self)
+        self.def()?.check_custom(self)
     }
 
-    pub(super) fn get_type_def<'a>(
-        &self,
-        ext: &'a Arc<Extension>,
-    ) -> Result<&'a TypeDef, SignatureError> {
-        ext.get_type(&self.id)
-            .ok_or(SignatureError::ExtensionTypeNotFound {
-                exn: self.extension.clone(),
+    pub fn def(&self) -> Result<&TypeDef, SignatureError> {
+        self.type_def.as_ref().map(Arc::as_ref).ok_or_else(|| {
+            SignatureError::MissingTypeExtension {
                 typ: self.id.clone(),
-            })
-            .map(Arc::as_ref)
-    }
-
-    pub(super) fn get_extension(&self) -> Result<Arc<Extension>, SignatureError> {
-        self.extension_ref
-            .upgrade()
-            .ok_or(SignatureError::MissingTypeExtension {
                 missing: self.extension.clone(),
-                typ: self.name().clone(),
-            })
+            }
+        })
     }
 
     pub(super) fn substitute(&self, tr: &Substitution) -> Self {
@@ -113,11 +102,7 @@ impl CustomType {
             .iter()
             .map(|arg| arg.substitute(tr))
             .collect::<Vec<_>>();
-        let ext = self.get_extension().unwrap_or_else(|e| panic!("{}", e));
-        let bound = self
-            .get_type_def(&ext)
-            .expect("validate should rule this out")
-            .bound(&args);
+        let bound = self.def().unwrap().bound(&args);
         debug_assert!(self.bound.contains(bound));
         Self {
             args,
@@ -146,14 +131,11 @@ impl CustomType {
         &self.extension
     }
 
-    /// Returns a weak reference to the extension defining this type.
-    pub fn extension_ref(&self) -> Weak<Extension> {
-        self.extension_ref.clone()
-    }
-
     /// Update the internal extension reference with a new weak pointer.
     pub fn update_extension(&mut self, extension_ref: Weak<Extension>) {
-        self.extension_ref = extension_ref;
+        if let Some(arc) = extension_ref.upgrade() {
+            self.type_def = Some(arc.get_type(&self.id).unwrap().clone());
+        }
     }
 }
 
