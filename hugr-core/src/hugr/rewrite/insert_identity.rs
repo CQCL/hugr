@@ -48,6 +48,7 @@ pub enum IdentityInsertionError {
 }
 
 impl Rewrite for IdentityInsertion {
+    type Node = Node;
     type Error = IdentityInsertionError;
     /// The inserted node.
     type ApplyResult = Node;
@@ -65,7 +66,10 @@ impl Rewrite for IdentityInsertion {
 
         unimplemented!()
     }
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, IdentityInsertionError> {
+    fn apply(
+        self,
+        h: &mut impl HugrMut<Node = Node>,
+    ) -> Result<Self::ApplyResult, IdentityInsertionError> {
         let kind = h.get_optype(self.post_node).port_kind(self.post_port);
         let Some(EdgeKind::Value(ty)) = kind else {
             return Err(IdentityInsertionError::InvalidPortKind(kind));

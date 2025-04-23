@@ -16,8 +16,8 @@ use hugr_core::{Hugr, HugrView, Node};
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
-pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
-    let mut worklist = cfg.nodes().collect::<Vec<_>>();
+pub fn merge_basic_blocks(cfg: &mut impl HugrMut<Node = Node, RootHandle = CfgID>) {
+    let mut worklist = cfg.children(cfg.root()).collect::<Vec<_>>();
     while let Some(n) = worklist.pop() {
         // Consider merging n with its successor
         let Ok(succ) = cfg.output_neighbours(n).exactly_one() else {
@@ -33,13 +33,11 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
             continue;
         };
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
-        let node_map = cfg.hugr_mut().apply_rewrite(rep).unwrap();
+        let node_map = cfg.apply_rewrite(rep).unwrap();
         let merged_bb = *node_map.get(&merge_bb).unwrap();
         for dfg_id in dfgs {
             let n_id = *node_map.get(&dfg_id).unwrap();
-            cfg.hugr_mut()
-                .apply_rewrite(InlineDFG(n_id.into()))
-                .unwrap();
+            cfg.apply_rewrite(InlineDFG(n_id.into())).unwrap();
         }
         worklist.push(merged_bb);
     }
@@ -160,12 +158,12 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::extension::prelude::PRELUDE_ID;
+    use hugr_core::hugr::views::RootChecked;
     use itertools::Itertools;
     use rstest::rstest;
 
     use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
     use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize};
-    use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
     use hugr_core::ops::{LoadConstant, OpTrait, OpType};
@@ -254,7 +252,7 @@ mod test {
 
         let mut h = h.finish_hugr()?;
         let r = h.root();
-        merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
+        merge_basic_blocks(&mut RootChecked::<_, CfgID>::try_new(&mut h).unwrap());
         h.validate().unwrap();
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
@@ -348,8 +346,7 @@ mod test {
         h.branch(&bb3, 0, &h.exit_block())?;
 
         let mut h = h.finish_hugr()?;
-        let root = h.root();
-        merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
+        merge_basic_blocks(&mut RootChecked::<_, CfgID>::try_new(&mut h).unwrap());
         h.validate()?;
 
         // Should only be one BB left

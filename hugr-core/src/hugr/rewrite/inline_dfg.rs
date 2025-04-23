@@ -23,6 +23,7 @@ pub enum InlineDFGError {
 
 impl Rewrite for InlineDFG {
     /// Returns the removed nodes: the DFG, and its Input and Output children.
+    type Node = Node;
     type ApplyResult = [Node; 3];
     type Error = InlineDFGError;
 
@@ -39,7 +40,10 @@ impl Rewrite for InlineDFG {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl crate::hugr::HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn apply(
+        self,
+        h: &mut impl crate::hugr::HugrMut<Node = Node>,
+    ) -> Result<Self::ApplyResult, Self::Error> {
         self.verify(h)?;
         let n = self.0.node();
         let (oth_in, oth_out) = {

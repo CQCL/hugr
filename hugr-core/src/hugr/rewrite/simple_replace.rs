@@ -275,6 +275,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
 }
 
 impl Rewrite for SimpleReplacement {
+    type Node = Node;
     type Error = SimpleReplacementError;
     type ApplyResult = Vec<(Node, OpType)>;
     const UNCHANGED_ON_FAILURE: bool = true;
@@ -283,7 +284,7 @@ impl Rewrite for SimpleReplacement {
         self.is_valid_rewrite(h)
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<Self::ApplyResult, Self::Error> {
         self.is_valid_rewrite(h)?;
 
         let parent = self.subgraph.get_parent(h);

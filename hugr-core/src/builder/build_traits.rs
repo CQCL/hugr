@@ -153,7 +153,7 @@ pub trait Container {
     where
         ExtensionRegistry: Extend<Reg>,
     {
-        self.hugr_mut().extensions_mut().extend(registry);
+        self.hugr_mut().use_extensions(registry);
     }
 }
 

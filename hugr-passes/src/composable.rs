@@ -2,6 +2,7 @@
 
 use std::{error::Error, marker::PhantomData};
 
+use hugr_core::core::HugrNode;
 use hugr_core::hugr::{hugrmut::HugrMut, ValidationError};
 use hugr_core::HugrView;
 use itertools::Either;
@@ -9,36 +10,40 @@ use itertools::Either;
 /// An optimization pass that can be sequenced with another and/or wrapped
 /// e.g. by [ValidatingPass]
 pub trait ComposablePass: Sized {
+    type Node: HugrNode;
     type Error: Error;
     type Result; // Would like to default to () but currently unstable
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error>;
+    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<Self::Result, Self::Error>;
 
     fn map_err<E2: Error>(
         self,
         f: impl Fn(Self::Error) -> E2,
-    ) -> impl ComposablePass<Result = Self::Result, Error = E2> {
+    ) -> impl ComposablePass<Result = Self::Result, Error = E2, Node = Self::Node> {
         ErrMapper::new(self, f)
     }
 
     /// Returns a [ComposablePass] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
-    fn then<P: ComposablePass, E: ErrorCombiner<Self::Error, P::Error>>(
+    fn then<P: ComposablePass<Node = Self::Node>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
-    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = E> {
+    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = E, Node = Self::Node> {
         struct Sequence<E, P1, P2>(P1, P2, PhantomData<E>);
         impl<E, P1, P2> ComposablePass for Sequence<E, P1, P2>
         where
             P1: ComposablePass,
-            P2: ComposablePass,
+            P2: ComposablePass<Node = P1::Node>,
             E: ErrorCombiner<P1::Error, P2::Error>,
         {
+            type Node = P1::Node;
             type Error = E;
-
             type Result = (P1::Result, P2::Result);
 
-            fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
+            fn run(
+                &self,
+                hugr: &mut impl HugrMut<Node = Self::Node>,
+            ) -> Result<Self::Result, Self::Error> {
                 let res1 = self.0.run(hugr).map_err(E::from_first)?;
                 let res2 = self.1.run(hugr).map_err(E::from_second)?;
                 Ok((res1, res2))
@@ -95,10 +100,11 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ErrMapper<P, E, F> {
 }
 
 impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMapper<P, E, F> {
+    type Node = P::Node;
     type Error = E;
     type Result = P::Result;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<P::Result, Self::Error> {
+    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<P::Result, Self::Error> {
         self.0.run(hugr).map_err(&self.1)
     }
 }
@@ -157,10 +163,11 @@ impl<P: ComposablePass> ValidatingPass<P> {
 }
 
 impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
+    type Node = P::Node;
     type Error = ValidatePassError<P::Error>;
     type Result = P::Result;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<P::Result, Self::Error> {
+    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<P::Result, Self::Error> {
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Input {
             err,
             pretty_hugr,
@@ -180,8 +187,11 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
 /// executes a second pass
 pub struct IfThen<E, A, B>(A, B, PhantomData<E>);
 
-impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Error, B::Error>>
-    IfThen<E, A, B>
+impl<
+        A: ComposablePass<Result = bool>,
+        B: ComposablePass<Node = A::Node>,
+        E: ErrorCombiner<A::Error, B::Error>,
+    > IfThen<E, A, B>
 {
     /// Make a new instance given the [ComposablePass] to run first
     /// and (maybe) second
@@ -190,14 +200,17 @@ impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Er
     }
 }
 
-impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Error, B::Error>>
-    ComposablePass for IfThen<E, A, B>
+impl<
+        A: ComposablePass<Result = bool>,
+        B: ComposablePass<Node = A::Node>,
+        E: ErrorCombiner<A::Error, B::Error>,
+    > ComposablePass for IfThen<E, A, B>
 {
+    type Node = A::Node;
     type Error = E;
-
     type Result = Option<B::Result>;
 
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<Self::Result, Self::Error> {
+    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<Self::Result, Self::Error> {
         let res: bool = self.0.run(hugr).map_err(ErrorCombiner::from_first)?;
         res.then(|| self.1.run(hugr).map_err(ErrorCombiner::from_second))
             .transpose()
@@ -206,7 +219,7 @@ impl<A: ComposablePass<Result = bool>, B: ComposablePass, E: ErrorCombiner<A::Er
 
 pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
-    hugr: &mut impl HugrMut,
+    hugr: &mut impl HugrMut<Node = P::Node>,
 ) -> Result<P::Result, ValidatePassError<P::Error>> {
     if cfg!(test) {
         ValidatingPass::new_default(pass).run(hugr)
