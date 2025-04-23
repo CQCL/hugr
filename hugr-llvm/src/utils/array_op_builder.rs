@@ -30,13 +30,13 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
         size: u64,
         input: Wire,
         index: Wire,
-    ) -> Result<Wire, BuildError> {
+    ) -> Result<(Wire, Wire), BuildError> {
         // TODO Add an OpLoadError variant to BuildError.
         let op = GenericArrayOpDef::<AK>::get
             .instantiate(&[size.into(), elem_ty.into()])
             .unwrap();
-        let [out] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
-        Ok(out)
+        let [out, arr] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
+        Ok((out, arr))
     }
 
     fn add_array_set(
@@ -154,7 +154,7 @@ pub mod test {
         };
 
         let [elem_0] = {
-            let r = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
+            let (r, _) = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
             builder
                 .build_unwrap_sum(1, option_type(usize_t()), r)
                 .unwrap()

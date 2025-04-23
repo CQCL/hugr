@@ -571,7 +571,7 @@ mod test {
             let op_def = collections::value_array::EXTENSION.get_op("get").unwrap();
             let op = hugr_core::ops::ExtensionOp::new(op_def.clone(), vec![sv(0), tv(1).into()])
                 .unwrap();
-            let [get] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
+            let [get, _] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
             let [got] = pf2
                 .build_unwrap_sum(1, SumType::new([vec![], vec![tv(1)]]), get)
                 .unwrap();

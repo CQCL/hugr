@@ -633,7 +633,7 @@ mod test {
                 .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
                 .unwrap()
                 .outputs_arr();
-            let [opt] = dfb
+            let [opt, _] = dfb
                 .add_dataflow_op(VArrayOpDef::get.to_concrete(ty.clone(), 64), [val, idx])
                 .unwrap()
                 .outputs_arr();

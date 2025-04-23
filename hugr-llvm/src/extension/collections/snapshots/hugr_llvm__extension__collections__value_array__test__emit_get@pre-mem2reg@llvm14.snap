@@ -11,7 +11,9 @@ alloca_block:
   %"5_0" = alloca i64, align 8
   %"8_0" = alloca [2 x i64], align 8
   %"9_0" = alloca { i1, i64 }, align 8
+  %"9_1" = alloca [2 x i64], align 8
   %"0" = alloca { i1, i64 }, align 8
+  %"1" = alloca [2 x i64], align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
@@ -29,6 +31,7 @@ entry_block:                                      ; preds = %alloca_block
 
 3:                                                ; preds = %entry_block
   store { i1, i64 } { i1 false, i64 poison }, { i1, i64 }* %"0", align 4
+  store [2 x i64] %"8_03", [2 x i64]* %"1", align 4
   br label %10
 
 4:                                                ; preds = %entry_block
@@ -39,10 +42,13 @@ entry_block:                                      ; preds = %alloca_block
   %8 = load i64, i64* %7, align 4
   %9 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %8, 1
   store { i1, i64 } %9, { i1, i64 }* %"0", align 4
+  store [2 x i64] %"8_03", [2 x i64]* %"1", align 4
   br label %10
 
 10:                                               ; preds = %3, %4
   %"05" = load { i1, i64 }, { i1, i64 }* %"0", align 4
+  %"16" = load [2 x i64], [2 x i64]* %"1", align 4
   store { i1, i64 } %"05", { i1, i64 }* %"9_0", align 4
+  store [2 x i64] %"16", [2 x i64]* %"9_1", align 4
   ret void
 }
