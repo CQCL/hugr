@@ -2,7 +2,7 @@ name: Rust Semver Checks
 on:
   pull_request_target:
     branches:
-      - main
+      - '**'
 
 jobs:
   # Check if changes were made to the relevant files.

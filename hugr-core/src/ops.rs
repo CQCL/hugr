@@ -301,9 +301,10 @@ impl OpType {
     }
 
     /// Cast to an extension operation.
+    ///
+    /// Returns `None` if the operation is not of the requested type.
     pub fn cast<T: MakeExtensionOp>(&self) -> Option<T> {
-        self.as_extension_op()
-            .and_then(|o| T::from_extension_op(o).ok())
+        self.as_extension_op().and_then(ExtensionOp::cast)
     }
 
     /// Returns the extension where the operation is defined, if any.
