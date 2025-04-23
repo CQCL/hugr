@@ -1,0 +1,44 @@
+---
+source: hugr-llvm/src/extension/collections/array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define void @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2))
+  %1 = bitcast i8* %0 to i64*
+  %2 = insertvalue { i64*, i64 } poison, i64* %1, 0
+  %3 = insertvalue { i64*, i64 } %2, i64 0, 1
+  %4 = getelementptr inbounds i64, i64* %1, i64 0
+  store i64 1, i64* %4, align 4
+  %5 = getelementptr inbounds i64, i64* %1, i64 1
+  store i64 2, i64* %5, align 4
+  %array_ptr = extractvalue { i64*, i64 } %3, 0
+  %array_offset = extractvalue { i64*, i64 } %3, 1
+  %6 = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2))
+  %7 = bitcast i8* %6 to i64*
+  %8 = insertvalue { i64*, i64 } poison, i64* %7, 0
+  %9 = insertvalue { i64*, i64 } %8, i64 0, 1
+  %10 = getelementptr inbounds i64, i64* %array_ptr, i64 %array_offset
+  %11 = bitcast i64* %7 to i8*
+  %12 = bitcast i64* %10 to i8*
+  call void @memcpy(i8* %11, i8* %12, i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2))
+  %array_ptr5 = extractvalue { i64*, i64 } %9, 0
+  %13 = bitcast i64* %array_ptr5 to i8*
+  call void @free(i8* %13)
+  %array_ptr7 = extractvalue { i64*, i64 } %3, 0
+  %14 = bitcast i64* %array_ptr7 to i8*
+  call void @free(i8* %14)
+  ret void
+}
+
+declare i8* @malloc(i64)
+
+declare void @memcpy(i8*, i8*, i64)
+
+declare void @free(i8*)
