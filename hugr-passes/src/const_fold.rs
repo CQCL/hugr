@@ -23,12 +23,11 @@ use crate::dataflow::{
     TailLoopTermination,
 };
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::{composable::validate_if_test, ComposablePass};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
-    validation: ValidationLevel,
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
     ///   - a FuncDefn child of the root, if the root is a module; or
@@ -36,13 +35,10 @@ pub struct ConstantFoldPass {
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 /// Errors produced by [ConstantFoldPass].
 pub enum ConstFoldError {
-    #[error(transparent)]
-    #[allow(missing_docs)]
-    ValidationError(#[from] ValidatePassError),
     /// Error raised when a Node is specified as an entry-point but
     /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
     /// a [Conditional](OpType::Conditional).
@@ -51,12 +47,6 @@ pub enum ConstFoldError {
 }
 
 impl ConstantFoldPass {
-    /// Sets the validation level used before and after the pass is run
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
     /// Allows the pass to remove potentially-non-terminating [TailLoop]s and [CFG] if their
     /// result (if/when they do terminate) is either known or not needed.
     ///
@@ -88,9 +78,19 @@ impl ConstantFoldPass {
             .extend(inputs.into_iter().map(|(p, v)| (p.into(), v)));
         self
     }
+}
+
+impl ComposablePass for ConstantFoldPass {
+    type Error = ConstFoldError;
+    type Result = ();
 
     /// Run the Constant Folding pass.
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
+    ///
+    /// # Errors
+    ///
+    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
+    /// was of an invalid [OpType]
+    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
@@ -132,7 +132,7 @@ impl ConstantFoldPass {
                     // into Call when the function input is known. (This will mean we will be unable to handle
                     // Value::Function's, so best to wait until those are removed.)
                     results
-                        .try_read_wire_concrete::<Value, _, _, _>(Wire::new(src, outp))
+                        .try_read_wire_concrete::<Value>(Wire::new(src, outp))
                         .ok()?,
                 ))
             })
@@ -169,22 +169,9 @@ impl ConstantFoldPass {
                     }
                 })
             })
-            .run(hugr)?;
+            .run(hugr)
+            .map_err(|inf| match inf {})?; // TODO use into_ok when available
         Ok(())
-    }
-
-    /// Run the pass using this configuration.
-    ///
-    /// # Errors
-    ///
-    /// [ConstFoldError::ValidationError] if the Hugr does not validate before/afnerwards
-    /// (if [Self::validation_level] is set, or in tests)
-    ///
-    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
-    /// was of an invalid OpType
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 }
 
@@ -203,7 +190,7 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H) {
     } else {
         c
     };
-    c.run(h).unwrap()
+    validate_if_test(c, h).unwrap()
 }
 
 struct ConstFoldContext;
@@ -241,6 +228,7 @@ impl DFContext<ValueHandle<Node>> for ConstFoldContext {
             .input_types()
             .iter()
             .zip_eq(ins.iter())
+            //.map(|(ty, pv)| fold_val_from_pv(pv, ty))
             .map(|(ty, pv)| pv.clone().try_into_concrete(ty).unwrap_or_default())
             .collect::<Vec<_>>();
         let mut out_fvs = vec![FoldVal::Unknown; outs.len()];
@@ -252,6 +240,24 @@ impl DFContext<ValueHandle<Node>> for ConstFoldContext {
         }
     }
 }
+
+/*fn fold_val_from_pv(value: &PartialValue<ValueHandle<Node>, Node>, ty: &Type) -> Option<FoldVal> {
+    Some(match value {
+        PartialValue::Bottom => return None,
+        PartialValue::Top => FoldVal::Unknown,
+        PartialValue::PartialSum(ps) => match ps.0.iter().exactly_one() {
+            Err(_) => FoldVal::Unknown,
+            Ok((&tag, vals)) => {
+                let sum_type = ty.as_sum()?.clone();
+                let items = vals.into_iter().zip_eq(sum_type.get_variant(tag)?.iter()).map(|(pv, t)| fold_val_from_pv(pv, &t.clone().try_into_type().unwrap())).collect::<Option<Vec<_>>>()?;
+                FoldVal::Sum { tag, sum_type, items }
+            }
+        }
+        PartialValue::LoadedFunction(LoadedFunction { func_node, args }) => FoldVal::LoadedFunction(*func_node, args.clone()),
+        // return None for nested Hugr, not representable
+        PartialValue::Value(v) => FoldVal::Extension(v.as_opaque()?.clone())
+    })
+}*/
 
 fn pv_from_fold_val(
     loc: ConstLocation<Node>,

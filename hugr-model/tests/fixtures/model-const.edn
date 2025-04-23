@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (define-func example.bools
   (core.fn []
            [(core.adt [[] []]) (core.adt [[] []])])

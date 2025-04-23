@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 
 use ascent::lattice::BoundedLattice;
+use ascent::Lattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{OpTrait, OpType, TailLoop};
+use hugr_core::ops::{DataflowOpTrait, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -325,22 +326,35 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             in_wire_value(outp, p, v);
 
         // CallIndirect --------------------
-        relation indirect_call(H::Node, H::Node); // <Node> is an `IndirectCall` to `FuncDefn` <Node>
-        indirect_call(call, func_node) <--
+        lattice indirect_call(H::Node, LatticeWrapper<H::Node>); // <Node> is an `IndirectCall` to `FuncDefn` <Node>
+        indirect_call(call, tgt) <--
             node(call),
             if let OpType::CallIndirect(_) = hugr.get_optype(*call),
             in_wire_value(call, IncomingPort::from(0), v),
-            if let PartialValue::LoadedFunction(LoadedFunction {func_node, ..}) = v;
+            let tgt = load_func(v);
 
         out_wire_value(inp, OutgoingPort::from(p.index()-1), v) <--
-            indirect_call(call, func),
+            indirect_call(call, lv),
+            if let LatticeWrapper::Value(func) = lv,
             input_child(func, inp),
-            in_wire_value(call, p, v);
+            in_wire_value(call, p, v)
+            if p.index() > 0;
 
         out_wire_value(call, OutgoingPort::from(p.index()), v) <--
-            indirect_call(call, func),
+            indirect_call(call, lv),
+            if let LatticeWrapper::Value(func) = lv,
             output_child(func, outp),
             in_wire_value(outp, p, v);
+
+        // Default out-value is Bottom, but if we can't determine the called function,
+        // assign everything to Top
+        out_wire_value(call, p, PV::Top) <--
+            node(call),
+            if let OpType::CallIndirect(ci) = hugr.get_optype(*call),
+            in_wire_value(call, IncomingPort::from(0), v),
+            // Second alternative below addresses function::Value's:
+            if matches!(v, PartialValue::Top | PartialValue::Value(_)),
+            for p in ci.signature().output_ports();
     };
     let out_wire_values = all_results
         .out_wire_value
@@ -353,6 +367,51 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         in_wire_value: all_results.in_wire_value,
         case_reachable: all_results.case_reachable,
         bb_reachable: all_results.bb_reachable,
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd)]
+enum LatticeWrapper<T> {
+    Bottom,
+    Value(T),
+    Top,
+}
+
+impl<N: PartialEq + PartialOrd> Lattice for LatticeWrapper<N> {
+    fn meet_mut(&mut self, other: Self) -> bool {
+        if *self == other || *self == LatticeWrapper::Bottom || other == LatticeWrapper::Top {
+            return false;
+        };
+        if *self == LatticeWrapper::Top || other == LatticeWrapper::Bottom {
+            *self = other;
+            return true;
+        };
+        // Both are `Value`s and not equal
+        *self = LatticeWrapper::Bottom;
+        true
+    }
+
+    fn join_mut(&mut self, other: Self) -> bool {
+        if *self == other || *self == LatticeWrapper::Top || other == LatticeWrapper::Bottom {
+            return false;
+        };
+        if *self == LatticeWrapper::Bottom || other == LatticeWrapper::Top {
+            *self = other;
+            return true;
+        };
+        // Both are `Value`s and are not equal
+        *self = LatticeWrapper::Top;
+        true
+    }
+}
+
+fn load_func<V, N: Copy>(v: &PV<V, N>) -> LatticeWrapper<N> {
+    match v {
+        PartialValue::Bottom | PartialValue::PartialSum(_) => LatticeWrapper::Bottom,
+        PartialValue::LoadedFunction(LoadedFunction { func_node, .. }) => {
+            LatticeWrapper::Value(*func_node)
+        }
+        PartialValue::Value(_) | PartialValue::Top => LatticeWrapper::Top,
     }
 }
 
@@ -398,11 +457,9 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
                 .unwrap()
                 .0;
             // Node could be a FuncDefn or a FuncDecl, so do not pass the node itself
-            Some(ValueRow::singleton(PartialValue::LoadedFunction(
-                LoadedFunction {
-                    func_node,
-                    args: load_op.type_args.clone(),
-                },
+            Some(ValueRow::singleton(PartialValue::new_load(
+                func_node,
+                load_op.type_args.clone(),
             )))
         }
         OpType::ExtensionOp(e) => {
@@ -423,5 +480,52 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
         }
         // We only call propagate_leaf_op for dataflow op non-containers,
         o => todo!("Unhandled: {:?}", o), // and OpType is non-exhaustive
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use ascent::Lattice;
+
+    use super::LatticeWrapper;
+
+    #[test]
+    fn latwrap_join() {
+        for lv in [
+            LatticeWrapper::Value(3),
+            LatticeWrapper::Value(5),
+            LatticeWrapper::Top,
+        ] {
+            let mut subject = LatticeWrapper::Bottom;
+            assert!(subject.join_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert!(!subject.join_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert_eq!(
+                subject.join_mut(LatticeWrapper::Value(11)),
+                lv != LatticeWrapper::Top
+            );
+            assert_eq!(subject, LatticeWrapper::Top);
+        }
+    }
+
+    #[test]
+    fn latwrap_meet() {
+        for lv in [
+            LatticeWrapper::Bottom,
+            LatticeWrapper::Value(3),
+            LatticeWrapper::Value(5),
+        ] {
+            let mut subject = LatticeWrapper::Top;
+            assert!(subject.meet_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert!(!subject.meet_mut(lv.clone()));
+            assert_eq!(subject, lv);
+            assert_eq!(
+                subject.meet_mut(LatticeWrapper::Value(11)),
+                lv != LatticeWrapper::Bottom
+            );
+            assert_eq!(subject, LatticeWrapper::Bottom);
+        }
     }
 }

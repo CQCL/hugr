@@ -169,7 +169,6 @@ where
         &self.graph
     }
 
-    #[inline]
     fn base_hugr(&self) -> &Hugr {
         self.hugr
     }

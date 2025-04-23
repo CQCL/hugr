@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use delegate::delegate;
@@ -58,6 +59,7 @@ impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Node;
             fn get_pg_index(&self, node: Node) -> portgraph::NodeIndex;

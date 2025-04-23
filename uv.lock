@@ -297,7 +297,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "graphviz", specifier = ">=0.20.3" },
-    { name = "pydantic", specifier = ">=2.8,<2.11" },
+    { name = "pydantic", specifier = ">=2.8,<2.12" },
     { name = "pydantic-extra-types", specifier = ">=2.9.0" },
     { name = "pyzstd", specifier = "~=0.16.2" },
     { name = "semver", specifier = ">=3.0.2" },

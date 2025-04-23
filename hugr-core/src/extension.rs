@@ -19,9 +19,8 @@ use derive_more::Display;
 use thiserror::Error;
 
 use crate::hugr::IdentList;
-use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::{self, OpName, OpNameRef};
+use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::RowVariable;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
@@ -378,6 +377,7 @@ pub static EMPTY_REG: ExtensionRegistry = ExtensionRegistry {
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
@@ -496,37 +496,6 @@ impl CustomConcrete for CustomType {
     }
 }
 
-/// A constant value provided by a extension.
-/// Must be an instance of a type available to the extension.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ExtensionValue {
-    extension: ExtensionId,
-    name: ValueName,
-    typed_value: ops::Value,
-}
-
-impl ExtensionValue {
-    /// Returns a reference to the typed value of this [`ExtensionValue`].
-    pub fn typed_value(&self) -> &ops::Value {
-        &self.typed_value
-    }
-
-    /// Returns a mutable reference to the typed value of this [`ExtensionValue`].
-    pub(super) fn typed_value_mut(&mut self) -> &mut ops::Value {
-        &mut self.typed_value
-    }
-
-    /// Returns a reference to the name of this [`ExtensionValue`].
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    /// Returns a reference to the extension this [`ExtensionValue`] belongs to.
-    pub fn extension(&self) -> &ExtensionId {
-        &self.extension
-    }
-}
-
 /// A unique identifier for a extension.
 ///
 /// The actual [`Extension`] is stored externally.
@@ -582,8 +551,6 @@ pub struct Extension {
     pub runtime_reqs: ExtensionSet,
     /// Types defined by this extension.
     types: BTreeMap<TypeName, TypeDef>,
-    /// Static values defined by this extension.
-    values: BTreeMap<ValueName, ExtensionValue>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
@@ -607,7 +574,6 @@ impl Extension {
             version,
             runtime_reqs: Default::default(),
             types: Default::default(),
-            values: Default::default(),
             operations: Default::default(),
         }
     }
@@ -679,11 +645,6 @@ impl Extension {
         self.types.get(type_name)
     }
 
-    /// Allows read-only access to the values in this Extension
-    pub fn get_value(&self, value_name: &ValueNameRef) -> Option<&ExtensionValue> {
-        self.values.get(value_name)
-    }
-
     /// Returns the name of the extension.
     pub fn name(&self) -> &ExtensionId {
         &self.name
@@ -702,25 +663,6 @@ impl Extension {
     /// Iterator over the types of this [`Extension`].
     pub fn types(&self) -> impl Iterator<Item = (&TypeName, &TypeDef)> {
         self.types.iter()
-    }
-
-    /// Add a named static value to the extension.
-    pub fn add_value(
-        &mut self,
-        name: impl Into<ValueName>,
-        typed_value: ops::Value,
-    ) -> Result<&mut ExtensionValue, ExtensionBuildError> {
-        let extension_value = ExtensionValue {
-            extension: self.name.clone(),
-            name: name.into(),
-            typed_value,
-        };
-        match self.values.entry(extension_value.name.clone()) {
-            btree_map::Entry::Occupied(_) => {
-                Err(ExtensionBuildError::ValueExists(extension_value.name))
-            }
-            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
-        }
     }
 
     /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
@@ -783,9 +725,6 @@ pub enum ExtensionBuildError {
     /// Existing [`TypeDef`]
     #[error("Extension already has an type called {0}.")]
     TypeDefExists(TypeName),
-    /// Existing [`ExtensionValue`]
-    #[error("Extension already has an extension value called {0}.")]
-    ValueExists(ValueName),
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].

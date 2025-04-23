@@ -19,7 +19,6 @@
       }
     }
   },
-  "values": {},
   "operations": {
     "New": {
       "extension": "ptr",

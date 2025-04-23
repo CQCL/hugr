@@ -1,6 +1,7 @@
 //! Total equality (and hence [AbstractValue] support for [Value]s
 //! (by adding a source-Node and part unhashable constants)
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
+use std::convert::Infallible;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -8,10 +9,11 @@ use hugr_core::core::HugrNode;
 use hugr_core::extension::FoldVal;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
+use hugr_core::types::ConstTypeError;
 use hugr_core::{Hugr, Node};
 use itertools::Either;
 
-use crate::dataflow::{AbstractValue, ConstLocation, LoadedFunction};
+use crate::dataflow::{AbstractValue, AsConcrete, ConstLocation, LoadedFunction, Sum};
 
 /// A custom constant that has been successfully hashed via [TryHash](hugr_core::ops::constant::TryHash)
 #[derive(Clone, Debug)]
@@ -102,6 +104,21 @@ impl<N: HugrNode> ValueHandle<N> {
             leaf: Either::Right(Arc::from(val)),
         }
     }
+
+    /// Gets the [OpaqueValue] inside this instance, if there is one
+    pub fn as_opaque(&self) -> Option<&OpaqueValue> {
+        match self {
+            Self::Unhashable {
+                leaf: Either::Left(val),
+                ..
+            }
+            | Self::Hashable(HashedConst { val, .. }) => Some(val.as_ref()),
+            Self::Unhashable {
+                leaf: Either::Right(_),
+                ..
+            } => None,
+        }
+    }
 }
 
 impl<N: HugrNode> AbstractValue for ValueHandle<N> {}
@@ -154,9 +171,12 @@ impl<N: HugrNode> Hash for ValueHandle<N> {
 
 // Unfortunately we need From<ValueHandle> for Value to be able to pass
 // Value's into interpret_leaf_op. So that probably doesn't make sense...
-impl<N: HugrNode> From<ValueHandle<N>> for Value {
-    fn from(value: ValueHandle<N>) -> Self {
-        match value {
+impl<N: HugrNode> AsConcrete<ValueHandle<N>, N> for Value {
+    type ValErr = Infallible;
+    type SumErr = ConstTypeError;
+
+    fn from_value(value: ValueHandle<N>) -> Result<Self, Infallible> {
+        Ok(match value {
             ValueHandle::Hashable(HashedConst { val, .. })
             | ValueHandle::Unhashable {
                 leaf: Either::Left(val),
@@ -172,27 +192,46 @@ impl<N: HugrNode> From<ValueHandle<N>> for Value {
             } => Value::function(Arc::try_unwrap(hugr).unwrap_or_else(|a| a.as_ref().clone()))
                 .map_err(|e| e.to_string())
                 .unwrap(),
-        }
+        })
+    }
+
+    fn from_sum(value: Sum<Self>) -> Result<Self, Self::SumErr> {
+        Self::sum(value.tag, value.values, value.st)
+    }
+
+    fn from_func(func: LoadedFunction<N>) -> Result<Self, crate::dataflow::LoadedFunction<N>> {
+        Err(func)
     }
 }
 
-impl From<ValueHandle<Node>> for FoldVal {
-    fn from(value: ValueHandle<Node>) -> FoldVal {
-        match value {
+impl AsConcrete<ValueHandle<Node>, Node> for FoldVal {
+    type ValErr = Infallible;
+
+    type SumErr = Infallible;
+
+    fn from_value(value: ValueHandle<Node>) -> Result<Self, Infallible> {
+        Ok(match value {
             ValueHandle::Hashable(HashedConst { val, .. })
             | ValueHandle::Unhashable {
                 leaf: Either::Left(val),
                 ..
             } => FoldVal::Extension(Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone())),
             _ => FoldVal::Unknown,
-        }
+        })
     }
-}
 
-impl From<LoadedFunction<Node>> for FoldVal {
-    fn from(value: LoadedFunction<Node>) -> Self {
-        let LoadedFunction { func_node, args } = value;
-        FoldVal::LoadedFunction(func_node, args)
+    fn from_sum(sum: Sum<Self>) -> Result<Self, Self::SumErr> {
+        let Sum { tag, values, st } = sum;
+        Ok(FoldVal::Sum {
+            tag,
+            sum_type: st,
+            items: values,
+        })
+    }
+
+    fn from_func(func: LoadedFunction<Node>) -> Result<Self, LoadedFunction<Node>> {
+        let LoadedFunction { func_node, args } = func;
+        Ok(FoldVal::LoadedFunction(func_node, args))
     }
 }
 

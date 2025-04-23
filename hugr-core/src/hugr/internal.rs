@@ -32,6 +32,13 @@ pub trait HugrInternals {
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
 
+    /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
+    /// returned by [`HugrInternals::portgraph`].
+    #[inline]
+    fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy> {
+        Cow::Borrowed(&self.base_hugr().hierarchy)
+    }
+
     /// Returns the Hugr at the base of a chain of views.
     fn base_hugr(&self) -> &Hugr;
 
@@ -56,6 +63,11 @@ impl HugrInternals for Hugr {
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
         &self.graph
+    }
+
+    #[inline]
+    fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy> {
+        Cow::Borrowed(&self.hierarchy)
     }
 
     #[inline]
@@ -87,6 +99,7 @@ impl<T: HugrInternals> HugrInternals for &T {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -105,6 +118,7 @@ impl<T: HugrInternals> HugrInternals for &mut T {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -123,6 +137,7 @@ impl<T: HugrInternals> HugrInternals for Rc<T> {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -141,6 +156,7 @@ impl<T: HugrInternals> HugrInternals for Arc<T> {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -159,6 +175,7 @@ impl<T: HugrInternals> HugrInternals for Box<T> {
     delegate! {
         to (**self) {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
@@ -177,6 +194,7 @@ impl<T: HugrInternals + ToOwned> HugrInternals for Cow<'_, T> {
     delegate! {
         to self.as_ref() {
             fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
             fn base_hugr(&self) -> &Hugr;
             fn root_node(&self) -> Self::Node;
             fn get_pg_index(&self, node: Self::Node) -> portgraph::NodeIndex;
