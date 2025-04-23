@@ -131,11 +131,9 @@ impl CustomType {
         &self.extension
     }
 
-    /// Update the internal extension reference with a new weak pointer.
-    pub fn update_extension(&mut self, extension_ref: Weak<Extension>) {
-        if let Some(arc) = extension_ref.upgrade() {
-            self.type_def = Some(arc.get_type(&self.id).unwrap().clone());
-        }
+    /// Update the internal TypeDef with one that has a new weak pointer.
+    pub(crate) fn update_extension(&mut self, ext: &Extension) {
+        self.type_def = Some(ext.get_type(&self.id).unwrap().clone())
     }
 }
 

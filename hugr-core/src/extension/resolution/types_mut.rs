@@ -198,7 +198,8 @@ pub(super) fn resolve_custom_type_exts(
     // Add the extension to the used extensions registry,
     // and update the CustomType with the valid pointer.
     used_extensions.register(ext_id.clone(), ext.clone());
-    custom.update_extension(ext.clone());
+    custom.update_extension(&ext.upgrade().unwrap());
+    assert!(custom.def().is_ok());
 
     Ok(())
 }
