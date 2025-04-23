@@ -25,6 +25,7 @@ pub enum RemoveError {
 }
 
 impl Rewrite for RemoveLoadConstant {
+    type Node = Node;
     type Error = RemoveError;
 
     // The Const node the LoadConstant was connected to.
@@ -50,7 +51,7 @@ impl Rewrite for RemoveLoadConstant {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<Self::ApplyResult, Self::Error> {
         self.verify(h)?;
         let node = self.0;
         let source = h
@@ -73,6 +74,7 @@ impl Rewrite for RemoveLoadConstant {
 pub struct RemoveConst(pub Node);
 
 impl Rewrite for RemoveConst {
+    type Node = Node;
     type Error = RemoveError;
 
     // The parent of the Const node.
@@ -94,7 +96,7 @@ impl Rewrite for RemoveConst {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<Self::ApplyResult, Self::Error> {
         self.verify(h)?;
         let node = self.0;
         let parent = h

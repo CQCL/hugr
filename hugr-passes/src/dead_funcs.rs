@@ -83,9 +83,10 @@ impl RemoveDeadFuncsPass {
 }
 
 impl ComposablePass for RemoveDeadFuncsPass {
+    type Node = Node;
     type Error = RemoveDeadFuncsError;
     type Result = ();
-    fn run(&self, hugr: &mut impl HugrMut) -> Result<(), RemoveDeadFuncsError> {
+    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), RemoveDeadFuncsError> {
         let reachable = reachable_funcs(
             &CallGraph::new(hugr),
             hugr,
@@ -125,7 +126,7 @@ impl ComposablePass for RemoveDeadFuncsPass {
 /// [LoadFunction]: hugr_core::ops::OpType::LoadFunction
 /// [Module]: hugr_core::ops::OpType::Module
 pub fn remove_dead_funcs(
-    h: &mut impl HugrMut,
+    h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
 ) -> Result<(), ValidatePassError<RemoveDeadFuncsError>> {
     validate_if_test(

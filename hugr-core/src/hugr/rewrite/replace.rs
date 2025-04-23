@@ -222,6 +222,7 @@ impl Replacement {
     }
 }
 impl Rewrite for Replacement {
+    type Node = Node;
     type Error = ReplaceError;
 
     /// Map from Node in replacement to corresponding Node in the result Hugr
@@ -282,7 +283,7 @@ impl Rewrite for Replacement {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<Self::ApplyResult, Self::Error> {
         let parent = self.check_parent(h)?;
         // Calculate removed nodes here. (Does not include transfers, so enumerates only
         // nodes we are going to remove, individually, anyway; so no *asymptotic* speed penalty)
@@ -343,7 +344,7 @@ impl Rewrite for Replacement {
 }
 
 fn transfer_edges<'a>(
-    h: &mut impl HugrMut,
+    h: &mut impl HugrMut<Node = Node>,
     edges: impl Iterator<Item = &'a NewEdgeSpec>,
     trans_src: impl Fn(Node) -> Result<Node, WhichHugr>,
     trans_tgt: impl Fn(Node) -> Result<Node, WhichHugr>,

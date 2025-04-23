@@ -52,7 +52,7 @@ pub struct Sum<V> {
 }
 
 /// The output of an [LoadFunction](hugr_core::ops::LoadFunction) - a "pointer"
-/// to a function at a specific node, instantiated with the provided type-args.    
+/// to a function at a specific node, instantiated with the provided type-args.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct LoadedFunction<N> {
     /// The [FuncDefn](hugr_core::ops::FuncDefn) or `FuncDecl`` that was loaded

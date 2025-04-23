@@ -33,7 +33,9 @@ use crate::ComposablePass;
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-pub fn monomorphize(hugr: &mut impl HugrMut) -> Result<(), ValidatePassError<Infallible>> {
+pub fn monomorphize(
+    hugr: &mut impl HugrMut<Node = Node>,
+) -> Result<(), ValidatePassError<Infallible>> {
     validate_if_test(MonomorphizePass, hugr)
 }
 
@@ -56,7 +58,7 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     since = "0.14.1",
     note = "Use hugr_passes::RemoveDeadFuncsPass instead"
 )]
-fn remove_polyfuncs_ref(h: &mut impl HugrMut) {
+fn remove_polyfuncs_ref(h: &mut impl HugrMut<Node = Node>) {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
     while let Some(n) = to_scan.pop() {
@@ -92,7 +94,7 @@ type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 /// Optionally copies the subtree into a new location whilst applying a substitution.
 /// The subtree should be monomorphic after the substitution (if provided) has been applied.
 fn mono_scan(
-    h: &mut impl HugrMut,
+    h: &mut impl HugrMut<Node = Node>,
     parent: Node,
     mut subst_into: Option<&mut Instantiating>,
     cache: &mut Instantiations,
@@ -160,7 +162,7 @@ fn mono_scan(
 }
 
 fn instantiate(
-    h: &mut impl HugrMut,
+    h: &mut impl HugrMut<Node = Node>,
     poly_func: Node,
     type_args: Vec<TypeArg>,
     mono_sig: Signature,
@@ -258,10 +260,11 @@ fn instantiate(
 pub struct MonomorphizePass;
 
 impl ComposablePass for MonomorphizePass {
+    type Node = Node;
     type Error = Infallible;
     type Result = ();
 
-    fn run(&self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn run(&self, h: &mut impl HugrMut<Node = Node>) -> Result<(), Self::Error> {
         let root = h.root();
         // If the root is a polymorphic function, then there are no external calls, so nothing to do
         if !is_polymorphic_funcdefn(h.get_optype(root)) {
