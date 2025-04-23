@@ -83,6 +83,7 @@ impl RemoveDeadFuncsPass {
 }
 
 impl ComposablePass for RemoveDeadFuncsPass {
+    type Node = Node;
     type Error = RemoveDeadFuncsError;
     type Result = ();
     fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), RemoveDeadFuncsError> {

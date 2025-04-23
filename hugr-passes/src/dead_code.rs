@@ -158,6 +158,7 @@ impl DeadCodeElimPass {
 }
 
 impl ComposablePass for DeadCodeElimPass {
+    type Node = Node;
     type Error = Infallible;
     type Result = ();
 

@@ -33,7 +33,9 @@ use crate::ComposablePass;
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-pub fn monomorphize(hugr: &mut impl HugrMut) -> Result<(), ValidatePassError<Infallible>> {
+pub fn monomorphize(
+    hugr: &mut impl HugrMut<Node = Node>,
+) -> Result<(), ValidatePassError<Infallible>> {
     validate_if_test(MonomorphizePass, hugr)
 }
 
@@ -258,6 +260,7 @@ fn instantiate(
 pub struct MonomorphizePass;
 
 impl ComposablePass for MonomorphizePass {
+    type Node = Node;
     type Error = Infallible;
     type Result = ();
 

@@ -122,8 +122,8 @@ impl UntuplePass {
 }
 
 impl ComposablePass for UntuplePass {
+    type Node = Node;
     type Error = UntupleError;
-
     type Result = UntupleResult;
 
     fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<Self::Result, Self::Error> {
