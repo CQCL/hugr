@@ -29,7 +29,7 @@ use hugr_core::{Hugr, HugrView, Node, Wire};
 use crate::validation::{ValidatePassError, ValidationLevel};
 
 mod linearize;
-pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
+pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError};
 
 /// A recipe for creating a dataflow Node - as a new child of a [DataflowParent]
 /// or in order to replace an existing node.
@@ -331,6 +331,7 @@ impl ReplaceTypes {
 
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
+        let mut cache = HashMap::new();
         for n in hugr.nodes().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
@@ -344,7 +345,7 @@ impl ReplaceTypes {
                         if targets.len() != 1 {
                             hugr.disconnect(n, outp);
                             let src = Wire::new(n, outp);
-                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
+                            self.linearize.handler(hugr, &mut cache).insert_copy_discard(src, &targets)?;
                         }
                     }
                 }

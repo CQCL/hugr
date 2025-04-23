@@ -18,7 +18,7 @@ use hugr_core::{type_row, Hugr, HugrView};
 use itertools::Itertools;
 
 use super::{
-    CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
+    CallbackHandler, LinearizeError, NodeTemplate, ReplaceTypes, ReplaceTypesError,
 };
 
 /// Handler for [ListValue] constants that updates the element type and

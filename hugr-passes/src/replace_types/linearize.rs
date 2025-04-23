@@ -9,97 +9,10 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, HugrView, IncomingPort, Node, Wire};
+use hugr_core::{hugr::hugrmut::HugrMut, Hugr, ops::Tag, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
 use super::{handlers::linearize_array, NodeTemplate, ParametricType};
-
-/// Trait for things that know how to wire up linear outports to other than one
-/// target.  Used to restore Hugr validity when a [ReplaceTypes](super::ReplaceTypes)
-/// results in types of such outports changing from [Copyable] to linear (i.e.
-/// [hugr_core::types::TypeBound::Any]).
-///
-/// Note that this is not really effective before [monomorphization]: if a
-/// function polymorphic over a [Copyable] becomes called with a
-/// non-Copyable type argument, [Linearizer] cannot insert copy/discard
-/// operations for such a case. However, following [monomorphization], there
-/// would be a specific instantiation of the function for the
-/// type-that-becomes-linear, into which copy/discard can be inserted.
-///
-/// [monomorphization]: crate::monomorphize()
-/// [Copyable]: hugr_core::types::TypeBound::Copyable
-pub trait Linearizer {
-    /// Insert copy or discard operations (as appropriate) enough to wire `src`
-    /// up to all `targets`.
-    ///
-    /// The default implementation
-    /// * if `targets.len() == 1`, wires `src` to the unique target
-    /// * otherwise, makes a single call to [Self::copy_discard_op], inserts that op,
-    ///   and wires its outputs 1:1 to each target
-    ///
-    /// # Errors
-    ///
-    /// Most variants of [LinearizeError] can be raised, specifically including
-    /// [LinearizeError::CopyableType] if the type is [Copyable], in which case the Hugr
-    /// will be unchanged.
-    ///
-    /// [Copyable]: hugr_core::types::TypeBound::Copyable
-    ///
-    /// # Panics
-    ///
-    /// if `src` is not a valid Wire (does not identify a dataflow out-port)
-    fn insert_copy_discard(
-        &self,
-        hugr: &mut impl HugrMut,
-        src: Wire,
-        targets: &[(Node, IncomingPort)],
-    ) -> Result<(), LinearizeError> {
-        let sig = hugr.signature(src.node()).unwrap();
-        let typ = sig.port_type(src.source()).unwrap();
-        let (tgt_node, tgt_inport) = if targets.len() == 1 {
-            *targets.first().unwrap()
-        } else {
-            // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
-            let src_parent = hugr
-                .get_parent(src.node())
-                .expect("Root node cannot have out edges");
-            if let Some((tgt, tgt_parent)) = targets.iter().find_map(|(tgt, _)| {
-                let tgt_parent = hugr
-                    .get_parent(*tgt)
-                    .expect("Root node cannot have incoming edges");
-                (tgt_parent != src_parent).then_some((*tgt, tgt_parent))
-            }) {
-                return Err(LinearizeError::NoLinearNonLocalEdges {
-                    src: src.node(),
-                    src_parent,
-                    tgt,
-                    tgt_parent,
-                });
-            }
-            let copy_discard_op = self
-                .copy_discard_op(typ, targets.len())?
-                .add_hugr(hugr, src_parent);
-            for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
-                hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
-            }
-            (copy_discard_op, 0.into())
-        };
-        hugr.connect(src.node(), src.source(), tgt_node, tgt_inport);
-        Ok(())
-    }
-
-    /// Gets an [NodeTemplate] for copying or discarding a value of type `typ`, i.e.
-    /// a recipe for a node with one input of that type and the specified number of
-    /// outports.
-    ///
-    /// Implementations are free to panic if `num_outports == 1`, such calls should never
-    /// occur as source/target can be directly wired without any node/op being required.
-    fn copy_discard_op(
-        &self,
-        typ: &Type,
-        num_outports: usize,
-    ) -> Result<NodeTemplate, LinearizeError>;
-}
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
@@ -129,11 +42,17 @@ impl Default for DelegatingLinearizer {
     }
 }
 
+type FuncId = String;
+
 /// Implementation of [Linearizer] passed to callbacks, (e.g.) so that callbacks for
 /// handling collection types can use it to generate copy/discards of elements.
 // (Note, this is its own type just to give a bit of room for future expansion,
 // rather than passing a &DelegatingLinearizer directly)
-pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
+pub struct CallbackHandler<'a> {
+    hugr: &'a mut Hugr,
+    cache: &'a mut HashMap<FuncId, Node>,
+    lin: &'a DelegatingLinearizer
+}
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 #[allow(missing_docs)]
@@ -245,11 +164,19 @@ fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(),
     }
 }
 
-impl Linearizer for DelegatingLinearizer {
+impl DelegatingLinearizer {
+    pub fn handler<'a>(&'a self, hugr: &'a mut impl HugrMut,  cache: &'a mut HashMap<FuncId, Node>) -> CallbackHandler<'a> {
+        // ALAN ugh, can we avoid hugr_mut() here? Maybe by *not* storing the hugr-mut in the
+        // CallbackHandler (==> NodeTemplate::Call contains FuncID *or* Node) ?
+        CallbackHandler { hugr: hugr.hugr_mut(), cache, lin: self}
+    }
+
     fn copy_discard_op(
         &self,
         typ: &Type,
         num_outports: usize,
+        hugr: &mut impl HugrMut,
+        cache: &mut HashMap<FuncId, Node>,
     ) -> Result<NodeTemplate, LinearizeError> {
         if typ.copyable() {
             return Err(LinearizeError::CopyableType(typ.clone()));
@@ -275,7 +202,7 @@ impl Linearizer for DelegatingLinearizer {
                         let inp_copies = if ty.copyable() {
                             repeat(inp).take(num_outports).collect::<Vec<_>>()
                         } else {
-                            self.copy_discard_op(ty, num_outports)?
+                            self.copy_discard_op(ty, num_outports, hugr, cache)?
                                 .add(&mut case_b, [inp])
                                 .unwrap()
                                 .outputs()
@@ -328,7 +255,7 @@ impl Linearizer for DelegatingLinearizer {
                         .get(&cty.into())
                         .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
                     let tmpl =
-                        copy_discard_fn(cty.args(), num_outports, &mut CallbackHandler(self))?;
+                        copy_discard_fn(cty.args(), num_outports, &mut self.handler(hugr, cache))?;
                     check_sig(&tmpl, typ, num_outports)?;
                     Ok(tmpl)
                 }
@@ -339,13 +266,107 @@ impl Linearizer for DelegatingLinearizer {
     }
 }
 
-impl Linearizer for CallbackHandler<'_> {
-    fn copy_discard_op(
-        &self,
+/// Trait for things that know how to wire up linear outports to other than one
+/// target.  Used to restore Hugr validity when a [ReplaceTypes](super::ReplaceTypes)
+/// results in types of such outports changing from [Copyable] to linear (i.e.
+/// [hugr_core::types::TypeBound::Any]).
+///
+/// Note that this is not really effective before [monomorphization]: if a
+/// function polymorphic over a [Copyable] becomes called with a
+/// non-Copyable type argument, [Linearizer] cannot insert copy/discard
+/// operations for such a case. However, following [monomorphization], there
+/// would be a specific instantiation of the function for the
+/// type-that-becomes-linear, into which copy/discard can be inserted.
+///
+/// [monomorphization]: crate::monomorphize()
+/// [Copyable]: hugr_core::types::TypeBound::Copyable
+impl CallbackHandler<'_> {
+    /// Callbacks can use this to make a function in the Hugr.
+    /// The first call for a given `id` will call `body`, which must return
+    /// a [FuncDefn]-rooted Hugr, and insert that into the underlying Hugr;
+    /// the node containing the newly-inserted FuncDefn is returned.
+    /// 
+    /// A second call with the same `id` will return the node from the first
+    /// call, without executing `body`.
+    pub fn make_function(&mut self, id: FuncId, body: impl Fn() -> Hugr) -> Node {
+        if let Some(n) = self.cache.get(&id) {return *n;}
+        let h = body();
+        let n = self.hugr.insert_hugr(self.hugr.root(), h).new_root;
+        self.cache.insert(id, n);
+        n
+    }
+
+    /// Insert copy or discard operations (as appropriate) enough to wire `src`
+    /// up to all `targets`.
+    ///
+    /// The default implementation
+    /// * if `targets.len() == 1`, wires `src` to the unique target
+    /// * otherwise, makes a single call to [Self::copy_discard_op], inserts that op,
+    ///   and wires its outputs 1:1 to each target
+    ///
+    /// # Errors
+    ///
+    /// Most variants of [LinearizeError] can be raised, specifically including
+    /// [LinearizeError::CopyableType] if the type is [Copyable], in which case the Hugr
+    /// will be unchanged.
+    ///
+    /// [Copyable]: hugr_core::types::TypeBound::Copyable
+    ///
+    /// # Panics
+    ///
+    /// if `src` is not a valid Wire (does not identify a dataflow out-port)
+    pub fn insert_copy_discard(
+        &mut self,
+        src: Wire,
+        targets: &[(Node, IncomingPort)],
+    ) -> Result<(), LinearizeError> {
+        let sig = self.hugr.signature(src.node()).unwrap();
+        // Must clone here to avoid borrowing part of `self`
+        let typ = sig.port_type(src.source()).unwrap().clone();
+        let (tgt_node, tgt_inport) = if targets.len() == 1 {
+            *targets.first().unwrap()
+        } else {
+            // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
+            let src_parent = self.hugr
+                .get_parent(src.node())
+                .expect("Root node cannot have out edges");
+            if let Some((tgt, tgt_parent)) = targets.iter().find_map(|(tgt, _)| {
+                let tgt_parent = self.hugr
+                    .get_parent(*tgt)
+                    .expect("Root node cannot have incoming edges");
+                (tgt_parent != src_parent).then_some((*tgt, tgt_parent))
+            }) {
+                return Err(LinearizeError::NoLinearNonLocalEdges {
+                    src: src.node(),
+                    src_parent,
+                    tgt,
+                    tgt_parent,
+                });
+            }
+            let copy_discard_op = self
+                .copy_discard_op(&typ, targets.len())?
+                .add_hugr(self.hugr, src_parent);
+            for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
+                self.hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
+            }
+            (copy_discard_op, 0.into())
+        };
+        self.hugr.connect(src.node(), src.source(), tgt_node, tgt_inport);
+        Ok(())
+    }
+
+    /// Gets an [NodeTemplate] for copying or discarding a value of type `typ`, i.e.
+    /// a recipe for a node with one input of that type and the specified number of
+    /// outports.
+    ///
+    /// Implementations are free to panic if `num_outports == 1`, such calls should never
+    /// occur as source/target can be directly wired without any node/op being required.
+    pub fn copy_discard_op(
+        &mut self,
         typ: &Type,
         num_outports: usize,
     ) -> Result<NodeTemplate, LinearizeError> {
-        self.0.copy_discard_op(typ, num_outports)
+        self.lin.copy_discard_op(typ, num_outports, self.hugr, self.cache)
     }
 }
 
