@@ -10,19 +10,19 @@ use hugr_core::hugr::views::SiblingSubgraph;
 use hugr_core::hugr::SimpleReplacementError;
 use hugr_core::ops::{NamedOp, OpTrait, OpType};
 use hugr_core::types::Type;
-use hugr_core::{HugrView, SimpleReplacement};
+use hugr_core::{HugrView, Node, SimpleReplacement};
 use itertools::Itertools;
 
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::ComposablePass;
 
 /// Configuration enum for the untuple rewrite pass.
 ///
 /// Indicates whether the pattern match should traverse the HUGR recursively.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum UntupleRecursive {
-    /// Traverse the HUGR recursively.
+    /// Traverse the HUGR recursively, i.e. consider the entire subtree
     Recursive,
-    /// Do not traverse the HUGR recursively.
+    /// Do not traverse the HUGR recursively, i.e. consider only the sibling subgraph
     #[default]
     NonRecursive,
 }
@@ -48,22 +48,20 @@ pub enum UntupleRecursive {
 pub struct UntuplePass {
     /// Whether to traverse the HUGR recursively.
     recursive: UntupleRecursive,
-    /// The level of validation to perform on the rewrite.
-    validation: ValidationLevel,
+    /// Parent node under which to operate; None indicates the Hugr root
+    parent: Option<Node>,
 }
 
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
 #[non_exhaustive]
 /// Errors produced by [UntuplePass].
 pub enum UntupleError {
-    /// An error occurred while validating the rewrite.
-    ValidationError(ValidatePassError),
     /// Rewriting the circuit failed.
     RewriteError(SimpleReplacementError),
 }
 
 /// Result type for the untuple pass.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct UntupleResult {
     /// Number of `MakeTuple` rewrites applied.
     pub rewrites_applied: usize,
@@ -71,16 +69,16 @@ pub struct UntupleResult {
 
 impl UntuplePass {
     /// Create a new untuple pass with the given configuration.
-    pub fn new(recursive: UntupleRecursive, validation: ValidationLevel) -> Self {
+    pub fn new(recursive: UntupleRecursive) -> Self {
         Self {
             recursive,
-            validation,
+            parent: None,
         }
     }
 
-    /// Sets the validation level used before and after the pass is run.
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
+    /// Sets the parent node to optimize (overwrites any previous setting)
+    pub fn set_parent(mut self, parent: impl Into<Option<Node>>) -> Self {
+        self.parent = parent.into();
         self
     }
 
@@ -88,31 +86,6 @@ impl UntuplePass {
     pub fn recursive(mut self, recursive: UntupleRecursive) -> Self {
         self.recursive = recursive;
         self
-    }
-
-    /// Run the pass using specified configuration.
-    pub fn run<H: HugrMut>(
-        &self,
-        hugr: &mut H,
-        parent: H::Node,
-    ) -> Result<UntupleResult, UntupleError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr, parent))
-    }
-
-    /// Run the Monomorphization pass.
-    fn run_no_validate<H: HugrMut>(
-        &self,
-        hugr: &mut H,
-        parent: H::Node,
-    ) -> Result<UntupleResult, UntupleError> {
-        let rewrites = self.find_rewrites(hugr, parent);
-        let rewrites_applied = rewrites.len();
-        // The rewrites are independent, so we can always apply them all.
-        for rewrite in rewrites {
-            hugr.apply_rewrite(rewrite)?;
-        }
-        Ok(UntupleResult { rewrites_applied })
     }
 
     /// Find tuple pack operations followed by tuple unpack operations
@@ -145,6 +118,22 @@ impl UntuplePass {
             }
         }
         res
+    }
+}
+
+impl ComposablePass for UntuplePass {
+    type Node = Node;
+    type Error = UntupleError;
+    type Result = UntupleResult;
+
+    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<Self::Result, Self::Error> {
+        let rewrites = self.find_rewrites(hugr, self.parent.unwrap_or(hugr.root()));
+        let rewrites_applied = rewrites.len();
+        // The rewrites are independent, so we can always apply them all.
+        for rewrite in rewrites {
+            hugr.apply_rewrite(rewrite)?;
+        }
+        Ok(UntupleResult { rewrites_applied })
     }
 }
 
@@ -421,7 +410,8 @@ mod test {
 
         let parent = hugr.root();
         let res = pass
-            .run(&mut hugr, parent)
+            .set_parent(parent)
+            .run(&mut hugr)
             .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(res.rewrites_applied, expected_rewrites);
         assert_eq!(hugr.children(parent).count(), remaining_nodes);

@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum UpgradeError {
     #[error(transparent)]
     Deserialize(#[from] serde_json::Error),

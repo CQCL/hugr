@@ -11,12 +11,12 @@ fn const_fn_name(konst_n: Node) -> String {
     format!("const_fun_{}", konst_n.index())
 }
 
-pub fn inline_constant_functions(hugr: &mut impl HugrMut) -> Result<()> {
+pub fn inline_constant_functions(hugr: &mut impl HugrMut<Node = Node>) -> Result<()> {
     while inline_constant_functions_impl(hugr)? {}
     Ok(())
 }
 
-fn inline_constant_functions_impl(hugr: &mut impl HugrMut) -> Result<bool> {
+fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Result<bool> {
     let mut const_funs = vec![];
 
     for n in hugr.nodes() {
