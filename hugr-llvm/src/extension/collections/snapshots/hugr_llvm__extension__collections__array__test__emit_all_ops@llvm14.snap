@@ -239,6 +239,7 @@ cond_exit_61:                                     ; preds = %cond_61_case_1, %co
   %"081.0" = phi i64 [ 0, %cond_61_case_0 ], [ %87, %cond_61_case_1 ]
   %"182.0" = phi { i64*, i64 } [ zeroinitializer, %cond_61_case_0 ], [ %88, %cond_61_case_1 ]
   %array_ptr95 = extractvalue { i64*, i64 } %"182.0", 0
+  %array_offset96 = extractvalue { i64*, i64 } %"182.0", 1
   %92 = bitcast i64* %array_ptr95 to i8*
   call void @free(i8* %92)
   ret void

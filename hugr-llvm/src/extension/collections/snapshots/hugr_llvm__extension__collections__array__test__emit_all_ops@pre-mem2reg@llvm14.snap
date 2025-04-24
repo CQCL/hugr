@@ -435,6 +435,7 @@ cond_exit_61:                                     ; preds = %cond_61_case_1, %co
   store { i64*, i64 } %"184", { i64*, i64 }* %"61_1", align 8
   %"61_194" = load { i64*, i64 }, { i64*, i64 }* %"61_1", align 8
   %array_ptr95 = extractvalue { i64*, i64 } %"61_194", 0
+  %array_offset96 = extractvalue { i64*, i64 } %"61_194", 1
   %92 = bitcast i64* %array_ptr95 to i8*
   call void @free(i8* %92)
   ret void

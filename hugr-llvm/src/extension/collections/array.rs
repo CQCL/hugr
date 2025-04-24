@@ -22,7 +22,7 @@ use hugr_core::extension::prelude::{option_type, usize_t};
 use hugr_core::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
 use hugr_core::ops::DataflowOpTrait;
 use hugr_core::std_extensions::collections::array::{
-    self, array_type, ArrayClone, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan,
+    self, array_type, ArrayClone, ArrayDiscard, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan,
 };
 use hugr_core::types::{TypeArg, TypeEnum};
 use hugr_core::{HugrView, Node};
@@ -128,9 +128,10 @@ pub trait ArrayCodegen: Clone {
     fn emit_array_discard<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
+        op: ArrayDiscard,
         array_v: BasicValueEnum<'c>,
     ) -> Result<()> {
-        emit_array_discard(self, ctx, array_v)
+        emit_array_discard(self, ctx, op, array_v)
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayRepeat] op.
@@ -234,7 +235,8 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
                 let ccg = self.0.clone();
                 move |context, args| {
                     let arr = args.inputs[0];
-                    ccg.emit_array_discard(context, arr)?;
+                    let op = ArrayDiscard::from_extension_op(args.node().as_ref())?;
+                    ccg.emit_array_discard(context, op, arr)?;
                     args.outputs.finish(context.builder(), [])
                 }
             })
@@ -673,7 +675,8 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             let [array_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("ArrayOpDef::discard_empty expects one argument"))?;
-            ccg.emit_array_discard(ctx, array_v)?;
+            let (ptr, _) = decompose_array_fat_pointer(builder, array_v)?;
+            ccg.emit_free_array(ctx, ptr)?;
             outputs.finish(ctx.builder(), [])
         }
         _ => todo!(),
@@ -724,10 +727,11 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     Ok((array_v, other_array_v.into()))
 }
 
-/// Emits an [array::ArrayDiscard] op.
+/// Emits an [ArrayDiscard] op.
 pub fn emit_array_discard<'c, H: HugrView<Node = Node>>(
     ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
+    _op: ArrayDiscard,
     array_v: BasicValueEnum<'c>,
 ) -> Result<()> {
     let array_ptr =
@@ -822,7 +826,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
     let (src_ptr, src_offset) = decompose_array_fat_pointer(ctx.builder(), src_array_v.into())?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
-    // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory 
+    // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory
     // from `src` instead of allocating a fresh array
     let (tgt_ptr, tgt_array_v) = build_array_alloc(ctx, ccg, tgt_elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
