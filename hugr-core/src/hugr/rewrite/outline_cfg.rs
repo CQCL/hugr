@@ -6,14 +6,12 @@ use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::extension::ExtensionSet;
-use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
-use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::controlflow::BasicBlock;
 use crate::ops::dataflow::DataflowOpTrait;
-use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
+use crate::ops::handle::NodeHandle;
 use crate::ops::{DataflowBlock, OpType};
 use crate::PortIndex;
 use crate::{type_row, Node};
@@ -95,6 +93,7 @@ impl OutlineCfg {
 }
 
 impl Rewrite for OutlineCfg {
+    type Node = Node;
     type Error = OutlineCfgError;
     /// The newly-created basic block, and the [CFG] node inside it
     ///
@@ -185,8 +184,19 @@ impl Rewrite for OutlineCfg {
         let inner_exit = {
             // These operations do not fit within any CSG/SiblingMut
             // so we need to access the Hugr directly.
-            let h = h.hugr_mut();
-            let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
+            //
+            // TODO: This is a temporary hack that won't be needed once Hugr Root Pointers get implemented.
+            // The commented line below are the correct ones, but they don't work yet.
+            // https://github.com/CQCL/hugr/issues/2029
+            let hierarchy = h.hierarchy();
+            let inner_exit = hierarchy
+                .children(h.get_pg_index(cfg_node))
+                .exactly_one()
+                .ok()
+                .unwrap();
+            let inner_exit = h.get_node(inner_exit);
+            //let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
+
             // Entry node must be first
             h.move_before_sibling(entry, inner_exit);
             // And remaining nodes
@@ -200,12 +210,7 @@ impl Rewrite for OutlineCfg {
         };
 
         // 4(b). Reconnect exit edge to the new exit node within the inner CFG
-        // Use nested SiblingMut's in case the outer `h` is only a SiblingMut itself.
-        let mut in_bb_view: SiblingMut<'_, BasicBlockID> =
-            SiblingMut::try_new(h, new_block).unwrap();
-        let mut in_cfg_view: SiblingMut<'_, CfgID> =
-            SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
-        in_cfg_view.connect(exit, exit_port, inner_exit, 0);
+        h.connect(exit, exit_port, inner_exit, 0);
 
         Ok((new_block, cfg_node))
     }
@@ -252,10 +257,9 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::usize_t;
-    use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::constant::Value;
-    use crate::ops::handle::{BasicBlockID, CfgID, ConstID, NodeHandle};
+    use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::types::Signature;
     use crate::{Hugr, HugrView, Node};
     use cool_asserts::assert_matches;
@@ -457,11 +461,7 @@ mod test {
             h.output_neighbours(tail).collect::<HashSet<_>>(),
             HashSet::from([head, exit_node])
         );
-        outline_cfg_check_parents(
-            &mut SiblingMut::<'_, CfgID>::try_new(&mut h, cfg).unwrap(),
-            cfg,
-            vec![head, tail],
-        );
+        outline_cfg_check_parents(&mut h, cfg, vec![head, tail]);
         h.validate().unwrap();
     }
 
@@ -491,7 +491,7 @@ mod test {
     }
 
     fn outline_cfg_check_parents(
-        h: &mut impl HugrMut,
+        h: &mut impl HugrMut<Node = Node>,
         cfg: Node,
         blocks: Vec<Node>,
     ) -> (Node, Node, Node) {

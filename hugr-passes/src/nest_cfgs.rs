@@ -51,7 +51,7 @@ use hugr_core::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
-use hugr_core::{Direction, Hugr};
+use hugr_core::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
@@ -155,7 +155,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 pub fn transform_all_cfgs(h: &mut Hugr) {
     let mut node_stack = Vec::from([h.root()]);
     while let Some(n) = node_stack.pop() {
-        if let Ok(s) = SiblingMut::<CfgID>::try_new(h, n) {
+        if let Ok(s) = SiblingMut::<_, CfgID>::try_new(h, n) {
             transform_cfg_to_nested(&mut IdentityCfgMap::new(s));
         }
         node_stack.extend(h.children(n))
@@ -246,7 +246,7 @@ impl<H: HugrView> CfgNodeMap<H::Node> for IdentityCfgMap<H> {
     }
 }
 
-impl<H: HugrMut> CfgNester<H::Node> for IdentityCfgMap<H> {
+impl<H: HugrMut<Node = Node>> CfgNester<H::Node> for IdentityCfgMap<H> {
     fn nest_sese_region(
         &mut self,
         entry_edge: (H::Node, H::Node),
@@ -760,7 +760,7 @@ pub(crate) mod test {
         // Again, there's no need for a view of a region here, but check that the
         // transformation still works when we can only directly mutate the top level
         let root = h.root();
-        let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
+        let m = SiblingMut::<_, CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
         h.validate().unwrap();
         assert_eq!(1, depth(&h, entry));

@@ -23,7 +23,6 @@
       }
     }
   },
-  "values": {},
   "operations": {
     "clone": {
       "extension": "collections.array",
