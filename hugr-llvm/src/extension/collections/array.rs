@@ -1,7 +1,7 @@
 //! Codegen for prelude array operations.
 //!
-//! An `array<n, T>`` is now lowered to a fat pointer `{ptr, usize}` that is allocated
-//! to at least `n * sizeof(T)` bytes. The extra `usize`` is an offset pointing to the
+//! An `array<n, T>` is now lowered to a fat pointer `{ptr, usize}` that is allocated
+//! to at least `n * sizeof(T)` bytes. The extra `usize` is an offset pointing to the
 //! first element, i.e. the first element is at address `ptr + offset * sizeof(T)`.
 //!
 //! The rational behind the additional offset is the `pop_left` operation which bumps
@@ -59,6 +59,19 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 
 /// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::array]
 /// types, [hugr_core::ops::constant::CustomConst]s, and ops.
+///
+/// An `array<n, T>` is now lowered to a fat pointer `{ptr, usize}` that is allocated
+/// to at least `n * sizeof(T)` bytes. The extra `usize` is an offset pointing to the
+/// first element, i.e. the first element is at address `ptr + offset * sizeof(T)`.
+///
+/// The rational behind the additional offset is the `pop_left` operation which bumps
+/// the offset instead of mutating the pointer. This way, we can still free the original
+/// pointer when the array is discarded after a pop.
+///
+/// By default, all arrays are allocated on the heap using the standard libc `malloc`
+/// and `free` functions. This behaviour can be customised by providing a different
+/// implementation for [ArrayCodegen::emit_allocate_array] and
+/// [ArrayCodegen::emit_free_array].
 pub trait ArrayCodegen: Clone {
     /// Emit an allocation of `size` bytes and return the corresponding pointer.
     ///
