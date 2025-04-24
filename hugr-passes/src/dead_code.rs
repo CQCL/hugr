@@ -1,13 +1,14 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
 use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, Hugr, HugrView, Node};
+use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
 };
 
-use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::ComposablePass;
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -18,7 +19,6 @@ pub struct DeadCodeElimPass {
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [PreserveNode::default_for].
     preserve_callback: Arc<PreserveCallback>,
-    validation: ValidationLevel,
 }
 
 impl Default for DeadCodeElimPass {
@@ -26,7 +26,6 @@ impl Default for DeadCodeElimPass {
         Self {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
-            validation: ValidationLevel::default(),
         }
     }
 }
@@ -39,13 +38,11 @@ impl Debug for DeadCodeElimPass {
         #[derive(Debug)]
         struct DCEDebug<'a> {
             entry_points: &'a Vec<Node>,
-            validation: ValidationLevel,
         }
 
         Debug::fmt(
             &DCEDebug {
                 entry_points: &self.entry_points,
-                validation: self.validation,
             },
             f,
         )
@@ -86,13 +83,6 @@ impl PreserveNode {
 }
 
 impl DeadCodeElimPass {
-    /// Sets the validation level used before and after the pass is run
-    #[allow(unused)]
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
     /// Allows setting a callback that determines whether a node must be preserved
     /// (even when its result is not used)
     pub fn set_preserve_callback(mut self, cb: Arc<PreserveCallback>) -> Self {
@@ -146,24 +136,6 @@ impl DeadCodeElimPass {
         needed
     }
 
-    pub fn run(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
-        self.validation.run_validated_pass(hugr, |h, _| {
-            self.run_no_validate(h);
-            Ok(())
-        })
-    }
-
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) {
-        let needed = self.find_needed_nodes(&*hugr);
-        let remove = hugr
-            .nodes()
-            .filter(|n| !needed.contains(n))
-            .collect::<Vec<_>>();
-        for n in remove {
-            hugr.remove_node(n);
-        }
-    }
-
     fn must_preserve(
         &self,
         h: &impl HugrView<Node = Node>,
@@ -185,6 +157,23 @@ impl DeadCodeElimPass {
     }
 }
 
+impl ComposablePass for DeadCodeElimPass {
+    type Node = Node;
+    type Error = Infallible;
+    type Result = ();
+
+    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), Infallible> {
+        let needed = self.find_needed_nodes(&*hugr);
+        let remove = hugr
+            .nodes()
+            .filter(|n| !needed.contains(n))
+            .collect::<Vec<_>>();
+        for n in remove {
+            hugr.remove_node(n);
+        }
+        Ok(())
+    }
+}
 #[cfg(test)]
 mod test {
     use std::sync::Arc;
@@ -195,6 +184,8 @@ mod test {
     use hugr_core::types::Signature;
     use hugr_core::{ops::Value, type_row, HugrView};
     use itertools::Itertools;
+
+    use crate::ComposablePass;
 
     use super::{DeadCodeElimPass, PreserveNode};
 

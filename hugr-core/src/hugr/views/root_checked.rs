@@ -1,22 +1,20 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use delegate::delegate;
-use portgraph::MultiPortGraph;
-
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
+use crate::ops::OpTrait;
 use crate::{Hugr, Node};
 
-use super::{check_tag, RootTagged};
+use super::{check_tag, HugrView, RootTagged};
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
 #[derive(Clone)]
 pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
 
-impl<H: RootTagged + AsRef<Hugr>, Root: NodeHandle> RootChecked<H, Root> {
+impl<H: RootTagged, Root: NodeHandle<H::Node>> RootChecked<H, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
@@ -49,26 +47,21 @@ impl<Root> RootChecked<&mut Hugr, Root> {
     }
 }
 
-impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
+impl<H: HugrInternals, Root> HugrInternals for RootChecked<H, Root> {
     type Portgraph<'p>
-        = &'p MultiPortGraph
+        = H::Portgraph<'p>
     where
         Self: 'p;
-    type Node = Node;
+    type Node = H::Node;
 
-    delegate! {
-        to self.as_ref() {
-            fn portgraph(&self) -> Self::Portgraph<'_>;
-            fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
-            fn base_hugr(&self) -> &Hugr;
-            fn root_node(&self) -> Node;
-            fn get_pg_index(&self, node: Node) -> portgraph::NodeIndex;
-            fn get_node(&self, index: portgraph::NodeIndex) -> Node;
-        }
-    }
+    super::impls::hugr_internal_methods! {this, &this.0}
 }
 
-impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
+impl<H: HugrView, Root> HugrView for RootChecked<H, Root> {
+    super::impls::hugr_view_methods! {this, &this.0}
+}
+
+impl<H: HugrView, Root: NodeHandle<H::Node>> RootTagged for RootChecked<H, Root> {
     type RootHandle = Root;
 }
 
@@ -78,17 +71,41 @@ impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
     }
 }
 
-impl<H: HugrMutInternals + AsRef<Hugr>, Root> HugrMutInternals for RootChecked<H, Root>
-where
-    Root: NodeHandle,
-{
-    #[inline(always)]
-    fn hugr_mut(&mut self) -> &mut Hugr {
-        self.0.hugr_mut()
+impl<H: HugrMutInternals, Root: NodeHandle<H::Node>> HugrMutInternals for RootChecked<H, Root> {
+    fn replace_op(
+        &mut self,
+        node: Self::Node,
+        op: impl Into<crate::ops::OpType>,
+    ) -> Result<crate::ops::OpType, crate::hugr::HugrError> {
+        let op = op.into();
+        if node == self.root() && !Root::TAG.is_superset(op.tag()) {
+            return Err(HugrError::InvalidTag {
+                required: Root::TAG,
+                actual: op.tag(),
+            });
+        }
+        self.0.replace_op(node, op)
+    }
+
+    delegate::delegate! {
+        to (&mut self.0) {
+            fn set_root(&mut self, root: Self::Node);
+            fn set_num_ports(&mut self, node: Self::Node, incoming: usize, outgoing: usize);
+            fn add_ports(&mut self, node: Self::Node, direction: crate::Direction, amount: isize) -> std::ops::Range<usize>;
+            fn insert_ports(&mut self, node: Self::Node, direction: crate::Direction, index: usize, amount: usize) -> std::ops::Range<usize>;
+            fn set_parent(&mut self, node: Self::Node, parent: Self::Node);
+            fn move_after_sibling(&mut self, node: Self::Node, after: Self::Node);
+            fn move_before_sibling(&mut self, node: Self::Node, before: Self::Node);
+            fn optype_mut(&mut self, node: Self::Node) -> &mut crate::ops::OpType;
+            fn node_metadata_map_mut(&mut self, node: Self::Node) -> &mut crate::hugr::NodeMetadataMap;
+            fn extensions_mut(&mut self) -> &mut crate::extension::ExtensionRegistry;
+        }
     }
 }
 
-impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecked<H, Root> {}
+impl<H: HugrMut, Root: NodeHandle<H::Node>> HugrMut for RootChecked<H, Root> {
+    super::impls::hugr_mut_methods! {this, &mut this.0}
+}
 
 #[cfg(test)]
 mod test {
