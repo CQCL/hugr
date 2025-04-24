@@ -13,15 +13,19 @@ use itertools::Itertools as _;
 pub trait ArrayOpBuilder: Dataflow {
     /// Adds a new array operation to the dataflow graph and return the wire
     /// representing the new array.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `elem_ty` - The type of the elements in the array.
     /// * `values` - An iterator over the values to initialize the array with.
     ///
     /// # Errors
-    /// 
+    ///
     /// If building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the new array.
     fn add_new_array(
         &mut self,
         elem_ty: Type,
@@ -34,6 +38,22 @@ pub trait ArrayOpBuilder: Dataflow {
         Ok(out)
     }
 
+    /// Adds an array get operation to the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index` - The wire representing the index to get.
+    ///
+    /// # Errors
+    ///
+    /// If building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the value at the specified index in the array.
     fn add_array_get(
         &mut self,
         elem_ty: Type,
@@ -49,6 +69,25 @@ pub trait ArrayOpBuilder: Dataflow {
         Ok(out)
     }
 
+    /// Adds an array set operation to the dataflow graph.
+    ///
+    /// This operation sets the value at a specified index in the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index` - The wire representing the index to set.
+    /// * `value` - The wire representing the value to set at the specified index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the updated array after the set operation.
     fn add_array_set(
         &mut self,
         elem_ty: Type,
@@ -67,6 +106,25 @@ pub trait ArrayOpBuilder: Dataflow {
         Ok(out)
     }
 
+    /// Adds an array swap operation to the dataflow graph.
+    ///
+    /// This operation swaps the values at two specified indices in the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index1` - The wire representing the first index to swap.
+    /// * `index2` - The wire representing the second index to swap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the updated array after the swap operation.
     fn add_array_swap(
         &mut self,
         elem_ty: Type,
@@ -85,6 +143,23 @@ pub trait ArrayOpBuilder: Dataflow {
         Ok(out)
     }
 
+    /// Adds an array pop-left operation to the dataflow graph.
+    ///
+    /// This operation removes the leftmost element from the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
     fn add_array_pop_left(
         &mut self,
         elem_ty: Type,
@@ -98,6 +173,23 @@ pub trait ArrayOpBuilder: Dataflow {
         Ok(self.add_dataflow_op(op, vec![input])?.out_wire(0))
     }
 
+    /// Adds an array pop-right operation to the dataflow graph.
+    ///
+    /// This operation removes the rightmost element from the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
     fn add_array_pop_right(
         &mut self,
         elem_ty: Type,
@@ -111,6 +203,16 @@ pub trait ArrayOpBuilder: Dataflow {
         Ok(self.add_dataflow_op(op, vec![input])?.out_wire(0))
     }
 
+    /// Adds an operation to discard an empty array from the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
     fn add_array_discard_empty(&mut self, elem_ty: Type, input: Wire) -> Result<(), BuildError> {
         // TODO Add an OpLoadError variant to BuildError
         self.add_dataflow_op(
