@@ -370,10 +370,9 @@ pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
     let elem_ty = ts.llvm_type(value.get_element_type())?;
     let (elem_ptr, array_v) =
         build_array_malloc(ctx, ccg, elem_ty, value.get_contents().len() as u64)?;
-    let usize_t = usize_ty(&ctx.typing_session());
     for (i, v) in value.get_contents().iter().enumerate() {
         let llvm_v = emit_value(ctx, v)?;
-        let idx = usize_t.const_int(i as u64, true);
+        let idx = ts.iw_context().i32_type().const_int(i as u64, true);
         let elem_addr = unsafe { ctx.builder().build_in_bounds_gep(elem_ptr, &[idx], "")? };
         ctx.builder().build_store(elem_addr, llvm_v)?;
     }

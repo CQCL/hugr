@@ -14,9 +14,9 @@ entry_block:                                      ; preds = %alloca_block
   %1 = bitcast i8* %0 to i64*
   %2 = insertvalue { i64*, i64 } poison, i64* %1, 0
   %3 = insertvalue { i64*, i64 } %2, i64 0, 1
-  %4 = getelementptr inbounds i64, i64* %1, i64 0
+  %4 = getelementptr inbounds i64, i64* %1, i32 0
   store i64 1, i64* %4, align 4
-  %5 = getelementptr inbounds i64, i64* %1, i64 1
+  %5 = getelementptr inbounds i64, i64* %1, i32 1
   store i64 2, i64* %5, align 4
   ret { i64*, i64 } %3
 }
