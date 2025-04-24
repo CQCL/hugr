@@ -1,4 +1,20 @@
 //! Codegen for prelude array operations.
+//!
+//! An `array<n, T>`` is now lowered to a fat pointer `{ptr, usize}` that is allocated
+//! to at least `n * sizeof(T)` bytes. The extra `usize`` is an offset pointing to the
+//! first element, i.e. the first element is at address `ptr + offset * sizeof(T)`.
+//!
+//! The rational behind the additional offset is the `pop_left` operation which bumps
+//! the offset instead of mutating the pointer. This way, we can still free the original
+//! pointer when the array is discarded after a pop.
+//!
+//! We provide utility functions [array_fat_pointer_ty], [build_array_fat_pointer], and
+//! [decompose_array_fat_pointer] to work with array fat pointers.
+//!
+//! The [DefaultArrayCodegen] extension allocates all arrays on the heap using the
+//! standard libc `malloc` and `free` functions. This behaviour can be customised
+//! by providing a different implementation for [ArrayCodegen::emit_allocate_array]
+//! and [ArrayCodegen::emit_free_array].
 use std::iter;
 
 use anyhow::{anyhow, Ok, Result};
@@ -44,14 +60,22 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 /// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::array]
 /// types, [hugr_core::ops::constant::CustomConst]s, and ops.
 pub trait ArrayCodegen: Clone {
+    /// Emit an allocation of `size` bytes and return the corresponding pointer.
+    ///
+    /// The default implementation allocates on the heap by emitting a call to the
+    /// standard libc `malloc` function.
     fn emit_allocate_array<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         size: IntValue<'c>,
-    ) -> Result<BasicValueEnum<'c>> {
-        emit_libc_malloc(ctx, size.into())
+    ) -> Result<PointerValue<'c>> {
+        let ptr = emit_libc_malloc(ctx, size.into())?;
+        Ok(ptr.into_pointer_value())
     }
 
+    /// Emit an deallocation of a pointer.
+    ///
+    /// The default implementation emits a call to the standard libc `free` function.
     fn emit_free_array<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -90,6 +114,7 @@ pub trait ArrayCodegen: Clone {
         emit_array_op(self, ctx, op, inputs, outputs)
     }
 
+    /// Emit a [hugr_core::std_extensions::collections::array::ArrayClone] operation.
     fn emit_array_clone<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -99,6 +124,7 @@ pub trait ArrayCodegen: Clone {
         emit_clone_op(self, ctx, op, array_v)
     }
 
+    /// Emit a [hugr_core::std_extensions::collections::array::ArrayDiscard] operation.
     fn emit_array_discard<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -243,11 +269,8 @@ fn usize_ty<'c>(ts: &TypingSession<'c, '_>) -> IntType<'c> {
         .into_int_type()
 }
 
-/// Returns the LLVM representation of an array value as a struct.
-///
-/// We represent arrays as a `{ptr, offset}` struct. This is required to lower `pop_left` since
-/// the original pointer is needed to be freed later.
-fn array_fat_pointer_ty<'c>(
+/// Returns the LLVM representation of an array value as a fat pointer.
+pub fn array_fat_pointer_ty<'c>(
     session: &TypingSession<'c, '_>,
     elem_ty: BasicTypeEnum<'c>,
 ) -> StructType<'c> {
@@ -261,7 +284,8 @@ fn array_fat_pointer_ty<'c>(
     )
 }
 
-fn build_array_value<'c, H: HugrView<Node = Node>>(
+/// Constructs an array fat pointer value.
+pub fn build_array_fat_pointer<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ptr: PointerValue<'c>,
     offset: IntValue<'c>,
@@ -280,7 +304,8 @@ fn build_array_value<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into_struct_value())
 }
 
-fn decompose_array_fat_pointer<'c>(
+/// Returns the underlying pointer and offset stored in a fat array pointer.
+pub fn decompose_array_fat_pointer<'c>(
     builder: &Builder<'c>,
     array_v: BasicValueEnum<'c>,
 ) -> Result<(PointerValue<'c>, IntValue<'c>)> {
@@ -293,11 +318,11 @@ fn decompose_array_fat_pointer<'c>(
     ))
 }
 
-/// Helper function to allocate an array on the heap.
+/// Helper function to allocate a fat array pointer.
 ///
 /// Returns a pointer and a struct: The pointer points to the first element of the array (i.e. it
-/// is of type `elem_ty.ptr_type()`). The struct is the representation of the array value that
-/// contains this pointer together with an integer offset (that is initialised to be 0).
+/// is of type `elem_ty.ptr_type()`). The struct is the fat pointer of the that stores an additional
+/// offset (initialised to be 0).
 fn build_array_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &impl ArrayCodegen,
@@ -315,7 +340,7 @@ fn build_array_alloc<'c, H: HugrView<Node = Node>>(
         .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
         .into_pointer_value();
     let offset = usize_t.const_zero();
-    let array_v = build_array_value(ctx, elem_ptr, offset)?;
+    let array_v = build_array_fat_pointer(ctx, elem_ptr, offset)?;
     Ok((elem_ptr, array_v))
 }
 
@@ -361,6 +386,7 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
     Ok(val)
 }
 
+/// Emits an [array::ArrayValue].
 pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
     ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -379,6 +405,7 @@ pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into())
 }
 
+/// Emits an [ArrayOp].
 pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
     ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -653,8 +680,8 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
     }
 }
 
-/// Helper function to emit the clone operation.
-fn emit_clone_op<'c, H: HugrView<Node = Node>>(
+/// Emits an [ArrayClone] op.
+pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     op: ArrayClone,
@@ -697,8 +724,8 @@ fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     Ok((array_v, other_array_v.into()))
 }
 
-/// Helper function to emit the discard operation.
-fn emit_array_discard<'c, H: HugrView<Node = Node>>(
+/// Emits an [array::ArrayDiscard] op.
+pub fn emit_array_discard<'c, H: HugrView<Node = Node>>(
     ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     array_v: BasicValueEnum<'c>,
@@ -710,7 +737,7 @@ fn emit_array_discard<'c, H: HugrView<Node = Node>>(
     Ok(())
 }
 
-/// Helper function to emit the pop operations.
+/// Emits the [ArrayOpDef::pop_left] and [ArrayOpDef::pop_right] operations.
 fn emit_pop_op<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     elem_ty: HugrType,
@@ -749,7 +776,7 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
         }
     };
     let elem_v = builder.build_load(elem_ptr, "")?;
-    let new_array_v = build_array_value(ctx, array_ptr, new_array_offset)?;
+    let new_array_v = build_array_fat_pointer(ctx, array_ptr, new_array_offset)?;
 
     Ok(ret_ty
         .build_tag(ctx.builder(), 1, vec![elem_v, new_array_v.into()])?
