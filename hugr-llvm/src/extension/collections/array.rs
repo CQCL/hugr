@@ -96,41 +96,7 @@ pub trait ArrayCodegen: Clone {
         op: ArrayClone,
         array_v: BasicValueEnum<'c>,
     ) -> Result<(BasicValueEnum<'c>, BasicValueEnum<'c>)> {
-        let elem_ty = ctx.llvm_type(&op.elem_ty)?;
-        let (array_ptr, array_offset) = decompose_array_value(ctx.builder(), array_v)?;
-        let (other_ptr, other_array_v) = build_array_malloc(ctx, self, elem_ty, op.size)?;
-        let src_ptr = unsafe {
-            ctx.builder()
-                .build_in_bounds_gep(array_ptr, &[array_offset], "")?
-        };
-        let length = usize_ty(&ctx.typing_session()).const_int(op.size, false);
-        let size_value = ctx
-            .builder()
-            .build_int_mul(length, elem_ty.size_of().unwrap(), "")?;
-        let is_volatile = ctx.iw_context().bool_type().const_zero();
-
-        let memcpy_intrinsic = Intrinsic::find("llvm.memcpy").unwrap();
-        let memcpy = memcpy_intrinsic
-            .get_declaration(
-                ctx.get_current_module(),
-                &[
-                    other_ptr.get_type().into(),
-                    src_ptr.get_type().into(),
-                    size_value.get_type().into(),
-                ],
-            )
-            .unwrap();
-        ctx.builder().build_call(
-            memcpy,
-            &[
-                other_ptr.into(),
-                src_ptr.into(),
-                size_value.into(),
-                is_volatile.into(),
-            ],
-            "",
-        )?;
-        Ok((array_v, other_array_v.into()))
+        emit_clone_op(self, ctx, op, array_v)
     }
 
     fn emit_array_discard<'c, H: HugrView<Node = Node>>(
@@ -138,11 +104,7 @@ pub trait ArrayCodegen: Clone {
         ctx: &mut EmitFuncContext<'c, '_, H>,
         array_v: BasicValueEnum<'c>,
     ) -> Result<()> {
-        let array_ptr =
-            ctx.builder()
-                .build_extract_value(array_v.into_struct_value(), 0, "array_ptr")?;
-        emit_libc_free(ctx, array_ptr.into())?;
-        Ok(())
+        emit_array_discard(ctx, array_v)
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayRepeat] op.
@@ -690,6 +652,62 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
         }
         _ => todo!(),
     }
+}
+
+/// Helper function to emit the clone operation.
+fn emit_clone_op<'c, H: HugrView<Node = Node>>(
+    ccg: &impl ArrayCodegen,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    op: ArrayClone,
+    array_v: BasicValueEnum<'c>,
+) -> Result<(BasicValueEnum<'c>, BasicValueEnum<'c>)> {
+    let elem_ty = ctx.llvm_type(&op.elem_ty)?;
+    let (array_ptr, array_offset) = decompose_array_value(ctx.builder(), array_v)?;
+    let (other_ptr, other_array_v) = build_array_malloc(ctx, ccg, elem_ty, op.size)?;
+    let src_ptr = unsafe {
+        ctx.builder()
+            .build_in_bounds_gep(array_ptr, &[array_offset], "")?
+    };
+    let length = usize_ty(&ctx.typing_session()).const_int(op.size, false);
+    let size_value = ctx
+        .builder()
+        .build_int_mul(length, elem_ty.size_of().unwrap(), "")?;
+    let is_volatile = ctx.iw_context().bool_type().const_zero();
+
+    let memcpy_intrinsic = Intrinsic::find("llvm.memcpy").unwrap();
+    let memcpy = memcpy_intrinsic
+        .get_declaration(
+            ctx.get_current_module(),
+            &[
+                other_ptr.get_type().into(),
+                src_ptr.get_type().into(),
+                size_value.get_type().into(),
+            ],
+        )
+        .unwrap();
+    ctx.builder().build_call(
+        memcpy,
+        &[
+            other_ptr.into(),
+            src_ptr.into(),
+            size_value.into(),
+            is_volatile.into(),
+        ],
+        "",
+    )?;
+    Ok((array_v, other_array_v.into()))
+}
+
+/// Helper function to emit the discard operation.
+fn emit_array_discard<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    array_v: BasicValueEnum<'c>,
+) -> Result<()> {
+    let array_ptr =
+        ctx.builder()
+            .build_extract_value(array_v.into_struct_value(), 0, "array_ptr")?;
+    emit_libc_free(ctx, array_ptr.into())?;
+    Ok(())
 }
 
 /// Helper function to emit the pop operations.
