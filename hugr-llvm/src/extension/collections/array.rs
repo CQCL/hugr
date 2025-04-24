@@ -104,7 +104,7 @@ pub trait ArrayCodegen: Clone {
         ctx: &mut EmitFuncContext<'c, '_, H>,
         array_v: BasicValueEnum<'c>,
     ) -> Result<()> {
-        emit_array_discard(ctx, array_v)
+        emit_array_discard(self, ctx, array_v)
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayRepeat] op.
@@ -699,13 +699,14 @@ fn emit_clone_op<'c, H: HugrView<Node = Node>>(
 
 /// Helper function to emit the discard operation.
 fn emit_array_discard<'c, H: HugrView<Node = Node>>(
+    ccg: &impl ArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     array_v: BasicValueEnum<'c>,
 ) -> Result<()> {
     let array_ptr =
         ctx.builder()
             .build_extract_value(array_v.into_struct_value(), 0, "array_ptr")?;
-    emit_libc_free(ctx, array_ptr.into())?;
+    ccg.emit_free(ctx, array_ptr.into_pointer_value())?;
     Ok(())
 }
 
