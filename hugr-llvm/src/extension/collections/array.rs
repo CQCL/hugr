@@ -822,6 +822,8 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
     let (src_ptr, src_offset) = decompose_array_fat_pointer(ctx.builder(), src_array_v.into())?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
+    // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory 
+    // from `src` instead of allocating a fresh array
     let (tgt_ptr, tgt_array_v) = build_array_alloc(ctx, ccg, tgt_elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     let acc_tys: Vec<_> = op
@@ -859,6 +861,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         Ok(())
     })?;
 
+    ccg.emit_free_array(ctx, src_ptr)?;
     let builder = ctx.builder();
     let final_accs = acc_ptrs
         .into_iter()
