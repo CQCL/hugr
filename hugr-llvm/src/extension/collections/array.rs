@@ -707,6 +707,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::Container as _;
+    use hugr_core::extension::prelude::either_type;
     use hugr_core::extension::ExtensionSet;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::collections::array::{self, array_type, ArrayRepeat, ArrayScan};
@@ -724,6 +725,7 @@ mod test {
                 int_ops::{self},
                 int_types::{self, int_type, ConstInt},
             },
+            collections::array::ArrayOpBuilder,
             logic,
         },
         type_row,
@@ -736,15 +738,66 @@ mod test {
         check_emission,
         emit::test::SimpleHugrConfig,
         test::{exec_ctx, llvm_ctx, TestContext},
-        utils::{array_op_builder, ArrayOpBuilder, IntOpBuilder, LogicOpBuilder},
+        utils::{IntOpBuilder, LogicOpBuilder},
     };
+
+    /// Build all array ops
+    /// Copied from `hugr_core::std_extensions::collections::array::builder::test`
+    fn all_array_ops<B: Dataflow>(mut builder: B) -> B {
+        let us0 = builder.add_load_value(ConstUsize::new(0));
+        let us1 = builder.add_load_value(ConstUsize::new(1));
+        let us2 = builder.add_load_value(ConstUsize::new(2));
+        let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
+        let [arr] = {
+            let r = builder.add_array_swap(usize_t(), 2, arr, us0, us1).unwrap();
+            let res_sum_ty = {
+                let array_type = array_type(2, usize_t());
+                either_type(array_type.clone(), array_type)
+            };
+            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
+        };
+
+        let [elem_0] = {
+            let r = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
+            builder
+                .build_unwrap_sum(1, option_type(usize_t()), r)
+                .unwrap()
+        };
+
+        let [_elem_1, arr] = {
+            let r = builder
+                .add_array_set(usize_t(), 2, arr, us1, elem_0)
+                .unwrap();
+            let res_sum_ty = {
+                let row = vec![usize_t(), array_type(2, usize_t())];
+                either_type(row.clone(), row)
+            };
+            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
+        };
+
+        let [_elem_left, arr] = {
+            let r = builder.add_array_pop_left(usize_t(), 2, arr).unwrap();
+            builder
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(1, usize_t())]), r)
+                .unwrap()
+        };
+        let [_elem_right, arr] = {
+            let r = builder.add_array_pop_right(usize_t(), 1, arr).unwrap();
+            builder
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(0, usize_t())]), r)
+                .unwrap()
+        };
+
+        builder.add_array_discard_empty(usize_t(), arr).unwrap();
+        builder
+    }
 
     #[rstest]
     fn emit_all_ops(mut llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
-                array_op_builder::test::all_array_ops(builder.dfg_builder_endo([]).unwrap())
+                all_array_ops(builder.dfg_builder_endo([]).unwrap())
                     .finish_sub_container()
                     .unwrap();
                 builder.finish_sub_container().unwrap()
