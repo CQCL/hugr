@@ -65,34 +65,3 @@ pub fn emit_libc_free<H: HugrView<Node = Node>>(
     context.builder().build_call(free, &[ptr.into()], "")?;
     Ok(())
 }
-
-/// Emits a call to the libc `void* memcpy(void* dest, void* src, size_t n)` function.
-pub fn emit_libc_memcpy<'c, H: HugrView<Node = Node>>(
-    context: &mut EmitFuncContext<'c, '_, H>,
-    dest_ptr: BasicMetadataValueEnum<'c>,
-    src_ptr: BasicMetadataValueEnum<'c>,
-    n: BasicMetadataValueEnum<'c>,
-) -> Result<()> {
-    let iw_ctx = context.typing_session().iw_context();
-    let ptr_ty = iw_ctx.i8_type().ptr_type(AddressSpace::default());
-    let dest_ptr = context
-        .builder()
-        .build_bit_cast(dest_ptr.into_pointer_value(), ptr_ty, "")?;
-    let src_ptr = context
-        .builder()
-        .build_bit_cast(src_ptr.into_pointer_value(), ptr_ty, "")?;
-
-    let memcpy_sig = iw_ctx.void_type().fn_type(
-        &[
-            ptr_ty.into(),
-            ptr_ty.into(),
-            n.into_int_value().get_type().into(),
-        ],
-        false,
-    );
-    let memcpy = context.get_extern_func("memcpy", memcpy_sig)?;
-    context
-        .builder()
-        .build_call(memcpy, &[dest_ptr.into(), src_ptr.into(), n], "")?;
-    Ok(())
-}

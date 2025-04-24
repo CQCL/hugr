@@ -25,20 +25,21 @@ entry_block:                                      ; preds = %alloca_block
   %8 = insertvalue { i64*, i64 } poison, i64* %7, 0
   %9 = insertvalue { i64*, i64 } %8, i64 0, 1
   %10 = getelementptr inbounds i64, i64* %array_ptr, i64 %array_offset
-  %11 = bitcast i64* %7 to i8*
-  %12 = bitcast i64* %10 to i8*
-  call void @memcpy(i8* %11, i8* %12, i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2))
+  call void @llvm.memcpy.p0i64.p0i64.i64(i64* %7, i64* %10, i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2), i1 false)
   %array_ptr5 = extractvalue { i64*, i64 } %9, 0
-  %13 = bitcast i64* %array_ptr5 to i8*
-  call void @free(i8* %13)
+  %11 = bitcast i64* %array_ptr5 to i8*
+  call void @free(i8* %11)
   %array_ptr7 = extractvalue { i64*, i64 } %3, 0
-  %14 = bitcast i64* %array_ptr7 to i8*
-  call void @free(i8* %14)
+  %12 = bitcast i64* %array_ptr7 to i8*
+  call void @free(i8* %12)
   ret void
 }
 
 declare i8* @malloc(i64)
 
-declare void @memcpy(i8*, i8*, i64)
+; Function Attrs: argmemonly nofree nounwind willreturn
+declare void @llvm.memcpy.p0i64.p0i64.i64(i64* noalias nocapture writeonly, i64* noalias nocapture readonly, i64, i1 immarg) #0
 
 declare void @free(i8*)
+
+attributes #0 = { argmemonly nofree nounwind willreturn }

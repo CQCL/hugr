@@ -11,6 +11,7 @@ use hugr_core::std_extensions::collections::array::{
 use hugr_core::types::{TypeArg, TypeEnum};
 use hugr_core::{HugrView, Node};
 use inkwell::builder::Builder;
+use inkwell::intrinsics::Intrinsic;
 use inkwell::types::{BasicType, BasicTypeEnum, IntType, StructType};
 use inkwell::values::{
     BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue, StructValue,
@@ -19,7 +20,7 @@ use inkwell::{AddressSpace, IntPredicate};
 use itertools::Itertools;
 
 use crate::emit::emit_value;
-use crate::emit::libc::{emit_libc_free, emit_libc_malloc, emit_libc_memcpy};
+use crate::emit::libc::{emit_libc_free, emit_libc_malloc};
 use crate::{
     emit::{deaggregate_call_result, EmitFuncContext, RowPromise},
     types::{HugrType, TypingSession},
@@ -106,7 +107,29 @@ pub trait ArrayCodegen: Clone {
         let size_value = ctx
             .builder()
             .build_int_mul(length, elem_ty.size_of().unwrap(), "")?;
-        emit_libc_memcpy(ctx, other_ptr.into(), src_ptr.into(), size_value.into())?;
+        let is_volatile = ctx.iw_context().bool_type().const_zero();
+
+        let memcpy_intrinsic = Intrinsic::find("llvm.memcpy").unwrap();
+        let memcpy = memcpy_intrinsic
+            .get_declaration(
+                ctx.get_current_module(),
+                &[
+                    other_ptr.get_type().into(),
+                    src_ptr.get_type().into(),
+                    size_value.get_type().into(),
+                ],
+            )
+            .unwrap();
+        ctx.builder().build_call(
+            memcpy,
+            &[
+                other_ptr.into(),
+                src_ptr.into(),
+                size_value.into(),
+                is_volatile.into(),
+            ],
+            "",
+        )?;
         Ok((array_v, other_array_v.into()))
     }
 
