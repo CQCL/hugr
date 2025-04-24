@@ -3,6 +3,7 @@
 mod array_op;
 mod array_repeat;
 mod array_scan;
+pub mod builder;
 
 use std::sync::Arc;
 
@@ -26,6 +27,7 @@ use crate::Extension;
 pub use array_op::{ArrayOp, ArrayOpDef, ArrayOpDefIter};
 pub use array_repeat::{ArrayRepeat, ArrayRepeatDef, ARRAY_REPEAT_OP_ID};
 pub use array_scan::{ArrayScan, ArrayScanDef, ARRAY_SCAN_OP_ID};
+pub use builder::ArrayOpBuilder;
 
 /// Reported unique name of the array type.
 pub const ARRAY_TYPENAME: TypeName = TypeName::new_inline("array");

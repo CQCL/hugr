@@ -1,5 +1,7 @@
-use hugr_core::std_extensions::collections::array::{new_array_op, ArrayOpDef};
-use hugr_core::{
+//! Builder trait for array operations in the dataflow graph.
+
+use crate::std_extensions::collections::array::{new_array_op, ArrayOpDef};
+use crate::{
     builder::{BuildError, Dataflow},
     extension::simple_op::HasConcrete as _,
     types::Type,
@@ -7,7 +9,19 @@ use hugr_core::{
 };
 use itertools::Itertools as _;
 
+/// Trait for building array operations in a dataflow graph.
 pub trait ArrayOpBuilder: Dataflow {
+    /// Adds a new array operation to the dataflow graph and return the wire
+    /// representing the new array.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `values` - An iterator over the values to initialize the array with.
+    ///
+    /// # Errors
+    /// 
+    /// If building the operation fails.
     fn add_new_array(
         &mut self,
         elem_ty: Type,
@@ -112,11 +126,11 @@ pub trait ArrayOpBuilder: Dataflow {
 impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
-pub mod test {
-    use hugr_core::extension::prelude::PRELUDE_ID;
-    use hugr_core::extension::ExtensionSet;
-    use hugr_core::std_extensions::collections::array::{self, array_type};
-    use hugr_core::{
+mod test {
+    use crate::extension::prelude::PRELUDE_ID;
+    use crate::extension::ExtensionSet;
+    use crate::std_extensions::collections::array::{self, array_type};
+    use crate::{
         builder::{DFGBuilder, HugrBuilder},
         extension::prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
         types::Signature,
@@ -128,7 +142,7 @@ pub mod test {
 
     #[rstest::fixture]
     #[default(DFGBuilder<Hugr>)]
-    pub fn all_array_ops<B: Dataflow>(
+    fn all_array_ops<B: Dataflow>(
         #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)
             .with_extension_delta(ExtensionSet::from_iter([
                 PRELUDE_ID,
