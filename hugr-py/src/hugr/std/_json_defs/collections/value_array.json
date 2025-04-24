@@ -25,7 +25,6 @@
       }
     }
   },
-  "values": {},
   "operations": {
     "discard_empty": {
       "extension": "collections.value_array",
