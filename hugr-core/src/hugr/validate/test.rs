@@ -20,7 +20,6 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{self, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::LogicOp;
-use crate::std_extensions::logic::{self};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
@@ -307,12 +306,7 @@ fn test_local_const() {
             port_kind: EdgeKind::Value(bool_t())
         })
     );
-    let const_op: ops::Const = logic::EXTENSION
-        .get_value(&logic::TRUE_NAME)
-        .unwrap()
-        .typed_value()
-        .clone()
-        .into();
+    let const_op: ops::Const = ops::Value::from_bool(true).into();
     // Second input of Xor from a constant
     let cst = h.add_node_with_parent(h.root(), const_op);
     let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: bool_t() });

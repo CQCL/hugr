@@ -33,6 +33,7 @@ impl InlineCall {
 }
 
 impl Rewrite for InlineCall {
+    type Node = Node;
     type ApplyResult = ();
     type Error = InlineCallError;
     fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
@@ -51,7 +52,7 @@ impl Rewrite for InlineCall {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
 

@@ -8,6 +8,7 @@ mod array_op;
 mod array_repeat;
 mod array_scan;
 mod array_value;
+pub mod op_builder;
 
 use std::sync::Arc;
 
@@ -31,6 +32,7 @@ pub use array_op::{GenericArrayOp, GenericArrayOpDef};
 pub use array_repeat::{GenericArrayRepeat, GenericArrayRepeatDef, ARRAY_REPEAT_OP_ID};
 pub use array_scan::{GenericArrayScan, GenericArrayScanDef, ARRAY_SCAN_OP_ID};
 pub use array_value::GenericArrayValue;
+pub use op_builder::ArrayOpBuilder;
 
 /// Reported unique name of the array type.
 pub const ARRAY_TYPENAME: TypeName = TypeName::new_inline("array");

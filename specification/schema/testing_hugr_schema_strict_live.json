@@ -517,13 +517,6 @@
                     "title": "Types",
                     "type": "object"
                 },
-                "values": {
-                    "additionalProperties": {
-                        "$ref": "#/$defs/ExtensionValue"
-                    },
-                    "title": "Values",
-                    "type": "object"
-                },
                 "operations": {
                     "additionalProperties": {
                         "$ref": "#/$defs/OpDef"
@@ -537,7 +530,6 @@
                 "name",
                 "runtime_reqs",
                 "types",
-                "values",
                 "operations"
             ],
             "title": "Extension",
@@ -587,28 +579,6 @@
                 "name"
             ],
             "title": "ExtensionOp",
-            "type": "object"
-        },
-        "ExtensionValue": {
-            "properties": {
-                "extension": {
-                    "title": "Extension",
-                    "type": "string"
-                },
-                "name": {
-                    "title": "Name",
-                    "type": "string"
-                },
-                "typed_value": {
-                    "$ref": "#/$defs/Value"
-                }
-            },
-            "required": [
-                "extension",
-                "name",
-                "typed_value"
-            ],
-            "title": "ExtensionValue",
             "type": "object"
         },
         "ExtensionsArg": {

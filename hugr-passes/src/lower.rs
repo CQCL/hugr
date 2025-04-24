@@ -15,7 +15,7 @@ use thiserror::Error;
 ///
 /// Returns a [`HugrError`] if any replacement fails.
 pub fn replace_many_ops<S: Into<OpType>>(
-    hugr: &mut impl HugrMut,
+    hugr: &mut impl HugrMut<Node = Node>,
     mapping: impl Fn(&OpType) -> Option<S>,
 ) -> Result<Vec<(Node, OpType)>, HugrError> {
     let replacements = hugr
@@ -35,6 +35,7 @@ pub fn replace_many_ops<S: Into<OpType>>(
 /// Errors produced by the [`lower_ops`] function.
 #[derive(Debug, Error)]
 #[error(transparent)]
+#[non_exhaustive]
 pub enum LowerError {
     /// Invalid subgraph.
     #[error("Subgraph formed by node is invalid: {0}")]
@@ -53,7 +54,7 @@ pub enum LowerError {
 ///
 /// Returns a [`LowerError`] if the lowered HUGR is invalid or if any rewrite fails.
 pub fn lower_ops(
-    hugr: &mut impl HugrMut,
+    hugr: &mut impl HugrMut<Node = Node>,
     lowering: impl Fn(&OpType) -> Option<Hugr>,
 ) -> Result<Vec<(Node, OpType)>, LowerError> {
     let replacements = hugr
