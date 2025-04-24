@@ -44,7 +44,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 /// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::array]
 /// types, [hugr_core::ops::constant::CustomConst]s, and ops.
 pub trait ArrayCodegen: Clone {
-    fn emit_malloc<'c, H: HugrView<Node = Node>>(
+    fn emit_allocate_array<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         size: IntValue<'c>,
@@ -52,7 +52,7 @@ pub trait ArrayCodegen: Clone {
         emit_libc_malloc(ctx, size.into())
     }
 
-    fn emit_free<'c, H: HugrView<Node = Node>>(
+    fn emit_free_array<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         ptr: PointerValue<'c>,
@@ -298,7 +298,7 @@ fn decompose_array_fat_pointer<'c>(
 /// Returns a pointer and a struct: The pointer points to the first element of the array (i.e. it
 /// is of type `elem_ty.ptr_type()`). The struct is the representation of the array value that
 /// contains this pointer together with an integer offset (that is initialised to be 0).
-fn build_array_malloc<'c, H: HugrView<Node = Node>>(
+fn build_array_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &impl ArrayCodegen,
     elem_ty: BasicTypeEnum<'c>,
@@ -309,7 +309,7 @@ fn build_array_malloc<'c, H: HugrView<Node = Node>>(
     let size_value = ctx
         .builder()
         .build_int_mul(length, elem_ty.size_of().unwrap(), "")?;
-    let ptr = ccg.emit_malloc(ctx, size_value)?;
+    let ptr = ccg.emit_allocate_array(ctx, size_value)?;
     let elem_ptr = ctx
         .builder()
         .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
@@ -369,7 +369,7 @@ pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
     let ts = ctx.typing_session();
     let elem_ty = ts.llvm_type(value.get_element_type())?;
     let (elem_ptr, array_v) =
-        build_array_malloc(ctx, ccg, elem_ty, value.get_contents().len() as u64)?;
+        build_array_alloc(ctx, ccg, elem_ty, value.get_contents().len() as u64)?;
     for (i, v) in value.get_contents().iter().enumerate() {
         let llvm_v = emit_value(ctx, v)?;
         let idx = ts.iw_context().i32_type().const_int(i as u64, true);
@@ -402,7 +402,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
     let elem_ty = ts.llvm_type(hugr_elem_ty)?;
     match def {
         ArrayOpDef::new_array => {
-            let (elem_ptr, array_v) = build_array_malloc(ctx, ccg, elem_ty, size)?;
+            let (elem_ptr, array_v) = build_array_alloc(ctx, ccg, elem_ty, size)?;
             let usize_t = usize_ty(&ctx.typing_session());
             for (i, v) in inputs.into_iter().enumerate() {
                 let idx = usize_t.const_int(i as u64, true);
@@ -662,7 +662,7 @@ fn emit_clone_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<(BasicValueEnum<'c>, BasicValueEnum<'c>)> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
     let (array_ptr, array_offset) = decompose_array_fat_pointer(ctx.builder(), array_v)?;
-    let (other_ptr, other_array_v) = build_array_malloc(ctx, ccg, elem_ty, op.size)?;
+    let (other_ptr, other_array_v) = build_array_alloc(ctx, ccg, elem_ty, op.size)?;
     let src_ptr = unsafe {
         ctx.builder()
             .build_in_bounds_gep(array_ptr, &[array_offset], "")?
@@ -706,7 +706,7 @@ fn emit_array_discard<'c, H: HugrView<Node = Node>>(
     let array_ptr =
         ctx.builder()
             .build_extract_value(array_v.into_struct_value(), 0, "array_ptr")?;
-    ccg.emit_free(ctx, array_ptr.into_pointer_value())?;
+    ccg.emit_free_array(ctx, array_ptr.into_pointer_value())?;
     Ok(())
 }
 
@@ -764,7 +764,7 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     func: BasicValueEnum<'c>,
 ) -> Result<BasicValueEnum<'c>> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
-    let (ptr, array_v) = build_array_malloc(ctx, ccg, elem_ty, op.size)?;
+    let (ptr, array_v) = build_array_alloc(ctx, ccg, elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
@@ -795,7 +795,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
     let (src_ptr, src_offset) = decompose_array_fat_pointer(ctx.builder(), src_array_v.into())?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
-    let (tgt_ptr, tgt_array_v) = build_array_malloc(ctx, ccg, tgt_elem_ty, op.size)?;
+    let (tgt_ptr, tgt_array_v) = build_array_alloc(ctx, ccg, tgt_elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     let acc_tys: Vec<_> = op
         .acc_tys
