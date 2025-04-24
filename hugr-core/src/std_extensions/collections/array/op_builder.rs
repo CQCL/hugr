@@ -61,10 +61,7 @@ pub trait ArrayOpBuilder: Dataflow {
         input: Wire,
         index: Wire,
     ) -> Result<Wire, BuildError> {
-        // TODO Add an OpLoadError variant to BuildError.
-        let op = ArrayOpDef::get
-            .instantiate(&[size.into(), elem_ty.into()])
-            .unwrap();
+        let op = ArrayOpDef::get.instantiate(&[size.into(), elem_ty.into()])?;
         let [out] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
         Ok(out)
     }
@@ -96,10 +93,7 @@ pub trait ArrayOpBuilder: Dataflow {
         index: Wire,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        // TODO Add an OpLoadError variant to BuildError
-        let op = ArrayOpDef::set
-            .instantiate(&[size.into(), elem_ty.into()])
-            .unwrap();
+        let op = ArrayOpDef::set.instantiate(&[size.into(), elem_ty.into()])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index, value])?
             .outputs_arr();
@@ -133,10 +127,7 @@ pub trait ArrayOpBuilder: Dataflow {
         index1: Wire,
         index2: Wire,
     ) -> Result<Wire, BuildError> {
-        // TODO Add an OpLoadError variant to BuildError
-        let op = ArrayOpDef::swap
-            .instantiate(&[size.into(), elem_ty.into()])
-            .unwrap();
+        let op = ArrayOpDef::swap.instantiate(&[size.into(), elem_ty.into()])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index1, index2])?
             .outputs_arr();
@@ -166,10 +157,7 @@ pub trait ArrayOpBuilder: Dataflow {
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        // TODO Add an OpLoadError variant to BuildError
-        let op = ArrayOpDef::pop_left
-            .instantiate(&[size.into(), elem_ty.into()])
-            .unwrap();
+        let op = ArrayOpDef::pop_left.instantiate(&[size.into(), elem_ty.into()])?;
         Ok(self.add_dataflow_op(op, vec![input])?.out_wire(0))
     }
 
@@ -196,10 +184,7 @@ pub trait ArrayOpBuilder: Dataflow {
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        // TODO Add an OpLoadError variant to BuildError
-        let op = ArrayOpDef::pop_right
-            .instantiate(&[size.into(), elem_ty.into()])
-            .unwrap();
+        let op = ArrayOpDef::pop_right.instantiate(&[size.into(), elem_ty.into()])?;
         Ok(self.add_dataflow_op(op, vec![input])?.out_wire(0))
     }
 
@@ -214,7 +199,6 @@ pub trait ArrayOpBuilder: Dataflow {
     ///
     /// Returns an error if building the operation fails.
     fn add_array_discard_empty(&mut self, elem_ty: Type, input: Wire) -> Result<(), BuildError> {
-        // TODO Add an OpLoadError variant to BuildError
         self.add_dataflow_op(
             ArrayOpDef::discard_empty
                 .instantiate(&[elem_ty.into()])
