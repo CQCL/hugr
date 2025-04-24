@@ -67,7 +67,7 @@ pub trait ArrayCodegen: Clone {
         elem_ty: BasicTypeEnum<'c>,
         _size: u64,
     ) -> impl BasicType<'c> {
-        array_struct_ty(session, elem_ty)
+        array_fat_pointer_ty(session, elem_ty)
     }
 
     /// Emit a [hugr_core::std_extensions::collections::array::ArrayValue].
@@ -247,7 +247,7 @@ fn usize_ty<'c>(ts: &TypingSession<'c, '_>) -> IntType<'c> {
 ///
 /// We represent arrays as a `{ptr, offset}` struct. This is required to lower `pop_left` since
 /// the original pointer is needed to be freed later.
-fn array_struct_ty<'c>(
+fn array_fat_pointer_ty<'c>(
     session: &TypingSession<'c, '_>,
     elem_ty: BasicTypeEnum<'c>,
 ) -> StructType<'c> {
@@ -266,7 +266,7 @@ fn build_array_value<'c, H: HugrView<Node = Node>>(
     ptr: PointerValue<'c>,
     offset: IntValue<'c>,
 ) -> Result<StructValue<'c>> {
-    let array_ty = array_struct_ty(
+    let array_ty = array_fat_pointer_ty(
         &ctx.typing_session(),
         ptr.get_type().get_element_type().try_into().unwrap(),
     );
@@ -280,7 +280,7 @@ fn build_array_value<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into_struct_value())
 }
 
-fn decompose_array_value<'c>(
+fn decompose_array_fat_pointer<'c>(
     builder: &Builder<'c>,
     array_v: BasicValueEnum<'c>,
 ) -> Result<(PointerValue<'c>, IntValue<'c>)> {
@@ -416,7 +416,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("ArrayOpDef::get expects two arguments"))?;
-            let (array_ptr, array_offset) = decompose_array_value(builder, array_v)?;
+            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
             let res_hugr_ty = sig
                 .output()
@@ -476,7 +476,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index_v, value_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("ArrayOpDef::set expects three arguments"))?;
-            let (array_ptr, array_offset) = decompose_array_value(builder, array_v)?;
+            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
 
             let res_hugr_ty = sig
@@ -537,7 +537,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index1_v, index2_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("ArrayOpDef::swap expects three arguments"))?;
-            let (array_ptr, array_offset) = decompose_array_value(builder, array_v)?;
+            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
             let index1_v = index1_v.into_int_value();
             let index2_v = index2_v.into_int_value();
 
@@ -662,7 +662,7 @@ fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     array_v: BasicValueEnum<'c>,
 ) -> Result<(BasicValueEnum<'c>, BasicValueEnum<'c>)> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
-    let (array_ptr, array_offset) = decompose_array_value(ctx.builder(), array_v)?;
+    let (array_ptr, array_offset) = decompose_array_fat_pointer(ctx.builder(), array_v)?;
     let (other_ptr, other_array_v) = build_array_malloc(ctx, ccg, elem_ty, op.size)?;
     let src_ptr = unsafe {
         ctx.builder()
@@ -720,7 +720,7 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let ts = ctx.typing_session();
     let builder = ctx.builder();
-    let (array_ptr, array_offset) = decompose_array_value(builder, array_v.into())?;
+    let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v.into())?;
     let ret_ty = ts.llvm_sum_type(option_type(vec![
         elem_ty.clone(),
         array_type(size.saturating_add_signed(-1), elem_ty),
@@ -793,7 +793,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     func: BasicValueEnum<'c>,
     initial_accs: &[BasicValueEnum<'c>],
 ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
-    let (src_ptr, src_offset) = decompose_array_value(ctx.builder(), src_array_v.into())?;
+    let (src_ptr, src_offset) = decompose_array_fat_pointer(ctx.builder(), src_array_v.into())?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
     let (tgt_ptr, tgt_array_v) = build_array_malloc(ctx, ccg, tgt_elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
