@@ -1,13 +1,15 @@
 //! Low-level interface for modifying a HUGR.
 
 use core::panic;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use portgraph::view::{NodeFilter, NodeFiltered};
 use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
+use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::hugr::internal::HugrInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
@@ -162,10 +164,10 @@ pub trait HugrMut: HugrMutInternals {
     ///   correspondingly for `Dom` edges)
     fn copy_descendants(
         &mut self,
-        root: Node,
-        new_parent: Node,
+        root: Self::Node,
+        new_parent: Self::Node,
         subst: Option<Substitution>,
-    ) -> BTreeMap<Node, Node> {
+    ) -> BTreeMap<Self::Node, Self::Node> {
         panic_invalid_node(self, root);
         panic_invalid_node(self, new_parent);
         self.hugr_mut().copy_descendants(root, new_parent, subst)
@@ -225,7 +227,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the root node is not in the graph.
     #[inline]
-    fn insert_hugr(&mut self, root: Node, other: Hugr) -> InsertionResult {
+    fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
         panic_invalid_node(self, root);
         self.hugr_mut().insert_hugr(root, other)
     }
@@ -236,7 +238,11 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the root node is not in the graph.
     #[inline]
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> InsertionResult {
+    fn insert_from_view<H: HugrView>(
+        &mut self,
+        root: Self::Node,
+        other: &H,
+    ) -> InsertionResult<H::Node, Self::Node> {
         panic_invalid_node(self, root);
         self.hugr_mut().insert_from_view(root, other)
     }
@@ -255,12 +261,12 @@ pub trait HugrMut: HugrMutInternals {
     // TODO: Try to preserve the order when possible? We cannot always ensure
     // it, since the subgraph may have arbitrary nodes without including their
     // parent.
-    fn insert_subgraph(
+    fn insert_subgraph<H: HugrView>(
         &mut self,
-        root: Node,
-        other: &impl HugrView,
-        subgraph: &SiblingSubgraph,
-    ) -> HashMap<Node, Node> {
+        root: Self::Node,
+        other: &H,
+        subgraph: &SiblingSubgraph<H::Node>,
+    ) -> HashMap<H::Node, Self::Node> {
         panic_invalid_node(self, root);
         self.hugr_mut().insert_subgraph(root, other, subgraph)
     }
@@ -307,20 +313,32 @@ pub trait HugrMut: HugrMutInternals {
 
 /// Records the result of inserting a Hugr or view
 /// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view].
-pub struct InsertionResult {
+///
+/// Contains a map from the nodes in the source HUGR to the nodes in the
+/// target HUGR, using their respective `Node` types.
+pub struct InsertionResult<SourceN = Node, TargetN = Node> {
     /// The node, after insertion, that was the root of the inserted Hugr.
     ///
     /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]
-    pub new_root: Node,
+    pub new_root: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
-    pub node_map: HashMap<Node, Node>,
+    pub node_map: HashMap<SourceN, TargetN>,
 }
 
-fn translate_indices(
+/// Translate a portgraph node index map into a map from nodes in the source
+/// HUGR to nodes in the target HUGR.
+///
+/// This is as a helper in `insert_hugr` and `insert_subgraph`, where the source
+/// HUGR may be an arbitrary `HugrView` with generic node types.
+fn translate_indices<N: HugrNode>(
+    mut source_node: impl FnMut(portgraph::NodeIndex) -> N,
+    mut target_node: impl FnMut(portgraph::NodeIndex) -> Node,
     node_map: HashMap<portgraph::NodeIndex, portgraph::NodeIndex>,
-) -> impl Iterator<Item = (Node, Node)> {
-    node_map.into_iter().map(|(k, v)| (k.into(), v.into()))
+) -> impl Iterator<Item = (N, Node)> {
+    node_map
+        .into_iter()
+        .map(move |(k, v)| (source_node(k), target_node(v)))
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -406,7 +424,11 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         (src_port, dst_port)
     }
 
-    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> InsertionResult {
+    fn insert_hugr(
+        &mut self,
+        root: Self::Node,
+        mut other: Hugr,
+    ) -> InsertionResult<Node, Self::Node> {
         let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other);
         // Update the optypes and metadata, taking them from the other graph.
         //
@@ -423,11 +445,16 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(node_map).collect(),
+            node_map: translate_indices(|n| other.get_node(n), |n| self.get_node(n), node_map)
+                .collect(),
         }
     }
 
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> InsertionResult {
+    fn insert_from_view<H: HugrView>(
+        &mut self,
+        root: Self::Node,
+        other: &H,
+    ) -> InsertionResult<H::Node, Self::Node> {
         let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, other);
         // Update the optypes and metadata, copying them from the other graph.
         //
@@ -444,22 +471,28 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(node_map).collect(),
+            node_map: translate_indices(|n| other.get_node(n), |n| self.get_node(n), node_map)
+                .collect(),
         }
     }
 
-    fn insert_subgraph(
+    fn insert_subgraph<H: HugrView>(
         &mut self,
-        root: Node,
-        other: &impl HugrView,
-        subgraph: &SiblingSubgraph,
-    ) -> HashMap<Node, Node> {
+        root: Self::Node,
+        other: &H,
+        subgraph: &SiblingSubgraph<H::Node>,
+    ) -> HashMap<H::Node, Self::Node> {
         // Create a portgraph view with the explicit list of nodes defined by the subgraph.
-        let portgraph: NodeFiltered<_, NodeFilter<&[Node]>, &[Node]> =
+        let context: HashSet<portgraph::NodeIndex> = subgraph
+            .nodes()
+            .iter()
+            .map(|&n| other.get_pg_index(n))
+            .collect();
+        let portgraph: NodeFiltered<_, NodeFilter<HashSet<portgraph::NodeIndex>>, _> =
             NodeFiltered::new_node_filtered(
                 other.portgraph(),
-                |node, ctx| ctx.contains(&node.into()),
-                subgraph.nodes(),
+                |node, ctx| ctx.contains(&node),
+                context,
             );
         let node_map = insert_subgraph_internal(self.as_mut(), root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
@@ -473,25 +506,24 @@ impl<T: RootTagged<RootHandle = Node, Node = Node> + AsMut<Hugr>> HugrMut for T 
                 self.use_extensions(exts);
             }
         }
-        translate_indices(node_map).collect()
+        translate_indices(|n| other.get_node(n), |n| self.get_node(n), node_map).collect()
     }
 
     fn copy_descendants(
         &mut self,
-        root: Node,
-        new_parent: Node,
+        root: Self::Node,
+        new_parent: Self::Node,
         subst: Option<Substitution>,
-    ) -> BTreeMap<Node, Node> {
+    ) -> BTreeMap<Self::Node, Self::Node> {
         let mut descendants = self.base_hugr().hierarchy.descendants(root.pg_index());
         let root2 = descendants.next();
         debug_assert_eq!(root2, Some(root.pg_index()));
         let nodes = Vec::from_iter(descendants);
-        let node_map = translate_indices(
-            portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
-                .copy_in_parent()
-                .expect("Is a MultiPortGraph"),
-        )
-        .collect::<BTreeMap<_, _>>();
+        let node_map = portgraph::view::Subgraph::with_nodes(&mut self.as_mut().graph, nodes)
+            .copy_in_parent()
+            .expect("Is a MultiPortGraph");
+        let node_map = translate_indices(|n| self.get_node(n), |n| self.get_node(n), node_map)
+            .collect::<BTreeMap<_, _>>();
 
         for node in self.children(root).collect::<Vec<_>>() {
             self.set_parent(*node_map.get(&node).unwrap(), new_parent);
@@ -563,10 +595,10 @@ fn insert_hugr_internal<H: HugrView>(
 /// sibling order in the hierarchy. This is due to the subgraph not necessarily
 /// having a single root, so the logic for reconstructing the hierarchy is not
 /// able to just do a BFS.
-fn insert_subgraph_internal(
+fn insert_subgraph_internal<N: HugrNode>(
     hugr: &mut Hugr,
     root: Node,
-    other: &impl HugrView,
+    other: &impl HugrView<Node = N>,
     portgraph: &impl portgraph::LinkView,
 ) -> HashMap<portgraph::NodeIndex, portgraph::NodeIndex> {
     let node_map = hugr

@@ -23,6 +23,7 @@ pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, I
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum NonLocalEdgesError<N> {
     #[error("Found {} nonlocal edges", .0.len())]
     Edges(Vec<(N, IncomingPort)>),

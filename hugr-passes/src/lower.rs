@@ -35,6 +35,7 @@ pub fn replace_many_ops<S: Into<OpType>>(
 /// Errors produced by the [`lower_ops`] function.
 #[derive(Debug, Error)]
 #[error(transparent)]
+#[non_exhaustive]
 pub enum LowerError {
     /// Invalid subgraph.
     #[error("Subgraph formed by node is invalid: {0}")]
