@@ -8,9 +8,10 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, Hugr, HugrView, IncomingPort, Node, Wire};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
+use super::CallbackHandler;
 use super::{handlers::linearize_array, FuncId, NodeTemplate, ParametricType};
 
 /// A configuration for implementing [Linearizer] by delegating to
@@ -28,7 +29,11 @@ pub struct DelegatingLinearizer {
     copy_discard_parametric: HashMap<
         ParametricType,
         Arc<
-            dyn Fn(&[TypeArg], usize, &mut CallbackHandler) -> Result<NodeTemplate, LinearizeError>,
+            dyn Fn(
+                &[TypeArg],
+                usize,
+                &mut CallbackHandler<DelegatingLinearizer>,
+            ) -> Result<NodeTemplate, LinearizeError>,
         >,
     >,
 }
@@ -39,16 +44,6 @@ impl Default for DelegatingLinearizer {
         res.register_callback(array_type_def(), linearize_array);
         res
     }
-}
-
-/// Implementation of [Linearizer] passed to callbacks, (e.g.) so that callbacks for
-/// handling collection types can use it to generate copy/discards of elements.
-// (Note, this is its own type just to give a bit of room for future expansion,
-// rather than passing a &DelegatingLinearizer directly)
-pub struct CallbackHandler<'a> {
-    hugr: &'a mut Hugr,
-    cache: &'a mut HashMap<FuncId, Node>,
-    lin: &'a DelegatingLinearizer,
 }
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
@@ -142,7 +137,11 @@ impl DelegatingLinearizer {
     pub fn register_callback(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &mut CallbackHandler) -> Result<NodeTemplate, LinearizeError>
+        copy_discard_fn: impl Fn(
+                &[TypeArg],
+                usize,
+                &mut CallbackHandler<DelegatingLinearizer>,
+            ) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
@@ -159,13 +158,13 @@ impl DelegatingLinearizer {
         &'a self,
         hugr: &'a mut impl HugrMut,
         cache: &'a mut HashMap<FuncId, Node>,
-    ) -> CallbackHandler<'a> {
+    ) -> CallbackHandler<'a, DelegatingLinearizer> {
         // ALAN ugh, can we avoid hugr_mut() here? Maybe by *not* storing the hugr-mut in the
         // CallbackHandler (==> NodeTemplate::Call contains FuncID *or* Node) ?
         CallbackHandler {
             hugr: hugr.hugr_mut(),
             cache,
-            lin: self,
+            deref: self,
         }
     }
 }
@@ -193,24 +192,7 @@ fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(),
 ///
 /// [monomorphization]: crate::monomorphize()
 /// [Copyable]: hugr_core::types::TypeBound::Copyable
-impl CallbackHandler<'_> {
-    /// Callbacks can use this to make a function in the Hugr.
-    /// The first call for a given `id` will call `body`, which must return
-    /// a [FuncDefn]-rooted Hugr, and insert that into the underlying Hugr;
-    /// the node containing the newly-inserted FuncDefn is returned.
-    ///
-    /// A second call with the same `id` will return the node from the first
-    /// call, without executing `body`.
-    pub fn make_function(&mut self, id: FuncId, body: impl Fn() -> Hugr) -> Node {
-        if let Some(n) = self.cache.get(&id) {
-            return *n;
-        }
-        let h = body();
-        let n = self.hugr.insert_hugr(self.hugr.root(), h).new_root;
-        self.cache.insert(id, n);
-        n
-    }
-
+impl CallbackHandler<'_, DelegatingLinearizer> {
     /// Insert copy or discard operations (as appropriate) enough to wire `src`
     /// up to all `targets`.
     ///
@@ -337,7 +319,7 @@ impl CallbackHandler<'_> {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => match self.lin.copy_discard.get(cty) {
+            TypeEnum::Extension(cty) => match self.copy_discard.get(cty) {
                 Some((copy, discard)) => Ok(if num_outports == 0 {
                     discard.clone()
                 } else {
@@ -358,7 +340,7 @@ impl CallbackHandler<'_> {
                 }),
                 None => {
                     let copy_discard_fn = self
-                        .lin
+                        .deref
                         .copy_discard_parametric
                         .get(&cty.into())
                         .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;

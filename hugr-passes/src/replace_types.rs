@@ -4,6 +4,7 @@
 //!
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use handlers::list_const;
@@ -200,7 +201,7 @@ pub struct ReplaceTypes {
     op_map: HashMap<OpHashWrapper, NodeTemplate>,
     param_ops: HashMap<
         ParametricOp,
-        Arc<dyn Fn(&[TypeArg], &mut CallbackHandler) -> Option<NodeTemplate>>,
+        Arc<dyn Fn(&[TypeArg], &mut CallbackHandler<ReplaceTypes>) -> Option<NodeTemplate>>,
     >,
     consts: HashMap<
         CustomType,
@@ -350,7 +351,8 @@ impl ReplaceTypes {
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg], &mut CallbackHandler) -> Option<NodeTemplate> + 'static,
+        dest_fn: impl Fn(&[TypeArg], &mut CallbackHandler<ReplaceTypes>) -> Option<NodeTemplate>
+            + 'static,
     ) {
         self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
@@ -484,13 +486,13 @@ impl ReplaceTypes {
         &'a self,
         hugr: &'a mut impl HugrMut,
         cache: &'a mut HashMap<FuncId, Node>,
-    ) -> CallbackHandler<'a> {
+    ) -> CallbackHandler<'a, ReplaceTypes> {
         // ALAN ugh, can we avoid hugr_mut() here? Maybe by *not* storing the hugr-mut in the
         // CallbackHandler (==> NodeTemplate::Call contains FuncID *or* Node) ?
         CallbackHandler {
             hugr: hugr.hugr_mut(),
             cache,
-            repl: self,
+            deref: self,
         }
     }
 
@@ -533,13 +535,21 @@ impl ReplaceTypes {
 
 /// struct passed to callbacks registered via [ReplaceTypes::replace_parametrized_op].
 /// The callbacks may use this to create functions to be called via [NodeTemplate::Call].
-pub struct CallbackHandler<'a> {
+pub struct CallbackHandler<'a, T> {
     hugr: &'a mut Hugr,
     cache: &'a mut HashMap<FuncId, Node>,
-    repl: &'a ReplaceTypes,
+    deref: &'a T,
 }
 
-impl CallbackHandler<'_> {
+impl<'a, T> Deref for CallbackHandler<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.deref
+    }
+}
+
+impl<T> CallbackHandler<'_, T> {
     /// Callbacks can use this to make a function in the Hugr.
     /// The first call for a given `id` will call `body`, which must return
     /// a [FuncDefn]-rooted Hugr, and insert that into the underlying Hugr;
@@ -555,12 +565,6 @@ impl CallbackHandler<'_> {
         let n = self.hugr.insert_hugr(self.hugr.root(), h).new_root;
         self.cache.insert(id, n);
         n
-    }
-
-    /// Allows access to the [ReplaceTypes] i.e. which implements [TypeTransformer]
-    /// to pass to [Type::transform]
-    pub fn replace_types(&self) -> &ReplaceTypes {
-        self.repl
     }
 }
 
