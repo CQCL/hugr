@@ -669,7 +669,7 @@ mod test {
         list::{list_type, list_type_def, ListOp, ListValue},
     };
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
-    use hugr_core::{type_row, Extension, HugrView};
+    use hugr_core::{type_row, Extension, Hugr, HugrView};
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -1122,8 +1122,19 @@ mod test {
         h.validate_no_extensions().unwrap();
     }
 
-    #[test]
-    fn op_to_call() {
+    fn make_read_func() -> Hugr {
+        lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
+            FunctionBuilder::new(
+                "lowered_read",
+                PolyFuncType::new([TypeBound::Copyable.into()], sig),
+            )
+        })
+        .finish_hugr()
+        .unwrap()
+    }
+
+    #[rstest]
+    fn op_to_call(#[values(false, true)] create_lazy: bool) {
         let e = ext();
         let pv = e.get_type(PACKED_VEC).unwrap();
         let inner = pv.instantiate([usize_t().into()]).unwrap();
@@ -1140,27 +1151,32 @@ mod test {
             .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
             .unwrap();
         let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
-        let read_func = h
-            .insert_hugr(
-                h.root(),
-                lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
-                    FunctionBuilder::new(
-                        "lowered_read",
-                        PolyFuncType::new([TypeBound::Copyable.into()], sig),
-                    )
-                })
-                .finish_hugr()
-                .unwrap(),
-            )
-            .new_root;
+        let read_func = (!create_lazy).then(|| h.insert_hugr(h.root(), make_read_func()).new_root);
 
         let mut lw = lowerer(&e);
-        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
-            Some(NodeTemplate::Call(read_func, args.to_owned()))
-        });
+        if let Some(read_func) = read_func {
+            lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
+                Some(NodeTemplate::Call(read_func, args.to_owned()))
+            });
+        } else {
+            lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, rt| {
+                let name = "test_read_func".to_string();
+                let read_func = rt
+                    .get_function(name.clone())
+                    .unwrap_or_else(|| rt.make_function(name, make_read_func()));
+                Some(NodeTemplate::Call(read_func, args.to_owned()))
+            });
+        }
         lw.run(&mut h).unwrap();
 
-        assert_eq!(h.output_neighbours(read_func).count(), 2);
+        let [func_node] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_func_defn())
+            .collect_array()
+            .unwrap();
+        assert!(read_func.is_none_or(|rf| rf == func_node));
+
+        assert_eq!(h.output_neighbours(func_node).count(), 2);
         let ext_op_names = h
             .nodes()
             .filter_map(|n| h.get_optype(n).as_extension_op())
