@@ -3,6 +3,7 @@
 //! Replace types with other types across the Hugr. See [ReplaceTypes] and [Linearizer].
 //!
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -550,21 +551,22 @@ impl<'a, T> Deref for CallbackHandler<'a, T> {
 }
 
 impl<T> CallbackHandler<'_, T> {
-    /// Callbacks can use this to make a function in the Hugr.
-    /// The first call for a given `id` will call `body`, which must return
-    /// a [FuncDefn]-rooted Hugr, and insert that into the underlying Hugr;
-    /// the node containing the newly-inserted FuncDefn is returned.
+    /// Returns any Node previously created by [Self::make_function] with the same `id`
+    pub fn get_function(&self, id: FuncId) -> Option<Node> {
+        self.cache.get(&id).copied()
+    }
+
+    /// Callbacks can use this to make a function in the Hugr, if none already
+    /// exists for the same `id` - check using `get_function` first.
     ///
-    /// A second call with the same `id` will return the node from the first
-    /// call, without executing `body`.
-    pub fn make_function(&mut self, id: FuncId, body: impl Fn() -> Hugr) -> Node {
-        if let Some(n) = self.cache.get(&id) {
-            return *n;
+    /// # Panics
+    ///
+    /// if `make_function` has already been called with the same `id`
+    pub fn make_function(&mut self, id: FuncId, body: Hugr) -> Node {
+        match self.cache.entry(id.clone()) {
+            Entry::Occupied(_) => panic!("Key {id} already present"),
+            Entry::Vacant(ve) => *ve.insert(self.hugr.insert_hugr(self.hugr.root(), body).new_root),
         }
-        let h = body();
-        let n = self.hugr.insert_hugr(self.hugr.root(), h).new_root;
-        self.cache.insert(id, n);
-        n
     }
 }
 
