@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.19.1](https://github.com/CQCL/hugr/compare/hugr-v0.15.3...hugr-v0.19.1) - 2025-04-25
+
+### New Features
+
+- Export the portgraph hierarchy in HugrInternals ([#2057](https://github.com/CQCL/hugr/pull/2057))
+- Implement Debug for generic Wire<N>s ([#2068](https://github.com/CQCL/hugr/pull/2068))
+- Add ExtensionOp helpers ([#2072](https://github.com/CQCL/hugr/pull/2072))
+- ReplaceTypes: handlers for array constants + linearization ([#2023](https://github.com/CQCL/hugr/pull/2023))
+- move `ArrayOpBuilder` to hugr-core ([#2115](https://github.com/CQCL/hugr/pull/2115))
+- [**breaking**] Removed `model_unstable` feature flag. ([#2113](https://github.com/CQCL/hugr/pull/2113))
+
 ## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-v0.15.2...hugr-v0.15.3) - 2025-04-02
 
 ### Documentation
