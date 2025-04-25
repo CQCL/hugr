@@ -55,7 +55,6 @@ use std::io::Write;
 #[allow(unused_imports)]
 use itertools::Itertools as _;
 
-#[cfg(feature = "model_unstable")]
 use crate::import::ImportError;
 
 /// Read a HUGR envelope from a reader.
@@ -197,19 +196,16 @@ pub enum EnvelopeError {
         source: PackageEncodingError,
     },
     /// Error importing a HUGR from a hugr-model payload.
-    #[cfg(feature = "model_unstable")]
     ModelImport {
         /// The source error.
         source: ImportError,
     },
     /// Error reading a HUGR model payload.
-    #[cfg(feature = "model_unstable")]
     ModelRead {
         /// The source error.
         source: hugr_model::v0::binary::ReadError,
     },
     /// Error writing a HUGR model payload.
-    #[cfg(feature = "model_unstable")]
     ModelWrite {
         /// The source error.
         source: hugr_model::v0::binary::WriteError,
@@ -225,16 +221,8 @@ fn read_impl(
     match header.format {
         #[allow(deprecated)]
         EnvelopeFormat::PackageJson => Ok(Package::from_json_reader(payload, registry)?),
-        #[cfg(feature = "model_unstable")]
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             decode_model(payload, registry, header.format)
-        }
-        #[cfg(not(feature = "model_unstable"))]
-        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
-            Err(EnvelopeError::FormatUnsupported {
-                format: header.format,
-                feature: Some("model_unstable"),
-            })
         }
     }
 }
@@ -246,7 +234,6 @@ fn read_impl(
 /// - `extension_registry`: An extension registry with additional extensions to use when
 ///   decoding the HUGR, if they are not already included in the package.
 /// - `format`: The format of the payload.
-#[cfg(feature = "model_unstable")]
 fn decode_model(
     mut stream: impl BufRead,
     extension_registry: &ExtensionRegistry,
@@ -286,22 +273,13 @@ fn write_impl(
     match config.format {
         #[allow(deprecated)]
         EnvelopeFormat::PackageJson => package.to_json_writer(writer)?,
-        #[cfg(feature = "model_unstable")]
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             encode_model(writer, package, config.format)?
-        }
-        #[cfg(not(feature = "model_unstable"))]
-        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
-            return Err(EnvelopeError::FormatUnsupported {
-                format: config.format,
-                feature: Some("model_unstable"),
-            })
         }
     }
     Ok(())
 }
 
-#[cfg(feature = "model_unstable")]
 fn encode_model(
     mut writer: impl Write,
     package: &Package,
@@ -391,7 +369,6 @@ mod tests {
     //#[case::empty(Package::default())] // Not currently supported
     #[case::simple(simple_package())]
     //#[case::multi(multi_module_package())] // Not currently supported
-    #[cfg(feature = "model_unstable")]
     fn module_exts_roundtrip(#[case] package: Package) {
         let mut buffer = Vec::new();
         let config = EnvelopeConfig {
@@ -417,15 +394,7 @@ mod tests {
             format: EnvelopeFormat::Model,
             zstd: None,
         };
-        let res = package.store(&mut buffer, config);
-
-        match cfg!(feature = "model_unstable") {
-            true => res.unwrap(),
-            false => {
-                assert_matches!(res, Err(EnvelopeError::FormatUnsupported { .. }));
-                return;
-            }
-        }
+        package.store(&mut buffer, config).unwrap();
 
         let (decoded_config, new_package) =
             read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();

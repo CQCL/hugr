@@ -105,7 +105,6 @@ pub struct ConstInt {
 
 impl ConstInt {
     /// Name of the constructor for creating constant integers.
-    #[cfg_attr(not(feature = "model_unstable"), allow(dead_code))]
     pub(crate) const CTR_NAME: &'static str = "arithmetic.int.const";
 
     /// Create a new [`ConstInt`] with a given width and unsigned value
