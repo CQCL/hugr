@@ -542,11 +542,11 @@ pub struct CallbackHandler<'a, T> {
     deref: &'a T,
 }
 
-impl<'a, T> Deref for CallbackHandler<'a, T> {
+impl<T> Deref for CallbackHandler<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.deref
+        self.deref
     }
 }
 
