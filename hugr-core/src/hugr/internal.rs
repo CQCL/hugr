@@ -95,7 +95,6 @@ impl HugrInternals for Hugr {
         index.into()
     }
 
-    #[inline]
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap {
         static EMPTY: OnceLock<NodeMetadataMap> = OnceLock::new();
         panic_invalid_node(self, node);
@@ -322,7 +321,6 @@ impl HugrMutInternals for Hugr {
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
         panic_invalid_node(self, node);
-        // We know RootHandle=Node here so no need to check
         std::mem::replace(self.optype_mut(node), op.into())
     }
 

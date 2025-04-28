@@ -373,7 +373,7 @@ impl<H: HugrMut, Root: NodeHandle<H::Node>> HugrMutInternals for SiblingMut<'_, 
         op: impl Into<crate::ops::OpType>,
     ) -> crate::ops::OpType {
         let op = op.into();
-        // Note: This wrapper will be removed in a subsequent PR, so we just panic here for now.
+        // Note: `SiblingMut` will be removed in a subsequent PR, so we just panic here for now.
         if node == self.root() && !Root::TAG.is_superset(op.tag()) {
             let err = HugrError::InvalidTag {
                 required: Root::TAG,
