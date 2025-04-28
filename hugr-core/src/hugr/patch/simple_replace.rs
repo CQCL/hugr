@@ -4,7 +4,6 @@ use std::collections::HashMap;
 
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
-pub use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};

@@ -7,9 +7,10 @@ use crate::ops::{DataflowParent, OpType, DFG};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
 
-use super::{PatchHugrMut, HugrMut, PatchVerification};
+use super::{HugrMut, PatchHugrMut, PatchVerification};
 
-/// Rewrite to inline a [Call](OpType::Call) to a known [FuncDefn](OpType::FuncDefn)
+/// Rewrite to inline a [Call](OpType::Call) to a known
+/// [FuncDefn](OpType::FuncDefn)
 pub struct InlineCall<N = Node>(N);
 
 /// Error in performing [InlineCall] rewrite.
@@ -19,7 +20,8 @@ pub enum InlineCallError<N = Node> {
     /// The specified Node was not a [Call](OpType::Call)
     #[display("Node to inline {_0} expected to be a Call but actually {_1}")]
     NotCallNode(N, OpType),
-    /// The node was a Call, but the target was not a [FuncDefn](OpType::FuncDefn)
+    /// The node was a Call, but the target was not a
+    /// [FuncDefn](OpType::FuncDefn)
     /// - presumably a [FuncDecl](OpType::FuncDecl), if the Hugr is valid.
     #[display("Call targetted node {_0} which must be a FuncDefn but was {_1}")]
     CallTargetNotFuncDefn(N, OpType),
@@ -104,8 +106,8 @@ impl PatchHugrMut for InlineCall {
         Ok(())
     }
 
-    /// Failure only occurs if the node is not a Call, or the target not a FuncDefn.
-    /// (Any later failure means an invalid Hugr and `panic`.)
+    /// Failure only occurs if the node is not a Call, or the target not a
+    /// FuncDefn. (Any later failure means an invalid Hugr and `panic`.)
     const UNCHANGED_ON_FAILURE: bool = true;
 }
 

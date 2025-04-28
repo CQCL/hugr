@@ -17,11 +17,13 @@ use super::{PatchHugrMut, VerifyPatch};
 /// Specifies how to create a new edge.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewEdgeSpec<SrcNode, TgtNode> {
-    /// The source of the new edge. For [Replacement::mu_inp] and [Replacement::mu_new], this is in the
-    /// existing Hugr; for edges in [Replacement::mu_out] this is in the [Replacement::replacement]
+    /// The source of the new edge. For [Replacement::mu_inp] and
+    /// [Replacement::mu_new], this is in the existing Hugr; for edges in
+    /// [Replacement::mu_out] this is in the [Replacement::replacement]
     pub src: SrcNode,
-    /// The target of the new edge. For [Replacement::mu_inp], this is in the [Replacement::replacement];
-    /// for edges in [Replacement::mu_out] and [Replacement::mu_new], this is in the existing Hugr.
+    /// The target of the new edge. For [Replacement::mu_inp], this is in the
+    /// [Replacement::replacement]; for edges in [Replacement::mu_out] and
+    /// [Replacement::mu_new], this is in the existing Hugr.
     pub tgt: TgtNode,
     /// The kind of edge to create, and any port specifiers required
     pub kind: NewEdgeKind,
@@ -57,29 +59,36 @@ pub enum NewEdgeKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Replacement<HostNode = Node> {
     /// The nodes to remove from the existing Hugr (known as Gamma).
-    /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
-    /// Must be non-empty - otherwise there is no parent under which to place [Self::replacement],
-    /// and there would be no possible [Self::mu_inp], [Self::mu_out] or [Self::adoptions].
+    /// These must all have a common parent (i.e. be siblings).  Called "S" in
+    /// the spec. Must be non-empty - otherwise there is no parent under
+    /// which to place [Self::replacement], and there would be no possible
+    /// [Self::mu_inp], [Self::mu_out] or [Self::adoptions].
     pub removal: Vec<HostNode>,
-    /// A hugr (not necessarily valid, as it may be missing edges and/or nodes), whose root
-    /// is the same type as the root of [Self::replacement].  "G" in the spec.
+    /// A hugr (not necessarily valid, as it may be missing edges and/or nodes),
+    /// whose root is the same type as the root of [Self::replacement].  "G"
+    /// in the spec.
     pub replacement: Hugr,
-    /// Describes how parts of the Hugr that would otherwise be removed should instead be preserved but
-    /// with new parents amongst the newly-inserted nodes.  This is a Map from container nodes in
-    /// [Self::replacement] that have no children, to container nodes that are descended from [Self::removal].
-    /// The keys are the new parents for the children of the values.  Note no value may be ancestor or
-    /// descendant of another.  This is "B" in the spec; "R" is the set of descendants of [Self::removal]
-    ///  that are not descendants of values here.
+    /// Describes how parts of the Hugr that would otherwise be removed should
+    /// instead be preserved but with new parents amongst the newly-inserted
+    /// nodes.  This is a Map from container nodes in [Self::replacement]
+    /// that have no children, to container nodes that are descended from
+    /// [Self::removal]. The keys are the new parents for the children of
+    /// the values.  Note no value may be ancestor or descendant of another.
+    /// This is "B" in the spec; "R" is the set of descendants of
+    /// [Self::removal]  that are not descendants of values here.
     pub adoptions: HashMap<Node, HostNode>,
-    /// Edges from nodes in the existing Hugr that are not removed ([NewEdgeSpec::src] in Gamma\R)
-    /// to inserted nodes ([NewEdgeSpec::tgt] in [Self::replacement]).
+    /// Edges from nodes in the existing Hugr that are not removed
+    /// ([NewEdgeSpec::src] in Gamma\R) to inserted nodes
+    /// ([NewEdgeSpec::tgt] in [Self::replacement]).
     pub mu_inp: Vec<NewEdgeSpec<HostNode, Node>>,
-    /// Edges from inserted nodes ([NewEdgeSpec::src] in [Self::replacement]) to existing nodes not removed
-    /// ([NewEdgeSpec::tgt] in Gamma \ R).
+    /// Edges from inserted nodes ([NewEdgeSpec::src] in [Self::replacement]) to
+    /// existing nodes not removed ([NewEdgeSpec::tgt] in Gamma \ R).
     pub mu_out: Vec<NewEdgeSpec<Node, HostNode>>,
-    /// Edges to add between existing nodes (both [NewEdgeSpec::src] and [NewEdgeSpec::tgt] in Gamma \ R).
-    /// For example, in cases where the source had an edge to a removed node, and the target had an
-    /// edge from a removed node, this would allow source to be directly connected to target.
+    /// Edges to add between existing nodes (both [NewEdgeSpec::src] and
+    /// [NewEdgeSpec::tgt] in Gamma \ R). For example, in cases where the
+    /// source had an edge to a removed node, and the target had an
+    /// edge from a removed node, this would allow source to be directly
+    /// connected to target.
     pub mu_new: Vec<NewEdgeSpec<HostNode, HostNode>>,
 }
 
@@ -175,8 +184,9 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
             .map_err(|ex_one| ReplaceError::MultipleParents(ex_one.flatten().collect()))?
             .ok_or(ReplaceError::CantReplaceRoot)?; // If no parent
 
-        // Check replacement parent is of same tag. Note we do not require exact equality
-        // of OpType/Signature, e.g. to ease changing of Input/Output node signatures too.
+        // Check replacement parent is of same tag. Note we do not require exact
+        // equality of OpType/Signature, e.g. to ease changing of Input/Output
+        // node signatures too.
         let removed = h.get_optype(parent).tag();
         let replacement = self.replacement.root_type().tag();
         if removed != replacement {
@@ -285,7 +295,8 @@ impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
             // The descendant check is to allow the case where the old edge is nonlocal
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
-            // the first "removed.contains" check, we'll keep that as a common-case fast-path.
+            // the first "removed.contains" check, we'll keep that as a common-case
+            // fast-path.
             e.check_existing_edge(h, &removed, DynEdgeSpec::ReplToHost)?;
         }
         for e in self.mu_new.iter() {
@@ -299,7 +310,8 @@ impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
             // The descendant check is to allow the case where the old edge is nonlocal
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
-            // the first "removed.contains" check, we'll keep that as a common-case fast-path.
+            // the first "removed.contains" check, we'll keep that as a common-case
+            // fast-path.
             e.check_existing_edge(h, &removed, DynEdgeSpec::HostToHost)?;
         }
         Ok(())
@@ -319,10 +331,12 @@ impl PatchHugrMut for Replacement {
     fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
         let parent = self.check_parent(h)?;
         // Calculate removed nodes here. (Does not include transfers, so enumerates only
-        // nodes we are going to remove, individually, anyway; so no *asymptotic* speed penalty)
+        // nodes we are going to remove, individually, anyway; so no *asymptotic* speed
+        // penalty)
         let to_remove = self.get_removed_nodes(h)?;
 
-        // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want.
+        // 1. Add all the new nodes. Note this includes replacement.root(), which we
+        //    don't want.
         // TODO what would an error here mean? e.g. malformed self.replacement??
         let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement);
 
@@ -459,17 +473,20 @@ pub enum ReplaceError<HostNode = Node> {
         /// The tag of the root in the replacement Hugr
         replacement: OpTag,
     },
-    /// Keys in [Replacement::adoptions] were not valid container nodes in [Replacement::replacement]
+    /// Keys in [Replacement::adoptions] were not valid container nodes in
+    /// [Replacement::replacement]
     #[error("Node {0} was not an empty container node in the replacement")]
     InvalidAdoptingParent(Node),
-    /// Some values in [Replacement::adoptions] were either descendants of other values, or not
-    /// descendants of the [Replacement::removal]. The nodes are indicated on a best-effort basis.
+    /// Some values in [Replacement::adoptions] were either descendants of other
+    /// values, or not descendants of the [Replacement::removal]. The nodes
+    /// are indicated on a best-effort basis.
     #[error("Nodes not free to be moved into new locations: {0:?}")]
     AdopteesNotSeparateDescendants(Vec<HostNode>),
     /// A node at one end of a [NewEdgeSpec] was not found
     #[error("{0:?} end of edge {1:?} not found in {which_hugr}", which_hugr = .1.which_hugr(*.0))]
     BadEdgeSpec(Direction, DynEdgeSpec<HostNode>),
-    /// The target of the edge was found, but there was no existing edge to replace
+    /// The target of the edge was found, but there was no existing edge to
+    /// replace
     #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
     NoRemovedEdge(DynEdgeSpec<HostNode>),
     /// The [NewEdgeKind] was not applicable for the source/target node(s)
@@ -480,7 +497,8 @@ pub enum ReplaceError<HostNode = Node> {
 /// The three kinds of edge that may appear in a [ReplaceError]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DynEdgeSpec<HostNode> {
-    /// An edge from the host Hugr into the replacement, i.e. [Replacement::mu_inp]
+    /// An edge from the host Hugr into the replacement, i.e.
+    /// [Replacement::mu_inp]
     HostToRepl(NewEdgeSpec<HostNode, Node>),
     /// An edge from the replacement to the host, i.e. [Replacement::mu_out]
     ReplToHost(NewEdgeSpec<Node, HostNode>),
@@ -571,7 +589,8 @@ mod test {
         }
 
         // Replacement: one BB with two DFGs inside.
-        // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
+        // Use Hugr rather than Builder because DFGs must be empty (not even
+        // Input/Output).
         let mut replacement = Hugr::new(ops::CFG {
             signature: Signature::new_endo(just_list.clone()),
         });

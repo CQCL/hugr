@@ -32,6 +32,7 @@ use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 
 use crate::dataflow::{partial_from_const, DFContext, PartialValue};
+use crate::ComposablePass as _;
 
 use super::{constant_fold_pass, ConstFoldContext, ConstantFoldPass, ValueHandle};
 
@@ -42,8 +43,7 @@ fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
     let n = Node::from(portgraph::NodeIndex::new(7));
     let st = SumType::new([vec![k.get_type()], vec![]]);
     let subject_val = Value::sum(0, [k.clone().into()], st).unwrap();
-    let temp = Hugr::default();
-    let ctx: ConstFoldContext<Hugr> = ConstFoldContext(&temp);
+    let ctx = ConstFoldContext;
     let v1 = partial_from_const(&ctx, n, &subject_val);
 
     let v1_subfield = {
@@ -114,8 +114,7 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
         v.get_custom_value::<ConstF64>().unwrap().value()
     }
     let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
-    let temp = Hugr::default();
-    let mut ctx = ConstFoldContext(&temp);
+    let mut ctx = ConstFoldContext;
     let v_a = partial_from_const(&ctx, n_a, &f2c(a));
     let v_b = partial_from_const(&ctx, n_b, &f2c(b));
     assert_eq!(unwrap_float(v_a.clone()), a);

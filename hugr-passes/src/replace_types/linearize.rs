@@ -1,18 +1,17 @@
-use std::borrow::Cow;
 use std::iter::repeat;
 use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::builder::{
-    inout_sig, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    HugrBuilder,
+    inout_sig, BuildError, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr,
+    DataflowSubContainer, HugrBuilder,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::Wire;
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, IncomingPort, Node};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, HugrView, IncomingPort, Node, Wire};
 use itertools::Itertools;
 
-use super::{NodeTemplate, ParametricType};
+use super::{handlers::linearize_array, NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
 /// target.  Used to restore Hugr validity when a [ReplaceTypes](super::ReplaceTypes)
@@ -50,7 +49,7 @@ pub trait Linearizer {
     /// if `src` is not a valid Wire (does not identify a dataflow out-port)
     fn insert_copy_discard(
         &self,
-        hugr: &mut impl HugrMut,
+        hugr: &mut impl HugrMut<Node = Node>,
         src: Wire,
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {
@@ -76,9 +75,11 @@ pub trait Linearizer {
                     tgt_parent,
                 });
             }
+            let typ = typ.clone(); // Stop borrowing hugr in order to add_hugr to it
             let copy_discard_op = self
-                .copy_discard_op(typ, targets.len())?
-                .add_hugr(hugr, src_parent);
+                .copy_discard_op(&typ, targets.len())?
+                .add_hugr(hugr, src_parent)
+                .map_err(|e| LinearizeError::NestedTemplateError(typ, e))?;
             for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
                 hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
             }
@@ -104,7 +105,7 @@ pub trait Linearizer {
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
 /// such as [TypeEnum::Sum]s.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
     copy_discard: HashMap<CustomType, (NodeTemplate, NodeTemplate)>,
@@ -119,14 +120,23 @@ pub struct DelegatingLinearizer {
     >,
 }
 
+impl Default for DelegatingLinearizer {
+    fn default() -> Self {
+        let mut res = Self::new_empty();
+        res.register_callback(array_type_def(), linearize_array);
+        res
+    }
+}
+
 /// Implementation of [Linearizer] passed to callbacks, (e.g.) so that callbacks for
 /// handling collection types can use it to generate copy/discards of elements.
 // (Note, this is its own type just to give a bit of room for future expansion,
 // rather than passing a &DelegatingLinearizer directly)
 pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 
-#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum LinearizeError {
     #[error("Need copy/discard op for {_0}")]
     NeedCopyDiscard(Type),
@@ -154,9 +164,22 @@ pub enum LinearizeError {
     /// Neither does linearization make sense for copyable types
     #[error("Type {_0} is copyable")]
     CopyableType(Type),
+    /// Error may be returned by a callback for e.g. a container because it could
+    /// not generate a [NodeTemplate] because of a problem with an element
+    #[error("Could not generate NodeTemplate for contained type {0} because {1}")]
+    NestedTemplateError(Type, BuildError),
 }
 
 impl DelegatingLinearizer {
+    /// Makes a new instance. Unlike [Self::default], this does not understand
+    /// any extension types, even those in the prelude.
+    pub fn new_empty() -> Self {
+        Self {
+            copy_discard: Default::default(),
+            copy_discard_parametric: Default::default(),
+        }
+    }
+
     /// Configures this instance that the specified monomorphic type can be copied and/or
     /// discarded via the provided [NodeTemplate]s - directly or as part of a compound type
     /// e.g. [TypeEnum::Sum].
@@ -167,8 +190,10 @@ impl DelegatingLinearizer {
     ///
     /// * [LinearizeError::CopyableType] If `typ` is
     ///   [Copyable](hugr_core::types::TypeBound::Copyable)
-    /// * [LinearizeError::WrongSignature] if `copy` or `discard` do not have the
-    ///   expected inputs or outputs
+    /// * [LinearizeError::WrongSignature] if `copy` or `discard` do not have the expected
+    ///   inputs or outputs (for [NodeTemplate::SingleOp] and [NodeTemplate::CompoundOp]
+    ///   only: the signature for a [NodeTemplate::Call] cannot be checked until it is used
+    ///   in a Hugr).
     pub fn register_simple(
         &mut self,
         cty: CustomType,
@@ -212,18 +237,12 @@ impl DelegatingLinearizer {
 }
 
 fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(), LinearizeError> {
-    let sig = tmpl.signature();
-    if sig.as_ref().is_some_and(|sig| {
-        sig.io() == (&typ.clone().into(), &vec![typ.clone(); num_outports].into())
-    }) {
-        Ok(())
-    } else {
-        Err(LinearizeError::WrongSignature {
+    tmpl.check_signature(&typ.clone().into(), &vec![typ.clone(); num_outports].into())
+        .map_err(|sig| LinearizeError::WrongSignature {
             typ: typ.clone(),
             num_outports,
-            sig: sig.map(Cow::into_owned),
+            sig,
         })
-    }
 }
 
 impl Linearizer for DelegatingLinearizer {
@@ -332,27 +351,37 @@ impl Linearizer for CallbackHandler<'_> {
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+    use std::iter::successors;
     use std::sync::Arc;
 
-    use hugr_core::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
+    use hugr_core::builder::{
+        inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder,
+    };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
+    use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
     };
     use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
-    use hugr_core::ops::{handle::NodeHandle, ExtensionOp, NamedOp, OpName};
-    use hugr_core::ops::{DataflowOpTrait, OpType};
+    use hugr_core::ops::handle::NodeHandle;
+    use hugr_core::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
-    use hugr_core::std_extensions::collections::array::{array_type, ArrayOpDef};
+    use hugr_core::std_extensions::collections::array::{
+        array_type, array_type_def, ArrayOpDef, ArrayRepeat, ArrayScan, ArrayScanDef,
+    };
     use hugr_core::types::type_param::TypeParam;
-    use hugr_core::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeRow};
-    use hugr_core::{hugr::IdentList, Extension, Hugr, HugrView, Node};
+    use hugr_core::types::{
+        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeEnum, TypeRow,
+    };
+    use hugr_core::{hugr::IdentList, type_row, Extension, Hugr, HugrView, Node};
     use itertools::Itertools;
     use rstest::rstest;
 
+    use crate::replace_types::handlers::linearize_array;
     use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
-    use crate::ReplaceTypes;
+    use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
 
@@ -644,5 +673,167 @@ mod test {
                 }
             ))
         );
+    }
+
+    #[rstest]
+    fn array(#[values(2, 3, 4)] num_outports: usize) {
+        let num_new = num_outports - 1;
+        let (e, mut lowerer) = ext_lowerer();
+
+        lowerer
+            .linearizer()
+            .register_callback(array_type_def(), linearize_array);
+        let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
+        let opt_lin_ty = Type::from(option_type(lin_t.clone()));
+        let array_ty = || array_type(5, usize_t());
+        let mut dfb = DFGBuilder::new(inout_sig(array_ty(), vec![array_ty(); num_new])).unwrap();
+        let [array_in] = dfb.input_wires_arr();
+        // The outer DFG passes the input array into (1) a DFG that discards it
+        let discard = dfb
+            .dfg_builder(
+                Signature::new(array_type(5, usize_t()), type_row![]),
+                [array_in],
+            )
+            .unwrap()
+            .finish_with_outputs([])
+            .unwrap();
+        // and (2) its own output
+        let mut h = dfb
+            .finish_hugr_with_outputs(vec![array_in; num_new])
+            .unwrap();
+
+        assert!(lowerer.run(&mut h).unwrap());
+
+        let (discard_ops, copy_ops): (Vec<_>, Vec<_>) = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_extension_op().map(|e| (n, e)))
+            .partition(|(n, _)| {
+                successors(Some(*n), |n| h.get_parent(*n)).contains(&discard.node())
+            });
+        {
+            let [(n, ext_op)] = discard_ops.try_into().unwrap();
+            assert!(ArrayScanDef::from_extension_op(ext_op).is_ok());
+            assert_eq!(
+                ext_op.signature().output,
+                TypeRow::from(vec![array_type(5, Type::UNIT)])
+            );
+            assert_eq!(h.linked_inputs(n, 0).next(), None);
+        }
+        assert_eq!(copy_ops.len(), num_new * 2 + 1); // 1 middle scan; 1repeat+1unwrap per new
+        let copy_ops = copy_ops.into_iter().map(|(_, e)| e).collect_vec();
+        let rpts = copy_ops
+            .iter()
+            .copied()
+            .filter(|e| ArrayRepeat::from_extension_op(e).is_ok())
+            .collect_vec();
+        assert_eq!(rpts.len(), num_new);
+        for rpt in rpts {
+            assert_eq!(
+                rpt.signature().output(),
+                &TypeRow::from(array_type(5, opt_lin_ty.clone()))
+            );
+        }
+        let unwrap_scans = copy_ops
+            .iter()
+            .filter_map(|e| {
+                ArrayScan::from_extension_op(e)
+                    .ok()
+                    .filter(|sc| sc.acc_tys.is_empty())
+            })
+            .collect_vec();
+        assert_eq!(unwrap_scans.len(), num_new);
+        for scan in unwrap_scans {
+            assert_eq!(scan.src_ty, opt_lin_ty);
+            assert_eq!(scan.tgt_ty, lin_t);
+        }
+
+        let copy_sig = copy_ops
+            .into_iter()
+            .find(|e| ArrayScan::from_extension_op(e).is_ok_and(|sc| !sc.acc_tys.is_empty()))
+            .unwrap()
+            .signature()
+            .into_owned();
+        assert_eq!(
+            copy_sig.output,
+            TypeRow::from(
+                [array_type(5, lin_t.clone()), INT_TYPES[6].to_owned()]
+                    .into_iter()
+                    .chain(vec![
+                        array_type(5, option_type(lin_t.clone()).into());
+                        num_new
+                    ])
+                    .collect_vec()
+            )
+        );
+        assert_eq!(copy_sig.input[0], copy_sig.output[0]);
+        assert!(matches!(
+            copy_sig.input[1].as_type_enum(),
+            TypeEnum::Function(_)
+        ));
+        assert_eq!(copy_sig.input[2..], copy_sig.output[1..]);
+    }
+
+    #[test]
+    fn call_ok_except_in_array() {
+        let (e, _) = ext_lowerer();
+        let lin_ct = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
+        let lin_t: Type = lin_ct.clone().into();
+
+        // A simple Hugr that discards a usize_t, with a "drop" function
+        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
+        let discard_fn = {
+            let mut fb = dfb
+                .define_function(
+                    "drop",
+                    Signature::new(lin_t.clone(), type_row![])
+                        .with_extension_delta(e.name().clone()),
+                )
+                .unwrap();
+            let ins = fb.input_wires();
+            fb.add_dataflow_op(
+                ExtensionOp::new(e.get_op("discard").unwrap().clone(), []).unwrap(),
+                ins,
+            )
+            .unwrap();
+            fb.finish_with_outputs([]).unwrap()
+        }
+        .node();
+        let backup = dfb.finish_hugr().unwrap();
+
+        let mut lower_discard_to_call = ReplaceTypes::default();
+        // The `copy_fn` here will break completely, but we don't use it
+        lower_discard_to_call
+            .linearizer()
+            .register_simple(
+                lin_ct.clone(),
+                NodeTemplate::Call(backup.root(), vec![]),
+                NodeTemplate::Call(discard_fn, vec![]),
+            )
+            .unwrap();
+
+        // Ok to lower usize_t to lin_t and call that function
+        {
+            let mut lowerer = lower_discard_to_call.clone();
+            lowerer.replace_type(usize_t().as_extension().unwrap().clone(), lin_t.clone());
+            let mut h = backup.clone();
+            lowerer.run(&mut h).unwrap();
+            assert_eq!(h.output_neighbours(discard_fn).count(), 1);
+        }
+
+        // But if we lower usize_t to array<lin_t>, the call will fail
+        lower_discard_to_call.replace_type(
+            usize_t().as_extension().unwrap().clone(),
+            array_type(4, lin_ct.into()),
+        );
+        let r = lower_discard_to_call.run(&mut backup.clone());
+        assert!(matches!(
+            r,
+            Err(ReplaceTypesError::LinearizeError(
+                LinearizeError::NestedTemplateError(
+                    nested_t,
+                    BuildError::UnexpectedType { node, .. }
+                )
+            )) if nested_t == lin_t && node == discard_fn
+        ));
     }
 }

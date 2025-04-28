@@ -485,7 +485,7 @@ pub trait RootTagged: HugrView {
     ///
     /// The handle is guaranteed to be able to contain the operation returned by
     /// [`HugrView::root_type`].
-    type RootHandle: NodeHandle;
+    type RootHandle: NodeHandle<Self::Node>;
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
@@ -515,7 +515,8 @@ pub trait ExtractHugr: HugrView + Sized {
     }
 }
 
-fn check_tag<Required: NodeHandle, N>(
+/// Check that the node in a HUGR can be represented by the required tag.
+fn check_tag<Required: NodeHandle<N>, N>(
     hugr: &impl HugrView<Node = N>,
     node: N,
 ) -> Result<(), HugrError> {
@@ -525,18 +526,6 @@ fn check_tag<Required: NodeHandle, N>(
         return Err(HugrError::InvalidTag { required, actual });
     }
     Ok(())
-}
-
-impl RootTagged for Hugr {
-    type RootHandle = Node;
-}
-
-impl RootTagged for &Hugr {
-    type RootHandle = Node;
-}
-
-impl RootTagged for &mut Hugr {
-    type RootHandle = Node;
 }
 
 // Explicit implementation to avoid cloning the Hugr.

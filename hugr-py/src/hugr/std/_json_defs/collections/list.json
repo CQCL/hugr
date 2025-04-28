@@ -21,7 +21,6 @@
       }
     }
   },
-  "values": {},
   "operations": {
     "get": {
       "extension": "collections.list",
