@@ -38,7 +38,7 @@ pub trait HugrInternals {
         parent: Self::Node,
     ) -> portgraph::view::FlatRegion<'_, Self::Portgraph<'_>> {
         let pg = self.portgraph();
-        let root = self.get_pg_index(parent);
+        let root = self.to_portgraph_node(parent);
         portgraph::view::FlatRegion::new_without_root(pg, self.hierarchy(), root)
     }
 
@@ -47,10 +47,11 @@ pub trait HugrInternals {
     fn hierarchy(&self) -> &portgraph::Hierarchy;
 
     /// Convert a node to a portgraph node index.
-    fn get_pg_index(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex;
+    fn to_portgraph_node(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex;
 
     /// Convert a portgraph node index to a node.
-    fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
+    #[allow(clippy::wrong_self_convention)]
+    fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
 
     /// Returns a metadata entry associated with a node.
     ///
@@ -92,12 +93,12 @@ impl HugrInternals for Hugr {
     }
 
     #[inline]
-    fn get_pg_index(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
+    fn to_portgraph_node(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
         node.node().pg_index()
     }
 
     #[inline]
-    fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node {
+    fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node {
         index.into()
     }
 
@@ -335,7 +336,7 @@ impl HugrMutInternals for Hugr {
 
     fn optype_mut(&mut self, node: Self::Node) -> &mut OpType {
         panic_invalid_node(self, node);
-        let node = self.get_pg_index(node);
+        let node = self.to_portgraph_node(node);
         self.op_types.get_mut(node)
     }
 

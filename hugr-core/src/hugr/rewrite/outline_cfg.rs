@@ -190,11 +190,11 @@ impl Rewrite for OutlineCfg {
             // https://github.com/CQCL/hugr/issues/2029
             let hierarchy = h.hierarchy();
             let inner_exit = hierarchy
-                .children(h.get_pg_index(cfg_node))
+                .children(h.to_portgraph_node(cfg_node))
                 .exactly_one()
                 .ok()
                 .unwrap();
-            let inner_exit = h.get_node(inner_exit);
+            let inner_exit = h.from_portgraph_node(inner_exit);
             //let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
 
             // Entry node must be first

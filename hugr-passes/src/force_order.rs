@@ -55,15 +55,15 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
         let ordered_nodes = {
-            let rank = |n| rank(hugr, hugr.get_node(n));
+            let rank = |n| rank(hugr, hugr.from_portgraph_node(n));
             let sg = hugr.region_portgraph(dp);
             let petgraph = NodeFiltered::from_fn(&sg, |x| {
-                let x = hugr.get_node(x);
+                let x = hugr.from_portgraph_node(x);
                 x != dp && x != i && x != o
             });
             ForceOrder::new(&petgraph, &rank)
                 .iter(&petgraph)
-                .map(|x| hugr.get_node(x))
+                .map(|x| hugr.from_portgraph_node(x))
                 .filter(|&x| {
                     let expected_edge = Some(EdgeKind::StateOrder);
                     let optype = hugr.get_optype(x);

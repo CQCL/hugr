@@ -57,7 +57,9 @@ macro_rules! impl_base_members {
 
         #[inline]
         fn node_count(&self) -> usize {
-            self.hierarchy().child_count(self.get_pg_index(self.root)) + 1
+            self.hierarchy()
+                .child_count(self.to_portgraph_node(self.root))
+                + 1
         }
 
         #[inline]
@@ -73,8 +75,8 @@ macro_rules! impl_base_members {
             // Faster implementation than filtering all the nodes in the internal graph.
             let children = self
                 .hierarchy()
-                .children(self.get_pg_index(self.root))
-                .map(|n| self.get_node(n));
+                .children(self.to_portgraph_node(self.root))
+                .map(|n| self.from_portgraph_node(n));
             iter::once(self.root).chain(children)
         }
 
@@ -84,10 +86,10 @@ macro_rules! impl_base_members {
         ) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
             // Same as SiblingGraph
             let children = match node == self.root {
-                true => self.hierarchy().children(self.get_pg_index(node)),
+                true => self.hierarchy().children(self.to_portgraph_node(node)),
                 false => portgraph::hierarchy::Children::default(),
             };
-            children.map(|n| self.get_node(n))
+            children.map(|n| self.from_portgraph_node(n))
         }
 
         fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType {
@@ -105,20 +107,20 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
 
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.graph.contains_node(self.get_pg_index(node))
+        self.graph.contains_node(self.to_portgraph_node(node))
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
         self.graph
-            .port_offsets(self.get_pg_index(node), dir)
+            .port_offsets(self.to_portgraph_node(node), dir)
             .map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
         self.graph
-            .all_port_offsets(self.get_pg_index(node))
+            .all_port_offsets(self.to_portgraph_node(node))
             .map_into()
     }
 
@@ -129,38 +131,38 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
     ) -> impl Iterator<Item = (Node, Port)> + Clone {
         let port = self
             .graph
-            .port_index(self.get_pg_index(node), port.into().pg_offset())
+            .port_index(self.to_portgraph_node(node), port.into().pg_offset())
             .unwrap();
         self.graph.port_links(port).map(|(_, link)| {
             let node = self.graph.port_node(link).unwrap();
             let offset = self.graph.port_offset(link).unwrap();
-            (self.get_node(node), offset.into())
+            (self.from_portgraph_node(node), offset.into())
         })
     }
 
     fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
         self.graph
-            .get_connections(self.get_pg_index(node), self.get_pg_index(other))
+            .get_connections(self.to_portgraph_node(node), self.to_portgraph_node(other))
             .map(|(p1, p2)| [p1, p2].map(|link| self.graph.port_offset(link).unwrap().into()))
     }
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(self.get_pg_index(node), dir)
+        self.graph.num_ports(self.to_portgraph_node(node), dir)
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
         self.graph
-            .neighbours(self.get_pg_index(node), dir)
-            .map(|n| self.get_node(n))
+            .neighbours(self.to_portgraph_node(node), dir)
+            .map(|n| self.from_portgraph_node(n))
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.graph
-            .all_neighbours(self.get_pg_index(node))
-            .map(|n| self.get_node(n))
+            .all_neighbours(self.to_portgraph_node(node))
+            .map(|n| self.from_portgraph_node(n))
     }
 }
 
@@ -173,7 +175,7 @@ impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
             graph: FlatRegionGraph::new_with_root(
                 &hugr.graph,
                 &hugr.hierarchy,
-                hugr.get_pg_index(root),
+                hugr.to_portgraph_node(root),
             ),
             hugr,
             _phantom: std::marker::PhantomData,
@@ -224,13 +226,13 @@ where
     }
 
     #[inline]
-    fn get_pg_index(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
-        self.hugr.get_pg_index(node)
+    fn to_portgraph_node(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
+        self.hugr.to_portgraph_node(node)
     }
 
     #[inline]
-    fn get_node(&self, index: portgraph::NodeIndex) -> Node {
-        self.hugr.get_node(index)
+    fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Node {
+        self.hugr.from_portgraph_node(index)
     }
 
     #[inline]
@@ -290,7 +292,7 @@ impl<'g, H: HugrMut, Root: NodeHandle<H::Node>> HugrInternals for SiblingMut<'g,
             #[allow(deprecated)]
             &self.base_hugr().graph,
             self.hierarchy(),
-            self.get_pg_index(self.root),
+            self.to_portgraph_node(self.root),
         )
     }
 
@@ -300,13 +302,13 @@ impl<'g, H: HugrMut, Root: NodeHandle<H::Node>> HugrInternals for SiblingMut<'g,
     }
 
     #[inline]
-    fn get_pg_index(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
-        self.hugr.get_pg_index(node)
+    fn to_portgraph_node(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
+        self.hugr.to_portgraph_node(node)
     }
 
     #[inline]
-    fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node {
-        self.hugr.get_node(index)
+    fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node {
+        self.hugr.from_portgraph_node(index)
     }
 
     #[inline]

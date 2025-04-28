@@ -57,8 +57,8 @@ pub trait HugrView: HugrInternals {
             return None;
         };
         self.hierarchy()
-            .parent(self.get_pg_index(node))
-            .map(|index| self.get_node(index))
+            .parent(self.to_portgraph_node(node))
+            .map(|index| self.from_portgraph_node(index))
     }
 
     /// Returns the metadata associated with a node.
@@ -240,7 +240,8 @@ pub trait HugrView: HugrInternals {
     /// Number of ports in node for a given direction.
     #[inline]
     fn num_ports(&self, node: Self::Node, dir: Direction) -> usize {
-        self.portgraph().num_ports(self.get_pg_index(node), dir)
+        self.portgraph()
+            .num_ports(self.to_portgraph_node(node), dir)
     }
 
     /// Number of inputs to a node.
@@ -261,8 +262,8 @@ pub trait HugrView: HugrInternals {
     #[inline]
     fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
         self.hierarchy()
-            .children(self.get_pg_index(node))
-            .map(|n| self.get_node(n))
+            .children(self.to_portgraph_node(node))
+            .map(|n| self.from_portgraph_node(n))
     }
 
     /// Returns an iterator over all the descendants of a node,
@@ -272,8 +273,8 @@ pub trait HugrView: HugrInternals {
     #[inline]
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
         self.hierarchy()
-            .descendants(self.get_pg_index(node))
-            .map(|n| self.get_node(n))
+            .descendants(self.to_portgraph_node(node))
+            .map(|n| self.from_portgraph_node(n))
     }
 
     /// Returns the first child of the specified node (if it is a parent).
@@ -531,7 +532,7 @@ impl HugrView for Hugr {
         // e.g. a parent outside a region view. We should be able to re-enable
         // this once we add hugr entrypoints.
         //panic_invalid_node(self, node);
-        self.op_types.get(self.get_pg_index(node))
+        self.op_types.get(self.to_portgraph_node(node))
     }
 
     #[inline]

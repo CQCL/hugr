@@ -373,8 +373,12 @@ impl HugrMut for Hugr {
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(|n| other.get_node(n), |n| self.get_node(n), node_map)
-                .collect(),
+            node_map: translate_indices(
+                |n| other.from_portgraph_node(n),
+                |n| self.from_portgraph_node(n),
+                node_map,
+            )
+            .collect(),
         }
     }
 
@@ -388,7 +392,7 @@ impl HugrMut for Hugr {
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
-            let node = other.get_node(node);
+            let node = other.from_portgraph_node(node);
             let nodetype = other.get_optype(node);
             self.op_types.set(new_node, nodetype.clone());
             let meta = other.node_metadata_map(node);
@@ -398,12 +402,16 @@ impl HugrMut for Hugr {
         }
         debug_assert_eq!(
             Some(&new_root.pg_index()),
-            node_map.get(&other.get_pg_index(other.root()))
+            node_map.get(&other.to_portgraph_node(other.root()))
         );
         InsertionResult {
             new_root,
-            node_map: translate_indices(|n| other.get_node(n), |n| self.get_node(n), node_map)
-                .collect(),
+            node_map: translate_indices(
+                |n| other.from_portgraph_node(n),
+                |n| self.from_portgraph_node(n),
+                node_map,
+            )
+            .collect(),
         }
     }
 
@@ -417,7 +425,7 @@ impl HugrMut for Hugr {
         let context: HashSet<portgraph::NodeIndex> = subgraph
             .nodes()
             .iter()
-            .map(|&n| other.get_pg_index(n))
+            .map(|&n| other.to_portgraph_node(n))
             .collect();
         let portgraph: NodeFiltered<_, NodeFilter<HashSet<portgraph::NodeIndex>>, _> =
             NodeFiltered::new_node_filtered(
@@ -428,7 +436,7 @@ impl HugrMut for Hugr {
         let node_map = insert_subgraph_internal(self, root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let node = other.get_node(node);
+            let node = other.from_portgraph_node(node);
             let nodetype = other.get_optype(node);
             self.op_types.set(new_node, nodetype.clone());
             let meta = other.node_metadata_map(node);
@@ -440,7 +448,12 @@ impl HugrMut for Hugr {
                 self.use_extensions(exts);
             }
         }
-        translate_indices(|n| other.get_node(n), |n| self.get_node(n), node_map).collect()
+        translate_indices(
+            |n| other.from_portgraph_node(n),
+            |n| self.from_portgraph_node(n),
+            node_map,
+        )
+        .collect()
     }
 
     fn copy_descendants(
@@ -456,8 +469,12 @@ impl HugrMut for Hugr {
         let node_map = portgraph::view::Subgraph::with_nodes(&mut self.graph, nodes)
             .copy_in_parent()
             .expect("Is a MultiPortGraph");
-        let node_map = translate_indices(|n| self.get_node(n), |n| self.get_node(n), node_map)
-            .collect::<BTreeMap<_, _>>();
+        let node_map = translate_indices(
+            |n| self.from_portgraph_node(n),
+            |n| self.from_portgraph_node(n),
+            node_map,
+        )
+        .collect::<BTreeMap<_, _>>();
 
         for node in self.children(root).collect::<Vec<_>>() {
             self.set_parent(*node_map.get(&node).unwrap(), new_parent);
@@ -497,18 +514,20 @@ fn insert_hugr_internal<H: HugrView>(
         .graph
         .insert_graph(&other.portgraph())
         .unwrap_or_else(|e| panic!("Internal error while inserting a hugr into another: {e}"));
-    let other_root = node_map[&other.get_pg_index(other.root())];
+    let other_root = node_map[&other.to_portgraph_node(other.root())];
 
     // Update hierarchy and optypes
     hugr.hierarchy
         .push_child(other_root, root.pg_index())
         .expect("Inserting a newly-created node into the hierarchy should never fail.");
     for (&node, &new_node) in node_map.iter() {
-        other.children(other.get_node(node)).for_each(|child| {
-            hugr.hierarchy
-                .push_child(node_map[&other.get_pg_index(child)], new_node)
-                .expect("Inserting a newly-created node into the hierarchy should never fail.");
-        });
+        other
+            .children(other.from_portgraph_node(node))
+            .for_each(|child| {
+                hugr.hierarchy
+                    .push_child(node_map[&other.to_portgraph_node(child)], new_node)
+                    .expect("Inserting a newly-created node into the hierarchy should never fail.");
+            });
     }
 
     // Merge the extension sets.
@@ -544,8 +563,8 @@ fn insert_subgraph_internal<N: HugrNode>(
     // update the hierarchy with their new id.
     for (&node, &new_node) in node_map.iter() {
         let new_parent = other
-            .get_parent(other.get_node(node))
-            .and_then(|parent| node_map.get(&other.get_pg_index(parent)).copied())
+            .get_parent(other.from_portgraph_node(node))
+            .and_then(|parent| node_map.get(&other.to_portgraph_node(parent)).copied())
             .unwrap_or(root.pg_index());
         hugr.hierarchy
             .push_child(new_node, new_parent)

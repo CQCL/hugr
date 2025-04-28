@@ -73,7 +73,7 @@ where
         let region_graph = node.hugr().region_portgraph(node.node());
         let topo = Topo::new(&region_graph);
         for n in topo.iter(&region_graph) {
-            let node = node.hugr().fat_optype(node.hugr().get_node(n));
+            let node = node.hugr().fat_optype(node.hugr().from_portgraph_node(n));
             let inputs_rmb = context.node_ins_rmb(node)?;
             let inputs = inputs_rmb.read(context.builder(), [])?;
             let outputs = context.node_outs_rmb(node)?.promise();

@@ -13,8 +13,8 @@ macro_rules! hugr_internal_methods {
             to ({let $arg=self; $e}) {
                 fn portgraph(&self) -> Self::Portgraph<'_>;
                 fn hierarchy(&self) -> &portgraph::Hierarchy;
-                fn get_pg_index(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
-                fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
+                fn to_portgraph_node(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
+                fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
                 fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap;
                 #[allow(deprecated)]
                 fn base_hugr(&self) -> &crate::Hugr;
