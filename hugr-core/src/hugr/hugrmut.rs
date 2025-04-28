@@ -156,14 +156,14 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph, or if the port is invalid.
     fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
-    /// Insert another hugr into this one, under a given root node.
+    /// Insert another hugr into this one, under a given parent node.
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node>;
 
-    /// Copy another hugr into this one, under a given root node.
+    /// Copy another hugr into this one, under a given parent node.
     ///
     /// # Panics
     ///
@@ -174,7 +174,7 @@ pub trait HugrMut: HugrMutInternals {
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node>;
 
-    /// Copy a subgraph from another hugr into this one, under a given root node.
+    /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///
     /// Sibling order is not preserved.
     ///

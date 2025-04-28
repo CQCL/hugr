@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     branches:
-      - '**'
+      - "**"
   merge_group:
     types: [checks_requested]
   workflow_dispatch: {}
@@ -25,7 +25,6 @@ env:
   LLVM_VERSION: "14.0"
   LLVM_FEATURE_NAME: "14-0"
 
-
 jobs:
   # Check if changes were made to the relevant files.
   # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
@@ -43,25 +42,25 @@ jobs:
       model: ${{ steps.filter.outputs.model == 'true' || steps.override.outputs.out == 'true' }}
       llvm: ${{ steps.filter.outputs.llvm == 'true' || steps.override.outputs.out == 'true' }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Override label
-      id: override
-      run: |
-        echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
-        if [ "$OVERRIDE_LABEL" == "true" ]; then
-          echo "Overriding due to label 'run-ci-checks'"
-          echo "out=true" >> $GITHUB_OUTPUT
-        elif [ "$DEFAULT_BRANCH" == "true" ]; then
-          echo "Overriding due to running on the default branch"
-          echo "out=true" >> $GITHUB_OUTPUT
-        fi
-      env:
-        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
-        DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: .github/change-filters.yml
+      - uses: actions/checkout@v4
+      - name: Override label
+        id: override
+        run: |
+          echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
+          if [ "$OVERRIDE_LABEL" == "true" ]; then
+            echo "Overriding due to label 'run-ci-checks'"
+            echo "out=true" >> $GITHUB_OUTPUT
+          elif [ "$DEFAULT_BRANCH" == "true" ]; then
+            echo "Overriding due to running on the default branch"
+            echo "out=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
+          DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: .github/change-filters.yml
 
   check:
     needs: changes
@@ -109,7 +108,7 @@ jobs:
       - name: Override criterion with the CodSpeed harness
         run: cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
       - name: Build benchmarks
-        run: cargo codspeed build --profile bench --features extension_inference,declarative,model_unstable,llvm,llvm-test
+        run: cargo codspeed build --profile bench --features extension_inference,declarative,llvm,llvm-test
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
         with:

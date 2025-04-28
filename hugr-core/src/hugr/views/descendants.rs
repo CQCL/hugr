@@ -8,7 +8,7 @@ use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView, RootTagged};
+use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -131,16 +131,13 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
             .map(|index| self.get_node(index))
     }
 }
-impl<Root: NodeHandle> RootTagged for DescendantsGraph<'_, Root> {
-    type RootHandle = Root;
-}
 
 impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
 where
     Root: NodeHandle,
 {
     fn try_new(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Result<Self, HugrError> {
-        check_tag::<Root, Node>(hugr, root)?;
+        check_tag::<Root, _>(hugr, root)?;
         let hugr = hugr.base_hugr();
         Ok(Self {
             root,

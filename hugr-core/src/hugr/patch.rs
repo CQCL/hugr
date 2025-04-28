@@ -158,8 +158,7 @@ impl<R: PatchHugrMut> PatchHugrMut for Transactional<R> {
         let r = self.underlying.apply_hugr_mut(h);
         if r.is_err() {
             // Try to restore backup.
-            h.replace_op(h.root(), backup.root_type().clone())
-                .expect("The root replacement should always match the old root type");
+            h.replace_op(h.root(), backup.root_type().clone());
             while let Some(child) = h.first_child(h.root()) {
                 h.remove_node(child);
             }

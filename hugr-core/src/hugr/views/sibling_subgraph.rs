@@ -22,12 +22,14 @@ use thiserror::Error;
 use crate::builder::{Container, FunctionBuilder};
 use crate::core::HugrNode;
 use crate::extension::ExtensionSet;
-use crate::hugr::{HugrMut, HugrView, RootTagged};
+use crate::hugr::{HugrMut, HugrView};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
 use crate::types::{Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
+
+use super::root_checked::RootCheckable;
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
@@ -95,11 +97,18 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ///
     /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
     /// subgraph is empty.
-    pub fn try_new_dataflow_subgraph<H, Root>(dfg_graph: &H) -> Result<Self, InvalidSubgraph<N>>
+    pub fn try_new_dataflow_subgraph<'h, H, Root>(
+        dfg_graph: impl RootCheckable<&'h H, Root>,
+    ) -> Result<Self, InvalidSubgraph<N>>
     where
-        H: Clone + RootTagged<RootHandle = Root, Node = N>,
-        Root: ContainerHandle<ChildrenHandle = DataflowOpID>,
+        H: 'h + Clone + HugrView<Node = N>,
+        Root: ContainerHandle<N, ChildrenHandle = DataflowOpID>,
     {
+        let Ok(dfg_graph) = dfg_graph.try_into_checked() else {
+            return Err(InvalidSubgraph::NonDataflowRegion);
+        };
+        let dfg_graph = dfg_graph.into_hugr();
+
         let parent = dfg_graph.root();
         let nodes = dfg_graph.children(parent).skip(2).collect_vec();
         let (inputs, outputs) = get_input_output_ports(dfg_graph);
@@ -798,6 +807,9 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
     /// An invalid boundary port was found.
     #[error("Invalid boundary port.")]
     InvalidBoundary(#[from] InvalidSubgraphBoundary<N>),
+    /// The hugr region is not a dataflow graph.
+    #[error("SiblingSubgraphs may only be defined on dataflow regions.")]
+    NonDataflowRegion,
 }
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
@@ -985,7 +997,7 @@ mod tests {
     fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
         let (mut hugr, func_root) = build_hugr().unwrap();
         let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
+        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)?;
 
         let empty_dfg = {
             let builder =
@@ -1009,7 +1021,7 @@ mod tests {
     fn test_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
         let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, dfg).unwrap();
-        let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
+        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)?;
         assert_eq!(
             sub.signature(&func),
             Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).with_extension_delta(
@@ -1046,7 +1058,7 @@ mod tests {
         let (hugr, func_root) = build_hugr().unwrap();
         let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         assert_eq!(
-            SiblingSubgraph::try_new_dataflow_subgraph(&func)
+            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)
                 .unwrap()
                 .nodes()
                 .len(),
@@ -1162,7 +1174,8 @@ mod tests {
         let (hugr, func_root) = build_hugr_classical().unwrap();
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let func = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
+        let func =
+            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func_graph).unwrap();
         let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
         assert_eq!(func_defn.signature, func.signature(&func_graph).into());
     }
@@ -1172,7 +1185,8 @@ mod tests {
         let (hugr, func_root) = build_hugr().unwrap();
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
+        let subgraph =
+            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func_graph).unwrap();
         let extracted = subgraph.extract_subgraph(&hugr, "region");
 
         extracted.validate().unwrap();
@@ -1197,7 +1211,7 @@ mod tests {
         let outw = [outw1].into_iter().chain(outw2);
         let h = builder.finish_hugr_with_outputs(outw).unwrap();
         let view = SiblingGraph::<DfgID>::try_new(&h, h.root()).unwrap();
-        let subg = SiblingSubgraph::try_new_dataflow_subgraph(&view).unwrap();
+        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DfgID>(&view).unwrap();
         assert_eq!(subg.nodes().len(), 2);
     }
 

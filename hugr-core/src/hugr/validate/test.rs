@@ -191,26 +191,23 @@ fn df_children_restrictions() {
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, Noop(usize_t())).unwrap();
+    b.replace_op(output, Noop(usize_t()));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
     );
 
     // Revert it back to an output, but with the wrong number of ports
-    b.replace_op(output, ops::Output::new(vec![bool_t()]))
-        .unwrap();
+    b.replace_op(output, ops::Output::new(vec![bool_t()]));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
             => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
     );
-    b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]))
-        .unwrap();
+    b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]));
 
     // After fixing the output back, replace the copy with an output op
-    b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]))
-        .unwrap();
+    b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
@@ -806,8 +803,7 @@ fn cfg_children_restrictions() {
         ops::CFG {
             signature: Signature::new(vec![bool_t()], vec![bool_t()]),
         },
-    )
-    .unwrap();
+    );
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { .. })
@@ -869,8 +865,7 @@ fn cfg_children_restrictions() {
         ops::CFG {
             signature: Signature::new(vec![qb_t()], vec![bool_t()]),
         },
-    )
-    .unwrap();
+    );
     b.replace_op(
         block,
         ops::DataflowBlock {
@@ -879,18 +874,15 @@ fn cfg_children_restrictions() {
             other_outputs: vec![qb_t()].into(),
             extension_delta: ExtensionSet::new(),
         },
-    )
-    .unwrap();
+    );
     let mut block_children = b.hierarchy.children(block.pg_index());
     let block_input = block_children.next().unwrap().into();
     let block_output = block_children.next_back().unwrap().into();
-    b.replace_op(block_input, ops::Input::new(vec![qb_t()]))
-        .unwrap();
+    b.replace_op(block_input, ops::Input::new(vec![qb_t()]));
     b.replace_op(
         block_output,
         ops::Output::new(vec![Type::new_unit_sum(1), qb_t()]),
-    )
-    .unwrap();
+    );
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
