@@ -12,7 +12,7 @@ use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node};
 
 use super::hugrmut::{panic_invalid_node, panic_invalid_non_root};
-use super::{HugrError, NodeMetadataMap, OpType, RootTagged};
+use super::{HugrView, NodeMetadataMap, OpType};
 
 /// Trait for accessing the internals of a Hugr(View).
 ///
@@ -107,7 +107,7 @@ impl HugrInternals for Hugr {
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
 /// invalidate the HUGR.
-pub trait HugrMutInternals: RootTagged {
+pub trait HugrMutInternals: HugrView {
     /// Set root node of the HUGR.
     ///
     /// This should be an existing node in the HUGR. Most operations use the
@@ -189,18 +189,10 @@ pub trait HugrMutInternals: RootTagged {
     ///
     /// Returns the old OpType.
     ///
-    /// If the module root is set to a non-module operation the hugr will
-    /// become invalid.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`HugrError::InvalidTag`] if this would break the bound
-    /// (`Self::RootHandle`) on the root node's OpTag.
-    ///
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn replace_op(&mut self, node: Self::Node, op: impl Into<OpType>) -> Result<OpType, HugrError>;
+    fn replace_op(&mut self, node: Self::Node, op: impl Into<OpType>) -> OpType;
 
     /// Gets a mutable reference to the optype.
     ///
@@ -223,9 +215,10 @@ pub trait HugrMutInternals: RootTagged {
     /// If the node is not in the graph.
     fn node_metadata_map_mut(&mut self, node: Self::Node) -> &mut NodeMetadataMap;
 
-    /// Returns a mutable reference to the extension registry for this hugr,
-    /// containing all extensions required to define the operations and types in
-    /// the hugr.
+    /// Returns a mutable reference to the extension registry for this HUGR.
+    ///
+    /// This set contains all extensions required to define the operations and
+    /// types in the HUGR.
     fn extensions_mut(&mut self) -> &mut ExtensionRegistry;
 }
 
@@ -326,10 +319,9 @@ impl HugrMutInternals for Hugr {
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
     }
 
-    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
+    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
         panic_invalid_node(self, node);
-        // We know RootHandle=Node here so no need to check
-        Ok(std::mem::replace(self.optype_mut(node), op.into()))
+        std::mem::replace(self.optype_mut(node), op.into())
     }
 
     fn optype_mut(&mut self, node: Self::Node) -> &mut OpType {

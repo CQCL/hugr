@@ -46,8 +46,8 @@ use thiserror::Error;
 
 use hugr_core::hugr::rewrite::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::sibling::SiblingMut;
-use hugr_core::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use hugr_core::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
+use hugr_core::hugr::views::{HierarchyView, HugrView, RootCheckable, SiblingGraph};
+use hugr_core::hugr::{hugrmut::HugrMut, Rewrite};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
@@ -219,9 +219,12 @@ pub struct IdentityCfgMap<H: HugrView> {
     entry: H::Node,
     exit: H::Node,
 }
-impl<H: RootTagged<RootHandle = CfgID>> IdentityCfgMap<H> {
+impl<H: HugrView> IdentityCfgMap<H> {
     /// Creates an [IdentityCfgMap] for the specified CFG
-    pub fn new(h: H) -> Self {
+    pub fn new(h: impl RootCheckable<H, CfgID<H::Node>>) -> Self {
+        let h = h.try_into_checked().expect("Hugr must be a CFG region");
+        let h = h.into_hugr();
+
         // Panic if malformed enough not to have two children
         let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
@@ -636,7 +639,7 @@ pub(crate) mod test {
         let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.borrow()));
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.as_ref()));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -734,7 +737,7 @@ pub(crate) mod test {
 
         // There's no need to use a view of a region here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's)
-        let v = IdentityCfgMap::new(SiblingGraph::try_new(&h, h.root()).unwrap());
+        let v = IdentityCfgMap::new(SiblingGraph::<Node>::try_new(&h, h.root()).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes

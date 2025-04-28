@@ -1,20 +1,28 @@
-use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use crate::hugr::internal::{HugrInternals, HugrMutInternals};
-use crate::hugr::{HugrError, HugrMut};
+use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
-use crate::ops::OpTrait;
+use crate::ops::{OpTag, OpTrait};
 use crate::{Hugr, Node};
 
-use super::{check_tag, HugrView, RootTagged};
+use super::HugrView;
 
-/// A view of the whole Hugr.
-/// (Just provides static checking of the type of the root node)
+/// A wrapper over a Hugr that ensures the root node optype is of the required
+/// [`OpTag`].
 #[derive(Clone)]
-pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
+pub struct RootChecked<H, Handle = Node>(H, PhantomData<Handle>);
 
-impl<H: RootTagged, Root: NodeHandle<H::Node>> RootChecked<H, Root> {
+impl<H: HugrView, Handle: NodeHandle<H::Node>> RootChecked<H, Handle> {
+    /// A tag that can contain the operation of the hugr root node.
+    const TAG: OpTag = Handle::TAG;
+
+    /// Returns the most specific tag that can be applied to the root node.
+    pub fn tag(&self) -> OpTag {
+        let tag = self.0.get_optype(self.0.root()).tag();
+        debug_assert!(Self::TAG.is_superset(tag));
+        tag
+    }
+
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
@@ -22,101 +30,80 @@ impl<H: RootTagged, Root: NodeHandle<H::Node>> RootChecked<H, Root> {
     ///
     /// [`OpTag`]: crate::ops::OpTag
     pub fn try_new(hugr: H) -> Result<Self, HugrError> {
-        if !H::RootHandle::TAG.is_superset(Root::TAG) {
-            return Err(HugrError::InvalidTag {
-                required: H::RootHandle::TAG,
-                actual: Root::TAG,
-            });
-        }
-        check_tag::<Root, _>(&hugr, hugr.root())?;
+        Self::check(&hugr)?;
         Ok(Self(hugr, PhantomData))
     }
-}
 
-impl<Root> RootChecked<Hugr, Root> {
-    /// Extracts the underlying (owned) Hugr
-    pub fn into_hugr(self) -> Hugr {
+    /// Check if a Hugr is valid for the given [`OpTag`].
+    ///
+    /// To check arbitrary nodes, use [`check_tag`].
+    pub fn check(hugr: &H) -> Result<(), HugrError> {
+        check_tag::<Handle, _>(hugr, hugr.root())?;
+        Ok(())
+    }
+
+    /// Returns a reference to the underlying Hugr.
+    pub fn hugr(&self) -> &H {
+        &self.0
+    }
+
+    /// Extracts the underlying Hugr
+    pub fn into_hugr(self) -> H {
         self.0
     }
-}
 
-impl<Root> RootChecked<&mut Hugr, Root> {
-    /// Allows immutably borrowing the underlying mutable reference
-    pub fn borrow(&self) -> RootChecked<&Hugr, Root> {
-        RootChecked(&*self.0, PhantomData)
+    /// Returns a wrapper over a reference to the underlying Hugr.
+    pub fn as_ref(&self) -> RootChecked<&H, Handle> {
+        RootChecked(&self.0, PhantomData)
     }
 }
 
-impl<H: HugrInternals, Root> HugrInternals for RootChecked<H, Root> {
-    type Portgraph<'p>
-        = H::Portgraph<'p>
-    where
-        Self: 'p;
-    type Node = H::Node;
-
-    super::impls::hugr_internal_methods! {this, &this.0}
-}
-
-impl<H: HugrView, Root> HugrView for RootChecked<H, Root> {
-    super::impls::hugr_view_methods! {this, &this.0}
-}
-
-impl<H: HugrView, Root: NodeHandle<H::Node>> RootTagged for RootChecked<H, Root> {
-    type RootHandle = Root;
-}
-
-impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
+impl<H: AsRef<Hugr>, Handle> AsRef<Hugr> for RootChecked<H, Handle> {
     fn as_ref(&self) -> &Hugr {
         self.0.as_ref()
     }
 }
 
-impl<H: HugrMutInternals, Root: NodeHandle<H::Node>> HugrMutInternals for RootChecked<H, Root> {
-    fn replace_op(
-        &mut self,
-        node: Self::Node,
-        op: impl Into<crate::ops::OpType>,
-    ) -> Result<crate::ops::OpType, crate::hugr::HugrError> {
-        let op = op.into();
-        if node == self.root() && !Root::TAG.is_superset(op.tag()) {
-            return Err(HugrError::InvalidTag {
-                required: Root::TAG,
-                actual: op.tag(),
-            });
-        }
-        self.0.replace_op(node, op)
+/// A trait for types that can be checked for a specific [`OpTag`] at their root node.
+///
+/// This is used mainly specifying function inputs that may either be a [`HugrView`] or an already checked [`RootChecked`].
+pub trait RootCheckable<H: HugrView, Handle: NodeHandle<H::Node>>: Sized {
+    /// Wrap the Hugr in a [`RootChecked`] if it is valid for the required [`OpTag`].
+    ///
+    /// If `Self` is already a [`RootChecked`], it is a no-op.
+    fn try_into_checked(self) -> Result<RootChecked<H, Handle>, HugrError>;
+}
+impl<H: HugrView, Handle: NodeHandle<H::Node>> RootCheckable<H, Handle> for H {
+    fn try_into_checked(self) -> Result<RootChecked<H, Handle>, HugrError> {
+        RootChecked::try_new(self)
     }
-
-    delegate::delegate! {
-        to (&mut self.0) {
-            fn set_root(&mut self, root: Self::Node);
-            fn set_num_ports(&mut self, node: Self::Node, incoming: usize, outgoing: usize);
-            fn add_ports(&mut self, node: Self::Node, direction: crate::Direction, amount: isize) -> std::ops::Range<usize>;
-            fn insert_ports(&mut self, node: Self::Node, direction: crate::Direction, index: usize, amount: usize) -> std::ops::Range<usize>;
-            fn set_parent(&mut self, node: Self::Node, parent: Self::Node);
-            fn move_after_sibling(&mut self, node: Self::Node, after: Self::Node);
-            fn move_before_sibling(&mut self, node: Self::Node, before: Self::Node);
-            fn optype_mut(&mut self, node: Self::Node) -> &mut crate::ops::OpType;
-            fn node_metadata_map_mut(&mut self, node: Self::Node) -> &mut crate::hugr::NodeMetadataMap;
-            fn extensions_mut(&mut self) -> &mut crate::extension::ExtensionRegistry;
-        }
+}
+impl<H: HugrView, Handle: NodeHandle<H::Node>> RootCheckable<H, Handle> for RootChecked<H, Handle> {
+    fn try_into_checked(self) -> Result<RootChecked<H, Handle>, HugrError> {
+        Ok(self)
     }
 }
 
-impl<H: HugrMut, Root: NodeHandle<H::Node>> HugrMut for RootChecked<H, Root> {
-    super::impls::hugr_mut_methods! {this, &mut this.0}
+/// Check that the node in a HUGR can be represented by the required tag.
+pub fn check_tag<Required: NodeHandle<N>, N>(
+    hugr: &impl HugrView<Node = N>,
+    node: N,
+) -> Result<(), HugrError> {
+    let actual = hugr.get_optype(node).tag();
+    let required = Required::TAG;
+    if !required.is_superset(actual) {
+        return Err(HugrError::InvalidTag { required, actual });
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::RootChecked;
-    use crate::extension::prelude::MakeTuple;
-    use crate::extension::ExtensionSet;
-    use crate::hugr::internal::HugrMutInternals;
-    use crate::hugr::{HugrError, HugrMut};
-    use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
-    use crate::ops::{DataflowBlock, OpTag, OpType};
-    use crate::{ops, type_row, types::Signature, Hugr, HugrView};
+    use crate::hugr::HugrError;
+    use crate::ops::handle::{CfgID, DfgID};
+    use crate::ops::{OpTag, OpType};
+    use crate::{ops, types::Signature, Hugr};
 
     #[test]
     fn root_checked() {
@@ -125,7 +112,7 @@ mod test {
         }
         .into();
         let mut h = Hugr::new(root_type.clone());
-        let cfg_v = RootChecked::<&Hugr, CfgID>::try_new(&h);
+        let cfg_v = RootChecked::<_, CfgID>::check(&h);
         assert_eq!(
             cfg_v.err(),
             Some(HugrError::InvalidTag {
@@ -133,46 +120,9 @@ mod test {
                 actual: OpTag::Dfg
             })
         );
-        let mut dfg_v = RootChecked::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
-        // That is a HugrMutInternal, so we can try:
-        let root = dfg_v.root();
-        let bb: OpType = DataflowBlock {
-            inputs: type_row![],
-            other_outputs: type_row![],
-            sum_rows: vec![type_row![]],
-            extension_delta: ExtensionSet::new(),
-        }
-        .into();
-        let r = dfg_v.replace_op(root, bb.clone());
-        assert_eq!(
-            r,
-            Err(HugrError::InvalidTag {
-                required: OpTag::Dfg,
-                actual: ops::OpTag::DataflowBlock
-            })
-        );
-        // That didn't do anything:
-        assert_eq!(dfg_v.get_optype(root), &root_type);
-
-        // Make a RootChecked that allows any DataflowParent
-        // We won't be able to do this by widening the bound:
-        assert_eq!(
-            RootChecked::<_, DataflowParentID>::try_new(dfg_v).err(),
-            Some(HugrError::InvalidTag {
-                required: OpTag::Dfg,
-                actual: OpTag::DataflowParent
-            })
-        );
-
-        let mut dfp_v = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut h).unwrap();
-        let r = dfp_v.replace_op(root, bb.clone());
-        assert_eq!(r, Ok(root_type));
-        assert_eq!(dfp_v.get_optype(root), &bb);
-        // Just check we can create a nested instance (narrowing the bound)
-        let mut bb_v = RootChecked::<_, BasicBlockID>::try_new(dfp_v).unwrap();
-
-        // And it's a HugrMut:
-        let nodetype = MakeTuple(type_row![]);
-        bb_v.add_node_with_parent(bb_v.root(), nodetype);
+        // This should succeed
+        let dfg_v = RootChecked::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
+        assert!(OpTag::Dfg.is_superset(dfg_v.tag()));
+        assert_eq!(dfg_v.as_ref().tag(), dfg_v.tag());
     }
 }

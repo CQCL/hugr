@@ -16,7 +16,7 @@ use std::borrow::Cow;
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
-pub use root_checked::RootChecked;
+pub use root_checked::{check_tag, RootCheckable, RootChecked};
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
@@ -29,7 +29,6 @@ use super::{
     Hugr, HugrError, HugrMut, Node, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
 };
 use crate::extension::ExtensionRegistry;
-use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
@@ -479,17 +478,8 @@ pub trait HugrView: HugrInternals {
     }
 }
 
-/// Trait for views that provides a guaranteed bound on the type of the root node.
-pub trait RootTagged: HugrView {
-    /// The kind of handle that can be used to refer to the root node.
-    ///
-    /// The handle is guaranteed to be able to contain the operation returned by
-    /// [`HugrView::root_type`].
-    type RootHandle: NodeHandle<Self::Node>;
-}
-
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: RootTagged + Sized {
+pub trait HierarchyView<'a>: HugrView + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
     ///
     /// # Errors
@@ -513,19 +503,6 @@ pub trait ExtractHugr: HugrView + Sized {
         hugr.remove_node(old_root);
         hugr
     }
-}
-
-/// Check that the node in a HUGR can be represented by the required tag.
-fn check_tag<Required: NodeHandle<N>, N>(
-    hugr: &impl HugrView<Node = N>,
-    node: N,
-) -> Result<(), HugrError> {
-    let actual = hugr.get_optype(node).tag();
-    let required = Required::TAG;
-    if !required.is_superset(actual) {
-        return Err(HugrError::InvalidTag { required, actual });
-    }
-    Ok(())
 }
 
 // Explicit implementation to avoid cloning the Hugr.

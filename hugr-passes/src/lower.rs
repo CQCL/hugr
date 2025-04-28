@@ -1,5 +1,5 @@
 use hugr_core::{
-    hugr::{hugrmut::HugrMut, views::SiblingSubgraph, HugrError},
+    hugr::{hugrmut::HugrMut, views::SiblingSubgraph},
     ops::OpType,
     Hugr, Node,
 };
@@ -10,14 +10,10 @@ use thiserror::Error;
 /// New operations must match the signature of the old operations.
 ///
 /// Returns a list of the replaced nodes and their old operations.
-///
-/// # Errors
-///
-/// Returns a [`HugrError`] if any replacement fails.
 pub fn replace_many_ops<S: Into<OpType>>(
     hugr: &mut impl HugrMut<Node = Node>,
     mapping: impl Fn(&OpType) -> Option<S>,
-) -> Result<Vec<(Node, OpType)>, HugrError> {
+) -> Vec<(Node, OpType)> {
     let replacements = hugr
         .nodes()
         .filter_map(|node| {
@@ -28,7 +24,10 @@ pub fn replace_many_ops<S: Into<OpType>>(
 
     replacements
         .into_iter()
-        .map(|(node, new_op)| hugr.replace_op(node, new_op).map(|old_op| (node, old_op)))
+        .map(|(node, new_op)| {
+            let old_op = hugr.replace_op(node, new_op);
+            (node, old_op)
+        })
         .collect()
 }
 
@@ -117,8 +116,7 @@ mod test {
             } else {
                 None
             }
-        })
-        .unwrap();
+        });
 
         assert_eq!(replaced.len(), 1);
         let (n, op) = replaced.remove(0);

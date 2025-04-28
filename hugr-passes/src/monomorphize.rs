@@ -157,7 +157,7 @@ fn mono_scan(
         h.disconnect(ch, fn_inp); // No-op if copying+substituting
         h.connect(new_tgt, fn_out, ch, fn_inp);
 
-        h.replace_op(ch, new_op).unwrap();
+        h.replace_op(ch, new_op);
     }
 }
 
@@ -178,7 +178,7 @@ fn instantiate(
                     name: mangle_inner_func(&outer_name, &fd.name),
                     signature: fd.signature.clone(),
                 };
-                h.replace_op(n, fd).unwrap();
+                h.replace_op(n, fd);
                 h.move_after_sibling(n, poly_func);
             } else {
                 to_scan.extend(h.children(n))
