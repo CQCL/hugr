@@ -13,8 +13,7 @@ pub struct InlineDFG(pub DfgID);
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum InlineDFGError {
-    /// Node to inline was not a DFG. (E.g. node has been overwritten since the
-    /// DfgID originated.)
+    /// Node to inline was not a DFG. (E.g. node has been overwritten since the DfgID originated.)
     #[error("Node {0} was not a DFG")]
     NotDFG(Node),
     /// DFG has no parent (is the root).
@@ -69,8 +68,7 @@ impl PatchHugrMut for InlineDFG {
         }
         // DFG Inputs. Deal with Order inputs first
         for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
-            // Order edge from src_n to DFG => add order edge to each successor of Input
-            // node
+            // Order edge from src_n to DFG => add order edge to each successor of Input node
             debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
             for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
                 h.add_other_edge(src_n, tgt_n);
@@ -94,8 +92,7 @@ impl PatchHugrMut for InlineDFG {
             for (tgt_n, tgt_p) in targets {
                 h.connect(src_n, src_p, tgt_n, tgt_p);
             }
-            // Ensure order-successors of Input node execute after any node producing an
-            // input
+            // Ensure order-successors of Input node execute after any node producing an input
             for (tgt, _) in input_ord_succs.iter() {
                 h.add_other_edge(src_n, *tgt);
             }
@@ -122,8 +119,7 @@ impl PatchHugrMut for InlineDFG {
 
             for (tgt_n, tgt_p) in h.linked_inputs(n, outport).collect::<Vec<_>>() {
                 h.connect(src_n, src_p, tgt_n, tgt_p);
-                // Ensure order-predecessors of Output node execute before any node consuming a
-                // DFG output
+                // Ensure order-predecessors of Output node execute before any node consuming a DFG output
                 for (src, _) in output_ord_preds.iter() {
                     h.add_other_edge(*src, tgt_n);
                 }
@@ -324,8 +320,7 @@ mod test {
          *             \  /
          *              CX
          */
-        // Extension inference here relies on quantum ops not requiring their own
-        // test_quantum_extension
+        // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
         let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
@@ -373,8 +368,7 @@ mod test {
             order_neighbours(h_a.node(), Direction::Outgoing),
             HashSet::from([r.node(), f.node()])
         );
-        // Likewise the load_const should have Order edges from the inputs to the inner
-        // DFG, i.e. h_a and h_b
+        // Likewise the load_const should have Order edges from the inputs to the inner DFG, i.e. h_a and h_b
         assert_eq!(
             order_neighbours(f.node(), Direction::Incoming),
             HashSet::from([h_a.node(), h_b.node()])

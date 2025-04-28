@@ -160,8 +160,7 @@ impl PatchHugrMut for OutlineCfg {
             )
         };
 
-        // 3. Entry edges. Change any edges into entry_block from outside, to target
-        //    new_block
+        // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
             .linked_outputs(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
@@ -198,9 +197,9 @@ impl PatchHugrMut for OutlineCfg {
             // These operations do not fit within any CSG/SiblingMut
             // so we need to access the Hugr directly.
             //
-            // TODO: This is a temporary hack that won't be needed once Hugr Root Pointers
-            // get implemented. The commented line below are the correct ones,
-            // but they don't work yet. https://github.com/CQCL/hugr/issues/2029
+            // TODO: This is a temporary hack that won't be needed once Hugr Root Pointers get implemented.
+            // The commented line below are the correct ones, but they don't work yet.
+            // https://github.com/CQCL/hugr/issues/2029
             let hierarchy = h.hierarchy();
             let inner_exit = hierarchy
                 .children(h.get_pg_index(cfg_node))
@@ -252,8 +251,7 @@ pub enum OutlineCfgError {
     /// No block was identified as an entry block
     #[error("No block had predecessors outside the set")]
     NoEntryNode,
-    /// No block was found with an edge leaving the set (so, must be an infinite
-    /// loop)
+    /// No block was found with an edge leaving the set (so, must be an infinite loop)
     #[error("No block had a successor outside the set")]
     NoExitNode,
 }
@@ -460,8 +458,7 @@ mod test {
             .unwrap();
         fbuild.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = module_builder.finish_hugr().unwrap();
-        // `add_hugr_with_wires` does not return an InsertionResult, so recover the
-        // nodes manually:
+        // `add_hugr_with_wires` does not return an InsertionResult, so recover the nodes manually:
         let cfg = cfg.node();
         let exit_node = h.children(cfg).nth(1).unwrap();
         let tail = h.input_neighbours(exit_node).exactly_one().ok().unwrap();
