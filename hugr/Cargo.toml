@@ -26,13 +26,12 @@ default = ["zstd"]
 
 extension_inference = ["hugr-core/extension_inference"]
 declarative = ["hugr-core/declarative"]
-model_unstable = ["hugr-core/model_unstable", "hugr-model"]
 llvm = ["hugr-llvm/llvm14-0"]
 llvm-test = ["hugr-llvm/llvm14-0", "hugr-llvm/test-utils"]
 zstd = ["hugr-core/zstd"]
 
 [dependencies]
-hugr-model = { path = "../hugr-model", optional = true, version = "0.19.1" }
+hugr-model = { path = "../hugr-model", version = "0.19.1" }
 hugr-core = { path = "../hugr-core", version = "0.15.4" }
 hugr-passes = { path = "../hugr-passes", version = "0.15.4" }
 hugr-llvm = { path = "../hugr-llvm", version = "0.15.4", optional = true }
