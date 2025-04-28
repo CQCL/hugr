@@ -11,7 +11,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView, RootTagged};
+use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
@@ -154,9 +154,6 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
             .map(|n| self.get_node(n))
     }
 }
-impl<Root: NodeHandle> RootTagged for SiblingGraph<'_, Root> {
-    type RootHandle = Root;
-}
 
 impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
     fn new_unchecked(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Self {
@@ -254,12 +251,6 @@ impl<'g, H: HugrMut, Root: NodeHandle<H::Node>> SiblingMut<'g, H, Root> {
     /// Create a new SiblingMut from a base.
     /// Equivalent to [HierarchyView::try_new] but takes a *mutable* reference.
     pub fn try_new(hugr: &'g mut H, root: H::Node) -> Result<Self, HugrError> {
-        if root == hugr.root() && !H::RootHandle::TAG.is_superset(Root::TAG) {
-            return Err(HugrError::InvalidTag {
-                required: H::RootHandle::TAG,
-                actual: Root::TAG,
-            });
-        }
         check_tag::<Root, _>(hugr, root)?;
         Ok(Self {
             hugr,
@@ -375,22 +366,20 @@ impl<H: HugrMut, Root: NodeHandle<H::Node>> HugrView for SiblingMut<'_, H, Root>
     }
 }
 
-impl<H: HugrMut, Root: NodeHandle<H::Node>> RootTagged for SiblingMut<'_, H, Root> {
-    type RootHandle = Root;
-}
-
 impl<H: HugrMut, Root: NodeHandle<H::Node>> HugrMutInternals for SiblingMut<'_, H, Root> {
     fn replace_op(
         &mut self,
         node: Self::Node,
         op: impl Into<crate::ops::OpType>,
-    ) -> Result<crate::ops::OpType, crate::hugr::HugrError> {
+    ) -> crate::ops::OpType {
         let op = op.into();
+        // Note: This wrapper will be removed in a subsequent PR, so we just panic here for now.
         if node == self.root() && !Root::TAG.is_superset(op.tag()) {
-            return Err(HugrError::InvalidTag {
+            let err = HugrError::InvalidTag {
                 required: Root::TAG,
                 actual: op.tag(),
-            });
+            };
+            panic!("{err}");
         }
         self.hugr.replace_op(node, op)
     }
@@ -424,9 +413,9 @@ mod test {
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::{qb_t, usize_t};
-    use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID};
+    use crate::ops::handle::{CfgID, DfgID, FuncID};
+    use crate::ops::OpType;
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
-    use crate::ops::{OpTrait, OpType};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension::EXTENSION_ID;
     use crate::IncomingPort;
@@ -585,43 +574,11 @@ mod test {
             })
         );
 
-        let mut sib_mut = SiblingMut::<_, DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
         let bad_nodetype: OpType = crate::ops::CFG { signature }.into();
-        assert_eq!(
-            sib_mut.replace_op(sib_mut.root(), bad_nodetype.clone()),
-            Err(HugrError::InvalidTag {
-                required: OpTag::Dfg,
-                actual: OpTag::Cfg
-            })
-        );
 
-        // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
-        simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
+        // Performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
+        simple_dfg_hugr.replace_op(root, bad_nodetype);
         assert!(simple_dfg_hugr.validate().is_err());
-    }
-
-    #[rstest]
-    fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
-        let root = simple_dfg_hugr.root();
-        let case_nodetype = crate::ops::Case {
-            signature: simple_dfg_hugr
-                .root_type()
-                .dataflow_signature()
-                .unwrap()
-                .into_owned(),
-        };
-        let mut sib_mut = SiblingMut::<_, DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
-        // As expected, we cannot replace the root with a Case
-        assert_eq!(
-            sib_mut.replace_op(root, case_nodetype),
-            Err(HugrError::InvalidTag {
-                required: OpTag::Dfg,
-                actual: OpTag::Case
-            })
-        );
-
-        let nested_sib_mut = SiblingMut::<_, DataflowParentID>::try_new(&mut sib_mut, root);
-        assert!(nested_sib_mut.is_err());
     }
 
     #[rstest]

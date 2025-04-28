@@ -69,7 +69,7 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
             hugr.insert_hugr(func_node, func_hugr);
 
             for lcn in load_constant_ns {
-                hugr.replace_op(lcn, LoadFunction::try_new(polysignature.clone(), [])?)?;
+                hugr.replace_op(lcn, LoadFunction::try_new(polysignature.clone(), [])?);
             }
             any_changes = true;
         }

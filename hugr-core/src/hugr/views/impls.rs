@@ -3,11 +3,8 @@
 use std::{borrow::Cow, rc::Rc, sync::Arc};
 
 use super::HugrView;
-use super::RootTagged;
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::HugrMut;
-use crate::Hugr;
-use crate::Node;
 
 macro_rules! hugr_internal_methods {
     // The extra ident here is because invocations of the macro cannot pass `self` as argument
@@ -116,7 +113,7 @@ macro_rules! hugr_mut_internal_methods {
                 fn set_parent(&mut self, node: Self::Node, parent: Self::Node);
                 fn move_after_sibling(&mut self, node: Self::Node, after: Self::Node);
                 fn move_before_sibling(&mut self, node: Self::Node, before: Self::Node);
-                fn replace_op(&mut self, node: Self::Node, op: impl Into<crate::ops::OpType>) -> Result<crate::ops::OpType, crate::hugr::HugrError>;
+                fn replace_op(&mut self, node: Self::Node, op: impl Into<crate::ops::OpType>) -> crate::ops::OpType;
                 fn optype_mut(&mut self, node: Self::Node) -> &mut crate::ops::OpType;
                 fn node_metadata_map_mut(&mut self, node: Self::Node) -> &mut crate::hugr::NodeMetadataMap;
                 fn extensions_mut(&mut self) -> &mut crate::extension::ExtensionRegistry;
@@ -149,11 +146,6 @@ macro_rules! hugr_mut_methods {
 }
 pub(crate) use hugr_mut_methods;
 
-// -------- Base Hugr implementation
-impl RootTagged for Hugr {
-    type RootHandle = Node;
-}
-
 // -------- Immutable borrow
 impl<T: HugrView> HugrInternals for &T {
     type Portgraph<'p>
@@ -166,9 +158,6 @@ impl<T: HugrView> HugrInternals for &T {
 }
 impl<T: HugrView> HugrView for &T {
     hugr_view_methods! {this, *this}
-}
-impl<T: RootTagged> RootTagged for &T {
-    type RootHandle = T::RootHandle;
 }
 
 // -------- Mutable borrow
@@ -183,9 +172,6 @@ impl<T: HugrView> HugrInternals for &mut T {
 }
 impl<T: HugrView> HugrView for &mut T {
     hugr_view_methods! {this, &**this}
-}
-impl<T: RootTagged> RootTagged for &mut T {
-    type RootHandle = T::RootHandle;
 }
 impl<T: HugrMutInternals> HugrMutInternals for &mut T {
     hugr_mut_internal_methods! {this, &mut **this}
@@ -207,9 +193,6 @@ impl<T: HugrView> HugrInternals for Rc<T> {
 impl<T: HugrView> HugrView for Rc<T> {
     hugr_view_methods! {this, this.as_ref()}
 }
-impl<T: RootTagged> RootTagged for Rc<T> {
-    type RootHandle = T::RootHandle;
-}
 
 // -------- Arc
 impl<T: HugrView> HugrInternals for Arc<T> {
@@ -224,9 +207,6 @@ impl<T: HugrView> HugrInternals for Arc<T> {
 impl<T: HugrView> HugrView for Arc<T> {
     hugr_view_methods! {this, this.as_ref()}
 }
-impl<T: RootTagged> RootTagged for Arc<T> {
-    type RootHandle = T::RootHandle;
-}
 
 // -------- Box
 impl<T: HugrView> HugrInternals for Box<T> {
@@ -240,9 +220,6 @@ impl<T: HugrView> HugrInternals for Box<T> {
 }
 impl<T: HugrView> HugrView for Box<T> {
     hugr_view_methods! {this, this.as_ref()}
-}
-impl<T: RootTagged> RootTagged for Box<T> {
-    type RootHandle = T::RootHandle;
 }
 impl<T: HugrMutInternals> HugrMutInternals for Box<T> {
     hugr_mut_internal_methods! {this, this.as_mut()}
@@ -263,9 +240,6 @@ impl<T: HugrView + ToOwned> HugrInternals for Cow<'_, T> {
 }
 impl<T: HugrView + ToOwned> HugrView for Cow<'_, T> {
     hugr_view_methods! {this, this.as_ref()}
-}
-impl<T: RootTagged + ToOwned> RootTagged for Cow<'_, T> {
-    type RootHandle = T::RootHandle;
 }
 impl<T> HugrMutInternals for Cow<'_, T>
 where

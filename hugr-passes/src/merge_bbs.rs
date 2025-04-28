@@ -4,11 +4,11 @@ use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::views::RootCheckable;
 use itertools::Itertools;
 
 use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
 use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
-use hugr_core::hugr::RootTagged;
 use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
 use hugr_core::{Hugr, HugrView, Node};
@@ -16,7 +16,13 @@ use hugr_core::{Hugr, HugrView, Node};
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
-pub fn merge_basic_blocks(cfg: &mut impl HugrMut<Node = Node, RootHandle = CfgID>) {
+pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID>)
+where
+    H: 'h + HugrMut<Node = Node>,
+{
+    let checked = cfg.try_into_checked().expect("Hugr must be a CFG region");
+    let cfg = checked.into_hugr();
+
     let mut worklist = cfg.children(cfg.root()).collect::<Vec<_>>();
     while let Some(n) = worklist.pop() {
         // Consider merging n with its successor
@@ -44,7 +50,7 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<Node = Node, RootHandle = CfgID
 }
 
 fn mk_rep(
-    cfg: &impl RootTagged<RootHandle = CfgID, Node = Node>,
+    cfg: &impl HugrView<Node = Node>,
     pred: Node,
     succ: Node,
 ) -> (Replacement, Node, [Node; 2]) {
@@ -158,14 +164,12 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::extension::prelude::PRELUDE_ID;
-    use hugr_core::hugr::views::RootChecked;
     use itertools::Itertools;
     use rstest::rstest;
 
     use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
     use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize};
     use hugr_core::ops::constant::Value;
-    use hugr_core::ops::handle::CfgID;
     use hugr_core::ops::{LoadConstant, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
@@ -252,7 +256,7 @@ mod test {
 
         let mut h = h.finish_hugr()?;
         let r = h.root();
-        merge_basic_blocks(&mut RootChecked::<_, CfgID>::try_new(&mut h).unwrap());
+        merge_basic_blocks(&mut h);
         h.validate().unwrap();
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
@@ -346,7 +350,7 @@ mod test {
         h.branch(&bb3, 0, &h.exit_block())?;
 
         let mut h = h.finish_hugr()?;
-        merge_basic_blocks(&mut RootChecked::<_, CfgID>::try_new(&mut h).unwrap());
+        merge_basic_blocks(&mut h);
         h.validate()?;
 
         // Should only be one BB left
