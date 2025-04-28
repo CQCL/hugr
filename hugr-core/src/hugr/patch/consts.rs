@@ -51,13 +51,13 @@ impl<N: HugrNode> PatchVerification for RemoveLoadConstant<N> {
     }
 }
 
-impl PatchHugrMut for RemoveLoadConstant {
+impl<N: HugrNode> PatchHugrMut for RemoveLoadConstant<N> {
     /// The [`crate::ops::Const`] node the [`crate::ops::LoadConstant`] was
     /// connected to.
-    type Outcome = Node;
+    type Outcome = N;
 
     const UNCHANGED_ON_FAILURE: bool = true;
-    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let node = self.0;
         let source = h
@@ -98,13 +98,13 @@ impl<N: HugrNode> PatchVerification for RemoveConst<N> {
     }
 }
 
-impl PatchHugrMut for RemoveConst {
+impl<N: HugrNode> PatchHugrMut for RemoveConst<N> {
     // The parent of the Const node.
-    type Outcome = Node;
+    type Outcome = N;
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let node = self.0;
         let parent = h

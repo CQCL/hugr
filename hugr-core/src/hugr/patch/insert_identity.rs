@@ -2,6 +2,7 @@
 
 use std::iter;
 
+use crate::core::HugrNode;
 use crate::extension::prelude::Noop;
 use crate::hugr::{HugrMut, Node};
 use crate::ops::{OpTag, OpTrait};
@@ -71,13 +72,16 @@ impl<N: Copy> PatchVerification for IdentityInsertion<N> {
     }
 }
 
-impl PatchHugrMut for IdentityInsertion {
+impl<N: HugrNode> PatchHugrMut for IdentityInsertion<N> {
     /// The inserted node.
-    type Outcome = Node;
+    type Outcome = N;
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, IdentityInsertionError> {
+    fn apply_hugr_mut(
+        self,
+        h: &mut impl HugrMut<Node = N>,
+    ) -> Result<Self::Outcome, IdentityInsertionError> {
         let kind = h.get_optype(self.post_node).port_kind(self.post_port);
         let Some(EdgeKind::Value(ty)) = kind else {
             return Err(IdentityInsertionError::InvalidPortKind(kind));

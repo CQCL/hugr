@@ -59,9 +59,9 @@ impl<N: HugrNode> PatchVerification for InlineCall<N> {
     }
 }
 
-impl PatchHugrMut for InlineCall {
+impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
     type Outcome = ();
-    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
 

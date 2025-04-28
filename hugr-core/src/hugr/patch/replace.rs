@@ -12,7 +12,7 @@ use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
-use super::{PatchHugrMut, VerifyPatch};
+use super::{PatchHugrMut, PatchVerification};
 
 /// Specifies how to create a new edge.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -322,13 +322,16 @@ impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
     }
 }
 
-impl PatchHugrMut for Replacement {
+impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
     /// Map from Node in replacement to corresponding Node in the result Hugr
-    type Outcome = HashMap<Node, Node>;
+    type Outcome = HashMap<Node, HostNode>;
 
     const UNCHANGED_ON_FAILURE: bool = false;
 
-    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
+    fn apply_hugr_mut(
+        self,
+        h: &mut impl HugrMut<Node = HostNode>,
+    ) -> Result<Self::Outcome, Self::Error> {
         let parent = self.check_parent(h)?;
         // Calculate removed nodes here. (Does not include transfers, so enumerates only
         // nodes we are going to remove, individually, anyway; so no *asymptotic* speed
@@ -377,7 +380,7 @@ impl PatchHugrMut for Replacement {
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
         let mut remove_top_sibs = self.removal.iter();
-        for new_node in h.children(new_root).collect::<Vec<Node>>().into_iter() {
+        for new_node in h.children(new_root).collect::<Vec<HostNode>>().into_iter() {
             if let Some(top_sib) = remove_top_sibs.next() {
                 h.move_before_sibling(new_node, *top_sib);
             } else {
@@ -404,14 +407,19 @@ impl PatchHugrMut for Replacement {
     }
 }
 
-fn transfer_edges<'a, SrcNode: 'a + Copy, TgtNode: 'a + Copy>(
-    h: &mut impl HugrMut,
+fn transfer_edges<'a, SrcNode, TgtNode, HostNode>(
+    h: &mut impl HugrMut<Node = HostNode>,
     edges: impl Iterator<Item = &'a NewEdgeSpec<SrcNode, TgtNode>>,
-    trans_src: impl Fn(SrcNode) -> Option<Node>,
-    trans_tgt: impl Fn(TgtNode) -> Option<Node>,
-    err_spec: impl Fn(NewEdgeSpec<SrcNode, TgtNode>) -> DynEdgeSpec<Node>,
-    legal_src_ancestors: Option<&HashSet<Node>>,
-) -> Result<(), ReplaceError> {
+    trans_src: impl Fn(SrcNode) -> Option<HostNode>,
+    trans_tgt: impl Fn(TgtNode) -> Option<HostNode>,
+    err_spec: impl Fn(NewEdgeSpec<SrcNode, TgtNode>) -> DynEdgeSpec<HostNode>,
+    legal_src_ancestors: Option<&HashSet<HostNode>>,
+) -> Result<(), ReplaceError<HostNode>>
+where
+    SrcNode: 'a + HugrNode,
+    TgtNode: 'a + HugrNode,
+    HostNode: 'a + HugrNode,
+{
     for oe in edges {
         let err_spec = err_spec(oe.clone());
         let e = NewEdgeSpec {

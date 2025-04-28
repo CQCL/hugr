@@ -51,7 +51,7 @@ impl PatchHugrMut for InlineDFG {
 
     fn apply_hugr_mut(
         self,
-        h: &mut impl crate::hugr::HugrMut,
+        h: &mut impl crate::hugr::HugrMut<Node = Node>,
     ) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let n = self.0.node();

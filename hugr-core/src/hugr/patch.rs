@@ -9,7 +9,7 @@ mod port_types;
 pub mod replace;
 pub mod simple_replace;
 
-use crate::{Hugr, HugrView, Node};
+use crate::{Hugr, HugrView};
 pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
@@ -87,7 +87,7 @@ pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
 /// Always implement this trait when possible, to define how a patch is applied
 /// to any type implementing [`HugrMut`]. A blanket implementation ensures that
 /// any type implementing this trait also implements [`Patch`].
-pub trait PatchHugrMut: PatchVerification<Node = Node> {
+pub trait PatchHugrMut: PatchVerification {
     /// The type returned on successful application of the rewrite.
     type Outcome;
 
@@ -105,10 +105,13 @@ pub trait PatchHugrMut: PatchVerification<Node = Node> {
     /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that
     /// is, implementations may begin with `assert!(h.validate())`, with
     /// `debug_assert!(h.validate())` being preferred.
-    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error>;
+    fn apply_hugr_mut(
+        self,
+        h: &mut impl HugrMut<Node = Self::Node>,
+    ) -> Result<Self::Outcome, Self::Error>;
 }
 
-impl<H: HugrMut, R: PatchHugrMut> Patch<H> for R {
+impl<R: PatchHugrMut, H: HugrMut<Node = R::Node>> Patch<H> for R {
     type Outcome = R::Outcome;
     const UNCHANGED_ON_FAILURE: bool = R::UNCHANGED_ON_FAILURE;
 

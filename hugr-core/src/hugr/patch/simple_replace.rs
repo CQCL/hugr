@@ -295,18 +295,18 @@ impl<HostNode: HugrNode> PatchVerification for SimpleReplacement<HostNode> {
 }
 
 /// Result of applying a [`SimpleReplacement`].
-pub struct SimpleReplacementOutcome {
+pub struct SimpleReplacementOutcome<HostNode = Node> {
     /// Map from Node in replacement to corresponding Node in the result Hugr
-    pub node_map: HashMap<Node, Node>,
+    pub node_map: HashMap<Node, HostNode>,
     /// Nodes removed from the result Hugr and their weights
-    pub removed_nodes: HashMap<Node, OpType>,
+    pub removed_nodes: HashMap<HostNode, OpType>,
 }
 
-impl PatchHugrMut for SimpleReplacement<Node> {
-    type Outcome = SimpleReplacementOutcome;
+impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
+    type Outcome = SimpleReplacementOutcome<N>;
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn apply_hugr_mut(self, h: &mut impl HugrMut) -> Result<Self::Outcome, Self::Error> {
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<Self::Outcome, Self::Error> {
         self.is_valid_rewrite(h)?;
 
         let parent = self.subgraph.get_parent(h);
@@ -330,7 +330,7 @@ impl PatchHugrMut for SimpleReplacement<Node> {
         let InsertionResult { new_root, node_map } = h.insert_hugr(parent, replacement);
 
         // remove the Input and Output nodes from the replacement graph
-        let replace_children = h.children(new_root).collect::<Vec<Node>>();
+        let replace_children = h.children(new_root).collect::<Vec<N>>();
         for &io in &replace_children[..2] {
             h.remove_node(io);
         }
