@@ -639,7 +639,7 @@ mod test {
             replacement.connect(r_df2, 1, out, 1);
         }
 
-        h.apply_rewrite(Replacement {
+        h.apply_patch(Replacement {
             removal: vec![entry.node(), bb2.node()],
             replacement,
             adoptions: HashMap::from([(r_df1.node(), entry.node()), (r_df2.node(), bb2.node())]),

@@ -125,7 +125,7 @@ mod tests {
 
         let rw = IdentityInsertion::new(final_node, final_node_port);
 
-        let noop_node = h.apply_rewrite(rw).unwrap();
+        let noop_node = h.apply_patch(rw).unwrap();
 
         assert_eq!(h.node_count(), 7);
 

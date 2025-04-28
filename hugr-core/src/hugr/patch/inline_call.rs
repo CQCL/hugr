@@ -186,7 +186,7 @@ mod test {
         );
         RootChecked::<_, ModuleRootID>::try_new(&mut hugr)
             .unwrap()
-            .apply_rewrite(InlineCall(call1.node()))
+            .apply_patch(InlineCall(call1.node()))
             .unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [call2]);
@@ -200,7 +200,7 @@ mod test {
             .count(),
             1
         );
-        hugr.apply_rewrite(InlineCall(call2.node())).unwrap();
+        hugr.apply_patch(InlineCall(call2.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).next(), None);
         assert_eq!(calls(&hugr), []);
@@ -235,7 +235,7 @@ mod test {
         let func = func.node();
         let mut call = call.node();
         for i in 2..10 {
-            hugr.apply_rewrite(InlineCall(call))?;
+            hugr.apply_patch(InlineCall(call))?;
             hugr.validate().unwrap();
             assert_eq!(extension_ops(&hugr).len(), i);
             let v = calls(&hugr);
@@ -274,7 +274,7 @@ mod test {
         let h = modb.finish_hugr().unwrap();
         let mut h2 = h.clone();
         assert_eq!(
-            h2.apply_rewrite(InlineCall(call.node())),
+            h2.apply_patch(InlineCall(call.node())),
             Err(InlineCallError::CallTargetNotFuncDefn(
                 decl.node(),
                 h.get_optype(decl.node()).clone()
@@ -287,7 +287,7 @@ mod test {
             .try_into()
             .unwrap();
         assert_eq!(
-            h2.apply_rewrite(InlineCall(inp)),
+            h2.apply_patch(InlineCall(inp)),
             Err(InlineCallError::NotCallNode(
                 inp,
                 Input {
@@ -324,7 +324,7 @@ mod test {
             hugr.output_neighbours(inner.node()).collect::<Vec<_>>(),
             [call1.node(), call2.node()]
         );
-        hugr.apply_rewrite(InlineCall::new(call1.node()))?;
+        hugr.apply_patch(InlineCall::new(call1.node()))?;
 
         assert_eq!(
             hugr.output_neighbours(inner.node()).collect::<Vec<_>>(),

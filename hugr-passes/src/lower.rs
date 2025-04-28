@@ -71,7 +71,7 @@ pub fn lower_ops(
         .map(|(node, replacement)| {
             let subcirc = SiblingSubgraph::from_node(node, hugr);
             let rw = subcirc.create_simple_replacement(hugr, replacement)?;
-            let mut removed_nodes = hugr.apply_rewrite(rw)?.removed_nodes;
+            let mut removed_nodes = hugr.apply_patch(rw)?.removed_nodes;
             Ok(removed_nodes
                 .drain()
                 .exactly_one()

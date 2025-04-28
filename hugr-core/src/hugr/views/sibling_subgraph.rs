@@ -999,7 +999,7 @@ mod tests {
         assert_eq!(rep.subgraph().nodes().len(), 4);
 
         assert_eq!(hugr.node_count(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
-        hugr.apply_rewrite(rep).unwrap();
+        hugr.apply_patch(rep).unwrap();
         assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
 
         Ok(())

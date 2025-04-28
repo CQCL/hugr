@@ -220,13 +220,13 @@ mod test {
             // Check we can't inline the outer DFG
             let mut h = outer.clone();
             assert_eq!(
-                h.apply_rewrite(InlineDFG(DfgID::from(h.root()))),
+                h.apply_patch(InlineDFG(DfgID::from(h.root()))),
                 Err(InlineDFGError::NoParent)
             );
             assert_eq!(h, outer); // unchanged
         }
 
-        outer.apply_rewrite(InlineDFG(*inner.handle()))?;
+        outer.apply_patch(InlineDFG(*inner.handle()))?;
         outer.validate()?;
         assert_eq!(outer.nodes().count(), 7);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
@@ -282,7 +282,7 @@ mod test {
             ]
         );
 
-        h.apply_rewrite(InlineDFG(*swap.handle()))?;
+        h.apply_patch(InlineDFG(*swap.handle()))?;
         assert_eq!(find_dfgs(&h), vec![h.root()]);
         assert_eq!(h.nodes().count(), 5); // Dfg+I+O
         let mut ops = extension_ops(&h);
@@ -359,7 +359,7 @@ mod test {
         )?;
         let mut outer = outer.finish_hugr_with_outputs(cx.outputs())?;
 
-        outer.apply_rewrite(InlineDFG(*inner.handle()))?;
+        outer.apply_patch(InlineDFG(*inner.handle()))?;
         outer.validate()?;
         let order_neighbours = |n, d| {
             let p = outer.get_optype(n).other_port(d).unwrap();

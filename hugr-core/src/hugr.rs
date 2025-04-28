@@ -94,9 +94,8 @@ impl Hugr {
     /// Validates the Hugr against the provided extension registry, ensuring all
     /// operations are resolved.
     ///
-    /// If the feature `extension_inference` is enabled, we will ensure every
-    /// function correctly specifies the extensions required by its
-    /// contained ops.
+    /// If the feature `extension_inference` is enabled, we will ensure every function
+    /// correctly specifies the extensions required by its contained ops.
     pub fn load_json(
         reader: impl Read,
         extension_registry: &ExtensionRegistry,
@@ -115,13 +114,12 @@ impl Hugr {
     }
 
     /// Infers an extension-delta for any non-function container node
-    /// whose current [extension_delta] contains [TO_BE_INFERRED]. The inferred
-    /// delta will be the smallest delta compatible with its children and
-    /// that includes any other [ExtensionId]s in the current delta.
+    /// whose current [extension_delta] contains [TO_BE_INFERRED]. The inferred delta
+    /// will be the smallest delta compatible with its children and that includes any
+    /// other [ExtensionId]s in the current delta.
     ///
-    /// If `remove` is true, for such container nodes *without*
-    /// [TO_BE_INFERRED], ExtensionIds are removed from the delta if they
-    /// are *not* used by any child node.
+    /// If `remove` is true, for such container nodes *without* [TO_BE_INFERRED],
+    /// ExtensionIds are removed from the delta if they are *not* used by any child node.
     ///
     /// The non-function container nodes are:
     /// [Case], [CFG], [Conditional], [DataflowBlock], [DFG], [TailLoop]
@@ -143,9 +141,8 @@ impl Hugr {
                 OpType::CFG(cfg) => Some(&mut cfg.signature.runtime_reqs),
                 OpType::Conditional(c) => Some(&mut c.extension_delta),
                 OpType::Case(c) => Some(&mut c.signature.runtime_reqs),
-                //OpType::Lift(_) // Not ATM: only a single element, and we expect Lift to be
-                // removed OpType::FuncDefn(_) // Not at present due to the
-                // possibility of recursion
+                //OpType::Lift(_) // Not ATM: only a single element, and we expect Lift to be removed
+                //OpType::FuncDefn(_) // Not at present due to the possibility of recursion
                 _ => None,
             }
         }
@@ -161,11 +158,8 @@ impl Hugr {
                 return Ok(h.get_optype(node).extension_delta());
             };
             if es.contains(&TO_BE_INFERRED) {
-                // Do not remove anything from current delta - any other elements are a lower
-                // bound
-                child_sets.push((node, es.clone())); // "child_sets" now
-                                                     // misnamed but we discard
-                                                     // fst
+                // Do not remove anything from current delta - any other elements are a lower bound
+                child_sets.push((node, es.clone())); // "child_sets" now misnamed but we discard fst
             } else if remove {
                 child_sets.iter().try_for_each(|(ch, ch_exts)| {
                     if !es.is_superset(ch_exts) {
@@ -179,8 +173,7 @@ impl Hugr {
                     Ok(())
                 })?;
             } else {
-                return Ok(es.clone()); // Can't neither add nor remove, so
-                                       // nothing to do
+                return Ok(es.clone()); // Can't neither add nor remove, so nothing to do
             }
             let merged = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
             *es = ExtensionSet::singleton(TO_BE_INFERRED).missing_from(&merged);
@@ -213,8 +206,8 @@ impl Hugr {
     /// # Parameters
     ///
     /// - `extensions`: The extension set considered when resolving opaque
-    ///   operations and types. The original Hugr's internal extension registry
-    ///   is ignored and replaced with the newly computed one.
+    ///   operations and types. The original Hugr's internal extension
+    ///   registry is ignored and replaced with the newly computed one.
     ///
     /// # Errors
     ///
@@ -320,14 +313,13 @@ impl Hugr {
         })
     }
 
-    /// Compact the nodes indices of the hugr to be contiguous, and order them
-    /// as a breadth-first traversal of the hierarchy.
+    /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
+    /// traversal of the hierarchy.
     ///
-    /// The rekey function is called for each moved node with the old and new
-    /// indices.
+    /// The rekey function is called for each moved node with the old and new indices.
     ///
-    /// After this operation, a serialization and deserialization of the Hugr is
-    /// guaranteed to preserve the indices.
+    /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
+    /// preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
         // Generate the ordered list of nodes
         let mut ordered = Vec::with_capacity(self.node_count());

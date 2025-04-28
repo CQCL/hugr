@@ -827,7 +827,7 @@ pub(crate) mod test {
 
         let rw = IdentityInsertion::new(final_node, final_node_input);
 
-        let apply_result = h.apply_rewrite(rw);
+        let apply_result = h.apply_patch(rw);
         assert_eq!(
             apply_result,
             Err(IdentityInsertionError::InvalidPortKind(Some(

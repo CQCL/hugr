@@ -703,7 +703,7 @@ pub(in crate::hugr::patch) mod test {
             nu_inp,
             nu_out,
         };
-        h.apply_rewrite(r).unwrap();
+        h.apply_patch(r).unwrap();
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
         // ┤ H ├┤ H ├
@@ -757,7 +757,7 @@ pub(in crate::hugr::patch) mod test {
             })
             .map(|p| ((output, p), p))
             .collect();
-        h.apply_rewrite(SimpleReplacement::new(
+        h.apply_patch(SimpleReplacement::new(
             SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
             replacement,
             inputs,
@@ -809,7 +809,7 @@ pub(in crate::hugr::patch) mod test {
             .map(|p| ((repl_output, p), p))
             .collect();
 
-        h.apply_rewrite(SimpleReplacement::new(
+        h.apply_patch(SimpleReplacement::new(
             SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
             repl,
             inputs,
@@ -1041,10 +1041,10 @@ pub(in crate::hugr::patch) mod test {
     }
 
     fn apply_simple(h: &mut Hugr, rw: SimpleReplacement) {
-        h.apply_rewrite(rw).unwrap();
+        h.apply_patch(rw).unwrap();
     }
 
     fn apply_replace(h: &mut Hugr, rw: SimpleReplacement) {
-        h.apply_rewrite(to_replace(h, rw)).unwrap();
+        h.apply_patch(to_replace(h, rw)).unwrap();
     }
 }

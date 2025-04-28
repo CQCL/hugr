@@ -148,12 +148,12 @@ mod test {
         let tup_node = tup.node();
         // can't remove invalid node
         assert_eq!(
-            h.apply_rewrite(RemoveConst(tup_node)),
+            h.apply_patch(RemoveConst(tup_node)),
             Err(RemoveError::InvalidNode(tup_node))
         );
 
         assert_eq!(
-            h.apply_rewrite(RemoveLoadConstant(tup_node)),
+            h.apply_patch(RemoveLoadConstant(tup_node)),
             Err(RemoveError::InvalidNode(tup_node))
         );
         let load_1_node = load_1.node();
@@ -176,7 +176,7 @@ mod test {
 
         // can't remove nodes in use
         assert_eq!(
-            h.apply_rewrite(remove_1.clone()),
+            h.apply_patch(remove_1.clone()),
             Err(RemoveError::ValueUsed(load_1_node))
         );
 
@@ -184,20 +184,20 @@ mod test {
         h.remove_node(tup_node);
 
         // remove first load
-        let reported_con_node = h.apply_rewrite(remove_1)?;
+        let reported_con_node = h.apply_patch(remove_1)?;
         assert_eq!(reported_con_node, con_node);
 
         // still can't remove const, in use by second load
         assert_eq!(
-            h.apply_rewrite(remove_con.clone()),
+            h.apply_patch(remove_con.clone()),
             Err(RemoveError::ValueUsed(con_node))
         );
 
         // remove second use
-        let reported_con_node = h.apply_rewrite(remove_2)?;
+        let reported_con_node = h.apply_patch(remove_2)?;
         assert_eq!(reported_con_node, con_node);
         // remove const
-        assert_eq!(h.apply_rewrite(remove_con)?, h.root());
+        assert_eq!(h.apply_patch(remove_con)?, h.root());
 
         assert_eq!(h.node_count(), 4);
         assert!(h.validate().is_ok());

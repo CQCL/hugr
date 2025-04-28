@@ -373,22 +373,22 @@ mod test {
         } = cond_then_loop_cfg;
         let backup = h.clone();
 
-        let r = h.apply_rewrite(OutlineCfg::new([tail]));
+        let r = h.apply_patch(OutlineCfg::new([tail]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
         assert_eq!(h, backup);
 
-        let r = h.apply_rewrite(OutlineCfg::new([entry, left, right]));
+        let r = h.apply_patch(OutlineCfg::new([entry, left, right]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitNodes(a,b))
             => assert_eq!(HashSet::from([a,b]), HashSet::from_iter([left, right])));
         assert_eq!(h, backup);
 
-        let r = h.apply_rewrite(OutlineCfg::new([left, right, merge]));
+        let r = h.apply_patch(OutlineCfg::new([left, right, merge]));
         assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b))
             => assert_eq!(HashSet::from([a,b]), HashSet::from([left, right])));
         assert_eq!(h, backup);
 
         // The entry node implicitly has an extra incoming edge
-        let r = h.apply_rewrite(OutlineCfg::new([entry, left, right, merge, head]));
+        let r = h.apply_patch(OutlineCfg::new([entry, left, right, merge, head]));
         assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b))
             => assert_eq!(HashSet::from([a,b]), HashSet::from([entry, head])));
         assert_eq!(h, backup);
@@ -510,7 +510,7 @@ mod test {
     ) -> (Node, Node, Node) {
         let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
         assert!(blocks.iter().all(|b| other_blocks.remove(b)));
-        let [new_block, new_cfg] = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
+        let [new_block, new_cfg] = h.apply_patch(OutlineCfg::new(blocks.clone())).unwrap();
 
         for n in other_blocks {
             assert_eq!(h.get_parent(n), Some(cfg))

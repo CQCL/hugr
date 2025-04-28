@@ -131,7 +131,7 @@ impl ComposablePass for UntuplePass {
         let rewrites_applied = rewrites.len();
         // The rewrites are independent, so we can always apply them all.
         for rewrite in rewrites {
-            hugr.apply_rewrite(rewrite)?;
+            hugr.apply_patch(rewrite)?;
         }
         Ok(UntupleResult { rewrites_applied })
     }

@@ -95,30 +95,24 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph, or if the node is the root node.
     fn remove_node(&mut self, node: Self::Node) -> OpType;
 
-    /// Remove a node from the graph, along with all its descendants in the
-    /// hierarchy.
+    /// Remove a node from the graph, along with all its descendants in the hierarchy.
     ///
     /// # Panics
     ///
-    /// If the node is not in the graph, or is the root (this would leave an
-    /// empty Hugr).
+    /// If the node is not in the graph, or is the root (this would leave an empty Hugr).
     fn remove_subtree(&mut self, node: Self::Node);
 
-    /// Copies the strict descendants of `root` to under the `new_parent`,
-    /// optionally applying a [Substitution] to the [OpType]s of the copied
-    /// nodes.
+    /// Copies the strict descendants of `root` to under the `new_parent`, optionally applying a
+    /// [Substitution] to the [OpType]s of the copied nodes.
     ///
-    /// That is, the immediate children of root, are copied to make children of
-    /// `new_parent`.
+    /// That is, the immediate children of root, are copied to make children of `new_parent`.
     ///
     /// Note this may invalidate the Hugr in two ways:
-    /// * Adding children of `root` may make the children-list of `new_parent`
-    ///   invalid e.g. leading to multiple [Input](OpType::Input),
-    ///   [Output](OpType::Output) or [ExitBlock](OpType::ExitBlock) nodes or
-    ///   Input/Output in the wrong positions
-    /// * Nonlocal edges incoming to the subtree of `root` will be copied to
-    ///   target the subtree under `new_parent` which may be invalid if
-    ///   `new_parent` is not a child of `root`s parent (for `Ext` edges - or
+    /// * Adding children of `root` may make the children-list of `new_parent` invalid e.g.
+    ///   leading to multiple [Input](OpType::Input), [Output](OpType::Output) or
+    ///   [ExitBlock](OpType::ExitBlock) nodes or Input/Output in the wrong positions
+    /// * Nonlocal edges incoming to the subtree of `root` will be copied to target the subtree under `new_parent`
+    ///   which may be invalid if `new_parent` is not a child of `root`s parent (for `Ext` edges - or
     ///   correspondingly for `Dom` edges)
     fn copy_descendants(
         &mut self,
@@ -180,8 +174,7 @@ pub trait HugrMut: HugrMutInternals {
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node>;
 
-    /// Copy a subgraph from another hugr into this one, under a given root
-    /// node.
+    /// Copy a subgraph from another hugr into this one, under a given root node.
     ///
     /// Sibling order is not preserved.
     ///
@@ -202,8 +195,8 @@ pub trait HugrMut: HugrMutInternals {
         subgraph: &SiblingSubgraph<H::Node>,
     ) -> HashMap<H::Node, Self::Node>;
 
-    /// Applies a rewrite to the graph.
-    fn apply_rewrite<R, E>(&mut self, rw: impl Patch<Self, Outcome = R, Error = E>) -> Result<R, E>
+    /// Applies a patch to the graph.
+    fn apply_patch<R, E>(&mut self, rw: impl Patch<Self, Outcome = R, Error = E>) -> Result<R, E>
     where
         Self: Sized,
     {
@@ -245,8 +238,7 @@ pub trait HugrMut: HugrMutInternals {
 pub struct InsertionResult<SourceN = Node, TargetN = Node> {
     /// The node, after insertion, that was the root of the inserted Hugr.
     ///
-    /// That is, the value in [InsertionResult::node_map] under the key that was
-    /// the [HugrView::root]
+    /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]
     pub new_root: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
@@ -268,8 +260,7 @@ fn translate_indices<N: HugrNode>(
         .map(move |(k, v)| (source_node(k), target_node(v)))
 }
 
-/// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to
-/// directly use the hugr.
+/// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
 impl HugrMut for Hugr {
     fn add_node_with_parent(&mut self, parent: Node, node: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(node.into());
@@ -365,8 +356,7 @@ impl HugrMut for Hugr {
         let (new_root, node_map) = insert_hugr_internal(self, root, &other);
         // Update the optypes and metadata, taking them from the other graph.
         //
-        // No need to compute each node's extensions here, as we merge
-        // `other.extensions` directly.
+        // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
             self.op_types.set(new_node, optype);
@@ -392,8 +382,7 @@ impl HugrMut for Hugr {
         let (new_root, node_map) = insert_hugr_internal(self, root, other);
         // Update the optypes and metadata, copying them from the other graph.
         //
-        // No need to compute each node's extensions here, as we merge
-        // `other.extensions` directly.
+        // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
             let nodetype = other.get_optype(other.get_node(node));
             self.op_types.set(new_node, nodetype.clone());
@@ -417,8 +406,7 @@ impl HugrMut for Hugr {
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
     ) -> HashMap<H::Node, Self::Node> {
-        // Create a portgraph view with the explicit list of nodes defined by the
-        // subgraph.
+        // Create a portgraph view with the explicit list of nodes defined by the subgraph.
         let context: HashSet<portgraph::NodeIndex> = subgraph
             .nodes()
             .iter()

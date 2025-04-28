@@ -33,11 +33,11 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<Node = Node, RootHandle = CfgID
             continue;
         };
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
-        let node_map = cfg.apply_rewrite(rep).unwrap();
+        let node_map = cfg.apply_patch(rep).unwrap();
         let merged_bb = *node_map.get(&merge_bb).unwrap();
         for dfg_id in dfgs {
             let n_id = *node_map.get(&dfg_id).unwrap();
-            cfg.apply_rewrite(InlineDFG(n_id.into())).unwrap();
+            cfg.apply_patch(InlineDFG(n_id.into())).unwrap();
         }
         worklist.push(merged_bb);
     }
