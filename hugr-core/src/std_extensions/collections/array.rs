@@ -3,6 +3,7 @@
 mod array_op;
 mod array_repeat;
 mod array_scan;
+pub mod op_builder;
 
 use std::sync::Arc;
 
@@ -26,6 +27,7 @@ use crate::Extension;
 pub use array_op::{ArrayOp, ArrayOpDef, ArrayOpDefIter};
 pub use array_repeat::{ArrayRepeat, ArrayRepeatDef, ARRAY_REPEAT_OP_ID};
 pub use array_scan::{ArrayScan, ArrayScanDef, ARRAY_SCAN_OP_ID};
+pub use op_builder::ArrayOpBuilder;
 
 /// Reported unique name of the array type.
 pub const ARRAY_TYPENAME: TypeName = TypeName::new_inline("array");
@@ -178,7 +180,9 @@ lazy_static! {
     };
 }
 
-fn array_type_def() -> &'static TypeDef {
+/// Gets the [TypeDef] for arrays. Note that instantiations are more easily
+/// created via [array_type] and [array_type_parametric]
+pub fn array_type_def() -> &'static TypeDef {
     EXTENSION.get_type(&ARRAY_TYPENAME).unwrap()
 }
 
