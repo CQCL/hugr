@@ -17,6 +17,7 @@ fn roundtrip(source: &str) -> String {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_add() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-add.edn"
@@ -24,6 +25,7 @@ pub fn test_roundtrip_add() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_call() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-call.edn"
@@ -31,6 +33,7 @@ pub fn test_roundtrip_call() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_alias() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-alias.edn"
@@ -38,6 +41,7 @@ pub fn test_roundtrip_alias() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_cfg() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-cfg.edn"
@@ -45,6 +49,7 @@ pub fn test_roundtrip_cfg() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_cond() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-cond.edn"
@@ -52,6 +57,7 @@ pub fn test_roundtrip_cond() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_loop() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-loop.edn"
@@ -59,6 +65,7 @@ pub fn test_roundtrip_loop() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_params() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-params.edn"
@@ -66,6 +73,7 @@ pub fn test_roundtrip_params() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_constraints() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-constraints.edn"
@@ -73,6 +81,7 @@ pub fn test_roundtrip_constraints() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_const() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-const.edn"
@@ -80,6 +89,7 @@ pub fn test_roundtrip_const() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 pub fn test_roundtrip_order() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-order.edn"
