@@ -61,7 +61,7 @@ pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
     ///
     /// Returns [`Self::Outcome`] if successful.
     /// If [Patch::UNCHANGED_ON_FAILURE] is true, then `h` must be unchanged if
-    /// Err is returned. See also [Patch::verify]
+    /// Err is returned. See also [PatchVerification::verify]
     ///
     /// # Panics
     ///
