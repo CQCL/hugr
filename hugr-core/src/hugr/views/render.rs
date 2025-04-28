@@ -45,14 +45,14 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
 
     if config.node_indices {
         Box::new(move |n| {
-            NodeStyle::Box(format!(
+            NodeStyle::boxed(format!(
                 "({ni}) {name}",
                 ni = n.index(),
                 name = node_name(h, n)
             ))
         })
     } else {
-        Box::new(move |n| NodeStyle::Box(node_name(h, n)))
+        Box::new(move |n| NodeStyle::boxed(node_name(h, n)))
     }
 }
 

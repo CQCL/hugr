@@ -36,9 +36,6 @@ missing_docs = "warn"
 # https://github.com/rust-lang/rust-clippy/issues/5112
 debug_assert_with_mut_call = "warn"
 
-[patch.crates-io]
-portgraph = { git = 'https://github.com/cqcl/portgraph.git', rev = "a0c83fc" }
-
 [workspace.dependencies]
 insta = { version = "1.42.2" }
 bitvec = "1.0.1"
@@ -90,8 +87,8 @@ zstd = "0.13.2"
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
 pyo3 = ">= 0.23.4, < 0.25"
-portgraph = { version = ">= 0.13.3, < 0.15" }
-petgraph = { version = ">= 0.7.1, < 0.9", default-features = false }
+portgraph = { version = "0.14.1" }
+petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
 
 [profile.dev.package]
 insta.opt-level = 3
