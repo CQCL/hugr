@@ -24,10 +24,8 @@ impl Serializer for JsonSer {
     }
 }
 
-#[cfg(feature = "model_unstable")]
 struct CapnpSer;
 
-#[cfg(feature = "model_unstable")]
 impl Serializer for CapnpSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
         let bump = bumpalo::Bump::new();
@@ -90,20 +88,17 @@ fn bench_serialization(c: &mut Criterion) {
     }
     group.finish();
 
-    #[cfg(feature = "model_unstable")]
-    {
-        let mut group = c.benchmark_group("circuit_roundtrip/capnp");
-        group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-        for size in [0, 1, 10, 100, 1000].iter() {
-            group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
-                let h = circuit(size).0;
-                b.iter(|| {
-                    black_box(roundtrip(&h, CapnpSer));
-                });
+    let mut group = c.benchmark_group("circuit_roundtrip/capnp");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    for size in [0, 1, 10, 100, 1000].iter() {
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            let h = circuit(size).0;
+            b.iter(|| {
+                black_box(roundtrip(&h, CapnpSer));
             });
-        }
-        group.finish();
+        });
     }
+    group.finish();
 }
 
 criterion_group! {
