@@ -1,6 +1,5 @@
 //! Internal traits, not exposed in the public `hugr` API.
 
-use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::OnceLock;
 
@@ -8,11 +7,12 @@ use itertools::Itertools;
 use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView};
 
 use crate::extension::ExtensionRegistry;
-use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node};
 
-use super::hugrmut::{panic_invalid_node, panic_invalid_non_root};
-use super::{HugrView, NodeMetadataMap, OpType};
+use super::views::{panic_invalid_node, panic_invalid_non_root};
+use super::HugrView;
+use super::{NodeMetadataMap, OpType};
+use crate::ops::handle::NodeHandle;
 
 /// Trait for accessing the internals of a Hugr(View).
 ///
@@ -20,7 +20,7 @@ use super::{HugrView, NodeMetadataMap, OpType};
 /// view.
 pub trait HugrInternals {
     /// The underlying portgraph view type.
-    type Portgraph<'p>: LinkView + Clone + 'p
+    type Portgraph<'p>: LinkView<LinkEndpoint: Eq> + Clone + 'p
     where
         Self: 'p;
 
@@ -30,18 +30,21 @@ pub trait HugrInternals {
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
 
-    /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
-    /// returned by [`HugrInternals::portgraph`].
-    #[inline]
-    fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy> {
-        Cow::Borrowed(&self.base_hugr().hierarchy)
+    /// Returns a flat portgraph view of a region in the HUGR.
+    ///
+    /// This is a subgraph of [`HugrInternals::portgraph`], with a flat hierarchy.
+    fn region_portgraph(
+        &self,
+        parent: Self::Node,
+    ) -> portgraph::view::FlatRegion<'_, Self::Portgraph<'_>> {
+        let pg = self.portgraph();
+        let root = self.get_pg_index(parent);
+        portgraph::view::FlatRegion::new_without_root(pg, self.hierarchy(), root)
     }
 
-    /// Returns the Hugr at the base of a chain of views.
-    fn base_hugr(&self) -> &Hugr;
-
-    /// Return the root node of this view.
-    fn root_node(&self) -> Self::Node;
+    /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
+    /// returned by [`HugrInternals::portgraph`].
+    fn hierarchy(&self) -> &portgraph::Hierarchy;
 
     /// Convert a node to a portgraph node index.
     fn get_pg_index(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex;
@@ -55,6 +58,14 @@ pub trait HugrInternals {
     ///
     /// If the node is not in the graph.
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap;
+
+    /// Returns the Hugr at the base of a chain of views.
+    // TODO: This will be removed in a future PR.
+    #[deprecated(
+        since = "0.16.0",
+        note = "This method will be removed in a future PR. Use the individual HugrInternals methods instead."
+    )]
+    fn base_hugr(&self) -> &Hugr;
 }
 
 impl HugrInternals for Hugr {
@@ -71,18 +82,13 @@ impl HugrInternals for Hugr {
     }
 
     #[inline]
-    fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy> {
-        Cow::Borrowed(&self.hierarchy)
+    fn hierarchy(&self) -> &portgraph::Hierarchy {
+        &self.hierarchy
     }
 
     #[inline]
     fn base_hugr(&self) -> &Hugr {
         self
-    }
-
-    #[inline]
-    fn root_node(&self) -> Self::Node {
-        self.root.into()
     }
 
     #[inline]
@@ -95,6 +101,7 @@ impl HugrInternals for Hugr {
         index.into()
     }
 
+    #[inline]
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap {
         static EMPTY: OnceLock<NodeMetadataMap> = OnceLock::new();
         panic_invalid_node(self, node);
@@ -108,10 +115,14 @@ impl HugrInternals for Hugr {
 /// Specifically, this trait lets you apply arbitrary modifications that may
 /// invalidate the HUGR.
 pub trait HugrMutInternals: HugrView {
-    /// Set root node of the HUGR.
+    /// Set the node at the root of the HUGR hierarchy.
     ///
-    /// This should be an existing node in the HUGR. Most operations use the
-    /// root node as a starting point for traversal.
+    /// Any node not reachable from this root should be deleted from the HUGR
+    /// after this call.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
     fn set_root(&mut self, root: Self::Node);
 
     /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
@@ -225,8 +236,8 @@ pub trait HugrMutInternals: HugrView {
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
 impl HugrMutInternals for Hugr {
     fn set_root(&mut self, root: Node) {
-        panic_invalid_node(self, root);
-        self.root = self.get_pg_index(root);
+        self.hierarchy.detach(self.root);
+        self.root = root.pg_index();
     }
 
     #[inline]
@@ -263,20 +274,18 @@ impl HugrMutInternals for Hugr {
         amount: usize,
     ) -> Range<usize> {
         panic_invalid_node(self, node);
-        let old_num_ports = self.base_hugr().graph.num_ports(node.pg_index(), direction);
+        let old_num_ports = self.graph.num_ports(node.pg_index(), direction);
 
         self.add_ports(node, direction, amount as isize);
 
         for swap_from_port in (index..old_num_ports).rev() {
             let swap_to_port = swap_from_port + amount;
             let [from_port_index, to_port_index] = [swap_from_port, swap_to_port].map(|p| {
-                self.base_hugr()
-                    .graph
+                self.graph
                     .port_index(node.pg_index(), PortOffset::new(direction, p))
                     .unwrap()
             });
             let linked_ports = self
-                .base_hugr()
                 .graph
                 .port_links(from_port_index)
                 .map(|(_, to_subport)| to_subport.port())

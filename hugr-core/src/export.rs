@@ -1,4 +1,5 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
+use crate::hugr::internal::HugrInternals;
 use crate::{
     extension::{ExtensionId, OpDef, SignatureFunc},
     hugr::IdentList,
@@ -999,7 +1000,7 @@ impl<'a> Context<'a> {
                 let outer_hugr = std::mem::replace(&mut self.hugr, hugr);
                 let outer_node_to_id = std::mem::take(&mut self.node_to_id);
 
-                let region = match hugr.root_type() {
+                let region = match hugr.root_optype() {
                     OpType::DFG(_) => self.export_dfg(hugr.root(), model::ScopeClosure::Closed),
                     _ => panic!("Value::Function root must be a DFG"),
                 };
@@ -1031,7 +1032,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_node_metadata(&mut self, node: Node) -> &'a [table::TermId] {
-        let metadata_map = self.hugr.get_node_metadata(node);
+        let metadata_map = self.hugr.node_metadata_map(node);
 
         let has_order_edges = {
             fn is_relevant_node(hugr: &Hugr, node: Node) -> bool {
@@ -1049,13 +1050,11 @@ impl<'a> Context<'a> {
                 .any(|(other, _)| is_relevant_node(self.hugr, other))
         };
 
-        let meta_capacity = metadata_map.map_or(0, |map| map.len()) + has_order_edges as usize;
+        let meta_capacity = metadata_map.len() + has_order_edges as usize;
         let mut meta = BumpVec::with_capacity_in(meta_capacity, self.bump);
 
-        if let Some(metadata_map) = metadata_map {
-            for (name, value) in metadata_map {
-                meta.push(self.export_json_meta(name, value));
-            }
+        for (name, value) in metadata_map {
+            meta.push(self.export_json_meta(name, value));
         }
 
         if has_order_edges {

@@ -20,7 +20,7 @@ use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
 
 use super::internal::HugrInternals;
-use super::views::{HierarchyView, HugrView, SiblingGraph};
+use super::views::HugrView;
 use super::ExtensionError;
 
 /// Structure keeping track of pre-computed information used in the validation
@@ -31,7 +31,7 @@ use super::ExtensionError;
 struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
-    dominators: HashMap<Node, Dominators<Node>>,
+    dominators: HashMap<Node, Dominators<portgraph::NodeIndex>>,
 }
 
 impl Hugr {
@@ -138,10 +138,10 @@ impl<'a> ValidationContext<'a> {
     ///
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
-    fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
+    fn compute_dominator(&self, parent: Node) -> Dominators<portgraph::NodeIndex> {
+        let region = self.hugr.region_portgraph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region.as_petgraph(), entry_node)
+        dominators::simple_fast(&region, entry_node.pg_index())
     }
 
     /// Check the constraints on a single node.
@@ -416,11 +416,11 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
-        let postorder = Topo::new(&region.as_petgraph());
+        let region = self.hugr.region_portgraph(parent);
+        let postorder = Topo::new(&region);
         let nodes_visited = postorder
-            .iter(&region.as_petgraph())
-            .filter(|n| *n != parent)
+            .iter(&region)
+            .filter(|n| *n != parent.pg_index())
             .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
@@ -537,8 +537,8 @@ impl<'a> ValidationContext<'a> {
                     }
                 };
                 if !dominator_tree
-                    .dominators(ancestor)
-                    .is_some_and(|mut ds| ds.any(|n| n == from_parent))
+                    .dominators(ancestor.pg_index())
+                    .is_some_and(|mut ds| ds.any(|n| n == from_parent.pg_index()))
                 {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
                         from,

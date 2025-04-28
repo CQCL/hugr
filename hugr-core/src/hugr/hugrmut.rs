@@ -18,6 +18,7 @@ use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
+use super::views::{panic_invalid_node, panic_invalid_non_root, panic_invalid_port};
 
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrMutInternals {
@@ -387,10 +388,13 @@ impl HugrMut for Hugr {
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_optype(other.get_node(node));
+            let node = other.get_node(node);
+            let nodetype = other.get_optype(node);
             self.op_types.set(new_node, nodetype.clone());
-            let meta = other.base_hugr().metadata.get(node);
-            self.metadata.set(new_node, meta.clone());
+            let meta = other.node_metadata_map(node);
+            if !meta.is_empty() {
+                self.metadata.set(new_node, Some(meta.clone()));
+            }
         }
         debug_assert_eq!(
             Some(&new_root.pg_index()),
@@ -424,10 +428,13 @@ impl HugrMut for Hugr {
         let node_map = insert_subgraph_internal(self, root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_optype(other.get_node(node));
+            let node = other.get_node(node);
+            let nodetype = other.get_optype(node);
             self.op_types.set(new_node, nodetype.clone());
-            let meta = other.base_hugr().metadata.get(node);
-            self.metadata.set(new_node, meta.clone());
+            let meta = other.node_metadata_map(node);
+            if !meta.is_empty() {
+                self.metadata.set(new_node, Some(meta.clone()));
+            }
             // Add the required extensions to the registry.
             if let Ok(exts) = nodetype.used_extensions() {
                 self.use_extensions(exts);
@@ -442,7 +449,7 @@ impl HugrMut for Hugr {
         new_parent: Self::Node,
         subst: Option<Substitution>,
     ) -> BTreeMap<Self::Node, Self::Node> {
-        let mut descendants = self.base_hugr().hierarchy.descendants(root.pg_index());
+        let mut descendants = self.hierarchy.descendants(root.pg_index());
         let root2 = descendants.next();
         debug_assert_eq!(root2, Some(root.pg_index()));
         let nodes = Vec::from_iter(descendants);
@@ -466,7 +473,7 @@ impl HugrMut for Hugr {
                 (Some(subst), op) => op.substitute(subst),
             };
             self.op_types.set(new_node.pg_index(), new_optype);
-            let meta = self.base_hugr().metadata.get(node.pg_index()).clone();
+            let meta = self.metadata.get(node.pg_index()).clone();
             self.metadata.set(new_node.pg_index(), meta);
         }
         node_map
@@ -546,45 +553,6 @@ fn insert_subgraph_internal<N: HugrNode>(
     }
 
     node_map
-}
-
-/// Panic if [`HugrView::valid_node`] fails.
-#[track_caller]
-pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    // TODO: When stacking hugr wrappers, this gets called for every layer.
-    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
-    if !hugr.valid_node(node) {
-        panic!("Received an invalid node {node} while mutating a HUGR.",);
-    }
-}
-
-/// Panic if [`HugrView::valid_non_root`] fails.
-#[track_caller]
-pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    // TODO: When stacking hugr wrappers, this gets called for every layer.
-    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
-    if !hugr.valid_non_root(node) {
-        panic!("Received an invalid non-root node {node} while mutating a HUGR.",);
-    }
-}
-
-/// Panic if [`HugrView::valid_node`] fails.
-#[track_caller]
-pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
-    hugr: &H,
-    node: Node,
-    port: impl Into<Port>,
-) {
-    let port = port.into();
-    // TODO: When stacking hugr wrappers, this gets called for every layer.
-    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
-    if hugr
-        .portgraph()
-        .port_index(node.pg_index(), port.pg_offset())
-        .is_none()
-    {
-        panic!("Received an invalid port {port} for node {node} while mutating a HUGR");
-    }
 }
 
 #[cfg(test)]

@@ -51,11 +51,13 @@ pub struct SiblingGraph<'g, Root = Node> {
 macro_rules! impl_base_members {
     () => {
         #[inline]
+        fn root(&self) -> Self::Node {
+            self.root
+        }
+
+        #[inline]
         fn node_count(&self) -> usize {
-            self.base_hugr()
-                .hierarchy
-                .child_count(self.get_pg_index(self.root))
-                + 1
+            self.hierarchy().child_count(self.get_pg_index(self.root)) + 1
         }
 
         #[inline]
@@ -70,8 +72,7 @@ macro_rules! impl_base_members {
         fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone {
             // Faster implementation than filtering all the nodes in the internal graph.
             let children = self
-                .base_hugr()
-                .hierarchy
+                .hierarchy()
                 .children(self.get_pg_index(self.root))
                 .map(|n| self.get_node(n));
             iter::once(self.root).chain(children)
@@ -83,10 +84,18 @@ macro_rules! impl_base_members {
         ) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
             // Same as SiblingGraph
             let children = match node == self.root {
-                true => self.base_hugr().hierarchy.children(self.get_pg_index(node)),
+                true => self.hierarchy().children(self.get_pg_index(node)),
                 false => portgraph::hierarchy::Children::default(),
             };
             children.map(|n| self.get_node(n))
+        }
+
+        fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType {
+            self.hugr.get_optype(node)
+        }
+
+        fn extensions(&self) -> &crate::extension::ExtensionRegistry {
+            self.hugr.extensions()
         }
     };
 }
@@ -157,10 +166,15 @@ impl<Root: NodeHandle> HugrView for SiblingGraph<'_, Root> {
 
 impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
     fn new_unchecked(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Self {
+        #[allow(deprecated)]
         let hugr = hugr.base_hugr();
         Self {
             root,
-            graph: FlatRegionGraph::new(&hugr.graph, &hugr.hierarchy, hugr.get_pg_index(root)),
+            graph: FlatRegionGraph::new_with_root(
+                &hugr.graph,
+                &hugr.hierarchy,
+                hugr.get_pg_index(root),
+            ),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -173,7 +187,7 @@ where
 {
     fn try_new(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Result<Self, HugrError> {
         assert!(
-            hugr.valid_node(root),
+            hugr.contains_node(root),
             "Cannot create a sibling graph from an invalid node {}.",
             root
         );
@@ -200,13 +214,13 @@ where
     }
 
     #[inline]
-    fn base_hugr(&self) -> &Hugr {
-        self.hugr
+    fn hierarchy(&self) -> &portgraph::Hierarchy {
+        self.hugr.hierarchy()
     }
 
     #[inline]
-    fn root_node(&self) -> Node {
-        self.root
+    fn base_hugr(&self) -> &Hugr {
+        self.hugr
     }
 
     #[inline]
@@ -272,21 +286,17 @@ impl<'g, H: HugrMut, Root: NodeHandle<H::Node>> HugrInternals for SiblingMut<'g,
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
-        FlatRegionGraph::new(
+        FlatRegionGraph::new_with_root(
+            #[allow(deprecated)]
             &self.base_hugr().graph,
-            &self.base_hugr().hierarchy,
+            self.hierarchy(),
             self.get_pg_index(self.root),
         )
     }
 
     #[inline]
-    fn base_hugr(&self) -> &Hugr {
-        self.hugr.base_hugr()
-    }
-
-    #[inline]
-    fn root_node(&self) -> Self::Node {
-        self.root
+    fn hierarchy(&self) -> &portgraph::Hierarchy {
+        self.hugr.hierarchy()
     }
 
     #[inline]
@@ -302,6 +312,12 @@ impl<'g, H: HugrMut, Root: NodeHandle<H::Node>> HugrInternals for SiblingMut<'g,
     #[inline]
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap {
         self.hugr.node_metadata_map(node)
+    }
+
+    #[inline]
+    fn base_hugr(&self) -> &Hugr {
+        #[allow(deprecated)]
+        self.hugr.base_hugr()
     }
 }
 
@@ -592,7 +608,7 @@ mod test {
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
 
         assert_eq!(region.node_count(), extracted.node_count());
-        assert_eq!(region.root_type(), extracted.root_type());
+        assert_eq!(region.root_optype(), extracted.root_optype());
 
         Ok(())
     }

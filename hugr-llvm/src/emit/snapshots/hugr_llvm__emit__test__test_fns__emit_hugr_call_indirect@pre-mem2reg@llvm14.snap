@@ -20,14 +20,14 @@ entry_block:                                      ; preds = %alloca_block
 define i1 @_hl.main_unary.6(i1 %0) {
 alloca_block:
   %"0" = alloca i1, align 1
-  %"7_0" = alloca i1, align 1
   %"9_0" = alloca i1 (i1)*, align 8
+  %"7_0" = alloca i1, align 1
   %"10_0" = alloca i1, align 1
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i1 %0, i1* %"7_0", align 1
   store i1 (i1)* @_hl.main_unary.6, i1 (i1)** %"9_0", align 8
+  store i1 %0, i1* %"7_0", align 1
   %"9_01" = load i1 (i1)*, i1 (i1)** %"9_0", align 8
   %"7_02" = load i1, i1* %"7_0", align 1
   %1 = call i1 %"9_01"(i1 %"7_02")
@@ -42,17 +42,17 @@ define { i1, i1 } @_hl.main_binary.11(i1 %0, i1 %1) {
 alloca_block:
   %"0" = alloca i1, align 1
   %"1" = alloca i1, align 1
+  %"14_0" = alloca { i1, i1 } (i1, i1)*, align 8
   %"12_0" = alloca i1, align 1
   %"12_1" = alloca i1, align 1
-  %"14_0" = alloca { i1, i1 } (i1, i1)*, align 8
   %"15_0" = alloca i1, align 1
   %"15_1" = alloca i1, align 1
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
+  store { i1, i1 } (i1, i1)* @_hl.main_binary.11, { i1, i1 } (i1, i1)** %"14_0", align 8
   store i1 %0, i1* %"12_0", align 1
   store i1 %1, i1* %"12_1", align 1
-  store { i1, i1 } (i1, i1)* @_hl.main_binary.11, { i1, i1 } (i1, i1)** %"14_0", align 8
   %"14_01" = load { i1, i1 } (i1, i1)*, { i1, i1 } (i1, i1)** %"14_0", align 8
   %"12_02" = load i1, i1* %"12_0", align 1
   %"12_13" = load i1, i1* %"12_1", align 1

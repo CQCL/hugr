@@ -42,6 +42,11 @@ pub struct DescendantsGraph<'g, Root = Node> {
 }
 impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
     #[inline]
+    fn root(&self) -> Self::Node {
+        self.root
+    }
+
+    #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(self.get_pg_index(node))
     }
@@ -110,11 +115,15 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
 
     #[inline]
     fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
+        let hierarchy = self.hierarchy();
         let children = match self.graph.contains_node(self.get_pg_index(node)) {
-            true => self.base_hugr().hierarchy.children(self.get_pg_index(node)),
+            true => hierarchy.children(self.get_pg_index(node)),
             false => portgraph::hierarchy::Children::default(),
         };
-        children.map(|index| self.get_node(index))
+        children.map(move |index| {
+            let _ = hierarchy;
+            self.get_node(index)
+        })
     }
 
     #[inline]
@@ -130,6 +139,13 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
             .all_neighbours(self.get_pg_index(node))
             .map(|index| self.get_node(index))
     }
+
+    delegate::delegate! {
+        to (&self.hugr) {
+            fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
+            fn extensions(&self) -> &crate::extension::ExtensionRegistry;
+        }
+    }
 }
 
 impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
@@ -138,6 +154,7 @@ where
 {
     fn try_new(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Result<Self, HugrError> {
         check_tag::<Root, _>(hugr, root)?;
+        #[allow(deprecated)]
         let hugr = hugr.base_hugr();
         Ok(Self {
             root,
@@ -166,13 +183,9 @@ where
         &self.graph
     }
 
-    fn base_hugr(&self) -> &Hugr {
-        self.hugr
-    }
-
     #[inline]
-    fn root_node(&self) -> Node {
-        self.root
+    fn hierarchy(&self) -> &portgraph::Hierarchy {
+        self.hugr.hierarchy()
     }
 
     #[inline]
@@ -187,6 +200,10 @@ where
 
     fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap {
         self.hugr.node_metadata_map(node)
+    }
+
+    fn base_hugr(&self) -> &Hugr {
+        self.hugr
     }
 }
 
@@ -316,7 +333,7 @@ pub(super) mod test {
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
 
         assert_eq!(region.node_count(), extracted.node_count());
-        assert_eq!(region.root_type(), extracted.root_type());
+        assert_eq!(region.root_optype(), extracted.root_optype());
 
         Ok(())
     }

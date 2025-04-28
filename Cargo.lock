@@ -2012,8 +2012,7 @@ checksum = "350e9b48cbc6b0e028b0473b114454c6316e57336ee184ceab6e53f72c178b3e"
 [[package]]
 name = "portgraph"
 version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a9ea69cfb011d5f17af28813ec37a0a9668a063090e14ad75dc5fc07ba01b47"
+source = "git+https://github.com/cqcl/portgraph.git?rev=a0c83fc#a0c83fc9337afeced78b87cd4091e1672886a585"
 dependencies = [
  "bitvec",
  "delegate",

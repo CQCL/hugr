@@ -507,7 +507,7 @@ pub(crate) mod test {
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
         assert_eq!(simple_dfg_hugr.node_count(), 3);
-        assert_matches!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
+        assert_matches!(simple_dfg_hugr.root_optype().tag(), OpTag::Dfg);
     }
 
     #[test]

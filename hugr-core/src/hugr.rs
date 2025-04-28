@@ -89,6 +89,25 @@ impl Hugr {
         Self::with_capacity(root_node.into(), 0, 0)
     }
 
+    /// Create a new Hugr, with a single root node and preallocated capacity.
+    pub(crate) fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
+        let mut graph = MultiPortGraph::with_capacity(nodes, ports);
+        let hierarchy = Hierarchy::new();
+        let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
+        let root = graph.add_node(root_node.input_count(), root_node.output_count());
+        let extensions = root_node.used_extensions();
+        op_types[root] = root_node;
+
+        Self {
+            graph,
+            hierarchy,
+            root,
+            op_types,
+            metadata: UnmanagedDenseMap::with_capacity(nodes),
+            extensions: extensions.unwrap_or_default(),
+        }
+    }
+
     /// Load a Hugr from a json reader.
     ///
     /// Validates the Hugr against the provided extension registry, ensuring all
@@ -260,31 +279,6 @@ impl Hugr {
 
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
-    /// Create a new Hugr, with a single root node and preallocated capacity.
-    pub(crate) fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
-        let mut graph = MultiPortGraph::with_capacity(nodes, ports);
-        let hierarchy = Hierarchy::new();
-        let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
-        let root = graph.add_node(root_node.input_count(), root_node.output_count());
-        let extensions = root_node.used_extensions();
-        op_types[root] = root_node;
-
-        Self {
-            graph,
-            hierarchy,
-            root,
-            op_types,
-            metadata: UnmanagedDenseMap::with_capacity(nodes),
-            extensions: extensions.unwrap_or_default(),
-        }
-    }
-
-    /// Set the root node of the hugr.
-    pub(crate) fn set_root(&mut self, root: Node) {
-        self.hierarchy.detach(self.root);
-        self.root = root.pg_index();
-    }
-
     /// Add a node to the graph.
     pub(crate) fn add_node(&mut self, nodetype: OpType) -> Node {
         let node = self

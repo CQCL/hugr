@@ -2,11 +2,7 @@
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
 use hugr_core::{
-    hugr::{
-        hugrmut::HugrMut,
-        views::{DescendantsGraph, HierarchyView, SiblingGraph},
-        HugrError,
-    },
+    hugr::{hugrmut::HugrMut, HugrError},
     ops::{NamedOp, OpTag, OpTrait},
     types::EdgeKind,
     HugrView as _, Node,
@@ -51,34 +47,42 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     root: Node,
     rank: impl Fn(&H, Node) -> K,
 ) -> Result<(), HugrError> {
-    let dataflow_parents = DescendantsGraph::<Node>::try_new(hugr, root)?
-        .nodes()
+    let dataflow_parents = hugr
+        .descendants(root)
         .filter(|n| hugr.get_optype(*n).tag() <= OpTag::DataflowParent)
         .collect_vec();
     for dp in dataflow_parents {
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
-        let rank = |n| rank(hugr, n);
-        let sg = SiblingGraph::<Node>::try_new(hugr, dp)?;
-        let petgraph = NodeFiltered::from_fn(sg.as_petgraph(), |x| x != dp && x != i && x != o);
-        let ordered_nodes = ForceOrder::new(&petgraph, &rank)
-            .iter(&petgraph)
-            .filter(|&x| {
-                let expected_edge = Some(EdgeKind::StateOrder);
-                let optype = hugr.get_optype(x);
-                if optype.other_input() == expected_edge || optype.other_output() == expected_edge {
-                    assert_eq!(
-                        optype.other_input(),
-                        optype.other_output(),
-                        "Optype does not have both input and output order edge: {}",
-                        optype.name()
-                    );
-                    true
-                } else {
-                    false
-                }
-            })
-            .collect_vec();
+        let ordered_nodes = {
+            let rank = |n| rank(hugr, hugr.get_node(n));
+            let sg = hugr.region_portgraph(dp);
+            let petgraph = NodeFiltered::from_fn(&sg, |x| {
+                let x = hugr.get_node(x);
+                x != dp && x != i && x != o
+            });
+            ForceOrder::new(&petgraph, &rank)
+                .iter(&petgraph)
+                .map(|x| hugr.get_node(x))
+                .filter(|&x| {
+                    let expected_edge = Some(EdgeKind::StateOrder);
+                    let optype = hugr.get_optype(x);
+                    if optype.other_input() == expected_edge
+                        || optype.other_output() == expected_edge
+                    {
+                        assert_eq!(
+                            optype.other_input(),
+                            optype.other_output(),
+                            "Optype does not have both input and output order edge: {}",
+                            optype.name()
+                        );
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .collect_vec()
+        };
 
         // we iterate over the topologically sorted nodes, prepending the input
         // node and suffixing the output node.
