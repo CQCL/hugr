@@ -174,9 +174,7 @@ impl FunctionBuilder<Hugr> {
 
         // Update the inner input node
         let types = new_optype.signature.body().input.clone();
-        self.hugr_mut()
-            .replace_op(inp_node, Input { types })
-            .unwrap();
+        self.hugr_mut().replace_op(inp_node, Input { types });
         let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
         let new_port = new_port.next().unwrap();
 
@@ -211,9 +209,7 @@ impl FunctionBuilder<Hugr> {
 
         // Update the inner input node
         let types = new_optype.signature.body().output.clone();
-        self.hugr_mut()
-            .replace_op(out_node, Output { types })
-            .unwrap();
+        self.hugr_mut().replace_op(out_node, Output { types });
         let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
         let new_port = new_port.next().unwrap();
 
@@ -250,15 +246,13 @@ impl FunctionBuilder<Hugr> {
             .expect("FunctionBuilder node must be a FuncDefn");
         let signature = old_optype.inner_signature().into_owned();
         let name = old_optype.name.clone();
-        self.hugr_mut()
-            .replace_op(
-                parent,
-                ops::FuncDefn {
-                    signature: f(signature).into(),
-                    name,
-                },
-            )
-            .expect("Could not replace FunctionBuilder operation");
+        self.hugr_mut().replace_op(
+            parent,
+            ops::FuncDefn {
+                signature: f(signature).into(),
+                name,
+            },
+        );
 
         self.hugr().get_optype(parent).as_func_defn().unwrap()
     }

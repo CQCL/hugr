@@ -732,8 +732,7 @@ mod test {
         // Root node type needs to be that of common parent of the removed nodes:
         let mut rep2 = rep.clone();
         rep2.replacement
-            .replace_op(rep2.replacement.root(), h.root_type().clone())
-            .unwrap();
+            .replace_op(rep2.replacement.root(), h.root_type().clone());
         assert_eq!(
             check_same_errors(rep2),
             ReplaceError::WrongRootNodeTag {

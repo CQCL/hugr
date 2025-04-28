@@ -23,7 +23,7 @@ use portgraph::multiportgraph::MultiPortGraph;
 use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
-pub use self::views::{HugrView, RootTagged};
+pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
@@ -367,13 +367,10 @@ pub struct ExtensionError {
 }
 
 /// Errors that can occur while manipulating a Hugr.
-///
-/// TODO: Better descriptions, not just re-exporting portgraph errors.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
     /// The node was not of the required [OpTag]
-    /// (e.g. to conform to the [RootTagged::RootHandle] of a [HugrView])
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
@@ -671,12 +668,12 @@ mod test {
                 signature: Signature::new_endo(ty).with_extension_delta(result.clone()),
             };
             let mut expected = backup;
-            expected.replace_op(p, expected_p).unwrap();
+            expected.replace_op(p, expected_p);
             let expected_gp = ops::Conditional {
                 extension_delta: result,
                 ..root_ty
             };
-            expected.replace_op(h.root(), expected_gp).unwrap();
+            expected.replace_op(h.root(), expected_gp);
 
             assert_eq!(h, expected);
         } else {

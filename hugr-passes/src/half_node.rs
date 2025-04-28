@@ -3,12 +3,10 @@ use std::hash::Hash;
 use super::nest_cfgs::CfgNodeMap;
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::hugr::RootTagged;
-
+use hugr_core::hugr::views::RootCheckable;
 use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{OpTag, OpTrait};
-
-use hugr_core::{Direction, Node};
+use hugr_core::{Direction, HugrView, Node};
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
@@ -32,9 +30,12 @@ struct HalfNodeView<H: HugrInternals> {
     exit: H::Node,
 }
 
-impl<H: RootTagged<RootHandle = CfgID>> HalfNodeView<H> {
+impl<H: HugrView> HalfNodeView<H> {
     #[allow(unused)]
-    pub(crate) fn new(h: H) -> Self {
+    pub(crate) fn new(h: impl RootCheckable<H, CfgID<H::Node>>) -> Self {
+        let checked = h.try_into_checked().expect("Hugr must be a CFG region");
+        let h = checked.into_hugr();
+
         let (entry, exit) = {
             let mut children = h.children(h.root());
             (children.next().unwrap(), children.next().unwrap())
@@ -64,7 +65,7 @@ impl<H: RootTagged<RootHandle = CfgID>> HalfNodeView<H> {
     }
 }
 
-impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode<H::Node>> for HalfNodeView<H> {
+impl<H: HugrView> CfgNodeMap<HalfNode<H::Node>> for HalfNodeView<H> {
     fn entry_node(&self) -> HalfNode<H::Node> {
         HalfNode::N(self.entry)
     }
@@ -98,7 +99,6 @@ mod test {
     use super::super::nest_cfgs::{test::*, EdgeClassifier};
     use super::{HalfNode, HalfNodeView};
     use hugr_core::builder::BuildError;
-    use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::NodeHandle;
 
     use itertools::Itertools;
@@ -118,7 +118,7 @@ mod test {
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identify two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
 
-        let v = HalfNodeView::new(RootChecked::try_new(&h).unwrap());
+        let v = HalfNodeView::new(&h);
 
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;

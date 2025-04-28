@@ -83,8 +83,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             .clone();
         let body = signature.body().clone();
         self.hugr_mut()
-            .replace_op(f_node, ops::FuncDefn { name, signature })
-            .expect("Replacing a FuncDecl node with a FuncDefn should always be valid");
+            .replace_op(f_node, ops::FuncDefn { name, signature });
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
