@@ -8,14 +8,16 @@ use std::sync::Arc;
 use delegate::delegate;
 use lazy_static::lazy_static;
 
+use crate::builder::{BuildError, Dataflow};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::simple_op::MakeOpDef;
+use crate::extension::simple_op::{HasConcrete, MakeOpDef};
 use crate::extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{CustomCheckFailure, Type, TypeBound, TypeName};
-use crate::Extension;
+use crate::{Extension, Wire};
 
+use super::array::op_builder::GenericArrayOpBuilder;
 use super::array::{
     Array, ArrayKind, GenericArrayConvert, GenericArrayConvertDef, GenericArrayOp,
     GenericArrayOpDef, GenericArrayRepeat, GenericArrayRepeatDef, GenericArrayScan,
@@ -142,3 +144,189 @@ pub fn value_array_type_parametric(
 ) -> Result<Type, SignatureError> {
     ValueArray::ty_parametric(size, element_ty)
 }
+
+/// Trait for building value array operations in a dataflow graph.
+pub trait VArrayOpBuilder: GenericArrayOpBuilder {
+    /// Adds a new array operation to the dataflow graph and return the wire
+    /// representing the new array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `values` - An iterator over the values to initialize the array with.
+    ///
+    /// # Errors
+    ///
+    /// If building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the new array.
+    fn add_new_value_array(
+        &mut self,
+        elem_ty: Type,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        self.add_new_generic_array::<ValueArray>(elem_ty, values)
+    }
+
+    /// Adds an array get operation to the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index` - The wire representing the index to get.
+    ///
+    /// # Errors
+    ///
+    /// If building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// * The wire representing the value at the specified index in the array
+    /// * The wire representing the array
+    fn add_value_array_get(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+        index: Wire,
+    ) -> Result<(Wire, Wire), BuildError> {
+        self.add_generic_array_get::<ValueArray>(elem_ty, size, input, index)
+    }
+
+    /// Adds an array set operation to the dataflow graph.
+    ///
+    /// This operation sets the value at a specified index in the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index` - The wire representing the index to set.
+    /// * `value` - The wire representing the value to set at the specified index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the updated array after the set operation.
+    fn add_value_array_set(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+        index: Wire,
+        value: Wire,
+    ) -> Result<Wire, BuildError> {
+        self.add_generic_array_set::<ValueArray>(elem_ty, size, input, index, value)
+    }
+
+    /// Adds an array swap operation to the dataflow graph.
+    ///
+    /// This operation swaps the values at two specified indices in the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index1` - The wire representing the first index to swap.
+    /// * `index2` - The wire representing the second index to swap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the updated array after the swap operation.
+    fn add_value_array_swap(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+        index1: Wire,
+        index2: Wire,
+    ) -> Result<Wire, BuildError> {
+        let op =
+            GenericArrayOpDef::<ValueArray>::swap.instantiate(&[size.into(), elem_ty.into()])?;
+        let [out] = self
+            .add_dataflow_op(op, vec![input, index1, index2])?
+            .outputs_arr();
+        Ok(out)
+    }
+
+    /// Adds an array pop-left operation to the dataflow graph.
+    ///
+    /// This operation removes the leftmost element from the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
+    fn add_array_pop_left(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+    ) -> Result<Wire, BuildError> {
+        self.add_generic_array_pop_left::<ValueArray>(elem_ty, size, input)
+    }
+
+    /// Adds an array pop-right operation to the dataflow graph.
+    ///
+    /// This operation removes the rightmost element from the array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
+    fn add_array_pop_right(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+    ) -> Result<Wire, BuildError> {
+        self.add_generic_array_pop_right::<ValueArray>(elem_ty, size, input)
+    }
+
+    /// Adds an operation to discard an empty array from the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    fn add_array_discard_empty(&mut self, elem_ty: Type, input: Wire) -> Result<(), BuildError> {
+        self.add_generic_array_discard_empty::<ValueArray>(elem_ty, input)
+    }
+}
+
+impl<D: Dataflow> VArrayOpBuilder for D {}
