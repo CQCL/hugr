@@ -560,7 +560,7 @@ mod test {
     fn prelude_panic(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "PANIC");
         let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
-        let type_arg_2q: TypeArg = TypeArg::Sequence {
+        let type_arg_2q: TypeArg = TypeArg::List {
             elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE
@@ -588,7 +588,7 @@ mod test {
     fn prelude_exit(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "EXIT");
         let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
-        let type_arg_2q: TypeArg = TypeArg::Sequence {
+        let type_arg_2q: TypeArg = TypeArg::List {
             elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let exit_op = PRELUDE

@@ -565,12 +565,24 @@ mod test {
         )
         .unwrap_err();
 
-        // TypeParam::Tuples require a TypeArg::Seq of the same number of elems
+        // TypeParam::Tuples require a TypeArg::Tuple of the same number of elems
         let usize_and_ty = TypeParam::Tuple {
             params: vec![TypeParam::max_nat(), TypeBound::Copyable.into()],
         };
-        check(vec![5.into(), usize_t().into()], &usize_and_ty).unwrap();
-        check(vec![usize_t().into(), 5.into()], &usize_and_ty).unwrap_err(); // Wrong way around
+        check(
+            TypeArg::Tuple {
+                elems: vec![5.into(), usize_t().into()],
+            },
+            &usize_and_ty,
+        )
+        .unwrap();
+        check(
+            TypeArg::Tuple {
+                elems: vec![usize_t().into(), 5.into()],
+            },
+            &usize_and_ty,
+        )
+        .unwrap_err(); // Wrong way around
         let two_types = TypeParam::Tuple {
             params: vec![TypeBound::Any.into(), TypeBound::Any.into()],
         };
