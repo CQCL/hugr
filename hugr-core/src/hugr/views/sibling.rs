@@ -231,6 +231,17 @@ where
     }
 
     #[inline]
+    fn region_portgraph(
+        &self,
+        parent: Self::Node,
+    ) -> portgraph::view::FlatRegion<
+        '_,
+        impl portgraph::view::LinkView<LinkEndpoint: Eq> + Clone + '_,
+    > {
+        self.hugr.region_portgraph(parent)
+    }
+
+    #[inline]
     fn hierarchy(&self) -> &portgraph::Hierarchy {
         self.hugr.hierarchy()
     }
@@ -309,6 +320,17 @@ impl<'g, H: HugrMut, Root: NodeHandle<H::Node>> HugrInternals for SiblingMut<'g,
             self.hierarchy(),
             self.to_portgraph_node(self.root),
         )
+    }
+
+    #[inline]
+    fn region_portgraph(
+        &self,
+        parent: Self::Node,
+    ) -> portgraph::view::FlatRegion<
+        '_,
+        impl portgraph::view::LinkView<LinkEndpoint: Eq> + Clone + '_,
+    > {
+        self.hugr.region_portgraph(parent)
     }
 
     #[inline]

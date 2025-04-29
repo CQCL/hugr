@@ -36,11 +36,7 @@ pub trait HugrInternals {
     fn region_portgraph(
         &self,
         parent: Self::Node,
-    ) -> portgraph::view::FlatRegion<'_, Self::Portgraph<'_>> {
-        let pg = self.portgraph();
-        let root = self.to_portgraph_node(parent);
-        portgraph::view::FlatRegion::new_without_root(pg, self.hierarchy(), root)
-    }
+    ) -> portgraph::view::FlatRegion<'_, impl LinkView<LinkEndpoint: Eq> + Clone + '_>;
 
     /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
     /// returned by [`HugrInternals::portgraph`].
@@ -80,6 +76,16 @@ impl HugrInternals for Hugr {
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
         &self.graph
+    }
+
+    #[inline]
+    fn region_portgraph(
+        &self,
+        parent: Self::Node,
+    ) -> portgraph::view::FlatRegion<'_, impl LinkView<LinkEndpoint: Eq> + Clone + '_> {
+        let pg = self.portgraph();
+        let root = self.to_portgraph_node(parent);
+        portgraph::view::FlatRegion::new_without_root(pg, &self.hierarchy, root)
     }
 
     #[inline]

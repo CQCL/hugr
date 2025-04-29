@@ -12,7 +12,7 @@ macro_rules! hugr_internal_methods {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
                 fn portgraph(&self) -> Self::Portgraph<'_>;
-                fn region_portgraph(&self, parent: Self::Node) -> portgraph::view::FlatRegion<'_, Self::Portgraph<'_>>;
+                fn region_portgraph(&self, parent: Self::Node) -> portgraph::view::FlatRegion<'_, impl portgraph::view::LinkView<LinkEndpoint: Eq> + Clone + '_>;
                 fn hierarchy(&self) -> &portgraph::Hierarchy;
                 fn to_portgraph_node(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
                 fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;

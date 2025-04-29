@@ -508,7 +508,7 @@ impl HugrView for Hugr {
         if !check_valid_non_root(self, node) {
             return None;
         };
-        self.hierarchy()
+        self.hierarchy
             .parent(self.to_portgraph_node(node))
             .map(|index| self.from_portgraph_node(index))
     }
