@@ -1390,19 +1390,14 @@ mod test {
     }
 
     #[rstest]
-    #[case(&[], 0, 0)]
-    #[case(&[true], 1, 1)]
-    #[case(&[false], 1, 4)]
-    #[case(&[true, true], 2, 3)]
-    #[case(&[false, false], 2, 6)]
-    #[case(&[true, false, true], 3, 7)]
-    #[case(&[false, true, false], 3, 7)]
-    fn exec_pop(
-        mut exec_ctx: TestContext,
-        #[case] from_left: &[bool],
-        #[case] num: usize,
-        #[case] expected: u64,
-    ) {
+    #[case(&[], 0)]
+    #[case(&[true], 1)]
+    #[case(&[false], 4)]
+    #[case(&[true, true], 3)]
+    #[case(&[false, false], 6)]
+    #[case(&[true, false, true], 7)]
+    #[case(&[false, true, false], 7)]
+    fn exec_pop(mut exec_ctx: TestContext, #[case] from_left: &[bool], #[case] expected: u64) {
         // We build a HUGR that:
         // - Creates an array: [1,2,4]
         // - Pops `num` elements from the left or right
@@ -1422,9 +1417,9 @@ mod test {
                 let mut arr = builder
                     .add_new_array(int_ty.clone(), new_array_args)
                     .unwrap();
-                for i in 0..num {
+                for (i, left) in from_left.iter().enumerate() {
                     let array_size = (array_contents.len() - i) as u64;
-                    let pop_res = if from_left[i] {
+                    let pop_res = if *left {
                         builder
                             .add_array_pop_left(int_ty.clone(), array_size, arr)
                             .unwrap()
@@ -1447,7 +1442,11 @@ mod test {
                     r = builder.add_iadd(6, r, elem).unwrap();
                 }
                 builder
-                    .add_array_discard(int_ty.clone(), (array_contents.len() - num) as u64, arr)
+                    .add_array_discard(
+                        int_ty.clone(),
+                        (array_contents.len() - from_left.len()) as u64,
+                        arr,
+                    )
                     .unwrap();
                 builder.finish_with_outputs([r]).unwrap()
             });
