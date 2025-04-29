@@ -782,13 +782,12 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
             let elem_ptr = unsafe { builder.build_in_bounds_gep(array_ptr, &[array_offset], "") }?;
             (elem_ptr, new_array_offset)
         } else {
-            let elem_ptr = unsafe {
-                builder.build_in_bounds_gep(
-                    array_ptr,
-                    &[usize_ty(&ts).const_int(size - 1, false)],
-                    "",
-                )
-            }?;
+            let idx = builder.build_int_add(
+                array_offset,
+                usize_ty(&ts).const_int(size - 1, false),
+                "",
+            )?;
+            let elem_ptr = unsafe { builder.build_in_bounds_gep(array_ptr, &[idx], "") }?;
             (elem_ptr, array_offset)
         }
     };
@@ -1338,17 +1337,16 @@ mod test {
     }
 
     #[rstest]
-    #[case(true, 0, 0)]
-    #[case(true, 1, 1)]
-    #[case(true, 2, 3)]
-    #[case(true, 3, 7)]
-    #[case(false, 0, 0)]
-    #[case(false, 1, 4)]
-    #[case(false, 2, 6)]
-    #[case(false, 3, 7)]
+    #[case(&[], 0, 0)]
+    #[case(&[true], 1, 1)]
+    #[case(&[false], 1, 4)]
+    #[case(&[true, true], 2, 3)]
+    #[case(&[false, false], 2, 6)]
+    #[case(&[true, false, true], 3, 7)]
+    #[case(&[false, true, false], 3, 7)]
     fn exec_pop(
         mut exec_ctx: TestContext,
-        #[case] from_left: bool,
+        #[case] from_left: &[bool],
         #[case] num: usize,
         #[case] expected: u64,
     ) {
@@ -1373,7 +1371,7 @@ mod test {
                     .unwrap();
                 for i in 0..num {
                     let array_size = (array_contents.len() - i) as u64;
-                    let pop_res = if from_left {
+                    let pop_res = if from_left[i] {
                         builder
                             .add_array_pop_left(int_ty.clone(), array_size, arr)
                             .unwrap()
