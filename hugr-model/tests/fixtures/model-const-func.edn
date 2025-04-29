@@ -1,0 +1,8 @@
+(hugr 0)
+
+(mod)
+
+(define-alias id
+  (param ?t core.type)
+  (core.const (core.fn [?t] [?t]))
+  (fn (dfg [%x] [%x])))

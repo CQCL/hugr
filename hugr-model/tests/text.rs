@@ -19,3 +19,9 @@ pub fn test_declarative_extensions() {
 pub fn test_literals() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-literals.edn")))
 }
+
+#[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+pub fn test_const_func() {
+    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-const-func.edn")))
+}
