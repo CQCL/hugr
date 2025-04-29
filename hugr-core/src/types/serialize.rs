@@ -104,8 +104,14 @@ pub(super) enum TypeArgSer {
     List {
         elems: Vec<Term>,
     },
+    ListConcat {
+        lists: Vec<Term>,
+    },
     Tuple {
         elems: Vec<Term>,
+    },
+    TupleConcat {
+        tuples: Vec<Term>,
     },
     Variable {
         #[serde(flatten)]
@@ -139,6 +145,8 @@ impl From<Term> for TermSer {
             Term::List(elems) => TermSer::TypeArg(TypeArgSer::List { elems }),
             Term::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple { elems }),
             Term::Variable(v) => TermSer::TypeArg(TypeArgSer::Variable { v }),
+            Term::ListConcat(lists) => TermSer::TypeArg(TypeArgSer::ListConcat { lists }),
+            Term::TupleConcat(tuples) => TermSer::TypeArg(TypeArgSer::TupleConcat { tuples }),
         }
     }
 }
@@ -165,6 +173,8 @@ impl From<TermSer> for Term {
                 TypeArgSer::List { elems } => Term::List(elems),
                 TypeArgSer::Tuple { elems } => Term::Tuple(elems),
                 TypeArgSer::Variable { v } => Term::Variable(v),
+                TypeArgSer::ListConcat { lists } => Term::ListConcat(lists),
+                TypeArgSer::TupleConcat { tuples } => Term::TupleConcat(tuples),
             },
         }
     }

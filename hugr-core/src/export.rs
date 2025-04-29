@@ -944,7 +944,7 @@ impl<'a> Context<'a> {
 
                 self.make_term_apply(model::CORE_TYPE, &[])
             }
-            Term::BoundedNatType { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
+            Term::BoundedNatType(_) => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
             Term::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
             Term::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
             Term::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
@@ -975,11 +975,27 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
+            Term::ListConcat(lists) => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    lists
+                        .iter()
+                        .map(|elem| table::SeqPart::Splice(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::List(parts))
+            }
             Term::Tuple(elems) => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
                         .map(|elem| table::SeqPart::Item(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::Tuple(parts))
+            }
+            Term::TupleConcat(tuples) => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    tuples
+                        .iter()
+                        .map(|elem| table::SeqPart::Splice(self.export_term(elem, None))),
                 );
                 self.make_term(table::Term::Tuple(parts))
             }

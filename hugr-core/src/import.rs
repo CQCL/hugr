@@ -25,13 +25,14 @@ use crate::{
     types::{
         CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
         Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
-        type_param::TypeParam, type_row::TypeRowBase,
+        type_param::{SeqPart, TypeParam},
+        type_row::TypeRowBase,
     },
 };
 use fxhash::FxHashMap;
 use hugr_model::v0 as model;
 use hugr_model::v0::table;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
@@ -1282,28 +1283,24 @@ impl<'a> Context<'a> {
                     Ok(Term::new_var_use(var.1 as _, decl))
                 }
 
-                table::Term::List { .. } => {
-                    let elems = (|| {
-                        self.import_closed_list(term_id)?
-                            .iter()
-                            .map(|item| self.import_term(*item))
-                            .collect::<Result<_, _>>()
-                    })()
-                    .map_err(|err| error_context!(err, "list items"))?;
-
-                    Ok(Term::List(elems))
+                table::Term::List(parts) => {
+                    // PERFORMANCE: Can we do this without the additional allocation?
+                    let parts: Vec<_> = parts
+                        .iter()
+                        .map(|part| self.import_seq_part(part))
+                        .collect::<Result<_, _>>()
+                        .map_err(|err| error_context!(err, "list parts"))?;
+                    Ok(TypeArg::new_list_from_parts(parts))
                 }
 
-                table::Term::Tuple { .. } => {
-                    let elems = (|| {
-                        self.import_closed_list(term_id)?
-                            .iter()
-                            .map(|item| self.import_term(*item))
-                            .collect::<Result<_, _>>()
-                    })()
-                    .map_err(|err| error_context!(err, "tuple items"))?;
-
-                    Ok(Term::Tuple(elems))
+                table::Term::Tuple(parts) => {
+                    // PERFORMANCE: Can we do this without the additional allocation?
+                    let parts: Vec<_> = parts
+                        .iter()
+                        .map(|part| self.import_seq_part(part))
+                        .try_collect()
+                        .map_err(|err| error_context!(err, "tuple parts"))?;
+                    Ok(TypeArg::new_tuple_from_parts(parts))
                 }
 
                 table::Term::Literal(model::Literal::Str(value)) => {
@@ -1325,6 +1322,16 @@ impl<'a> Context<'a> {
             }
         })()
         .map_err(|err| error_context!(err, "term {}", term_id))
+    }
+
+    fn import_seq_part(
+        &mut self,
+        seq_part: &'a table::SeqPart,
+    ) -> Result<SeqPart<TypeArg>, ImportError> {
+        Ok(match seq_part {
+            table::SeqPart::Item(term_id) => SeqPart::Item(self.import_term(*term_id)?),
+            table::SeqPart::Splice(term_id) => SeqPart::Splice(self.import_term(*term_id)?),
+        })
     }
 
     /// Import a `Type` from a term that represents a runtime type.

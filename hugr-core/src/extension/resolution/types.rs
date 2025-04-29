@@ -235,6 +235,16 @@ pub(super) fn collect_term_exts(
                 collect_term_exts(item_type, used_extensions, missing_extensions);
             }
         }
+        Term::ListConcat(lists) => {
+            for list in lists {
+                collect_term_exts(list, used_extensions, missing_extensions);
+            }
+        }
+        Term::TupleConcat(tuples) => {
+            for tuple in tuples {
+                collect_term_exts(tuple, used_extensions, missing_extensions);
+            }
+        }
         Term::Variable(_)
         | Term::RuntimeType(_)
         | Term::StaticType

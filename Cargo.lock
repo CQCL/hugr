@@ -1268,12 +1268,14 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "regex",
+ "relrc",
  "rstest",
  "semver",
  "serde",
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "smallvec",
  "smol_str",
  "static_assertions",
  "strum",
@@ -2580,6 +2582,7 @@ dependencies = [
  "fxhash",
  "itertools 0.13.0",
  "petgraph 0.8.1",
+ "serde",
  "thiserror 1.0.69",
 ]
 
