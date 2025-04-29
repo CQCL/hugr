@@ -79,13 +79,13 @@ pub trait HugrView: HugrInternals {
 
     /// Returns the number of nodes in the HUGR.
     #[inline]
-    fn node_count(&self) -> usize {
+    fn num_nodes(&self) -> usize {
         self.portgraph().node_count()
     }
 
     /// Returns the number of edges in the HUGR.
     #[inline]
-    fn edge_count(&self) -> usize {
+    fn num_edges(&self) -> usize {
         self.portgraph().link_count()
     }
 

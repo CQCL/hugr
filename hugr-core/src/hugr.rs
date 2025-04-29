@@ -316,7 +316,7 @@ impl Hugr {
     /// preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
         // Generate the ordered list of nodes
-        let mut ordered = Vec::with_capacity(self.node_count());
+        let mut ordered = Vec::with_capacity(self.num_nodes());
         let root = self.root();
         ordered.extend(self.as_mut().canonical_order(root));
 

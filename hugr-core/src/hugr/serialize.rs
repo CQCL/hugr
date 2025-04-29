@@ -157,13 +157,13 @@ impl TryFrom<&Hugr> for SerHugrLatest {
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
-        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
+        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
         for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
-        let mut nodes = vec![None; hugr.node_count()];
-        let mut metadata = vec![None; hugr.node_count()];
+        let mut nodes = vec![None; hugr.num_nodes()];
+        let mut metadata = vec![None; hugr.num_nodes()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_optype(n);

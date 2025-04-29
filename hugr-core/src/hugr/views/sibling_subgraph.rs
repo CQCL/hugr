@@ -1010,9 +1010,9 @@ mod tests {
 
         assert_eq!(rep.subgraph().nodes().len(), 4);
 
-        assert_eq!(hugr.node_count(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
+        assert_eq!(hugr.num_nodes(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
         hugr.apply_rewrite(rep).unwrap();
-        assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
+        assert_eq!(hugr.num_nodes(), 4); // Module + Def + In + Out
 
         Ok(())
     }

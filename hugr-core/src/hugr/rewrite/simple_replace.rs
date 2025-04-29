@@ -745,7 +745,7 @@ pub(in crate::hugr::rewrite) mod test {
         .unwrap();
 
         // They should be the same, up to node indices
-        assert_eq!(h.edge_count(), orig.edge_count());
+        assert_eq!(h.num_edges(), orig.num_edges());
     }
 
     #[test]
@@ -797,7 +797,7 @@ pub(in crate::hugr::rewrite) mod test {
         .unwrap();
 
         // Nothing changed
-        assert_eq!(h.node_count(), orig.node_count());
+        assert_eq!(h.num_nodes(), orig.num_nodes());
     }
 
     /// Remove all the NOT gates in [`dfg_hugr_copy_bools`] by connecting the input
@@ -854,7 +854,7 @@ pub(in crate::hugr::rewrite) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.node_count(), 3);
+        assert_eq!(hugr.num_nodes(), 3);
     }
 
     /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting the input
@@ -912,7 +912,7 @@ pub(in crate::hugr::rewrite) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.node_count(), 4);
+        assert_eq!(hugr.num_nodes(), 4);
     }
 
     #[rstest]
@@ -951,12 +951,12 @@ pub(in crate::hugr::rewrite) mod test {
 
         let rewrite = SimpleReplacement::new(subgraph, replacement, nu_inp, nu_out);
 
-        assert_eq!(h.node_count(), 4);
+        assert_eq!(h.num_nodes(), 4);
 
         rewrite.apply(&mut h).unwrap_or_else(|e| panic!("{e}"));
         h.validate().unwrap_or_else(|e| panic!("{e}"));
 
-        assert_eq!(h.node_count(), 6);
+        assert_eq!(h.num_nodes(), 6);
     }
 
     use crate::hugr::rewrite::replace::Replacement;

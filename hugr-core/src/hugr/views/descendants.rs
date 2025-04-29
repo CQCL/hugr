@@ -52,12 +52,12 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
     }
 
     #[inline]
-    fn node_count(&self) -> usize {
+    fn num_nodes(&self) -> usize {
         self.graph.node_count()
     }
 
     #[inline]
-    fn edge_count(&self) -> usize {
+    fn num_edges(&self) -> usize {
         self.graph.link_count()
     }
 
@@ -264,7 +264,7 @@ pub(super) mod test {
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
         let def_io = region.get_io(def).unwrap();
 
-        assert_eq!(region.node_count(), 7);
+        assert_eq!(region.num_nodes(), 7);
         assert!(region.nodes().all(|n| n == def
             || hugr.get_parent(n) == Some(def)
             || hugr.get_parent(n) == Some(inner)));
@@ -284,8 +284,8 @@ pub(super) mod test {
             inner_region.inner_function_type().map(Cow::into_owned),
             Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
-        assert_eq!(inner_region.node_count(), 3);
-        assert_eq!(inner_region.edge_count(), 1);
+        assert_eq!(inner_region.num_nodes(), 3);
+        assert_eq!(inner_region.num_edges(), 1);
         assert_eq!(inner_region.children(inner).count(), 2);
         assert_eq!(inner_region.children(hugr.root()).count(), 0);
         assert_eq!(
@@ -334,7 +334,7 @@ pub(super) mod test {
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
 
-        assert_eq!(region.node_count(), extracted.node_count());
+        assert_eq!(region.num_nodes(), extracted.num_nodes());
         assert_eq!(region.root_optype(), extracted.root_optype());
 
         Ok(())

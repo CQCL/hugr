@@ -34,8 +34,6 @@ macro_rules! hugr_view_methods {
                 fn contains_node(&self, node: Self::Node) -> bool;
                 fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
                 fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
-                fn node_count(&self) -> usize;
-                fn edge_count(&self) -> usize;
                 fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
                 fn node_ports(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = crate::Port> + Clone;
                 fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = crate::OutgoingPort> + Clone;

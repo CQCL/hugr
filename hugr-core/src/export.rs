@@ -95,7 +95,7 @@ struct Context<'a> {
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
         let mut module = table::Module::default();
-        module.nodes.reserve(hugr.node_count());
+        module.nodes.reserve(hugr.num_nodes());
         let links = Links::new(hugr);
 
         Self {

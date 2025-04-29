@@ -56,14 +56,14 @@ macro_rules! impl_base_members {
         }
 
         #[inline]
-        fn node_count(&self) -> usize {
+        fn num_nodes(&self) -> usize {
             self.hierarchy()
                 .child_count(self.to_portgraph_node(self.root))
                 + 1
         }
 
         #[inline]
-        fn edge_count(&self) -> usize {
+        fn num_edges(&self) -> usize {
             // Faster implementation than filtering all the nodes in the internal graph.
             self.nodes()
                 .map(|n| self.output_neighbours(n).count())
@@ -453,7 +453,7 @@ mod test {
     {
         let def_io = region.get_io(def).unwrap();
 
-        assert_eq!(region.node_count(), 5);
+        assert_eq!(region.num_nodes(), 5);
         assert_eq!(region.portgraph().node_count(), 5);
         assert!(region.nodes().all(|n| n == def
             || hugr.get_parent(n) == Some(def)
@@ -473,8 +473,8 @@ mod test {
             inner_region.inner_function_type().map(Cow::into_owned),
             Some(Signature::new(vec![usize_t()], vec![usize_t()]))
         );
-        assert_eq!(inner_region.node_count(), 3);
-        assert_eq!(inner_region.edge_count(), 1);
+        assert_eq!(inner_region.num_nodes(), 3);
+        assert_eq!(inner_region.num_edges(), 1);
         assert_eq!(inner_region.children(inner).count(), 2);
         assert_eq!(inner_region.children(hugr.root()).count(), 0);
         assert_eq!(
@@ -609,7 +609,7 @@ mod test {
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
 
-        assert_eq!(region.node_count(), extracted.node_count());
+        assert_eq!(region.num_nodes(), extracted.num_nodes());
         assert_eq!(region.root_optype(), extracted.root_optype());
 
         Ok(())

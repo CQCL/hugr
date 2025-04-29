@@ -657,14 +657,14 @@ mod test {
             fd
         });
         hugr.validate().unwrap();
-        assert_eq!(hugr.node_count(), 7);
+        assert_eq!(hugr.num_nodes(), 7);
 
         hugr.remove_subtree(foo);
         hugr.validate().unwrap();
-        assert_eq!(hugr.node_count(), 4);
+        assert_eq!(hugr.num_nodes(), 4);
 
         hugr.remove_subtree(bar);
         hugr.validate().unwrap();
-        assert_eq!(hugr.node_count(), 1);
+        assert_eq!(hugr.num_nodes(), 1);
     }
 }

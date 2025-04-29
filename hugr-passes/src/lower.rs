@@ -138,6 +138,6 @@ mod test {
         });
 
         assert_eq!(lowered.unwrap().len(), 1);
-        assert_eq!(h.node_count(), 3); // DFG, input, output
+        assert_eq!(h.num_nodes(), 3); // DFG, input, output
     }
 }

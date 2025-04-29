@@ -55,7 +55,7 @@ where
     T: HugrView,
 {
     fn node_count(&self) -> usize {
-        HugrView::node_count(self.hugr)
+        HugrView::num_nodes(self.hugr)
     }
 }
 
@@ -64,7 +64,7 @@ where
     T: HugrView,
 {
     fn node_bound(&self) -> usize {
-        HugrView::node_count(self.hugr)
+        HugrView::num_nodes(self.hugr)
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
@@ -81,7 +81,7 @@ where
     T: HugrView,
 {
     fn edge_count(&self) -> usize {
-        HugrView::edge_count(self.hugr)
+        HugrView::num_edges(self.hugr)
     }
 }
 

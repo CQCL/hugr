@@ -140,7 +140,7 @@ mod test {
 
         let mut h = build.finish_hugr()?;
         // nodes are Module, Function, Input, Output, Const, LoadConstant*2, MakeTuple
-        assert_eq!(h.node_count(), 8);
+        assert_eq!(h.num_nodes(), 8);
         let tup_node = tup.node();
         // can't remove invalid node
         assert_eq!(
@@ -195,7 +195,7 @@ mod test {
         // remove const
         assert_eq!(h.apply_rewrite(remove_con)?, h.root());
 
-        assert_eq!(h.node_count(), 4);
+        assert_eq!(h.num_nodes(), 4);
         assert!(h.validate().is_ok());
         Ok(())
     }
