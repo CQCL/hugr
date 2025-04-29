@@ -247,7 +247,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
             .add_dataflow_op(op, replacement.input_wires())
             .unwrap()
             .outputs_arr();
-        outputs.extend(std::iter::repeat(tuple).take(num_other_outputs))
+        outputs.extend(std::iter::repeat_n(tuple, num_other_outputs))
     }
 
     // These should never fail, as we are defining the replacement ourselves.
