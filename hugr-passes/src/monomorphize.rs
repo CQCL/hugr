@@ -593,7 +593,8 @@ mod test {
     #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$t(int(2))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
-    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq($n(0)$t(Unit))")]
+    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
+    #[case::sequence(vec![TypeArg::Tuple { elems: vec![0.into(), Type::UNIT.into()] }], "$foo$$tuple($n(0)$t(Unit))")]
     #[should_panic]
     #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String)],
                             "$foo$$v(1)")]
