@@ -19,6 +19,7 @@ pub struct DeadCodeElimPass {
     /// results are not used. Defaults to [PreserveNode::default_for].
     preserve_callback: Arc<PreserveCallback>,
     validation: ValidationLevel,
+    include_exports: bool,
 }
 
 impl Default for DeadCodeElimPass {
@@ -27,6 +28,7 @@ impl Default for DeadCodeElimPass {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
             validation: ValidationLevel::default(),
+            include_exports: true,
         }
     }
 }
@@ -102,11 +104,18 @@ impl DeadCodeElimPass {
 
     /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
     /// used to evaluate these nodes.
-    /// The root node is assumed to be an entry point;
-    /// for Module roots the client will want to mark some of the FuncDefn children
-    /// as entry points too.
+    /// The root node is assumed to be an entry point; for Module roots, any public
+    /// [FuncDefn](OpType::FuncDefn)s and [Const](OpType::Const)s are also considered entry points
+    /// by default, but these can be removed by [Self::include_module_exports].
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = Node>) -> Self {
         self.entry_points.extend(entry_points);
+        self
+    }
+
+    /// Sets whether, for Module-rooted Hugrs, the exported [FuncDefn](OpType::FuncDefn)s
+    /// and [Const](OpType::Const)s are included as entry points (they are by default)
+    pub fn include_module_exports(mut self, include: bool) -> Self {
+        self.include_exports = include;
         self
     }
 
@@ -114,6 +123,13 @@ impl DeadCodeElimPass {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
+        if self.include_exports && h.root_type().is_module() {
+            q.extend(h.children(h.root()).filter(|ch| {
+                let op = h.get_optype(*ch);
+                op.as_func_defn().is_some_and(|fd| fd.public)
+                    || op.as_const().is_some_and(|c| c.is_public())
+            }))
+        }
         q.push_front(h.root());
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {

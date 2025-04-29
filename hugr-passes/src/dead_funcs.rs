@@ -61,11 +61,22 @@ fn reachable_funcs<'a, H: HugrView>(
     }))
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 /// A configuration for the Dead Function Removal pass.
 pub struct RemoveDeadFuncsPass {
     validation: ValidationLevel,
     entry_points: Vec<Node>,
+    include_exports: bool,
+}
+
+impl Default for RemoveDeadFuncsPass {
+    fn default() -> Self {
+        Self {
+            validation: Default::default(),
+            entry_points: Default::default(),
+            include_exports: true,
+        }
+    }
 }
 
 impl RemoveDeadFuncsPass {
@@ -88,10 +99,28 @@ impl RemoveDeadFuncsPass {
         self
     }
 
+    /// Sets whether the exported [FuncDefn](hugr_core::ops::FuncDefn) children of a
+    /// [Module](hugr_core::ops::Module) are included as entry points (yes by default)
+    pub fn include_module_exports(mut self, include: bool) -> Self {
+        self.include_exports = include;
+        self
+    }
+
     /// Runs the pass (see [remove_dead_funcs]) with this configuration
     pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         self.validation.run_validated_pass(hugr, |hugr: &mut H, _| {
-            remove_dead_funcs(hugr, self.entry_points.iter().cloned())
+            let exports = if hugr.root_type().is_module() && self.include_exports {
+                hugr.children(hugr.root())
+                    .filter(|ch| {
+                        hugr.get_optype(*ch)
+                            .as_func_defn()
+                            .is_some_and(|fd| fd.public)
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
+            remove_dead_funcs(hugr, self.entry_points.iter().cloned().chain(exports))
         })
     }
 }
@@ -145,13 +174,16 @@ mod test {
     use super::RemoveDeadFuncsPass;
 
     #[rstest]
-    #[case([], vec![])] // No entry_points removes everything!
-    #[case(["main"], vec!["from_main", "main"])]
-    #[case(["from_main"], vec!["from_main"])]
-    #[case(["other1"], vec!["other1", "other2"])]
-    #[case(["other2"], vec!["other2"])]
-    #[case(["other1", "other2"], vec!["other1", "other2"])]
+    #[case(false, [], vec![])] // No entry_points removes everything!
+    #[case(false, ["main"], vec!["from_main", "main"])]
+    #[case(false, ["from_main"], vec!["from_main"])]
+    #[case(false, ["other1"], vec!["other1", "other2"])]
+    #[case(false, ["other2"], vec!["other2"])]
+    #[case(false, ["other1", "other2"], vec!["other1", "other2"])]
+    #[case(true, [], vec!["from_main", "main", "other2"])]
+    #[case(true, ["other1"], vec!["from_main", "main", "other1", "other2"])]
     fn remove_dead_funcs_entry_points(
+        #[case] include_exports: bool,
         #[case] entry_points: impl IntoIterator<Item = &'static str>,
         #[case] retained_funcs: Vec<&'static str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -159,12 +191,12 @@ mod test {
         let o2 = hb.define_function("other2", Signature::new_endo(usize_t()))?;
         let o2inp = o2.input_wires();
         let o2 = o2.finish_with_outputs(o2inp)?;
-        let mut o1 = hb.define_function("other1", Signature::new_endo(usize_t()))?;
+        let mut o1 = hb.define_function_vis("other1", Signature::new_endo(usize_t()), false)?;
 
         let o1c = o1.call(o2.handle(), &[], o1.input_wires())?;
         o1.finish_with_outputs(o1c.outputs())?;
 
-        let fm = hb.define_function("from_main", Signature::new_endo(usize_t()))?;
+        let fm = hb.define_function_vis("from_main", Signature::new_endo(usize_t()), false)?;
         let f_inp = fm.input_wires();
         let fm = fm.finish_with_outputs(f_inp)?;
         let mut m = hb.define_function("main", Signature::new_endo(usize_t()))?;
@@ -183,6 +215,7 @@ mod test {
             .collect::<HashMap<_, _>>();
 
         RemoveDeadFuncsPass::default()
+            .include_module_exports(include_exports)
             .with_module_entry_points(
                 entry_points
                     .into_iter()

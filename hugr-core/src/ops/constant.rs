@@ -56,6 +56,12 @@ impl Const {
         &self.value
     }
 
+    /// Whether the [`Const`] would be exported for linking
+    /// (only applies if the parent is a [Module](super::Module))
+    pub fn is_public(&self) -> bool {
+        self.name.is_some()
+    }
+
     delegate! {
         to self.value {
             /// Returns the type of this constant.
