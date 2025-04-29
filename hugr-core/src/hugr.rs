@@ -90,7 +90,7 @@ impl Hugr {
     }
 
     /// Create a new Hugr, with a single root node and preallocated capacity.
-    pub(crate) fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
+    pub fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
         let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
@@ -173,7 +173,7 @@ impl Hugr {
                 .map(|ch| Ok((ch, infer(h, ch, remove)?)))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let Some(es) = delta_mut(h.op_types.get_mut(node.pg_index())) else {
+            let Some(es) = delta_mut(h.op_types.get_mut(node.into_portgraph())) else {
                 return Ok(h.get_optype(node).extension_delta());
             };
             if es.contains(&TO_BE_INFERRED) {
@@ -333,8 +333,8 @@ impl Hugr {
 
             let target: Node = portgraph::NodeIndex::new(position).into();
             if target != source {
-                let pg_target = target.pg_index();
-                let pg_source = source.pg_index();
+                let pg_target = target.into_portgraph();
+                let pg_source = source.into_portgraph();
                 self.graph.swap_nodes(pg_target, pg_source);
                 self.op_types.swap(pg_target, pg_source);
                 self.hierarchy.swap_nodes(pg_target, pg_source);

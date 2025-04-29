@@ -537,7 +537,7 @@ impl HugrView for Hugr {
 
     #[inline]
     fn contains_node(&self, node: Self::Node) -> bool {
-        self.graph.contains_node(node.pg_index())
+        self.graph.contains_node(node.into_portgraph())
     }
 
     #[inline]
@@ -547,12 +547,16 @@ impl HugrView for Hugr {
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
-        self.graph.port_offsets(node.pg_index(), dir).map_into()
+        self.graph
+            .port_offsets(node.into_portgraph(), dir)
+            .map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
-        self.graph.all_port_offsets(node.pg_index()).map_into()
+        self.graph
+            .all_port_offsets(node.into_portgraph())
+            .map_into()
     }
 
     #[inline]
@@ -565,7 +569,7 @@ impl HugrView for Hugr {
 
         let port = self
             .graph
-            .port_index(node.pg_index(), port.pg_offset())
+            .port_index(node.into_portgraph(), port.pg_offset())
             .unwrap();
         self.graph.port_links(port).map(|(_, link)| {
             let port = link.port();
@@ -578,7 +582,7 @@ impl HugrView for Hugr {
     #[inline]
     fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
         self.graph
-            .get_connections(node.pg_index(), other.pg_index())
+            .get_connections(node.into_portgraph(), other.into_portgraph())
             .map(|(p1, p2)| {
                 [p1, p2].map(|link| self.graph.port_offset(link.port()).unwrap().into())
             })
@@ -586,12 +590,12 @@ impl HugrView for Hugr {
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
-        self.graph.neighbours(node.pg_index(), dir).map_into()
+        self.graph.neighbours(node.into_portgraph(), dir).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
-        self.graph.all_neighbours(node.pg_index()).map_into()
+        self.graph.all_neighbours(node.into_portgraph()).map_into()
     }
 
     #[inline]
@@ -675,7 +679,7 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
     // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
     if hugr
         .portgraph()
-        .port_index(node.pg_index(), port.pg_offset())
+        .port_index(node.into_portgraph(), port.pg_offset())
         .is_none()
     {
         panic!("Received an invalid port {port} for node {node} while mutating a HUGR");

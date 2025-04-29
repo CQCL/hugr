@@ -269,7 +269,7 @@ impl HugrMut for Hugr {
     fn add_node_with_parent(&mut self, parent: Node, node: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(node.into());
         self.hierarchy
-            .push_child(node.pg_index(), parent.pg_index())
+            .push_child(node.into_portgraph(), parent.into_portgraph())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
         node
     }
@@ -277,7 +277,7 @@ impl HugrMut for Hugr {
     fn add_node_before(&mut self, sibling: Node, nodetype: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(nodetype.into());
         self.hierarchy
-            .insert_before(node.pg_index(), sibling.pg_index())
+            .insert_before(node.into_portgraph(), sibling.into_portgraph())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
         node
     }
@@ -285,16 +285,16 @@ impl HugrMut for Hugr {
     fn add_node_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(op.into());
         self.hierarchy
-            .insert_after(node.pg_index(), sibling.pg_index())
+            .insert_after(node.into_portgraph(), sibling.into_portgraph())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
         node
     }
 
     fn remove_node(&mut self, node: Node) -> OpType {
         panic_invalid_non_root(self, node);
-        self.hierarchy.remove(node.pg_index());
-        self.graph.remove_node(node.pg_index());
-        self.op_types.take(node.pg_index())
+        self.hierarchy.remove(node.into_portgraph());
+        self.graph.remove_node(node.into_portgraph());
+        self.op_types.take(node.into_portgraph())
     }
 
     fn remove_subtree(&mut self, node: Node) {
@@ -320,9 +320,9 @@ impl HugrMut for Hugr {
         panic_invalid_port(self, dst, dst_port);
         self.graph
             .link_nodes(
-                src.pg_index(),
+                src.into_portgraph(),
                 src_port.index(),
-                dst.pg_index(),
+                dst.into_portgraph(),
                 dst_port.index(),
             )
             .expect("The ports should exist at this point.");
@@ -334,7 +334,7 @@ impl HugrMut for Hugr {
         panic_invalid_port(self, node, port);
         let port = self
             .graph
-            .port_index(node.pg_index(), offset)
+            .port_index(node.into_portgraph(), offset)
             .expect("The port should exist at this point.");
         self.graph.unlink_port(port);
     }
@@ -368,8 +368,8 @@ impl HugrMut for Hugr {
             self.metadata.set(new_node, meta);
         }
         debug_assert_eq!(
-            Some(&new_root.pg_index()),
-            node_map.get(&other.root().pg_index())
+            Some(&new_root.into_portgraph()),
+            node_map.get(&other.root().into_portgraph())
         );
         InsertionResult {
             new_root,
@@ -401,7 +401,7 @@ impl HugrMut for Hugr {
             }
         }
         debug_assert_eq!(
-            Some(&new_root.pg_index()),
+            Some(&new_root.into_portgraph()),
             node_map.get(&other.to_portgraph_node(other.root()))
         );
         InsertionResult {
@@ -462,9 +462,9 @@ impl HugrMut for Hugr {
         new_parent: Self::Node,
         subst: Option<Substitution>,
     ) -> BTreeMap<Self::Node, Self::Node> {
-        let mut descendants = self.hierarchy.descendants(root.pg_index());
+        let mut descendants = self.hierarchy.descendants(root.into_portgraph());
         let root2 = descendants.next();
-        debug_assert_eq!(root2, Some(root.pg_index()));
+        debug_assert_eq!(root2, Some(root.into_portgraph()));
         let nodes = Vec::from_iter(descendants);
         let node_map = portgraph::view::Subgraph::with_nodes(&mut self.graph, nodes)
             .copy_in_parent()
@@ -489,9 +489,9 @@ impl HugrMut for Hugr {
                 (None, op) => op.clone(),
                 (Some(subst), op) => op.substitute(subst),
             };
-            self.op_types.set(new_node.pg_index(), new_optype);
-            let meta = self.metadata.get(node.pg_index()).clone();
-            self.metadata.set(new_node.pg_index(), meta);
+            self.op_types.set(new_node.into_portgraph(), new_optype);
+            let meta = self.metadata.get(node.into_portgraph()).clone();
+            self.metadata.set(new_node.into_portgraph(), meta);
         }
         node_map
     }
@@ -518,7 +518,7 @@ fn insert_hugr_internal<H: HugrView>(
 
     // Update hierarchy and optypes
     hugr.hierarchy
-        .push_child(other_root, root.pg_index())
+        .push_child(other_root, root.into_portgraph())
         .expect("Inserting a newly-created node into the hierarchy should never fail.");
     for (&node, &new_node) in node_map.iter() {
         other
@@ -565,7 +565,7 @@ fn insert_subgraph_internal<N: HugrNode>(
         let new_parent = other
             .get_parent(other.from_portgraph_node(node))
             .and_then(|parent| node_map.get(&other.to_portgraph_node(parent)).copied())
-            .unwrap_or(root.pg_index());
+            .unwrap_or(root.into_portgraph());
         hugr.hierarchy
             .push_child(new_node, new_parent)
             .expect("Inserting a newly-created node into the hierarchy should never fail.");

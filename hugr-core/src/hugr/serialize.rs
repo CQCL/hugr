@@ -172,7 +172,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
                 parent,
                 op: opt.clone(),
             });
-            metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
+            metadata[new_node].clone_from(hugr.metadata.get(n.into_portgraph()));
         }
         let nodes = nodes
             .into_iter()
@@ -251,7 +251,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
-            if !hugr.graph.contains_node(node.pg_index()) {
+            if !hugr.graph.contains_node(node.into_portgraph()) {
                 return Err(HUGRSerializationError::UnknownEdgeNode { node });
             }
             let offset = match offset {

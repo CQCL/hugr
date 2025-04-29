@@ -233,7 +233,7 @@ mod test {
         assert_eq!(wrapper.node_bound(), 5);
         assert_eq!(wrapper.edge_count(), 7);
 
-        let cx1_index = cx1.node().pg_index().index();
+        let cx1_index = cx1.node().into_portgraph().index();
         assert_eq!(wrapper.to_index(cx1.node()), cx1_index);
         assert_eq!(wrapper.from_index(cx1_index), cx1.node());
 

@@ -94,7 +94,7 @@ impl HugrInternals for Hugr {
 
     #[inline]
     fn to_portgraph_node(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
-        node.node().pg_index()
+        node.node().into_portgraph()
     }
 
     #[inline]
@@ -106,7 +106,7 @@ impl HugrInternals for Hugr {
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap {
         static EMPTY: OnceLock<NodeMetadataMap> = OnceLock::new();
         panic_invalid_node(self, node);
-        let map = self.metadata.get(node.pg_index()).as_ref();
+        let map = self.metadata.get(node.into_portgraph()).as_ref();
         map.unwrap_or(EMPTY.get_or_init(Default::default))
     }
 }
@@ -238,20 +238,20 @@ pub trait HugrMutInternals: HugrView {
 impl HugrMutInternals for Hugr {
     fn set_root(&mut self, root: Node) {
         self.hierarchy.detach(self.root);
-        self.root = root.pg_index();
+        self.root = root.into_portgraph();
     }
 
     #[inline]
     fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
         panic_invalid_node(self, node);
         self.graph
-            .set_num_ports(node.pg_index(), incoming, outgoing, |_, _| {})
+            .set_num_ports(node.into_portgraph(), incoming, outgoing, |_, _| {})
     }
 
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
         panic_invalid_node(self, node);
-        let mut incoming = self.graph.num_inputs(node.pg_index());
-        let mut outgoing = self.graph.num_outputs(node.pg_index());
+        let mut incoming = self.graph.num_inputs(node.into_portgraph());
+        let mut outgoing = self.graph.num_outputs(node.into_portgraph());
         let increment = |num: &mut usize| {
             let new = num.saturating_add_signed(amount);
             let range = *num..new;
@@ -263,7 +263,7 @@ impl HugrMutInternals for Hugr {
             Direction::Outgoing => increment(&mut outgoing),
         };
         self.graph
-            .set_num_ports(node.pg_index(), incoming, outgoing, |_, _| {});
+            .set_num_ports(node.into_portgraph(), incoming, outgoing, |_, _| {});
         range
     }
 
@@ -275,7 +275,7 @@ impl HugrMutInternals for Hugr {
         amount: usize,
     ) -> Range<usize> {
         panic_invalid_node(self, node);
-        let old_num_ports = self.graph.num_ports(node.pg_index(), direction);
+        let old_num_ports = self.graph.num_ports(node.into_portgraph(), direction);
 
         self.add_ports(node, direction, amount as isize);
 
@@ -283,7 +283,7 @@ impl HugrMutInternals for Hugr {
             let swap_to_port = swap_from_port + amount;
             let [from_port_index, to_port_index] = [swap_from_port, swap_to_port].map(|p| {
                 self.graph
-                    .port_index(node.pg_index(), PortOffset::new(direction, p))
+                    .port_index(node.into_portgraph(), PortOffset::new(direction, p))
                     .unwrap()
             });
             let linked_ports = self
@@ -305,27 +305,27 @@ impl HugrMutInternals for Hugr {
     fn set_parent(&mut self, node: Node, parent: Node) {
         panic_invalid_node(self, parent);
         panic_invalid_node(self, node);
-        self.hierarchy.detach(node.pg_index());
+        self.hierarchy.detach(node.into_portgraph());
         self.hierarchy
-            .push_child(node.pg_index(), parent.pg_index())
+            .push_child(node.into_portgraph(), parent.into_portgraph())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
     }
 
     fn move_after_sibling(&mut self, node: Node, after: Node) {
         panic_invalid_non_root(self, node);
         panic_invalid_non_root(self, after);
-        self.hierarchy.detach(node.pg_index());
+        self.hierarchy.detach(node.into_portgraph());
         self.hierarchy
-            .insert_after(node.pg_index(), after.pg_index())
+            .insert_after(node.into_portgraph(), after.into_portgraph())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
     }
 
     fn move_before_sibling(&mut self, node: Node, before: Node) {
         panic_invalid_non_root(self, node);
         panic_invalid_non_root(self, before);
-        self.hierarchy.detach(node.pg_index());
+        self.hierarchy.detach(node.into_portgraph());
         self.hierarchy
-            .insert_before(node.pg_index(), before.pg_index())
+            .insert_before(node.into_portgraph(), before.into_portgraph())
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
     }
 
@@ -343,7 +343,7 @@ impl HugrMutInternals for Hugr {
     fn node_metadata_map_mut(&mut self, node: Self::Node) -> &mut NodeMetadataMap {
         panic_invalid_node(self, node);
         self.metadata
-            .get_mut(node.pg_index())
+            .get_mut(node.into_portgraph())
             .get_or_insert_with(Default::default)
     }
 
