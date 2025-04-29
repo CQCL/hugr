@@ -23,7 +23,7 @@ test-rust:
     HUGR_TEST_SCHEMA=1 cargo test \
         --workspace \
         --exclude 'hugr-py' \
-        --features 'hugr/extension_inference hugr/declarative hugr/model_unstable hugr/llvm hugr/llvm-test hugr/zstd'
+        --features 'hugr/extension_inference hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd'
 # Run all python tests.
 test-python:
     uv run maturin develop --uv

@@ -1,4 +1,3 @@
-use std::iter::repeat;
 use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::builder::{
@@ -273,7 +272,7 @@ impl Linearizer for DelegatingLinearizer {
                     let mut elems_for_copy = vec![vec![]; num_outports];
                     for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
                         let inp_copies = if ty.copyable() {
-                            repeat(inp).take(num_outports).collect::<Vec<_>>()
+                            std::iter::repeat_n(inp, num_outports).collect::<Vec<_>>()
                         } else {
                             self.copy_discard_op(ty, num_outports)?
                                 .add(&mut case_b, [inp])
