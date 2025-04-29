@@ -114,6 +114,14 @@ macro_rules! impl_base_members {
                 Either::Right(iter::empty())
             }
         }
+
+        delegate::delegate! {
+            to (&self.hugr) {
+                fn mermaid_string(&self) -> String;
+                fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig) -> String;
+                fn dot_string(&self) -> String;
+            }
+        }
     };
 }
 

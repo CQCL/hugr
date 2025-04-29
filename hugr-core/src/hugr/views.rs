@@ -332,13 +332,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_config(RenderConfig {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-        })
-    }
+    fn mermaid_string(&self) -> String;
 
     /// Return the mermaid representation of the underlying hierarchical graph.
     ///
@@ -347,33 +341,14 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
-        let graph = self.portgraph();
-        graph
-            .mermaid_format()
-            .with_hierarchy(self.hierarchy())
-            .with_node_style(render::node_style(self, config))
-            .with_edge_style(render::edge_style(self, config))
-            .finish()
-    }
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String;
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
     /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
     fn dot_string(&self) -> String
     where
-        Self: Sized,
-    {
-        let graph = self.portgraph();
-        let config = RenderConfig::default();
-        graph
-            .dot_format()
-            .with_hierarchy(self.hierarchy())
-            .with_node_style(render::node_style(self, config))
-            .with_port_style(render::port_style(self, config))
-            .with_edge_style(render::edge_style(self, config))
-            .finish()
-    }
+        Self: Sized;
 
     /// If a node has a static input, return the source node.
     fn static_source(&self, node: Self::Node) -> Option<Self::Node> {
@@ -608,6 +583,39 @@ impl HugrView for Hugr {
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.graph.all_neighbours(node.into_portgraph()).map_into()
+    }
+
+    fn mermaid_string(&self) -> String {
+        self.mermaid_string_with_config(RenderConfig {
+            node_indices: true,
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+        })
+    }
+
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
+        let graph = self.portgraph();
+        graph
+            .mermaid_format()
+            .with_hierarchy(&self.hierarchy)
+            .with_node_style(render::node_style(self, config))
+            .with_edge_style(render::edge_style(self, config))
+            .finish()
+    }
+
+    fn dot_string(&self) -> String
+    where
+        Self: Sized,
+    {
+        let graph = self.portgraph();
+        let config = RenderConfig::default();
+        graph
+            .dot_format()
+            .with_hierarchy(&self.hierarchy)
+            .with_node_style(render::node_style(self, config))
+            .with_port_style(render::port_style(self, config))
+            .with_edge_style(render::edge_style(self, config))
+            .finish()
     }
 
     #[inline]
