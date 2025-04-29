@@ -734,7 +734,8 @@ mod test {
     #[case::type_int(vec![INT_TYPES[2].to_owned().into()], "$foo$$t(int(2))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
-    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq($n(0)$t(Unit))")]
+    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
+    #[case::sequence(vec![TypeArg::Tuple { elems: vec![0.into(), Type::UNIT.into()] }], "$foo$$tuple($n(0)$t(Unit))")]
     #[case::extensionset(vec![ExtensionSet::from_iter([PRELUDE_ID,int_types::EXTENSION_ID]).into()],
                          "$foo$$es(arithmetic.int.types,prelude)")] // alphabetic ordering of extension names
     #[should_panic]
