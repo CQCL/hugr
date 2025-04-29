@@ -1,7 +1,6 @@
 //! Builder trait for array operations in the dataflow graph.
 
 use crate::std_extensions::collections::array::GenericArrayOpDef;
-use crate::std_extensions::collections::value_array::ValueArray;
 use crate::{
     builder::{BuildError, Dataflow},
     extension::simple_op::HasConcrete as _,
@@ -10,7 +9,7 @@ use crate::{
 };
 use itertools::Itertools as _;
 
-use super::ArrayKind;
+use super::{Array, ArrayKind, GenericArrayClone, GenericArrayDiscard};
 
 /// Trait for building array operations in a dataflow graph.
 pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
@@ -42,6 +41,55 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
             )?
             .outputs_arr();
         Ok(out)
+    }
+
+    /// Adds an array clone operation to the dataflow graph and return the wires
+    /// representing the originala and cloned array.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// If building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// The wires representing the original and cloned array.
+    fn add_array_clone(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+    ) -> Result<(Wire, Wire), BuildError> {
+        let op = GenericArrayClone::<AK>::new(elem_ty, size).unwrap();
+        let [arr1, arr2] = self.add_dataflow_op(op, vec![input])?.outputs_arr();
+        Ok((arr1, arr2))
+    }
+
+    /// Adds an array discard operation to the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// If building the operation fails.
+    fn add_array_discard(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+    ) -> Result<(), BuildError> {
+        let op = GenericArrayDiscard::<AK>::new(elem_ty, size).unwrap();
+        let [] = self.add_dataflow_op(op, vec![input])?.outputs_arr();
+        Ok(())
     }
 
     /// Adds an array get operation to the dataflow graph.
@@ -216,13 +264,13 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     }
 }
 
-impl<D: Dataflow> ArrayOpBuilder<ValueArray> for D {}
+impl<D: Dataflow> ArrayOpBuilder<Array> for D {}
 
 #[cfg(test)]
 mod test {
     use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
-    use crate::std_extensions::collections::value_array::{self, value_array_type};
+    use crate::std_extensions::collections::array::{self, array_type};
     use crate::{
         builder::{DFGBuilder, HugrBuilder},
         extension::prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
@@ -235,11 +283,11 @@ mod test {
 
     #[rstest::fixture]
     #[default(DFGBuilder<Hugr>)]
-    fn all_value_array_ops<B: Dataflow>(
+    pub fn all_array_ops<B: Dataflow>(
         #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)
             .with_extension_delta(ExtensionSet::from_iter([
                 PRELUDE_ID,
-                value_array::EXTENSION_ID
+                array::EXTENSION_ID
         ]))).unwrap())]
         mut builder: B,
     ) -> B {
@@ -250,17 +298,20 @@ mod test {
         let [arr] = {
             let r = builder.add_array_swap(usize_t(), 2, arr, us0, us1).unwrap();
             let res_sum_ty = {
-                let array_type = value_array_type(2, usize_t());
+                let array_type = array_type(2, usize_t());
                 either_type(array_type.clone(), array_type)
             };
             builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
         };
 
-        let [elem_0] = {
-            let (r, _) = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
-            builder
-                .build_unwrap_sum(1, option_type(usize_t()), r)
-                .unwrap()
+        let ([elem_0], arr) = {
+            let (r, arr) = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
+            (
+                builder
+                    .build_unwrap_sum(1, option_type(usize_t()), r)
+                    .unwrap(),
+                arr,
+            )
         };
 
         let [_elem_1, arr] = {
@@ -268,7 +319,7 @@ mod test {
                 .add_array_set(usize_t(), 2, arr, us1, elem_0)
                 .unwrap();
             let res_sum_ty = {
-                let row = vec![usize_t(), value_array_type(2, usize_t())];
+                let row = vec![usize_t(), array_type(2, usize_t())];
                 either_type(row.clone(), row)
             };
             builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
@@ -277,21 +328,13 @@ mod test {
         let [_elem_left, arr] = {
             let r = builder.add_array_pop_left(usize_t(), 2, arr).unwrap();
             builder
-                .build_unwrap_sum(
-                    1,
-                    option_type(vec![usize_t(), value_array_type(1, usize_t())]),
-                    r,
-                )
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(1, usize_t())]), r)
                 .unwrap()
         };
         let [_elem_right, arr] = {
             let r = builder.add_array_pop_right(usize_t(), 1, arr).unwrap();
             builder
-                .build_unwrap_sum(
-                    1,
-                    option_type(vec![usize_t(), value_array_type(0, usize_t())]),
-                    r,
-                )
+                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(0, usize_t())]), r)
                 .unwrap()
         };
 
@@ -300,7 +343,7 @@ mod test {
     }
 
     #[rstest]
-    fn build_all_ops(all_value_array_ops: DFGBuilder<Hugr>) {
-        all_value_array_ops.finish_hugr().unwrap();
+    fn build_all_ops(all_array_ops: DFGBuilder<Hugr>) {
+        all_array_ops.finish_hugr().unwrap();
     }
 }
