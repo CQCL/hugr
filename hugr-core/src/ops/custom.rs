@@ -231,7 +231,7 @@ pub struct OpaqueOp {
     signature: Signature,
 }
 
-pub(crate) fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
+fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
     format!("{}.{}", res_id, name).into()
 }
 
