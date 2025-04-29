@@ -79,7 +79,7 @@ repos:
           # built into a binary build (without using `maturin`)
           #
           # This feature list should be kept in sync with the `hugr-py/pyproject.toml`
-        entry: cargo test --workspace --exclude 'hugr-py' --features 'hugr/extension_inference hugr/declarative hugr/model_unstable hugr/llvm hugr/llvm-test hugr/zstd'
+        entry: cargo test --workspace --exclude 'hugr-py' --features 'hugr/extension_inference hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd'
         language: system
         files: \.rs$
         pass_filenames: false

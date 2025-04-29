@@ -15,7 +15,7 @@ members = [
 default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
 [workspace.package]
-rust-version = "1.75"
+rust-version = "1.85"
 edition = "2021"
 homepage = "https://github.com/CQCL/hugr"
 repository = "https://github.com/CQCL/hugr"
