@@ -396,6 +396,7 @@ impl<'a> Context<'a> {
                     let optype = OpType::FuncDefn(FuncDefn {
                         name: symbol.name.to_string(),
                         signature,
+                        public: true, // TODO: identify whether name is exported?
                     });
 
                     let node = ctx.make_node(node_id, optype, parent)?;
