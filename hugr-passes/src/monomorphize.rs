@@ -305,9 +305,10 @@ impl MonomorphizePass {
     }
 }
 
-struct TypeArgsList<'a>(&'a [TypeArg]);
+/// Helper to create mangled representations of lists of [TypeArg]s.
+struct TypeArgsSeq<'a>(&'a [TypeArg]);
 
-impl std::fmt::Display for TypeArgsList<'_> {
+impl std::fmt::Display for TypeArgsSeq<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for arg in self.0 {
             f.write_char('$')?;
@@ -326,7 +327,8 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
         TypeArg::Type { ty } => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
         TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
         TypeArg::String { arg } => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
-        TypeArg::Sequence { elems } => f.write_fmt(format_args!("seq({})", TypeArgsList(elems))),
+        TypeArg::List { elems } => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
+        TypeArg::Tuple { elems } => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
         TypeArg::Extensions { es } => f.write_fmt(format_args!(
             "es({})",
             es.iter().map(|x| x.deref()).join(",")
@@ -352,7 +354,7 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
 ///    and use "t({arg})" as the string representation of that arg.
 fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
     let name = escape_dollar(name);
-    format!("${name}${}", TypeArgsList(type_args.as_ref()))
+    format!("${name}${}", TypeArgsSeq(type_args.as_ref()))
 }
 
 fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {

@@ -188,7 +188,7 @@ impl MakeExtensionOp for ArrayScan {
             TypeArg::BoundedNat { n: self.size },
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
-            TypeArg::Sequence {
+            TypeArg::List {
                 elems: self.acc_tys.clone().into_iter().map_into().collect(),
             },
             TypeArg::Extensions {
@@ -217,7 +217,7 @@ impl HasConcrete for ArrayScanDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::Sequence { elems: acc_tys }, TypeArg::Extensions { es }] =>
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::List { elems: acc_tys }, TypeArg::Extensions { es }] =>
             {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
