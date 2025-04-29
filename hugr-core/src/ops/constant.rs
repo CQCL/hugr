@@ -45,7 +45,10 @@ impl Const {
 
     /// Create a new [`Const`] operation available for linking
     pub fn new_public(value: Value, name: impl ToString) -> Self {
-        Self {value, name: Some(name.to_string()) }
+        Self {
+            value,
+            name: Some(name.to_string()),
+        }
     }
 
     /// The inner value of the [`Const`]
