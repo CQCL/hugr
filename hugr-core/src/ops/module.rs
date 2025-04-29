@@ -58,6 +58,29 @@ pub struct FuncDefn {
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
+    /// Is the function public? (Can it be linked against and called externally?)
+    pub public: bool,
+}
+
+impl FuncDefn {
+    /// Create a new instance with the specified visibility
+    pub fn new(name: impl ToString, signature: impl Into<PolyFuncType>, public: bool) -> Self {
+        Self {
+            name: name.to_string(),
+            signature: signature.into(),
+            public,
+        }
+    }
+
+    /// Create a new instance with [Self::public] set
+    pub fn new_public(name: impl ToString, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new(name, signature, true)
+    }
+
+    /// Create a new function that is not for external calls or linkage
+    pub fn new_private(name: impl ToString, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new(name, signature, false)
+    }
 }
 
 impl_op_name!(FuncDefn);

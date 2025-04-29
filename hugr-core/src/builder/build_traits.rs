@@ -83,7 +83,8 @@ pub trait Container {
     }
 
     /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
-    /// body graph.
+    /// body graph. The function has the default [ops::FuncDefn::public] for the parent
+    /// (`false` with the default impl.)
     ///
     /// # Errors
     ///
@@ -94,12 +95,25 @@ pub trait Container {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        self.define_function_vis(name, signature, false)
+    }
+
+    /// Add a [`ops::FuncDefn`] node with the specified [visibility](ops::FuncDefn::public)
+    /// and returns a builder to define the function body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::FuncDefn`] node.
+    fn define_function_vis(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        public: bool,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let signature = signature.into();
         let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn {
-            name: name.into(),
-            signature,
-        });
+        let f_node = self.add_child_node(ops::FuncDefn::new(name.into(), signature, public));
 
         // Add the extensions used by the function types.
         self.use_extensions(

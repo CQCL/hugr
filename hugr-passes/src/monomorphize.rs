@@ -186,12 +186,8 @@ fn instantiate(
         let outer_name = h.get_optype(poly_func).as_func_defn().unwrap().name.clone();
         let mut to_scan = Vec::from_iter(h.children(poly_func));
         while let Some(n) = to_scan.pop() {
-            if let OpType::FuncDefn(fd) = h.get_optype(n) {
-                let fd = FuncDefn {
-                    name: mangle_inner_func(&outer_name, &fd.name),
-                    signature: fd.signature.clone(),
-                };
-                h.replace_op(n, fd).unwrap();
+            if let OpType::FuncDefn(fd) = h.optype_mut(n) {
+                fd.name = mangle_inner_func(&outer_name, &fd.name);
                 h.move_after_sibling(n, poly_func);
             } else {
                 to_scan.extend(h.children(n))
@@ -204,18 +200,10 @@ fn instantiate(
         Entry::Occupied(n) => return *n.get(),
         Entry::Vacant(ve) => ve,
     };
-
-    let name = mangle_name(
-        &h.get_optype(poly_func).as_func_defn().unwrap().name,
-        &type_args,
-    );
-    let mono_tgt = h.add_node_after(
-        poly_func,
-        FuncDefn {
-            name,
-            signature: mono_sig.into(),
-        },
-    );
+    let poly_func_def = h.get_optype(poly_func).as_func_defn().unwrap();
+    let name = mangle_name(&poly_func_def.name, &type_args);
+    let public = poly_func_def.public;
+    let mono_tgt = h.add_node_after(poly_func, FuncDefn::new(name, mono_sig, public));
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
     // Now make the instantiation
