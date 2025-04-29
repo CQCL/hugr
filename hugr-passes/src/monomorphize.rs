@@ -1,20 +1,20 @@
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::{hash_map::Entry, HashMap},
     convert::Infallible,
     fmt::Write,
 };
 
 use hugr_core::{
-    Node,
     ops::{Call, FuncDefn, LoadFunction, OpTrait},
     types::{Signature, Substitution, TypeArg},
+    Node,
 };
 
-use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
+use hugr_core::hugr::{hugrmut::HugrMut, HugrView, OpType};
 use itertools::Itertools as _;
 
+use crate::composable::{validate_if_test, ValidatePassError};
 use crate::ComposablePass;
-use crate::composable::{ValidatePassError, validate_if_test};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -213,9 +213,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     }
 }
 
-struct TypeArgsList<'a>(&'a [TypeArg]);
+/// Helper to create mangled representations of lists of [TypeArg]s.
+struct TypeArgsSeq<'a>(&'a [TypeArg]);
 
-impl std::fmt::Display for TypeArgsList<'_> {
+impl std::fmt::Display for TypeArgsSeq<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for arg in self.0 {
             f.write_char('$')?;
@@ -234,7 +235,8 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
         TypeArg::Type { ty } => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
         TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
         TypeArg::String { arg } => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
-        TypeArg::Sequence { elems } => f.write_fmt(format_args!("seq({})", TypeArgsList(elems))),
+        TypeArg::List { elems } => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
+        TypeArg::Tuple { elems } => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
         // We are monomorphizing. We will never monomorphize to a signature
         // containing a variable.
         TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
@@ -257,7 +259,7 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
 ///    is used as "t({arg})" for the string representation of that arg.
 pub fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
     let name = escape_dollar(name);
-    format!("${name}${}", TypeArgsList(type_args.as_ref()))
+    format!("${name}${}", TypeArgsSeq(type_args.as_ref()))
 }
 
 #[cfg(test)]
@@ -278,7 +280,7 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
+    use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, UnwrapBuilder};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};

@@ -436,14 +436,12 @@ pub(crate) mod test {
         }
         pf.instantiate(&[TypeArg::Type { ty: usize_t() }])
             .unwrap_err();
-        pf.instantiate(&[TypeArg::Sequence {
-            elems: vec![usize_t().into(), TypeArg::Sequence { elems: seq2() }],
+        pf.instantiate(&[TypeArg::List {
+            elems: vec![usize_t().into(), TypeArg::List { elems: seq2() }],
         }])
         .unwrap_err();
 
-        let t2 = pf
-            .instantiate(&[TypeArg::Sequence { elems: seq2() }])
-            .unwrap();
+        let t2 = pf.instantiate(&[TypeArg::List { elems: seq2() }]).unwrap();
         assert_eq!(
             t2,
             Signature::new(
@@ -471,7 +469,7 @@ pub(crate) mod test {
 
         let inner3 = Type::new_function(Signature::new_endo(vec![usize_t(), bool_t(), usize_t()]));
         let t3 = pf
-            .instantiate(&[TypeArg::Sequence {
+            .instantiate(&[TypeArg::List {
                 elems: vec![usize_t().into(), bool_t().into(), usize_t().into()],
             }])
             .unwrap();

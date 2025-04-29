@@ -29,12 +29,12 @@ pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
-    resolve_op_types_extensions,
+    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
+    WeakExtensionRegistry,
 };
 use crate::extension::{EMPTY_REG, ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
-pub use crate::ops::{DEFAULT_OPTYPE, OpType};
+pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::package::Package;
 use crate::{Direction, Node};
 
