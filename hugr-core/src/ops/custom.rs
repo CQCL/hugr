@@ -137,12 +137,13 @@ impl ExtensionOp {
         self.def.extension_id()
     }
 
-    /// Returns the unqualified name of the operation.
+    /// Returns the unqualified name of the operation. e.g. 'iadd'
+    ///
     pub fn unqualified_name(&self) -> &OpNameRef {
         self.def.name()
     }
 
-    /// Returns the unqualified name of the operation.
+    /// Returns the unqualified name of the operation. e.g. 'arithmetic.iadd'
     pub fn qualified_name(&self) -> OpName {
         self.name()
     }
