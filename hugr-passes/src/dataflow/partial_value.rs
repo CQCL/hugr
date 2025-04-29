@@ -642,7 +642,7 @@ mod test {
 
     fn partial_sum_strat(
         variants: &[Vec<Arc<TestSumType>>],
-    ) -> impl Strategy<Value = PartialSum<TestValue>> {
+    ) -> impl Strategy<Value = PartialSum<TestValue>> + use<> {
         // We have to clone the `variants` here but only as far as the Vec<Vec<Arc<_>>>
         let tagged_variants = variants.iter().cloned().enumerate().collect::<Vec<_>>();
         // The type annotation here (and the .boxed() enabling it) are just for documentation
@@ -667,7 +667,7 @@ mod test {
 
     fn any_partial_value_of_type(
         ust: &TestSumType,
-    ) -> impl Strategy<Value = PartialValue<TestValue>> {
+    ) -> impl Strategy<Value = PartialValue<TestValue>> + use<> {
         match ust {
             TestSumType::LeafVal(i) => (0..=*i)
                 .prop_map(TestValue)

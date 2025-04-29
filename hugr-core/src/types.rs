@@ -552,10 +552,10 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
         match &mut self.0 {
             TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
             TypeEnum::Extension(custom_type) => {
-                Ok(if let Some(nt) = tr.apply_custom(custom_type)? {
+                Ok(match tr.apply_custom(custom_type)? { Some(nt) => {
                     *self = nt.into_();
                     true
-                } else {
+                } _ => {
                     let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
                         *self = Self::new_extension(
@@ -565,7 +565,7 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
                         );
                     }
                     args_changed
-                })
+                }})
             }
             TypeEnum::Function(fty) => fty.transform(tr),
             TypeEnum::Sum(sum_type) => {

@@ -313,7 +313,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     pub fn emit_module(mut self, node: FatNode<'_, hugr_core::ops::Module, H>) -> Result<Self> {
         for c in node.children() {
             match c.as_ref() {
-                OpType::FuncDefn(ref fd) => {
+                OpType::FuncDefn(fd) => {
                     let fat_ot = c.into_ot(fd);
                     self = self.emit_func(fat_ot)?;
                 }
