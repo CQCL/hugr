@@ -7,8 +7,8 @@ use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::views::RootCheckable;
 use itertools::Itertools;
 
-use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
-use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
+use hugr_core::hugr::patch::inline_dfg::InlineDFG;
+use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
 use hugr_core::{Hugr, HugrView, Node};
@@ -39,11 +39,11 @@ where
             continue;
         };
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
-        let node_map = cfg.apply_rewrite(rep).unwrap();
+        let node_map = cfg.apply_patch(rep).unwrap();
         let merged_bb = *node_map.get(&merge_bb).unwrap();
         for dfg_id in dfgs {
             let n_id = *node_map.get(&dfg_id).unwrap();
-            cfg.apply_rewrite(InlineDFG(n_id.into())).unwrap();
+            cfg.apply_patch(InlineDFG(n_id.into())).unwrap();
         }
         worklist.push(merged_bb);
     }

@@ -4,6 +4,7 @@ use hugr_core::{
     Hugr, Node,
 };
 
+use itertools::Itertools;
 use thiserror::Error;
 
 /// Replace all operations in a HUGR according to a mapping.
@@ -69,9 +70,11 @@ pub fn lower_ops(
         .map(|(node, replacement)| {
             let subcirc = SiblingSubgraph::from_node(node, hugr);
             let rw = subcirc.create_simple_replacement(hugr, replacement)?;
-            let mut repls = hugr.apply_rewrite(rw)?;
-            debug_assert_eq!(repls.len(), 1);
-            Ok(repls.remove(0))
+            let removed_nodes = hugr.apply_patch(rw)?.removed_nodes;
+            Ok(removed_nodes
+                .into_iter()
+                .exactly_one()
+                .expect("removed exactly one node"))
         })
         .collect()
 }

@@ -12,7 +12,7 @@ use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType};
-use crate::hugr::{NodeMetadata, Rewrite};
+use crate::hugr::{NodeMetadata, Patch};
 use crate::ops::OpTrait;
 use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
@@ -195,11 +195,8 @@ pub trait HugrMut: HugrMutInternals {
         subgraph: &SiblingSubgraph<H::Node>,
     ) -> HashMap<H::Node, Self::Node>;
 
-    /// Applies a rewrite to the graph.
-    fn apply_rewrite<R, E>(
-        &mut self,
-        rw: impl Rewrite<Node = Self::Node, ApplyResult = R, Error = E>,
-    ) -> Result<R, E>
+    /// Applies a patch to the graph.
+    fn apply_patch<R, E>(&mut self, rw: impl Patch<Self, Outcome = R, Error = E>) -> Result<R, E>
     where
         Self: Sized,
     {

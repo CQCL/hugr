@@ -44,10 +44,10 @@ use std::hash::Hash;
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr_core::hugr::rewrite::outline_cfg::OutlineCfg;
+use hugr_core::hugr::patch::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::sibling::SiblingMut;
 use hugr_core::hugr::views::{HierarchyView, HugrView, RootCheckable, SiblingGraph};
-use hugr_core::hugr::{hugrmut::HugrMut, Rewrite};
+use hugr_core::hugr::{hugrmut::HugrMut, Patch};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
@@ -260,7 +260,7 @@ impl<H: HugrMut<Node = Node>> CfgNester<H::Node> for IdentityCfgMap<H> {
         assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
-        let (new_block, new_cfg) = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
+        let [new_block, new_cfg] = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
         debug_assert!([entry_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
@@ -579,7 +579,7 @@ pub(crate) mod test {
     };
     use hugr_core::extension::{prelude::usize_t, ExtensionSet};
 
-    use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
+    use hugr_core::hugr::patch::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::ops::Value;
@@ -830,7 +830,7 @@ pub(crate) mod test {
 
         let rw = IdentityInsertion::new(final_node, final_node_input);
 
-        let apply_result = h.apply_rewrite(rw);
+        let apply_result = h.apply_patch(rw);
         assert_eq!(
             apply_result,
             Err(IdentityInsertionError::InvalidPortKind(Some(

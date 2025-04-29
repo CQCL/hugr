@@ -838,7 +838,7 @@ mod tests {
     use cool_asserts::assert_matches;
 
     use crate::builder::inout_sig;
-    use crate::hugr::Rewrite;
+    use crate::hugr::Patch;
     use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::std_extensions::logic::{self, LogicOp};
@@ -1011,7 +1011,7 @@ mod tests {
         assert_eq!(rep.subgraph().nodes().len(), 4);
 
         assert_eq!(hugr.node_count(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
-        hugr.apply_rewrite(rep).unwrap();
+        hugr.apply_patch(rep).unwrap();
         assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
 
         Ok(())
