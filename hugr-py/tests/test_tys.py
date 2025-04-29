@@ -22,7 +22,8 @@ from hugr.tys import (
     PolyFuncType,
     Qubit,
     RowVariable,
-    SequenceArg,
+    ListArg,
+    TupleArg,
     StringArg,
     StringParam,
     Sum,
@@ -107,7 +108,11 @@ def test_params_str(param: TypeParam, string: str):
         (BoundedNatArg(3), "3"),
         (StringArg("hello"), '"hello"'),
         (
-            SequenceArg([TypeTypeArg(Qubit), BoundedNatArg(3)]),
+            ListArg([TypeTypeArg(Qubit), BoundedNatArg(3)]),
+            "[Type(Qubit), 3]",
+        ),
+        (
+            TupleArg([TypeTypeArg(Qubit), BoundedNatArg(3)]),
             "(Type(Qubit), 3)",
         ),
         (VariableArg(2, StringParam()), "$2"),

@@ -245,24 +245,41 @@ class StringArg(TypeArg):
 
 
 @dataclass(frozen=True)
-class SequenceArg(TypeArg):
-    """Sequence of type arguments, for a :class:`ListParam` or :class:`TupleParam`."""
+class ListArg(TypeArg):
+    """Sequence of type arguments for a :class:`ListParam`."""
 
     elems: list[TypeArg]
 
-    def _to_serial(self) -> stys.SequenceArg:
-        return stys.SequenceArg(elems=ser_it(self.elems))
+    def _to_serial(self) -> stys.ListArg:
+        return stys.ListArg(elems=ser_it(self.elems))
 
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
-        return SequenceArg([arg.resolve(registry) for arg in self.elems])
+        return ListArg([arg.resolve(registry) for arg in self.elems])
+
+    def __str__(self) -> str:
+        return f"[{comma_sep_str(self.elems)}]"
+
+    def to_model(self) -> model.Term:
+        return model.List([elem.to_model() for elem in self.elems])
+
+
+@dataclass(frozen=True)
+class TupleArg(TypeArg):
+    """Sequence of type arguments for a :class:`TupleParam`."""
+
+    elems: list[TypeArg]
+
+    def _to_serial(self) -> stys.TupleArg:
+        return stys.TupleArg(elems=ser_it(self.elems))
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        return TupleArg([arg.resolve(registry) for arg in self.elems])
 
     def __str__(self) -> str:
         return f"({comma_sep_str(self.elems)})"
 
     def to_model(self) -> model.Term:
-        # TODO: We should separate lists and tuples.
-        # For now we assume that this is a list.
-        return model.List([elem.to_model() for elem in self.elems])
+        return model.Tuple([elem.to_model() for elem in self.elems])
 
 
 @dataclass(frozen=True)

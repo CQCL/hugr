@@ -534,7 +534,7 @@ class MakeTuple(AsExtOp, _PartialOp):
         )
 
     def type_args(self) -> list[tys.TypeArg]:
-        return [tys.SequenceArg([t.type_arg() for t in self.types])]
+        return [tys.ListArg([t.type_arg() for t in self.types])]
 
     def __call__(self, *elements: ComWire) -> Command:
         return super().__call__(*elements)
@@ -576,7 +576,7 @@ class UnpackTuple(AsExtOp, _PartialOp):
         )
 
     def type_args(self) -> list[tys.TypeArg]:
-        return [tys.SequenceArg([t.type_arg() for t in self.types])]
+        return [tys.ListArg([t.type_arg() for t in self.types])]
 
     @property
     def num_out(self) -> int:
