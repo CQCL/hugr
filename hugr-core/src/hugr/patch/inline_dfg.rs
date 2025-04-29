@@ -2,7 +2,7 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
-use super::Rewrite;
+use super::{PatchHugrMut, PatchVerification};
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{IncomingPort, Node, OutgoingPort, PortIndex};
 
@@ -21,13 +21,10 @@ pub enum InlineDFGError {
     NoParent,
 }
 
-impl Rewrite for InlineDFG {
-    /// Returns the removed nodes: the DFG, and its Input and Output children.
-    type Node = Node;
-    type ApplyResult = [Node; 3];
+impl PatchVerification for InlineDFG {
     type Error = InlineDFGError;
 
-    const UNCHANGED_ON_FAILURE: bool = true;
+    type Node = Node;
 
     fn verify(&self, h: &impl crate::HugrView<Node = Node>) -> Result<(), Self::Error> {
         let n = self.0.node();
@@ -40,10 +37,21 @@ impl Rewrite for InlineDFG {
         Ok(())
     }
 
-    fn apply(
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+        [self.0.node()].into_iter()
+    }
+}
+
+impl PatchHugrMut for InlineDFG {
+    /// The removed nodes: the DFG, and its Input and Output children.
+    type Outcome = [Node; 3];
+
+    const UNCHANGED_ON_FAILURE: bool = true;
+
+    fn apply_hugr_mut(
         self,
         h: &mut impl crate::hugr::HugrMut<Node = Node>,
-    ) -> Result<Self::ApplyResult, Self::Error> {
+    ) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let n = self.0.node();
         let (oth_in, oth_out) = {
@@ -124,10 +132,6 @@ impl Rewrite for InlineDFG {
         h.remove_node(n);
         Ok([n, input, output])
     }
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        [self.0.node()].into_iter()
-    }
 }
 
 #[cfg(test)]
@@ -142,7 +146,7 @@ mod test {
     };
     use crate::extension::prelude::qb_t;
     use crate::extension::ExtensionSet;
-    use crate::hugr::rewrite::inline_dfg::InlineDFGError;
+    use crate::hugr::patch::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
@@ -212,13 +216,13 @@ mod test {
             // Check we can't inline the outer DFG
             let mut h = outer.clone();
             assert_eq!(
-                h.apply_rewrite(InlineDFG(DfgID::from(h.root()))),
+                h.apply_patch(InlineDFG(DfgID::from(h.root()))),
                 Err(InlineDFGError::NoParent)
             );
             assert_eq!(h, outer); // unchanged
         }
 
-        outer.apply_rewrite(InlineDFG(*inner.handle()))?;
+        outer.apply_patch(InlineDFG(*inner.handle()))?;
         outer.validate()?;
         assert_eq!(outer.nodes().count(), 7);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
@@ -274,7 +278,7 @@ mod test {
             ]
         );
 
-        h.apply_rewrite(InlineDFG(*swap.handle()))?;
+        h.apply_patch(InlineDFG(*swap.handle()))?;
         assert_eq!(find_dfgs(&h), vec![h.root()]);
         assert_eq!(h.nodes().count(), 5); // Dfg+I+O
         let mut ops = extension_ops(&h);
@@ -350,7 +354,7 @@ mod test {
         )?;
         let mut outer = outer.finish_hugr_with_outputs(cx.outputs())?;
 
-        outer.apply_rewrite(InlineDFG(*inner.handle()))?;
+        outer.apply_patch(InlineDFG(*inner.handle()))?;
         outer.validate()?;
         let order_neighbours = |n, d| {
             let p = outer.get_optype(n).other_port(d).unwrap();
