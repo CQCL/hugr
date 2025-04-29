@@ -222,14 +222,12 @@ pub(super) fn resolve_typearg_exts(
 ) -> Result<(), ExtensionResolutionError> {
     match arg {
         TypeArg::Type { ty } => resolve_type_exts(node, ty, extensions, used_extensions)?,
-        TypeArg::List { elems } => {
-            for elem in elems.iter_mut() {
-                resolve_typearg_exts(node, elem, extensions, used_extensions)?;
-            }
-        }
-        TypeArg::Tuple { elems } => {
-            for elem in elems.iter_mut() {
-                resolve_typearg_exts(node, elem, extensions, used_extensions)?;
+        TypeArg::List { elems: children }
+        | TypeArg::ListConcat { lists: children }
+        | TypeArg::Tuple { elems: children }
+        | TypeArg::TupleConcat { tuples: children } => {
+            for child in children.iter_mut() {
+                resolve_typearg_exts(node, child, extensions, used_extensions)?;
             }
         }
         _ => {}

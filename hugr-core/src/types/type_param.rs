@@ -7,6 +7,7 @@
 use itertools::Itertools;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
+use smallvec::{SmallVec, smallvec};
 use std::num::NonZeroU64;
 use thiserror::Error;
 
@@ -180,6 +181,15 @@ pub enum TypeArg {
         /// List of elements
         elems: Vec<TypeArg>,
     },
+    /// Instance of [`TypeParam::List`] defined by a sequence of concatenated lists of the same type.
+    #[display("[{}]", {
+        use itertools::Itertools as _;
+        lists.iter().map(|t| format!("... {}", t)).join(",")
+    })]
+    ListConcat {
+        /// The lists to concat.
+        lists: Vec<TypeArg>,
+    },
     /// Instance of [`TypeParam::Tuple`] defined by a sequence of elements of varying type.
     #[display("({})", {
         use itertools::Itertools as _;
@@ -188,6 +198,15 @@ pub enum TypeArg {
     Tuple {
         /// List of elements
         elems: Vec<TypeArg>,
+    },
+    /// Instance of [`TypeParam::Tuple`] defined by a sequence of concatenated tuples.
+    #[display("({})", {
+          use itertools::Itertools as _;
+          tuples.iter().map(|tuple| format!("... {}", tuple)).join(",")
+      })]
+    TupleConcat {
+        /// The tuples to concat.
+        tuples: Vec<TypeArg>,
     },
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [`TypeArg::Type`] (not even a row variable i.e. [`TypeParam::List`] of type)
@@ -269,6 +288,46 @@ impl TypeArg {
         }
     }
 
+    /// Creates a new string literal.
+    #[inline]
+    pub fn new_string(str: impl ToString) -> Self {
+        Self::String {
+            arg: str.to_string(),
+        }
+    }
+
+    /// Creates a new list from its items.
+    #[inline]
+    pub fn new_list(items: impl IntoIterator<Item = Self>) -> Self {
+        Self::List {
+            elems: items.into_iter().collect(),
+        }
+    }
+
+    /// Creates a new concatenated list.
+    #[inline]
+    pub fn new_list_concat(lists: impl IntoIterator<Item = Self>) -> Self {
+        Self::ListConcat {
+            lists: lists.into_iter().collect(),
+        }
+    }
+
+    /// Creates a new tuple from its items.
+    #[inline]
+    pub fn new_tuple(items: impl IntoIterator<Item = Self>) -> Self {
+        Self::Tuple {
+            elems: items.into_iter().collect(),
+        }
+    }
+
+    /// Creates a new concatenated tuple.
+    #[inline]
+    pub fn new_tuple_concat(tuples: impl IntoIterator<Item = Self>) -> Self {
+        Self::TupleConcat {
+            tuples: tuples.into_iter().collect(),
+        }
+    }
+
     /// Returns an integer if the `TypeArg` is an instance of `BoundedNat`.
     #[must_use]
     pub fn as_nat(&self) -> Option<u64> {
@@ -306,7 +365,15 @@ impl TypeArg {
                 // TODO: Full validation would check that the type of the elements agrees
                 elems.iter().try_for_each(|a| a.validate(var_decls))
             }
+            TypeArg::ListConcat { lists } => {
+                // TODO: Full validation would check that each of the lists is indeed a
+                // list or list variable of the correct types.
+                lists.iter().try_for_each(|a| a.validate(var_decls))
+            }
             TypeArg::Tuple { elems } => elems.iter().try_for_each(|a| a.validate(var_decls)),
+            TypeArg::TupleConcat { tuples } => {
+                tuples.iter().try_for_each(|a| a.validate(var_decls))
+            }
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => {
@@ -328,38 +395,220 @@ impl TypeArg {
             }
             TypeArg::BoundedNat { .. } | TypeArg::String { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::List { elems } => {
-                let mut are_types = elems.iter().map(|ta| match ta {
-                    TypeArg::Type { .. } => true,
-                    TypeArg::Variable { v } => v.bound_if_row_var().is_some(),
-                    _ => false,
-                });
-                let elems = match are_types.next() {
-                    Some(true) => {
-                        assert!(are_types.all(|b| b)); // If one is a Type, so must the rest be
-                        // So, anything that doesn't produce a Type, was a row variable => multiple Types
-                        elems
-                            .iter()
-                            .flat_map(|ta| match ta.substitute(t) {
-                                ty @ TypeArg::Type { .. } => vec![ty],
-                                TypeArg::List { elems } => elems,
-                                _ => panic!("Expected Type or row of Types"),
-                            })
-                            .collect()
+                // NOTE: This implements a hack allowing substitutions to
+                // replace `TypeArg::Variable`s representing "row variables"
+                // with a list that is to be spliced into the containing list.
+                // We won't need this code anymore once we stop conflating types
+                // with lists of types.
+
+                fn is_type(type_arg: &TypeArg) -> bool {
+                    match type_arg {
+                        TypeArg::Type { .. } => true,
+                        TypeArg::Variable { v } => v.bound_if_row_var().is_some(),
+                        _ => false,
                     }
-                    _ => {
-                        // not types, no need to flatten (and mustn't, in case of nested Sequences)
-                        elems.iter().map(|ta| ta.substitute(t)).collect()
-                    }
-                };
-                TypeArg::List { elems }
+                }
+
+                let are_types = elems.first().map(is_type).unwrap_or(false);
+
+                Self::new_list_from_parts(elems.iter().map(|elem| match elem.substitute(t) {
+                    list @ TypeArg::List { .. } if are_types => SeqPart::Splice(list),
+                    list @ TypeArg::ListConcat { .. } if are_types => SeqPart::Splice(list),
+                    elem => SeqPart::Item(elem),
+                }))
+            }
+            TypeArg::ListConcat { lists } => {
+                // When a substitution instantiates spliced list variables, we
+                // may be able to merge the concatenated lists.
+                Self::new_list_from_parts(
+                    lists.iter().map(|list| SeqPart::Splice(list.substitute(t))),
+                )
             }
             TypeArg::Tuple { elems } => TypeArg::Tuple {
                 elems: elems.iter().map(|elem| elem.substitute(t)).collect(),
             },
+            TypeArg::TupleConcat { tuples } => {
+                // When a substitution instantiates spliced tuple variables,
+                // we may be able to merge the concatenated tuples.
+                Self::new_tuple_from_parts(
+                    tuples
+                        .iter()
+                        .map(|tuple| SeqPart::Splice(tuple.substitute(t))),
+                )
+            }
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
         }
+    }
+
+    /// Helper method for [`TypeArg::new_list_from_parts`] and [`TypeArg::new_tuple_from_parts`].
+    fn new_seq_from_parts(
+        parts: impl IntoIterator<Item = SeqPart<Self>>,
+        make_items: impl Fn(Vec<Self>) -> Self,
+        make_concat: impl Fn(Vec<Self>) -> Self,
+    ) -> Self {
+        let mut items = Vec::new();
+        let mut seqs = Vec::new();
+
+        for part in parts {
+            match part {
+                SeqPart::Item(item) => items.push(item),
+                SeqPart::Splice(list) => {
+                    if !items.is_empty() {
+                        seqs.push(make_items(std::mem::take(&mut items)));
+                    }
+                    seqs.push(list);
+                }
+            }
+        }
+
+        if seqs.is_empty() {
+            make_items(items)
+        } else if items.is_empty() {
+            make_concat(seqs)
+        } else {
+            seqs.push(make_items(items));
+            make_concat(seqs)
+        }
+    }
+
+    /// Creates a new list from a sequence of [`SeqPart`]s.
+    ///
+    /// # Examples
+    ///
+    /// When all parts are [`SeqPart::Item`]s, a closed list is created:
+    /// ```
+    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
+    /// # let a = TypeArg::new_string("a");
+    /// # let b = TypeArg::new_string("b");
+    /// assert_eq!(
+    ///     TypeArg::new_list_from_parts([SeqPart::Item(a.clone()), SeqPart::Item(b.clone())]),
+    ///     TypeArg::new_list([a, b])
+    /// );
+    /// ```
+    ///
+    /// Otherwise the result is a concatenation of lists, flattened as much as possible:
+    /// ```
+    /// # use hugr_core::types::type_param::{TypeParam, TypeArg, SeqPart};
+    /// # let a = TypeArg::new_string("a");
+    /// # let b = TypeArg::new_string("b");
+    /// # let c = TypeArg::new_string("c");
+    /// # let d = TypeArg::new_string("d");
+    /// # let var = TypeArg::new_var_use(0, TypeParam::new_list(TypeParam::String));
+    /// let parts = [
+    ///     SeqPart::Splice(TypeArg::new_list([a.clone(), b.clone()])),
+    ///     SeqPart::Splice(TypeArg::new_list_concat([TypeArg::new_list([c.clone()])])),
+    ///     SeqPart::Item(d.clone()),
+    ///     SeqPart::Splice(var.clone())
+    /// ];
+    /// assert_eq!(
+    ///     TypeArg::new_list_from_parts(parts),
+    ///     TypeArg::new_list_concat([TypeArg::new_list([a, b, c, d]), var])
+    /// );
+    /// ```
+    pub fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+        Self::new_seq_from_parts(
+            parts.into_iter().flat_map(|part| part.into_list_parts()),
+            |elems| TypeArg::List { elems },
+            |lists| TypeArg::ListConcat { lists },
+        )
+    }
+
+    /// Iterates over the [`SeqPart`]s of a list.
+    ///
+    /// # Examples
+    ///
+    /// The parts of a closed list are the items of that list wrapped in [`SeqPart::Item`]:
+    ///
+    /// ```
+    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
+    /// # let a = TypeArg::new_string("a");
+    /// # let b = TypeArg::new_string("b");
+    /// let type_arg = TypeArg::new_list([a.clone(), b.clone()]);
+    ///
+    /// assert_eq!(
+    ///     type_arg.into_list_parts().collect::<Vec<_>>(),
+    ///     vec![SeqPart::Item(a), SeqPart::Item(b)]
+    /// );
+    /// ```
+    ///
+    /// Parts of a concatenated list that are not closed lists are wrapped in [`SeqPart::Splice`]:
+    ///
+    /// ```
+    /// # use hugr_core::types::type_param::{TypeParam, TypeArg, SeqPart};
+    /// # let a = TypeArg::new_string("a");
+    /// # let b = TypeArg::new_string("b");
+    /// # let c = TypeArg::new_string("c");
+    /// let var = TypeArg::new_var_use(0, TypeParam::new_list(TypeParam::String));
+    /// let type_arg = TypeArg::new_list_concat([
+    ///     TypeArg::new_list([a.clone(), b.clone()]),
+    ///     var.clone(),
+    ///     TypeArg::new_list([c.clone()])
+    ///  ]);
+    ///
+    /// assert_eq!(
+    ///     type_arg.into_list_parts().collect::<Vec<_>>(),
+    ///     vec![SeqPart::Item(a), SeqPart::Item(b), SeqPart::Splice(var), SeqPart::Item(c)]
+    /// );
+    /// ```
+    ///
+    /// Nested concatenations are traversed recursively:
+    ///
+    /// ```
+    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
+    /// # let a = TypeArg::new_string("a");
+    /// # let b = TypeArg::new_string("b");
+    /// # let c = TypeArg::new_string("c");
+    /// let type_arg = TypeArg::new_list_concat([
+    ///     TypeArg::new_list_concat([
+    ///         TypeArg::new_list([a.clone()]),
+    ///         TypeArg::new_list([b.clone()])
+    ///     ]),
+    ///     TypeArg::new_list([]),
+    ///     TypeArg::new_list([c.clone()])
+    /// ]);
+    ///
+    /// assert_eq!(
+    ///     type_arg.into_list_parts().collect::<Vec<_>>(),
+    ///     vec![SeqPart::Item(a), SeqPart::Item(b), SeqPart::Item(c)]
+    /// );
+    /// ```
+    ///
+    /// When invoked on a type argument that is not a list, a single
+    /// [`SeqPart::Splice`] is returned that wraps the type argument.
+    /// This is the expected behaviour for type variables that stand for lists.
+    /// This behaviour also allows this method not to fail on ill-typed type arguments.
+    /// ```
+    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
+    /// let type_arg = TypeArg::new_string("not a list");
+    /// assert_eq!(
+    ///     type_arg.clone().into_list_parts().collect::<Vec<_>>(),
+    ///     vec![SeqPart::Splice(type_arg)]
+    /// );
+    /// ```
+    #[inline]
+    pub fn into_list_parts(self) -> ListPartIter {
+        ListPartIter::new(SeqPart::Splice(self))
+    }
+
+    /// Creates a new tuple from a sequence of [`SeqPart`]s.
+    ///
+    /// Analogous to [`TypeArg::new_list_from_parts`].
+    pub fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+        Self::new_seq_from_parts(
+            parts.into_iter().flat_map(|part| part.into_tuple_parts()),
+            |elems| TypeArg::Tuple { elems },
+            |tuples| TypeArg::TupleConcat { tuples },
+        )
+    }
+
+    /// Iterates over the [`SeqPart`]s of a tuple.
+    ///
+    /// Analogous to [`TypeArg::into_list_parts`].
+    #[inline]
+    pub fn into_tuple_parts(self) -> TuplePartIter {
+        TuplePartIter::new(SeqPart::Splice(self))
     }
 }
 
@@ -368,7 +617,9 @@ impl Transformable for TypeArg {
         match self {
             TypeArg::Type { ty } => ty.transform(tr),
             TypeArg::List { elems } => elems.transform(tr),
+            TypeArg::ListConcat { lists } => lists.transform(tr),
             TypeArg::Tuple { elems } => elems.transform(tr),
+            TypeArg::TupleConcat { tuples } => tuples.transform(tr),
             TypeArg::BoundedNat { .. } | TypeArg::String { .. } | TypeArg::Variable { .. } => {
                 Ok(false)
             }
@@ -425,6 +676,9 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                 check_type_arg(arg, param)
             })
         }
+        (TypeArg::ListConcat { lists }, TypeParam::List { .. }) => lists
+            .iter()
+            .try_for_each(|list| check_type_arg(list, param)),
         (TypeArg::Tuple { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {
                 return Err(TypeArgError::WrongNumberTuple(items.len(), types.len()));
@@ -440,7 +694,6 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         {
             Ok(())
         }
-
         (TypeArg::String { .. }, TypeParam::String) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
@@ -487,6 +740,93 @@ pub enum TypeArgError {
     /// Invalid value
     #[error("Invalid value of type argument")]
     InvalidValue(TypeArg),
+}
+
+/// Part of a sequence.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SeqPart<T> {
+    /// An individual item in the sequence.
+    Item(T),
+    /// A subsequence that is spliced into the parent sequence.
+    Splice(T),
+}
+
+impl SeqPart<TypeArg> {
+    #[inline]
+    fn into_list_parts(self) -> ListPartIter {
+        ListPartIter::new(self)
+    }
+
+    #[inline]
+    fn into_tuple_parts(self) -> TuplePartIter {
+        TuplePartIter::new(self)
+    }
+}
+
+/// Iterator created by [`TypeArg::into_list_parts`].
+#[derive(Debug, Clone)]
+pub struct ListPartIter {
+    parts: SmallVec<[SeqPart<TypeArg>; 1]>,
+}
+
+impl ListPartIter {
+    #[inline]
+    fn new(part: SeqPart<TypeArg>) -> Self {
+        Self {
+            parts: smallvec![part],
+        }
+    }
+}
+
+impl Iterator for ListPartIter {
+    type Item = SeqPart<TypeArg>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.parts.pop()? {
+                SeqPart::Splice(TypeArg::List { elems }) => self
+                    .parts
+                    .extend(elems.into_iter().rev().map(SeqPart::Item)),
+                SeqPart::Splice(TypeArg::ListConcat { lists }) => self
+                    .parts
+                    .extend(lists.into_iter().rev().map(SeqPart::Splice)),
+                part => return Some(part),
+            }
+        }
+    }
+}
+
+/// Iterator created by [`TypeArg::into_tuple_parts`].
+#[derive(Debug, Clone)]
+pub struct TuplePartIter {
+    parts: SmallVec<[SeqPart<TypeArg>; 1]>,
+}
+
+impl TuplePartIter {
+    #[inline]
+    fn new(part: SeqPart<TypeArg>) -> Self {
+        Self {
+            parts: smallvec![part],
+        }
+    }
+}
+
+impl Iterator for TuplePartIter {
+    type Item = SeqPart<TypeArg>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.parts.pop()? {
+                SeqPart::Splice(TypeArg::Tuple { elems }) => self
+                    .parts
+                    .extend(elems.into_iter().rev().map(SeqPart::Item)),
+                SeqPart::Splice(TypeArg::TupleConcat { tuples }) => self
+                    .parts
+                    .extend(tuples.into_iter().rev().map(SeqPart::Splice)),
+                part => return Some(part),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
