@@ -55,7 +55,7 @@ where
     T: HugrView,
 {
     fn node_count(&self) -> usize {
-        HugrView::node_count(self.hugr)
+        HugrView::num_nodes(self.hugr)
     }
 }
 
@@ -64,15 +64,15 @@ where
     T: HugrView,
 {
     fn node_bound(&self) -> usize {
-        HugrView::node_count(self.hugr)
+        HugrView::num_nodes(self.hugr)
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
-        self.hugr.get_pg_index(ix).into()
+        self.hugr.to_portgraph_node(ix).into()
     }
 
     fn from_index(&self, ix: usize) -> Self::NodeId {
-        self.hugr.get_node(portgraph::NodeIndex::new(ix))
+        self.hugr.from_portgraph_node(portgraph::NodeIndex::new(ix))
     }
 }
 
@@ -81,7 +81,7 @@ where
     T: HugrView,
 {
     fn edge_count(&self) -> usize {
-        HugrView::edge_count(self.hugr)
+        HugrView::num_edges(self.hugr)
     }
 }
 
@@ -233,7 +233,7 @@ mod test {
         assert_eq!(wrapper.node_bound(), 5);
         assert_eq!(wrapper.edge_count(), 7);
 
-        let cx1_index = cx1.node().pg_index().index();
+        let cx1_index = cx1.node().into_portgraph().index();
         assert_eq!(wrapper.to_index(cx1.node()), cx1_index);
         assert_eq!(wrapper.from_index(cx1_index), cx1.node());
 

@@ -135,7 +135,7 @@ impl NodeTemplate {
     ) -> Result<(), Option<Signature>> {
         let sig = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
-            NodeTemplate::CompoundOp(hugr) => hugr.root_type(),
+            NodeTemplate::CompoundOp(hugr) => hugr.root_optype(),
             NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
@@ -1012,7 +1012,7 @@ mod test {
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
         // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
         assert_eq!(
-            h.root_type().dataflow_signature().unwrap().io(),
+            h.root_optype().dataflow_signature().unwrap().io(),
             (
                 &vec![list_type(qb_t()); 2].into(),
                 &vec![qb_t(), option_type(qb_t()).into()].into()

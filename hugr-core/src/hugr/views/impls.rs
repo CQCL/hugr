@@ -12,12 +12,13 @@ macro_rules! hugr_internal_methods {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
                 fn portgraph(&self) -> Self::Portgraph<'_>;
-                fn hierarchy(&self) -> Cow<'_, portgraph::Hierarchy>;
-                fn base_hugr(&self) -> &crate::Hugr;
-                fn root_node(&self) -> Self::Node;
-                fn get_pg_index(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
-                fn get_node(&self, index: portgraph::NodeIndex) -> Self::Node;
+                fn region_portgraph(&self, parent: Self::Node) -> portgraph::view::FlatRegion<'_, impl portgraph::view::LinkView<LinkEndpoint: Eq> + Clone + '_>;
+                fn hierarchy(&self) -> &portgraph::Hierarchy;
+                fn to_portgraph_node(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
+                fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
                 fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap;
+                #[allow(deprecated)]
+                fn base_hugr(&self) -> &crate::Hugr;
             }
         }
     };
@@ -30,34 +31,23 @@ macro_rules! hugr_view_methods {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
                 fn root(&self) -> Self::Node;
-                fn root_type(&self) -> &crate::ops::OpType;
+                fn root_optype(&self) -> &crate::ops::OpType;
                 fn contains_node(&self, node: Self::Node) -> bool;
-                fn valid_node(&self, node: Self::Node) -> bool;
-                fn valid_non_root(&self, node: Self::Node) -> bool;
                 fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
-                fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
                 fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::hugr::NodeMetadata>;
-                fn get_node_metadata(&self, node: Self::Node) -> Option<&crate::hugr::NodeMetadataMap>;
-                fn node_count(&self) -> usize;
-                fn edge_count(&self) -> usize;
+                fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
+                fn num_nodes(&self) -> usize;
+                fn num_edges(&self) -> usize;
+                fn num_ports(&self, node: Self::Node, dir: crate::Direction) -> usize;
+                fn num_inputs(&self, node: Self::Node) -> usize;
+                fn num_outputs(&self, node: Self::Node) -> usize;
                 fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
                 fn node_ports(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = crate::Port> + Clone;
                 fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = crate::OutgoingPort> + Clone;
                 fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = crate::IncomingPort> + Clone;
                 fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = crate::Port> + Clone;
-                fn linked_ports(
-                    &self,
-                    node: Self::Node,
-                    port: impl Into<crate::Port>,
-                ) -> impl Iterator<Item = (Self::Node, crate::Port)> + Clone;
-                fn all_linked_ports(
-                    &self,
-                    node: Self::Node,
-                    dir: crate::Direction,
-                ) -> itertools::Either<
-                    impl Iterator<Item = (Self::Node, crate::OutgoingPort)>,
-                    impl Iterator<Item = (Self::Node, crate::IncomingPort)>,
-                >;
+                fn linked_ports(&self, node: Self::Node, port: impl Into<crate::Port>) -> impl Iterator<Item = (Self::Node, crate::Port)> + Clone;
+                fn all_linked_ports(&self, node: Self::Node, dir: crate::Direction) -> itertools::Either<impl Iterator<Item = (Self::Node, crate::OutgoingPort)>, impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
                 fn all_linked_outputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
                 fn all_linked_inputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
                 fn single_linked_port(&self, node: Self::Node, port: impl Into<crate::Port>) -> Option<(Self::Node, crate::Port)>;
@@ -67,31 +57,19 @@ macro_rules! hugr_view_methods {
                 fn linked_inputs(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
                 fn node_connections(&self, node: Self::Node, other: Self::Node) -> impl Iterator<Item = [crate::Port; 2]> + Clone;
                 fn is_linked(&self, node: Self::Node, port: impl Into<crate::Port>) -> bool;
-                fn num_ports(&self, node: Self::Node, dir: crate::Direction) -> usize;
-                fn num_inputs(&self, node: Self::Node) -> usize;
-                fn num_outputs(&self, node: Self::Node) -> usize;
                 fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
+                fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
                 fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
                 fn input_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn output_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
-                fn get_io(&self, node: Self::Node) -> Option<[Self::Node; 2]>;
-                fn inner_function_type(&self) -> Option<Cow<'_, crate::types::Signature>>;
-                fn poly_func_type(&self) -> Option<crate::types::PolyFuncType>;
-                // TODO: cannot use delegate here. `PetgraphWrapper` is a thin
-                // wrapper around `Self`, so falling back to the default impl
-                // should be harmless.
-                // fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>;
                 fn mermaid_string(&self) -> String;
                 fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig) -> String;
                 fn dot_string(&self) -> String;
                 fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
                 fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
-                fn signature(&self, node: Self::Node) -> Option<Cow<'_, crate::types::Signature>>;
                 fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
-                fn in_value_types(&self, node: Self::Node) -> impl Iterator<Item = (crate::IncomingPort, crate::types::Type)>;
-                fn out_value_types(&self, node: Self::Node) -> impl Iterator<Item = (crate::OutgoingPort, crate::types::Type)>;
                 fn extensions(&self) -> &crate::extension::ExtensionRegistry;
                 fn validate(&self) -> Result<(), crate::hugr::ValidationError>;
                 fn validate_no_extensions(&self) -> Result<(), crate::hugr::ValidationError>;
@@ -128,6 +106,9 @@ macro_rules! hugr_mut_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
+                fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::hugr::NodeMetadata;
+                fn set_metadata(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::hugr::NodeMetadata>);
+                fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
                 fn add_node_with_parent(&mut self, parent: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_before(&mut self, sibling: Self::Node, nodetype: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_after(&mut self, sibling: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
@@ -140,6 +121,8 @@ macro_rules! hugr_mut_methods {
                 fn insert_hugr(&mut self, root: Self::Node, other: crate::Hugr) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
                 fn insert_from_view<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other) -> crate::hugr::hugrmut::InsertionResult<Other::Node, Self::Node>;
                 fn insert_subgraph<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, subgraph: &crate::hugr::views::SiblingSubgraph<Other::Node>) -> std::collections::HashMap<Other::Node, Self::Node>;
+                fn use_extension(&mut self, extension: impl Into<std::sync::Arc<crate::extension::Extension>>);
+                fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>) where crate::extension::ExtensionRegistry: Extend<Reg>;
             }
         }
     };

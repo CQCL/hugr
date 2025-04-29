@@ -59,7 +59,7 @@ fn mk_rep(
     let succ_sig = succ_ty.inner_signature();
 
     // Make a Hugr with just a single CFG root node having the same signature.
-    let mut replacement: Hugr = Hugr::new(cfg.root_type().clone());
+    let mut replacement: Hugr = Hugr::new(cfg.root_optype().clone());
 
     let merged = replacement.add_node_with_parent(replacement.root(), {
         let mut merged_block = DataflowBlock {

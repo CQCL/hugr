@@ -77,12 +77,12 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
             return self.underlying.apply(h);
         }
         // Try to backup just the contents of this HugrMut.
-        let mut backup = Hugr::new(h.root_type().clone());
+        let mut backup = Hugr::new(h.root_optype().clone());
         backup.insert_from_view(backup.root(), h);
         let r = self.underlying.apply(h);
         if r.is_err() {
             // Try to restore backup.
-            h.replace_op(h.root(), backup.root_type().clone());
+            h.replace_op(h.root(), backup.root_optype().clone());
             while let Some(child) = h.first_child(h.root()) {
                 h.remove_node(child);
             }
