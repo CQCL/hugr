@@ -59,17 +59,18 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     ///
     /// # Returns
     ///
-    /// The wire representing the value at the specified index in the array.
+    /// * The wire representing the value at the specified index in the array
+    /// * The wire representing the array
     fn add_array_get(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
         index: Wire,
-    ) -> Result<Wire, BuildError> {
+    ) -> Result<(Wire, Wire), BuildError> {
         let op = GenericArrayOpDef::<AK>::get.instantiate(&[size.into(), elem_ty.into()])?;
-        let [out] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
-        Ok(out)
+        let [out, arr] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
+        Ok((out, arr))
     }
 
     /// Adds an array set operation to the dataflow graph.
@@ -256,7 +257,7 @@ mod test {
         };
 
         let [elem_0] = {
-            let r = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
+            let (r, _) = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
             builder
                 .build_unwrap_sum(1, option_type(usize_t()), r)
                 .unwrap()

@@ -198,6 +198,30 @@
                   }
                 ]
               ]
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
             }
           ],
           "runtime_reqs": []

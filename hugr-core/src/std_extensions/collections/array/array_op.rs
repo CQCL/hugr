@@ -31,7 +31,7 @@ pub enum GenericArrayOpDef<AK: ArrayKind> {
     /// where `SIZE` must be statically known (not a variable)
     new_array,
     /// Copies an element out of the array ([TypeBound::Copyable] elements only):
-    /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>`
+    /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>, array`
     get,
     /// Exchanges an element of the array with an external value:
     /// `set<size, elemty>: array<size, elemty>, index, elemty -> either(elemty, array | elemty, array)`
@@ -148,7 +148,10 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
                     let option_type: Type = option_type(copy_elem_ty).into();
                     PolyFuncTypeRV::new(
                         params,
-                        FuncValueType::new(vec![copy_array_ty, usize_t], option_type),
+                        FuncValueType::new(
+                            vec![copy_array_ty.clone(), usize_t],
+                            vec![option_type, copy_array_ty],
+                        ),
                     )
                 }
                 set => {
@@ -385,7 +388,11 @@ mod tests {
             sig.io(),
             (
                 &vec![AK::ty(size, element_ty.clone()), usize_t()].into(),
-                &vec![option_type(element_ty.clone()).into()].into()
+                &vec![
+                    option_type(element_ty.clone()).into(),
+                    AK::ty(size, element_ty.clone())
+                ]
+                .into()
             )
         );
     }
@@ -500,7 +507,11 @@ mod tests {
             sig.io(),
             (
                 &vec![AK::ty(size, element_ty.clone()), usize_t()].into(),
-                &vec![option_type(element_ty.clone()).into()].into()
+                &vec![
+                    option_type(element_ty.clone()).into(),
+                    AK::ty(size, element_ty.clone())
+                ]
+                .into()
             )
         );
     }

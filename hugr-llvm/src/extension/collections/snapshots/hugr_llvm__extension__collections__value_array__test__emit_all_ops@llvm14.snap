@@ -114,12 +114,12 @@ cond_28_case_1:                                   ; preds = %37
   br label %cond_exit_28
 
 cond_exit_28:                                     ; preds = %cond_28_case_1, %cond_28_case_0
-  %"023.0" = phi i64 [ 0, %cond_28_case_0 ], [ %38, %cond_28_case_1 ]
+  %"024.0" = phi i64 [ 0, %cond_28_case_0 ], [ %38, %cond_28_case_1 ]
   %42 = icmp ult i64 1, 2
   br i1 %42, label %46, label %43
 
 43:                                               ; preds = %cond_exit_28
-  %44 = insertvalue { i1, i64, [2 x i64] } { i1 false, i64 poison, [2 x i64] poison }, i64 %"023.0", 1
+  %44 = insertvalue { i1, i64, [2 x i64] } { i1 false, i64 poison, [2 x i64] poison }, i64 %"024.0", 1
   %45 = insertvalue { i1, i64, [2 x i64] } %44, [2 x i64] %"08.0", 2
   br label %55
 
@@ -129,7 +129,7 @@ cond_exit_28:                                     ; preds = %cond_28_case_1, %co
   store [2 x i64] %"08.0", [2 x i64]* %48, align 4
   %49 = getelementptr inbounds i64, i64* %47, i64 1
   %50 = load i64, i64* %49, align 4
-  store i64 %"023.0", i64* %49, align 4
+  store i64 %"024.0", i64* %49, align 4
   %51 = bitcast i64* %47 to [2 x i64]*
   %52 = load [2 x i64], [2 x i64]* %51, align 4
   %53 = insertvalue { i1, i64, [2 x i64] } { i1 true, i64 poison, [2 x i64] poison }, i64 %50, 1
@@ -137,20 +137,20 @@ cond_exit_28:                                     ; preds = %cond_28_case_1, %co
   br label %55
 
 55:                                               ; preds = %43, %46
-  %"033.0" = phi { i1, i64, [2 x i64] } [ %54, %46 ], [ %45, %43 ]
-  %56 = extractvalue { i1, i64, [2 x i64] } %"033.0", 0
+  %"034.0" = phi { i1, i64, [2 x i64] } [ %54, %46 ], [ %45, %43 ]
+  %56 = extractvalue { i1, i64, [2 x i64] } %"034.0", 0
   switch i1 %56, label %57 [
     i1 true, label %60
   ]
 
 57:                                               ; preds = %55
-  %58 = extractvalue { i1, i64, [2 x i64] } %"033.0", 1
-  %59 = extractvalue { i1, i64, [2 x i64] } %"033.0", 2
+  %58 = extractvalue { i1, i64, [2 x i64] } %"034.0", 1
+  %59 = extractvalue { i1, i64, [2 x i64] } %"034.0", 2
   br label %cond_40_case_0
 
 60:                                               ; preds = %55
-  %61 = extractvalue { i1, i64, [2 x i64] } %"033.0", 1
-  %62 = extractvalue { i1, i64, [2 x i64] } %"033.0", 2
+  %61 = extractvalue { i1, i64, [2 x i64] } %"034.0", 1
+  %62 = extractvalue { i1, i64, [2 x i64] } %"034.0", 2
   br label %cond_40_case_1
 
 cond_40_case_0:                                   ; preds = %57
@@ -164,11 +164,11 @@ cond_40_case_1:                                   ; preds = %60
   br label %cond_exit_40
 
 cond_exit_40:                                     ; preds = %cond_40_case_1, %cond_40_case_0
-  %"036.0" = phi i64 [ 0, %cond_40_case_0 ], [ %61, %cond_40_case_1 ]
-  %"1.0" = phi [2 x i64] [ zeroinitializer, %cond_40_case_0 ], [ %62, %cond_40_case_1 ]
+  %"037.0" = phi i64 [ 0, %cond_40_case_0 ], [ %61, %cond_40_case_1 ]
+  %"138.0" = phi [2 x i64] [ zeroinitializer, %cond_40_case_0 ], [ %62, %cond_40_case_1 ]
   %66 = alloca i64, i32 2, align 8
   %67 = bitcast i64* %66 to [2 x i64]*
-  store [2 x i64] %"1.0", [2 x i64]* %67, align 4
+  store [2 x i64] %"138.0", [2 x i64]* %67, align 4
   %68 = getelementptr i64, i64* %66, i32 1
   %69 = load i64, i64* %66, align 4
   %70 = bitcast i64* %68 to [1 x i64]*
@@ -199,11 +199,11 @@ cond_51_case_1:                                   ; preds = %76
   br label %cond_exit_51
 
 cond_exit_51:                                     ; preds = %cond_51_case_1, %cond_51_case_0
-  %"056.0" = phi i64 [ 0, %cond_51_case_0 ], [ %77, %cond_51_case_1 ]
-  %"157.0" = phi [1 x i64] [ zeroinitializer, %cond_51_case_0 ], [ %78, %cond_51_case_1 ]
+  %"058.0" = phi i64 [ 0, %cond_51_case_0 ], [ %77, %cond_51_case_1 ]
+  %"159.0" = phi [1 x i64] [ zeroinitializer, %cond_51_case_0 ], [ %78, %cond_51_case_1 ]
   %82 = alloca i64, align 8
   %83 = bitcast i64* %82 to [1 x i64]*
-  store [1 x i64] %"157.0", [1 x i64]* %83, align 4
+  store [1 x i64] %"159.0", [1 x i64]* %83, align 4
   %84 = getelementptr i64, i64* %82, i32 0
   %85 = load i64, i64* %84, align 4
   %86 = bitcast i64* %82 to [0 x i64]*
@@ -232,7 +232,7 @@ cond_62_case_1:                                   ; preds = %91
   br label %cond_exit_62
 
 cond_exit_62:                                     ; preds = %cond_62_case_1, %cond_62_case_0
-  %"071.0" = phi i64 [ 0, %cond_62_case_0 ], [ %92, %cond_62_case_1 ]
+  %"073.0" = phi i64 [ 0, %cond_62_case_0 ], [ %92, %cond_62_case_1 ]
   ret void
 }
 

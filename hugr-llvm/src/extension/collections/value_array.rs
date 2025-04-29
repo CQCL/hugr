@@ -339,7 +339,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 ts.llvm_sum_type(st.clone())?
             };
 
-            let exit_rmb = ctx.new_row_mail_box([res_hugr_ty], "")?;
+            let exit_rmb = ctx.new_row_mail_box(sig.output.iter(), "")?;
 
             let exit_block = ctx.build_positioned_new_block("", None, |ctx, bb| {
                 outputs.finish(ctx.builder(), exit_rmb.read_vec(ctx.builder(), [])?)?;
@@ -357,7 +357,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                         builder.build_load(elem_addr, "")
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v])?;
-                    exit_rmb.write(ctx.builder(), [success_v.into()])?;
+                    exit_rmb.write(ctx.builder(), [success_v.into(), array_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -366,7 +366,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 ctx.build_positioned_new_block("", Some(success_block), |ctx, bb| {
                     let builder = ctx.builder();
                     let failure_v = res_sum_ty.build_tag(builder, 0, vec![])?;
-                    exit_rmb.write(ctx.builder(), [failure_v.into()])?;
+                    exit_rmb.write(ctx.builder(), [failure_v.into(), array_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -764,7 +764,7 @@ mod test {
         };
 
         let [elem_0] = {
-            let r = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
+            let (r, _) = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
             builder
                 .build_unwrap_sum(1, option_type(usize_t()), r)
                 .unwrap()
@@ -897,7 +897,7 @@ mod test {
                 let us2 = builder.add_load_value(ConstUsize::new(2));
                 let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
                 let i = builder.add_load_value(ConstUsize::new(index));
-                let get_r = builder.add_array_get(usize_t(), 2, arr, i).unwrap();
+                let (get_r, _) = builder.add_array_get(usize_t(), 2, arr, i).unwrap();
                 let r = {
                     let ot = option_type(usize_t());
                     let variants = (0..ot.num_variants())
@@ -989,13 +989,15 @@ mod test {
                         let expected_arr_1 =
                             builder.add_load_value(ConstInt::new_u(3, expected_arr[1]).unwrap());
                         let [arr_0] = {
-                            let r = builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
+                            let (r, _) =
+                                builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
                             builder
                                 .build_unwrap_sum(1, option_type(int_ty.clone()), r)
                                 .unwrap()
                         };
                         let [arr_1] = {
-                            let r = builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
+                            let (r, _) =
+                                builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
                             builder
                                 .build_unwrap_sum(1, option_type(int_ty.clone()), r)
                                 .unwrap()
@@ -1100,13 +1102,13 @@ mod test {
                     conditional.finish_sub_container().unwrap().outputs_arr()
                 };
                 let elem_0 = {
-                    let r = builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
+                    let (r, _) = builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
                     builder
                         .build_unwrap_sum::<1>(1, option_type(int_ty.clone()), r)
                         .unwrap()[0]
                 };
                 let elem_1 = {
-                    let r = builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
+                    let (r, _) = builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
                     builder
                         .build_unwrap_sum::<1>(1, option_type(int_ty), r)
                         .unwrap()[0]
@@ -1252,7 +1254,7 @@ mod test {
                     .unwrap()
                     .out_wire(0);
                 let idx_v = builder.add_load_value(ConstUsize::new(idx));
-                let get_res = builder
+                let (get_res, _) = builder
                     .add_array_get(int_ty.clone(), size, arr, idx_v)
                     .unwrap();
                 let [elem] = builder
