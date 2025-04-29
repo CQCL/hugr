@@ -968,7 +968,7 @@ mod extension_tests {
 
     #[rstest]
     #[case::d1(|signature| ops::DFG {signature}.into())]
-    #[case::f1(|sig: Signature| ops::FuncDefn {name: "foo".to_string(), signature: sig.into()}.into())]
+    #[case::f1(|sig: Signature| ops::FuncDefn::new("foo", sig, true).into())]
     #[case::c1(|signature| ops::Case {signature}.into())]
     fn parent_extension_mismatch(
         #[case] parent_f: impl Fn(Signature) -> OpType,
