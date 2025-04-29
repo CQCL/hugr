@@ -188,7 +188,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
             TypeArg::BoundedNat { n: self.size },
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
-            TypeArg::Sequence {
+            TypeArg::List {
                 elems: self.acc_tys.clone().into_iter().map_into().collect(),
             },
         ]
@@ -214,12 +214,17 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
+<<<<<<< HEAD
             [
                 TypeArg::BoundedNat { n },
                 TypeArg::Type { ty: src_ty },
                 TypeArg::Type { ty: tgt_ty },
                 TypeArg::Sequence { elems: acc_tys },
             ] => {
+=======
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::List { elems: acc_tys }, TypeArg::Extensions { es }] =>
+            {
+>>>>>>> 5f33fffb (Split `TypeArg::Sequence` into tuples and lists.)
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
                     .map(|acc_ty| match acc_ty {

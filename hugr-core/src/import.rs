@@ -1173,14 +1173,17 @@ impl<'a> Context<'a> {
                     .map(|item| self.import_type_arg(*item))
                     .collect::<Result<_, _>>()?;
 
-                Ok(TypeArg::Sequence { elems })
+                Ok(TypeArg::List { elems })
             }
 
             table::Term::Tuple { .. } => {
-                // NOTE: While `TypeArg`s can represent tuples as
-                // `TypeArg::Sequence`s, this conflates lists and tuples. To
-                // avoid ambiguity we therefore report an error here for now.
-                Err(error_unsupported!("tuples as `TypeArg`"))
+                let elems = self
+                    .import_closed_list(term_id)?
+                    .iter()
+                    .map(|item| self.import_type_arg(*item))
+                    .collect::<Result<_, _>>()?;
+
+                Ok(TypeArg::Tuple { elems })
             }
 
             table::Term::Literal(model::Literal::Str(value)) => Ok(TypeArg::String {

@@ -2,28 +2,28 @@
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::{
-    Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
     hugr::IdentList,
     ops::{
-        DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value, constant::CustomSerialized,
+        constant::CustomSerialized, DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value,
     },
     std_extensions::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
     },
     types::{
-        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
+        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
+        TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
     },
+    Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
 use hugr_model::v0::{
     self as model,
-    bumpalo::{Bump, collections::String as BumpString, collections::Vec as BumpVec},
+    bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump},
     table,
 };
 use petgraph::unionfind::UnionFind;
@@ -863,14 +863,21 @@ impl<'a> Context<'a> {
             TypeArg::Type { ty } => self.export_type(ty),
             TypeArg::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
             TypeArg::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
-            TypeArg::Sequence { elems } => {
-                // For now we assume that the sequence is meant to be a list.
+            TypeArg::List { elems } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
                         .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
                 );
                 self.make_term(table::Term::List(parts))
+            }
+            TypeArg::Tuple { elems } => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    elems
+                        .iter()
+                        .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
+                );
+                self.make_term(table::Term::Tuple(parts))
             }
             TypeArg::Variable { v } => self.export_type_arg_var(v),
         }
@@ -1217,11 +1224,11 @@ mod test {
     use rstest::{fixture, rstest};
 
     use crate::{
-        Hugr,
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::qb_t,
         types::Signature,
         utils::test_quantum_extension::{cx_gate, h_gate},
+        Hugr,
     };
 
     #[fixture]
