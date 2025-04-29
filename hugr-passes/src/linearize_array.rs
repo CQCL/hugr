@@ -9,12 +9,10 @@ use hugr_core::{
     ops::NamedOp,
     std_extensions::collections::{
         array::{
-            array_type_def, array_type_parametric, Array, ArrayKind, ArrayRepeatDef,
+            array_type_def, array_type_parametric, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
             ArrayScanDef, ArrayValue, ARRAY_REPEAT_OP_ID, ARRAY_SCAN_OP_ID,
         },
-        value_array::{
-            self, VArrayFromArrayDef, VArrayOpDef, VArrayToArrayDef, VArrayValue, ValueArray,
-        },
+        value_array::{self, VArrayFromArrayDef, VArrayToArrayDef, VArrayValue, ValueArray},
     },
     types::Transformable,
     Node,
@@ -51,7 +49,7 @@ impl Default for LinearizeArrayPass {
             });
             Ok(Some(ArrayValue::new(ty, contents).into()))
         });
-        for op_def in VArrayOpDef::iter() {
+        for op_def in ArrayOpDef::iter() {
             pass.replace_parametrized_op(
                 value_array::EXTENSION.get_op(&op_def.name()).unwrap(),
                 move |args| {
@@ -59,7 +57,7 @@ impl Default for LinearizeArrayPass {
                     // are now linear, we'd have to replace it with a `set`. But what
                     // should we put in??? For now, let's just error out and make sure
                     // we're not emitting `get`s for nested value arrays.
-                    if op_def == VArrayOpDef::get && !args[1].as_type().unwrap().copyable() {
+                    if op_def == ArrayOpDef::get && !args[1].as_type().unwrap().copyable() {
                         panic!(
                             "Cannot linearise arrays in this Hugr: \
                             Contains a `get` operation on nested value arrays"
