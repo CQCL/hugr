@@ -597,7 +597,7 @@ mod test {
         }
 
         // Replacement: one BB with two DFGs inside.
-        // Use Hugr rather than Builder because DFGs must be empty (not even
+        // Use Hugr rather than Builder because it must be empty (not even
         // Input/Output).
         let mut replacement = Hugr::new(ops::CFG {
             signature: Signature::new_endo(just_list.clone()),
