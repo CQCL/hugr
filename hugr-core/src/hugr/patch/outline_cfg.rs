@@ -202,11 +202,11 @@ impl PatchHugrMut for OutlineCfg {
             // https://github.com/CQCL/hugr/issues/2029
             let hierarchy = h.hierarchy();
             let inner_exit = hierarchy
-                .children(h.get_pg_index(cfg_node))
+                .children(h.to_portgraph_node(cfg_node))
                 .exactly_one()
                 .ok()
                 .unwrap();
-            let inner_exit = h.get_node(inner_exit);
+            let inner_exit = h.from_portgraph_node(inner_exit);
             //let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
 
             // Entry node must be first
@@ -512,6 +512,7 @@ mod test {
         }
         assert_eq!(h.get_parent(new_block), Some(cfg));
         assert!(h.get_optype(new_block).is_dataflow_block());
+        #[allow(deprecated)]
         let b = h.base_hugr(); // To cope with `h` potentially being a SiblingMut
         assert_eq!(b.get_parent(new_cfg), Some(new_block));
         for n in blocks {

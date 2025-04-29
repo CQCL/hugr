@@ -83,7 +83,7 @@ pub struct Wire<N = Node>(N, OutgoingPort);
 impl Node {
     /// Returns the node as a portgraph `NodeIndex`.
     #[inline]
-    pub(crate) fn pg_index(self) -> portgraph::NodeIndex {
+    pub(crate) fn into_portgraph(self) -> portgraph::NodeIndex {
         self.index
     }
 }

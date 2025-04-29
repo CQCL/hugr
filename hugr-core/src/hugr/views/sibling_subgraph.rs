@@ -194,7 +194,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let subpg = Subgraph::new_subgraph(pg.clone(), make_boundary(hugr, &inputs, &outputs));
         let nodes = subpg
             .nodes_iter()
-            .map(|index| hugr.get_node(index))
+            .map(|index| hugr.from_portgraph_node(index))
             .collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 
@@ -525,7 +525,7 @@ fn make_boundary<'a, N: HugrNode>(
 ) -> Boundary {
     let to_pg_index = |n: N, p: Port| {
         hugr.portgraph()
-            .port_index(hugr.get_pg_index(n), p.pg_offset())
+            .port_index(hugr.to_portgraph_node(n), p.pg_offset())
             .unwrap()
     };
     Boundary::new(
@@ -1010,9 +1010,9 @@ mod tests {
 
         assert_eq!(rep.subgraph().nodes().len(), 4);
 
-        assert_eq!(hugr.node_count(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
+        assert_eq!(hugr.num_nodes(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
         hugr.apply_patch(rep).unwrap();
-        assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
+        assert_eq!(hugr.num_nodes(), 4); // Module + Def + In + Out
 
         Ok(())
     }

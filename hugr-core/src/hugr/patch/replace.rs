@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
+use crate::hugr::views::check_valid_non_root;
 use crate::hugr::HugrMut;
 use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
@@ -188,7 +189,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
         // equality of OpType/Signature, e.g. to ease changing of Input/Output
         // node signatures too.
         let removed = h.get_optype(parent).tag();
-        let replacement = self.replacement.root_type().tag();
+        let replacement = self.replacement.root_optype().tag();
         if removed != replacement {
             return Err(ReplaceError::WrongRootNodeTag {
                 removed,
@@ -265,25 +266,25 @@ impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
             }
             e.check_src(h, WhichEdgeSpec::HostToHost)?;
         }
-        self.mu_out
-            .iter()
-            .try_for_each(|e| match self.replacement.valid_non_root(e.src) {
+        self.mu_out.iter().try_for_each(|e| {
+            match check_valid_non_root(&self.replacement, e.src) {
                 true => e.check_src(&self.replacement, WhichEdgeSpec::ReplToHost),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Outgoing,
                     WhichEdgeSpec::ReplToHost(e.clone()),
                 )),
-            })?;
+            }
+        })?;
         // Edge targets...
-        self.mu_inp
-            .iter()
-            .try_for_each(|e| match self.replacement.valid_non_root(e.tgt) {
+        self.mu_inp.iter().try_for_each(|e| {
+            match check_valid_non_root(&self.replacement, e.tgt) {
                 true => e.check_tgt(&self.replacement, WhichEdgeSpec::HostToRepl),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Incoming,
                     WhichEdgeSpec::HostToRepl(e.clone()),
                 )),
-            })?;
+            }
+        })?;
         for e in self.mu_out.iter() {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
                 return Err(ReplaceError::BadEdgeSpec(
@@ -430,13 +431,13 @@ where
                 .ok_or_else(|| ReplaceError::BadEdgeSpec(Direction::Incoming, err_spec.clone()))?,
             kind: oe.kind,
         };
-        if !h.valid_node(e.src) {
+        if !h.contains_node(e.src) {
             return Err(ReplaceError::BadEdgeSpec(
                 Direction::Outgoing,
                 err_spec.clone(),
             ));
         }
-        if !h.valid_node(e.tgt) {
+        if !h.contains_node(e.tgt) {
             return Err(ReplaceError::BadEdgeSpec(
                 Direction::Incoming,
                 err_spec.clone(),
@@ -810,7 +811,7 @@ mod test {
         // Root node type needs to be that of common parent of the removed nodes:
         let mut rep2 = rep.clone();
         rep2.replacement
-            .replace_op(rep2.replacement.root(), h.root_type().clone());
+            .replace_op(rep2.replacement.root(), h.root_optype().clone());
         assert_eq!(
             check_same_errors(rep2),
             ReplaceError::WrongRootNodeTag {

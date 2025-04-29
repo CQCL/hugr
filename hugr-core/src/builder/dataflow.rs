@@ -506,8 +506,8 @@ pub(crate) mod test {
 
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
-        assert_eq!(simple_dfg_hugr.node_count(), 3);
-        assert_matches!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
+        assert_eq!(simple_dfg_hugr.num_nodes(), 3);
+        assert_matches!(simple_dfg_hugr.root_optype().tag(), OpTag::Dfg);
     }
 
     #[test]
@@ -533,7 +533,7 @@ pub(crate) mod test {
         };
 
         let hugr = module_builder.finish_hugr()?;
-        assert_eq!(hugr.node_count(), 7);
+        assert_eq!(hugr.num_nodes(), 7);
 
         assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
         assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));

@@ -20,7 +20,7 @@ use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
 
 use super::internal::HugrInternals;
-use super::views::{HierarchyView, HugrView, SiblingGraph};
+use super::views::HugrView;
 use super::ExtensionError;
 
 /// Structure keeping track of pre-computed information used in the validation
@@ -31,7 +31,7 @@ use super::ExtensionError;
 struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
-    dominators: HashMap<Node, Dominators<Node>>,
+    dominators: HashMap<Node, Dominators<portgraph::NodeIndex>>,
 }
 
 impl Hugr {
@@ -138,10 +138,10 @@ impl<'a> ValidationContext<'a> {
     ///
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
-    fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
+    fn compute_dominator(&self, parent: Node) -> Dominators<portgraph::NodeIndex> {
+        let region = self.hugr.region_portgraph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region.as_petgraph(), entry_node)
+        dominators::simple_fast(&region, entry_node.into_portgraph())
     }
 
     /// Check the constraints on a single node.
@@ -163,7 +163,7 @@ impl<'a> ValidationContext<'a> {
 
         for dir in Direction::BOTH {
             // Check that we have the correct amount of ports and edges.
-            let num_ports = self.hugr.graph.num_ports(node.pg_index(), dir);
+            let num_ports = self.hugr.graph.num_ports(node.into_portgraph(), dir);
             if num_ports != op_type.port_count(dir) {
                 return Err(ValidationError::WrongNumberOfPorts {
                     node,
@@ -316,7 +316,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_children(&self, node: Node, op_type: &OpType) -> Result<(), ValidationError> {
         let flags = op_type.validity_flags();
 
-        if self.hugr.hierarchy().child_count(node.pg_index()) > 0 {
+        if self.hugr.hierarchy().child_count(node.into_portgraph()) > 0 {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
@@ -352,7 +352,8 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             // Additional validations running over the full list of children optypes
-            let children_optypes = all_children.map(|c| (c.pg_index(), self.hugr.get_optype(c)));
+            let children_optypes =
+                all_children.map(|c| (c.into_portgraph(), self.hugr.get_optype(c)));
             if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
@@ -363,9 +364,9 @@ impl<'a> ValidationContext<'a> {
 
             // Additional validations running over the edges of the contained graph
             if let Some(edge_check) = flags.edge_check {
-                for source in self.hugr.hierarchy().children(node.pg_index()) {
+                for source in self.hugr.hierarchy().children(node.into_portgraph()) {
                     for target in self.hugr.graph.output_neighbours(source) {
-                        if self.hugr.hierarchy.parent(target) != Some(node.pg_index()) {
+                        if self.hugr.hierarchy.parent(target) != Some(node.into_portgraph()) {
                             continue;
                         }
                         let source_op = self.hugr.get_optype(source.into());
@@ -411,16 +412,16 @@ impl<'a> ValidationContext<'a> {
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
     fn validate_children_dag(&self, parent: Node, op_type: &OpType) -> Result<(), ValidationError> {
-        if !self.hugr.hierarchy.has_children(parent.pg_index()) {
+        if !self.hugr.hierarchy.has_children(parent.into_portgraph()) {
             // No children, nothing to do
             return Ok(());
         };
 
-        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
-        let postorder = Topo::new(&region.as_petgraph());
+        let region = self.hugr.region_portgraph(parent);
+        let postorder = Topo::new(&region);
         let nodes_visited = postorder
-            .iter(&region.as_petgraph())
-            .filter(|n| *n != parent)
+            .iter(&region)
+            .filter(|n| *n != parent.into_portgraph())
             .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
@@ -500,7 +501,7 @@ impl<'a> ValidationContext<'a> {
                     // Must have an order edge.
                     self.hugr
                         .graph
-                        .get_connections(from.pg_index(), ancestor.pg_index())
+                        .get_connections(from.into_portgraph(), ancestor.into_portgraph())
                         .find(|&(p, _)| {
                             let offset = self.hugr.graph.port_offset(p).unwrap();
                             from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
@@ -537,8 +538,8 @@ impl<'a> ValidationContext<'a> {
                     }
                 };
                 if !dominator_tree
-                    .dominators(ancestor)
-                    .is_some_and(|mut ds| ds.any(|n| n == from_parent))
+                    .dominators(ancestor.into_portgraph())
+                    .is_some_and(|mut ds| ds.any(|n| n == from_parent.into_portgraph()))
                 {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
                         from,
@@ -616,7 +617,12 @@ impl<'a> ValidationContext<'a> {
         // Root nodes are ignored, as they cannot have connected edges.
         if node != self.hugr.root() {
             for dir in Direction::BOTH {
-                for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
+                for (i, port_index) in self
+                    .hugr
+                    .graph
+                    .ports(node.into_portgraph(), dir)
+                    .enumerate()
+                {
                     let port = Port::new(dir, i);
                     self.validate_port(node, port, port_index, op_type, var_decls)?;
                 }

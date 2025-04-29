@@ -145,6 +145,7 @@ impl DeadCodeElimPass {
         if let Some(res) = cache.get(&n) {
             return *res;
         }
+        #[allow(deprecated)]
         let res = match self.preserve_callback.as_ref()(h.base_hugr(), n) {
             PreserveNode::MustKeep => true,
             PreserveNode::CanRemoveIgnoringChildren => false,

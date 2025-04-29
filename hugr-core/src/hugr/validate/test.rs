@@ -103,7 +103,7 @@ fn invalid_root() {
     );
 
     // Fix the root
-    b.root = module.pg_index();
+    b.root = module.into_portgraph();
     b.remove_node(root);
     assert_eq!(b.validate(), Ok(()));
 }
@@ -142,7 +142,7 @@ fn children_restrictions() {
     let root = b.root();
     let (_input, copy, _output) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
@@ -185,7 +185,7 @@ fn df_children_restrictions() {
     let (mut b, def) = make_simple_hugr(2);
     let (_input, output, copy) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
@@ -202,7 +202,7 @@ fn df_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
+            => {assert_eq!(parent, def); assert_eq!(child, output.into_portgraph())}
     );
     b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]));
 
@@ -211,7 +211,7 @@ fn df_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, copy.pg_index())}
+            => {assert_eq!(parent, def); assert_eq!(child, copy.into_portgraph())}
     );
 }
 
@@ -791,7 +791,7 @@ fn cfg_children_restrictions() {
     let (mut b, def) = make_simple_hugr(1);
     let (_input, _output, copy) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
@@ -855,7 +855,7 @@ fn cfg_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
+            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.into_portgraph())}
     );
     b.remove_node(exit2);
 
@@ -875,7 +875,7 @@ fn cfg_children_restrictions() {
             extension_delta: ExtensionSet::new(),
         },
     );
-    let mut block_children = b.hierarchy.children(block.pg_index());
+    let mut block_children = b.hierarchy.children(block.into_portgraph());
     let block_input = block_children.next().unwrap().into();
     let block_output = block_children.next_back().unwrap().into();
     b.replace_op(block_input, ops::Input::new(vec![qb_t()]));
