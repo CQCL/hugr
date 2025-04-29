@@ -5,8 +5,8 @@ use itertools::Itertools;
 
 use derive_more::Display;
 
-use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::Extension;
+use crate::extension::{ExtensionId, ExtensionRegistry};
 
 /// The equivalent to an [`ExtensionRegistry`] that only contains weak
 /// references.

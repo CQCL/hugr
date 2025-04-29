@@ -345,12 +345,12 @@ impl HugrMutInternals for Hugr {
 #[cfg(test)]
 mod test {
     use crate::{
+        Direction, HugrView as _,
         builder::{Container, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::Noop,
         hugr::internal::HugrMutInternals as _,
         ops::handle::NodeHandle,
         types::{Signature, Type},
-        Direction, HugrView as _,
     };
 
     #[test]

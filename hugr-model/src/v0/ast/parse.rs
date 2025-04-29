@@ -16,11 +16,11 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use base64::prelude::BASE64_STANDARD;
 use base64::Engine as _;
+use base64::prelude::BASE64_STANDARD;
 use ordered_float::OrderedFloat;
-use pest::iterators::{Pair, Pairs};
 use pest::Parser as _;
+use pest::iterators::{Pair, Pairs};
 use pest_parser::{HugrParser, Rule};
 use smol_str::SmolStr;
 use thiserror::Error;

@@ -243,6 +243,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
+    use crate::Extension;
     use crate::builder::{Container, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::{ExtensionId, ExtensionSet};
@@ -250,9 +251,8 @@ mod test {
     use crate::utils::test_quantum_extension::{
         self, cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
     };
-    use crate::Extension;
     use crate::{
-        builder::{test::build_main, DataflowSubContainer},
+        builder::{DataflowSubContainer, test::build_main},
         extension::prelude::bool_t,
         types::Signature,
     };

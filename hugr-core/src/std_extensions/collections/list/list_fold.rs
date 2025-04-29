@@ -1,14 +1,14 @@
 //! Folding definitions for list operations.
 
+use crate::IncomingPort;
 use crate::extension::prelude::{
-    const_fail, const_none, const_ok, const_ok_tuple, const_some, ConstUsize,
+    ConstUsize, const_fail, const_none, const_ok, const_ok_tuple, const_some,
 };
 use crate::extension::{ConstFold, ConstFoldResult, OpDef};
 use crate::ops::Value;
-use crate::types::type_param::TypeArg;
 use crate::types::Type;
+use crate::types::type_param::TypeArg;
 use crate::utils::sorted_consts;
-use crate::IncomingPort;
 
 use super::{ListOp, ListValue};
 

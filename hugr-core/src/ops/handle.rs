@@ -1,7 +1,7 @@
 //! Handles to nodes in HUGR.
+use crate::Node;
 use crate::core::HugrNode;
 use crate::types::{Type, TypeBound};
-use crate::Node;
 
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;

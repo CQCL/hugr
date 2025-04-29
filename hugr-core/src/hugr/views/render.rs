@@ -4,9 +4,9 @@
 use portgraph::render::{EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
 
+use crate::HugrView;
 use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
-use crate::HugrView;
 
 /// Configuration for rendering a HUGR graph.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

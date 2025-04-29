@@ -6,12 +6,12 @@ use strum::IntoEnumIterator;
 
 use crate::ops::{ExtensionOp, OpName, OpNameRef};
 use crate::{
+    Extension,
     ops::{NamedOp, OpType},
     types::TypeArg,
-    Extension,
 };
 
-use super::{op_def::SignatureFunc, ExtensionBuildError, ExtensionId, OpDef, SignatureError};
+use super::{ExtensionBuildError, ExtensionId, OpDef, SignatureError, op_def::SignatureFunc};
 use delegate::delegate;
 use thiserror::Error;
 

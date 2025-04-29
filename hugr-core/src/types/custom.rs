@@ -4,12 +4,12 @@
 use std::fmt::{self, Display};
 use std::sync::{Arc, Weak};
 
-use crate::extension::{ExtensionId, SignatureError, TypeDef};
 use crate::Extension;
+use crate::extension::{ExtensionId, SignatureError, TypeDef};
 
 use super::{
-    type_param::{TypeArg, TypeParam},
     Substitution, TypeBound,
+    type_param::{TypeArg, TypeParam},
 };
 use super::{Type, TypeName};
 
@@ -181,8 +181,8 @@ mod test {
         use std::sync::Weak;
 
         use crate::extension::ExtensionId;
-        use crate::proptest::any_nonempty_string;
         use crate::proptest::RecursionDepth;
+        use crate::proptest::any_nonempty_string;
         use crate::types::type_param::TypeArg;
         use crate::types::{CustomType, TypeBound};
         use ::proptest::collection::vec;

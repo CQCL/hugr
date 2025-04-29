@@ -2,7 +2,7 @@
 //! into a DFG which replaces the Call node.
 use derive_more::{Display, Error};
 
-use crate::ops::{DataflowParent, OpType, DFG};
+use crate::ops::{DFG, DataflowParent, OpType};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
 

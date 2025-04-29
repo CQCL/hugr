@@ -7,11 +7,11 @@ use portgraph::{LinkView, MultiPortGraph, PortView};
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeMetadataMap};
-use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
+use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView};
+use super::{ExtractHugr, HierarchyView, HugrInternals, HugrView, check_tag};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
@@ -410,15 +410,15 @@ mod test {
 
     use rstest::rstest;
 
+    use crate::IncomingPort;
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::{qb_t, usize_t};
-    use crate::ops::handle::{CfgID, DfgID, FuncID};
     use crate::ops::OpType;
-    use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
+    use crate::ops::handle::{CfgID, DfgID, FuncID};
+    use crate::ops::{Input, OpTag, Output, dataflow::IOTrait};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension::EXTENSION_ID;
-    use crate::IncomingPort;
 
     use super::super::descendants::test::make_module_hgr;
     use super::*;

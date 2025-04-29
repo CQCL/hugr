@@ -56,7 +56,7 @@
 //!   [INPUT]                    Input file. Defaults to `-` for stdin.
 //! ```
 
-use clap::{crate_version, Parser};
+use clap::{Parser, crate_version};
 use clap_verbosity_flag::log::Level;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use hugr::envelope::EnvelopeError;

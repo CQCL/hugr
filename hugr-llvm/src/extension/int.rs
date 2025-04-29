@@ -1,37 +1,36 @@
 use hugr_core::{
-    extension::prelude::{sum_with_error, ConstError},
-    ops::{constant::CustomConst, ExtensionOp, NamedOp, Value},
+    HugrView, Node,
+    extension::prelude::{ConstError, sum_with_error},
+    ops::{ExtensionOp, NamedOp, Value, constant::CustomConst},
     std_extensions::arithmetic::{
         int_ops::IntOpDef,
         int_types::{self, ConstInt},
     },
     types::{CustomType, Type, TypeArg},
-    HugrView, Node,
 };
 use inkwell::{
+    IntPredicate,
     types::{BasicType, BasicTypeEnum, IntType},
     values::{BasicValue, BasicValueEnum, IntValue},
-    IntPredicate,
 };
 use lazy_static::lazy_static;
 
 use crate::{
+    CodegenExtension,
     custom::CodegenExtsBuilder,
     emit::{
-        emit_value,
+        EmitOpArgs, emit_value,
         func::EmitFuncContext,
         get_intrinsic,
         ops::{emit_custom_binary_op, emit_custom_unary_op},
-        EmitOpArgs,
     },
     sum::{LLVMSumType, LLVMSumValue},
     types::{HugrSumType, TypingSession},
-    CodegenExtension,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 
-use super::{conversions::int_type_bounds, DefaultPreludeCodegen, PreludeCodegen};
+use super::{DefaultPreludeCodegen, PreludeCodegen, conversions::int_type_bounds};
 
 #[derive(Clone, Debug, Default)]
 pub struct IntCodegenExtension<PCG>(PCG);
@@ -134,11 +133,13 @@ impl DivModOp {
             };
             // If we emitted a panicking divmod, the result is just a tuple type.
             if self.panic {
-                Ok(vec![quotrem
-                    .build_untag(ctx.builder(), 0)?
-                    .into_iter()
-                    .nth(index)
-                    .unwrap()])
+                Ok(vec![
+                    quotrem
+                        .build_untag(ctx.builder(), 0)?
+                        .into_iter()
+                        .nth(index)
+                        .unwrap(),
+                ])
             }
             // Otherwise, we have a sum type `err + [int,int]`, which we need to
             // turn into a `err + int`.
@@ -207,9 +208,9 @@ fn emit_icmp<'c, H: HugrView<Node = Node>>(
             "",
         )?;
         // convert to whatever bool_t is
-        Ok(vec![ctx
-            .builder()
-            .build_select(r, true_val, false_val, "")?])
+        Ok(vec![
+            ctx.builder().build_select(r, true_val, false_val, "")?,
+        ])
     })
 }
 
@@ -278,22 +279,25 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<()> {
     match op {
         IntOpDef::iadd => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::imul => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::isub => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::idiv_s => {
             let log_width = get_width_arg(&args, &op)?;
@@ -501,10 +505,11 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::ineg => emit_custom_unary_op(context, args, |ctx, arg, _| {
-            Ok(vec![ctx
-                .builder()
-                .build_int_neg(arg.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_int_neg(arg.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::iabs => emit_custom_unary_op(context, args, |ctx, arg, _| {
             let intr = get_intrinsic(
@@ -589,16 +594,18 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             Ok(vec![r])
         }),
         IntOpDef::ishl => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::ishr => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_right_shift(lhs.into_int_value(), rhs.into_int_value(), false, "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_right_shift(lhs.into_int_value(), rhs.into_int_value(), false, "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::ieq => emit_icmp(context, args, inkwell::IntPredicate::EQ),
         IntOpDef::ine => emit_icmp(context, args, inkwell::IntPredicate::NE),
@@ -611,45 +618,51 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
         IntOpDef::ile_u => emit_icmp(context, args, inkwell::IntPredicate::ULE),
         IntOpDef::ige_u => emit_icmp(context, args, inkwell::IntPredicate::UGE),
         IntOpDef::ixor => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_xor(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_xor(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::ior => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_or(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_or(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::inot => emit_custom_unary_op(context, args, |ctx, arg, _| {
-            Ok(vec![ctx
-                .builder()
-                .build_not(arg.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_not(arg.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::iand => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_and(lhs.into_int_value(), rhs.into_int_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_and(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::ipow => emit_ipow(context, args),
         // Type args are width of input, width of output
         IntOpDef::iwiden_u => emit_custom_unary_op(context, args, |ctx, arg, outs| {
             let [out] = outs.try_into()?;
-            Ok(vec![ctx
-                .builder()
-                .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), false, "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), false, "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::iwiden_s => emit_custom_unary_op(context, args, |ctx, arg, outs| {
             let [out] = outs.try_into()?;
 
-            Ok(vec![ctx
-                .builder()
-                .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), true, "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_int_cast_sign_flag(arg.into_int_value(), out.into_int_type(), true, "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         IntOpDef::inarrow_s => {
             let Some(TypeArg::BoundedNat { n: out_log_width }) = args.node().args().last().cloned()
@@ -1145,10 +1158,11 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 #[cfg(test)]
 mod test {
     use anyhow::Result;
-    use hugr_core::extension::prelude::{error_type, ConstError, UnwrapBuilder};
+    use hugr_core::extension::prelude::{ConstError, UnwrapBuilder, error_type};
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
-        builder::{handle::Outputs, Dataflow, DataflowSubContainer, SubContainer},
+        Hugr,
+        builder::{Dataflow, DataflowSubContainer, SubContainer, handle::Outputs},
         extension::prelude::bool_t,
         ops::{DataflowOpTrait, ExtensionOp, NamedOp},
         std_extensions::arithmetic::{
@@ -1156,14 +1170,13 @@ mod test {
             int_types::{ConstInt, INT_TYPES},
         },
         types::{SumType, Type, TypeRow},
-        Hugr,
     };
     use rstest::rstest;
 
     use crate::{
         check_emission,
-        emit::test::{SimpleHugrConfig, DFGW},
-        test::{exec_ctx, llvm_ctx, single_op_hugr, TestContext},
+        emit::test::{DFGW, SimpleHugrConfig},
+        test::{TestContext, exec_ctx, llvm_ctx, single_op_hugr},
     };
 
     #[rstest::fixture]

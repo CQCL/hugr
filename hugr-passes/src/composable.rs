@@ -2,9 +2,9 @@
 
 use std::{error::Error, marker::PhantomData};
 
-use hugr_core::core::HugrNode;
-use hugr_core::hugr::{hugrmut::HugrMut, ValidationError};
 use hugr_core::HugrView;
+use hugr_core::core::HugrNode;
+use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
@@ -188,10 +188,10 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
 pub struct IfThen<E, A, B>(A, B, PhantomData<E>);
 
 impl<
-        A: ComposablePass<Result = bool>,
-        B: ComposablePass<Node = A::Node>,
-        E: ErrorCombiner<A::Error, B::Error>,
-    > IfThen<E, A, B>
+    A: ComposablePass<Result = bool>,
+    B: ComposablePass<Node = A::Node>,
+    E: ErrorCombiner<A::Error, B::Error>,
+> IfThen<E, A, B>
 {
     /// Make a new instance given the [ComposablePass] to run first
     /// and (maybe) second
@@ -201,10 +201,10 @@ impl<
 }
 
 impl<
-        A: ComposablePass<Result = bool>,
-        B: ComposablePass<Node = A::Node>,
-        E: ErrorCombiner<A::Error, B::Error>,
-    > ComposablePass for IfThen<E, A, B>
+    A: ComposablePass<Result = bool>,
+    B: ComposablePass<Node = A::Node>,
+    E: ErrorCombiner<A::Error, B::Error>,
+> ComposablePass for IfThen<E, A, B>
 {
     type Node = A::Node;
     type Error = E;
@@ -238,10 +238,10 @@ mod test {
         ModuleBuilder,
     };
     use hugr_core::extension::prelude::{
-        bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple, PRELUDE_ID,
+        ConstUsize, MakeTuple, PRELUDE_ID, UnpackTuple, bool_t, usize_t,
     };
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DEFAULT_OPTYPE, DFG};
+    use hugr_core::ops::{DEFAULT_OPTYPE, DFG, Input, OpType, Output, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, TypeRow};
     use hugr_core::{Hugr, HugrView, IncomingPort};
@@ -250,7 +250,7 @@ mod test {
     use crate::untuple::{UntupleRecursive, UntupleResult};
     use crate::{DeadCodeElimPass, ReplaceTypes, UntuplePass};
 
-    use super::{validate_if_test, ComposablePass, IfThen, ValidatePassError, ValidatingPass};
+    use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass, validate_if_test};
 
     #[test]
     fn test_then() {

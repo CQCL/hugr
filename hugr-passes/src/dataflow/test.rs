@@ -1,24 +1,24 @@
 use std::convert::Infallible;
 
-use ascent::{lattice::BoundedLattice, Lattice};
+use ascent::{Lattice, lattice::BoundedLattice};
 
-use hugr_core::builder::{inout_sig, CFGBuilder, Container, DataflowHugr, ModuleBuilder};
+use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder, inout_sig};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::handle::DfgID;
 use hugr_core::ops::{CallIndirect, TailLoop};
 use hugr_core::types::{ConstTypeError, TypeRow};
+use hugr_core::{Hugr, Node, Wire};
 use hugr_core::{
-    builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
+    HugrView,
+    builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer, endo_sig},
     extension::{
-        prelude::{bool_t, UnpackTuple},
         ExtensionSet,
+        prelude::{UnpackTuple, bool_t},
     },
-    ops::{handle::NodeHandle, DataflowOpTrait, Tag, Value},
+    ops::{DataflowOpTrait, Tag, Value, handle::NodeHandle},
     type_row,
     types::{Signature, SumType, Type},
-    HugrView,
 };
-use hugr_core::{Hugr, Node, Wire};
 use rstest::{fixture, rstest};
 
 use super::{

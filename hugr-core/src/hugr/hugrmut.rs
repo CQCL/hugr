@@ -591,8 +591,8 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
 mod test {
     use crate::extension::PRELUDE;
     use crate::{
-        extension::prelude::{usize_t, Noop},
-        ops::{self, dataflow::IOTrait, FuncDefn, Input, Output},
+        extension::prelude::{Noop, usize_t},
+        ops::{self, FuncDefn, Input, Output, dataflow::IOTrait},
         types::Signature,
     };
 

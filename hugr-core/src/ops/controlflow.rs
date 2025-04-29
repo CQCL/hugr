@@ -2,12 +2,12 @@
 
 use std::borrow::Cow;
 
+use crate::Direction;
 use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, Signature, Type, TypeRow};
-use crate::Direction;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{impl_op_name, NamedOp, OpTrait, StaticTag};
+use super::{NamedOp, OpTrait, StaticTag, impl_op_name};
 use super::{OpName, OpTag};
 
 /// Tail-controlled loop.
@@ -374,8 +374,8 @@ impl Case {
 mod test {
     use crate::{
         extension::{
-            prelude::{qb_t, usize_t, PRELUDE_ID},
             ExtensionSet,
+            prelude::{PRELUDE_ID, qb_t, usize_t},
         },
         ops::{Conditional, DataflowOpTrait, DataflowParent},
         types::{Signature, Substitution, Type, TypeArg, TypeBound, TypeRV},

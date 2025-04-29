@@ -1,11 +1,11 @@
 use std::{collections::HashMap, rc::Rc};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr_core::{
-    extension::prelude::{either_type, option_type},
-    ops::{constant::CustomConst, ExtensionOp, FuncDecl, FuncDefn},
-    types::Type,
     HugrView, Node, NodeIndex, PortIndex, Wire,
+    extension::prelude::{either_type, option_type},
+    ops::{ExtensionOp, FuncDecl, FuncDefn, constant::CustomConst},
+    types::Type,
 };
 use inkwell::{
     basic_block::BasicBlock,
@@ -247,8 +247,10 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             })
             .collect::<Result<RowMailBox>>()?;
 
-        debug_assert!(zip_eq(node.in_value_types(), r.get_types())
-            .all(|((_, t), lt)| self.llvm_type(&t).unwrap() == lt));
+        debug_assert!(
+            zip_eq(node.in_value_types(), r.get_types())
+                .all(|((_, t), lt)| self.llvm_type(&t).unwrap() == lt)
+        );
         Ok(r)
     }
 
@@ -262,8 +264,10 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             .out_value_types()
             .map(|(port, hugr_type)| self.map_wire(node, port, &hugr_type))
             .collect::<Result<RowMailBox>>()?;
-        debug_assert!(zip_eq(node.out_value_types(), r.get_types())
-            .all(|((_, t), lt)| self.llvm_type(&t).unwrap() == lt));
+        debug_assert!(
+            zip_eq(node.out_value_types(), r.get_types())
+                .all(|((_, t), lt)| self.llvm_type(&t).unwrap() == lt)
+        );
         Ok(r)
     }
 

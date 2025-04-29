@@ -2,8 +2,8 @@
 
 use clap::Parser;
 use clap_verbosity_flag::log::Level;
-use hugr::package::PackageValidationError;
 use hugr::Hugr;
+use hugr::package::PackageValidationError;
 
 use crate::hugr_io::HugrInputArgs;
 use crate::{CliError, OtherArgs};

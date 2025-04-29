@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::HugrMut;
+use crate::hugr::hugrmut::InsertionResult;
 use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort};
@@ -456,8 +456,8 @@ mod test {
     use itertools::Itertools;
 
     use crate::builder::{
-        endo_sig, BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
-        DataflowSubContainer, HugrBuilder, SubContainer,
+        BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer, HugrBuilder, SubContainer, endo_sig,
     };
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionRegistry, PRELUDE};
@@ -467,11 +467,11 @@ mod test {
     use crate::ops::custom::ExtensionOp;
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
+    use crate::ops::{self, Case, DFG, DataflowBlock, OpTag, OpType};
     use crate::std_extensions::collections::list;
     use crate::types::{Signature, Type, TypeRow};
     use crate::utils::{depth, test_quantum_extension};
-    use crate::{type_row, Direction, Extension, Hugr, HugrView, OutgoingPort};
+    use crate::{Direction, Extension, Hugr, HugrView, OutgoingPort, type_row};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
 

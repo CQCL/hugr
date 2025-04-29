@@ -1,21 +1,21 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     convert::Infallible,
     fmt::Write,
     ops::Deref,
 };
 
 use hugr_core::{
+    Node,
     ops::{Call, FuncDefn, LoadFunction, OpTrait},
     types::{Signature, Substitution, TypeArg},
-    Node,
 };
 
-use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
+use hugr_core::hugr::{Hugr, HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::composable::{validate_if_test, ValidatePassError};
 use crate::ComposablePass;
+use crate::composable::{ValidatePassError, validate_if_test};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -339,7 +339,7 @@ mod test {
 
     use hugr_core::extension::simple_op::MakeRegisteredOp as _;
     use hugr_core::std_extensions::collections;
-    use hugr_core::std_extensions::collections::array::{array_type_parametric, ArrayOpDef};
+    use hugr_core::std_extensions::collections::array::{ArrayOpDef, array_type_parametric};
     use hugr_core::types::type_param::TypeParam;
     use itertools::Itertools;
 
@@ -347,10 +347,10 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{
-        usize_t, ConstUsize, UnpackTuple, UnwrapBuilder, PRELUDE_ID,
-    };
     use hugr_core::extension::ExtensionSet;
+    use hugr_core::extension::prelude::{
+        ConstUsize, PRELUDE_ID, UnpackTuple, UnwrapBuilder, usize_t,
+    };
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};

@@ -10,5 +10,5 @@
 mod read;
 mod write;
 
-pub use read::{read_from_reader, read_from_slice, ReadError};
-pub use write::{write_to_vec, write_to_writer, WriteError};
+pub use read::{ReadError, read_from_reader, read_from_slice};
+pub use write::{WriteError, write_to_vec, write_to_writer};

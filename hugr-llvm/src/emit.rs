@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use delegate::delegate;
 use hugr_core::{
+    HugrView, Node,
     ops::{FuncDecl, FuncDefn, OpType},
     types::PolyFuncType,
-    HugrView, Node,
 };
 use inkwell::{
     builder::Builder,

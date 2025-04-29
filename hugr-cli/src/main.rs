@@ -2,7 +2,7 @@
 
 use clap::Parser as _;
 
-use hugr_cli::{mermaid, validate, CliArgs};
+use hugr_cli::{CliArgs, mermaid, validate};
 
 use clap_verbosity_flag::log::Level;
 

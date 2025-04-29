@@ -12,9 +12,9 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
-use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
+use super::type_param::{TypeArg, TypeParam, check_type_args};
+use super::{MaybeRV, NoRV, RowVariable, signature::FuncTypeBase};
 
 /// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -160,8 +160,9 @@ pub(crate) mod test {
     use cool_asserts::assert_matches;
     use lazy_static::lazy_static;
 
+    use crate::Extension;
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE};
+    use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE, SignatureError, TypeDefBound};
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
@@ -169,7 +170,6 @@ pub(crate) mod test {
     use crate::types::{
         CustomType, FuncValueType, MaybeRV, Signature, Type, TypeBound, TypeName, TypeRV,
     };
-    use crate::Extension;
 
     use super::PolyFuncTypeBase;
 

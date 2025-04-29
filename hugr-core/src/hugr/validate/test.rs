@@ -7,26 +7,26 @@ use cool_asserts::assert_matches;
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
+    BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, inout_sig,
 };
 use crate::extension::prelude::Noop;
-use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
-use crate::extension::{Extension, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE};
-use crate::hugr::internal::HugrMutInternals;
+use crate::extension::prelude::{PRELUDE_ID, bool_t, qb_t, usize_t};
+use crate::extension::{Extension, ExtensionRegistry, ExtensionSet, PRELUDE, TypeDefBound};
 use crate::hugr::HugrMut;
+use crate::hugr::internal::HugrMutInternals;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, OpType, Value};
-use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::LogicOp;
+use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
 use crate::{
-    const_extension_ids, test_file, type_row, Direction, IncomingPort, Node, OutgoingPort,
+    Direction, IncomingPort, Node, OutgoingPort, const_extension_ids, test_file, type_row,
 };
 
 /// Creates a hugr with a single function definition that copies a bit `copies` times.
@@ -951,13 +951,13 @@ mod extension_tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::Wire;
     use crate::builder::handle::Outputs;
     use crate::builder::{BlockBuilder, BuildHandle, CFGBuilder, DFGWrapper, TailLoopBuilder};
-    use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
-    use crate::hugr::test::{lift_op, LIFT_EXT_ID};
+    use crate::extension::prelude::PRELUDE_ID;
+    use crate::hugr::test::{LIFT_EXT_ID, lift_op};
     use crate::macros::const_extension_ids;
-    use crate::Wire;
     const_extension_ids! {
         const XA: ExtensionId = "A";
         const XB: ExtensionId = "BOOL_EXT";

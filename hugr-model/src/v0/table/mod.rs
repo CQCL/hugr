@@ -29,7 +29,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 mod view;
-use super::{ast, Literal, RegionKind};
+use super::{Literal, RegionKind, ast};
 pub use view::View;
 
 /// A package consisting of a sequence of [`Module`]s.

@@ -5,6 +5,7 @@ use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -12,9 +13,8 @@ use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, Signatu
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
-use crate::Extension;
 
-use super::{array_type_def, instantiate_array, ARRAY_TYPENAME};
+use super::{ARRAY_TYPENAME, array_type_def, instantiate_array};
 
 /// Name of the operation for the combined map/fold operation
 pub const ARRAY_SCAN_OP_ID: OpName = OpName::new_inline("scan");
@@ -217,8 +217,13 @@ impl HasConcrete for ArrayScanDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::Sequence { elems: acc_tys }, TypeArg::Extensions { es }] =>
-            {
+            [
+                TypeArg::BoundedNat { n },
+                TypeArg::Type { ty: src_ty },
+                TypeArg::Type { ty: tgt_ty },
+                TypeArg::Sequence { elems: acc_tys },
+                TypeArg::Extensions { es },
+            ] => {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
                     .map(|acc_ty| match acc_ty {
@@ -243,7 +248,7 @@ impl HasConcrete for ArrayScanDef {
 mod tests {
 
     use crate::extension::prelude::usize_t;
-    use crate::std_extensions::collections::array::{array_type, EXTENSION_ID};
+    use crate::std_extensions::collections::array::{EXTENSION_ID, array_type};
     use crate::{
         extension::prelude::{bool_t, qb_t},
         ops::{OpTrait, OpType},

@@ -1,9 +1,9 @@
 use crate::{
-    extension::{prelude::ConstString, ConstFold, ConstFoldResult, OpDef},
+    IncomingPort,
+    extension::{ConstFold, ConstFoldResult, OpDef, prelude::ConstString},
     ops,
     std_extensions::arithmetic::float_types::ConstF64,
     utils::sorted_consts,
-    IncomingPort,
 };
 
 use super::FloatOps;

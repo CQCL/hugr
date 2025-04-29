@@ -8,7 +8,7 @@ use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView};
+use super::{ExtractHugr, HierarchyView, HugrInternals, HugrView, check_tag};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -196,12 +196,12 @@ pub(super) mod test {
 
     use rstest::rstest;
 
-    use crate::extension::prelude::{qb_t, usize_t};
     use crate::IncomingPort;
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         types::Signature,
-        utils::test_quantum_extension::{h_gate, EXTENSION_ID},
+        utils::test_quantum_extension::{EXTENSION_ID, h_gate},
     };
 
     use super::*;
@@ -209,8 +209,8 @@ pub(super) mod test {
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///
     /// Returns the hugr, the fn node id, and the nested dgf node id.
-    pub(in crate::hugr::views) fn make_module_hgr(
-    ) -> Result<(Hugr, Node, Node), Box<dyn std::error::Error>> {
+    pub(in crate::hugr::views) fn make_module_hgr()
+    -> Result<(Hugr, Node, Node), Box<dyn std::error::Error>> {
         let mut module_builder = ModuleBuilder::new();
 
         let (f_id, inner_id) = {

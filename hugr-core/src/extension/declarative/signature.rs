@@ -11,11 +11,11 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
+use crate::Extension;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{ExtensionSet, SignatureFunc, TypeDef};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeRowRV};
-use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
 
@@ -89,7 +89,7 @@ impl SignaturePortDeclaration {
                 return Err(ExtensionDeclarationError::UnsupportedPortRepetition {
                     ext: ext.name().clone(),
                     parametric_repetition: parametric_repetition.clone(),
-                })
+                });
             }
         };
 

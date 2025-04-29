@@ -1,10 +1,10 @@
 //! Implementations of petgraph's traits for Hugr Region views.
 
+use crate::Port;
 use crate::core::HugrNode;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
 use crate::types::EdgeKind;
-use crate::Port;
 
 use petgraph::visit as pv;
 
@@ -218,9 +218,9 @@ mod test {
         EdgeCount, GetAdjacencyMatrix, IntoNodeReferences, NodeCount, NodeIndexable, NodeRef,
     };
 
+    use crate::HugrView;
     use crate::hugr::views::tests::sample_hugr;
     use crate::ops::handle::NodeHandle;
-    use crate::HugrView;
 
     use super::PetgraphWrapper;
 

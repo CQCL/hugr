@@ -1,24 +1,24 @@
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{Result, anyhow, bail, ensure};
 
 use hugr_core::{
+    HugrView, Node,
     extension::{
-        prelude::{bool_t, sum_with_error, ConstError},
+        prelude::{ConstError, bool_t, sum_with_error},
         simple_op::MakeExtensionOp,
     },
-    ops::{constant::Value, custom::ExtensionOp, DataflowOpTrait as _},
+    ops::{DataflowOpTrait as _, constant::Value, custom::ExtensionOp},
     std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
     types::{TypeEnum, TypeRow},
-    HugrView, Node,
 };
 
-use inkwell::{types::IntType, values::BasicValue, FloatPredicate, IntPredicate};
+use inkwell::{FloatPredicate, IntPredicate, types::IntType, values::BasicValue};
 
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
     emit::{
+        EmitOpArgs,
         func::EmitFuncContext,
         ops::{emit_custom_unary_op, emit_value},
-        EmitOpArgs,
     },
     extension::int::get_width_arg,
     sum::LLVMSumValue,
@@ -160,18 +160,24 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
 
         ConvertOpDef::convert_u => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
             let out_ty = out_tys.last().unwrap();
-            Ok(vec![ctx
-                .builder()
-                .build_unsigned_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_unsigned_int_to_float(
+                        arg.into_int_value(),
+                        out_ty.into_float_type(),
+                        "",
+                    )?
+                    .as_basic_value_enum(),
+            ])
         }),
 
         ConvertOpDef::convert_s => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
             let out_ty = out_tys.last().unwrap();
-            Ok(vec![ctx
-                .builder()
-                .build_signed_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_signed_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         // These ops convert between hugr's `USIZE` and u64. The former is
         // implementation-dependent and we define them to be the same.
@@ -268,22 +274,22 @@ mod test {
     use super::*;
 
     use crate::check_emission;
-    use crate::emit::test::{SimpleHugrConfig, DFGW};
-    use crate::test::{exec_ctx, llvm_ctx, TestContext};
+    use crate::emit::test::{DFGW, SimpleHugrConfig};
+    use crate::test::{TestContext, exec_ctx, llvm_ctx};
     use hugr_core::builder::SubContainer;
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::std_extensions::arithmetic::float_types::ConstF64;
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
-    use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
+        Hugr,
         builder::{Dataflow, DataflowSubContainer},
-        extension::prelude::{usize_t, ConstUsize, PRELUDE_REGISTRY},
+        extension::prelude::{ConstUsize, PRELUDE_REGISTRY, usize_t},
         std_extensions::arithmetic::{
             conversions::{ConvertOpDef, EXTENSION},
             float_types::float64_type,
             int_types::INT_TYPES,
         },
         types::Type,
-        Hugr,
     };
     use rstest::rstest;
 

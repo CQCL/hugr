@@ -1,19 +1,19 @@
 use crate::extension::prelude::{ConstString, ConstUsize};
-use crate::ops::constant::get_single_input_value;
 use crate::ops::Value;
+use crate::ops::constant::get_single_input_value;
 use crate::std_extensions::arithmetic::int_types::INT_TYPES;
 use crate::{
+    IncomingPort,
     extension::{
-        prelude::{const_ok, error_type, ConstError},
         ConstFold, ConstFoldResult, OpDef,
+        prelude::{ConstError, const_ok, error_type},
     },
     ops,
     std_extensions::arithmetic::{
         float_types::ConstF64,
-        int_types::{get_log_width, ConstInt},
+        int_types::{ConstInt, get_log_width},
     },
     types::ConstTypeError,
-    IncomingPort,
 };
 
 use super::ConvertOpDef;

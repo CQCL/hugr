@@ -20,26 +20,26 @@ use std::{
 };
 
 use crate::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
+        ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef,
         prelude::{option_type, usize_t},
         resolution::{ExtensionResolutionError, WeakExtensionRegistry},
         simple_op::{
-            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
-            OpLoadError,
+            HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+            try_from_name,
         },
-        ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef,
     },
     ops::{
-        constant::{maybe_hash_values, CustomConst, TryHash, ValueName},
         ExtensionOp, NamedOp, OpName, Value,
+        constant::{CustomConst, TryHash, ValueName, maybe_hash_values},
     },
     types::{
-        type_param::{TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, PolyFuncType, Signature, Type, TypeArg,
         TypeBound, TypeName,
+        type_param::{TypeArgError, TypeParam},
     },
-    Extension, Wire,
 };
 
 use lazy_static::lazy_static;
@@ -404,7 +404,7 @@ impl<T: Dataflow> StaticArrayOpBuilder for T {}
 mod test {
     use crate::{
         builder::{DFGBuilder, DataflowHugr as _},
-        extension::prelude::{qb_t, ConstUsize, PRELUDE_ID},
+        extension::prelude::{ConstUsize, PRELUDE_ID, qb_t},
         type_row,
     };
 

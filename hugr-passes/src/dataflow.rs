@@ -11,10 +11,10 @@ pub use results::{AnalysisResults, TailLoopTermination};
 mod partial_value;
 pub use partial_value::{AbstractValue, AsConcrete, LoadedFunction, PartialSum, PartialValue, Sum};
 
+use hugr_core::Hugr;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::types::TypeArg;
-use hugr_core::Hugr;
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).

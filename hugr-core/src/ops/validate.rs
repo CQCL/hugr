@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::types::TypeRow;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{impl_validate_op, BasicBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp};
+use super::{BasicBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp, impl_validate_op};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -175,7 +175,9 @@ pub enum ChildrenValidationError {
         expected_position: &'static str,
     },
     /// The signature of the contained dataflow graph does not match the one of the container.
-    #[error("The {node_desc} node of a {container_desc} has a signature of {actual}, which differs from the expected type row {expected}")]
+    #[error(
+        "The {node_desc} node of a {container_desc} has a signature of {actual}, which differs from the expected type row {expected}"
+    )]
     IOSignatureMismatch {
         child: NodeIndex,
         actual: TypeRow,
@@ -317,14 +319,14 @@ fn validate_io_nodes<'a>(
                     child,
                     optype: optype.clone(),
                     expected_position: "first",
-                })
+                });
             }
             OpTag::Output => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
                     expected_position: "second",
-                })
+                });
             }
             _ => {}
         }
@@ -360,7 +362,7 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::{usize_t, Noop};
+    use crate::extension::prelude::{Noop, usize_t};
     use crate::ops;
     use crate::ops::dataflow::IOTrait;
     use cool_asserts::assert_matches;

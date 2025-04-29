@@ -7,8 +7,8 @@ use crate::{Hugr, Node};
 
 use super::handle::BuildHandle;
 use super::{
-    dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
+    dataflow::{DFGBuilder, DFGWrapper},
 };
 
 /// Builder for a [`ops::TailLoop`] node.
@@ -109,7 +109,7 @@ mod test {
     use crate::extension::prelude::bool_t;
     use crate::{
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{usize_t, ConstUsize, PRELUDE_ID},
+        extension::prelude::{ConstUsize, PRELUDE_ID, usize_t},
         hugr::ValidationError,
         ops::Value,
         type_row,

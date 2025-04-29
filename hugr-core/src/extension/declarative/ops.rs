@@ -13,10 +13,10 @@ use std::sync::Weak;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
+use crate::Extension;
 use crate::extension::{OpDef, SignatureFunc};
 use crate::ops::OpName;
 use crate::types::type_param::TypeParam;
-use crate::Extension;
 
 use super::signature::SignatureDeclaration;
 use super::{DeclarationContext, ExtensionDeclarationError};

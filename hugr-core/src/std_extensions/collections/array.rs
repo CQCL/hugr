@@ -12,21 +12,21 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
+use crate::Extension;
 use crate::extension::resolution::{
-    resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    resolve_value_extensions,
 };
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound};
-use crate::ops::constant::{maybe_hash_values, CustomConst, TryHash, ValueName};
+use crate::ops::constant::{CustomConst, TryHash, ValueName, maybe_hash_values};
 use crate::ops::{ExtensionOp, OpName, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{CustomCheckFailure, CustomType, Type, TypeBound, TypeName};
-use crate::Extension;
 
 pub use array_op::{ArrayOp, ArrayOpDef, ArrayOpDefIter};
-pub use array_repeat::{ArrayRepeat, ArrayRepeatDef, ARRAY_REPEAT_OP_ID};
-pub use array_scan::{ArrayScan, ArrayScanDef, ARRAY_SCAN_OP_ID};
+pub use array_repeat::{ARRAY_REPEAT_OP_ID, ArrayRepeat, ArrayRepeatDef};
+pub use array_scan::{ARRAY_SCAN_OP_ID, ArrayScan, ArrayScanDef};
 pub use op_builder::ArrayOpBuilder;
 
 /// Reported unique name of the array type.
@@ -123,7 +123,7 @@ impl CustomConst for ArrayValue {
                 return Err(CustomCheckFailure::Message(format!(
                     "Invalid array type arguments: {:?}",
                     typ.args()
-                )))
+                )));
             }
         };
 
@@ -235,12 +235,12 @@ pub fn new_array_op(element_ty: Type, size: u64) -> ExtensionOp {
 
 #[cfg(test)]
 mod test {
-    use crate::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::prelude::{qb_t, usize_t, ConstUsize};
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig};
+    use crate::extension::prelude::{ConstUsize, qb_t, usize_t};
     use crate::ops::constant::CustomConst;
     use crate::std_extensions::arithmetic::float_types::ConstF64;
 
-    use super::{array_type, new_array_op, ArrayValue};
+    use super::{ArrayValue, array_type, new_array_op};
 
     #[test]
     /// Test building a HUGR involving a new_array operation.

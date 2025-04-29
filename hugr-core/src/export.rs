@@ -1,9 +1,10 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::{
+    Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
     hugr::IdentList,
     ops::{
-        constant::CustomSerialized, DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value,
+        DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value, constant::CustomSerialized,
     },
     package::Package,
     std_extensions::{
@@ -11,18 +12,17 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::{
-        type_param::{TypeArgVariable, TypeParam},
-        type_row::TypeRowBase,
         CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
         TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
+        type_param::{TypeArgVariable, TypeParam},
+        type_row::TypeRowBase,
     },
-    Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
 use hugr_model::v0::{
     self as model,
-    bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump},
+    bumpalo::{Bump, collections::String as BumpString, collections::Vec as BumpVec},
     table,
 };
 use petgraph::unionfind::UnionFind;
@@ -1174,12 +1174,12 @@ mod test {
     use rstest::{fixture, rstest};
 
     use crate::{
+        Hugr,
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::qb_t,
         std_extensions::arithmetic::float_types,
         types::Signature,
         utils::test_quantum_extension::{self, cx_gate, h_gate},
-        Hugr,
     };
 
     #[fixture]

@@ -1,21 +1,21 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{Ok, Result, bail};
 use hugr_core::{
+    HugrView, Node,
     ops::{ExtensionOp, NamedOp},
     std_extensions::collections::list::{self, ListOp, ListValue},
     types::{SumType, Type, TypeArg},
-    HugrView, Node,
 };
 use inkwell::values::FunctionValue;
 use inkwell::{
+    AddressSpace,
     types::{BasicType, BasicTypeEnum, FunctionType},
     values::{BasicValueEnum, PointerValue},
-    AddressSpace,
 };
 
 use crate::emit::func::{build_ok_or_else, build_option};
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
-    emit::{emit_value, func::EmitFuncContext, EmitOpArgs},
+    emit::{EmitOpArgs, emit_value, func::EmitFuncContext},
     types::TypingSession,
 };
 
@@ -366,11 +366,11 @@ mod test {
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::{
-            prelude::{self, qb_t, usize_t, ConstUsize},
             ExtensionRegistry,
+            prelude::{self, ConstUsize, qb_t, usize_t},
         },
         ops::{DataflowOpTrait, NamedOp, Value},
-        std_extensions::collections::list::{self, list_type, ListOp, ListValue},
+        std_extensions::collections::list::{self, ListOp, ListValue, list_type},
     };
     use rstest::rstest;
 
@@ -378,7 +378,7 @@ mod test {
         check_emission,
         custom::CodegenExtsBuilder,
         emit::test::SimpleHugrConfig,
-        test::{llvm_ctx, TestContext},
+        test::{TestContext, llvm_ctx},
     };
 
     #[rstest]

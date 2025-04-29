@@ -4,6 +4,7 @@ use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Extension;
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
@@ -16,9 +17,8 @@ use crate::std_extensions::collections::array::instantiate_array;
 use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
-use crate::Extension;
 
-use super::{array_type, array_type_def, ARRAY_TYPENAME};
+use super::{ARRAY_TYPENAME, array_type, array_type_def};
 
 /// Array operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -313,7 +313,7 @@ mod tests {
     use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::std_extensions::collections::array::new_array_op;
     use crate::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
         extension::prelude::{bool_t, qb_t},
         ops::{OpTrait, OpType},
     };
@@ -427,11 +427,13 @@ mod tests {
                 sig.io(),
                 (
                     &vec![array_type(size, element_ty.clone())].into(),
-                    &vec![option_type(vec![
-                        element_ty.clone(),
-                        array_type(size - 1, element_ty.clone())
-                    ])
-                    .into()]
+                    &vec![
+                        option_type(vec![
+                            element_ty.clone(),
+                            array_type(size - 1, element_ty.clone())
+                        ])
+                        .into()
+                    ]
                     .into()
                 )
             );

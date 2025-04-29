@@ -1,11 +1,11 @@
 //! Builder trait for array operations in the dataflow graph.
 
-use crate::std_extensions::collections::array::{new_array_op, ArrayOpDef};
+use crate::std_extensions::collections::array::{ArrayOpDef, new_array_op};
 use crate::{
+    Wire,
     builder::{BuildError, Dataflow},
     extension::simple_op::HasConcrete as _,
     types::Type,
-    Wire,
 };
 use itertools::Itertools as _;
 
@@ -213,14 +213,14 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
+    use crate::extension::prelude::PRELUDE_ID;
     use crate::std_extensions::collections::array::{self, array_type};
     use crate::{
-        builder::{DFGBuilder, HugrBuilder},
-        extension::prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
-        types::Signature,
         Hugr,
+        builder::{DFGBuilder, HugrBuilder},
+        extension::prelude::{ConstUsize, UnwrapBuilder as _, either_type, option_type, usize_t},
+        types::Signature,
     };
     use rstest::rstest;
 

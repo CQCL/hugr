@@ -6,7 +6,7 @@ use std::path::Path;
 use std::{fs, io, mem};
 
 use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
-use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeError};
+use crate::envelope::{EnvelopeConfig, EnvelopeError, read_envelope, write_envelope};
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
@@ -442,8 +442,8 @@ mod test {
     use crate::builder::test::{
         simple_cfg_hugr, simple_dfg_hugr, simple_funcdef_hugr, simple_module_hugr,
     };
-    use crate::ops::dataflow::IOTrait;
     use crate::ops::Input;
+    use crate::ops::dataflow::IOTrait;
 
     use super::*;
     use rstest::{fixture, rstest};

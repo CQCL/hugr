@@ -1,6 +1,6 @@
 use anyhow::Result;
 use hugr_core::{HugrView, Node};
-use inkwell::{values::BasicMetadataValueEnum, AddressSpace};
+use inkwell::{AddressSpace, values::BasicMetadataValueEnum};
 
 use crate::emit::func::EmitFuncContext;
 

@@ -47,10 +47,10 @@ use thiserror::Error;
 use hugr_core::hugr::rewrite::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::sibling::SiblingMut;
 use hugr_core::hugr::views::{HierarchyView, HugrView, RootCheckable, SiblingGraph};
-use hugr_core::hugr::{hugrmut::HugrMut, Rewrite};
-use hugr_core::ops::handle::{BasicBlockID, CfgID};
+use hugr_core::hugr::{Rewrite, hugrmut::HugrMut};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
+use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
@@ -257,13 +257,17 @@ impl<H: HugrMut<Node = Node>> CfgNester<H::Node> for IdentityCfgMap<H> {
     ) -> H::Node {
         // The algorithm only calls with entry/exit edges for a SESE region; panic if they don't
         let blocks = region_blocks(self, entry_edge, exit_edge).unwrap();
-        assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
-            .iter()
-            .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
+        assert!(
+            [entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
+                .iter()
+                .all(|n| self.h.get_parent(*n) == Some(self.h.root()))
+        );
         let (new_block, new_cfg) = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
-        debug_assert!([entry_edge.0, exit_edge.1]
-            .iter()
-            .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
+        debug_assert!(
+            [entry_edge.0, exit_edge.1]
+                .iter()
+                .all(|n| self.h.get_parent(*n) == Some(self.h.root()))
+        );
 
         debug_assert!({
             let new_block_view = SiblingGraph::<BasicBlockID>::try_new(&self.h, new_block).unwrap();
@@ -575,17 +579,17 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use hugr_core::builder::{
-        endo_sig, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
+        BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder, endo_sig,
     };
-    use hugr_core::extension::{prelude::usize_t, ExtensionSet};
+    use hugr_core::extension::{ExtensionSet, prelude::usize_t};
 
+    use hugr_core::Node;
     use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
-    use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::ops::Value;
+    use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::types::{EdgeKind, Signature};
     use hugr_core::utils::depth;
-    use hugr_core::Node;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();

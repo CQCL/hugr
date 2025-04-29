@@ -1,4 +1,4 @@
-use hugr_core::{ops::OpType, HugrView, Node};
+use hugr_core::{HugrView, Node, ops::OpType};
 use inkwell::values::BasicValueEnum;
 
 use crate::utils::fat::FatNode;

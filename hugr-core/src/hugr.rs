@@ -26,12 +26,12 @@ use thiserror::Error;
 pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::extension::resolution::{
-    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
+    resolve_op_types_extensions,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
+pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::ops::{OpTag, OpTrait};
-pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
 
 /// The Hugr data structure.
@@ -357,7 +357,9 @@ impl Hugr {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
+#[error(
+    "Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}"
+)]
 /// An error in the extension deltas.
 pub struct ExtensionError {
     parent: Node,
@@ -402,9 +404,9 @@ mod test {
     use std::sync::Arc;
     use std::{fs::File, io::BufReader};
 
-    use super::internal::HugrMutInternals;
     #[cfg(feature = "extension_inference")]
     use super::ValidationError;
+    use super::internal::HugrMutInternals;
     use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
     use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
     use crate::ops::{ExtensionOp, OpName};
@@ -413,7 +415,7 @@ mod test {
         FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV, TypeRow,
     };
 
-    use crate::{const_extension_ids, ops, test_file, type_row, Extension};
+    use crate::{Extension, const_extension_ids, ops, test_file, type_row};
     use cool_asserts::assert_matches;
     use lazy_static::lazy_static;
     use rstest::rstest;

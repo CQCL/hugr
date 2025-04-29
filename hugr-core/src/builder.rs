@@ -214,7 +214,9 @@ pub enum BuilderWiringError {
         src_offset: Port,
     },
     /// The ancestors of an inter-graph edge are not related.
-    #[error("Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NoRelationIntergraph {
         src: Node,
@@ -223,7 +225,9 @@ pub enum BuilderWiringError {
         dst_offset: Port,
     },
     /// Inter-Graph edges can only carry copyable data.
-    #[error("Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NonCopyableIntergraph {
         src: Node,
@@ -238,12 +242,12 @@ pub enum BuilderWiringError {
 pub(crate) mod test {
     use rstest::fixture;
 
+    use crate::Hugr;
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::hugr::{views::HugrView, HugrMut};
+    use crate::hugr::{HugrMut, views::HugrView};
     use crate::ops;
     use crate::package::Package;
     use crate::types::{PolyFuncType, Signature};
-    use crate::Hugr;
 
     use super::handle::BuildHandle;
     use super::{

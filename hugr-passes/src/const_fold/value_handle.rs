@@ -6,8 +6,8 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use hugr_core::core::HugrNode;
-use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
+use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::types::ConstTypeError;
 use hugr_core::{Hugr, Node};
 use itertools::Either;
@@ -189,11 +189,11 @@ impl<N: HugrNode> AsConcrete<ValueHandle<N>, N> for Value {
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{usize_t, ConstString},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
+        extension::prelude::{ConstString, usize_t},
         std_extensions::{
             arithmetic::{
-                float_types::{float64_type, ConstF64},
+                float_types::{ConstF64, float64_type},
                 int_types::{ConstInt, INT_TYPES},
             },
             collections::list::ListValue,

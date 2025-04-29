@@ -8,10 +8,10 @@
 use std::sync::Arc;
 
 use super::{Extension, ExtensionCollectionError, ExtensionResolutionError};
+use crate::Node;
 use crate::extension::ExtensionRegistry;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpType};
-use crate::Node;
 
 /// Returns the extension in the registry required by the operation.
 ///

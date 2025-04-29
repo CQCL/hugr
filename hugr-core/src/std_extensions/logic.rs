@@ -5,19 +5,19 @@ use std::sync::{Arc, Weak};
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
-use crate::ops::constant::ValueName;
 use crate::ops::Value;
+use crate::ops::constant::ValueName;
 use crate::types::Signature;
 use crate::{
+    Extension, IncomingPort,
     extension::{
-        prelude::bool_t,
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, OpDef, SignatureFunc,
+        prelude::bool_t,
+        simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name},
     },
     ops,
     types::type_param::TypeArg,
     utils::sorted_consts,
-    Extension, IncomingPort,
 };
 use lazy_static::lazy_static;
 /// Name of extension false value.
@@ -165,11 +165,11 @@ fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
 pub(crate) mod test {
     use std::sync::Arc;
 
-    use super::{extension, LogicOp};
+    use super::{LogicOp, extension};
     use crate::{
+        Extension,
         extension::simple_op::{MakeOpDef, MakeRegisteredOp},
         ops::{NamedOp, Value},
-        Extension,
     };
 
     use rstest::rstest;

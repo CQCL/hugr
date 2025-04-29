@@ -551,11 +551,12 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match &mut self.0 {
             TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
-            TypeEnum::Extension(custom_type) => {
-                Ok(match tr.apply_custom(custom_type)? { Some(nt) => {
+            TypeEnum::Extension(custom_type) => Ok(match tr.apply_custom(custom_type)? {
+                Some(nt) => {
                     *self = nt.into_();
                     true
-                } _ => {
+                }
+                _ => {
                     let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
                         *self = Self::new_extension(
@@ -565,8 +566,8 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
                         );
                     }
                     args_changed
-                }})
-            }
+                }
+            }),
             TypeEnum::Function(fty) => fty.transform(tr),
             TypeEnum::Sum(sum_type) => {
                 let ch = sum_type.transform(tr)?;
@@ -790,12 +791,12 @@ pub(crate) mod test {
     use std::sync::Weak;
 
     use super::*;
-    use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::TypeDefBound;
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::collections::array::{array_type, array_type_parametric};
     use crate::std_extensions::collections::list::list_type;
     use crate::types::type_param::TypeArgError;
-    use crate::{hugr::IdentList, type_row, Extension};
+    use crate::{Extension, hugr::IdentList, type_row};
 
     #[test]
     fn construct() {

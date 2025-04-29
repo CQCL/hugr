@@ -1,17 +1,17 @@
-use anyhow::{anyhow, bail, Result};
-use hugr_core::ops::{
-    constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
-    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, CFG,
-};
+use anyhow::{Result, anyhow, bail};
 use hugr_core::Node;
+use hugr_core::ops::{
+    CFG, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
+    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, constant::Sum,
+};
 use hugr_core::{
+    HugrView, NodeIndex,
     hugr::views::SiblingGraph,
     types::{SumType, Type, TypeEnum},
-    HugrView, NodeIndex,
 };
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, CallableValue};
-use itertools::{zip_eq, Itertools};
+use itertools::{Itertools, zip_eq};
 use petgraph::visit::Walker;
 
 use crate::{
@@ -20,9 +20,8 @@ use crate::{
 };
 
 use super::{
-    deaggregate_call_result,
+    EmitOpArgs, deaggregate_call_result,
     func::{EmitFuncContext, RowPromise},
-    EmitOpArgs,
 };
 
 mod cfg;

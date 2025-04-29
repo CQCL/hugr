@@ -2,18 +2,18 @@
 
 use super::*;
 use crate::builder::{
-    endo_sig, inout_sig, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
-    DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    ModuleBuilder, endo_sig, inout_sig, test::closed_dfg_root_hugr,
 };
-use crate::extension::prelude::Noop;
-use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
-use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::ExtensionRegistry;
-use crate::extension::{test::SimpleOpDef, ExtensionSet};
+use crate::extension::prelude::Noop;
+use crate::extension::prelude::{PRELUDE_ID, bool_t, qb_t, usize_t};
+use crate::extension::simple_op::MakeRegisteredOp;
+use crate::extension::{ExtensionSet, test::SimpleOpDef};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
-use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
+use crate::ops::{self, DFG, Input, Module, Output, Value, dataflow::IOTrait};
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
@@ -22,13 +22,13 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
-use crate::{type_row, OutgoingPort};
+use crate::{OutgoingPort, type_row};
 
 use itertools::Itertools;
 use jsonschema::{Draft, Validator};
 use lazy_static::lazy_static;
 use portgraph::LinkView;
-use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, LinkMut, PortMut, UnmanagedDenseMap, multiportgraph::MultiPortGraph};
 use rstest::rstest;
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.

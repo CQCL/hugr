@@ -15,13 +15,13 @@ use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, NamedOp, OpName, OpParent, OpTag, OpTrait, OpType, ValidateOp};
-use crate::types::type_param::TypeParam;
 use crate::types::EdgeKind;
+use crate::types::type_param::TypeParam;
 use crate::{Direction, Hugr, Node, Port};
 
+use super::ExtensionError;
 use super::internal::HugrInternals;
 use super::views::{HierarchyView, HugrView, SiblingGraph};
-use super::ExtensionError;
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -68,9 +68,11 @@ impl Hugr {
                     // ModuleRoot holds but does not execute its children, so allow any extensions
                     OpTag::ModuleRoot => continue,
                     _ => {
-                        assert!(self.children(parent).next().is_none(),
+                        assert!(
+                            self.children(parent).next().is_none(),
                             "Unknown parent node type {} - not a DataflowParent, Module, Cfg or Conditional",
-                            parent_op);
+                            parent_op
+                        );
                         continue;
                     }
                 },
@@ -275,7 +277,9 @@ impl<'a> ValidationContext<'a> {
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
-                panic!("The number of ports in {other_node} does not match the operation definition. This should have been caught by `validate_node`.");
+                panic!(
+                    "The number of ports in {other_node} does not match the operation definition. This should have been caught by `validate_node`."
+                );
             };
             // TODO: We will require some "unifiable" comparison instead of strict equality, to allow for pre-type inference hugrs.
             if other_kind != port_kind {
@@ -651,7 +655,9 @@ pub enum ValidationError {
     #[error("The root node of the Hugr {node} has edges when it should not.")]
     RootWithEdges { node: Node },
     /// The node ports do not match the operation signature.
-    #[error("The node {node} has an invalid number of ports. The operation {optype} cannot have {actual} {dir:?} ports. Expected {expected}.")]
+    #[error(
+        "The node {node} has an invalid number of ports. The operation {optype} cannot have {actual} {dir:?} ports. Expected {expected}."
+    )]
     WrongNumberOfPorts {
         node: Node,
         optype: OpType,
@@ -667,16 +673,16 @@ pub enum ValidationError {
         port_kind: EdgeKind,
     },
     /// A linear port is connected to more than one thing.
-    #[error(
-        "The node {node} has a port {port} of type {port_kind} with more than one connection."
-    )]
+    #[error("The node {node} has a port {port} of type {port_kind} with more than one connection.")]
     TooManyConnections {
         node: Node,
         port: Port,
         port_kind: EdgeKind,
     },
     /// Connected ports have different types, or non-unifiable types.
-    #[error("Connected ports {from_port} in node {from} and {to_port} in node {to} have incompatible kinds. Cannot connect {from_kind} to {to_kind}.")]
+    #[error(
+        "Connected ports {from_port} in node {from} and {to_port} in node {to} have incompatible kinds. Cannot connect {from_kind} to {to_kind}."
+    )]
     IncompatiblePorts {
         from: Node,
         from_port: Port,
@@ -698,7 +704,9 @@ pub enum ValidationError {
         allowed_children: OpTag,
     },
     /// Invalid first/second child.
-    #[error("A {optype} operation cannot be the {position} child of a {parent_optype}. Expected {expected}. In parent node {parent}")]
+    #[error(
+        "A {optype} operation cannot be the {position} child of a {parent_optype}. Expected {expected}. In parent node {parent}"
+    )]
     InvalidInitialChild {
         parent: Node,
         parent_optype: OpType,
@@ -736,7 +744,9 @@ pub enum ValidationError {
     #[error("The node {node} with optype {optype} must have children, but has none.")]
     ContainerWithoutChildren { node: Node, optype: OpType },
     /// The children of a node do not form a DAG.
-    #[error("The children of an operation {optype} must form a DAG. Loops are not allowed. In node {node}.")]
+    #[error(
+        "The children of an operation {optype} must form a DAG. Loops are not allowed. In node {node}."
+    )]
     NotADag { node: Node, optype: OpType },
     /// There are invalid inter-graph edges.
     #[error(transparent)]
@@ -745,7 +755,9 @@ pub enum ValidationError {
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
     /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference.
-    #[error("Node {node} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only")]
+    #[error(
+        "Node {node} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only"
+    )]
     ExtensionsNotInferred { node: Node },
     /// Error in a node signature
     #[error("Error in signature of operation {op} at {node}: {cause}")]
@@ -776,7 +788,9 @@ pub enum ValidationError {
 #[non_exhaustive]
 pub enum InterGraphEdgeError {
     /// Inter-Graph edges can only carry copyable data.
-    #[error("Inter-graph edges can only carry copyable data. In an inter-graph edge from {from} ({from_offset}) to {to} ({to_offset}) with type {ty}.")]
+    #[error(
+        "Inter-graph edges can only carry copyable data. In an inter-graph edge from {from} ({from_offset}) to {to} ({to_offset}) with type {ty}."
+    )]
     NonCopyableData {
         from: Node,
         from_offset: Port,
@@ -785,7 +799,9 @@ pub enum InterGraphEdgeError {
         ty: EdgeKind,
     },
     /// Inter-Graph edges may not enter into FuncDefns unless they are static
-    #[error("Inter-graph Value edges cannot enter into FuncDefns. Inter-graph edge from {from} ({from_offset}) to {to} ({to_offset} enters FuncDefn {func}")]
+    #[error(
+        "Inter-graph Value edges cannot enter into FuncDefns. Inter-graph edge from {from} ({from_offset}) to {to} ({to_offset} enters FuncDefn {func}"
+    )]
     ValueEdgeIntoFunc {
         from: Node,
         from_offset: Port,
@@ -794,7 +810,9 @@ pub enum InterGraphEdgeError {
         func: Node,
     },
     /// The grandparent of a dominator inter-graph edge must be a CFG container.
-    #[error("The grandparent of a dominator inter-graph edge must be a CFG container. Found operation {ancestor_parent_op}. In a dominator inter-graph edge from {from} ({from_offset}) to {to} ({to_offset}).")]
+    #[error(
+        "The grandparent of a dominator inter-graph edge must be a CFG container. Found operation {ancestor_parent_op}. In a dominator inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
+    )]
     NonCFGAncestor {
         from: Node,
         from_offset: Port,
@@ -803,7 +821,9 @@ pub enum InterGraphEdgeError {
         ancestor_parent_op: OpType,
     },
     /// The sibling ancestors of the external inter-graph edge endpoints must be have an order edge between them.
-    #[error("Missing state order between the external inter-graph source {from} and the ancestor of the target {to_ancestor}. In an external inter-graph edge from {from} ({from_offset}) to {to} ({to_offset}).")]
+    #[error(
+        "Missing state order between the external inter-graph source {from} and the ancestor of the target {to_ancestor}. In an external inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
+    )]
     MissingOrderEdge {
         from: Node,
         from_offset: Port,
@@ -812,7 +832,9 @@ pub enum InterGraphEdgeError {
         to_ancestor: Node,
     },
     /// The ancestors of an inter-graph edge are not related.
-    #[error("The ancestors of an inter-graph edge are not related. In an inter-graph edge from {from} ({from_offset}) to {to} ({to_offset}).")]
+    #[error(
+        "The ancestors of an inter-graph edge are not related. In an inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
+    )]
     NoRelation {
         from: Node,
         from_offset: Port,
@@ -820,7 +842,9 @@ pub enum InterGraphEdgeError {
         to_offset: Port,
     },
     /// The basic block containing the source node does not dominate the basic block containing the target node.
-    #[error(" The basic block containing the source node does not dominate the basic block containing the target node in the CFG. Expected node {from_parent} to dominate {ancestor}. In a dominator inter-graph edge from {from} ({from_offset}) to {to} ({to_offset}).")]
+    #[error(
+        " The basic block containing the source node does not dominate the basic block containing the target node in the CFG. Expected node {from_parent} to dominate {ancestor}. In a dominator inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
+    )]
     NonDominatedAncestor {
         from: Node,
         from_offset: Port,

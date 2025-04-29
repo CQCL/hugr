@@ -42,7 +42,7 @@
 
 mod header;
 
-pub use header::{EnvelopeConfig, EnvelopeFormat, ZstdConfig, MAGIC_NUMBERS};
+pub use header::{EnvelopeConfig, EnvelopeFormat, MAGIC_NUMBERS, ZstdConfig};
 
 use crate::{
     extension::ExtensionRegistry,
@@ -166,8 +166,8 @@ pub enum EnvelopeError {
     ZstdUnsupported,
     /// Tried to encode a package with multiple HUGRs, when only 1 was expected.
     #[display(
-            "Packages with multiple HUGRs are currently unsupported. Tried to encode {count} HUGRs, when 1 was expected."
-        )]
+        "Packages with multiple HUGRs are currently unsupported. Tried to encode {count} HUGRs, when 1 was expected."
+    )]
     #[from(ignore)]
     /// Deprecated: Packages with multiple HUGRs is a legacy feature that is no longer supported.
     #[deprecated(since = "0.15.2", note = "Multiple HUGRs are supported via packages.")]
@@ -239,7 +239,7 @@ fn decode_model(
     extension_registry: &ExtensionRegistry,
     format: EnvelopeFormat,
 ) -> Result<Package, EnvelopeError> {
-    use crate::{import::import_package, Extension};
+    use crate::{Extension, import::import_package};
     use hugr_model::v0::bumpalo::Bump;
 
     if format.model_version() != Some(0) {

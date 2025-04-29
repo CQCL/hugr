@@ -96,7 +96,7 @@ impl<H: HugrView> CfgNodeMap<HalfNode<H::Node>> for HalfNodeView<H> {
 
 #[cfg(test)]
 mod test {
-    use super::super::nest_cfgs::{test::*, EdgeClassifier};
+    use super::super::nest_cfgs::{EdgeClassifier, test::*};
     use super::{HalfNode, HalfNodeView};
     use hugr_core::builder::BuildError;
     use hugr_core::ops::handle::NodeHandle;

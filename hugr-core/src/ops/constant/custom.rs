@@ -7,16 +7,16 @@
 use std::any::Any;
 use std::hash::{Hash, Hasher};
 
-use downcast_rs::{impl_downcast, Downcast};
+use downcast_rs::{Downcast, impl_downcast};
 use thiserror::Error;
 
-use crate::extension::resolution::{
-    resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry,
-};
+use crate::IncomingPort;
 use crate::extension::ExtensionSet;
+use crate::extension::resolution::{
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+};
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFailure, Type};
-use crate::IncomingPort;
 
 use super::{Value, ValueName};
 
@@ -382,8 +382,8 @@ mod test {
     use rstest::rstest;
 
     use crate::{
-        extension::prelude::{usize_t, ConstUsize},
-        ops::{constant::custom::serialize_custom_const, Value},
+        extension::prelude::{ConstUsize, usize_t},
+        ops::{Value, constant::custom::serialize_custom_const},
         std_extensions::collections::list::ListValue,
     };
 

@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr_core::{
-    ops::{DataflowBlock, ExitBlock, OpType, CFG},
-    types::SumType,
     HugrView, Node, NodeIndex,
+    ops::{CFG, DataflowBlock, ExitBlock, OpType},
+    types::SumType,
 };
 use inkwell::{basic_block::BasicBlock, values::BasicValueEnum};
 use itertools::Itertools as _;
 
 use crate::{
     emit::{
-        func::{EmitFuncContext, RowMailBox, RowPromise},
         EmitOpArgs,
+        func::{EmitFuncContext, RowMailBox, RowPromise},
     },
     sum::LLVMSumValue,
     utils::fat::FatNode,
@@ -229,7 +229,7 @@ mod test {
 
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::test::{llvm_ctx, TestContext};
+    use crate::test::{TestContext, llvm_ctx};
 
     use crate::check_emission;
     use crate::types::HugrType;

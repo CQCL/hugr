@@ -3,6 +3,7 @@
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -10,9 +11,8 @@ use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, Signatu
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
-use crate::Extension;
 
-use super::{array_type_def, instantiate_array, ARRAY_TYPENAME};
+use super::{ARRAY_TYPENAME, array_type_def, instantiate_array};
 
 /// Name of the operation to repeat a value multiple times
 pub const ARRAY_REPEAT_OP_ID: OpName = OpName::new_inline("repeat");
@@ -169,9 +169,11 @@ impl HasConcrete for ArrayRepeatDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }, TypeArg::Extensions { es }] => {
-                Ok(ArrayRepeat::new(ty.clone(), *n, es.clone()))
-            }
+            [
+                TypeArg::BoundedNat { n },
+                TypeArg::Type { ty },
+                TypeArg::Extensions { es },
+            ] => Ok(ArrayRepeat::new(ty.clone(), *n, es.clone())),
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
     }
@@ -179,7 +181,7 @@ impl HasConcrete for ArrayRepeatDef {
 
 #[cfg(test)]
 mod tests {
-    use crate::std_extensions::collections::array::{array_type, EXTENSION_ID};
+    use crate::std_extensions::collections::array::{EXTENSION_ID, array_type};
     use crate::{
         extension::prelude::qb_t,
         ops::{OpTrait, OpType},

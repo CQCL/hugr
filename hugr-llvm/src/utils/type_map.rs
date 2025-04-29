@@ -6,7 +6,7 @@ use hugr_core::{
     types::{CustomType, TypeEnum, TypeName, TypeRow},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::types::{HugrFuncType, HugrSumType, HugrType};
 

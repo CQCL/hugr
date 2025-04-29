@@ -1,11 +1,11 @@
 //! Classes for row variables (i.e. Type variables that can stand for multiple types)
 
 use super::type_param::TypeParam;
-use super::{check_typevar_decl, Substitution, TypeBase, TypeBound};
+use super::{Substitution, TypeBase, TypeBound, check_typevar_decl};
 use crate::extension::SignatureError;
 
 #[cfg(test)]
-use proptest::prelude::{any, BoxedStrategy, Strategy};
+use proptest::prelude::{BoxedStrategy, Strategy, any};
 /// Describes a row variable - a type variable bound with a [TypeParam::List] of [TypeParam::Type]
 /// of the specified bound (checked in validation)
 // The serde derives here are not used except as markers

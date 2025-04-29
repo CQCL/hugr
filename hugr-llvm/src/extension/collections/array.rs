@@ -1,29 +1,29 @@
 //! Codegen for prelude array operations.
 use std::iter;
 
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{Ok, Result, anyhow};
 use hugr_core::extension::prelude::option_type;
 use hugr_core::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
 use hugr_core::ops::DataflowOpTrait;
 use hugr_core::std_extensions::collections::array::{
-    self, array_type, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan,
+    self, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan, array_type,
 };
 use hugr_core::types::{TypeArg, TypeEnum};
 use hugr_core::{HugrView, Node};
+use inkwell::IntPredicate;
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
     ArrayValue, BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue,
 };
-use inkwell::IntPredicate;
 use itertools::Itertools;
 
 use crate::emit::emit_value;
+use crate::{CodegenExtension, CodegenExtsBuilder};
 use crate::{
-    emit::{deaggregate_call_result, EmitFuncContext, RowPromise},
+    emit::{EmitFuncContext, RowPromise, deaggregate_call_result},
     types::{HugrType, TypingSession},
 };
-use crate::{CodegenExtension, CodegenExtsBuilder};
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
@@ -707,23 +707,23 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::Container as _;
-    use hugr_core::extension::prelude::either_type;
     use hugr_core::extension::ExtensionSet;
+    use hugr_core::extension::prelude::either_type;
     use hugr_core::ops::Tag;
-    use hugr_core::std_extensions::collections::array::{self, array_type, ArrayRepeat, ArrayScan};
     use hugr_core::std_extensions::STD_REG;
+    use hugr_core::std_extensions::collections::array::{self, ArrayRepeat, ArrayScan, array_type};
     use hugr_core::types::Type;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer, SubContainer},
         extension::{
-            prelude::{self, bool_t, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
             ExtensionRegistry,
+            prelude::{self, ConstUsize, UnwrapBuilder as _, bool_t, option_type, usize_t},
         },
         ops::Value,
         std_extensions::{
             arithmetic::{
                 int_ops::{self},
-                int_types::{self, int_type, ConstInt},
+                int_types::{self, ConstInt, int_type},
             },
             collections::array::ArrayOpBuilder,
             logic,
@@ -737,7 +737,7 @@ mod test {
     use crate::{
         check_emission,
         emit::test::SimpleHugrConfig,
-        test::{exec_ctx, llvm_ctx, TestContext},
+        test::{TestContext, exec_ctx, llvm_ctx},
         utils::{IntOpBuilder, LogicOpBuilder},
     };
 

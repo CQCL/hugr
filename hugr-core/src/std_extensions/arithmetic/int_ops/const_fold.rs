@@ -1,17 +1,17 @@
 use std::cmp::{max, min};
 
 use crate::{
+    IncomingPort,
     extension::{
-        prelude::{sum_with_error, ConstError},
         ConstFoldResult, Folder, OpDef,
+        prelude::{ConstError, sum_with_error},
     },
     ops::{
-        constant::{get_pair_of_input_values, get_single_input_value},
         Value,
+        constant::{get_pair_of_input_values, get_single_input_value},
     },
-    std_extensions::arithmetic::int_types::{get_log_width, ConstInt, INT_TYPES},
+    std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES, get_log_width},
     types::{Type, TypeArg},
-    IncomingPort,
 };
 
 use super::IntOpDef;
@@ -50,11 +50,7 @@ fn divmod_s(n: i64, m: u64) -> (i64, u64) {
         let n_u = (-n) as u64;
         let q = (n_u / m) as i64;
         let r = n_u % m;
-        if r == 0 {
-            (-q, 0)
-        } else {
-            (-q - 1, m - r)
-        }
+        if r == 0 { (-q, 0) } else { (-q - 1, m - r) }
     } else if m == 1 {
         // n = -2^63, m = 1
         (n, 0)

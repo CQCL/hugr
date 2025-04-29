@@ -8,7 +8,7 @@ pub mod dataflow;
 pub mod dead_code;
 pub use dead_code::DeadCodeElimPass;
 mod dead_funcs;
-pub use dead_funcs::{remove_dead_funcs, RemoveDeadFuncsError, RemoveDeadFuncsPass};
+pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs};
 pub mod force_order;
 mod half_node;
 pub mod lower;
@@ -23,7 +23,7 @@ pub mod untuple;
 )]
 #[allow(deprecated)]
 pub use monomorphize::remove_polyfuncs;
-pub use monomorphize::{monomorphize, MonomorphizePass};
+pub use monomorphize::{MonomorphizePass, monomorphize};
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;
 pub mod nest_cfgs;

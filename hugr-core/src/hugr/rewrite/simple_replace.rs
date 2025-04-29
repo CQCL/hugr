@@ -371,21 +371,21 @@ pub(in crate::hugr::rewrite) mod test {
 
     use crate::builder::test::n_identity;
     use crate::builder::{
-        endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
-        DataflowSubContainer, HugrBuilder, ModuleBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
     };
-    use crate::extension::prelude::{bool_t, qb_t};
     use crate::extension::ExtensionSet;
+    use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
-    use crate::ops::dataflow::DataflowOpTrait;
-    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
-    use crate::std_extensions::logic::test::and_op;
+    use crate::ops::dataflow::DataflowOpTrait;
+    use crate::ops::handle::NodeHandle;
     use crate::std_extensions::logic::LogicOp;
+    use crate::std_extensions::logic::test::and_op;
     use crate::types::{Signature, Type};
-    use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
+    use crate::utils::test_quantum_extension::{EXTENSION_ID, cx_gate, h_gate};
     use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;

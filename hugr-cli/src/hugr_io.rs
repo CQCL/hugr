@@ -1,7 +1,7 @@
 //! Input/output arguments for the HUGR CLI.
 
 use clio::Input;
-use hugr::envelope::{read_envelope, EnvelopeError};
+use hugr::envelope::{EnvelopeError, read_envelope};
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};

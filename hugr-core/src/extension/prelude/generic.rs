@@ -1,12 +1,12 @@
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
+use crate::extension::OpDef;
+use crate::extension::SignatureFunc;
 use crate::extension::prelude::usize_custom_t;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::OpDef;
-use crate::extension::SignatureFunc;
 use crate::extension::{ConstFold, ExtensionId};
 use crate::ops::ExtensionOp;
 use crate::ops::NamedOp;
@@ -20,8 +20,8 @@ use crate::extension::SignatureError;
 
 use crate::types::PolyFuncTypeRV;
 
-use crate::types::type_param::TypeArg;
 use crate::Extension;
+use crate::types::type_param::TypeArg;
 
 use super::PRELUDE;
 use super::{ConstUsize, PRELUDE_ID};
@@ -168,12 +168,12 @@ impl HasConcrete for LoadNatDef {
 #[cfg(test)]
 mod tests {
     use crate::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{usize_t, ConstUsize},
-        ops::{constant, OpType},
+        HugrView, OutgoingPort,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+        extension::prelude::{ConstUsize, usize_t},
+        ops::{OpType, constant},
         type_row,
         types::TypeArg,
-        HugrView, OutgoingPort,
     };
 
     use super::LoadNat;

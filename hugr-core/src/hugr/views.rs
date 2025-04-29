@@ -16,7 +16,7 @@ use std::borrow::Cow;
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
-pub use root_checked::{check_tag, RootCheckable, RootChecked};
+pub use root_checked::{RootCheckable, RootChecked, check_tag};
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
@@ -26,7 +26,7 @@ use portgraph::{LinkView, PortView};
 
 use super::internal::HugrInternals;
 use super::{
-    Hugr, HugrError, HugrMut, Node, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
+    DEFAULT_OPTYPE, Hugr, HugrError, HugrMut, Node, NodeMetadata, NodeMetadataMap, ValidationError,
 };
 use crate::extension::ExtensionRegistry;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};

@@ -1,13 +1,13 @@
 use std::iter;
 
 use crate::{
+    Wire,
     builder::{BuildError, BuildHandle, Dataflow, DataflowSubContainer, SubContainer},
     extension::prelude::{ConstError, PANIC_OP_ID},
     ops::handle::DataflowOpID,
     types::{SumType, Type, TypeArg, TypeRow},
-    Wire,
 };
-use itertools::{zip_eq, Itertools as _};
+use itertools::{Itertools as _, zip_eq};
 
 use super::PRELUDE;
 

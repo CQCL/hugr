@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use thiserror::Error;
 
+use crate::PortIndex;
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::extension::ExtensionSet;
 use crate::hugr::rewrite::Rewrite;
@@ -13,8 +14,7 @@ use crate::ops::controlflow::BasicBlock;
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{DataflowBlock, OpType};
-use crate::PortIndex;
-use crate::{type_row, Node};
+use crate::{Node, type_row};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.

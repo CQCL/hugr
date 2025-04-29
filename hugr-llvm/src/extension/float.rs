@@ -1,11 +1,11 @@
-use anyhow::{anyhow, Result};
-use hugr_core::ops::ExtensionOp;
-use hugr_core::ops::{constant::CustomConst, Value};
-use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
+use anyhow::{Result, anyhow};
 use hugr_core::Node;
+use hugr_core::ops::ExtensionOp;
+use hugr_core::ops::{Value, constant::CustomConst};
+use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr_core::{
-    std_extensions::arithmetic::float_types::{self, ConstF64},
     HugrView,
+    std_extensions::arithmetic::float_types::{self, ConstF64},
 };
 use inkwell::{
     types::{BasicType, FloatType},
@@ -13,8 +13,8 @@ use inkwell::{
 };
 
 use crate::emit::ops::{emit_custom_binary_op, emit_custom_unary_op};
+use crate::emit::{EmitOpArgs, func::EmitFuncContext};
 use crate::emit::{emit_value, get_intrinsic};
-use crate::emit::{func::EmitFuncContext, EmitOpArgs};
 
 use crate::custom::CodegenExtsBuilder;
 
@@ -36,9 +36,9 @@ fn emit_fcmp<'c, H: HugrView<Node = Node>>(
             "",
         )?;
         // convert to whatever bool_t is
-        Ok(vec![ctx
-            .builder()
-            .build_select(r, true_val, false_val, "")?])
+        Ok(vec![
+            ctx.builder().build_select(r, true_val, false_val, "")?,
+        ])
     })
 }
 
@@ -58,44 +58,50 @@ fn emit_float_op<'c, H: HugrView<Node = Node>>(
         FloatOps::fle => emit_fcmp(context, args, inkwell::FloatPredicate::OLE),
         FloatOps::fge => emit_fcmp(context, args, inkwell::FloatPredicate::OGE),
         FloatOps::fadd => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_float_add(lhs.into_float_value(), rhs.into_float_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_float_add(lhs.into_float_value(), rhs.into_float_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         FloatOps::fsub => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_float_sub(lhs.into_float_value(), rhs.into_float_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_float_sub(lhs.into_float_value(), rhs.into_float_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         FloatOps::fneg => emit_custom_unary_op(context, args, |ctx, v, _| {
-            Ok(vec![ctx
-                .builder()
-                .build_float_neg(v.into_float_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_float_neg(v.into_float_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         FloatOps::fmul => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_float_mul(lhs.into_float_value(), rhs.into_float_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_float_mul(lhs.into_float_value(), rhs.into_float_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         FloatOps::fdiv => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![ctx
-                .builder()
-                .build_float_div(lhs.into_float_value(), rhs.into_float_value(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_float_div(lhs.into_float_value(), rhs.into_float_value(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         FloatOps::fpow => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
             let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();
             let func = get_intrinsic(ctx.get_current_module(), "llvm.pow.f64", [float_ty])?;
-            Ok(vec![ctx
-                .builder()
-                .build_call(func, &[lhs.into(), rhs.into()], "")?
-                .try_as_basic_value()
-                .unwrap_left()
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_call(func, &[lhs.into(), rhs.into()], "")?
+                    .try_as_basic_value()
+                    .unwrap_left()
+                    .as_basic_value_enum(),
+            ])
         }),
         // Missing ops, not supported by inkwell
         FloatOps::fmax
@@ -141,15 +147,15 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 
 #[cfg(test)]
 mod test {
-    use hugr_core::extension::simple_op::MakeOpDef;
-    use hugr_core::extension::SignatureFunc;
-    use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
-    use hugr_core::std_extensions::STD_REG;
-    use hugr_core::types::TypeRow;
     use hugr_core::Hugr;
+    use hugr_core::extension::SignatureFunc;
+    use hugr_core::extension::simple_op::MakeOpDef;
+    use hugr_core::std_extensions::STD_REG;
+    use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
+    use hugr_core::types::TypeRow;
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
-        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
+        std_extensions::arithmetic::float_types::{ConstF64, float64_type},
     };
     use rstest::rstest;
 
@@ -157,7 +163,7 @@ mod test {
     use crate::{
         check_emission,
         emit::test::SimpleHugrConfig,
-        test::{llvm_ctx, TestContext},
+        test::{TestContext, llvm_ctx},
     };
 
     fn test_float_op(op: FloatOps) -> Hugr {

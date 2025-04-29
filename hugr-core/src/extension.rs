@@ -21,9 +21,9 @@ use thiserror::Error;
 use crate::hugr::IdentList;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{OpName, OpNameRef};
-use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::RowVariable;
-use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
+use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::{CustomType, Substitution, TypeBound, TypeName, check_typevar_decl};
 use crate::types::{Signature, TypeNameRef};
 
 mod const_fold;
@@ -33,7 +33,7 @@ pub mod resolution;
 pub mod simple_op;
 mod type_def;
 
-pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
+pub use const_fold::{ConstFold, ConstFoldResult, Folder, fold_out_row};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,
@@ -392,7 +392,9 @@ pub enum SignatureError {
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
     /// The weak [`Extension`] reference for a custom type has been dropped.
-    #[error("Type '{typ}' is defined in extension '{missing}', but the extension reference has been dropped.")]
+    #[error(
+        "Type '{typ}' is defined in extension '{missing}', but the extension reference has been dropped."
+    )]
     MissingTypeExtension { typ: TypeName, missing: ExtensionId },
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
@@ -696,7 +698,9 @@ impl PartialEq for Extension {
 #[non_exhaustive]
 pub enum ExtensionRegistryError {
     /// Extension already defined.
-    #[error("The registry already contains an extension with id {0} and version {1}. New extension has version {2}.")]
+    #[error(
+        "The registry already contains an extension with id {0} and version {1}. New extension has version {2}."
+    )]
     AlreadyRegistered(ExtensionId, Version, Version),
     /// A registered extension has invalid signatures.
     #[error("The extension {0} contains an invalid signature, {1}.")]

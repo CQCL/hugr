@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
 use hugr_core::{
+    Hugr,
     builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
     ops::{OpTrait, OpType},
     types::PolyFuncType,
-    Hugr,
 };
 use inkwell::{
     context::Context,
@@ -15,7 +15,7 @@ use rstest::fixture;
 
 use crate::{
     custom::{CodegenExtsBuilder, CodegenExtsMap},
-    emit::{test::Emission, EmitHugr, EmitModuleContext, Namer},
+    emit::{EmitHugr, EmitModuleContext, Namer, test::Emission},
     types::{TypeConverter, TypingSession},
     utils::fat::FatExt as _,
 };
@@ -71,10 +71,10 @@ pub trait MakeCodegenExtsMapFn:
 }
 
 impl<
-        F: Fn(CodegenExtsBuilder<'static, THugrView>) -> CodegenExtsBuilder<'static, THugrView>
-            + ?Sized
-            + 'static,
-    > MakeCodegenExtsMapFn for F
+    F: Fn(CodegenExtsBuilder<'static, THugrView>) -> CodegenExtsBuilder<'static, THugrView>
+        + ?Sized
+        + 'static,
+> MakeCodegenExtsMapFn for F
 {
 }
 
