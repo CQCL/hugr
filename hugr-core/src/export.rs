@@ -874,11 +874,27 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
+            TypeArg::ListConcat { lists } => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    lists
+                        .iter()
+                        .map(|list| table::SeqPart::Splice(self.export_type_arg(list))),
+                );
+                self.make_term(table::Term::List(parts))
+            }
             TypeArg::Tuple { elems } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
                         .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
+                );
+                self.make_term(table::Term::Tuple(parts))
+            }
+            TypeArg::TupleConcat { tuples } => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    tuples
+                        .iter()
+                        .map(|elem| table::SeqPart::Splice(self.export_type_arg(elem))),
                 );
                 self.make_term(table::Term::Tuple(parts))
             }
