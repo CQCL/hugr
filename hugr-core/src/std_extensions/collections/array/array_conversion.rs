@@ -55,17 +55,6 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> Default
     }
 }
 
-impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> NamedOp
-    for GenericArrayConvertDef<AK, DIR, OtherAK>
-{
-    fn name(&self) -> OpName {
-        match DIR {
-            INTO => format!("to_{}", OtherAK::TYPE_NAME).into(),
-            FROM => format!("from_{}", OtherAK::TYPE_NAME).into(),
-        }
-    }
-}
-
 impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> FromStr
     for GenericArrayConvertDef<AK, DIR, OtherAK>
 {
@@ -106,6 +95,14 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
 impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeOpDef
     for GenericArrayConvertDef<AK, DIR, OtherAK>
 {
+    fn opdef_name(&self) -> OpName {
+        match DIR {
+            INTO => format!("to_{}", OtherAK::TYPE_NAME).into(),
+            FROM => format!("from_{}", OtherAK::TYPE_NAME).into(),
+        }
+
+
+    }
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -192,6 +189,10 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> NamedOp
 impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeExtensionOp
     for GenericArrayConvert<AK, DIR, OtherAK>
 {
+    fn name(&self) -> OpName {
+        GenericArrayConvertDef::<AK, DIR, OtherAK>::new().opdef_name()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

@@ -12,7 +12,7 @@ use crate::extension::simple_op::{
 use crate::extension::{
     ExtensionId, OpDef, SignatureError, SignatureFromArgs, SignatureFunc, TypeDef,
 };
-use crate::ops::{ExtensionOp, NamedOp, OpName};
+use crate::ops::{ExtensionOp, OpName};
 use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
@@ -89,7 +89,7 @@ impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
             GenericArrayOpDef::_phantom(_, never) => match *never {},
             _ => unreachable!(
                 "Operation {} should not need custom computation.",
-                self.name()
+                self.opdef_name()
             ),
         };
         Ok(poly_func_ty)
@@ -189,6 +189,9 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
 }
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayOpDef<AK> {
+    fn opdef_name(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -253,13 +256,11 @@ pub struct GenericArrayOp<AK: ArrayKind> {
     pub size: u64,
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayOp<AK> {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
-
 impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
+    fn name(&self) -> OpName {
+        self.def.opdef_name()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

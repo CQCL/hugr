@@ -37,12 +37,6 @@ impl<AK: ArrayKind> Default for GenericArrayScanDef<AK> {
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayScanDef<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_SCAN_OP_ID
-    }
-}
-
 impl<AK: ArrayKind> FromStr for GenericArrayScanDef<AK> {
     type Err = ();
 
@@ -97,6 +91,10 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
 }
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayScanDef<AK> {
+    fn opdef_name(&self) -> OpName {
+        ARRAY_SCAN_OP_ID
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -177,6 +175,10 @@ impl<AK: ArrayKind> NamedOp for GenericArrayScan<AK> {
 }
 
 impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
+    fn name(&self) -> OpName {
+        GenericArrayScanDef::<AK>::default().opdef_name()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

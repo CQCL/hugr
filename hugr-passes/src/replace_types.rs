@@ -548,7 +548,6 @@ pub mod handlers;
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
-    ext_name: ExtensionId,
     op_name: String, // Only because SmolStr not in hugr-passes yet
     args: Vec<TypeArg>,
 }
@@ -556,8 +555,7 @@ struct OpHashWrapper {
 impl From<&ExtensionOp> for OpHashWrapper {
     fn from(op: &ExtensionOp) -> Self {
         Self {
-            ext_name: op.def().extension_id().clone(),
-            op_name: op.def().name().to_string(),
+            op_name: op.qualified_name().to_string(),
             args: op.args().to_vec(),
         }
     }
@@ -605,13 +603,12 @@ mod test {
     use hugr_core::hugr::{IdentList, ValidationError};
     use hugr_core::ops::constant::CustomConst;
     use hugr_core::ops::constant::OpaqueValue;
-    use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
-    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
-    use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
-    use hugr_core::std_extensions::collections::array::Array;
-    use hugr_core::std_extensions::collections::array::{ArrayKind, GenericArrayValue};
-    use hugr_core::std_extensions::collections::list::{
-        list_type, list_type_def, ListOp, ListValue,
+    use hugr_core::ops::{ExtensionOp, OpTrait, OpType, Tag, Value};
+    use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
+    use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+    use hugr_core::std_extensions::collections::{
+        array::{array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue},
+        list::{list_type, list_type_def, ListOp, ListValue},
     };
     use hugr_core::std_extensions::collections::value_array::{
         value_array_type, VArrayOp, VArrayOpDef, VArrayValue, ValueArray,
@@ -792,7 +789,7 @@ mod test {
 
         let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(
-            ext_ops.map(|e| e.def().name()).sorted().collect_vec(),
+            ext_ops.map(|e| e.unqualified_name()).sorted().collect_vec(),
             ["get", "itousize", "lowered_read_bool", "panic",]
         );
     }
@@ -839,7 +836,7 @@ mod test {
         assert_eq!(
             ext_ops
                 .iter()
-                .map(|e| e.def().name())
+                .map(|x| x.unqualified_name())
                 .sorted()
                 .collect_vec(),
             ["get", "itousize", "panic"]
@@ -1030,7 +1027,7 @@ mod test {
         assert_eq!(
             h.nodes()
                 .filter_map(|n| h.get_optype(n).as_extension_op())
-                .map(ExtensionOp::name)
+                .map(|x| x.qualified_name())
                 .sorted()
                 .collect_vec(),
             ["NoBoundsCheck.read", "collections.list.get"]
@@ -1118,7 +1115,7 @@ mod test {
         let ext_op_names = h
             .nodes()
             .filter_map(|n| h.get_optype(n).as_extension_op())
-            .map(|e| e.def().name())
+            .map(|e| e.unqualified_name())
             .sorted()
             .collect_vec();
         assert_eq!(ext_op_names, ["get", "itousize", "panic",]);

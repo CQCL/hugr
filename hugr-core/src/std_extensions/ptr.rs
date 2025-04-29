@@ -16,7 +16,7 @@ use crate::{
         },
         ExtensionId, OpDef, SignatureError, SignatureFunc,
     },
-    ops::{custom::ExtensionOp, NamedOp},
+    ops::custom::ExtensionOp,
     type_row,
     types::type_param::{TypeArg, TypeParam},
     Extension,
@@ -43,6 +43,11 @@ impl PtrOpDef {
 }
 
 impl MakeOpDef for PtrOpDef {
+    fn opdef_name(&self) -> OpName {
+        let s: &str = self.into();
+        s.into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -145,13 +150,11 @@ impl PtrOp {
     }
 }
 
-impl NamedOp for PtrOp {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
-
 impl MakeExtensionOp for PtrOp {
+    fn name(&self) -> OpName {
+        self.def.opdef_name()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = PtrOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
@@ -225,7 +228,6 @@ pub(crate) mod test {
     use crate::ops::ExtensionOp;
     use crate::{
         builder::{Dataflow, DataflowHugr},
-        ops::NamedOp,
         std_extensions::arithmetic::int_types::INT_TYPES,
     };
     use cool_asserts::assert_matches;
@@ -234,8 +236,8 @@ pub(crate) mod test {
 
     use super::*;
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    fn get_opdef(op: impl NamedOp) -> Option<&'static Arc<OpDef>> {
-        EXTENSION.get_op(&op.name())
+    fn get_opdef(op: impl Into<&'static str>) -> Option<&'static Arc<OpDef>> {
+        EXTENSION.get_op(op.into())
     }
 
     #[test]

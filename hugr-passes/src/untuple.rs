@@ -3,12 +3,12 @@
 use std::collections::VecDeque;
 
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
-use hugr_core::extension::prelude::{MakeTuple, TupleOpDef};
+use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::hugr::views::SiblingSubgraph;
 use hugr_core::hugr::SimpleReplacementError;
-use hugr_core::ops::{NamedOp, OpTrait, OpType};
+use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, SimpleReplacement};
 use itertools::Itertools;
@@ -141,14 +141,14 @@ impl ComposablePass for UntuplePass {
 ///
 /// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
 fn is_make_tuple(optype: &OpType) -> bool {
-    optype.name() == format!("prelude.{}", TupleOpDef::MakeTuple.name())
+    optype.cast::<MakeTuple>().is_some()
 }
 
 /// Returns true if the given optype is an UnpackTuple operation.
 ///
 /// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
 fn is_unpack_tuple(optype: &OpType) -> bool {
-    optype.name() == format!("prelude.{}", TupleOpDef::UnpackTuple.name())
+    optype.cast::<UnpackTuple>().is_some()
 }
 
 /// If this is a MakeTuple operation followed by some number of UnpackTuple operations

@@ -35,12 +35,6 @@ impl<AK: ArrayKind> Default for GenericArrayCloneDef<AK> {
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayCloneDef<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_CLONE_OP_ID
-    }
-}
-
 impl<AK: ArrayKind> FromStr for GenericArrayCloneDef<AK> {
     type Err = ();
 
@@ -70,6 +64,10 @@ impl<AK: ArrayKind> GenericArrayCloneDef<AK> {
 }
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayCloneDef<AK> {
+    fn opdef_name(&self) -> OpName {
+        ARRAY_CLONE_OP_ID
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -145,6 +143,10 @@ impl<AK: ArrayKind> NamedOp for GenericArrayClone<AK> {
 }
 
 impl<AK: ArrayKind> MakeExtensionOp for GenericArrayClone<AK> {
+    fn name(&self) -> OpName {
+        ARRAY_CLONE_OP_ID
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

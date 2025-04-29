@@ -84,10 +84,14 @@ impl<'a, H: HugrView<Node = Node>> ExtensionOpMap<'a, H> {
         let handler = Rc::new(handler);
         for op in Op::iter() {
             let handler = handler.clone();
-            self.extension_op(op.extension(), op.name().clone(), move |context, args| {
-                let op = Op::from_extension_op(&args.node())?;
-                handler(context, args, op)
-            });
+            self.extension_op(
+                op.extension(),
+                op.opdef_name().clone(),
+                move |context, args| {
+                    let op = Op::from_extension_op(&args.node())?;
+                    handler(context, args, op)
+                },
+            );
         }
     }
 
@@ -100,7 +104,10 @@ impl<'a, H: HugrView<Node = Node>> ExtensionOpMap<'a, H> {
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     ) -> Result<()> {
         let node = args.node();
-        let key = (node.def().extension_id().clone(), node.def().name().clone());
+        let key = (
+            node.def().extension_id().clone(),
+            node.unqualified_name().into(),
+        );
         let Some(handler) = self.0.get(&key) else {
             bail!("No extension could emit extension op: {key:?}")
         };

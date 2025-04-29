@@ -32,7 +32,7 @@ use crate::{
     },
     ops::{
         constant::{maybe_hash_values, CustomConst, TryHash, ValueName},
-        ExtensionOp, NamedOp, OpName, Value,
+        ExtensionOp, OpName, Value,
     },
     types::{
         type_param::{TypeArgError, TypeParam},
@@ -213,6 +213,11 @@ impl StaticArrayOpDef {
 }
 
 impl MakeOpDef for StaticArrayOpDef {
+    fn opdef_name(&self) -> OpName {
+        let s: &str = self.into();
+        s.into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -255,7 +260,7 @@ impl MakeOpDef for StaticArrayOpDef {
             extension.get_type(&STATIC_ARRAY_TYPENAME).unwrap(),
             extension_ref,
         );
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -272,13 +277,11 @@ pub struct StaticArrayOp {
     pub elem_ty: Type,
 }
 
-impl NamedOp for StaticArrayOp {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
-
 impl MakeExtensionOp for StaticArrayOp {
+    fn name(&self) -> OpName {
+        self.def.opdef_name()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

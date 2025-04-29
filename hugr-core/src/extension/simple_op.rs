@@ -5,11 +5,7 @@ use std::sync::Weak;
 use strum::IntoEnumIterator;
 
 use crate::ops::{ExtensionOp, OpName, OpNameRef};
-use crate::{
-    ops::{NamedOp, OpType},
-    types::TypeArg,
-    Extension,
-};
+use crate::{ops::OpType, types::TypeArg, Extension};
 
 use super::{op_def::SignatureFunc, ExtensionBuildError, ExtensionId, OpDef, SignatureError};
 use delegate::delegate;
@@ -29,22 +25,15 @@ pub enum OpLoadError {
     WrongExtension(ExtensionId, ExtensionId),
 }
 
-impl<T> NamedOp for T
-where
-    for<'a> &'a T: Into<&'static str>,
-{
-    fn name(&self) -> OpName {
-        let s = self.into();
-        s.into()
-    }
-}
-
 /// Traits implemented by types which can add themselves to [`Extension`]s as
 /// [`OpDef`]s or load themselves from an [`OpDef`].
 ///
 /// Particularly useful with C-style enums that implement [strum::IntoEnumIterator],
 /// as then all definitions can be added to an extension at once.
-pub trait MakeOpDef: NamedOp {
+pub trait MakeOpDef {
+    /// TODO docs
+    fn opdef_name(&self) -> OpName;
+
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
@@ -70,7 +59,7 @@ pub trait MakeOpDef: NamedOp {
 
     /// Description of the operation. By default, the same as `self.name()`.
     fn description(&self) -> String {
-        self.name().to_string()
+        self.opdef_name().to_string()
     }
 
     /// Edit the opdef before finalising. By default does nothing.
@@ -87,7 +76,7 @@ pub trait MakeOpDef: NamedOp {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), ExtensionBuildError> {
         let def = extension.add_op(
-            self.name(),
+            self.opdef_name(),
             self.description(),
             self.init_signature(extension_ref),
             extension_ref,
@@ -150,7 +139,10 @@ pub trait HasDef: MakeExtensionOp {
 
 /// Traits implemented by types which can be loaded from [`ExtensionOp`]s,
 /// i.e. concrete instances of [`OpDef`]s, with defined type arguments.
-pub trait MakeExtensionOp: NamedOp {
+pub trait MakeExtensionOp {
+    /// The name of the operation
+    fn name(&self) -> OpName;
+
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
@@ -188,6 +180,10 @@ pub trait MakeExtensionOp: NamedOp {
 
 /// Blanket implementation for non-polymorphic operations - [OpDef]s with no type parameters.
 impl<T: MakeOpDef> MakeExtensionOp for T {
+    fn name(&self) -> OpName {
+        <Self as MakeOpDef>::opdef_name(self)
+    }
+
     #[inline]
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
@@ -310,6 +306,10 @@ mod test {
     }
 
     impl MakeOpDef for DummyEnum {
+        fn opdef_name(&self) -> OpName {
+            <&Self as Into<&'static str>>::into(self).into()
+        }
+
         fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
             Signature::new_endo(type_row![]).into()
         }
@@ -366,7 +366,7 @@ mod test {
         let o = DummyEnum::Dumb;
 
         assert_eq!(
-            DummyEnum::from_def(EXT.get_op(&o.name()).unwrap()).unwrap(),
+            DummyEnum::from_def(EXT.get_op(&o.opdef_name()).unwrap()).unwrap(),
             o
         );
 

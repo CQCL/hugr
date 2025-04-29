@@ -355,7 +355,7 @@ pub type OpNameRef = str;
 #[enum_dispatch]
 /// Trait for setting name of OpType variants.
 // Separate to OpTrait to allow simple definition via impl_op_name
-pub trait NamedOp {
+pub(crate) trait NamedOp {
     /// The name of the operation.
     fn name(&self) -> OpName;
 }

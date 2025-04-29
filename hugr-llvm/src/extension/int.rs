@@ -1,6 +1,9 @@
 use hugr_core::{
-    extension::prelude::{sum_with_error, ConstError},
-    ops::{constant::CustomConst, ExtensionOp, NamedOp, Value},
+    extension::{
+        prelude::{sum_with_error, ConstError},
+        simple_op::MakeExtensionOp,
+    },
+    ops::{constant::CustomConst, ExtensionOp, Value},
     std_extensions::arithmetic::{
         int_ops::IntOpDef,
         int_types::{self, ConstInt},
@@ -738,7 +741,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
 // panic if there's not exactly one nat arg
 pub(crate) fn get_width_arg<H: HugrView<Node = Node>>(
     args: &EmitOpArgs<'_, '_, ExtensionOp, H>,
-    op: &impl NamedOp,
+    op: &impl MakeExtensionOp,
 ) -> Result<u64> {
     let [TypeArg::BoundedNat { n: log_width }] = args.node.args() else {
         bail!("Expected exactly one BoundedNat parameter to {}", op.name())
@@ -1150,7 +1153,7 @@ mod test {
     use hugr_core::{
         builder::{handle::Outputs, Dataflow, DataflowSubContainer, SubContainer},
         extension::prelude::bool_t,
-        ops::{DataflowOpTrait, ExtensionOp, NamedOp},
+        ops::{DataflowOpTrait, ExtensionOp},
         std_extensions::arithmetic::{
             int_ops::{self, IntOpDef},
             int_types::{ConstInt, INT_TYPES},
@@ -1263,6 +1266,8 @@ mod test {
     #[case::idivmod_checked_u("idivmod_checked_u", &[6])]
     #[case::idivmod_checked_s("idivmod_checked_s", &[6])]
     fn test_emission(int_llvm_ctx: TestContext, #[case] op: IntOpDef, #[case] args: &[u8]) {
+        use hugr_core::extension::simple_op::MakeExtensionOp as _;
+
         let mut insta = insta::Settings::clone_current();
         insta.set_snapshot_suffix(format!(
             "{}_{}_{:?}",

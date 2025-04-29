@@ -1,6 +1,7 @@
 use anyhow::{bail, Ok, Result};
 use hugr_core::{
-    ops::{ExtensionOp, NamedOp},
+    extension::simple_op::MakeExtensionOp as _,
+    ops::ExtensionOp,
     std_extensions::collections::list::{self, ListOp, ListValue},
     types::{SumType, Type, TypeArg},
     HugrView, Node,
@@ -369,7 +370,7 @@ mod test {
             prelude::{self, qb_t, usize_t, ConstUsize},
             ExtensionRegistry,
         },
-        ops::{DataflowOpTrait, NamedOp, Value},
+        ops::{DataflowOpTrait, Value},
         std_extensions::collections::list::{self, list_type, ListOp, ListValue},
     };
     use rstest::rstest;
@@ -389,6 +390,8 @@ mod test {
     #[case::insert(ListOp::insert)]
     #[case::length(ListOp::length)]
     fn test_list_emission(mut llvm_ctx: TestContext, #[case] op: ListOp) {
+        use hugr_core::extension::simple_op::MakeExtensionOp as _;
+
         let ext_op = list::EXTENSION
             .instantiate_extension_op(op.name().as_ref(), [qb_t().into()])
             .unwrap();

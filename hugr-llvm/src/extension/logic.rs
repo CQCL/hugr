@@ -1,6 +1,6 @@
 use hugr_core::{
     extension::simple_op::MakeExtensionOp,
-    ops::{ExtensionOp, NamedOp, Value},
+    ops::{ExtensionOp, Value},
     std_extensions::logic::{self, LogicOp},
     types::SumType,
     HugrView, Node,

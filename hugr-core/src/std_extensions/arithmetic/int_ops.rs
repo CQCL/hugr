@@ -9,7 +9,7 @@ use crate::extension::simple_op::{
 };
 use crate::extension::{CustomValidator, OpDef, SignatureFunc, ValidateJustArgs};
 use crate::ops::custom::ExtensionOp;
-use crate::ops::{NamedOp, OpName};
+use crate::ops::OpName;
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
@@ -100,6 +100,9 @@ pub enum IntOpDef {
 }
 
 impl MakeOpDef for IntOpDef {
+    fn opdef_name(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
@@ -290,12 +293,11 @@ pub struct ConcreteIntOp {
     pub log_widths: Vec<u8>,
 }
 
-impl NamedOp for ConcreteIntOp {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
 impl MakeExtensionOp for ConcreteIntOp {
+    fn name(&self) -> OpName {
+        self.def.opdef_name()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = IntOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())

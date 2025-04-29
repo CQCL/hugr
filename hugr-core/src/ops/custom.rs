@@ -136,6 +136,16 @@ impl ExtensionOp {
     pub fn extension_id(&self) -> &ExtensionId {
         self.def.extension_id()
     }
+
+    /// Returns the unqualified name of the operation.
+    pub fn unqualified_name(&self) -> &OpNameRef {
+        self.def.name()
+    }
+
+    /// Returns the unqualified name of the operation.
+    pub fn qualified_name(&self) -> OpName {
+        self.name()
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
@@ -220,7 +230,7 @@ pub struct OpaqueOp {
     signature: Signature,
 }
 
-fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
+pub(crate) fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
     format!("{}.{}", res_id, name).into()
 }
 
@@ -251,9 +261,10 @@ impl OpaqueOp {
 impl NamedOp for OpaqueOp {
     /// The name of the operation.
     fn name(&self) -> OpName {
-        qualify_name(&self.extension, &self.name)
+        format!("OpaqueOp:{}", qualify_name(&self.extension, &self.name)).into()
     }
 }
+
 impl OpaqueOp {
     /// Unique name of the operation.
     pub fn op_name(&self) -> &OpName {
@@ -378,7 +389,7 @@ mod test {
             vec![TypeArg::Type { ty: usize_t() }],
             sig.clone(),
         );
-        assert_eq!(op.name(), "res.op");
+        assert_eq!(op.name(), "OpaqueOp:res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
         assert_eq!(op.signature().as_ref(), &sig);
