@@ -1,0 +1,67 @@
+name: Check for breaking changes targeting main
+on:
+  pull_request_target:
+    branches:
+      - "**"
+    types:
+      - opened
+      - edited
+      - synchronize
+      - labeled
+      - unlabeled
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  main:
+    name: Check for breaking changes targeting main
+    if: ${{ vars.BREAKING_CHANGE_RELEASE_BRANCH }} != 'main'
+    runs-on: ubuntu-latest
+    env:
+      # We use a HUGRBOT_PAT secret locally.
+      GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.HUGRBOT_PAT }}
+    steps:
+      - name: Check for breaking change in title
+        if: github.event_name == 'pull_request_target'
+        id: breaking
+        run: |
+          if [[ "${{ github.event.pull_request.title }}" =~ ^.*\!:.*$ ]]; then
+            echo "breaking=true" >> $GITHUB_OUTPUT
+          else
+            echo "breaking=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post comment for breaking change targeting main
+        if: |
+          github.event_name == 'pull_request_target' && 
+          steps.breaking.outputs.breaking == 'true' && 
+          github.event.pull_request.base.ref == 'main'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: breaking-change-to-main
+          message: |
+            ⚠️ **Breaking Change Alert** ⚠️
+
+            This PR contains a breaking change and is targeting the `main` branch.
+
+            Breaking changes are currently not allowed to be merged into `main` and should instead target the release branch `${{ vars.BREAKING_CHANGE_RELEASE_BRANCH }}`.
+
+            Please update your PR to target the appropriate branch.
+          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+
+      - name: Fail if breaking change targeting main
+        if: |
+          github.event_name == 'pull_request_target' && 
+          steps.breaking.outputs.breaking == 'true' && 
+          github.event.pull_request.base.ref == 'main'
+        run: |
+          echo "Breaking changes are not allowed to be merged into `main`."
+          exit 1
+
+      # only make it to this point if we have not failed above
+      - name: Delete comment when fixed
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: breaking-change-to-main
+          delete: true
+          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
