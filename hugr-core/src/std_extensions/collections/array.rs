@@ -1,6 +1,7 @@
 //! Fixed-length array type and operations extension.
 
 mod array_clone;
+mod array_conversion;
 mod array_discard;
 mod array_kind;
 mod array_op;
@@ -24,6 +25,7 @@ use crate::types::{CustomCheckFailure, Type, TypeBound, TypeName};
 use crate::Extension;
 
 pub use array_clone::{GenericArrayClone, GenericArrayCloneDef, ARRAY_CLONE_OP_ID};
+pub use array_conversion::{Direction, GenericArrayConvert, GenericArrayConvertDef, FROM, INTO};
 pub use array_discard::{GenericArrayDiscard, GenericArrayDiscardDef, ARRAY_DISCARD_OP_ID};
 pub use array_kind::ArrayKind;
 pub use array_op::{GenericArrayOp, GenericArrayOpDef};
