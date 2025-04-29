@@ -4,7 +4,6 @@ pub mod examples;
 
 use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, black_box, criterion_group};
 use hugr::Hugr;
-#[allow(unused)]
 use hugr::std_extensions::STD_REG;
 
 pub use examples::{circuit, simple_cfg_hugr, simple_dfg_hugr};
@@ -66,7 +65,7 @@ fn bench_serialization(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("circuit_roundtrip/json");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-    for size in [0, 1, 10, 100, 1000].iter() {
+    for size in &[0, 1, 10, 100, 1000] {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size).0;
             b.iter(|| {
@@ -78,7 +77,7 @@ fn bench_serialization(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("circuit_serialize/json");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-    for size in [0, 1, 10, 100, 1000].iter() {
+    for size in &[0, 1, 10, 100, 1000] {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size).0;
             b.iter(|| {
@@ -90,7 +89,7 @@ fn bench_serialization(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("circuit_roundtrip/capnp");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-    for size in [0, 1, 10, 100, 1000].iter() {
+    for size in &[0, 1, 10, 100, 1000] {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size).0;
             b.iter(|| {

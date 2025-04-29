@@ -47,7 +47,7 @@ impl ArrayValue {
     /// Name of the constructor for creating constant arrays.
     pub(crate) const CTR_NAME: &'static str = "collections.array.const";
 
-    /// Create a new [CustomConst] for an array of values of type `typ`.
+    /// Create a new [`CustomConst`] for an array of values of type `typ`.
     /// That all values are of type `typ` is not checked here.
     pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
         Self {
@@ -56,7 +56,8 @@ impl ArrayValue {
         }
     }
 
-    /// Create a new [CustomConst] for an empty array of values of type `typ`.
+    /// Create a new [`CustomConst`] for an empty array of values of type `typ`.
+    #[must_use]
     pub fn new_empty(typ: Type) -> Self {
         Self {
             values: vec![],
@@ -65,16 +66,19 @@ impl ArrayValue {
     }
 
     /// Returns the type of the `[ArrayValue]` as a `[CustomType]`.`
+    #[must_use]
     pub fn custom_type(&self) -> CustomType {
         array_custom_type(self.values.len() as u64, self.typ.clone())
     }
 
     /// Returns the type of values inside the `[ArrayValue]`.
+    #[must_use]
     pub fn get_element_type(&self) -> &Type {
         &self.typ
     }
 
     /// Returns the values contained inside the `[ArrayValue]`.
+    #[must_use]
     pub fn get_contents(&self) -> &[Value] {
         &self.values
     }
@@ -179,8 +183,9 @@ lazy_static! {
     };
 }
 
-/// Gets the [TypeDef] for arrays. Note that instantiations are more easily
-/// created via [array_type] and [array_type_parametric]
+/// Gets the [`TypeDef`] for arrays. Note that instantiations are more easily
+/// created via [`array_type`] and [`array_type_parametric`]
+#[must_use]
 pub fn array_type_def() -> &'static TypeDef {
     EXTENSION.get_type(&ARRAY_TYPENAME).unwrap()
 }
@@ -189,6 +194,7 @@ pub fn array_type_def() -> &'static TypeDef {
 ///
 /// This method is equivalent to [`array_type_parametric`], but uses concrete
 /// arguments types to ensure no errors are possible.
+#[must_use]
 pub fn array_type(size: u64, element_ty: Type) -> Type {
     array_custom_type(size, element_ty).into()
 }
@@ -228,6 +234,7 @@ fn instantiate_array(
 pub const NEW_ARRAY_OP_ID: OpName = OpName::new_inline("new_array");
 
 /// Initialize a new array op of element type `element_ty` of length `size`
+#[must_use]
 pub fn new_array_op(element_ty: Type, size: u64) -> ExtensionOp {
     let op = array_op::ArrayOpDef::new_array.to_concrete(element_ty, size);
     op.to_extension_op().unwrap()
@@ -243,7 +250,7 @@ mod test {
     use super::{ArrayValue, array_type, new_array_op};
 
     #[test]
-    /// Test building a HUGR involving a new_array operation.
+    /// Test building a HUGR involving a `new_array` operation.
     fn test_new_array() {
         let mut b =
             DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], array_type(2, qb_t()))).unwrap();

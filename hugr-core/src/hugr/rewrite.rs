@@ -36,10 +36,10 @@ pub trait Rewrite {
 
     /// Mutate the specified Hugr, or fail with an error.
     /// Returns [`Self::ApplyResult`] if successful.
-    /// If [self.unchanged_on_failure] is true, then `h` must be unchanged if Err is returned.
+    /// If [`self.unchanged_on_failure`] is true, then `h` must be unchanged if Err is returned.
     /// See also [self.verify]
     /// # Panics
-    /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that is,
+    /// May panic if-and-only-if `h` would have failed [`Hugr::validate`]; that is,
     /// implementations may begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
     /// being preferred.
     fn apply(

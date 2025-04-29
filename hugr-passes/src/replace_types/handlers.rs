@@ -1,5 +1,5 @@
-//! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
-//! and [DelegatingLinearizer::register_callback](super::DelegatingLinearizer::register_callback)
+//! Callbacks for use with [`ReplaceTypes::replace_consts_parametrized`]
+//! and [`DelegatingLinearizer::register_callback`](super::DelegatingLinearizer::register_callback)
 
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig};
 use hugr_core::extension::ExtensionSet;
@@ -21,9 +21,9 @@ use super::{
     CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
 };
 
-/// Handler for [ListValue] constants that updates the element type and
-/// recursively [ReplaceTypes::change_value]s the elements of the list.
-/// Included in [ReplaceTypes::default].
+/// Handler for [`ListValue`] constants that updates the element type and
+/// recursively [`ReplaceTypes::change_value`]s the elements of the list.
+/// Included in [`ReplaceTypes::default`].
 pub fn list_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -38,15 +38,15 @@ pub fn list_const(
     }
 
     let mut vals: Vec<Value> = lv.get_contents().to_vec();
-    for v in vals.iter_mut() {
+    for v in &mut vals {
         repl.change_value(v)?;
     }
     Ok(Some(ListValue::new(elem_t, vals).into()))
 }
 
-/// Handler for [ArrayValue] constants that recursively
-/// [ReplaceTypes::change_value]s the elements of the list.
-/// Included in [ReplaceTypes::default].
+/// Handler for [`ArrayValue`] constants that recursively
+/// [`ReplaceTypes::change_value`]s the elements of the list.
+/// Included in [`ReplaceTypes::default`].
 pub fn array_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -61,7 +61,7 @@ pub fn array_const(
     }
 
     let mut vals: Vec<Value> = av.get_contents().to_vec();
-    for v in vals.iter_mut() {
+    for v in &mut vals {
         repl.change_value(v)?;
     }
     Ok(Some(ArrayValue::new(elem_t, vals).into()))
@@ -72,9 +72,9 @@ fn runtime_reqs(h: &Hugr) -> ExtensionSet {
 }
 
 /// Handler for copying/discarding arrays if their elements have become linear.
-/// Included in [ReplaceTypes::default] and [DelegatingLinearizer::default].
+/// Included in [`ReplaceTypes::default`] and [`DelegatingLinearizer::default`].
 ///
-/// [DelegatingLinearizer::default]: super::DelegatingLinearizer::default
+/// [`DelegatingLinearizer::default`]: super::DelegatingLinearizer::default
 pub fn linearize_array(
     args: &[TypeArg],
     num_outports: usize,
@@ -83,7 +83,7 @@ pub fn linearize_array(
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
     let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
-        panic!("Illegal TypeArgs to array: {:?}", args)
+        panic!("Illegal TypeArgs to array: {args:?}")
     };
     if num_outports == 0 {
         // "Simple" discard - first map each element to unit (via type-specific discard):
@@ -109,7 +109,7 @@ pub fn linearize_array(
             dfb.add_dataflow_op(array_scan, [in_array, map_fn]).unwrap();
             dfb.finish_hugr_with_outputs([]).unwrap()
         })));
-    };
+    }
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
     let num_new = num_outports - 1;
@@ -145,7 +145,7 @@ pub fn linearize_array(
 
     // 2. use a scan through the input array, copying the element num_outputs times;
     // return the first copy, and put each of the other copies into one of the array<option>
-    let i64_t = INT_TYPES[6].to_owned();
+    let i64_t = INT_TYPES[6].clone();
     let option_array = array_type(*n, option_ty.clone());
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];

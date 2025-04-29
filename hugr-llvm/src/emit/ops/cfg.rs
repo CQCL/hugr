@@ -64,9 +64,9 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
         let (entry_node, exit_node) = node.get_entry_exit();
         Ok(CfgEmitter {
             bbs,
-            node,
             inputs,
             outputs,
+            node,
             entry_node,
             exit_node,
         })

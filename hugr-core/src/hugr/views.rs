@@ -76,7 +76,7 @@ pub trait HugrView: HugrInternals {
     fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
         if !self.valid_non_root(node) {
             return None;
-        };
+        }
         self.base_hugr()
             .hierarchy
             .parent(self.get_pg_index(node))
@@ -86,18 +86,20 @@ pub trait HugrView: HugrInternals {
     /// Returns the operation type of a node.
     #[inline]
     fn get_optype(&self, node: Self::Node) -> &OpType {
-        match self.contains_node(node) {
-            true => self.base_hugr().op_types.get(self.get_pg_index(node)),
-            false => &DEFAULT_OPTYPE,
+        if self.contains_node(node) {
+            self.base_hugr().op_types.get(self.get_pg_index(node))
+        } else {
+            &DEFAULT_OPTYPE
         }
     }
 
     /// Returns the metadata associated with a node.
     #[inline]
     fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
-        match self.contains_node(node) {
-            true => self.get_node_metadata(node)?.get(key.as_ref()),
-            false => None,
+        if self.contains_node(node) {
+            self.get_node_metadata(node)?.get(key.as_ref())
+        } else {
+            None
         }
     }
 
@@ -126,7 +128,7 @@ pub trait HugrView: HugrInternals {
 
     /// Iterator over output ports of node.
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`
-    /// but preserves knowledge that the ports are [OutgoingPort]s.
+    /// but preserves knowledge that the ports are [`OutgoingPort`]s.
     #[inline]
     fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = OutgoingPort> + Clone {
         self.node_ports(node, Direction::Outgoing)
@@ -135,7 +137,7 @@ pub trait HugrView: HugrInternals {
 
     /// Iterator over inputs ports of node.
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`
-    /// but preserves knowledge that the ports are [IncomingPort]s.
+    /// but preserves knowledge that the ports are [`IncomingPort`]s.
     #[inline]
     fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = IncomingPort> + Clone {
         self.node_ports(node, Direction::Incoming)
@@ -203,7 +205,7 @@ pub trait HugrView: HugrInternals {
         self.linked_ports(node, port).exactly_one().ok()
     }
 
-    /// If there is exactly one OutgoingPort connected to this IncomingPort, return
+    /// If there is exactly one `OutgoingPort` connected to this `IncomingPort`, return
     /// it and its node.
     fn single_linked_output(
         &self,
@@ -214,7 +216,7 @@ pub trait HugrView: HugrInternals {
             .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
 
-    /// If there is exactly one IncomingPort connected to this OutgoingPort, return
+    /// If there is exactly one `IncomingPort` connected to this `OutgoingPort`, return
     /// it and its node.
     fn single_linked_input(
         &self,
@@ -226,7 +228,7 @@ pub trait HugrView: HugrInternals {
     }
     /// Iterator over the nodes and output ports connected to a given *input* port.
     /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
-    /// that the linked ports are [OutgoingPort]s.
+    /// that the linked ports are [`OutgoingPort`]s.
     fn linked_outputs(
         &self,
         node: Self::Node,
@@ -238,7 +240,7 @@ pub trait HugrView: HugrInternals {
 
     /// Iterator over the nodes and input ports connected to a given *output* port
     /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
-    /// that the linked ports are [IncomingPort]s.
+    /// that the linked ports are [`IncomingPort`]s.
     fn linked_inputs(
         &self,
         node: Self::Node,
@@ -434,7 +436,7 @@ pub trait HugrView: HugrInternals {
     fn value_types(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
         let sig = self.signature(node).unwrap_or_default();
         self.node_ports(node, dir)
-            .flat_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
+            .filter_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
     }
 
     /// Iterator over all incoming ports that have Value type, along
@@ -483,7 +485,7 @@ pub trait HierarchyView<'a>: HugrView + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
     ///
     /// # Errors
-    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [OpTag]
+    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [`OpTag`]
     fn try_new(
         hugr: &'a impl HugrView<Node = Self::Node>,
         root: Self::Node,
@@ -612,7 +614,7 @@ where
     Self: Sized,
 {
     /// Filter an iterator of node-ports to only dataflow dependency specifying
-    /// ports (Value and StateOrder)
+    /// ports (Value and `StateOrder`)
     fn dataflow_ports_only(
         self,
         hugr: &impl HugrView<Node = Node>,

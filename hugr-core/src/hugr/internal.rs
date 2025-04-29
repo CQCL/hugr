@@ -183,11 +183,11 @@ pub trait HugrMutInternals: HugrView {
     /// If either node is not in the graph, or if it is a root.
     fn move_before_sibling(&mut self, node: Self::Node, before: Self::Node);
 
-    /// Replace the OpType at node and return the old OpType.
+    /// Replace the `OpType` at node and return the old `OpType`.
     /// In general this invalidates the ports, which may need to be resized to
-    /// match the OpType signature.
+    /// match the `OpType` signature.
     ///
-    /// Returns the old OpType.
+    /// Returns the old `OpType`.
     ///
     /// # Panics
     ///
@@ -197,7 +197,7 @@ pub trait HugrMutInternals: HugrView {
     /// Gets a mutable reference to the optype.
     ///
     /// Changing this may invalidate the ports, which may need to be resized to
-    /// match the OpType signature.
+    /// match the `OpType` signature.
     ///
     /// Mutating the root node operation may invalidate the root tag.
     ///
@@ -233,7 +233,7 @@ impl HugrMutInternals for Hugr {
     fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
         panic_invalid_node(self, node);
         self.graph
-            .set_num_ports(node.pg_index(), incoming, outgoing, |_, _| {})
+            .set_num_ports(node.pg_index(), incoming, outgoing, |_, _| {});
     }
 
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {

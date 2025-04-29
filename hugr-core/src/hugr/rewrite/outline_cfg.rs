@@ -23,7 +23,7 @@ pub struct OutlineCfg {
 }
 
 impl OutlineCfg {
-    /// Create a new OutlineCfg rewrite that will move the provided blocks.
+    /// Create a new `OutlineCfg` rewrite that will move the provided blocks.
     pub fn new(blocks: impl IntoIterator<Item = Node>) -> Self {
         Self {
             blocks: HashSet::from_iter(blocks),
@@ -32,7 +32,7 @@ impl OutlineCfg {
 
     /// Compute the entry and exit nodes of the CFG which contains
     /// [`self.blocks`], along with the output neighbour its parent graph and
-    /// the combined extension_deltas of all of the blocks.
+    /// the combined `extension_deltas` of all of the blocks.
     fn compute_entry_exit_outside_extensions(
         &self,
         h: &impl HugrView<Node = Node>,
@@ -55,7 +55,7 @@ impl OutlineCfg {
         let mut entry = None;
         let mut exit_succ = None;
         let mut extension_delta = ExtensionSet::new();
-        for &n in self.blocks.iter() {
+        for &n in &self.blocks {
             if n == cfg_entry
                 || h.input_neighbours(n)
                     .any(|pred| !self.blocks.contains(&pred))
@@ -82,7 +82,7 @@ impl OutlineCfg {
                     }
                 },
                 Err(ext) => return Err(OutlineCfgError::MultipleExitEdges(n, ext.collect())),
-            };
+            }
         }
         match (entry, exit_succ) {
             (Some(e), Some((x, o))) => Ok((e, x, o, extension_delta)),
@@ -220,7 +220,7 @@ impl Rewrite for OutlineCfg {
     }
 }
 
-/// Errors that can occur in expressing an OutlineCfg rewrite.
+/// Errors that can occur in expressing an `OutlineCfg` rewrite.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum OutlineCfgError {
@@ -500,7 +500,7 @@ mod test {
         let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
 
         for n in other_blocks {
-            assert_eq!(h.get_parent(n), Some(cfg))
+            assert_eq!(h.get_parent(n), Some(cfg));
         }
         assert_eq!(h.get_parent(new_block), Some(cfg));
         assert!(h.get_optype(new_block).is_dataflow_block());

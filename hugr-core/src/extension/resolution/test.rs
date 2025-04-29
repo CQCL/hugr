@@ -79,7 +79,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
     let ext = Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
         ext.add_op(
             op_name.into(),
-            "".to_string(),
+            String::new(),
             Signature::new_endo(vec![bool_t()]),
             extension_ref,
         )
@@ -99,7 +99,7 @@ fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -
             .add_type(
                 type_name.into(),
                 vec![],
-                "".to_string(),
+                String::new(),
                 TypeDefBound::any(),
                 extension_ref,
             )
@@ -108,7 +108,7 @@ fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -
 
         ext.add_op(
             op_name.into(),
-            "".to_string(),
+            String::new(),
             Signature::new(vec![typ.into()], vec![usize_t()]),
             extension_ref,
         )
@@ -161,8 +161,8 @@ fn resolve_hugr_extensions_simple() {
     let mut build = DFGBuilder::new(
         Signature::new(vec![], vec![float64_type()]).with_extension_delta(
             [
-                PRELUDE_ID.to_owned(),
-                std_extensions::arithmetic::float_types::EXTENSION_ID.to_owned(),
+                PRELUDE_ID.clone(),
+                std_extensions::arithmetic::float_types::EXTENSION_ID.clone(),
             ]
             .into_iter()
             .collect::<ExtensionSet>(),
@@ -358,8 +358,8 @@ fn resolve_call() {
     let generic_type_1 = TypeArg::Type { ty: float64_type() };
     let generic_type_2 = TypeArg::Type { ty: int_type(6) };
     let expected_exts = [
-        float_types::EXTENSION_ID.to_owned(),
-        int_types::EXTENSION_ID.to_owned(),
+        float_types::EXTENSION_ID.clone(),
+        int_types::EXTENSION_ID.clone(),
     ]
     .into_iter()
     .collect::<ExtensionSet>();

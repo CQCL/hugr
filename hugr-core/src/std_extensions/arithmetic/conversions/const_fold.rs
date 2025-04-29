@@ -19,7 +19,10 @@ use crate::{
 use super::ConvertOpDef;
 
 pub(super) fn set_fold(op: &ConvertOpDef, def: &mut OpDef) {
-    use ConvertOpDef::*;
+    use ConvertOpDef::{
+        bytecast_float64_to_int64, bytecast_int64_to_float64, convert_s, convert_u, ifrombool,
+        ifromusize, itobool, itostring_s, itostring_u, itousize, trunc_s, trunc_u,
+    };
 
     match op {
         trunc_u => def.set_constant_folder(TruncU),
@@ -47,7 +50,7 @@ fn fold_trunc(
         return None;
     };
     let log_width = get_log_width(arg).ok()?;
-    let int_type = INT_TYPES[log_width as usize].to_owned();
+    let int_type = INT_TYPES[log_width as usize].clone();
     let err_value = || {
         ConstError {
             signal: 0,
@@ -55,15 +58,15 @@ fn fold_trunc(
         }
         .as_either(int_type.clone())
     };
-    let out_const: ops::Value = if !f.is_finite() {
-        err_value()
-    } else {
+    let out_const: ops::Value = if f.is_finite() {
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
             const_ok(cv, error_type())
         } else {
             err_value()
         }
+    } else {
+        err_value()
     };
 
     Some(vec![(0.into(), out_const)])
@@ -189,13 +192,13 @@ impl ConstFold for IToStringU {
         };
         let logwidth: u8 = get_log_width(arg).ok()?;
         let n0: &ConstInt = get_single_input_value(consts)?;
-        if n0.log_width() != logwidth {
-            None
-        } else {
+        if n0.log_width() == logwidth {
             Some(vec![(
                 0.into(),
                 Value::extension(ConstString::new(n0.value_u().to_string())),
             )])
+        } else {
+            None
         }
     }
 }
@@ -213,13 +216,13 @@ impl ConstFold for IToStringS {
         };
         let logwidth: u8 = get_log_width(arg).ok()?;
         let n0: &ConstInt = get_single_input_value(consts)?;
-        if n0.log_width() != logwidth {
-            None
-        } else {
+        if n0.log_width() == logwidth {
             Some(vec![(
                 0.into(),
                 Value::extension(ConstString::new(n0.value_s().to_string())),
             )])
+        } else {
+            None
         }
     }
 }
@@ -234,15 +237,15 @@ impl ConstFold for IToUsize {
     ) -> ConstFoldResult {
         if !type_args.is_empty() {
             return None;
-        };
+        }
         let n0: &ConstInt = get_single_input_value(consts)?;
-        if n0.log_width() != 6 {
-            None
-        } else {
+        if n0.log_width() == 6 {
             Some(vec![(
                 0.into(),
                 Value::extension(ConstUsize::new(n0.value_u())),
             )])
+        } else {
+            None
         }
     }
 }
@@ -257,7 +260,7 @@ impl ConstFold for IFromUsize {
     ) -> ConstFoldResult {
         if !type_args.is_empty() {
             return None;
-        };
+        }
         let n0: &ConstUsize = get_single_input_value(consts)?;
         Some(vec![(
             0.into(),

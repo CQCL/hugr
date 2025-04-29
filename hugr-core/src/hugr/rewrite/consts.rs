@@ -1,4 +1,4 @@
-//! Rewrite operations involving Const and LoadConst operations
+//! Rewrite operations involving Const and `LoadConst` operations
 
 use std::iter;
 

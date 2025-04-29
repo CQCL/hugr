@@ -30,28 +30,26 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
-        let result = match self.input_args.hugr_json {
-            true => {
-                let hugr = self.input_args.get_hugr()?;
-                hugr.validate()
-                    .map_err(PackageValidationError::Validation)?;
-                vec![hugr]
-            }
-            false => {
-                let package = self.input_args.get_package()?;
-                package.validate()?;
-                package.modules
-            }
+        let result = if self.input_args.hugr_json {
+            let hugr = self.input_args.get_hugr()?;
+            hugr.validate()
+                .map_err(PackageValidationError::Validation)?;
+            vec![hugr]
+        } else {
+            let package = self.input_args.get_package()?;
+            package.validate()?;
+            package.modules
         };
 
         if self.verbosity(Level::Info) {
-            eprintln!("{}", VALID_PRINT);
+            eprintln!("{VALID_PRINT}");
         }
 
         Ok(result)
     }
 
     /// Test whether a `level` message should be output.
+    #[must_use]
     pub fn verbosity(&self, level: Level) -> bool {
         self.other_args.verbosity(level)
     }

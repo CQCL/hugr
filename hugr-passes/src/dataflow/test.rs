@@ -127,7 +127,7 @@ fn test_tail_loop_never_iterates() {
     assert_eq!(
         Some(TailLoopTermination::NeverContinues),
         results.tail_loop_terminates(tail_loop.node())
-    )
+    );
 }
 
 #[test]

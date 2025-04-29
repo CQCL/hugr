@@ -284,13 +284,13 @@ mod test {
     use super::*;
 
     /// A yaml extension defining an empty extension.
-    const EMPTY_YAML: &str = r#"
+    const EMPTY_YAML: &str = r"
 extensions:
 - name: EmptyExt
-"#;
+";
 
     /// A yaml extension defining an extension with one type and two operations.
-    const BASIC_YAML: &str = r#"
+    const BASIC_YAML: &str = r"
 imports: [prelude]
 
 extensions:
@@ -310,7 +310,7 @@ extensions:
     signature:
         inputs: [MyType, Q, Q]
         outputs: [[MyType, 1], [Control, Q, 2]]
-"#;
+";
 
     /// A yaml extension with unsupported features.
     const UNSUPPORTED_YAML: &str = r#"

@@ -190,7 +190,7 @@ impl DivModOp {
     }
 }
 
-/// ConstError an integer comparison operation.
+/// `ConstError` an integer comparison operation.
 fn emit_icmp<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
@@ -783,21 +783,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
     let pair_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), tuple_sum_ty.clone())?;
 
     let build_divmod = |ctx: &mut EmitFuncContext<'c, '_, H>| -> Result<BasicValueEnum<'c>> {
-        if !signed {
-            let quot = ctx
-                .builder()
-                .build_int_unsigned_div(numerator, denominator, "quotient")?;
-            let rem = ctx
-                .builder()
-                .build_int_unsigned_rem(numerator, denominator, "remainder")?;
-            Ok(pair_ty
-                .build_tag(
-                    ctx.builder(),
-                    0,
-                    vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
-                )?
-                .as_basic_value_enum())
-        } else {
+        if signed {
             let max_signed_value = u64::pow(2, u32::pow(2, log_width as u32) - 1) - 1;
             let max_signed = numerator.get_type().const_int(max_signed_value, false);
             // Determine whether the divisor is "big" or "smol" for special casing.
@@ -952,6 +938,20 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
             ctx.builder().position_at_end(finish);
             let result = ctx.builder().build_load(result_ptr, "result")?;
             Ok(result)
+        } else {
+            let quot = ctx
+                .builder()
+                .build_int_unsigned_div(numerator, denominator, "quotient")?;
+            let rem = ctx
+                .builder()
+                .build_int_unsigned_rem(numerator, denominator, "remainder")?;
+            Ok(pair_ty
+                .build_tag(
+                    ctx.builder(),
+                    0,
+                    vec![quot.as_basic_value_enum(), rem.as_basic_value_enum()],
+                )?
+                .as_basic_value_enum())
         }
     };
 
@@ -1121,11 +1121,12 @@ fn emit_const_int<'c, H: HugrView<Node = Node>>(
     Ok(ty.const_int(k.value_u(), false).as_basic_value_enum())
 }
 
-/// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
+/// Populates a [`CodegenExtsBuilder`] with all extensions needed to lower int
 /// ops, types, and constants.
 ///
-/// Any ops that panic will do so using [DefaultPreludeCodegen].
+/// Any ops that panic will do so using [`DefaultPreludeCodegen`].
 #[deprecated]
+#[must_use]
 pub fn add_int_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
 ) -> CodegenExtsBuilder<'a, H> {
@@ -1133,23 +1134,25 @@ pub fn add_int_extensions<'a, H: HugrView<Node = Node> + 'a>(
 }
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
+    /// Populates a [`CodegenExtsBuilder`] with all extensions needed to lower int
     /// ops, types, and constants.
     ///
-    /// Any ops that panic will do so using [DefaultPreludeCodegen].
+    /// Any ops that panic will do so using [`DefaultPreludeCodegen`].
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated in favor of [Self::add_default_int_extensions].
+    /// This method is deprecated in favor of [`Self::add_default_int_extensions`].
     #[deprecated]
+    #[must_use]
     pub fn add_int_extensions(self) -> Self {
         self.add_default_int_extensions()
     }
 
-    /// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
+    /// Populates a [`CodegenExtsBuilder`] with all extensions needed to lower int
     /// ops, types, and constants.
     ///
-    /// Any ops that panic will do so using [DefaultPreludeCodegen].
+    /// Any ops that panic will do so using [`DefaultPreludeCodegen`].
+    #[must_use]
     pub fn add_default_int_extensions(self) -> Self {
         self.add_extension(IntCodegenExtension::new(DefaultPreludeCodegen))
     }
@@ -1200,7 +1203,7 @@ mod test {
     // Instantiate an extension op which takes one width argument
     fn make_int_op(name: impl AsRef<str>, log_width: u8) -> ExtensionOp {
         int_ops::EXTENSION
-            .instantiate_extension_op(name.as_ref(), [(log_width as u64).into()])
+            .instantiate_extension_op(name.as_ref(), [u64::from(log_width).into()])
             .unwrap()
     }
 
@@ -1247,10 +1250,10 @@ mod test {
                     None => hugr_builder.input_wires_arr::<N>().to_vec(),
                     Some(inputs) => {
                         let mut input_wires = Vec::new();
-                        inputs.into_iter().for_each(|i| {
+                        for i in inputs {
                             let w = hugr_builder.add_load_value(i);
                             input_wires.push(w);
-                        });
+                        }
                         input_wires
                     }
                 };
@@ -1292,7 +1295,7 @@ mod test {
         insta.bind(|| {
             let hugr = single_op_hugr(concrete.into());
             check_emission!(hugr, int_llvm_ctx);
-        })
+        });
     }
 
     #[rstest]
@@ -1322,7 +1325,7 @@ mod test {
     ) {
         let out_ty = INT_TYPES[to as usize].clone();
         let ext_op = int_ops::EXTENSION
-            .instantiate_extension_op(&op, [(from as u64).into(), (to as u64).into()])
+            .instantiate_extension_op(&op, [u64::from(from).into(), u64::from(to).into()])
             .unwrap();
         let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty);
 
@@ -1344,7 +1347,7 @@ mod test {
     ) {
         let out_ty = SumType::new([vec![error_type()], vec![INT_TYPES[to as usize].clone()]]);
         let ext_op = int_ops::EXTENSION
-            .instantiate_extension_op(&op, [(from as u64).into(), (to as u64).into()])
+            .instantiate_extension_op(&op, [u64::from(from).into(), u64::from(to).into()])
             .unwrap();
         let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty.into());
 
@@ -1487,7 +1490,7 @@ mod test {
         let ext_op = int_ops::EXTENSION
             .instantiate_extension_op(
                 "iwiden_u".as_ref(),
-                [(from as u64).into(), (to as u64).into()],
+                [u64::from(from).into(), u64::from(to).into()],
             )
             .unwrap();
 
@@ -1500,7 +1503,7 @@ mod test {
         let ext_op = int_ops::EXTENSION
             .instantiate_extension_op(
                 "iwiden_s".as_ref(),
-                [(from as u64).into(), (to as u64).into()],
+                [u64::from(from).into(), u64::from(to).into()],
             )
             .unwrap();
 
@@ -1526,7 +1529,7 @@ mod test {
         let input = ConstInt::new_s(from, arg).unwrap();
         let to_ty = INT_TYPES[to as usize].clone();
         let ext_op = int_ops::EXTENSION
-            .instantiate_extension_op(op.as_ref(), [(from as u64).into(), (to as u64).into()])
+            .instantiate_extension_op(op.as_ref(), [u64::from(from).into(), u64::from(to).into()])
             .unwrap();
 
         let hugr = test_int_op_with_results_processing::<1>(

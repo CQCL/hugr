@@ -31,6 +31,7 @@ impl From<TypeBound> for TypeDefBound {
 
 impl TypeDefBound {
     /// Create a new [`TypeDefBound::Explicit`] with the `Any` bound.
+    #[must_use]
     pub fn any() -> Self {
         TypeDefBound::Explicit {
             bound: TypeBound::Any,
@@ -38,6 +39,7 @@ impl TypeDefBound {
     }
 
     /// Create a new [`TypeDefBound::Explicit`] with the `Copyable` bound.
+    #[must_use]
     pub fn copyable() -> Self {
         TypeDefBound::Explicit {
             bound: TypeBound::Copyable,
@@ -45,6 +47,7 @@ impl TypeDefBound {
     }
 
     /// Create a new [`TypeDefBound::FromParams`] with the given indices.
+    #[must_use]
     pub fn from_params(indices: Vec<usize>) -> Self {
         TypeDefBound::FromParams { indices }
     }
@@ -55,14 +58,14 @@ impl TypeDefBound {
 /// - typically these are operations also provided by the Extension.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
-    /// The unique Extension owning this TypeDef (of which this TypeDef is a member)
+    /// The unique Extension owning this `TypeDef` (of which this `TypeDef` is a member)
     extension: ExtensionId,
     /// A weak reference to the extension defining this operation.
     #[serde(skip)]
     extension_ref: Weak<Extension>,
     /// The unique name of the type
     name: TypeName,
-    /// Declaration of type parameters. The TypeDef must be instantiated
+    /// Declaration of type parameters. The `TypeDef` must be instantiated
     /// with the same number of [`TypeArg`]'s to make an actual type.
     ///
     /// [`TypeArg`]: crate::types::type_param::TypeArg
@@ -131,6 +134,7 @@ impl TypeDef {
         ))
     }
     /// The [`TypeBound`] of the definition.
+    #[must_use]
     pub fn bound(&self, args: &[TypeArg]) -> TypeBound {
         match &self.bound {
             TypeDefBound::Explicit { bound } => *bound,
@@ -151,23 +155,27 @@ impl TypeDef {
         }
     }
 
-    /// The static parameters to the TypeDef; a [TypeArg] appropriate for each
+    /// The static parameters to the `TypeDef`; a [`TypeArg`] appropriate for each
     /// must be provided to produce an actual type.
+    #[must_use]
     pub fn params(&self) -> &[TypeParam] {
         &self.params
     }
 
     /// The type name of the definition.
+    #[must_use]
     pub fn name(&self) -> &TypeName {
         &self.name
     }
 
     /// Returns a reference to the extension id of this [`TypeDef`].
+    #[must_use]
     pub fn extension_id(&self) -> &ExtensionId {
         &self.extension
     }
 
     /// Returns a weak reference to the extension defining this type.
+    #[must_use]
     pub fn extension(&self) -> Weak<Extension> {
         self.extension_ref.clone()
     }

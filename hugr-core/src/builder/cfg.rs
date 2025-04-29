@@ -258,7 +258,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and `extension_delta` explicitly specified, plus a UnitSum type
+    /// and `outputs` and `extension_delta` explicitly specified, plus a `UnitSum` type
     /// (a Sum of `n_cases` unit types) to select the successor.
     ///
     /// # Errors
@@ -294,7 +294,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`,
     /// the variants of the branching Sum value specified by `sum_rows`, and
-    /// `extension_delta` explicitly specified. ([entry_builder](Self::entry_builder)
+    /// `extension_delta` explicitly specified. ([`entry_builder`](Self::entry_builder)
     /// may be used to infer.)
     ///
     /// # Errors
@@ -320,7 +320,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with
-    /// `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
+    /// `outputs` and a `UnitSum` type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -335,7 +335,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with
     /// `outputs` and a Sum of `n_cases` unit types, and explicit `extension_delta`.
-    /// ([simple_entry_builder](Self::simple_entry_builder) may be used to infer.)
+    /// ([`simple_entry_builder`](Self::simple_entry_builder) may be used to infer.)
     ///
     /// # Errors
     ///
@@ -445,7 +445,7 @@ impl BlockBuilder<Hugr> {
         Self::create(base, root)
     }
 
-    /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
+    /// [Set outputs](BlockBuilder::set_outputs) and [`finish_hugr`](`BlockBuilder::finish_hugr`).
     pub fn finish_hugr_with_outputs(
         mut self,
         branch_wire: Wire,

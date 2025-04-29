@@ -1,4 +1,4 @@
-//! SiblingGraph: view onto a sibling subgraph of the HUGR.
+//! `SiblingGraph`: view onto a sibling subgraph of the HUGR.
 
 use std::iter;
 
@@ -46,8 +46,8 @@ pub struct SiblingGraph<'g, Root = Node> {
     _phantom: std::marker::PhantomData<Root>,
 }
 
-/// HugrView trait members common to both [SiblingGraph] and [SiblingMut],
-/// i.e. that rely only on [HugrInternals::base_hugr]
+/// `HugrView` trait members common to both [`SiblingGraph`] and [`SiblingMut`],
+/// i.e. that rely only on [`HugrInternals::base_hugr`]
 macro_rules! impl_base_members {
     () => {
         #[inline]
@@ -174,8 +174,7 @@ where
     fn try_new(hugr: &'a impl HugrView<Node = Node>, root: Node) -> Result<Self, HugrError> {
         assert!(
             hugr.valid_node(root),
-            "Cannot create a sibling graph from an invalid node {}.",
-            root
+            "Cannot create a sibling graph from an invalid node {root}."
         );
         check_tag::<Root, _>(hugr, root)?;
         Ok(Self::new_unchecked(hugr, root))
@@ -227,13 +226,13 @@ where
 
 /// Mutable view onto a HUGR sibling graph.
 ///
-/// Like [SiblingGraph], includes only the root node and its direct children, but no
+/// Like [`SiblingGraph`], includes only the root node and its direct children, but no
 /// deeper descendants; but the descendants can still be accessed by creating nested
-/// [SiblingMut] instances from nodes in the view.
+/// [`SiblingMut`] instances from nodes in the view.
 ///
 /// Uniquely, the root node has no parent.
 ///
-/// [HugrView] methods may be slower than for an immutable [SiblingGraph]
+/// [`HugrView`] methods may be slower than for an immutable [`SiblingGraph`]
 /// as the latter may cache information about the graph connectivity,
 /// whereas (in order to ease mutation) this does not.
 pub struct SiblingMut<'g, H: HugrView, Root = Node> {
@@ -248,8 +247,8 @@ pub struct SiblingMut<'g, H: HugrView, Root = Node> {
 }
 
 impl<'g, H: HugrMut, Root: NodeHandle<H::Node>> SiblingMut<'g, H, Root> {
-    /// Create a new SiblingMut from a base.
-    /// Equivalent to [HierarchyView::try_new] but takes a *mutable* reference.
+    /// Create a new `SiblingMut` from a base.
+    /// Equivalent to [`HierarchyView::try_new`] but takes a *mutable* reference.
     pub fn try_new(hugr: &'g mut H, root: H::Node) -> Result<Self, HugrError> {
         check_tag::<Root, _>(hugr, root)?;
         Ok(Self {
@@ -337,11 +336,10 @@ impl<H: HugrMut, Root: NodeHandle<H::Node>> HugrView for SiblingMut<'_, H, Root>
         node: Self::Node,
         other: Self::Node,
     ) -> impl Iterator<Item = [Port; 2]> + Clone {
-        match self.contains_node(node) && self.contains_node(other) {
-            // The nodes are not in the sibling graph
-            false => Either::Left(iter::empty()),
-            // The nodes are in the sibling graph
-            true => Either::Right(self.hugr.node_connections(node, other)),
+        if self.contains_node(node) && self.contains_node(other) {
+            Either::Right(self.hugr.node_connections(node, other))
+        } else {
+            Either::Left(iter::empty())
         }
     }
 

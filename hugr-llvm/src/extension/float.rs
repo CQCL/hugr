@@ -140,6 +140,7 @@ pub fn add_float_extensions<'a, H: HugrView<Node = Node> + 'a>(
 }
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
+    #[must_use]
     pub fn add_float_extensions(self) -> Self {
         add_float_extensions(self)
     }

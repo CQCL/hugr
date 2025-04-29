@@ -90,7 +90,7 @@ pub enum ExtensionResolutionError {
     /// An operation requires an extension that is not in the given registry.
     #[display(
         "{op}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
-        node.map(|n| format!(" in {}", n)).unwrap_or_default(),
+        node.map(|n| format!(" in {n}")).unwrap_or_default(),
         available_extensions.join(", ")
     )]
     MissingOpExtension {
@@ -106,7 +106,7 @@ pub enum ExtensionResolutionError {
     /// A type references an extension that is not in the given registry.
     #[display(
         "Type {ty}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
-        node.map(|n| format!(" in {}", n)).unwrap_or_default(),
+        node.map(|n| format!(" in {n}")).unwrap_or_default(),
         available_extensions.join(", ")
     )]
     MissingTypeExtension {
@@ -172,6 +172,7 @@ impl ExtensionResolutionError {
     }
 
     /// Create a new error for missing type extensions.
+    #[must_use]
     pub fn missing_type_extension(
         node: Option<Node>,
         ty: &TypeName,
@@ -194,7 +195,7 @@ pub enum ExtensionCollectionError {
     /// An operation requires an extension that is not in the given registry.
     #[display(
         "{op}{} contains custom types for which have lost the reference to their defining extensions. Dropped extensions: {}",
-        if let Some(node) = node { format!(" ({})", node) } else { "".to_string() },
+        if let Some(node) = node { format!(" ({node})") } else { String::new() },
         missing_extensions.join(", ")
     )]
     DroppedOpExtensions {

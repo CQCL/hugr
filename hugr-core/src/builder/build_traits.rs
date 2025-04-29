@@ -350,7 +350,7 @@ pub trait Dataflow: Container {
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
     /// `extension_delta` is explicitly specified. Alternatively
-    /// [cfg_builder](Self::cfg_builder) may be used to infer it.
+    /// [`cfg_builder`](Self::cfg_builder) may be used to infer it.
     ///
     /// # Errors
     ///
@@ -470,7 +470,7 @@ pub trait Dataflow: Container {
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
     /// `extension_delta` explicitly specified. Alternatively
-    /// [tail_loop_builder](Self::tail_loop_builder) may be used to infer it.
+    /// [`tail_loop_builder`](Self::tail_loop_builder) may be used to infer it.
     ///
     /// # Errors
     ///
@@ -530,7 +530,7 @@ pub trait Dataflow: Container {
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
     /// `extension_delta` is explicitly specified. Alternatively
-    /// [conditional_builder](Self::conditional_builder) may be used to infer it.
+    /// [`conditional_builder`](Self::conditional_builder) may be used to infer it.
     ///
     /// # Errors
     ///

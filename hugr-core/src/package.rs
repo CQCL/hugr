@@ -60,7 +60,7 @@ impl Package {
     /// HUGRs that do not have a `Module` root will be wrapped in a new `Module` root,
     /// depending on the root optype.
     ///
-    /// - Currently all non-module roots will raise [PackageError::CannotWrapHugr].
+    /// - Currently all non-module roots will raise [`PackageError::CannotWrapHugr`].
     ///
     /// # Errors
     ///
@@ -84,10 +84,10 @@ impl Package {
 
     /// Create a new package containing a single HUGR.
     ///
-    /// If the Hugr is not a module, a new [OpType::Module] root will be added.
+    /// If the Hugr is not a module, a new [`OpType::Module`] root will be added.
     /// This behaviours depends on the root optype.
     ///
-    /// - Currently all non-module roots will raise [PackageError::CannotWrapHugr].
+    /// - Currently all non-module roots will raise [`PackageError::CannotWrapHugr`].
     ///
     /// # Errors
     ///
@@ -104,7 +104,7 @@ impl Package {
     ///
     /// Ensures that the top-level extension list is a superset of the extensions used in the modules.
     pub fn validate(&self) -> Result<(), PackageValidationError> {
-        for hugr in self.modules.iter() {
+        for hugr in &self.modules {
             hugr.validate()?;
 
             let missing_exts = hugr
@@ -157,7 +157,7 @@ impl Package {
     ///
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::store` with a bytearray instead.
-    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {
@@ -218,7 +218,7 @@ impl Package {
                 modules,
                 extensions: pkg_extensions,
             });
-        };
+        }
         let pkg_load_err = loaded_pkg.unwrap_err();
 
         // As a fallback, try to load a hugr json.
@@ -316,13 +316,13 @@ impl AsRef<[Hugr]> for Package {
     }
 }
 
-/// Alter an arbitrary hugr to contain an [OpType::Module] root.
+/// Alter an arbitrary hugr to contain an [`OpType::Module`] root.
 ///
-/// The behaviour depends on the root optype. See [Package::from_hugr] for details.
+/// The behaviour depends on the root optype. See [`Package::from_hugr`] for details.
 ///
 /// # Errors
 ///
-/// Returns [PackageError::]
+/// Returns [`PackageError::`]
 fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
     let root = hugr.root();
     let root_op = hugr.get_optype(root).clone();
@@ -383,7 +383,7 @@ fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
 #[derive(Debug, Display, Error, PartialEq)]
 #[non_exhaustive]
 pub enum PackageError {
-    /// A hugr in the package does not have an [OpType::Module] root.
+    /// A hugr in the package does not have an [`OpType::Module`] root.
     #[display("Module {module_index} in the package does not have an OpType::Module root, but {}", root_op.name())]
     NonModuleHugr {
         /// The module index.
@@ -422,8 +422,8 @@ pub enum PackageValidationError {
     /// Error raised while processing the package extensions.
     #[display("The package modules use the extension{} {} not present in the defined set. The declared extensions are {}",
             if missing.len() > 1 {"s"} else {""},
-            missing.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
-            available.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
+            missing.iter().map(std::string::ToString::to_string).collect::<Vec<_>>().join(", "),
+            available.iter().map(std::string::ToString::to_string).collect::<Vec<_>>().join(", "),
         )]
     MissingExtension {
         /// The missing extensions.
@@ -471,7 +471,7 @@ mod test {
                 insta::assert_snapshot!(test_name, hugr.mermaid_string());
             }
             (Err(_), true) => {}
-            (p, _) => panic!("Unexpected result {:?}", p),
+            (p, _) => panic!("Unexpected result {p:?}"),
         }
     }
 

@@ -106,6 +106,7 @@ impl Outputs {
     /// # Panics
     ///
     /// If the length of the slice is not equal to `N`.
+    #[must_use]
     pub fn to_array<const N: usize>(self) -> [Wire; N] {
         collect_array(self)
     }

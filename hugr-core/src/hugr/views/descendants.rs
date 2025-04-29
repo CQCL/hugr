@@ -1,4 +1,4 @@
-//! DescendantsGraph: view onto the subgraph of the HUGR starting from a root
+//! `DescendantsGraph`: view onto the subgraph of the HUGR starting from a root
 //! (all descendants at all depths).
 
 use itertools::Itertools;
@@ -110,9 +110,10 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
 
     #[inline]
     fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
-        let children = match self.graph.contains_node(self.get_pg_index(node)) {
-            true => self.base_hugr().hierarchy.children(self.get_pg_index(node)),
-            false => portgraph::hierarchy::Children::default(),
+        let children = if self.graph.contains_node(self.get_pg_index(node)) {
+            self.base_hugr().hierarchy.children(self.get_pg_index(node))
+        } else {
+            portgraph::hierarchy::Children::default()
         };
         children.map(|index| self.get_node(index))
     }

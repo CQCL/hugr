@@ -88,7 +88,7 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Remove a node from the graph and return the node weight.
     /// Note that if the node has children, they are not removed; this leaves
-    /// the Hugr in an invalid state. See [Self::remove_subtree].
+    /// the Hugr in an invalid state. See [`Self::remove_subtree`].
     ///
     /// # Panics
     ///
@@ -103,14 +103,14 @@ pub trait HugrMut: HugrMutInternals {
     fn remove_subtree(&mut self, node: Self::Node);
 
     /// Copies the strict descendants of `root` to under the `new_parent`, optionally applying a
-    /// [Substitution] to the [OpType]s of the copied nodes.
+    /// [Substitution] to the [`OpType`]s of the copied nodes.
     ///
     /// That is, the immediate children of root, are copied to make children of `new_parent`.
     ///
     /// Note this may invalidate the Hugr in two ways:
     /// * Adding children of `root` may make the children-list of `new_parent` invalid e.g.
     ///   leading to multiple [Input](OpType::Input), [Output](OpType::Output) or
-    ///   [ExitBlock](OpType::ExitBlock) nodes or Input/Output in the wrong positions
+    ///   [`ExitBlock`](OpType::ExitBlock) nodes or Input/Output in the wrong positions
     /// * Nonlocal edges incoming to the subtree of `root` will be copied to target the subtree under `new_parent`
     ///   which may be invalid if `new_parent` is not a child of `root`s parent (for `Ext` edges - or
     ///   correspondingly for `Dom` edges)
@@ -234,14 +234,14 @@ pub trait HugrMut: HugrMutInternals {
 }
 
 /// Records the result of inserting a Hugr or view
-/// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view].
+/// via [`HugrMut::insert_hugr`] or [`HugrMut::insert_from_view`].
 ///
 /// Contains a map from the nodes in the source HUGR to the nodes in the
 /// target HUGR, using their respective `Node` types.
 pub struct InsertionResult<SourceN = Node, TargetN = Node> {
     /// The node, after insertion, that was the root of the inserted Hugr.
     ///
-    /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]
+    /// That is, the value in [`InsertionResult::node_map`] under the key that was the [`HugrView::root`]
     pub new_root: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
@@ -360,7 +360,7 @@ impl HugrMut for Hugr {
         // Update the optypes and metadata, taking them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             let optype = other.op_types.take(node);
             self.op_types.set(new_node, optype);
             let meta = other.metadata.take(node);
@@ -386,7 +386,7 @@ impl HugrMut for Hugr {
         // Update the optypes and metadata, copying them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             let nodetype = other.get_optype(other.get_node(node));
             self.op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
@@ -423,7 +423,7 @@ impl HugrMut for Hugr {
             );
         let node_map = insert_subgraph_internal(self, root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             let nodetype = other.get_optype(other.get_node(node));
             self.op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
@@ -457,7 +457,7 @@ impl HugrMut for Hugr {
         }
 
         // Copy the optypes, metadata, and hierarchy
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             for ch in self.children(node).collect::<Vec<_>>() {
                 self.set_parent(*node_map.get(&ch).unwrap(), new_node);
             }
@@ -474,7 +474,7 @@ impl HugrMut for Hugr {
 }
 
 /// Internal implementation of `insert_hugr` and `insert_view` methods for
-/// AsMut<Hugr>.
+/// `AsMut`<Hugr>.
 ///
 /// Returns the root node of the inserted hierarchy and a mapping from the nodes
 /// in the inserted graph to their new indices in `hugr`.
@@ -496,7 +496,7 @@ fn insert_hugr_internal<H: HugrView>(
     hugr.hierarchy
         .push_child(other_root, root.pg_index())
         .expect("Inserting a newly-created node into the hierarchy should never fail.");
-    for (&node, &new_node) in node_map.iter() {
+    for (&node, &new_node) in &node_map {
         other.children(other.get_node(node)).for_each(|child| {
             hugr.hierarchy
                 .push_child(node_map[&other.get_pg_index(child)], new_node)
@@ -510,7 +510,7 @@ fn insert_hugr_internal<H: HugrView>(
     (other_root.into(), node_map)
 }
 
-/// Internal implementation of the `insert_subgraph` method for AsMut<Hugr>.
+/// Internal implementation of the `insert_subgraph` method for `AsMut`<Hugr>.
 ///
 /// Returns a mapping from the nodes in the inserted graph to their new indices
 /// in `hugr`.
@@ -535,7 +535,7 @@ fn insert_subgraph_internal<N: HugrNode>(
 
     // A map for nodes that we inserted before their parent, so we couldn't
     // update the hierarchy with their new id.
-    for (&node, &new_node) in node_map.iter() {
+    for (&node, &new_node) in &node_map {
         let new_parent = other
             .get_parent(other.get_node(node))
             .and_then(|parent| node_map.get(&other.get_pg_index(parent)).copied())
@@ -553,9 +553,10 @@ fn insert_subgraph_internal<N: HugrNode>(
 pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
     // TODO: When stacking hugr wrappers, this gets called for every layer.
     // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
-    if !hugr.valid_node(node) {
-        panic!("Received an invalid node {node} while mutating a HUGR.",);
-    }
+    assert!(
+        hugr.valid_node(node),
+        "Received an invalid node {node} while mutating a HUGR.",
+    );
 }
 
 /// Panic if [`HugrView::valid_non_root`] fails.
@@ -563,9 +564,10 @@ pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) 
 pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
     // TODO: When stacking hugr wrappers, this gets called for every layer.
     // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
-    if !hugr.valid_non_root(node) {
-        panic!("Received an invalid non-root node {node} while mutating a HUGR.",);
-    }
+    assert!(
+        hugr.valid_non_root(node),
+        "Received an invalid non-root node {node} while mutating a HUGR.",
+    );
 }
 
 /// Panic if [`HugrView::valid_node`] fails.

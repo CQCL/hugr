@@ -24,18 +24,20 @@ impl WeakExtensionRegistry {
     /// Create a new weak registry from a list of extensions and their ids.
     pub fn new(extensions: impl IntoIterator<Item = (ExtensionId, Weak<Extension>)>) -> Self {
         let mut res = Self::default();
-        for (id, ext) in extensions.into_iter() {
+        for (id, ext) in extensions {
             res.register(id, ext);
         }
         res
     }
 
     /// Gets the Extension with the given name
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Weak<Extension>> {
         self.exts.get(name)
     }
 
     /// Returns `true` if the registry contains an extension with the given name.
+    #[must_use]
     pub fn contains(&self, name: &str) -> bool {
         self.exts.contains_key(name)
     }

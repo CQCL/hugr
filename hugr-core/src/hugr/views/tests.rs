@@ -170,7 +170,7 @@ fn static_targets() {
     assert_eq!(
         &h.static_targets(c.node()).unwrap().collect_vec()[..],
         &[(load.node(), 0.into())]
-    )
+    );
 }
 
 #[test]
@@ -211,5 +211,5 @@ fn test_dataflow_ports_only() {
             (not.node(), 0.into()),
             (not.node(), 1.into())
         ]
-    )
+    );
 }

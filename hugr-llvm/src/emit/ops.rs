@@ -61,8 +61,8 @@ where
         use petgraph::visit::Topo;
         let node = self.node;
         if !OpTag::DataflowParent.is_superset(node.tag()) {
-            Err(anyhow!("Not a dataflow parent"))?
-        };
+            Err(anyhow!("Not a dataflow parent"))?;
+        }
 
         let (i, o): (FatNode<Input, H>, FatNode<Output, H>) = node
             .get_io()

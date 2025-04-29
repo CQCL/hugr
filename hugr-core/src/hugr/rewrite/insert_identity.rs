@@ -24,6 +24,7 @@ pub struct IdentityInsertion {
 
 impl IdentityInsertion {
     /// Create a new [`IdentityInsertion`] specification.
+    #[must_use]
     pub fn new(post_node: Node, post_port: IncomingPort) -> Self {
         Self {
             post_node,

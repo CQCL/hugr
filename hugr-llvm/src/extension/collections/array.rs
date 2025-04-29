@@ -26,23 +26,24 @@ use crate::{
 };
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
+    /// Add a [`ArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
     /// as the implementation.
+    #[must_use]
     pub fn add_default_array_extensions(self) -> Self {
         self.add_array_extensions(DefaultArrayCodegen)
     }
 
-    /// Add a [ArrayCodegenExtension] to the given [CodegenExtsBuilder] using
-    /// [DefaultArrayCodegen] as the implementation.
+    /// Add a [`ArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using
+    /// [`DefaultArrayCodegen`] as the implementation.
     pub fn add_array_extensions(self, ccg: impl ArrayCodegen + 'a) -> Self {
         self.add_extension(ArrayCodegenExtension::from(ccg))
     }
 }
 
-/// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::array]
-/// types, [hugr_core::ops::constant::CustomConst]s, and ops.
+/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::array`]
+/// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait ArrayCodegen: Clone {
-    /// Return the llvm type of [hugr_core::std_extensions::collections::array::ARRAY_TYPENAME].
+    /// Return the llvm type of [`hugr_core::std_extensions::collections::array::ARRAY_TYPENAME`].
     fn array_type<'c>(
         &self,
         _session: &TypingSession<'c, '_>,
@@ -52,7 +53,7 @@ pub trait ArrayCodegen: Clone {
         elem_ty.array_type(size as u32)
     }
 
-    /// Emit a [hugr_core::std_extensions::collections::array::ArrayValue].
+    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayValue`].
     fn emit_array_value<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -61,7 +62,7 @@ pub trait ArrayCodegen: Clone {
         emit_array_value(self, ctx, value)
     }
 
-    /// Emit a [hugr_core::std_extensions::collections::array::ArrayOp].
+    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayOp`].
     fn emit_array_op<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -72,7 +73,7 @@ pub trait ArrayCodegen: Clone {
         emit_array_op(self, ctx, op, inputs, outputs)
     }
 
-    /// Emit a [hugr_core::std_extensions::collections::array::ArrayRepeat] op.
+    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayRepeat`] op.
     fn emit_array_repeat<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -82,7 +83,7 @@ pub trait ArrayCodegen: Clone {
         emit_repeat_op(ctx, op, func)
     }
 
-    /// Emit a [hugr_core::std_extensions::collections::array::ArrayScan] op.
+    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayScan`] op.
     ///
     /// Returns the resulting array and the final values of the accumulators.
     fn emit_array_scan<'c, H: HugrView<Node = Node>>(
@@ -97,7 +98,7 @@ pub trait ArrayCodegen: Clone {
     }
 }
 
-/// A trivial implementation of [ArrayCodegen] which passes all methods
+/// A trivial implementation of [`ArrayCodegen`] which passes all methods
 /// through to their default implementations.
 #[derive(Default, Clone)]
 pub struct DefaultArrayCodegen;
@@ -190,7 +191,7 @@ fn build_array_alloca<'c>(
     let array_ty = array.get_type();
     let array_len: IntValue<'c> = {
         let ctx = builder.get_insert_block().unwrap().get_context();
-        ctx.i32_type().const_int(array_ty.len() as u64, false)
+        ctx.i32_type().const_int(u64::from(array_ty.len()), false)
     };
     let ptr = builder.build_array_alloca(array_ty.get_element_type(), array_len, "")?;
     let array_ptr = builder
@@ -620,7 +621,7 @@ fn emit_pop_op<'c>(
     Ok(ret_ty.build_tag(builder, 1, vec![elem_v, array_v])?.into())
 }
 
-/// Emits an [ArrayRepeat] op.
+/// Emits an [`ArrayRepeat`] op.
 pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     op: ArrayRepeat,
@@ -633,7 +634,7 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
         let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|_| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
+            .map_err(|()| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
         let v = builder
             .build_call(func_ptr, &[], "")?
             .try_as_basic_value()
@@ -649,7 +650,7 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     Ok(array_v)
 }
 
-/// Emits an [ArrayScan] op.
+/// Emits an [`ArrayScan`] op.
 ///
 /// Returns the resulting array and the final values of the accumulators.
 pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
@@ -678,11 +679,11 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
         let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|_| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
+            .map_err(|()| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
         let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ptr, &[idx], "")? };
         let src_elem = builder.build_load(src_elem_addr, "")?;
         let mut args = vec![src_elem.into()];
-        for ptr in acc_ptrs.iter() {
+        for ptr in &acc_ptrs {
             args.push(builder.build_load(*ptr, "")?.into());
         }
         let call = builder.build_call(func_ptr, args.as_slice(), "")?;

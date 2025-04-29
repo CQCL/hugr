@@ -30,7 +30,7 @@ pub struct CustomType {
     ///
     /// [`TypeParam`]: super::type_param::TypeParam
     args: Vec<TypeArg>,
-    /// The [TypeBound] describing what can be done to instances of this type
+    /// The [`TypeBound`] describing what can be done to instances of this type
     bound: TypeBound,
 }
 
@@ -73,6 +73,7 @@ impl CustomType {
     }
 
     /// Returns the bound of this [`CustomType`].
+    #[must_use]
     pub const fn bound(&self) -> TypeBound {
         self.bound
     }
@@ -126,11 +127,13 @@ impl CustomType {
     }
 
     /// unique name of the type.
+    #[must_use]
     pub fn name(&self) -> &TypeName {
         &self.id
     }
 
     /// Type arguments.
+    #[must_use]
     pub fn args(&self) -> &[TypeArg] {
         &self.args
     }
@@ -141,11 +144,13 @@ impl CustomType {
     }
 
     /// Parent extension.
+    #[must_use]
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
 
     /// Returns a weak reference to the extension defining this type.
+    #[must_use]
     pub fn extension_ref(&self) -> Weak<Extension> {
         self.extension_ref.clone()
     }

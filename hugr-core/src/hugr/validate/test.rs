@@ -50,7 +50,7 @@ fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     (b, def)
 }
 
-/// Adds an input{bool_t()}, copy{bool_t() -> bool_t()^copies}, and output{bool_t()^copies} operation to a dataflow container.
+/// Adds an `input{bool_t()`}, `copy{bool_t()` -> `bool_t()^copies`}, and `output{bool_t()^copies`} operation to a dataflow container.
 ///
 /// Returns the node indices of each of the operations.
 fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
@@ -361,7 +361,7 @@ fn invalid_types() {
         ext.add_type(
             "MyContainer".into(),
             vec![TypeBound::Copyable.into()],
-            "".into(),
+            String::new(),
             TypeDefBound::any(),
             extension_ref,
         )
@@ -494,7 +494,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Test that nested FuncDefns cannot use Type Variables declared by enclosing FuncDefns
+/// Test that nested `FuncDefns` cannot use Type Variables declared by enclosing `FuncDefns`
 #[test]
 fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     const OUTER_BOUND: TypeBound = TypeBound::Any;
@@ -584,7 +584,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
             [rowp.clone(), rowp.clone()],
             FuncValueType::new(vec![evaled_fn, inputs], outputs),
         );
-        ext.add_op("eval".into(), "".into(), pf, extension_ref)
+        ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
 
         let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
@@ -598,7 +598,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
                 Type::new_function(FuncValueType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
             ),
         );
-        ext.add_op("parallel".into(), "".into(), pf, extension_ref)
+        ext.add_op("parallel".into(), String::new(), pf, extension_ref)
             .unwrap();
     })
 }
@@ -685,7 +685,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         // Note the extension-delta of the eval node includes that of the input function.
         ext.add_op(
             "eval".into(),
-            "".into(),
+            String::new(),
             PolyFuncTypeRV::new(
                 params.clone(),
                 Signature::new(
@@ -1029,7 +1029,7 @@ mod extension_tests {
         let root = cfg.hugr().root();
         let res = cfg.finish_hugr();
         if success {
-            assert!(res.is_ok())
+            assert!(res.is_ok());
         } else {
             assert_eq!(
                 res,
@@ -1134,7 +1134,7 @@ mod extension_tests {
             if res.is_err() {
                 dbg!(&res);
             }
-            assert!(res.is_ok())
+            assert!(res.is_ok());
         } else {
             assert_eq!(
                 res,

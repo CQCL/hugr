@@ -53,7 +53,7 @@ impl MakeOpDef for FloatOps {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -61,7 +61,10 @@ impl MakeOpDef for FloatOps {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        use FloatOps::*;
+        use FloatOps::{
+            fabs, fadd, fceil, fdiv, feq, ffloor, fge, fgt, fle, flt, fmax, fmin, fmul, fne, fneg,
+            fpow, fround, fsub, ftostring,
+        };
 
         match self {
             feq | fne | flt | fgt | fle | fge => {
@@ -77,7 +80,10 @@ impl MakeOpDef for FloatOps {
     }
 
     fn description(&self) -> String {
-        use FloatOps::*;
+        use FloatOps::{
+            fabs, fadd, fceil, fdiv, feq, ffloor, fge, fgt, fle, flt, fmax, fmin, fmul, fne, fneg,
+            fpow, fround, fsub, ftostring,
+        };
         match self {
             feq => "equality test",
             fne => "inequality test",
@@ -103,7 +109,7 @@ impl MakeOpDef for FloatOps {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
@@ -119,7 +125,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for FloatOps {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -180,9 +186,7 @@ mod test {
 
             assert!(
                 res_val.abs_diff_eq(expected, f64::EPSILON),
-                "expected {:?}, got {:?}",
-                expected,
-                res_val
+                "expected {expected:?}, got {res_val:?}"
             );
         }
     }

@@ -8,7 +8,7 @@ use crate::types::EdgeKind;
 
 use petgraph::visit as pv;
 
-/// Wrapper for a HugrView that implements petgraph's traits.
+/// Wrapper for a `HugrView` that implements petgraph's traits.
 ///
 /// It can be used to apply petgraph's algorithms to a Hugr.
 #[derive(Debug)]
@@ -182,7 +182,7 @@ where
     }
 }
 
-/// Reference to a Hugr node and its associated OpType.
+/// Reference to a Hugr node and its associated `OpType`.
 #[derive(Debug, Clone, Copy)]
 pub struct HugrNodeRef<'a, N> {
     node: N,

@@ -70,13 +70,13 @@ fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
 
 /// Check that a hugr just loads and returns a single expected constant.
 pub fn assert_fully_folded(h: &impl HugrView, expected_value: &Value) {
-    assert_fully_folded_with(h, |v| v == expected_value)
+    assert_fully_folded_with(h, |v| v == expected_value);
 }
 
 /// Check that a hugr just loads and returns a single constant, and validate
 /// that constant using `check_value`.
 ///
-/// [CustomConst::equals_const] is not required to be implemented. Use this
+/// [`CustomConst::equals_const`] is not required to be implemented. Use this
 /// function for Values containing such a `CustomConst`.
 fn assert_fully_folded_with(h: &impl HugrView, check_value: impl Fn(&Value) -> bool) {
     let mut node_count = 0;
@@ -140,7 +140,7 @@ fn test_big() {
        let x = (5.6, 3.2);
        int(x.0 - x.1) == 2
     */
-    let sum_type = sum_with_error(INT_TYPES[5].to_owned());
+    let sum_type = sum_with_error(INT_TYPES[5].clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
 
     let tup = build.add_load_const(Value::tuple([f2c(5.6), f2c(3.2)]));
@@ -286,7 +286,7 @@ fn orphan_output() {
     h.connect(new_not, 0, or_node, 1);
     h.remove_node(orig_not.node());
     constant_fold_pass(&mut h);
-    assert_fully_folded(&h, &Value::true_val())
+    assert_fully_folded(&h, &Value::true_val());
 }
 
 #[test]
@@ -411,7 +411,7 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     //   variant.
 
     use hugr_core::extension::prelude::const_ok;
-    let elem_type = INT_TYPES[to_log_width as usize].to_owned();
+    let elem_type = INT_TYPES[to_log_width as usize].clone();
     let sum_type = sum_with_error(elem_type.clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(mk_const(from_log_width, val).unwrap().into());
@@ -900,7 +900,7 @@ fn test_fold_idiv_checked_u() {
     // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := idiv_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].to_owned());
+    let sum_type = sum_with_error(INT_TYPES[5].clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -913,7 +913,7 @@ fn test_fold_idiv_checked_u() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].to_owned());
+    .as_either(INT_TYPES[5].clone());
     assert_fully_folded(&h, &expected);
 }
 
@@ -941,7 +941,7 @@ fn test_fold_imod_checked_u() {
     // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].to_owned());
+    let sum_type = sum_with_error(INT_TYPES[5].clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -954,7 +954,7 @@ fn test_fold_imod_checked_u() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].to_owned());
+    .as_either(INT_TYPES[5].clone());
     assert_fully_folded(&h, &expected);
 }
 
@@ -982,7 +982,7 @@ fn test_fold_idiv_checked_s() {
     // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := idiv_checked_s(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].to_owned());
+    let sum_type = sum_with_error(INT_TYPES[5].clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -995,7 +995,7 @@ fn test_fold_idiv_checked_s() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].to_owned());
+    .as_either(INT_TYPES[5].clone());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1023,7 +1023,7 @@ fn test_fold_imod_checked_s() {
     // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].to_owned());
+    let sum_type = sum_with_error(INT_TYPES[5].clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -1036,7 +1036,7 @@ fn test_fold_imod_checked_s() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].to_owned());
+    .as_either(INT_TYPES[5].clone());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1329,7 +1329,7 @@ fn test_via_part_unknown_tuple() {
         let removed = expected_op_tags.remove(&t.tag().to_string());
         assert!(removed);
         if let Some(c) = t.as_const() {
-            assert_eq!(c.value, ConstInt::new_u(3, 9).unwrap().into())
+            assert_eq!(c.value, ConstInt::new_u(3, 9).unwrap().into());
         }
     }
     assert!(expected_op_tags.is_empty());
@@ -1374,7 +1374,7 @@ fn test_tail_loop_unknown() {
     for n in h.nodes() {
         if let Some(p) = h.get_parent(n) {
             if p == h.root() {
-                dfg_nodes.push(n)
+                dfg_nodes.push(n);
             } else {
                 assert_eq!(p, tl);
                 loop_nodes.push(n);
@@ -1434,7 +1434,7 @@ fn test_tail_loop_unknown() {
             assert_eq!(target, tl);
         } else {
             assert_eq!(cst.value(), &ConstInt::new_u(3, 10).unwrap().into());
-            assert_eq!(target, root_out)
+            assert_eq!(target, root_out);
         }
     }
     assert!(cst5.is_none()); // Found in loop
@@ -1549,7 +1549,7 @@ fn test_cfg(
                 HashSet::from(["Input", "Output", "Leaf", "Const", "LoadConst"]);
             for ch in hugr.children(blk) {
                 let tag = format!("{:?}", hugr.get_optype(ch).tag());
-                assert!(expected_tags.remove(tag.as_str()), "Not found: {}", tag);
+                assert!(expected_tags.remove(tag.as_str()), "Not found: {tag}");
                 if let Some(cst) = hugr.get_optype(ch).as_const() {
                     assert_eq!(
                         cst.value(),
@@ -1567,7 +1567,7 @@ fn test_cfg(
         .ok()
         .unwrap();
     if let Some(res_int) = fold_res {
-        let res_v = ConstInt::new_u(4, res_int as _).unwrap().into();
+        let res_v = ConstInt::new_u(4, res_int.into()).unwrap().into();
         assert!(hugr.get_optype(output_src).is_load_constant());
         let output_cst = hugr
             .input_neighbours(output_src)

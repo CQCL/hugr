@@ -105,7 +105,7 @@ impl MakeOpDef for IntOpDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -113,7 +113,13 @@ impl MakeOpDef for IntOpDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        use IntOpDef::*;
+        use IntOpDef::{
+            iabs, iadd, iand, idiv_checked_s, idiv_checked_u, idiv_s, idiv_u, idivmod_checked_s,
+            idivmod_checked_u, idivmod_s, idivmod_u, ieq, ige_s, ige_u, igt_s, igt_u, ile_s, ile_u,
+            ilt_s, ilt_u, imax_s, imax_u, imin_s, imin_u, imod_checked_s, imod_checked_u, imod_s,
+            imod_u, imul, inarrow_s, inarrow_u, ine, ineg, inot, ior, ipow, irotl, irotr, is_to_u,
+            ishl, ishr, isub, iu_to_s, iwiden_s, iwiden_u, ixor,
+        };
         let tv0 = int_tv(0);
         match self {
             iwiden_s | iwiden_u => CustomValidator::new(
@@ -160,7 +166,13 @@ impl MakeOpDef for IntOpDef {
     }
 
     fn description(&self) -> String {
-        use IntOpDef::*;
+        use IntOpDef::{
+            iabs, iadd, iand, idiv_checked_s, idiv_checked_u, idiv_s, idiv_u, idivmod_checked_s,
+            idivmod_checked_u, idivmod_s, idivmod_u, ieq, ige_s, ige_u, igt_s, igt_u, ile_s, ile_u,
+            ilt_s, ilt_u, imax_s, imax_u, imin_s, imin_u, imod_checked_s, imod_checked_u, imod_s,
+            imod_u, imul, inarrow_s, inarrow_u, ine, ineg, inot, ior, ipow, irotl, irotr, is_to_u,
+            ishl, ishr, isub, iu_to_s, iwiden_s, iwiden_u, ixor,
+        };
 
         match self {
             iwiden_u => "widen an unsigned integer to a wider one with the same value",
@@ -221,7 +233,7 @@ impl MakeOpDef for IntOpDef {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
@@ -285,9 +297,9 @@ pub struct ConcreteIntOp {
     pub def: IntOpDef,
     /// The width parameters of the int op. These are interpreted differently,
     /// depending on `def`. The types of inputs and outputs of the op will have
-    /// [int_type]s of these widths.
+    /// [`int_type`]s of these widths.
     ///
-    /// [int_type]: crate::std_extensions::arithmetic::int_types::int_type
+    /// [`int_type`]: crate::std_extensions::arithmetic::int_types::int_type
     pub log_widths: Vec<u8>,
 }
 
@@ -303,13 +315,16 @@ impl MakeExtensionOp for ConcreteIntOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        self.log_widths.iter().map(|&n| (n as u64).into()).collect()
+        self.log_widths
+            .iter()
+            .map(|&n| u64::from(n).into())
+            .collect()
     }
 }
 
 impl MakeRegisteredOp for ConcreteIntOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -318,24 +333,27 @@ impl MakeRegisteredOp for ConcreteIntOp {
 }
 
 impl IntOpDef {
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires no
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires no
     /// integer widths set.
+    #[must_use]
     pub fn without_log_width(self) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
             log_widths: vec![],
         }
     }
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires one
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires one
     /// integer width set.
+    #[must_use]
     pub fn with_log_width(self, log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
             log_widths: vec![log_width],
         }
     }
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires two
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires two
     /// integer widths set.
+    #[must_use]
     pub fn with_two_log_widths(self, first_log_width: u8, second_log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
@@ -435,9 +453,9 @@ mod test {
     #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
     #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
     #[should_panic(expected = "too large to be converted to signed")]
-    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u32::MAX as u64], &[], 5)]
+    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u64::from(u32::MAX)], &[], 5)]
     #[should_panic(expected = "Cannot convert negative integer")]
-    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[(0u32.wrapping_sub(42)) as u64], &[], 5)]
+    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[u64::from(0u32.wrapping_sub(42))], &[], 5)]
     fn int_fold(
         #[case] op: ConcreteIntOp,
         #[case] inputs: &[u64],

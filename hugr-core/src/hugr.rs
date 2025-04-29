@@ -114,24 +114,24 @@ impl Hugr {
     }
 
     /// Infers an extension-delta for any non-function container node
-    /// whose current [extension_delta] contains [TO_BE_INFERRED]. The inferred delta
+    /// whose current [`extension_delta`] contains [`TO_BE_INFERRED`]. The inferred delta
     /// will be the smallest delta compatible with its children and that includes any
-    /// other [ExtensionId]s in the current delta.
+    /// other [`ExtensionId`]s in the current delta.
     ///
-    /// If `remove` is true, for such container nodes *without* [TO_BE_INFERRED],
-    /// ExtensionIds are removed from the delta if they are *not* used by any child node.
+    /// If `remove` is true, for such container nodes *without* [`TO_BE_INFERRED`],
+    /// `ExtensionIds` are removed from the delta if they are *not* used by any child node.
     ///
     /// The non-function container nodes are:
-    /// [Case], [CFG], [Conditional], [DataflowBlock], [DFG], [TailLoop]
+    /// [`Case`], [`CFG`], [`Conditional`], [`DataflowBlock`], [`DFG`], [`TailLoop`]
     ///
-    /// [Case]: crate::ops::Case
-    /// [CFG]: crate::ops::CFG
-    /// [Conditional]: crate::ops::Conditional
-    /// [DataflowBlock]: crate::ops::DataflowBlock
-    /// [DFG]: crate::ops::DFG
-    /// [TailLoop]: crate::ops::TailLoop
-    /// [extension_delta]: crate::ops::OpType::extension_delta
-    /// [ExtensionId]: crate::extension::ExtensionId
+    /// [`Case`]: crate::ops::Case
+    /// [`CFG`]: crate::ops::CFG
+    /// [`Conditional`]: crate::ops::Conditional
+    /// [`DataflowBlock`]: crate::ops::DataflowBlock
+    /// [`DFG`]: crate::ops::DFG
+    /// [`TailLoop`]: crate::ops::TailLoop
+    /// [`extension_delta`]: crate::ops::OpType::extension_delta
+    /// [`ExtensionId`]: crate::extension::ExtensionId
     pub fn infer_extensions(&mut self, remove: bool) -> Result<(), ExtensionError> {
         fn delta_mut(optype: &mut OpType) -> Option<&mut ExtensionSet> {
             match optype {
@@ -372,7 +372,7 @@ pub struct ExtensionError {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
-    /// The node was not of the required [OpTag]
+    /// The node was not of the required [`OpTag`]
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
@@ -432,7 +432,7 @@ mod test {
                 |ext, extension_ref| {
                     ext.add_op(
                         OpName::new_inline("Lift"),
-                        "".into(),
+                        String::new(),
                         PolyFuncTypeRV::new(
                             vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
                             FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))

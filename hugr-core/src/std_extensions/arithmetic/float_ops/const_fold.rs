@@ -9,11 +9,14 @@ use crate::{
 use super::FloatOps;
 
 pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
-    use FloatOps::*;
+    use FloatOps::{
+        fabs, fadd, fceil, fdiv, feq, ffloor, fge, fgt, fle, flt, fmax, fmin, fmul, fne, fneg,
+        fpow, fround, fsub, ftostring,
+    };
 
     match op {
         fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
-            def.set_constant_folder(BinaryFold::from_op(op))
+            def.set_constant_folder(BinaryFold::from_op(op));
         }
         feq | fne | flt | fgt | fle | fge => def.set_constant_folder(CmpFold::from_op(*op)),
         fneg | fabs | ffloor | fceil | fround => def.set_constant_folder(UnaryFold::from_op(op)),
@@ -37,7 +40,7 @@ fn get_floats<const N: usize>(consts: &[(IncomingPort, ops::Value)]) -> Option<[
 struct BinaryFold(Box<dyn Fn(f64, f64) -> f64 + Send + Sync>);
 impl BinaryFold {
     fn from_op(op: &FloatOps) -> Self {
-        use FloatOps::*;
+        use FloatOps::{fadd, fdiv, fmax, fmin, fmul, fpow, fsub};
         Self(Box::new(match op {
             fmax => f64::max,
             fmin => f64::min,
@@ -70,7 +73,7 @@ impl ConstFold for BinaryFold {
 struct CmpFold(Box<dyn Fn(f64, f64) -> bool + Send + Sync>);
 impl CmpFold {
     fn from_op(op: FloatOps) -> Self {
-        use FloatOps::*;
+        use FloatOps::{feq, fge, fgt, fle, flt, fne};
         Self(Box::new(move |x, y| {
             (match op {
                 feq => f64::eq,
@@ -103,7 +106,7 @@ impl ConstFold for CmpFold {
 struct UnaryFold(Box<dyn Fn(f64) -> f64 + Send + Sync>);
 impl UnaryFold {
     fn from_op(op: &FloatOps) -> Self {
-        use FloatOps::*;
+        use FloatOps::{fabs, fceil, ffloor, fneg, fround};
         Self(Box::new(match op {
             fneg => std::ops::Neg::neg,
             fabs => f64::abs,

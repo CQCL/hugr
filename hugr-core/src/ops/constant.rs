@@ -37,11 +37,13 @@ pub struct Const {
 
 impl Const {
     /// Create a new [`Const`] operation.
+    #[must_use]
     pub fn new(value: Value) -> Self {
         Self { value }
     }
 
     /// The inner value of the [`Const`]
+    #[must_use]
     pub fn value(&self) -> &Value {
         &self.value
     }
@@ -49,10 +51,10 @@ impl Const {
     delegate! {
         to self.value {
             /// Returns the type of this constant.
-            pub fn get_type(&self) -> Type;
+            #[must_use] pub fn get_type(&self) -> Type;
             /// For a Const holding a CustomConst, extract the CustomConst by
             /// downcasting.
-            pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T>;
+            #[must_use] pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T>;
 
             /// Check the value.
             pub fn validate(&self) -> Result<(), ConstTypeError>;
@@ -77,7 +79,7 @@ impl StaticTag for Const {
 }
 
 impl OpTrait for Const {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Constant value"
     }
 
@@ -136,6 +138,7 @@ pub struct Sum {
 
 impl Sum {
     /// If value is a sum with a single row variant, return the row.
+    #[must_use]
     pub fn as_tuple(&self) -> Option<&[Value]> {
         // For valid instances, the type row will not have any row variables.
         self.sum_type.as_tuple().map(|_| self.values.as_ref())
@@ -202,7 +205,7 @@ impl From<Sum> for SerialSum {
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
 pub enum Value {
-    /// An extension constant value, that can check it is of a given [CustomType].
+    /// An extension constant value, that can check it is of a given [`CustomType`].
     Extension {
         #[serde(flatten)]
         /// The custom constant value.
@@ -282,6 +285,7 @@ impl OpaqueValue {
     }
 
     /// Returns a reference to the internal [`CustomConst`].
+    #[must_use]
     pub fn value(&self) -> &dyn CustomConst {
         self.v.as_ref()
     }
@@ -294,11 +298,11 @@ impl OpaqueValue {
     delegate! {
         to self.value() {
             /// Returns the type of the internal [`CustomConst`].
-            pub fn get_type(&self) -> Type;
+            #[must_use] pub fn get_type(&self) -> Type;
             /// An identifier of the internal [`CustomConst`].
-            pub fn name(&self) -> ValueName;
+            #[must_use] pub fn name(&self) -> ValueName;
             /// The extension(s) defining the internal [`CustomConst`].
-            pub fn extension_reqs(&self) -> ExtensionSet;
+            #[must_use] pub fn extension_reqs(&self) -> ExtensionSet;
         }
     }
 }
@@ -378,6 +382,7 @@ fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
 
 impl Value {
     /// Returns the type of this [`Value`].
+    #[must_use]
     pub fn get_type(&self) -> Type {
         match self {
             Self::Extension { e } => e.get_type(),
@@ -428,6 +433,7 @@ impl Value {
     }
 
     /// Returns a constant unit type (empty Tuple).
+    #[must_use]
     pub const fn unit() -> Self {
         Self::Sum(Sum {
             tag: 0,
@@ -442,16 +448,19 @@ impl Value {
     }
 
     /// Returns a constant Sum over units, with only one variant.
+    #[must_use]
     pub fn unary_unit_sum() -> Self {
         Self::unit_sum(0, 1).expect("0 < 1")
     }
 
     /// Returns a constant "true" value, i.e. the second variant of Sum((), ()).
+    #[must_use]
     pub fn true_val() -> Self {
         Self::unit_sum(1, 2).expect("1 < 2")
     }
 
     /// Returns a constant "false" value, i.e. the first variant of Sum((), ()).
+    #[must_use]
     pub fn false_val() -> Self {
         Self::unit_sum(0, 2).expect("0 < 2")
     }
@@ -460,7 +469,7 @@ impl Value {
     /// first being empty and the second being the values.
     pub fn some<V: Into<Value>>(values: impl IntoIterator<Item = V>) -> Self {
         let values: Vec<Value> = values.into_iter().map(Into::into).collect_vec();
-        let value_types: Vec<Type> = values.iter().map(|v| v.get_type()).collect_vec();
+        let value_types: Vec<Type> = values.iter().map(Value::get_type).collect_vec();
         let sum_type = SumType::new_option(value_types);
         Self::sum(1, values, sum_type).unwrap()
     }
@@ -474,6 +483,7 @@ impl Value {
     /// Returns a constant `bool` value.
     ///
     /// see [`Value::true_val`] and [`Value::false_val`].
+    #[must_use]
     pub fn from_bool(b: bool) -> Self {
         if b {
             Self::true_val()
@@ -482,14 +492,15 @@ impl Value {
         }
     }
 
-    /// Returns a [Value::Extension] holding `custom_const`.
+    /// Returns a [`Value::Extension`] holding `custom_const`.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
             e: OpaqueValue::new(custom_const),
         }
     }
 
-    /// For a [Value] holding a [CustomConst], extract the CustomConst by downcasting.
+    /// For a [Value] holding a [`CustomConst`], extract the `CustomConst` by downcasting.
+    #[must_use]
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
         if let Self::Extension { e } = self {
             e.v.downcast_ref()
@@ -505,7 +516,7 @@ impl Value {
                 let Ok(t) = mono_fn_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
-                format!("const:function:[{}]", t)
+                format!("const:function:[{t}]")
             }
             Self::Sum(Sum {
                 tag,
@@ -524,12 +535,13 @@ impl Value {
     }
 
     /// The extensions required by a [`Value`]
+    #[must_use]
     pub fn extension_reqs(&self) -> ExtensionSet {
         match self {
             Self::Extension { e } => e.extension_reqs().clone(),
             Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
             Self::Sum(Sum { values, .. }) => {
-                ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
+                ExtensionSet::union_over(values.iter().map(Value::extension_reqs))
             }
         }
     }
@@ -554,6 +566,7 @@ impl Value {
     }
 
     /// If value is a sum with a single row variant, return the row.
+    #[must_use]
     pub fn as_tuple(&self) -> Option<&[Value]> {
         if let Self::Sum(sum) = self {
             sum.as_tuple()
@@ -562,9 +575,9 @@ impl Value {
         }
     }
 
-    /// Hashes this value, if possible. [Value::Extension]s are hashable according
-    /// to their implementation of [TryHash]; [Value::Function]s never are;
-    /// [Value::Sum]s are if their contents are.
+    /// Hashes this value, if possible. [`Value::Extension`]s are hashable according
+    /// to their implementation of [`TryHash`]; [`Value::Function`]s never are;
+    /// [`Value::Sum`]s are if their contents are.
     pub fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
         match self {
             Value::Extension { e } => e.value().try_hash(&mut *st),
@@ -747,7 +760,7 @@ pub(crate) mod test {
         let correct_type = Type::new_function(Signature::new_endo(vec![bool_t()]));
 
         assert_eq!(v.get_type(), correct_type);
-        assert!(v.name().starts_with("const:function:"))
+        assert!(v.name().starts_with("const:function:"));
     }
 
     #[fixture]

@@ -21,6 +21,7 @@ pub struct Tag {
 
 impl Tag {
     /// Create a new Tag operation.
+    #[must_use]
     pub fn new(tag: usize, variants: Vec<TypeRow>) -> Self {
         Self { tag, variants }
     }
@@ -32,7 +33,7 @@ impl DataflowOpTrait for Tag {
     const TAG: OpTag = OpTag::Leaf;
 
     /// A human-readable description of the operation.
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Tag Sum operation"
     }
 

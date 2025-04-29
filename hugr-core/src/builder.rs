@@ -5,17 +5,17 @@
 //! Depending on the type of HUGR you want to build, you may want to use one of
 //! the following builders:
 //!
-//! - [ModuleBuilder]: For building a module with function declarations and
+//! - [`ModuleBuilder`]: For building a module with function declarations and
 //!   definitions.
-//! - [DFGBuilder]: For building a dataflow graph.
-//! - [FunctionBuilder]: A `DFGBuilder` specialised in defining functions with a
+//! - [`DFGBuilder`]: For building a dataflow graph.
+//! - [`FunctionBuilder`]: A `DFGBuilder` specialised in defining functions with a
 //!   dataflow graph.
-//! - [CFGBuilder]: For building a control flow graph.
-//! - [ConditionalBuilder]: For building a conditional node.
-//! - [TailLoopBuilder]: For building a tail-loop node.
+//! - [`CFGBuilder`]: For building a control flow graph.
+//! - [`ConditionalBuilder`]: For building a conditional node.
+//! - [`TailLoopBuilder`]: For building a tail-loop node.
 //!
-//! Additionally, the [CircuitBuilder] provides an alternative to the
-//! [DFGBuilder] when working with circuits, where some inputs of operations directly
+//! Additionally, the [`CircuitBuilder`] provides an alternative to the
+//! [`DFGBuilder`] when working with circuits, where some inputs of operations directly
 //! correspond to some outputs and operations can be directly appended using
 //! unit indices.
 //!
@@ -123,13 +123,13 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 mod circuit;
 pub use circuit::{CircuitBuildError, CircuitBuilder};
 
-/// Return a FunctionType with the same input and output types (specified)
+/// Return a `FunctionType` with the same input and output types (specified)
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
 pub fn endo_sig(types: impl Into<TypeRow>) -> Signature {
     Signature::new_endo(types).with_extension_delta(TO_BE_INFERRED)
 }
 
-/// Return a FunctionType with the specified input and output types
+/// Return a `FunctionType` with the specified input and output types
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
 pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Signature {
     Signature::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
@@ -142,8 +142,8 @@ pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
-    /// SignatureError in trying to construct a node (differs from
-    /// [ValidationError::SignatureError] in that we could not construct a node to report about)
+    /// `SignatureError` in trying to construct a node (differs from
+    /// [`ValidationError::SignatureError`] in that we could not construct a node to report about)
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// Tried to add a malformed [Const]
@@ -156,7 +156,6 @@ pub enum BuildError {
     EntryBuiltError(Node),
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node} does not have type {op_desc} as expected.")]
-    #[allow(missing_docs)]
     UnexpectedType {
         /// Index of node where error occurred.
         node: Node,
@@ -171,7 +170,7 @@ pub enum BuildError {
     #[error("Wire not found in Hugr: {0}.")]
     WireNotFound(Wire),
 
-    /// Error in CircuitBuilder
+    /// Error in `CircuitBuilder`
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit::CircuitBuildError),
 

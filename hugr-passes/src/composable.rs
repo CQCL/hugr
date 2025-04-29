@@ -8,7 +8,7 @@ use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
-/// e.g. by [ValidatingPass]
+/// e.g. by [`ValidatingPass`]
 pub trait ComposablePass: Sized {
     type Node: HugrNode;
     type Error: Error;
@@ -23,7 +23,7 @@ pub trait ComposablePass: Sized {
         ErrMapper::new(self, f)
     }
 
-    /// Returns a [ComposablePass] that does "`self` then `other`", so long as
+    /// Returns a [`ComposablePass`] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
     fn then<P: ComposablePass<Node = Self::Node>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
@@ -111,7 +111,7 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMa
 
 // ValidatingPass ------------------------------
 
-/// Error from a [ValidatingPass]
+/// Error from a [`ValidatingPass`]
 #[derive(thiserror::Error, Debug)]
 pub enum ValidatePassError<E> {
     #[error("Failed to validate input HUGR: {err}\n{pretty_hugr}")]
@@ -154,9 +154,10 @@ impl<P: ComposablePass> ValidatingPass<P> {
         hugr: &impl HugrView,
         mk_err: impl FnOnce(ValidationError, String) -> ValidatePassError<E>,
     ) -> Result<(), ValidatePassError<E>> {
-        match self.1 {
-            false => hugr.validate_no_extensions(),
-            true => hugr.validate(),
+        if self.1 {
+            hugr.validate()
+        } else {
+            hugr.validate_no_extensions()
         }
         .map_err(|err| mk_err(err, hugr.mermaid_string()))
     }
@@ -182,7 +183,7 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
 }
 
 // IfThen ------------------------------
-/// [ComposablePass] that executes a first pass that returns a `bool`
+/// [`ComposablePass`] that executes a first pass that returns a `bool`
 /// result; and then, if-and-only-if that first result was true,
 /// executes a second pass
 pub struct IfThen<E, A, B>(A, B, PhantomData<E>);
@@ -193,7 +194,7 @@ impl<
     E: ErrorCombiner<A::Error, B::Error>,
 > IfThen<E, A, B>
 {
-    /// Make a new instance given the [ComposablePass] to run first
+    /// Make a new instance given the [`ComposablePass`] to run first
     /// and (maybe) second
     pub fn new(fst: A, opt_snd: B) -> Self {
         Self(fst, opt_snd, PhantomData)

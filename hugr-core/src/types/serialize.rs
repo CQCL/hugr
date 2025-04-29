@@ -23,10 +23,10 @@ impl<RV: MaybeRV> From<TypeBase<RV>> for SerSimpleType {
     fn from(value: TypeBase<RV>) -> Self {
         if value == qb_t() {
             return SerSimpleType::Q;
-        };
+        }
         if value == usize_t() {
             return SerSimpleType::I;
-        };
+        }
         match value.0 {
             TypeEnum::Extension(o) => SerSimpleType::Opaque(o),
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),

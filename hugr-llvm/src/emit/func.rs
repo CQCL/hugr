@@ -33,15 +33,15 @@ pub use mailbox::{RowMailBox, RowPromise};
 /// One of the primary interfaces for implementing codegen extensions.
 /// We have methods for:
 ///   * Converting from hugr [Type]s to LLVM [Type](BasicTypeEnum)s;
-///   * Maintaining [MailBox](RowMailBox) for each [Wire] in the [FuncDefn];
-///   * Accessing the [CodegenExtsMap];
+///   * Maintaining [`MailBox`](RowMailBox) for each [Wire] in the [`FuncDefn`];
+///   * Accessing the [`CodegenExtsMap`];
 ///   * Accessing an in internal [Builder].
 ///
 /// The internal [Builder] must always be positioned at the end of a
-/// [BasicBlock]. This invariant is not checked when the builder is accessed
-/// through [EmitFuncContext::builder].
+/// [`BasicBlock`]. This invariant is not checked when the builder is accessed
+/// through [`EmitFuncContext::builder`].
 ///
-/// [MailBox](RowMailBox)es are stack allocations that are `alloca`ed in the
+/// [`MailBox`](RowMailBox)es are stack allocations that are `alloca`ed in the
 /// first basic block of the function, read from to get the input values of each
 /// node, and written to with the output values of each node.
 pub struct EmitFuncContext<'c, 'a, H>
@@ -104,7 +104,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
     }
 
     /// Used when emitters encounter a scoped definition. `node` will be
-    /// returned from [EmitFuncContext::finish].
+    /// returned from [`EmitFuncContext::finish`].
     pub fn push_todo_func(&mut self, node: FatNode<'_, FuncDefn, H>) {
         self.todo.insert(node.node());
     }
@@ -139,9 +139,9 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
 
     /// Creates a new `EmitFuncContext` for `func`, taking ownership of
     /// `emit_context`. `emit_context` will be returned in
-    /// [EmitFuncContext::finish].
+    /// [`EmitFuncContext::finish`].
     ///
-    /// If `func` has any existing [BasicBlock]s we will fail.
+    /// If `func` has any existing [`BasicBlock`]s we will fail.
     ///
     /// TODO on failure return `emit_context`
     pub fn new(
@@ -179,9 +179,9 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         Ok(ValueMailBox::new(bte, ptr, Some(name.as_ref().into())))
     }
 
-    /// Create a new anonymous [RowMailBox]. This mailbox is not mapped to any
+    /// Create a new anonymous [`RowMailBox`]. This mailbox is not mapped to any
     /// [Wire]s, and so will not interact with any mailboxes returned from
-    /// [EmitFuncContext::node_ins_rmb] or [EmitFuncContext::node_outs_rmb].
+    /// [`EmitFuncContext::node_ins_rmb`] or [`EmitFuncContext::node_outs_rmb`].
     pub fn new_row_mail_box<'t>(
         &mut self,
         ts: impl IntoIterator<Item = &'t Type>,
@@ -201,8 +201,8 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         self.build_positioned(b, |x| f(&x.builder))
     }
 
-    /// Creates a new [BasicBlock] and calls `f` with the internal builder
-    /// positioned at the start of that [BasicBlock]. The builder will be
+    /// Creates a new [`BasicBlock`] and calls `f` with the internal builder
+    /// positioned at the start of that [`BasicBlock`]. The builder will be
     /// repositioned back to it's location before `f` before this function
     /// returns.
     pub fn build_positioned_new_block<T>(
@@ -231,7 +231,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         r
     }
 
-    /// Returns a [RowMailBox] mapped to the input wires of `node`. When emitting a node
+    /// Returns a [`RowMailBox`] mapped to the input wires of `node`. When emitting a node
     /// input values are from this mailbox.
     pub fn node_ins_rmb<'hugr, OT: 'hugr>(
         &mut self,
@@ -254,7 +254,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         Ok(r)
     }
 
-    /// Returns a [RowMailBox] mapped to the output wires of `node`. When emitting a node
+    /// Returns a [`RowMailBox`] mapped to the output wires of `node`. When emitting a node
     /// output values are written to this mailbox.
     pub fn node_outs_rmb<'hugr, OT: 'hugr>(
         &mut self,
@@ -312,7 +312,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
     }
 
     /// Consumes the `EmitFuncContext` and returns both the inner
-    /// [EmitModuleContext] and the scoped [FuncDefn]s that were encountered.
+    /// [`EmitModuleContext`] and the scoped [`FuncDefn`]s that were encountered.
     pub fn finish(self) -> Result<(EmitModuleContext<'c, 'a, H>, EmissionSet)> {
         self.builder.position_at_end(self.prologue_bb);
         self.builder.build_unconditional_branch(self.launch_bb)?;

@@ -200,6 +200,7 @@ pub enum ChildrenValidationError {
 
 impl ChildrenValidationError {
     /// Returns the node index of the child that caused the error.
+    #[must_use]
     pub fn child(&self) -> NodeIndex {
         match self {
             ChildrenValidationError::InternalIOChildren { child, .. } => *child,
@@ -229,6 +230,7 @@ pub enum EdgeValidationError {
 
 impl EdgeValidationError {
     /// Returns information on the edge that caused the error.
+    #[must_use]
     pub fn edge(&self) -> &ChildrenEdgeData {
         match self {
             EdgeValidationError::CFGEdgeSignatureMismatch { edge, .. } => edge,

@@ -29,7 +29,7 @@ pub enum ArrayOpDef {
     /// `new_array<SIZE><elemty>: (elemty)^SIZE -> array<SIZE, elemty>`
     /// where `SIZE` must be statically known (not a variable)
     new_array,
-    /// Copies an element out of the array ([TypeBound::Copyable] elements only):
+    /// Copies an element out of the array ([`TypeBound::Copyable`] elements only):
     /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>`
     get,
     /// Exchanges an element of the array with an external value:
@@ -96,6 +96,7 @@ impl SignatureFromArgs for ArrayOpDef {
 
 impl ArrayOpDef {
     /// Instantiate a new array operation with the given element type and array size.
+    #[must_use]
     pub fn to_concrete(self, elem_ty: Type, size: u64) -> ArrayOp {
         if self == ArrayOpDef::discard_empty {
             debug_assert_eq!(
@@ -116,7 +117,7 @@ impl ArrayOpDef {
         array_def: &TypeDef,
         _extension_ref: &Weak<Extension>,
     ) -> SignatureFunc {
-        use ArrayOpDef::*;
+        use ArrayOpDef::{discard_empty, get, new_array, pop_left, pop_right, set, swap};
         if let new_array | pop_left | pop_right = self {
             // implements SignatureFromArgs
             // signature computed dynamically, so can rely on type definition in extension.
@@ -211,8 +212,8 @@ impl MakeOpDef for ArrayOpDef {
         .into()
     }
 
-    /// Add an operation implemented as an [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as an [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the list type def while computing the signature,
     // to avoid recursive loops initializing the extension.
@@ -258,7 +259,7 @@ impl MakeExtensionOp for ArrayOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        use ArrayOpDef::*;
+        use ArrayOpDef::{discard_empty, get, new_array, pop_left, pop_right, set, swap};
         let ty_arg = TypeArg::Type {
             ty: self.elem_ty.clone(),
         };
@@ -341,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    /// Test building a HUGR involving a new_array operation.
+    /// Test building a HUGR involving a `new_array` operation.
     fn test_new_array() {
         let mut b =
             DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], array_type(2, qb_t()))).unwrap();
@@ -417,7 +418,7 @@ mod tests {
     fn test_pops() {
         let size = 2;
         let element_ty = bool_t();
-        for op in [ArrayOpDef::pop_left, ArrayOpDef::pop_right].iter() {
+        for op in &[ArrayOpDef::pop_left, ArrayOpDef::pop_right] {
             let op = op.to_concrete(element_ty.clone(), size);
 
             let optype: OpType = op.into();
