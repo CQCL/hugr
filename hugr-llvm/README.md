@@ -32,7 +32,7 @@ See [DEVELOPMENT](DEVELOPMENT.md) for instructions on setting up the development
 This project is licensed under Apache License, Version 2.0 ([LICENCE](LICENCE) or <http://www.apache.org/licenses/LICENSE-2.0>).
 
   [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-rs.yml/badge.svg?branch=main
-  [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
+  [msrv]: https://img.shields.io/crates/msrv/hugr-llvm
   [hugr]: https://lib.rs/crates/hugr
   [inkwell]: https://thedan64.github.io/inkwell/inkwell/index.html
   [llvm-sys]: https://crates.io/crates/llvm-sys
