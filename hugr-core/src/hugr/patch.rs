@@ -46,7 +46,7 @@ pub trait PatchVerification {
 ///
 /// ### When to implement
 ///
-/// For `H: HugrMut`, prefer implementing [`PatchHugrMut`] instead. This
+/// For patches that work on any `H: HugrMut`, prefer implementing [`PatchHugrMut`] instead. This
 /// will automatically implement this trait.
 pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
     /// The type returned on successful application of the rewrite.
