@@ -99,6 +99,21 @@ macro_rules! impl_base_members {
         fn extensions(&self) -> &crate::extension::ExtensionRegistry {
             self.hugr.extensions()
         }
+
+        fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
+            match self.hugr.get_parent(node) {
+                Some(parent) if parent == self.root => Some(self.root),
+                _ => None,
+            }
+        }
+
+        fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
+            if node == self.root {
+                Either::Left(self.hugr.descendants(node))
+            } else {
+                Either::Right(iter::empty())
+            }
+        }
     };
 }
 

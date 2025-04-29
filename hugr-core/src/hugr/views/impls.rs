@@ -12,6 +12,7 @@ macro_rules! hugr_internal_methods {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
                 fn portgraph(&self) -> Self::Portgraph<'_>;
+                fn region_portgraph(&self, parent: Self::Node) -> portgraph::view::FlatRegion<'_, Self::Portgraph<'_>>;
                 fn hierarchy(&self) -> &portgraph::Hierarchy;
                 fn to_portgraph_node(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
                 fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
@@ -33,7 +34,13 @@ macro_rules! hugr_view_methods {
                 fn root_optype(&self) -> &crate::ops::OpType;
                 fn contains_node(&self, node: Self::Node) -> bool;
                 fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
+                fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::hugr::NodeMetadata>;
                 fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
+                fn num_nodes(&self) -> usize;
+                fn num_edges(&self) -> usize;
+                fn num_ports(&self, node: Self::Node, dir: crate::Direction) -> usize;
+                fn num_inputs(&self, node: Self::Node) -> usize;
+                fn num_outputs(&self, node: Self::Node) -> usize;
                 fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
                 fn node_ports(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = crate::Port> + Clone;
                 fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = crate::OutgoingPort> + Clone;
@@ -41,12 +48,21 @@ macro_rules! hugr_view_methods {
                 fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = crate::Port> + Clone;
                 fn linked_ports(&self, node: Self::Node, port: impl Into<crate::Port>) -> impl Iterator<Item = (Self::Node, crate::Port)> + Clone;
                 fn all_linked_ports(&self, node: Self::Node, dir: crate::Direction) -> itertools::Either<impl Iterator<Item = (Self::Node, crate::OutgoingPort)>, impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
+                fn all_linked_outputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
+                fn all_linked_inputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
+                fn single_linked_port(&self, node: Self::Node, port: impl Into<crate::Port>) -> Option<(Self::Node, crate::Port)>;
+                fn single_linked_output(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> Option<(Self::Node, crate::OutgoingPort)>;
+                fn single_linked_input(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> Option<(Self::Node, crate::IncomingPort)>;
+                fn linked_outputs(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
+                fn linked_inputs(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
                 fn node_connections(&self, node: Self::Node, other: Self::Node) -> impl Iterator<Item = [crate::Port; 2]> + Clone;
                 fn is_linked(&self, node: Self::Node, port: impl Into<crate::Port>) -> bool;
-                fn num_ports(&self, node: Self::Node, dir: crate::Direction) -> usize;
-                fn num_inputs(&self, node: Self::Node) -> usize;
-                fn num_outputs(&self, node: Self::Node) -> usize;
+                fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
+                fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
                 fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
+                fn input_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                fn output_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn mermaid_string(&self) -> String;
                 fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig) -> String;
@@ -90,6 +106,9 @@ macro_rules! hugr_mut_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
+                fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::hugr::NodeMetadata;
+                fn set_metadata(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::hugr::NodeMetadata>);
+                fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
                 fn add_node_with_parent(&mut self, parent: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_before(&mut self, sibling: Self::Node, nodetype: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_after(&mut self, sibling: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
@@ -102,6 +121,8 @@ macro_rules! hugr_mut_methods {
                 fn insert_hugr(&mut self, root: Self::Node, other: crate::Hugr) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
                 fn insert_from_view<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other) -> crate::hugr::hugrmut::InsertionResult<Other::Node, Self::Node>;
                 fn insert_subgraph<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, subgraph: &crate::hugr::views::SiblingSubgraph<Other::Node>) -> std::collections::HashMap<Other::Node, Self::Node>;
+                fn use_extension(&mut self, extension: impl Into<std::sync::Arc<crate::extension::Extension>>);
+                fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>) where crate::extension::ExtensionRegistry: Extend<Reg>;
             }
         }
     };

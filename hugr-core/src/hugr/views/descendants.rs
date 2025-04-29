@@ -144,7 +144,9 @@ impl<Root: NodeHandle> HugrView for DescendantsGraph<'_, Root> {
 
     delegate::delegate! {
         to (&self.hugr) {
+            fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
             fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
+            fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
             fn extensions(&self) -> &crate::extension::ExtensionRegistry;
         }
     }

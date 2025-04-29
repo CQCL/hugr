@@ -51,15 +51,7 @@ pub trait HugrView: HugrInternals {
     fn contains_node(&self, node: Self::Node) -> bool;
 
     /// Returns the parent of a node.
-    #[inline]
-    fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
-        if !check_valid_non_root(self, node) {
-            return None;
-        };
-        self.hierarchy()
-            .parent(self.to_portgraph_node(node))
-            .map(|index| self.from_portgraph_node(index))
-    }
+    fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
 
     /// Returns the metadata associated with a node.
     #[inline]
@@ -78,15 +70,26 @@ pub trait HugrView: HugrInternals {
     fn get_optype(&self, node: Self::Node) -> &OpType;
 
     /// Returns the number of nodes in the HUGR.
-    #[inline]
-    fn num_nodes(&self) -> usize {
-        self.portgraph().node_count()
-    }
+    fn num_nodes(&self) -> usize;
 
     /// Returns the number of edges in the HUGR.
+    fn num_edges(&self) -> usize;
+
+    /// Number of ports in node for a given direction.
+    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize;
+
+    /// Number of inputs to a node.
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Incoming)`.
     #[inline]
-    fn num_edges(&self) -> usize {
-        self.portgraph().link_count()
+    fn num_inputs(&self, node: Self::Node) -> usize {
+        self.num_ports(node, Direction::Incoming)
+    }
+
+    /// Number of outputs from a node.
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Outgoing)`.
+    #[inline]
+    fn num_outputs(&self, node: Self::Node) -> usize {
+        self.num_ports(node, Direction::Outgoing)
     }
 
     /// Iterates over the all the nodes in the HUGR.
@@ -237,45 +240,14 @@ pub trait HugrView: HugrInternals {
         self.linked_ports(node, port).next().is_some()
     }
 
-    /// Number of ports in node for a given direction.
-    #[inline]
-    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize {
-        self.portgraph()
-            .num_ports(self.to_portgraph_node(node), dir)
-    }
-
-    /// Number of inputs to a node.
-    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Incoming)`.
-    #[inline]
-    fn num_inputs(&self, node: Self::Node) -> usize {
-        self.num_ports(node, Direction::Incoming)
-    }
-
-    /// Number of outputs from a node.
-    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Outgoing)`.
-    #[inline]
-    fn num_outputs(&self, node: Self::Node) -> usize {
-        self.num_ports(node, Direction::Outgoing)
-    }
-
     /// Returns an iterator over the direct children of node.
-    #[inline]
-    fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
-        self.hierarchy()
-            .children(self.to_portgraph_node(node))
-            .map(|n| self.from_portgraph_node(n))
-    }
+    fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
 
     /// Returns an iterator over all the descendants of a node,
     /// including the node itself.
     ///
     /// Yields the node itself first, followed by its children in breath-first order.
-    #[inline]
-    fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
-        self.hierarchy()
-            .descendants(self.to_portgraph_node(node))
-            .map(|n| self.from_portgraph_node(n))
-    }
+    fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Returns the first child of the specified node (if it is a parent).
     /// Useful because `x.children().next()` leaves x borrowed.
@@ -527,6 +499,21 @@ impl HugrView for Hugr {
     }
 
     #[inline]
+    fn contains_node(&self, node: Self::Node) -> bool {
+        self.graph.contains_node(node.into_portgraph())
+    }
+
+    #[inline]
+    fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
+        if !check_valid_non_root(self, node) {
+            return None;
+        };
+        self.hierarchy()
+            .parent(self.to_portgraph_node(node))
+            .map(|index| self.from_portgraph_node(index))
+    }
+
+    #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
         // TODO: This currently fails because some methods get the optype of
         // e.g. a parent outside a region view. We should be able to re-enable
@@ -536,8 +523,19 @@ impl HugrView for Hugr {
     }
 
     #[inline]
-    fn contains_node(&self, node: Self::Node) -> bool {
-        self.graph.contains_node(node.into_portgraph())
+    fn num_nodes(&self) -> usize {
+        self.portgraph().node_count()
+    }
+
+    #[inline]
+    fn num_edges(&self) -> usize {
+        self.portgraph().link_count()
+    }
+
+    #[inline]
+    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize {
+        self.portgraph()
+            .num_ports(self.to_portgraph_node(node), dir)
     }
 
     #[inline]
@@ -586,6 +584,20 @@ impl HugrView for Hugr {
             .map(|(p1, p2)| {
                 [p1, p2].map(|link| self.graph.port_offset(link.port()).unwrap().into())
             })
+    }
+
+    #[inline]
+    fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
+        self.hierarchy
+            .children(self.to_portgraph_node(node))
+            .map(|n| self.from_portgraph_node(n))
+    }
+
+    #[inline]
+    fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
+        self.hierarchy
+            .descendants(self.to_portgraph_node(node))
+            .map(|n| self.from_portgraph_node(n))
     }
 
     #[inline]

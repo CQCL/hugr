@@ -27,12 +27,7 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata {
-        panic_invalid_node(self, node);
-        self.node_metadata_map_mut(node)
-            .entry(key.as_ref())
-            .or_insert(serde_json::Value::Null)
-    }
+    fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata;
 
     /// Sets a metadata value associated with a node.
     ///
@@ -44,21 +39,14 @@ pub trait HugrMut: HugrMutInternals {
         node: Self::Node,
         key: impl AsRef<str>,
         metadata: impl Into<NodeMetadata>,
-    ) {
-        let entry = self.get_metadata_mut(node, key);
-        *entry = metadata.into();
-    }
+    );
 
     /// Remove a metadata entry associated with a node.
     ///
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>) {
-        panic_invalid_node(self, node);
-        let node_meta = self.node_metadata_map_mut(node);
-        node_meta.remove(key.as_ref());
-    }
+    fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
 
     /// Add a node to the graph with a parent in the hierarchy.
     ///
@@ -213,9 +201,7 @@ pub trait HugrMut: HugrMutInternals {
     /// These can be queried using [`HugrView::extensions`].
     ///
     /// See [`ExtensionRegistry::register_updated`] for more information.
-    fn use_extension(&mut self, extension: impl Into<Arc<Extension>>) {
-        self.extensions_mut().register_updated(extension);
-    }
+    fn use_extension(&mut self, extension: impl Into<Arc<Extension>>);
 
     /// Extend the set of extensions used by the hugr with the extensions in the
     /// registry.
@@ -228,10 +214,7 @@ pub trait HugrMut: HugrMutInternals {
     /// See [`ExtensionRegistry::register_updated`] for more information.
     fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>)
     where
-        ExtensionRegistry: Extend<Reg>,
-    {
-        self.extensions_mut().extend(registry);
-    }
+        ExtensionRegistry: Extend<Reg>;
 }
 
 /// Records the result of inserting a Hugr or view
@@ -266,6 +249,29 @@ fn translate_indices<N: HugrNode>(
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
 impl HugrMut for Hugr {
+    fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata {
+        panic_invalid_node(self, node);
+        self.node_metadata_map_mut(node)
+            .entry(key.as_ref())
+            .or_insert(serde_json::Value::Null)
+    }
+
+    fn set_metadata(
+        &mut self,
+        node: Self::Node,
+        key: impl AsRef<str>,
+        metadata: impl Into<NodeMetadata>,
+    ) {
+        let entry = self.get_metadata_mut(node, key);
+        *entry = metadata.into();
+    }
+
+    fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>) {
+        panic_invalid_node(self, node);
+        let node_meta = self.node_metadata_map_mut(node);
+        node_meta.remove(key.as_ref());
+    }
+
     fn add_node_with_parent(&mut self, parent: Node, node: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(node.into());
         self.hierarchy
@@ -494,6 +500,19 @@ impl HugrMut for Hugr {
             self.metadata.set(new_node.into_portgraph(), meta);
         }
         node_map
+    }
+
+    #[inline]
+    fn use_extension(&mut self, extension: impl Into<Arc<Extension>>) {
+        self.extensions_mut().register_updated(extension);
+    }
+
+    #[inline]
+    fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>)
+    where
+        ExtensionRegistry: Extend<Reg>,
+    {
+        self.extensions_mut().extend(registry);
     }
 }
 
