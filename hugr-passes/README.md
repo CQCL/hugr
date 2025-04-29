@@ -51,7 +51,7 @@ This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http:
 
   [API documentation here]: https://docs.rs/hugr-passes/
   [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-rs.yml/badge.svg?branch=main
-  [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
+  [msrv]: https://img.shields.io/crates/msrv/hugr-passes
   [crates]: https://img.shields.io/crates/v/hugr-passes
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
