@@ -52,7 +52,7 @@ impl<N: HugrNode> PatchVerification for RemoveLoadConstant<N> {
 }
 
 impl<N: HugrNode> PatchHugrMut for RemoveLoadConstant<N> {
-    /// The [`crate::ops::Const`] node the [`crate::ops::LoadConstant`] was
+    /// The [`Const`](crate::ops::Const) node the [`LoadConstant`](crate::ops::LoadConstant) was
     /// connected to.
     type Outcome = N;
 
