@@ -1,6 +1,6 @@
 name: Check for breaking changes targeting main
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - "**"
     types:
@@ -15,7 +15,7 @@ on:
 jobs:
   breaking-change-to-main:
     name: Check for breaking changes targeting main
-    uses: CQCL/hugrverse-actions/.github/workflows/breaking-change-to-main.yml@luca/breakingpr
+    uses: CQCL/hugrverse-actions/.github/workflows/breaking-change-to-main.yml@luca/breakingprtmp
     secrets:
       GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
     with:
