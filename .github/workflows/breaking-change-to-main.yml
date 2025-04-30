@@ -19,4 +19,4 @@ jobs:
     secrets:
       GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
     with:
-      release_branch: release-rs-v0.16.0
+      release_branch: ${{ vars.BREAKING_RELEASE_BRANCH }}
