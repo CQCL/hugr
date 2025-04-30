@@ -47,6 +47,7 @@ fn basic_type_undef<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
         BasicTypeEnum::PointerType(t) => t.get_undef().as_basic_value_enum(),
         BasicTypeEnum::StructType(t) => t.get_undef().as_basic_value_enum(),
         BasicTypeEnum::VectorType(t) => t.get_undef().as_basic_value_enum(),
+        BasicTypeEnum::ScalableVectorType(t) => t.get_undef().as_basic_value_enum(),
     }
 }
 
@@ -60,6 +61,7 @@ fn basic_type_poison<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
         BasicTypeEnum::PointerType(t) => t.get_poison().as_basic_value_enum(),
         BasicTypeEnum::StructType(t) => t.get_poison().as_basic_value_enum(),
         BasicTypeEnum::VectorType(t) => t.get_poison().as_basic_value_enum(),
+        BasicTypeEnum::ScalableVectorType(t) => t.get_poison().as_basic_value_enum(),
     }
 }
 
