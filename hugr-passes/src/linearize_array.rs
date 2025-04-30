@@ -124,6 +124,11 @@ impl ComposablePass for LinearizeArrayPass {
 }
 
 impl LinearizeArrayPass {
+    /// Returns a new [`LinearizeArrayPass`] that handles all standard extensions.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Allows to configure how to clone and discard arrays that are nested
     /// inside opaque extension values.
     pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
