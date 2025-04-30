@@ -1,6 +1,6 @@
 name: Check for breaking changes targeting main
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - "**"
     types:
@@ -9,6 +9,8 @@ on:
       - synchronize
       - labeled
       - unlabeled
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   main:
@@ -20,6 +22,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.HUGRBOT_PAT }}
     steps:
       - name: Check for breaking change in title
+        if: github.event_name == 'pull_request_target'
         id: breaking
         run: |
           if [[ "${{ github.event.pull_request.title }}" =~ ^.*\!:.*$ ]]; then
@@ -30,6 +33,7 @@ jobs:
 
       - name: Post comment for breaking change targeting main
         if: |
+          github.event_name == 'pull_request_target' && 
           steps.breaking.outputs.breaking == 'true' && 
           github.event.pull_request.base.ref == 'main'
         uses: marocchino/sticky-pull-request-comment@v2
@@ -47,6 +51,7 @@ jobs:
 
       - name: Fail if breaking change targeting main
         if: |
+          github.event_name == 'pull_request_target' && 
           steps.breaking.outputs.breaking == 'true' && 
           github.event.pull_request.base.ref == 'main'
         run: |
