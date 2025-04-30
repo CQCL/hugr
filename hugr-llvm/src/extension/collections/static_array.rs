@@ -58,6 +58,7 @@ fn value_is_const<'c>(value: impl BasicValue<'c>) -> bool {
         BasicValueEnum::PointerValue(v) => v.is_const(),
         BasicValueEnum::StructValue(v) => v.is_const(),
         BasicValueEnum::VectorValue(v) => v.is_const(),
+        BasicValueEnum::ScalableVectorValue(v) => v.is_const(),
     }
 }
 
@@ -106,6 +107,13 @@ fn const_array<'c>(
             values
                 .into_iter()
                 .map(|x| x.as_basic_value_enum().into_vector_value())
+                .collect_vec()
+                .as_slice(),
+        ),
+        BasicTypeEnum::ScalableVectorType(t) => t.const_array(
+            values
+                .into_iter()
+                .map(|x| x.as_basic_value_enum().into_scalable_vector_value())
                 .collect_vec()
                 .as_slice(),
         ),

@@ -25,7 +25,7 @@ version will only change on major releases.
 
 ## Developing hugr-llvm
 
-See [DEVELOPMENT](DEVELOPMENT.md) for instructions on setting up the development environment.
+See [DEVELOPMENT](../DEVELOPMENT.md) for instructions on setting up the development environment.
 
 ## License
 

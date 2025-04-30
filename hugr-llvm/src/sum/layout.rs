@@ -45,6 +45,9 @@ fn size_of_type<'c>(t: impl BasicType<'c>) -> Option<u64> {
         BasicTypeEnum::PointerType(t) => t.size_of().get_zero_extended_constant(),
         BasicTypeEnum::StructType(t) => t.size_of().and_then(|x| x.get_zero_extended_constant()),
         BasicTypeEnum::VectorType(t) => t.size_of().and_then(|x| x.get_zero_extended_constant()),
+        BasicTypeEnum::ScalableVectorType(t) => {
+            t.size_of().and_then(|x| x.get_zero_extended_constant())
+        }
     }
 }
 
