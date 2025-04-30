@@ -2,7 +2,7 @@
 
 // Exports everything except the `internal` module.
 pub use hugr_core::hugr::{
-    hugrmut, rewrite, serialize, validate, views, Hugr, HugrError, HugrView, IdentList,
-    InvalidIdentifier, LoadHugrError, NodeMetadata, NodeMetadataMap, OpType, Rewrite, RootTagged,
+    hugrmut, patch, serialize, validate, views, Hugr, HugrError, HugrView, IdentList,
+    InvalidIdentifier, LoadHugrError, NodeMetadata, NodeMetadataMap, OpType, Patch,
     SimpleReplacement, SimpleReplacementError, ValidationError, DEFAULT_OPTYPE,
 };

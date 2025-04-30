@@ -157,13 +157,13 @@ impl TryFrom<&Hugr> for SerHugrLatest {
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
-        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
+        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
         for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
-        let mut nodes = vec![None; hugr.node_count()];
-        let mut metadata = vec![None; hugr.node_count()];
+        let mut nodes = vec![None; hugr.num_nodes()];
+        let mut metadata = vec![None; hugr.num_nodes()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_optype(n);
@@ -172,7 +172,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
                 parent,
                 op: opt.clone(),
             });
-            metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
+            metadata[new_node].clone_from(hugr.metadata.get(n.into_portgraph()));
         }
         let nodes = nodes
             .into_iter()
@@ -251,7 +251,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
-            if !hugr.graph.contains_node(node.pg_index()) {
+            if !hugr.graph.contains_node(node.into_portgraph()) {
                 return Err(HUGRSerializationError::UnknownEdgeNode { node });
             }
             let offset = match offset {

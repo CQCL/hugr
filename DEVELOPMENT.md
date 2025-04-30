@@ -29,7 +29,7 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 To setup the environment manually you will need:
 
 - Just: <https://just.systems/>
-- Rust `>=1.75`: <https://www.rust-lang.org/tools/install>
+- Rust `>=1.85`: <https://www.rust-lang.org/tools/install>
 - uv `>=0.3`: <https://docs.astral.sh/uv/getting-started/installation>
 - Optional: capnproto `>=1.0`: <https://capnproto.org/install.html>
     Required when modifying the `hugr-model` serialization schema.

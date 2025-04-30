@@ -456,6 +456,7 @@ pub struct VarId(pub NodeId, pub VarIndex);
 
 /// Errors that can occur when traversing and interpreting the model.
 #[derive(Debug, Clone, Error)]
+#[non_exhaustive]
 pub enum ModelError {
     /// There is a reference to a node that does not exist.
     #[error("node not found: {0}")]

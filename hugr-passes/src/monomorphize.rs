@@ -1,5 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    convert::Infallible,
     fmt::Write,
     ops::Deref,
 };
@@ -12,7 +13,9 @@ use hugr_core::{
 
 use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
 use itertools::Itertools as _;
-use thiserror::Error;
+
+use crate::composable::{validate_if_test, ValidatePassError};
+use crate::ComposablePass;
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -30,26 +33,10 @@ use thiserror::Error;
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-#[deprecated(
-    since = "0.14.1",
-    note = "Use `hugr_passes::MonomorphizePass` instead."
-)]
-// TODO: Deprecated. Remove on a breaking release and rename private `monomorphize_ref` to `monomorphize`.
-pub fn monomorphize(mut h: Hugr) -> Hugr {
-    monomorphize_ref(&mut h);
-    h
-}
-
-fn monomorphize_ref(h: &mut impl HugrMut) {
-    let root = h.root();
-    // If the root is a polymorphic function, then there are no external calls, so nothing to do
-    if !is_polymorphic_funcdefn(h.get_optype(root)) {
-        mono_scan(h, root, None, &mut HashMap::new());
-        if !h.get_optype(root).is_module() {
-            #[allow(deprecated)] // TODO remove in next breaking release and update docs
-            remove_polyfuncs_ref(h);
-        }
-    }
+pub fn monomorphize(
+    hugr: &mut impl HugrMut<Node = Node>,
+) -> Result<(), ValidatePassError<Infallible>> {
+    validate_if_test(MonomorphizePass, hugr)
 }
 
 /// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
@@ -71,7 +58,7 @@ pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
     since = "0.14.1",
     note = "Use hugr_passes::RemoveDeadFuncsPass instead"
 )]
-fn remove_polyfuncs_ref(h: &mut impl HugrMut) {
+fn remove_polyfuncs_ref(h: &mut impl HugrMut<Node = Node>) {
     let mut pfs_to_delete = Vec::new();
     let mut to_scan = Vec::from_iter(h.children(h.root()));
     while let Some(n) = to_scan.pop() {
@@ -107,7 +94,7 @@ type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
 /// Optionally copies the subtree into a new location whilst applying a substitution.
 /// The subtree should be monomorphic after the substitution (if provided) has been applied.
 fn mono_scan(
-    h: &mut impl HugrMut,
+    h: &mut impl HugrMut<Node = Node>,
     parent: Node,
     mut subst_into: Option<&mut Instantiating>,
     cache: &mut Instantiations,
@@ -170,12 +157,12 @@ fn mono_scan(
         h.disconnect(ch, fn_inp); // No-op if copying+substituting
         h.connect(new_tgt, fn_out, ch, fn_inp);
 
-        h.replace_op(ch, new_op).unwrap();
+        h.replace_op(ch, new_op);
     }
 }
 
 fn instantiate(
-    h: &mut impl HugrMut,
+    h: &mut impl HugrMut<Node = Node>,
     poly_func: Node,
     type_args: Vec<TypeArg>,
     mono_sig: Signature,
@@ -191,7 +178,7 @@ fn instantiate(
                     name: mangle_inner_func(&outer_name, &fd.name),
                     signature: fd.signature.clone(),
                 };
-                h.replace_op(n, fd).unwrap();
+                h.replace_op(n, fd);
                 h.move_after_sibling(n, poly_func);
             } else {
                 to_scan.extend(h.children(n))
@@ -254,8 +241,6 @@ fn instantiate(
     mono_tgt
 }
 
-use crate::validation::{ValidatePassError, ValidationLevel};
-
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
@@ -271,37 +256,25 @@ use crate::validation::{ValidatePassError, ValidationLevel};
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-#[derive(Debug, Clone, Default)]
-pub struct MonomorphizePass {
-    validation: ValidationLevel,
-}
+#[derive(Debug, Clone)]
+pub struct MonomorphizePass;
 
-#[derive(Debug, Error)]
-#[non_exhaustive]
-/// Errors produced by [MonomorphizePass].
-pub enum MonomorphizeError {
-    #[error(transparent)]
-    #[allow(missing_docs)]
-    ValidationError(#[from] ValidatePassError),
-}
+impl ComposablePass for MonomorphizePass {
+    type Node = Node;
+    type Error = Infallible;
+    type Result = ();
 
-impl MonomorphizePass {
-    /// Sets the validation level used before and after the pass is run.
-    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-        self.validation = level;
-        self
-    }
-
-    /// Run the Monomorphization pass.
-    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), MonomorphizeError> {
-        monomorphize_ref(hugr);
+    fn run(&self, h: &mut impl HugrMut<Node = Node>) -> Result<(), Self::Error> {
+        let root = h.root();
+        // If the root is a polymorphic function, then there are no external calls, so nothing to do
+        if !is_polymorphic_funcdefn(h.get_optype(root)) {
+            mono_scan(h, root, None, &mut HashMap::new());
+            if !h.get_optype(root).is_module() {
+                #[allow(deprecated)] // TODO remove in next breaking release and update docs
+                remove_polyfuncs_ref(h);
+            }
+        }
         Ok(())
-    }
-
-    /// Run the pass using specified configuration.
-    pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), MonomorphizeError> {
-        self.validation
-            .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 }
 
@@ -387,9 +360,9 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::remove_dead_funcs;
+    use crate::{monomorphize, remove_dead_funcs};
 
-    use super::{is_polymorphic, mangle_inner_func, mangle_name, MonomorphizePass};
+    use super::{is_polymorphic, mangle_inner_func, mangle_name};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -410,7 +383,7 @@ mod test {
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1]).unwrap();
         let mut hugr2 = hugr.clone();
-        MonomorphizePass::default().run(&mut hugr2).unwrap();
+        monomorphize(&mut hugr2).unwrap();
         assert_eq!(hugr, hugr2);
     }
 
@@ -472,7 +445,7 @@ mod test {
                 .count(),
             3
         );
-        MonomorphizePass::default().run(&mut hugr)?;
+        monomorphize(&mut hugr)?;
         let mono = hugr;
         mono.validate()?;
 
@@ -493,7 +466,7 @@ mod test {
             ["double", "main", "triple"]
         );
         let mut mono2 = mono.clone();
-        MonomorphizePass::default().run(&mut mono2)?;
+        monomorphize(&mut mono2)?;
 
         assert_eq!(mono2, mono); // Idempotent
 
@@ -601,7 +574,7 @@ mod test {
             .outputs_arr();
         let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
 
-        MonomorphizePass::default().run(&mut hugr).unwrap();
+        monomorphize(&mut hugr).unwrap();
         let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
@@ -662,7 +635,7 @@ mod test {
         let mono = mono.finish_with_outputs([a, b]).unwrap();
         let c = dfg.call(mono.handle(), &[], dfg.input_wires()).unwrap();
         let mut hugr = dfg.finish_hugr_with_outputs(c.outputs()).unwrap();
-        MonomorphizePass::default().run(&mut hugr)?;
+        monomorphize(&mut hugr)?;
         let mono_hugr = hugr;
 
         let mut funcs = list_funcs(&mono_hugr);
@@ -719,7 +692,7 @@ mod test {
             module_builder.finish_hugr().unwrap()
         };
 
-        MonomorphizePass::default().run(&mut hugr).unwrap();
+        monomorphize(&mut hugr).unwrap();
         remove_dead_funcs(&mut hugr, []).unwrap();
 
         let funcs = list_funcs(&hugr);

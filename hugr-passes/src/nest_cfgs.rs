@@ -44,14 +44,14 @@ use std::hash::Hash;
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr_core::hugr::rewrite::outline_cfg::OutlineCfg;
+use hugr_core::hugr::patch::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::sibling::SiblingMut;
-use hugr_core::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use hugr_core::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
+use hugr_core::hugr::views::{HierarchyView, HugrView, RootCheckable, SiblingGraph};
+use hugr_core::hugr::{hugrmut::HugrMut, Patch};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
-use hugr_core::{Direction, Hugr};
+use hugr_core::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
@@ -155,7 +155,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 pub fn transform_all_cfgs(h: &mut Hugr) {
     let mut node_stack = Vec::from([h.root()]);
     while let Some(n) = node_stack.pop() {
-        if let Ok(s) = SiblingMut::<CfgID>::try_new(h, n) {
+        if let Ok(s) = SiblingMut::<_, CfgID>::try_new(h, n) {
             transform_cfg_to_nested(&mut IdentityCfgMap::new(s));
         }
         node_stack.extend(h.children(n))
@@ -219,9 +219,12 @@ pub struct IdentityCfgMap<H: HugrView> {
     entry: H::Node,
     exit: H::Node,
 }
-impl<H: RootTagged<RootHandle = CfgID>> IdentityCfgMap<H> {
+impl<H: HugrView> IdentityCfgMap<H> {
     /// Creates an [IdentityCfgMap] for the specified CFG
-    pub fn new(h: H) -> Self {
+    pub fn new(h: impl RootCheckable<H, CfgID<H::Node>>) -> Self {
+        let h = h.try_into_checked().expect("Hugr must be a CFG region");
+        let h = h.into_hugr();
+
         // Panic if malformed enough not to have two children
         let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
@@ -246,7 +249,7 @@ impl<H: HugrView> CfgNodeMap<H::Node> for IdentityCfgMap<H> {
     }
 }
 
-impl<H: HugrMut> CfgNester<H::Node> for IdentityCfgMap<H> {
+impl<H: HugrMut<Node = Node>> CfgNester<H::Node> for IdentityCfgMap<H> {
     fn nest_sese_region(
         &mut self,
         entry_edge: (H::Node, H::Node),
@@ -257,7 +260,7 @@ impl<H: HugrMut> CfgNester<H::Node> for IdentityCfgMap<H> {
         assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
-        let (new_block, new_cfg) = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
+        let [new_block, new_cfg] = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
         debug_assert!([entry_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
@@ -576,7 +579,7 @@ pub(crate) mod test {
     };
     use hugr_core::extension::{prelude::usize_t, ExtensionSet};
 
-    use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
+    use hugr_core::hugr::patch::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::ops::Value;
@@ -636,7 +639,7 @@ pub(crate) mod test {
         let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.borrow()));
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.as_ref()));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -734,7 +737,7 @@ pub(crate) mod test {
 
         // There's no need to use a view of a region here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's)
-        let v = IdentityCfgMap::new(SiblingGraph::try_new(&h, h.root()).unwrap());
+        let v = IdentityCfgMap::new(SiblingGraph::<Node>::try_new(&h, h.root()).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
@@ -760,7 +763,7 @@ pub(crate) mod test {
         // Again, there's no need for a view of a region here, but check that the
         // transformation still works when we can only directly mutate the top level
         let root = h.root();
-        let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
+        let m = SiblingMut::<_, CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
         h.validate().unwrap();
         assert_eq!(1, depth(&h, entry));
@@ -827,7 +830,7 @@ pub(crate) mod test {
 
         let rw = IdentityInsertion::new(final_node, final_node_input);
 
-        let apply_result = h.apply_rewrite(rw);
+        let apply_result = h.apply_patch(rw);
         assert_eq!(
             apply_result,
             Err(IdentityInsertionError::InvalidPortKind(Some(

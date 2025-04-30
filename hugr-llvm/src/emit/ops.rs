@@ -5,7 +5,6 @@ use hugr_core::ops::{
 };
 use hugr_core::Node;
 use hugr_core::{
-    hugr::views::SiblingGraph,
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
 };
@@ -71,34 +70,33 @@ where
         debug_assert!(i.out_value_types().count() == self.inputs.as_ref().unwrap().len());
         debug_assert!(o.in_value_types().count() == self.outputs.as_ref().unwrap().len());
 
-        let region: SiblingGraph = node.try_new_hierarchy_view().unwrap();
-        Topo::new(&region.as_petgraph())
-            .iter(&region.as_petgraph())
-            .filter(|x| (*x != node.node()))
-            .map(|x| node.hugr().fat_optype(x))
-            .try_for_each(|node| {
-                let inputs_rmb = context.node_ins_rmb(node)?;
-                let inputs = inputs_rmb.read(context.builder(), [])?;
-                let outputs = context.node_outs_rmb(node)?.promise();
-                match node.as_ref() {
-                    OpType::Input(_) => {
-                        let i = self.take_input()?;
-                        outputs.finish(context.builder(), i)
-                    }
-                    OpType::Output(_) => {
-                        let o = self.take_output()?;
-                        o.finish(context.builder(), inputs)
-                    }
-                    _ => emit_optype(
-                        context,
-                        EmitOpArgs {
-                            node,
-                            inputs,
-                            outputs,
-                        },
-                    ),
+        let region_graph = node.hugr().region_portgraph(node.node());
+        let topo = Topo::new(&region_graph);
+        for n in topo.iter(&region_graph) {
+            let node = node.hugr().fat_optype(node.hugr().from_portgraph_node(n));
+            let inputs_rmb = context.node_ins_rmb(node)?;
+            let inputs = inputs_rmb.read(context.builder(), [])?;
+            let outputs = context.node_outs_rmb(node)?.promise();
+            match node.as_ref() {
+                OpType::Input(_) => {
+                    let i = self.take_input()?;
+                    outputs.finish(context.builder(), i)?;
                 }
-            })
+                OpType::Output(_) => {
+                    let o = self.take_output()?;
+                    o.finish(context.builder(), inputs)?;
+                }
+                _ => emit_optype(
+                    context,
+                    EmitOpArgs {
+                        node,
+                        inputs,
+                        outputs,
+                    },
+                )?,
+            }
+        }
+        Ok(())
     }
 }
 

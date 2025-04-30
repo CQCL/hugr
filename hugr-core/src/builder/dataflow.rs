@@ -174,9 +174,7 @@ impl FunctionBuilder<Hugr> {
 
         // Update the inner input node
         let types = new_optype.signature.body().input.clone();
-        self.hugr_mut()
-            .replace_op(inp_node, Input { types })
-            .unwrap();
+        self.hugr_mut().replace_op(inp_node, Input { types });
         let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
         let new_port = new_port.next().unwrap();
 
@@ -211,9 +209,7 @@ impl FunctionBuilder<Hugr> {
 
         // Update the inner input node
         let types = new_optype.signature.body().output.clone();
-        self.hugr_mut()
-            .replace_op(out_node, Output { types })
-            .unwrap();
+        self.hugr_mut().replace_op(out_node, Output { types });
         let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
         let new_port = new_port.next().unwrap();
 
@@ -250,15 +246,13 @@ impl FunctionBuilder<Hugr> {
             .expect("FunctionBuilder node must be a FuncDefn");
         let signature = old_optype.inner_signature().into_owned();
         let name = old_optype.name.clone();
-        self.hugr_mut()
-            .replace_op(
-                parent,
-                ops::FuncDefn {
-                    signature: f(signature).into(),
-                    name,
-                },
-            )
-            .expect("Could not replace FunctionBuilder operation");
+        self.hugr_mut().replace_op(
+            parent,
+            ops::FuncDefn {
+                signature: f(signature).into(),
+                name,
+            },
+        );
 
         self.hugr().get_optype(parent).as_func_defn().unwrap()
     }
@@ -512,8 +506,8 @@ pub(crate) mod test {
 
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
-        assert_eq!(simple_dfg_hugr.node_count(), 3);
-        assert_matches!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
+        assert_eq!(simple_dfg_hugr.num_nodes(), 3);
+        assert_matches!(simple_dfg_hugr.root_optype().tag(), OpTag::Dfg);
     }
 
     #[test]
@@ -539,7 +533,7 @@ pub(crate) mod test {
         };
 
         let hugr = module_builder.finish_hugr()?;
-        assert_eq!(hugr.node_count(), 7);
+        assert_eq!(hugr.num_nodes(), 7);
 
         assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
         assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));

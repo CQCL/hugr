@@ -2,40 +2,41 @@
 //! into a DFG which replaces the Call node.
 use derive_more::{Display, Error};
 
+use crate::core::HugrNode;
 use crate::ops::{DataflowParent, OpType, DFG};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
 
-use super::{HugrMut, Rewrite};
+use super::{HugrMut, PatchHugrMut, PatchVerification};
 
 /// Rewrite to inline a [Call](OpType::Call) to a known [FuncDefn](OpType::FuncDefn)
-pub struct InlineCall(Node);
+pub struct InlineCall<N = Node>(N);
 
 /// Error in performing [InlineCall] rewrite.
 #[derive(Clone, Debug, Display, Error, PartialEq)]
 #[non_exhaustive]
-pub enum InlineCallError {
+pub enum InlineCallError<N = Node> {
     /// The specified Node was not a [Call](OpType::Call)
     #[display("Node to inline {_0} expected to be a Call but actually {_1}")]
-    NotCallNode(Node, OpType),
+    NotCallNode(N, OpType),
     /// The node was a Call, but the target was not a [FuncDefn](OpType::FuncDefn)
     /// - presumably a [FuncDecl](OpType::FuncDecl), if the Hugr is valid.
     #[display("Call targetted node {_0} which must be a FuncDefn but was {_1}")]
-    CallTargetNotFuncDefn(Node, OpType),
+    CallTargetNotFuncDefn(N, OpType),
 }
 
-impl InlineCall {
+impl<N> InlineCall<N> {
     /// Create a new instance that will inline the specified node
     /// (i.e. that should be a [Call](OpType::Call))
-    pub fn new(node: Node) -> Self {
+    pub fn new(node: N) -> Self {
         Self(node)
     }
 }
 
-impl Rewrite for InlineCall {
-    type ApplyResult = ();
-    type Error = InlineCallError;
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), Self::Error> {
+impl<N: HugrNode> PatchVerification for InlineCall<N> {
+    type Error = InlineCallError<N>;
+    type Node = N;
+    fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
         let call_ty = h.get_optype(self.0);
         if !call_ty.is_call() {
             return Err(InlineCallError::NotCallNode(self.0, call_ty.clone()));
@@ -51,7 +52,14 @@ impl Rewrite for InlineCall {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+        Some(self.0).into_iter()
+    }
+}
+
+impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
+    type Outcome = ();
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
 
@@ -75,7 +83,6 @@ impl Rewrite for InlineCall {
 
         let ty_args = h
             .replace_op(self.0, new_op)
-            .unwrap()
             .as_call()
             .unwrap()
             .type_args
@@ -99,10 +106,6 @@ impl Rewrite for InlineCall {
     /// Failure only occurs if the node is not a Call, or the target not a FuncDefn.
     /// (Any later failure means an invalid Hugr and `panic`.)
     const UNCHANGED_ON_FAILURE: bool = true;
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        Some(self.0).into_iter()
-    }
 }
 
 #[cfg(test)]
@@ -116,8 +119,7 @@ mod test {
         ModuleBuilder,
     };
     use crate::extension::prelude::usize_t;
-    use crate::hugr::views::RootChecked;
-    use crate::ops::handle::{FuncID, ModuleRootID, NodeHandle};
+    use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{Input, OpType, Value};
     use crate::std_extensions::arithmetic::{
         int_ops::{self, IntOpDef},
@@ -178,10 +180,7 @@ mod test {
             .count(),
             1
         );
-        RootChecked::<_, ModuleRootID>::try_new(&mut hugr)
-            .unwrap()
-            .apply_rewrite(InlineCall(call1.node()))
-            .unwrap();
+        hugr.apply_patch(InlineCall(call1.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [call2]);
         assert_eq!(calls(&hugr), [call2]);
@@ -194,7 +193,7 @@ mod test {
             .count(),
             1
         );
-        hugr.apply_rewrite(InlineCall(call2.node())).unwrap();
+        hugr.apply_patch(InlineCall(call2.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).next(), None);
         assert_eq!(calls(&hugr), []);
@@ -229,7 +228,7 @@ mod test {
         let func = func.node();
         let mut call = call.node();
         for i in 2..10 {
-            hugr.apply_rewrite(InlineCall(call))?;
+            hugr.apply_patch(InlineCall(call))?;
             hugr.validate().unwrap();
             assert_eq!(extension_ops(&hugr).len(), i);
             let v = calls(&hugr);
@@ -268,7 +267,7 @@ mod test {
         let h = modb.finish_hugr().unwrap();
         let mut h2 = h.clone();
         assert_eq!(
-            h2.apply_rewrite(InlineCall(call.node())),
+            h2.apply_patch(InlineCall(call.node())),
             Err(InlineCallError::CallTargetNotFuncDefn(
                 decl.node(),
                 h.get_optype(decl.node()).clone()
@@ -281,7 +280,7 @@ mod test {
             .try_into()
             .unwrap();
         assert_eq!(
-            h2.apply_rewrite(InlineCall(inp)),
+            h2.apply_patch(InlineCall(inp)),
             Err(InlineCallError::NotCallNode(
                 inp,
                 Input {
@@ -318,7 +317,7 @@ mod test {
             hugr.output_neighbours(inner.node()).collect::<Vec<_>>(),
             [call1.node(), call2.node()]
         );
-        hugr.apply_rewrite(InlineCall::new(call1.node()))?;
+        hugr.apply_patch(InlineCall::new(call1.node()))?;
 
         assert_eq!(
             hugr.output_neighbours(inner.node()).collect::<Vec<_>>(),

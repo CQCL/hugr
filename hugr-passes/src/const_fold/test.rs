@@ -32,6 +32,7 @@ use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 
 use crate::dataflow::{partial_from_const, DFContext, PartialValue};
+use crate::ComposablePass as _;
 
 use super::{constant_fold_pass, ConstFoldContext, ConstantFoldPass, ValueHandle};
 
@@ -42,8 +43,7 @@ fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
     let n = Node::from(portgraph::NodeIndex::new(7));
     let st = SumType::new([vec![k.get_type()], vec![]]);
     let subject_val = Value::sum(0, [k.clone().into()], st).unwrap();
-    let temp = Hugr::default();
-    let ctx: ConstFoldContext<Hugr> = ConstFoldContext(&temp);
+    let ctx = ConstFoldContext;
     let v1 = partial_from_const(&ctx, n, &subject_val);
 
     let v1_subfield = {
@@ -114,8 +114,7 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
         v.get_custom_value::<ConstF64>().unwrap().value()
     }
     let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
-    let temp = Hugr::default();
-    let mut ctx = ConstFoldContext(&temp);
+    let mut ctx = ConstFoldContext;
     let v_a = partial_from_const(&ctx, n_a, &f2c(a));
     let v_b = partial_from_const(&ctx, n_b, &f2c(b));
     assert_eq!(unwrap_float(v_a.clone()), a);
@@ -161,7 +160,7 @@ fn test_big() {
         .unwrap();
 
     let mut h = build.finish_hugr_with_outputs(to_int.outputs()).unwrap();
-    assert_eq!(h.node_count(), 8);
+    assert_eq!(h.num_nodes(), 8);
 
     constant_fold_pass(&mut h);
 
@@ -334,7 +333,7 @@ fn test_const_fold_to_nonfinite() {
     assert_fully_folded_with(&h0, |v| {
         v.get_custom_value::<ConstF64>().unwrap().value() == 1.0
     });
-    assert_eq!(h0.node_count(), 5);
+    assert_eq!(h0.num_nodes(), 5);
 
     // HUGR computing 1.0 / 0.0
     let mut build = DFGBuilder::new(noargfn(vec![float64_type()])).unwrap();
@@ -343,7 +342,7 @@ fn test_const_fold_to_nonfinite() {
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
     let mut h1 = build.finish_hugr_with_outputs(x2.outputs()).unwrap();
     constant_fold_pass(&mut h1);
-    assert_eq!(h1.node_count(), 8);
+    assert_eq!(h1.num_nodes(), 8);
 }
 
 #[test]
@@ -1363,7 +1362,7 @@ fn test_tail_loop_unknown() {
 
     constant_fold_pass(&mut h);
     // Must keep the loop, even though we know the output, in case the output doesn't happen
-    assert_eq!(h.node_count(), 12);
+    assert_eq!(h.num_nodes(), 12);
     let tl = h
         .nodes()
         .filter(|n| h.get_optype(*n).is_tail_loop())

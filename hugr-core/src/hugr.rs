@@ -4,7 +4,7 @@ pub mod hugrmut;
 
 pub(crate) mod ident;
 pub mod internal;
-pub mod rewrite;
+pub mod patch;
 pub mod serialize;
 pub mod validate;
 pub mod views;
@@ -17,13 +17,13 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 pub use ident::{IdentList, InvalidIdentifier};
-pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
+pub use patch::{Patch, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
 use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
-pub use self::views::{HugrView, RootTagged};
+pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
@@ -87,6 +87,25 @@ impl Hugr {
     /// Create a new Hugr, with a single root node.
     pub fn new(root_node: impl Into<OpType>) -> Self {
         Self::with_capacity(root_node.into(), 0, 0)
+    }
+
+    /// Create a new Hugr, with a single root node and preallocated capacity.
+    pub fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
+        let mut graph = MultiPortGraph::with_capacity(nodes, ports);
+        let hierarchy = Hierarchy::new();
+        let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
+        let root = graph.add_node(root_node.input_count(), root_node.output_count());
+        let extensions = root_node.used_extensions();
+        op_types[root] = root_node;
+
+        Self {
+            graph,
+            hierarchy,
+            root,
+            op_types,
+            metadata: UnmanagedDenseMap::with_capacity(nodes),
+            extensions: extensions.unwrap_or_default(),
+        }
     }
 
     /// Load a Hugr from a json reader.
@@ -154,7 +173,7 @@ impl Hugr {
                 .map(|ch| Ok((ch, infer(h, ch, remove)?)))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let Some(es) = delta_mut(h.op_types.get_mut(node.pg_index())) else {
+            let Some(es) = delta_mut(h.op_types.get_mut(node.into_portgraph())) else {
                 return Ok(h.get_optype(node).extension_delta());
             };
             if es.contains(&TO_BE_INFERRED) {
@@ -260,31 +279,6 @@ impl Hugr {
 
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
-    /// Create a new Hugr, with a single root node and preallocated capacity.
-    pub(crate) fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
-        let mut graph = MultiPortGraph::with_capacity(nodes, ports);
-        let hierarchy = Hierarchy::new();
-        let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
-        let root = graph.add_node(root_node.input_count(), root_node.output_count());
-        let extensions = root_node.used_extensions();
-        op_types[root] = root_node;
-
-        Self {
-            graph,
-            hierarchy,
-            root,
-            op_types,
-            metadata: UnmanagedDenseMap::with_capacity(nodes),
-            extensions: extensions.unwrap_or_default(),
-        }
-    }
-
-    /// Set the root node of the hugr.
-    pub(crate) fn set_root(&mut self, root: Node) {
-        self.hierarchy.detach(self.root);
-        self.root = root.pg_index();
-    }
-
     /// Add a node to the graph.
     pub(crate) fn add_node(&mut self, nodetype: OpType) -> Node {
         let node = self
@@ -322,7 +316,7 @@ impl Hugr {
     /// preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
         // Generate the ordered list of nodes
-        let mut ordered = Vec::with_capacity(self.node_count());
+        let mut ordered = Vec::with_capacity(self.num_nodes());
         let root = self.root();
         ordered.extend(self.as_mut().canonical_order(root));
 
@@ -339,8 +333,8 @@ impl Hugr {
 
             let target: Node = portgraph::NodeIndex::new(position).into();
             if target != source {
-                let pg_target = target.pg_index();
-                let pg_source = source.pg_index();
+                let pg_target = target.into_portgraph();
+                let pg_source = source.into_portgraph();
                 self.graph.swap_nodes(pg_target, pg_source);
                 self.op_types.swap(pg_target, pg_source);
                 self.hierarchy.swap_nodes(pg_target, pg_source);
@@ -367,13 +361,10 @@ pub struct ExtensionError {
 }
 
 /// Errors that can occur while manipulating a Hugr.
-///
-/// TODO: Better descriptions, not just re-exporting portgraph errors.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
     /// The node was not of the required [OpTag]
-    /// (e.g. to conform to the [RootTagged::RootHandle] of a [HugrView])
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
@@ -671,12 +662,12 @@ mod test {
                 signature: Signature::new_endo(ty).with_extension_delta(result.clone()),
             };
             let mut expected = backup;
-            expected.replace_op(p, expected_p).unwrap();
+            expected.replace_op(p, expected_p);
             let expected_gp = ops::Conditional {
                 extension_delta: result,
                 ..root_ty
             };
-            expected.replace_op(h.root(), expected_gp).unwrap();
+            expected.replace_op(h.root(), expected_gp);
 
             assert_eq!(h, expected);
         } else {

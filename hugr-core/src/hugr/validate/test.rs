@@ -20,7 +20,6 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{self, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::LogicOp;
-use crate::std_extensions::logic::{self};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
@@ -104,7 +103,7 @@ fn invalid_root() {
     );
 
     // Fix the root
-    b.root = module.pg_index();
+    b.root = module.into_portgraph();
     b.remove_node(root);
     assert_eq!(b.validate(), Ok(()));
 }
@@ -143,7 +142,7 @@ fn children_restrictions() {
     let root = b.root();
     let (_input, copy, _output) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
@@ -186,36 +185,33 @@ fn df_children_restrictions() {
     let (mut b, def) = make_simple_hugr(2);
     let (_input, output, copy) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, Noop(usize_t())).unwrap();
+    b.replace_op(output, Noop(usize_t()));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
     );
 
     // Revert it back to an output, but with the wrong number of ports
-    b.replace_op(output, ops::Output::new(vec![bool_t()]))
-        .unwrap();
+    b.replace_op(output, ops::Output::new(vec![bool_t()]));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
+            => {assert_eq!(parent, def); assert_eq!(child, output.into_portgraph())}
     );
-    b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]))
-        .unwrap();
+    b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]));
 
     // After fixing the output back, replace the copy with an output op
-    b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]))
-        .unwrap();
+    b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, copy.pg_index())}
+            => {assert_eq!(parent, def); assert_eq!(child, copy.into_portgraph())}
     );
 }
 
@@ -307,12 +303,7 @@ fn test_local_const() {
             port_kind: EdgeKind::Value(bool_t())
         })
     );
-    let const_op: ops::Const = logic::EXTENSION
-        .get_value(&logic::TRUE_NAME)
-        .unwrap()
-        .typed_value()
-        .clone()
-        .into();
+    let const_op: ops::Const = ops::Value::from_bool(true).into();
     // Second input of Xor from a constant
     let cst = h.add_node_with_parent(h.root(), const_op);
     let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: bool_t() });
@@ -800,7 +791,7 @@ fn cfg_children_restrictions() {
     let (mut b, def) = make_simple_hugr(1);
     let (_input, _output, copy) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
@@ -812,8 +803,7 @@ fn cfg_children_restrictions() {
         ops::CFG {
             signature: Signature::new(vec![bool_t()], vec![bool_t()]),
         },
-    )
-    .unwrap();
+    );
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { .. })
@@ -865,7 +855,7 @@ fn cfg_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
+            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.into_portgraph())}
     );
     b.remove_node(exit2);
 
@@ -875,8 +865,7 @@ fn cfg_children_restrictions() {
         ops::CFG {
             signature: Signature::new(vec![qb_t()], vec![bool_t()]),
         },
-    )
-    .unwrap();
+    );
     b.replace_op(
         block,
         ops::DataflowBlock {
@@ -885,18 +874,15 @@ fn cfg_children_restrictions() {
             other_outputs: vec![qb_t()].into(),
             extension_delta: ExtensionSet::new(),
         },
-    )
-    .unwrap();
-    let mut block_children = b.hierarchy.children(block.pg_index());
+    );
+    let mut block_children = b.hierarchy.children(block.into_portgraph());
     let block_input = block_children.next().unwrap().into();
     let block_output = block_children.next_back().unwrap().into();
-    b.replace_op(block_input, ops::Input::new(vec![qb_t()]))
-        .unwrap();
+    b.replace_op(block_input, ops::Input::new(vec![qb_t()]));
     b.replace_op(
         block_output,
         ops::Output::new(vec![Type::new_unit_sum(1), qb_t()]),
-    )
-    .unwrap();
+    );
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
