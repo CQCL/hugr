@@ -29,7 +29,11 @@ use crate::{
 
 /// A HUGR -> HUGR pass that turns 'value_array`s into regular linear `array`s.
 ///
-/// To construct a [LinearizeArrayPass] use [Default::default].
+/// # Panics
+///
+/// - If the Hugr has inter-graph edges whose type contains `value_array`s
+/// - If the Hugr contains [`ArrayOpDef::get`] operations on `value_array`s that
+///   contain nested `value_array`s.
 #[derive(Clone)]
 pub struct LinearizeArrayPass(ReplaceTypes);
 
@@ -53,10 +57,15 @@ impl Default for LinearizeArrayPass {
             pass.replace_parametrized_op(
                 value_array::EXTENSION.get_op(&op_def.name()).unwrap(),
                 move |args| {
-                    // `get` is only allowed for copyable elements. If the elements
-                    // are now linear, we'd have to replace it with a `set`. But what
-                    // should we put in??? For now, let's just error out and make sure
-                    // we're not emitting `get`s for nested value arrays.
+                    // `get` is only allowed for copyable elements. Assuming the Hugr was
+                    // valid when we started, the only way for the element to become linear
+                    // is if it used to contain nested `value_array`s. In that case, we
+                    // have to get rid of the `get`.
+                    // TODO: But what should we replace it with? Can't be a `set` since we
+                    // don't have anything to put in. Maybe we need a new `get_copy` op
+                    // that takes a function ptr to copy the element? For now, let's just
+                    // error out and make sure we're not emitting `get`s for nested value
+                    // arrays.
                     if op_def == ArrayOpDef::get && !args[1].as_type().unwrap().copyable() {
                         panic!(
                             "Cannot linearise arrays in this Hugr: \
