@@ -8,9 +8,8 @@ use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
 use crate::hugr::ValidationError;
 use crate::ops;
-use crate::types::{PolyFuncType, Type, TypeBound};
-
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
+use crate::types::{PolyFuncType, Type, TypeBound};
 
 use crate::{Hugr, Node};
 use smol_str::SmolStr;
@@ -32,6 +31,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
 
     fn hugr(&self) -> &Hugr {
         self.0.as_ref()
+    }
+
+    fn define_function(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        self.define_function_vis(name, signature, true)
     }
 }
 
@@ -60,7 +67,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
-    /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
+    /// Replace a [`ops::FuncDecl`] with public [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
     /// # Errors
@@ -72,19 +79,16 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let ops::FuncDecl { signature, name } = self
-            .hugr()
-            .get_optype(f_node)
-            .as_func_decl()
-            .ok_or(BuildError::UnexpectedType {
+        let opty = self.hugr_mut().optype_mut(f_node);
+        let ops::OpType::FuncDecl(ops::FuncDecl { signature, name }) = opty else {
+            return Err(BuildError::UnexpectedType {
                 node: f_node,
                 op_desc: "crate::ops::OpType::FuncDecl",
-            })?
-            .clone();
+            });
+        };
+
         let body = signature.body().clone();
-        self.hugr_mut()
-            .replace_op(f_node, ops::FuncDefn { name, signature })
-            .expect("Replacing a FuncDecl node with a FuncDefn should always be valid");
+        *opty = ops::FuncDefn::new_public(name, signature.clone()).into();
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
@@ -203,10 +207,7 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new(
-                    vec![qubit_state_type.get_alias_type()],
-                    vec![qubit_state_type.get_alias_type()],
-                ),
+                Signature::new_endo(qubit_state_type.get_alias_type()),
             )?;
             n_identity(f_build)?;
             module_builder.finish_hugr()

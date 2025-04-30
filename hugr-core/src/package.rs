@@ -347,14 +347,8 @@ fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
 
         // Convert the DFG into a `FuncDefn`
         hugr.set_num_ports(root, 0, 1);
-        hugr.replace_op(
-            root,
-            FuncDefn {
-                name: "main".to_string(),
-                signature: signature.into_owned().into(),
-            },
-        )
-        .expect("Hugr accepts any root node");
+        hugr.replace_op(root, FuncDefn::new_public("main", signature.into_owned()))
+            .expect("Hugr accepts any root node");
 
         // Wrap it in a module.
         let new_root = hugr.add_node(Module::new().into());

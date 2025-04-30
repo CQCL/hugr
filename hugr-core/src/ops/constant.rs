@@ -33,17 +33,33 @@ pub struct Const {
     /// The [Value] of the constant.
     #[serde(rename = "v")]
     pub value: Value,
+    /// The external name of the constant for linking, if any
+    pub name: Option<String>,
 }
 
 impl Const {
-    /// Create a new [`Const`] operation.
+    /// Create a new [`Const`] operation that cannot be linked against.
     pub fn new(value: Value) -> Self {
-        Self { value }
+        Self { value, name: None }
+    }
+
+    /// Create a new [`Const`] operation available for linking
+    pub fn new_public(value: Value, name: impl ToString) -> Self {
+        Self {
+            value,
+            name: Some(name.to_string()),
+        }
     }
 
     /// The inner value of the [`Const`]
     pub fn value(&self) -> &Value {
         &self.value
+    }
+
+    /// Whether the [`Const`] would be exported for linking
+    /// (only applies if the parent is a [Module](super::Module))
+    pub fn is_public(&self) -> bool {
+        self.name.is_some()
     }
 
     delegate! {

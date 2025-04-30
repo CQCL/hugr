@@ -457,8 +457,9 @@ impl SiblingSubgraph {
         &self,
         hugr: &impl HugrView<Node = Node>,
         name: impl Into<String>,
+        public: bool,
     ) -> Hugr {
-        let mut builder = FunctionBuilder::new(name, self.signature(hugr)).unwrap();
+        let mut builder = FunctionBuilder::new_vis(name, self.signature(hugr), public).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
@@ -1175,7 +1176,7 @@ mod tests {
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let extracted = subgraph.extract_subgraph(&hugr, "region");
+        let extracted = subgraph.extract_subgraph(&hugr, "region", true);
 
         extracted.validate().unwrap();
     }

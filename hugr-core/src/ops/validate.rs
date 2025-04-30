@@ -6,6 +6,8 @@
 //! It also defines a `validate_op_children` method for more complex tests that
 //! require traversing the children.
 
+use std::collections::HashMap;
+
 use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
@@ -59,6 +61,34 @@ impl ValidateOp for super::Module {
             requires_children: false,
             ..Default::default()
         }
+    }
+
+    fn validate_op_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        let mut ops_by_name = HashMap::new();
+        for (node, op) in children {
+            let name = match op {
+                OpType::FuncDecl(fd) => Some(&fd.name),
+                OpType::FuncDefn(fd) => fd.public.then_some(&fd.name),
+                OpType::Const(c) => c.name.as_ref(),
+                _ => None,
+            };
+            if let Some(name) = name {
+                ops_by_name.entry(name).or_insert(Vec::new()).push(node)
+            }
+        }
+        for (name, nodes) in ops_by_name {
+            let mut nodes = nodes.iter().copied();
+            let fst = nodes.next().unwrap();
+            let Some(snd) = nodes.next() else { continue };
+            return Err(ChildrenValidationError::DuplicateExternalNames {
+                name: name.clone(),
+                children: [fst, snd],
+            });
+        }
+        Ok(())
     }
 }
 
@@ -194,6 +224,14 @@ pub enum ChildrenValidationError {
         expected_count: usize,
         actual_sum_rows: Vec<TypeRow>,
     },
+    /// Multiple nodes were exported using the same name from a [Module](super::Module)
+    #[error("Node is exported under same name {name} as earlier node {:?}", children[0])]
+    DuplicateExternalNames {
+        /// The name of a [FuncDecl], public [FuncDefn](super::FuncDefn) or [Const]
+        name: String,
+        /// Two nodes node exported under that name
+        children: [NodeIndex; 2],
+    },
 }
 
 impl ChildrenValidationError {
@@ -205,6 +243,7 @@ impl ChildrenValidationError {
             ChildrenValidationError::ConditionalCaseSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
             ChildrenValidationError::InvalidConditionalSum { child, .. } => *child,
+            ChildrenValidationError::DuplicateExternalNames { children, .. } => children[1],
         }
     }
 }

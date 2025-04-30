@@ -34,12 +34,10 @@ use crate::{
 ///
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
-    let def_op: OpType = ops::FuncDefn {
-        name: "main".into(),
-        signature: Signature::new(vec![bool_t()], vec![bool_t(); copies])
-            .with_prelude()
-            .into(),
-    }
+    let def_op: OpType = ops::FuncDefn::new_public(
+        "main",
+        Signature::new(bool_t(), vec![bool_t(); copies]).with_prelude(),
+    )
     .into();
 
     let mut b = Hugr::default();
@@ -150,13 +148,7 @@ fn children_restrictions() {
 
     // Add a definition without children
     let def_sig = Signature::new(vec![bool_t()], vec![bool_t(), bool_t()]);
-    let new_def = b.add_node_with_parent(
-        root,
-        ops::FuncDefn {
-            signature: def_sig.into(),
-            name: "main".into(),
-        },
-    );
+    let new_def = b.add_node_with_parent(root, ops::FuncDefn::new_private("main", def_sig));
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
@@ -349,10 +341,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 
     let def = b.add_node_with_parent(
         b.root(),
-        ops::FuncDefn {
-            name: "main".into(),
-            signature: Signature::new(row.clone(), row.clone()).into(),
-        },
+        ops::FuncDefn::new_public("main", Signature::new_endo(row.clone())),
     );
 
     let input = b.add_node_with_parent(def, ops::Input::new(row.clone()));
@@ -979,7 +968,7 @@ mod extension_tests {
 
     #[rstest]
     #[case::d1(|signature| ops::DFG {signature}.into())]
-    #[case::f1(|sig: Signature| ops::FuncDefn {name: "foo".to_string(), signature: sig.into()}.into())]
+    #[case::f1(|sig: Signature| ops::FuncDefn::new("foo", sig, true).into())]
     #[case::c1(|signature| ops::Case {signature}.into())]
     fn parent_extension_mismatch(
         #[case] parent_f: impl Fn(Signature) -> OpType,
