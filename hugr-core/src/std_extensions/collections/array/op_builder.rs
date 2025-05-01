@@ -213,9 +213,7 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::PRELUDE_ID;
-    use crate::extension::ExtensionSet;
-    use crate::std_extensions::collections::array::{self, array_type};
+    use crate::std_extensions::collections::array::array_type;
     use crate::{
         builder::{DFGBuilder, HugrBuilder},
         extension::prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
@@ -229,11 +227,7 @@ mod test {
     #[rstest::fixture]
     #[default(DFGBuilder<Hugr>)]
     fn all_array_ops<B: Dataflow>(
-        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)
-            .with_extension_delta(ExtensionSet::from_iter([
-                PRELUDE_ID,
-                array::EXTENSION_ID
-        ]))).unwrap())]
+        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)).unwrap())]
         mut builder: B,
     ) -> B {
         let us0 = builder.add_load_value(ConstUsize::new(0));

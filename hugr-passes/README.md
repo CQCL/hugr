@@ -1,7 +1,6 @@
 ![](/hugr/assets/hugr_logo.svg)
 
-hugr-passes
-===============
+# hugr-passes
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
 [![crates][]](https://crates.io/crates/hugr-passes)
@@ -28,13 +27,6 @@ cargo add hugr-passes
 ```
 
 Please read the [API documentation here][].
-
-## Experimental Features
-
-- `extension_inference`:
-  Experimental feature which allows automatic inference of which extra extensions
-  are required at runtime by a HUGR when validating it.
-  Not enabled by default.
 
 ## Recent Changes
 

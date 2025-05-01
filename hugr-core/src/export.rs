@@ -832,7 +832,6 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
-            TypeArg::Extensions { .. } => self.make_term_apply("compat.ext_set", &[]),
             TypeArg::Variable { v } => self.export_type_arg_var(v),
         }
     }
@@ -939,7 +938,6 @@ impl<'a> Context<'a> {
                 let types = self.make_term(table::Term::List(parts));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
-            TypeParam::Extensions => self.make_term_apply("compat.ext_set_type", &[]),
         }
     }
 
@@ -1175,19 +1173,15 @@ mod test {
     use crate::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::qb_t,
-        std_extensions::arithmetic::float_types,
         types::Signature,
-        utils::test_quantum_extension::{self, cx_gate, h_gate},
+        utils::test_quantum_extension::{cx_gate, h_gate},
         Hugr,
     };
 
     #[fixture]
     fn test_simple_circuit() -> Hugr {
         crate::builder::test::build_main(
-            Signature::new_endo(vec![qb_t(), qb_t()])
-                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
-                .with_extension_delta(float_types::EXTENSION_ID)
-                .into(),
+            Signature::new_endo(vec![qb_t(), qb_t()]).into(),
             |mut f_build| {
                 let wires: Vec<_> = f_build.input_wires().collect();
                 let mut linear = f_build.as_circuit(wires);

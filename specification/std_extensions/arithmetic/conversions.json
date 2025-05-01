@@ -1,10 +1,6 @@
 {
   "version": "0.1.0",
   "name": "arithmetic.conversions",
-  "runtime_reqs": [
-    "arithmetic.float.types",
-    "arithmetic.int.types"
-  ],
   "types": {},
   "operations": {
     "bytecast_float64_to_int64": {
@@ -36,8 +32,7 @@
               ],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -71,8 +66,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -115,8 +109,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -159,8 +152,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -192,8 +184,7 @@
               ],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -223,8 +214,7 @@
               ],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -256,8 +246,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -300,8 +289,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -344,8 +332,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -375,8 +362,7 @@
             {
               "t": "I"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -436,8 +422,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -497,8 +482,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

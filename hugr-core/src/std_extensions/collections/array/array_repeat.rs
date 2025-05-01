@@ -6,7 +6,7 @@ use std::sync::{Arc, Weak};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef};
+use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
@@ -42,16 +42,10 @@ impl FromStr for ArrayRepeatDef {
 impl ArrayRepeatDef {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![
-            TypeParam::max_nat(),
-            TypeBound::Any.into(),
-            TypeParam::Extensions,
-        ];
+        let params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
         let n = TypeArg::new_var_use(0, TypeParam::max_nat());
         let t = Type::new_var_use(1, TypeBound::Any);
-        let es = ExtensionSet::type_var(2);
-        let func =
-            Type::new_function(Signature::new(vec![], vec![t.clone()]).with_extension_delta(es));
+        let func = Type::new_function(Signature::new(vec![], vec![t.clone()]));
         let array_ty = instantiate_array(array_def, n, t).expect("Array type instantiation failed");
         PolyFuncTypeRV::new(params, FuncValueType::new(vec![func], array_ty)).into()
     }
@@ -109,18 +103,12 @@ pub struct ArrayRepeat {
     pub elem_ty: Type,
     /// Size of the array.
     pub size: u64,
-    /// The extensions required by the function that generates the array elements.
-    pub extension_reqs: ExtensionSet,
 }
 
 impl ArrayRepeat {
     /// Creates a new array repeat op.
-    pub fn new(elem_ty: Type, size: u64, extension_reqs: ExtensionSet) -> Self {
-        ArrayRepeat {
-            elem_ty,
-            size,
-            extension_reqs,
-        }
+    pub fn new(elem_ty: Type, size: u64) -> Self {
+        ArrayRepeat { elem_ty, size }
     }
 }
 
@@ -143,9 +131,6 @@ impl MakeExtensionOp for ArrayRepeat {
         vec![
             TypeArg::BoundedNat { n: self.size },
             self.elem_ty.clone().into(),
-            TypeArg::Extensions {
-                es: self.extension_reqs.clone(),
-            },
         ]
     }
 }
@@ -169,8 +154,8 @@ impl HasConcrete for ArrayRepeatDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }, TypeArg::Extensions { es }] => {
-                Ok(ArrayRepeat::new(ty.clone(), *n, es.clone()))
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] => {
+                Ok(ArrayRepeat::new(ty.clone(), *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
@@ -179,7 +164,7 @@ impl HasConcrete for ArrayRepeatDef {
 
 #[cfg(test)]
 mod tests {
-    use crate::std_extensions::collections::array::{array_type, EXTENSION_ID};
+    use crate::std_extensions::collections::array::array_type;
     use crate::{
         extension::prelude::qb_t,
         ops::{OpTrait, OpType},
@@ -190,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_repeat_def() {
-        let op = ArrayRepeat::new(qb_t(), 2, ExtensionSet::singleton(EXTENSION_ID));
+        let op = ArrayRepeat::new(qb_t(), 2);
         let optype: OpType = op.clone().into();
         let new_op: ArrayRepeat = optype.cast().unwrap();
         assert_eq!(new_op, op);
@@ -200,8 +185,7 @@ mod tests {
     fn test_repeat() {
         let size = 2;
         let element_ty = qb_t();
-        let es = ExtensionSet::singleton(EXTENSION_ID);
-        let op = ArrayRepeat::new(element_ty.clone(), size, es.clone());
+        let op = ArrayRepeat::new(element_ty.clone(), size);
 
         let optype: OpType = op.into();
 
@@ -210,10 +194,7 @@ mod tests {
         assert_eq!(
             sig.io(),
             (
-                &vec![Type::new_function(
-                    Signature::new(vec![], vec![qb_t()]).with_extension_delta(es)
-                )]
-                .into(),
+                &vec![Type::new_function(Signature::new(vec![], vec![qb_t()]))].into(),
                 &vec![array_type(size, element_ty.clone())].into(),
             )
         );

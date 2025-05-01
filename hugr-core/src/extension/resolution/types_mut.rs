@@ -124,8 +124,6 @@ pub(super) fn resolve_signature_exts<RV: MaybeRV>(
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    // Note that we do not include the signature's `runtime_reqs` here, as those refer
-    // to _runtime_ requirements that may not be currently present.
     resolve_type_row_exts(node, &mut signature.input, extensions, used_extensions)?;
     resolve_type_row_exts(node, &mut signature.output, extensions, used_extensions)?;
     Ok(())

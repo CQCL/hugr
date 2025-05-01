@@ -2,7 +2,6 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     convert::Infallible,
     fmt::Write,
-    ops::Deref,
 };
 
 use hugr_core::{
@@ -300,10 +299,6 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
         TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
         TypeArg::String { arg } => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
         TypeArg::Sequence { elems } => f.write_fmt(format_args!("seq({})", TypeArgsList(elems))),
-        TypeArg::Extensions { es } => f.write_fmt(format_args!(
-            "es({})",
-            es.iter().map(|x| x.deref()).join(",")
-        )),
         // We are monomorphizing. We will never monomorphize to a signature
         // containing a variable.
         TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
@@ -338,6 +333,7 @@ mod test {
     use std::iter;
 
     use hugr_core::extension::simple_op::MakeRegisteredOp as _;
+    use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections;
     use hugr_core::std_extensions::collections::array::{array_type_parametric, ArrayOpDef};
     use hugr_core::types::type_param::TypeParam;
@@ -347,16 +343,10 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{
-        usize_t, ConstUsize, UnpackTuple, UnwrapBuilder, PRELUDE_ID,
-    };
-    use hugr_core::extension::ExtensionSet;
+    use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, UnwrapBuilder};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
-    use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
-    use hugr_core::types::{
-        PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
-    };
+    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
@@ -370,10 +360,6 @@ mod test {
 
     fn triple_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty.clone(), ty])
-    }
-
-    fn prelusig(ins: impl Into<TypeRow>, outs: impl Into<TypeRow>) -> Signature {
-        Signature::new(ins, outs).with_extension_delta(PRELUDE_ID)
     }
 
     #[test]
@@ -411,7 +397,7 @@ mod test {
         };
 
         let tr = {
-            let sig = prelusig(tv0(), Type::new_tuple(vec![tv0(); 3]));
+            let sig = Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3]));
             let mut fb = mb.define_function(
                 "triple",
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),
@@ -428,7 +414,7 @@ mod test {
         };
         let mn = {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function("main", prelusig(usize_t(), outs))?;
+            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?
@@ -493,37 +479,30 @@ mod test {
         let n: u64 = 5;
         let mut outer = FunctionBuilder::new(
             "mainish",
-            prelusig(
+            Signature::new(
                 array_type_parametric(sa(n), array_type_parametric(sa(2), usize_t()).unwrap())
                     .unwrap(),
                 vec![usize_t(); 2],
-            )
-            .with_extension_delta(collections::array::EXTENSION_ID),
+            ),
         )
         .unwrap();
 
         let arr2u = || array_type_parametric(sa(2), usize_t()).unwrap();
         let pf1t = PolyFuncType::new(
             [TypeParam::max_nat()],
-            prelusig(array_type_parametric(sv(0), arr2u()).unwrap(), usize_t())
-                .with_extension_delta(collections::array::EXTENSION_ID),
+            Signature::new(array_type_parametric(sv(0), arr2u()).unwrap(), usize_t()),
         );
         let mut pf1 = outer.define_function("pf1", pf1t).unwrap();
 
         let pf2t = PolyFuncType::new(
             [TypeParam::max_nat(), TypeBound::Copyable.into()],
-            prelusig(vec![array_type_parametric(sv(0), tv(1)).unwrap()], tv(1))
-                .with_extension_delta(collections::array::EXTENSION_ID),
+            Signature::new(vec![array_type_parametric(sv(0), tv(1)).unwrap()], tv(1)),
         );
         let mut pf2 = pf1.define_function("pf2", pf2t).unwrap();
 
         let mono_func = {
             let mut fb = pf2
-                .define_function(
-                    "get_usz",
-                    prelusig(vec![], usize_t())
-                        .with_extension_delta(collections::array::EXTENSION_ID),
-                )
+                .define_function("get_usz", Signature::new(vec![], usize_t()))
                 .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
@@ -706,8 +685,6 @@ mod test {
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq($n(0)$t(Unit))")]
-    #[case::extensionset(vec![ExtensionSet::from_iter([PRELUDE_ID,int_types::EXTENSION_ID]).into()],
-                         "$foo$$es(arithmetic.int.types,prelude)")] // alphabetic ordering of extension names
     #[should_panic]
     #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String)],
                             "$foo$$v(1)")]

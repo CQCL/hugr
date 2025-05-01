@@ -132,21 +132,11 @@ pub enum ValidatePassError<E> {
 
 /// Runs an underlying pass, but with validation of the Hugr
 /// both before and afterwards.
-pub struct ValidatingPass<P>(P, bool);
+pub struct ValidatingPass<P>(P);
 
 impl<P: ComposablePass> ValidatingPass<P> {
-    pub fn new_default(underlying: P) -> Self {
-        // Self(underlying, cfg!(feature = "extension_inference"))
-        // Sadly, many tests fail with extension inference, hence:
-        Self(underlying, false)
-    }
-
-    pub fn new_validating_extensions(underlying: P) -> Self {
-        Self(underlying, true)
-    }
-
-    pub fn new(underlying: P, validate_extensions: bool) -> Self {
-        Self(underlying, validate_extensions)
+    pub fn new(underlying: P) -> Self {
+        Self(underlying)
     }
 
     fn validation_impl<E>(
@@ -154,11 +144,8 @@ impl<P: ComposablePass> ValidatingPass<P> {
         hugr: &impl HugrView,
         mk_err: impl FnOnce(ValidationError, String) -> ValidatePassError<E>,
     ) -> Result<(), ValidatePassError<E>> {
-        match self.1 {
-            false => hugr.validate_no_extensions(),
-            true => hugr.validate(),
-        }
-        .map_err(|err| mk_err(err, hugr.mermaid_string()))
+        hugr.validate()
+            .map_err(|err| mk_err(err, hugr.mermaid_string()))
     }
 }
 
@@ -222,7 +209,7 @@ pub(crate) fn validate_if_test<P: ComposablePass>(
     hugr: &mut impl HugrMut<Node = P::Node>,
 ) -> Result<P::Result, ValidatePassError<P::Error>> {
     if cfg!(test) {
-        ValidatingPass::new_default(pass).run(hugr)
+        ValidatingPass::new(pass).run(hugr)
     } else {
         pass.run(hugr).map_err(ValidatePassError::Underlying)
     }
@@ -237,9 +224,7 @@ mod test {
         Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
         ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{
-        bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple, PRELUDE_ID,
-    };
+    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple};
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DEFAULT_OPTYPE, DFG};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
@@ -315,7 +300,7 @@ mod test {
         cfold.run(&mut h).unwrap();
         assert_eq!(h, backup); // Did nothing
 
-        let r = ValidatingPass(cfold, false).run(&mut h);
+        let r = ValidatingPass(cfold).run(&mut h);
         assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if e == err));
     }
 
@@ -324,7 +309,7 @@ mod test {
         let tr = TypeRow::from(vec![usize_t(); 2]);
 
         let h = {
-            let sig = Signature::new_endo(tr.clone()).with_extension_delta(PRELUDE_ID);
+            let sig = Signature::new_endo(tr.clone());
             let mut fb = FunctionBuilder::new("tupuntup", sig).unwrap();
             let [a, b] = fb.input_wires_arr();
             let tup = fb

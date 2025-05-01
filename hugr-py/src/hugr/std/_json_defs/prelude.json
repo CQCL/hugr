@@ -1,7 +1,6 @@
 {
   "version": "0.2.0",
   "name": "prelude",
-  "runtime_reqs": [],
   "types": {
     "error": {
       "extension": "prelude",
@@ -73,8 +72,7 @@
               "i": 0,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -115,8 +113,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -146,8 +143,7 @@
               "i": 0,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -188,8 +184,7 @@
               "i": 0,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -236,8 +231,7 @@
               "i": 1,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -259,8 +253,7 @@
             {
               "t": "I"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -307,8 +300,7 @@
               "i": 1,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -329,8 +321,7 @@
               "bound": "C"
             }
           ],
-          "output": [],
-          "runtime_reqs": []
+          "output": []
         }
       },
       "binary": false
