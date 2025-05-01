@@ -295,7 +295,7 @@ class Function(Value):
     body: Hugr
 
     def type_(self) -> tys.FunctionType:
-        return self.body.root_op().inner_signature()
+        return self.body.entrypoint_op().inner_signature()
 
     def _to_serial(self) -> sops.FunctionValue:
         return sops.FunctionValue(

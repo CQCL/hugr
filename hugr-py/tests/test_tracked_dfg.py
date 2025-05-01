@@ -39,7 +39,7 @@ def test_simple_circuit():
 
     circ.set_tracked_outputs()
 
-    assert len(circ.hugr) == 6
+    assert len(circ.hugr) == 10
 
     # all nodes connected to output
     out_ins = {
@@ -64,7 +64,7 @@ def test_complex_circuit():
 
     circ.set_tracked_outputs()
 
-    assert len(circ.hugr) == 10
+    assert len(circ.hugr) == 14
 
     assert circ._output_op().types == [tys.Qubit, tys.Qubit, tys.Bool]
 

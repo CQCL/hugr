@@ -88,9 +88,34 @@ class DataflowOp(Op, Protocol):
     kind ports.
     """
 
+    #: When initializing a Hugr with a dataflow operation
+    #: a function is defined in the root module containing the op,
+    #: marked as entrypoint.
+    #: If the operation's output types are only known _after_ the
+    #: HUGR is defined, we need to wire up the function containing
+    #: the entrypoint as soon as the outputs are set.
+    #:
+    #: This flag is set to True for such cases. It should never be set
+    #: manually.
+    _entrypoint_requires_wiring: bool = field(
+        init=False, repr=False, default=False, compare=False
+    )
+
+    def _inputs(self) -> tys.TypeRow:
+        """The external input row of this operation. Defines the valid external
+        connectivity of the node the operation belongs to.
+
+        Raises:
+            IncompleteOp: If the operation's inputs have not been set.
+        """
+        ...  # pragma: no cover
+
     def outer_signature(self) -> tys.FunctionType:
         """The external signature of this operation. Defines the valid external
         connectivity of the node the operation belongs to.
+
+        Raises:
+            IncompleteOp: If the operation's inputs and outputs have not been set.
         """
         ...  # pragma: no cover
 
@@ -180,6 +205,9 @@ class Input(DataflowOp):
     def _to_serial(self, parent: Node) -> sops.Input:
         return sops.Input(parent=parent.idx, types=ser_it(self.types))
 
+    def _inputs(self) -> tys.TypeRow:
+        return []
+
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=self.types)
 
@@ -205,6 +233,9 @@ class Output(DataflowOp, _PartialOp):
 
     def _to_serial(self, parent: Node) -> sops.Output:
         return sops.Output(parent=parent.idx, types=ser_it(self.types))
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.types
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=self.types, output=[])
@@ -291,6 +322,9 @@ class AsExtOp(DataflowOp, Protocol):
             and slf.args == other.args
         )
 
+    def _inputs(self) -> tys.TypeRow:
+        return self.outer_signature().input
+
     def outer_signature(self) -> tys.FunctionType:
         return self.ext_op.outer_signature()
 
@@ -326,6 +360,9 @@ class Custom(DataflowOp):
             signature=self.signature._to_serial(),
             args=ser_it(self.args),
         )
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.signature.input
 
     def outer_signature(self) -> tys.FunctionType:
         return self.signature
@@ -405,6 +442,11 @@ class ExtOp(AsExtOp):
     def from_ext(cls, custom: ExtOp) -> ExtOp:
         return custom
 
+    def _inputs(self) -> tys.TypeRow:
+        if self.signature is None:
+            raise IncompleteOp(self)
+        return self.signature.input
+
     def outer_signature(self) -> tys.FunctionType:
         if self.signature is not None:
             return self.signature
@@ -444,6 +486,9 @@ class MakeTuple(AsExtOp, _PartialOp):
             IncompleteOp: If the types have not been set.
         """
         return _check_complete(self, self._types)
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.types
 
     def op_def(self) -> ext.OpDef:
         from hugr import std  # no circular import
@@ -508,6 +553,9 @@ class UnpackTuple(AsExtOp, _PartialOp):
     def __call__(self, tuple_: ComWire) -> Command:
         return super().__call__(tuple_)
 
+    def _inputs(self) -> tys.TypeRow:
+        return MakeTuple(self.types).outer_signature().output
+
     def outer_signature(self) -> tys.FunctionType:
         return MakeTuple(self.types).outer_signature().flip()
 
@@ -542,6 +590,9 @@ class Tag(DataflowOp):
             tag=self.tag,
             variants=[ser_it(r) for r in self.sum_ty.variant_rows],
         )
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.sum_ty.variant_rows[self.tag]
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(
@@ -715,6 +766,9 @@ class CFG(DataflowOp):
     def name(self) -> str:
         return "CFG"
 
+    def _inputs(self) -> tys.TypeRow:
+        return self.inputs
+
 
 @dataclass
 class DataflowBlock(DfParentOp):
@@ -861,6 +915,9 @@ class LoadConst(DataflowOp):
             datatype=self.type_._to_serial_root(),
         )
 
+    def _inputs(self) -> tys.TypeRow:
+        return []
+
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=[self.type_])
 
@@ -908,8 +965,7 @@ class Conditional(DataflowOp):
         Raises:
             IncompleteOp: If the outputs have not been set.
         """
-        inputs = [self.sum_ty, *self.other_inputs]
-        return tys.FunctionType(inputs, self.outputs)
+        return tys.FunctionType(self._inputs(), self.outputs)
 
     @property
     def num_out(self) -> int:
@@ -934,6 +990,10 @@ class Conditional(DataflowOp):
 
     def name(self) -> str:
         return "Conditional"
+
+    def _inputs(self) -> tys.TypeRow:
+        """Input row of the outer signature."""
+        return [self.sum_ty, *self.other_inputs]
 
 
 @dataclass
@@ -1246,6 +1306,10 @@ class CallIndirect(DataflowOp, _PartialOp):
     def __call__(self, function: ComWire, *args: ComWire) -> Command:  # type: ignore[override]
         return super().__call__(function, *args)
 
+    def _inputs(self) -> tys.TypeRow:
+        sig = self.signature
+        return [sig, *sig.input]
+
     def outer_signature(self) -> tys.FunctionType:
         sig = self.signature
 
@@ -1285,6 +1349,9 @@ class LoadFunc(_CallOrLoad, DataflowOp):
             type_args=ser_it(self.type_args),
             instantiation=self.instantiation._to_serial(),
         )
+
+    def _inputs(self) -> tys.TypeRow:
+        return []
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=[self.instantiation])

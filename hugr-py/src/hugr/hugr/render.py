@@ -21,6 +21,7 @@ class Palette:
     background: str
     node: str
     edge: str
+    entrypoint_edge: str
     dark: str
     const: str
     discard: str
@@ -37,6 +38,7 @@ PALETTE: dict[str, Palette] = {
         background="white",
         node="#ACCBF9",
         edge="#1CADE4",
+        entrypoint_edge="#832561",
         dark="black",
         const="#77CEEF",
         discard="#ff8888",
@@ -47,6 +49,7 @@ PALETTE: dict[str, Palette] = {
         background="white",
         node="#7952B3",
         edge="#FFC107",
+        entrypoint_edge="#832561",
         dark="#343A40",
         const="#7c55b4",
         discard="#ff8888",
@@ -57,6 +60,7 @@ PALETTE: dict[str, Palette] = {
         background="white",
         node="#629DD1",
         edge="#297FD5",
+        entrypoint_edge="#832561",
         dark="#112D4E",
         const="#a1eea1",
         discard="#ff8888",
@@ -97,13 +101,13 @@ class DotRenderer:
             "margin": "0",
             "bgcolor": self.config.palette.background,
         }
-        if not (name := hugr[hugr.root].metadata.get("name", None)):
+        if not (name := hugr[hugr.module_root].metadata.get("name", None)):
             name = ""
 
         graph = gv.Digraph(name, strict=False)
         graph.attr(**graph_attr)
 
-        self._viz_node(hugr.root, hugr, graph)
+        self._viz_node(hugr.module_root, hugr, graph)
 
         for src_port, tgt_port in hugr.links():
             kind = hugr.port_kind(src_port)
@@ -232,29 +236,32 @@ class DotRenderer:
             op_name = op.op_def().name
         else:
             op_name = op.name()
+
+        label_config = {
+            "node_back_color": self.config.palette.node,
+            "node_label": op_name,
+            "node_data": data,
+            "inputs_row": inputs_row,
+            "outputs_row": outputs_row,
+            "border_colour": self.config.palette.background,
+        }
+        if hugr.children(node):
+            # Some overrides when rendering a container node
+            label_config["node_back_color"] = self.config.palette.edge
+            label_config["border_colour"] = self.config.palette.port_border
+        if node == hugr.entrypoint:
+            label_config["node_label"] = f"<b>[{label_config["node_label"]}]</b>"
+            label_config["border_colour"] = self.config.palette.entrypoint_edge
+
         if hugr.children(node):
             with graph.subgraph(name=f"cluster{node.idx}") as sub:
                 for child in hugr.children(node):
                     self._viz_node(child, hugr, sub)
-                html_label = self._format_html_label(
-                    node_back_color=self.config.palette.edge,
-                    node_label=op_name,
-                    node_data=data,
-                    border_colour=self.config.palette.port_border,
-                    inputs_row=inputs_row,
-                    outputs_row=outputs_row,
-                )
+                html_label = self._format_html_label(**label_config)
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
                 sub.attr(label="", margin="10", color=self.config.palette.edge)
         else:
-            html_label = self._format_html_label(
-                node_back_color=self.config.palette.node,
-                node_label=op_name,
-                node_data=data,
-                inputs_row=inputs_row,
-                outputs_row=outputs_row,
-                border_colour=self.config.palette.background,
-            )
+            html_label = self._format_html_label(**label_config)
             graph.node(f"{node.idx}", label=f"<{html_label}>", shape="plain")
 
     def _viz_link(
