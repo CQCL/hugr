@@ -22,7 +22,7 @@ class Module(DefinitionBuilder[ops.Module]):
 
     Examples:
         >>> m = Module()
-        >>> m.hugr.root_op()
+        >>> m.hugr.entrypoint_op()
         Module()
     """
 
@@ -52,13 +52,13 @@ class Module(DefinitionBuilder[ops.Module]):
             >>> m.declare_function("f", sig)
             Node(1)
         """
-        return self.hugr.add_node(ops.FuncDecl(name, signature), self.hugr.root)
+        return self.hugr.add_node(ops.FuncDecl(name, signature), self.hugr.entrypoint)
 
     def add_alias_decl(self, name: str, bound: TypeBound) -> Node:
         """Add a type alias declaration."""
-        return self.hugr.add_node(ops.AliasDecl(name, bound), self.hugr.root)
+        return self.hugr.add_node(ops.AliasDecl(name, bound), self.hugr.entrypoint)
 
     @property
     def metadata(self) -> dict[str, object]:
         """Metadata associated with this module."""
-        return self.hugr.root.metadata
+        return self.hugr.entrypoint.metadata
