@@ -235,13 +235,6 @@ class OpDef(ExtensionObject):
             concrete_signature: Concrete function type of the operation, only required
             if the operation is polymorphic.
         """
-        # Add the extension where the operation is defined as a runtime requirement.
-        # We don't store this in the json definition as it is redundant information.
-        if concrete_signature is not None:
-            concrete_signature = concrete_signature.with_runtime_reqs(
-                [self.get_extension().name]
-            )
-
         return ops.ExtOp(self, concrete_signature, list(args or []))
 
 
@@ -256,8 +249,6 @@ class Extension:
     name: ExtensionId
     #: The version of the extension.
     version: Version
-    #: Extensions required by this extension at runtime, identified by name.
-    runtime_reqs: set[ExtensionId] = field(default_factory=set)
     #: Type definitions in the extension.
     types: dict[str, TypeDef] = field(default_factory=dict)
     #: Operation definitions in the extension.
@@ -273,7 +264,6 @@ class Extension:
         return ext_s.Extension(
             name=self.name,
             version=self.version,  # type: ignore[arg-type]
-            runtime_reqs=self.runtime_reqs,
             types={k: v._to_serial() for k, v in self.types.items()},
             operations={k: v._to_serial() for k, v in self.operations.items()},
         )
@@ -303,12 +293,6 @@ class Extension:
         Returns:
             The added operation definition, now associated with the extension.
         """
-        if op_def.signature.poly_func is not None:
-            # Ensure the op def signature has the extension as a requirement
-            op_def.signature.poly_func = op_def.signature.poly_func.with_runtime_reqs(
-                [self.name]
-            )
-
         op_def._extension = self
         self.operations[op_def.name] = op_def
         return self.operations[op_def.name]

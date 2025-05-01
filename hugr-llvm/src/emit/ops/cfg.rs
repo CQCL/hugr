@@ -219,7 +219,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer, SubContainer};
     use hugr_core::extension::prelude::{self, bool_t};
-    use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
+    use hugr_core::extension::ExtensionRegistry;
     use hugr_core::ops::Value;
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
     use hugr_core::type_row;
@@ -239,7 +239,6 @@ mod test {
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         let t1 = INT_TYPES[0].clone();
         let t2 = INT_TYPES[1].clone();
-        let es = ExtensionSet::from_iter([int_types::EXTENSION_ID, prelude::PRELUDE_ID]);
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), t2.clone()])
             .with_outs(t2.clone())
@@ -250,11 +249,7 @@ mod test {
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let mut cfg_builder = builder
-                    .cfg_builder_exts(
-                        [(t1.clone(), in1), (t2.clone(), in2)],
-                        t2.clone().into(),
-                        es.clone(),
-                    )
+                    .cfg_builder([(t1.clone(), in1), (t2.clone(), in2)], t2.clone().into())
                     .unwrap();
 
                 // entry block takes (t1,t2) and unconditionally branches to b1 with no other outputs

@@ -614,9 +614,7 @@ mod test {
             module,
             ops::FuncDefn {
                 name: "main".into(),
-                signature: Signature::new(vec![usize_t()], vec![usize_t(), usize_t()])
-                    .with_prelude()
-                    .into(),
+                signature: Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]).into(),
             },
         );
 

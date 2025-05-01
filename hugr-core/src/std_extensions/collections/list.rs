@@ -25,7 +25,7 @@ use crate::types::{TypeName, TypeRowRV};
 use crate::{
     extension::{
         simple_op::{MakeExtensionOp, OpLoadError},
-        ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound,
+        ExtensionId, SignatureError, TypeDef, TypeDefBound,
     },
     ops::constant::CustomConst,
     ops::{custom::ExtensionOp, NamedOp},
@@ -124,11 +124,6 @@ impl CustomConst for ListValue {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
-            .union(EXTENSION_ID.into())
     }
 
     fn update_extensions(

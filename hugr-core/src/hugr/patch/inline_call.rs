@@ -121,10 +121,8 @@ mod test {
     use crate::extension::prelude::usize_t;
     use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{Input, OpType, Value};
-    use crate::std_extensions::arithmetic::{
-        int_ops::{self, IntOpDef},
-        int_types::{self, ConstInt, INT_TYPES},
-    };
+    use crate::std_extensions::arithmetic::int_types::INT_TYPES;
+    use crate::std_extensions::arithmetic::{int_ops::IntOpDef, int_types::ConstInt};
 
     use crate::types::{PolyFuncType, Signature, Type, TypeBound};
     use crate::{HugrView, Node};
@@ -145,9 +143,7 @@ mod test {
     fn test_inline() -> Result<(), Box<dyn std::error::Error>> {
         let mut mb = ModuleBuilder::new();
         let cst3 = mb.add_constant(Value::from(ConstInt::new_u(4, 3)?));
-        let sig = Signature::new_endo(INT_TYPES[4].clone())
-            .with_extension_delta(int_ops::EXTENSION_ID)
-            .with_extension_delta(int_types::EXTENSION_ID);
+        let sig = Signature::new_endo(INT_TYPES[4].clone());
         let func = {
             let mut fb = mb.define_function("foo", sig.clone())?;
             let c1 = fb.load_const(&cst3);
@@ -205,9 +201,7 @@ mod test {
     #[test]
     fn test_recursion() -> Result<(), Box<dyn std::error::Error>> {
         let mut mb = ModuleBuilder::new();
-        let sig = Signature::new_endo(INT_TYPES[5].clone())
-            .with_extension_delta(int_ops::EXTENSION_ID)
-            .with_extension_delta(int_types::EXTENSION_ID);
+        let sig = Signature::new_endo(INT_TYPES[5].clone());
         let (func, rec_call) = {
             let mut fb = mb.define_function("foo", sig.clone())?;
             let cst1 = fb.add_load_value(ConstInt::new_u(5, 1)?);
@@ -294,10 +288,7 @@ mod test {
     #[test]
     fn test_polymorphic() -> Result<(), Box<dyn std::error::Error>> {
         let tuple_ty = Type::new_tuple(vec![usize_t(); 2]);
-        let mut fb = FunctionBuilder::new(
-            "mkpair",
-            Signature::new(usize_t(), tuple_ty.clone()).with_prelude(),
-        )?;
+        let mut fb = FunctionBuilder::new("mkpair", Signature::new(usize_t(), tuple_ty.clone()))?;
         let inner = fb.define_function(
             "id",
             PolyFuncType::new(

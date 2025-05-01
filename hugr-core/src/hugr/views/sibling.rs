@@ -480,7 +480,6 @@ mod test {
     use crate::ops::OpType;
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::types::Signature;
-    use crate::utils::test_quantum_extension::EXTENSION_ID;
     use crate::IncomingPort;
 
     use super::super::descendants::test::make_module_hgr;
@@ -507,11 +506,7 @@ mod test {
 
         assert_eq!(
             region.poly_func_type(),
-            Some(
-                Signature::new_endo(vec![usize_t(), qb_t()])
-                    .with_extension_delta(EXTENSION_ID)
-                    .into()
-            )
+            Some(Signature::new_endo(vec![usize_t(), qb_t()]).into())
         );
 
         assert_eq!(

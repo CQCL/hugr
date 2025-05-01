@@ -577,7 +577,7 @@ pub(crate) mod test {
     use hugr_core::builder::{
         endo_sig, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
     };
-    use hugr_core::extension::{prelude::usize_t, ExtensionSet};
+    use hugr_core::extension::prelude::usize_t;
 
     use hugr_core::hugr::patch::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
@@ -612,11 +612,7 @@ pub(crate) mod test {
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
-            cfg_builder.simple_entry_builder_exts(
-                vec![usize_t()].into(),
-                1,
-                ExtensionSet::new(),
-            )?,
+            cfg_builder.simple_entry_builder(vec![usize_t()].into(), 1)?,
             &const_unit,
         )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;

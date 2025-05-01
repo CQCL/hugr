@@ -82,10 +82,7 @@ impl DFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.base.infer_extensions(false)?;
-        }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.base.validate()?;
         Ok(self.base)
     }
@@ -418,19 +415,15 @@ pub(crate) mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build = FunctionBuilder::new(
-                "main",
-                Signature::new(vec![bool_t()], vec![bool_t()]).with_prelude(),
-            )?;
+            let mut f_build =
+                FunctionBuilder::new("main", Signature::new(vec![bool_t()], vec![bool_t()]))?;
 
             let [i1] = f_build.input_wires_arr();
             let noop = f_build.add_dataflow_op(Noop(bool_t()), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested = f_build.dfg_builder(
-                Signature::new(type_row![], vec![bool_t()]).with_prelude(),
-                [],
-            )?;
+            let mut nested =
+                f_build.dfg_builder(Signature::new(type_row![], vec![bool_t()]), [])?;
 
             let id = nested.add_dataflow_op(Noop(bool_t()), [i1])?;
 
@@ -445,10 +438,8 @@ pub(crate) mod test {
     #[test]
     fn add_inputs_outputs() {
         let builder = || -> Result<(Hugr, Node), BuildError> {
-            let mut f_build = FunctionBuilder::new(
-                "main",
-                Signature::new(vec![bool_t()], vec![bool_t()]).with_prelude(),
-            )?;
+            let mut f_build =
+                FunctionBuilder::new("main", Signature::new(vec![bool_t()], vec![bool_t()]))?;
             let f_node = f_build.container_node();
 
             let [i0] = f_build.input_wires_arr();
