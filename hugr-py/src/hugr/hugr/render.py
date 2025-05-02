@@ -250,7 +250,7 @@ class DotRenderer:
             label_config["node_back_color"] = self.config.palette.edge
             label_config["border_colour"] = self.config.palette.port_border
         if node == hugr.entrypoint:
-            label_config["node_label"] = f"<b>[{label_config["node_label"]}]</b>"
+            label_config["node_label"] = "<b>[" + label_config["node_label"] + "]</b>"
             label_config["border_colour"] = self.config.palette.entrypoint_edge
 
         if hugr.children(node):
