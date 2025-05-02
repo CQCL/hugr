@@ -331,7 +331,7 @@ fn test_const_fold_to_nonfinite() {
     assert_fully_folded_with(&h0, |v| {
         v.get_custom_value::<ConstF64>().unwrap().value() == 1.0
     });
-    assert_eq!(h0.num_nodes(), 5);
+    assert_eq!(h0.num_nodes(), 11);
 
     // HUGR computing 1.0 / 0.0
     let mut build = DFGBuilder::new(noargfn(vec![float64_type()])).unwrap();
@@ -1322,7 +1322,7 @@ fn test_via_part_unknown_tuple() {
     .map(|t| t.to_string())
     .into_iter()
     .collect();
-    for n in hugr.nodes() {
+    for n in hugr.descendants(hugr.entrypoint()) {
         let t = hugr.get_optype(n);
         let removed = expected_op_tags.remove(&t.tag().to_string());
         assert!(removed);
@@ -1360,7 +1360,7 @@ fn test_tail_loop_unknown() {
 
     constant_fold_pass(&mut h);
     // Must keep the loop, even though we know the output, in case the output doesn't happen
-    assert_eq!(h.num_nodes(), 12);
+    assert_eq!(h.num_nodes(), 18);
     let tl = h
         .nodes()
         .filter(|n| h.get_optype(*n).is_tail_loop())

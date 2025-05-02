@@ -92,7 +92,7 @@ impl DeadCodeElimPass {
 
     /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
     /// used to evaluate these nodes.
-    /// The root node is assumed to be an entry point;
+    /// [`HugrView::entrypoint`] is assumed to be an entry point;
     /// for Module roots the client will want to mark some of the FuncDefn children
     /// as entry points too.
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = Node>) -> Self {
@@ -166,7 +166,7 @@ impl ComposablePass for DeadCodeElimPass {
     fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), Infallible> {
         let needed = self.find_needed_nodes(&*hugr);
         let remove = hugr
-            .nodes()
+            .descendants(hugr.entrypoint())
             .filter(|n| !needed.contains(n))
             .collect::<Vec<_>>();
         for n in remove {

@@ -586,9 +586,11 @@ mod test {
         );
         for (n, fd) in funcs.into_values() {
             assert!(!is_polymorphic(fd));
-            assert!(
-                mono_hugr.get_parent(n) == (fd.name != "mainish").then_some(mono_hugr.entrypoint())
-            );
+            if n == mono_hugr.entrypoint() {
+                assert_eq!(fd.name, "mainish");
+            } else {
+                assert_ne!(fd.name, "mainish");
+            }
         }
     }
 

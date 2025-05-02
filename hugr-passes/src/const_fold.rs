@@ -172,7 +172,7 @@ impl ComposablePass for ConstantFoldPass {
 }
 
 /// Exhaustively apply constant folding to a HUGR.
-/// If the Hugr is [Module]-rooted, assumes all [FuncDefn] children are reachable.
+/// If the Hugr's entrypoint is its [Module], assumes all [FuncDefn] children are reachable.
 ///
 /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
 /// [Module]: hugr_core::ops::OpType::Module

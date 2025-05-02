@@ -141,6 +141,6 @@ mod test {
         });
 
         assert_eq!(lowered.unwrap().len(), 1);
-        assert_eq!(h.num_nodes(), 3); // DFG, input, output
+        assert_eq!(h.descendants(h.entrypoint()).count(), 3); // DFG, input, output
     }
 }

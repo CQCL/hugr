@@ -653,8 +653,8 @@ pub(crate) mod test {
         );
         transform_cfg_to_nested(&mut IdentityCfgMap::new(rc));
         h.validate().unwrap();
-        assert_eq!(1, depth(&h, entry));
-        assert_eq!(1, depth(&h, exit));
+        assert_eq!(3, depth(&h, entry));
+        assert_eq!(3, depth(&h, exit));
         for n in [split, left, right, merge, head, tail] {
             assert_eq!(3, depth(&h, n));
         }
@@ -755,13 +755,13 @@ pub(crate) mod test {
         // transformation still works when we can only directly mutate the top level
         transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut h));
         h.validate().unwrap();
-        assert_eq!(1, depth(&h, entry));
-        assert_eq!(3, depth(&h, head));
+        assert_eq!(3, depth(&h, entry));
+        assert_eq!(5, depth(&h, head));
         for n in [split, left, right, merge] {
             assert_eq!(5, depth(&h, n));
         }
-        assert_eq!(3, depth(&h, tail));
-        assert_eq!(1, depth(&h, exit));
+        assert_eq!(5, depth(&h, tail));
+        assert_eq!(3, depth(&h, exit));
         Ok(())
     }
 
