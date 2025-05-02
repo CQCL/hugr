@@ -1370,13 +1370,15 @@ fn test_tail_loop_unknown() {
     let mut dfg_nodes = Vec::new();
     let mut loop_nodes = Vec::new();
     for n in h.entry_descendants() {
-        if let Some(p) = h.get_parent(n) {
-            if p == h.entrypoint() {
-                dfg_nodes.push(n)
-            } else {
-                assert_eq!(p, tl);
-                loop_nodes.push(n);
-            }
+        if n == h.entrypoint() {
+            continue;
+        }
+        let p = h.get_parent(n).unwrap();
+        if p == h.entrypoint() {
+            dfg_nodes.push(n)
+        } else {
+            assert_eq!(p, tl);
+            loop_nodes.push(n);
         }
     }
     let tag_string = |n: &Node| format!("{:?}", h.get_optype(*n).tag());
