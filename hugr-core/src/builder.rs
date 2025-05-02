@@ -151,6 +151,10 @@ pub enum BuildError {
     /// CFG can only have one entry.
     #[error("CFG entry node already built for CFG node: {0}.")]
     EntryBuiltError(Node),
+    /// We don't allow creating BasicBlockBuilder<Hugr>s when the sum-rows
+    /// are not homogeneous. Use a CFGBuilder and create a valid graph instead.
+    #[error("Cannot initialize hugr for a BasicBlockBuilder with complex sum-rows. Use a CFGBuilder instead.")]
+    BasicBlockTooComplex,
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node} does not have type {op_desc} as expected.")]
     #[allow(missing_docs)]

@@ -27,25 +27,19 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
+    /// Returns a new DFGBuilder with the given base and parent node.
+    ///
+    /// Sets up the input and output nodes of the region. If `parent` already has
+    /// input and output nodes, use [`DFGBuilder::create`] instead.
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
         signature: Signature,
     ) -> Result<Self, BuildError> {
-        let num_in_wires = signature.input().len();
-        let num_out_wires = signature.output().len();
-        /* For a given dataflow graph with extension requirements IR -> IR + dR,
-         - The output node's extension requirements are IR + dR -> IR + dR
-           (but we expect no output wires)
+        debug_assert_eq!(base.as_ref().children(parent).count(), 0);
 
-         - The input node's extension requirements are IR -> IR, though we
-           expect no input wires. We must avoid the case where the difference
-           in extensions is an open variable, as it would be if the requirements
-           were 0 -> IR.
-           N.B. This means that for input nodes, we can't infer the extensions
-           from the input wires as we normally expect, but have to infer the
-           output wires and make use of the equality between the two.
-        */
+        let num_in_wires = signature.input_count();
+        let num_out_wires = signature.output_count();
         let input = ops::Input {
             types: signature.input().clone(),
         };
@@ -54,6 +48,28 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         };
         base.as_mut().add_node_with_parent(parent, input);
         base.as_mut().add_node_with_parent(parent, output);
+
+        Ok(Self {
+            base,
+            dfg_node: parent,
+            num_in_wires,
+            num_out_wires,
+        })
+    }
+
+    /// Returns a new DFGBuilder with the given base and parent node.
+    ///
+    /// If `parent` doesn't have input and output nodes, use
+    /// [`DFGBuilder::create_with_io`] instead.
+    pub(super) fn create(base: T, parent: Node) -> Result<Self, BuildError> {
+        let sig = base
+            .as_ref()
+            .get_optype(parent)
+            .as_dataflow_block()
+            .expect("Parent must be a dataflow block")
+            .inner_signature();
+        let num_in_wires = sig.input_count();
+        let num_out_wires = sig.output_count();
 
         Ok(Self {
             base,
@@ -143,7 +159,7 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        let signature = signature.into();
+        let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
         let op = ops::FuncDefn {
             signature,

@@ -158,7 +158,7 @@ fn test_big() {
         .unwrap();
 
     let mut h = build.finish_hugr_with_outputs(to_int.outputs()).unwrap();
-    assert_eq!(h.num_nodes(), 8);
+    assert_eq!(h.num_nodes(), 12);
 
     constant_fold_pass(&mut h);
 

@@ -807,18 +807,15 @@ pub(in crate::hugr::patch) mod test {
 
         // 1. Locate the CX in h
         let h_node_cx: Node = h
-            .nodes()
+            .descendants(h.entrypoint())
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
-        let s: Vec<Node> = vec![h_node_cx].into_iter().collect();
+        let s: Vec<Node> = vec![h_node_cx];
         // 2. Construct a new DFG-rooted hugr for the replacement
         let n: Hugr = dfg_hugr2;
         // 3. Construct the input and output matchings
         // 3.1. Locate the Output and its predecessor H in n
-        let n_node_output = n
-            .nodes()
-            .find(|node: &Node| n.get_optype(*node).tag() == OpTag::Output)
-            .unwrap();
+        let n_node_output = n.get_io(n.entrypoint()).unwrap()[1];
         let (_n_node_input, n_node_h) = n.input_neighbours(n_node_output).collect_tuple().unwrap();
         // 3.2. Locate the ports we need to specify as "glue" in n
         let (n_port_0, n_port_1) = n
@@ -1019,7 +1016,7 @@ pub(in crate::hugr::patch) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.num_nodes(), 3);
+        assert_eq!(hugr.num_nodes(), 7);
     }
 
     /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting
@@ -1078,7 +1075,7 @@ pub(in crate::hugr::patch) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.num_nodes(), 4);
+        assert_eq!(hugr.num_nodes(), 8);
     }
 
     #[rstest]
@@ -1117,12 +1114,12 @@ pub(in crate::hugr::patch) mod test {
 
         let rewrite = SimpleReplacement::new(subgraph, replacement, nu_inp, nu_out);
 
-        assert_eq!(h.num_nodes(), 4);
+        assert_eq!(h.num_nodes(), 8);
 
         rewrite.apply(&mut h).unwrap_or_else(|e| panic!("{e}"));
         h.validate().unwrap_or_else(|e| panic!("{e}"));
 
-        assert_eq!(h.num_nodes(), 6);
+        assert_eq!(h.num_nodes(), 10);
     }
 
     #[rstest]

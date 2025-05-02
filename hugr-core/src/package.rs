@@ -296,26 +296,17 @@ pub enum PackageValidationError {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::builder::test::{
         simple_cfg_hugr, simple_dfg_hugr, simple_funcdef_hugr, simple_module_hugr,
     };
-    use crate::ops::dataflow::IOTrait;
-    use crate::ops::Input;
-
-    use super::*;
-    use rstest::{fixture, rstest};
-
-    #[fixture]
-    fn simple_input_node() -> Hugr {
-        Hugr::new(Input::new(vec![]))
-    }
+    use rstest::rstest;
 
     #[rstest]
     #[case::module("module", simple_module_hugr())]
     #[case::funcdef("funcdef", simple_funcdef_hugr())]
     #[case::dfg("dfg", simple_dfg_hugr())]
     #[case::cfg("cfg", simple_cfg_hugr())]
-    #[case::unsupported_input("input", simple_input_node())]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_to_package(#[case] test_name: &str, #[case] hugr: Hugr) {
         let package = &Package::from_hugr(hugr.clone());

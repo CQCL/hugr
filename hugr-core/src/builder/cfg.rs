@@ -224,7 +224,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             self.hugr_mut().add_node_with_parent(parent, op)
         };
 
-        BlockBuilder::create(self.hugr_mut(), block_n)
+        BlockBuilder::create(self.hugr_mut(), block_n, true)
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with
@@ -314,7 +314,19 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
-    fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
+
+    /// Create a new BlockBuilder.
+    ///
+    /// # Parameters
+    /// - `base`: The base HUGR to build on.
+    /// - `block_n`: The block we are building.
+    /// - `add_io`: Whether to initialize the inputs and outputs nodes for to the block.
+    fn create(base: B, block_n: Node, add_io: bool) -> Result<Self, BuildError> {
+        if !add_io {
+            let db = DFGBuilder::create(base, block_n)?;
+            return Ok(BlockBuilder::from_dfg_builder(db));
+        }
+
         let block_op = base
             .as_ref()
             .get_optype(block_n)
@@ -348,16 +360,29 @@ impl BlockBuilder<Hugr> {
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
-        let other_outputs = other_outputs.into();
-        let op = DataflowBlock {
-            inputs: inputs.clone(),
-            other_outputs: other_outputs.clone(),
-            sum_rows,
-        };
+        let other_outputs: TypeRow = other_outputs.into();
+        let num_out_branches = sum_rows.len();
 
-        let base = Hugr::new(op);
-        let root = base.entrypoint();
-        Self::create(base, root)
+        // We only support blocks where all the possible `sum_rows` branches have the same types,
+        // as that lets us branch it directly to an exit node.
+        if let Some(row) = sum_rows.first() {
+            if sum_rows.iter().skip(1).any(|r2| row != r2) {
+                return Err(BuildError::BasicBlockTooComplex);
+            }
+        }
+        let cfg_outputs = sum_rows.first().cloned().unwrap_or_default();
+        let cfg_outputs = cfg_outputs.extend(other_outputs.as_slice());
+
+        let mut cfg = CFGBuilder::new(Signature::new(inputs, cfg_outputs))?;
+        let block = cfg.entry_builder(sum_rows, other_outputs)?;
+        let block = block.finish_sub_container()?;
+        for i in 0..num_out_branches {
+            cfg.branch(&block, i, &cfg.exit_block())?;
+        }
+        let mut base = std::mem::take(cfg.hugr_mut());
+        let root = block.node();
+        base.set_entrypoint(root);
+        Self::create(base, root, false)
     }
 
     /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
@@ -375,7 +400,7 @@ impl BlockBuilder<Hugr> {
 pub(crate) mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
-    use crate::extension::prelude::usize_t;
+    use crate::extension::prelude::{bool_t, usize_t};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::hugr::ValidationError;
     use crate::type_row;
@@ -413,6 +438,29 @@ pub(crate) mod test {
         let mut cfg_builder = CFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()]))?;
         build_basic_cfg(&mut cfg_builder)?;
         assert_matches!(cfg_builder.finish_hugr(), Ok(_));
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_cfg_block() -> Result<(), BuildError> {
+        assert_eq!(
+            BlockBuilder::new(
+                vec![],
+                [vec![usize_t()].into(), vec![bool_t()].into()],
+                vec![]
+            ),
+            Err(BuildError::BasicBlockTooComplex)
+        );
+
+        let sum_rows: Vec<TypeRow> = vec![vec![usize_t()].into(), vec![usize_t()].into()];
+        let mut block_builder =
+            BlockBuilder::new(vec![usize_t()], sum_rows.clone(), vec![usize_t()])?;
+        let [inp] = block_builder.input_wires_arr();
+        let branch = block_builder.make_sum(0, sum_rows, [inp])?;
+        let hugr = block_builder.finish_hugr_with_outputs(branch, [inp])?;
+
+        hugr.validate().unwrap();
 
         Ok(())
     }

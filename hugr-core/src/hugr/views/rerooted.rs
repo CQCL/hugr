@@ -107,7 +107,6 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
                 fn extensions(&self) -> &crate::extension::ExtensionRegistry;
                 fn validate(&self) -> Result<(), crate::hugr::ValidationError>;
-                fn validate_no_extensions(&self) -> Result<(), crate::hugr::ValidationError>;
                 fn extract_hugr(&self) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
         }
     }
@@ -149,7 +148,6 @@ impl<H: HugrMut> HugrMut for Rerooted<H> {
 #[cfg(test)]
 mod test {
     use crate::builder::{Dataflow, FunctionBuilder, HugrBuilder, SubContainer};
-    use crate::extension::ExtensionSet;
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::HugrMut;
     use crate::ops::handle::NodeHandle;
@@ -184,7 +182,6 @@ mod test {
                 inputs: type_row![],
                 other_outputs: type_row![],
                 sum_rows: vec![type_row![]],
-                extension_delta: ExtensionSet::new(),
             }
             .into();
             dfg_v.replace_op(root, bb.clone());

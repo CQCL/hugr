@@ -812,7 +812,7 @@ mod test {
         // Removed nodes...
         assert_eq!(
             check_same_errors(Replacement {
-                removal: vec![h.entrypoint()],
+                removal: vec![h.module_root()],
                 ..rep.clone()
             }),
             ReplaceError::CantReplaceRoot

@@ -245,8 +245,15 @@ impl TryFrom<SerHugrLatest> for Hugr {
         // an underestimate
         let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
 
+        // Since the new Hugr may add some nodes to contain the root (if the
+        // encoded file did not have a module at the root), we need a function
+        // to map the node indices.
+        let padding_nodes = hugr.entrypoint.index();
+        let hugr_node =
+            |node: Node| -> Node { portgraph::NodeIndex::new(node.index() + padding_nodes).into() };
+
         for node_ser in nodes {
-            hugr.add_node_with_parent(node_ser.parent, node_ser.op);
+            hugr.add_node_with_parent(hugr_node(node_ser.parent), node_ser.op);
         }
 
         if let Some(entrypoint) = entrypoint {
@@ -254,10 +261,10 @@ impl TryFrom<SerHugrLatest> for Hugr {
         }
 
         if let Some(metadata) = metadata {
-            for (node, metadata) in metadata.into_iter().enumerate() {
+            for (node_idx, metadata) in metadata.into_iter().enumerate() {
                 if let Some(metadata) = metadata {
-                    let node = portgraph::NodeIndex::new(node);
-                    hugr.metadata[node] = Some(metadata);
+                    let node = hugr_node(portgraph::NodeIndex::new(node_idx).into());
+                    hugr.metadata[node.into_portgraph()] = Some(metadata);
                 }
             }
         }
@@ -283,6 +290,9 @@ impl TryFrom<SerHugrLatest> for Hugr {
             Ok(offset)
         };
         for [(src, from_offset), (dst, to_offset)] in edges {
+            let src = hugr_node(src);
+            let dst = hugr_node(dst);
+
             let src_port = unwrap_offset(src, from_offset, Direction::Outgoing, &hugr)?;
             let dst_port = unwrap_offset(dst, to_offset, Direction::Incoming, &hugr)?;
 

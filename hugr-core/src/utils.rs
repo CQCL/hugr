@@ -58,6 +58,7 @@ where
 ///
 /// See also [`try_collect_array`] for a non-panicking version.
 #[inline]
+#[track_caller]
 pub fn collect_array<const N: usize, T: Debug>(arr: impl IntoIterator<Item = T>) -> [T; N] {
     try_collect_array(arr).unwrap_or_else(|v| panic!("Expected {} elements, got {:?}", N, v))
 }
@@ -77,6 +78,7 @@ pub fn collect_array<const N: usize, T: Debug>(arr: impl IntoIterator<Item = T>)
 ///
 /// See also [`collect_array`].
 #[inline]
+#[track_caller]
 pub fn try_collect_array<const N: usize, T>(
     arr: impl IntoIterator<Item = T>,
 ) -> Result<[T; N], Vec<T>> {

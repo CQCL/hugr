@@ -4,7 +4,7 @@ expression: h.dot_string()
 ---
 digraph {
 0 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(0) Module</td></tr></table>>]
-1 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(1) FuncDefn: "main"</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: [qubit, qubit] -&gt; [.TO_BE_INFERRED][qubit, qubit]</td></tr></table>>]
+1 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(1) FuncDefn: "main"</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: [qubit, qubit] -&gt; [qubit, qubit]</td></tr></table>>]
 2 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="2">(2) Input</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: qubit</td><td port="out1" align="text" colspan="1" cellpadding="1" >1: qubit</td></tr></table>>]
 2:out0 -> 4:in0 [style=""]
 2:out1 -> 4:in1 [style=""]

@@ -16,8 +16,8 @@ use crate::{type_row, Node};
 
 use super::{PatchHugrMut, PatchVerification};
 
-/// Moves part of a Control-flow Sibling Graph into a new CFG-node
-/// that is the only child of a new Basic Block in the original CSG.
+/// Moves some of the blocks in a Control-flow region into a new CFG-node that
+/// is the only child of a new Basic Block in the original CSG.
 pub struct OutlineCfg {
     blocks: HashSet<Node>,
 }
@@ -140,7 +140,8 @@ impl PatchHugrMut for OutlineCfg {
             new_block_bldr
                 .set_outputs(pred_wire, cfg.outputs())
                 .unwrap();
-            let ins_res = h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone());
+            let new_block_hugr = std::mem::take(new_block_bldr.hugr_mut());
+            let ins_res = h.insert_hugr(outer_cfg, new_block_hugr);
             (
                 ins_res.inserted_entrypoint,
                 *ins_res.node_map.get(&cfg.node()).unwrap(),
@@ -480,7 +481,7 @@ mod test {
         let root = h.entrypoint();
         let (new_block, _, _) =
             outline_cfg_check_parents(&mut h, root, vec![entry, left, right, merge]);
-        h.validate().unwrap();
+        h.validate().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(new_block, h.children(h.entrypoint()).next().unwrap());
         assert_eq!(h.output_neighbours(new_block).collect_vec(), [head]);
     }
@@ -499,15 +500,13 @@ mod test {
         }
         assert_eq!(h.get_parent(new_block), Some(cfg));
         assert!(h.get_optype(new_block).is_dataflow_block());
-        #[allow(deprecated)]
-        let b = h.base_hugr(); // To cope with `h` potentially being a SiblingMut
-        assert_eq!(b.get_parent(new_cfg), Some(new_block));
+        assert_eq!(h.get_parent(new_cfg), Some(new_block));
         for n in blocks {
-            assert_eq!(b.get_parent(n), Some(new_cfg));
+            assert_eq!(h.get_parent(n), Some(new_cfg));
         }
-        assert!(b.get_optype(new_cfg).is_cfg());
-        let exit_block = b.children(new_cfg).nth(1).unwrap();
-        assert!(b.get_optype(exit_block).is_exit_block());
+        assert!(h.get_optype(new_cfg).is_cfg());
+        let exit_block = h.children(new_cfg).nth(1).unwrap();
+        assert!(h.get_optype(exit_block).is_exit_block());
         (new_block, new_cfg, exit_block)
     }
 }

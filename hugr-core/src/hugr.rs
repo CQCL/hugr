@@ -30,7 +30,6 @@ use crate::extension::resolution::{
     WeakExtensionRegistry,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet};
-use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{self, NamedOp, OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
@@ -253,10 +252,10 @@ impl Hugr {
                 self.op_types.swap(pg_target, pg_source);
                 self.hierarchy.swap_nodes(pg_target, pg_source);
                 rekey(source, target);
-            }
 
-            if source.into_portgraph() == self.entrypoint {
-                new_entrypoint = target.into_portgraph();
+                if source.into_portgraph() == self.entrypoint {
+                    new_entrypoint = target.into_portgraph();
+                }
             }
         }
         self.module_root = portgraph::NodeIndex::new(0);

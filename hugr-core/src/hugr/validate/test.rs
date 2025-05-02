@@ -886,7 +886,6 @@ fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
         File::open(test_file!("issue-1189.json")).unwrap(),
     ))
     .unwrap();
-    println!("{}", hugr.mermaid_string());
     assert_matches!(
         hugr.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch{..}, .. })

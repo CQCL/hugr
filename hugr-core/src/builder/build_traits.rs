@@ -94,7 +94,7 @@ pub trait Container {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature = signature.into();
+        let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
         let f_node = self.add_child_node(ops::FuncDefn {
             name: name.into(),
@@ -284,6 +284,7 @@ pub trait Dataflow: Container {
     /// # Panics
     ///
     /// Panics if the number of input Wires does not match the size of the array.
+    #[track_caller]
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
         collect_array(self.input_wires())
     }
@@ -676,7 +677,7 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     nodetype: impl Into<OpType>,
     inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let op = nodetype.into();
+    let op: OpType = nodetype.into();
     let num_outputs = op.value_output_count();
     let op_node = data_builder.add_child_node(op.clone());
 

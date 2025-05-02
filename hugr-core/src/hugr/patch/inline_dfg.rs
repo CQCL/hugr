@@ -14,11 +14,17 @@ pub struct InlineDFG(pub DfgID);
 #[non_exhaustive]
 pub enum InlineDFGError {
     /// Node to inline was not a DFG. (E.g. node has been overwritten since the DfgID originated.)
-    #[error("Node {0} was not a DFG")]
-    NotDFG(Node),
-    /// DFG has no parent (is the root).
-    #[error("Node did not have a parent into which to inline")]
-    NoParent,
+    #[error("{node} was not a DFG")]
+    NotDFG {
+        /// The node we tried to inline
+        node: Node,
+    },
+    /// The DFG node is the hugr entrypoint
+    #[error("Cannot inline the entrypoint node, {node}")]
+    CantInlineEntrypoint {
+        /// The node we tried to inline
+        node: Node,
+    },
 }
 
 impl PatchVerification for InlineDFG {
@@ -29,10 +35,10 @@ impl PatchVerification for InlineDFG {
     fn verify(&self, h: &impl crate::HugrView<Node = Node>) -> Result<(), Self::Error> {
         let n = self.0.node();
         if h.get_optype(n).as_dfg().is_none() {
-            return Err(InlineDFGError::NotDFG(n));
+            return Err(InlineDFGError::NotDFG { node: n });
         };
-        if h.get_parent(n).is_none() {
-            return Err(InlineDFGError::NoParent);
+        if n == h.entrypoint() {
+            return Err(InlineDFGError::CantInlineEntrypoint { node: n });
         };
         Ok(())
     }
@@ -211,20 +217,22 @@ mod test {
             outer.get_parent(outer.get_parent(add).unwrap()),
             outer.get_parent(sub)
         );
-        assert_eq!(outer.nodes().count(), 10); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
+        assert_eq!(outer.descendants(outer.entrypoint()).count(), 10); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
         {
             // Check we can't inline the outer DFG
             let mut h = outer.clone();
             assert_eq!(
                 h.apply_patch(InlineDFG(DfgID::from(h.entrypoint()))),
-                Err(InlineDFGError::NoParent)
+                Err(InlineDFGError::CantInlineEntrypoint {
+                    node: h.entrypoint()
+                })
             );
             assert_eq!(h, outer); // unchanged
         }
 
         outer.apply_patch(InlineDFG(*inner.handle()))?;
         outer.validate()?;
-        assert_eq!(outer.nodes().count(), 7);
+        assert_eq!(outer.nodes().count(), 11);
         assert_eq!(find_dfgs(&outer), vec![outer.entrypoint()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(outer.get_parent(add), Some(outer.entrypoint()));
@@ -253,8 +261,8 @@ mod test {
 
         let mut h = h.finish_hugr_with_outputs(cx.outputs())?;
         assert_eq!(find_dfgs(&h), vec![h.entrypoint(), swap.node()]);
-        assert_eq!(h.nodes().count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
-                                          // No permutation outside the swap DFG:
+        assert_eq!(h.descendants(h.entrypoint()).count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
+                                                              // No permutation outside the swap DFG:
         assert_eq!(
             h.node_connections(p_h.node(), swap.node())
                 .collect::<Vec<_>>(),
@@ -280,7 +288,7 @@ mod test {
 
         h.apply_patch(InlineDFG(*swap.handle()))?;
         assert_eq!(find_dfgs(&h), vec![h.entrypoint()]);
-        assert_eq!(h.nodes().count(), 5); // Dfg+I+O
+        assert_eq!(h.descendants(h.entrypoint()).count(), 5); // Dfg+I+O
         let mut ops = extension_ops(&h);
         ops.sort_by_key(|n| h.num_outputs(*n)); // Put H before CX
         let [h_gate, cx] = ops.try_into().unwrap();
