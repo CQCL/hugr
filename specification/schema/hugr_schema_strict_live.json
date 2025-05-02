@@ -1302,6 +1302,18 @@
                     "default": null,
                     "description": "The name of the encoder used to generate the Hugr.",
                     "title": "Encoder"
+                },
+                "entrypoint": {
+                    "anyOf": [
+                        {
+                            "type": "integer"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Entrypoint"
                 }
             },
             "required": [
