@@ -514,12 +514,7 @@ pub(crate) mod test {
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
         assert_eq!(simple_dfg_hugr.num_nodes(), 7);
-        assert_eq!(
-            simple_dfg_hugr
-                .descendants(simple_dfg_hugr.entrypoint())
-                .count(),
-            3
-        );
+        assert_eq!(simple_dfg_hugr.entry_descendants().count(), 3);
         assert_matches!(simple_dfg_hugr.entrypoint_optype().tag(), OpTag::Dfg);
     }
 

@@ -718,7 +718,7 @@ pub(in crate::hugr::patch) mod test {
         let mut h: Hugr = simple_hugr;
         // 1. Locate the CX and its successor H's in h
         let h_node_cx: Node = h
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
@@ -728,7 +728,7 @@ pub(in crate::hugr::patch) mod test {
         // 3. Construct the input and output matchings
         // 3.1. Locate the CX and its predecessor H's in n
         let n_node_cx = n
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *n.get_optype(*node) == cx_gate().into())
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
@@ -807,7 +807,7 @@ pub(in crate::hugr::patch) mod test {
 
         // 1. Locate the CX in h
         let h_node_cx: Node = h
-            .descendants(h.entrypoint())
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
         let s: Vec<Node> = vec![h_node_cx];
@@ -867,7 +867,7 @@ pub(in crate::hugr::patch) mod test {
         let orig = h.clone();
 
         let removal = h
-            .nodes()
+            .entry_descendants()
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect_vec();
         let inputs = h
@@ -932,7 +932,7 @@ pub(in crate::hugr::patch) mod test {
         let orig = h.clone();
 
         let removal = h
-            .nodes()
+            .entry_descendants()
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect_vec();
 
@@ -1084,7 +1084,7 @@ pub(in crate::hugr::patch) mod test {
 
         let mut h = dfg_hugr2;
         let h_node = h
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == h_gate().into())
             .unwrap();
 

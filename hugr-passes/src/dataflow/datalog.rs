@@ -161,7 +161,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
 
-        node(n) <-- for n in hugr.nodes();
+        node(n) <-- for n in hugr.entry_descendants();
 
         in_wire(n, p) <-- node(n), for (p,_) in hugr.in_value_types(*n); // Note, gets connected inports only
         out_wire(n, p) <-- node(n), for (p,_) in hugr.out_value_types(*n); // (and likewise)

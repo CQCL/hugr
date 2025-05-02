@@ -94,7 +94,7 @@ impl ComposablePass for RemoveDeadFuncsPass {
         )?
         .collect::<HashSet<_>>();
         let unreachable = hugr
-            .nodes()
+            .entry_descendants()
             .filter(|n| {
                 OpTag::Function.is_superset(hugr.get_optype(*n).tag()) && !reachable.contains(n)
             })
@@ -179,7 +179,7 @@ mod test {
         let mut hugr = hb.finish_hugr()?;
 
         let avail_funcs = hugr
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| {
                 hugr.get_optype(n)
                     .as_func_defn()

@@ -136,11 +136,12 @@ pub trait HugrView: HugrInternals {
 
     /// Iterates over the all the nodes in the HUGR.
     ///
-    /// This iterator returns every node in the HUGR, including those that are
-    /// not descendants from the entrypoint node.
+    /// This iterator returns every node in the HUGR. In most cases, you will
+    /// want to use [`HugrView::entry_descendants`] instead to get the nodes
+    /// that are reachable from the entrypoint.
     ///
-    /// See [`HugrView::descendants`] and [`HugrView::children`] for more specific
-    /// iterators.
+    /// See also [`HugrView::descendants`] and [`HugrView::children`] for more
+    /// general iterators.
     fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Iterator over ports of node in a given direction.
@@ -290,6 +291,14 @@ pub trait HugrView: HugrInternals {
     ///
     /// Yields the node itself first, followed by its children in breath-first order.
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+
+    /// Returns an iterator over all the descendants of the hugr entrypoint,
+    /// including the node itself.
+    ///
+    /// Yields the node itself first, followed by its children in breath-first order.
+    fn entry_descendants(&self) -> impl Iterator<Item = Self::Node> + Clone {
+        self.descendants(self.entrypoint())
+    }
 
     /// Returns the first child of the specified node (if it is a parent).
     /// Useful because `x.children().next()` leaves x borrowed.

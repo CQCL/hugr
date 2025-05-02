@@ -16,7 +16,7 @@ pub fn replace_many_ops<S: Into<OpType>>(
     mapping: impl Fn(&OpType) -> Option<S>,
 ) -> Vec<(Node, OpType)> {
     let replacements = hugr
-        .nodes()
+        .entry_descendants()
         .filter_map(|node| {
             let new_op = mapping(hugr.get_optype(node))?;
             Some((node, new_op))
@@ -58,7 +58,7 @@ pub fn lower_ops(
     lowering: impl Fn(&OpType) -> Option<Hugr>,
 ) -> Result<Vec<(Node, OpType)>, LowerError> {
     let replacements = hugr
-        .nodes()
+        .entry_descendants()
         .filter_map(|node| {
             let hugr = lowering(hugr.get_optype(node))?;
             Some((node, hugr))
@@ -141,6 +141,6 @@ mod test {
         });
 
         assert_eq!(lowered.unwrap().len(), 1);
-        assert_eq!(h.descendants(h.entrypoint()).count(), 3); // DFG, input, output
+        assert_eq!(h.entry_descendants().count(), 3); // DFG, input, output
     }
 }

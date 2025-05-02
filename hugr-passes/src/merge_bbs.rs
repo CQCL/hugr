@@ -264,7 +264,7 @@ mod test {
             .unwrap();
         // Check the Noop('s) is/are in the right block(s)
         let nops = h
-            .nodes()
+            .entry_descendants()
             .filter(|n| h.get_optype(*n).cast::<Noop>().is_some());
         let (entry_nop, expected_backedge_target) = if self_loop {
             assert_eq!(h.children(r).count(), 2);
@@ -289,7 +289,7 @@ mod test {
         );
         // And the Noop in the entry block is consumed by the custom Test op
         let tst = find_unique(
-            h.nodes(),
+            h.entry_descendants(),
             |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(entry));
@@ -356,12 +356,14 @@ mod test {
             .try_into()
             .unwrap();
         let tst = find_unique(
-            h.nodes(),
+            h.entry_descendants(),
             |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(bb));
 
-        let inp = find_unique(h.nodes(), |n| matches!(h.get_optype(*n), OpType::Input(_)));
+        let inp = find_unique(h.entry_descendants(), |n| {
+            matches!(h.get_optype(*n), OpType::Input(_))
+        });
         let mut tst_inputs = h.input_neighbours(tst).collect::<Vec<_>>();
         tst_inputs.remove(tst_inputs.iter().find_position(|n| **n == inp).unwrap().0);
         let [other_input] = tst_inputs.try_into().unwrap();

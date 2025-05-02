@@ -331,7 +331,7 @@ fn test_const_fold_to_nonfinite() {
     assert_fully_folded_with(&h0, |v| {
         v.get_custom_value::<ConstF64>().unwrap().value() == 1.0
     });
-    assert_eq!(h0.num_nodes(), 11);
+    assert_eq!(h0.num_nodes(), 9);
 
     // HUGR computing 1.0 / 0.0
     let mut build = DFGBuilder::new(noargfn(vec![float64_type()])).unwrap();
@@ -340,7 +340,7 @@ fn test_const_fold_to_nonfinite() {
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
     let mut h1 = build.finish_hugr_with_outputs(x2.outputs()).unwrap();
     constant_fold_pass(&mut h1);
-    assert_eq!(h1.num_nodes(), 8);
+    assert_eq!(h1.num_nodes(), 12);
 }
 
 #[test]
@@ -1322,7 +1322,7 @@ fn test_via_part_unknown_tuple() {
     .map(|t| t.to_string())
     .into_iter()
     .collect();
-    for n in hugr.descendants(hugr.entrypoint()) {
+    for n in hugr.entry_descendants() {
         let t = hugr.get_optype(n);
         let removed = expected_op_tags.remove(&t.tag().to_string());
         assert!(removed);
@@ -1360,16 +1360,16 @@ fn test_tail_loop_unknown() {
 
     constant_fold_pass(&mut h);
     // Must keep the loop, even though we know the output, in case the output doesn't happen
-    assert_eq!(h.num_nodes(), 18);
+    assert_eq!(h.num_nodes(), 16);
     let tl = h
-        .nodes()
+        .entry_descendants()
         .filter(|n| h.get_optype(*n).is_tail_loop())
         .exactly_one()
         .ok()
         .unwrap();
     let mut dfg_nodes = Vec::new();
     let mut loop_nodes = Vec::new();
-    for n in h.nodes() {
+    for n in h.entry_descendants() {
         if let Some(p) = h.get_parent(n) {
             if p == h.entrypoint() {
                 dfg_nodes.push(n)
@@ -1526,7 +1526,7 @@ fn test_cfg(
         .ok()
         .unwrap();
     let cfg = hugr
-        .nodes()
+        .entry_descendants()
         .filter(|n| hugr.get_optype(*n).is_cfg())
         .exactly_one()
         .ok()

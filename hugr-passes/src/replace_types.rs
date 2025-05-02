@@ -523,7 +523,7 @@ impl ComposablePass for ReplaceTypes {
 
     fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
-        for n in hugr.nodes().collect::<Vec<_>>() {
+        for n in hugr.entry_descendants().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             if let Some(new_sig) = new_dfsig
@@ -789,7 +789,9 @@ mod test {
 
         assert!(lowerer(&ext).run(&mut h).unwrap());
 
-        let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        let ext_ops = h
+            .entry_descendants()
+            .filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(
             ext_ops.map(|e| e.unqualified_id()).sorted().collect_vec(),
             ["get", "itousize", "lowered_read_bool", "panic",]
@@ -832,7 +834,7 @@ mod test {
         lowerer(&ext).run(&mut h).unwrap();
 
         let ext_ops = h
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| h.get_optype(n).as_extension_op())
             .collect_vec();
         assert_eq!(
@@ -914,7 +916,7 @@ mod test {
             assert_eq!(sig.input(), sig.output());
             // This will have to update inside the Const
             let cst = h
-                .nodes()
+                .entry_descendants()
                 .filter_map(|n| h.get_optype(n).as_const())
                 .exactly_one()
                 .ok()
@@ -1027,7 +1029,7 @@ mod test {
             )
         );
         assert_eq!(
-            h.nodes()
+            h.entry_descendants()
                 .filter_map(|n| h.get_optype(n).as_extension_op())
                 .map(|x| x.qualified_id())
                 .sorted()
@@ -1115,7 +1117,7 @@ mod test {
 
         assert_eq!(h.output_neighbours(read_func).count(), 2);
         let ext_op_names = h
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| h.get_optype(n).as_extension_op())
             .map(|e| e.unqualified_id())
             .sorted()

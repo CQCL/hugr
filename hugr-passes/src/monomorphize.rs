@@ -428,7 +428,7 @@ mod test {
         };
         let mut hugr = mb.finish_hugr()?;
         assert_eq!(
-            hugr.nodes()
+            hugr.entry_descendants()
                 .filter(|n| hugr.get_optype(*n).is_func_defn())
                 .count(),
             3
@@ -595,7 +595,7 @@ mod test {
     }
 
     fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
-        h.nodes()
+        h.entry_descendants()
             .filter_map(|n| h.get_optype(n).as_func_defn().map(|fd| (&fd.name, (n, fd))))
             .collect::<HashMap<_, _>>()
     }

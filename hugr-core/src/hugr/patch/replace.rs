@@ -684,7 +684,7 @@ mod test {
     }
 
     fn find_node(h: &Hugr, s: &str) -> crate::Node {
-        h.nodes()
+        h.entry_descendants()
             .filter(|n| format!("{}", h.get_optype(*n)).contains(s))
             .exactly_one()
             .ok()

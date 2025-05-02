@@ -130,11 +130,13 @@ mod test {
     use super::{HugrMut, InlineCall, InlineCallError};
 
     fn calls(h: &impl HugrView<Node = Node>) -> Vec<Node> {
-        h.nodes().filter(|n| h.get_optype(*n).is_call()).collect()
+        h.entry_descendants()
+            .filter(|n| h.get_optype(*n).is_call())
+            .collect()
     }
 
     fn extension_ops(h: &impl HugrView<Node = Node>) -> Vec<Node> {
-        h.nodes()
+        h.entry_descendants()
             .filter(|n| h.get_optype(*n).is_extension_op())
             .collect()
     }

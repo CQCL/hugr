@@ -115,7 +115,9 @@ pub struct DelegatingLinearizer {
     // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        Arc<dyn Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>>,
+        Arc<
+            dyn Fn(&[TypeArg], usize, &CallbackHandler<'_>) -> Result<NodeTemplate, LinearizeError>,
+        >,
     >,
 }
 
@@ -224,7 +226,7 @@ impl DelegatingLinearizer {
     pub fn register_callback(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler<'_>) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
@@ -470,7 +472,9 @@ mod test {
 
         assert!(lowerer.run(&mut h).unwrap());
 
-        let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        let ext_ops = h
+            .entry_descendants()
+            .filter_map(|n| h.get_optype(n).as_extension_op());
         let mut counts = HashMap::<OpName, u32>::new();
         for e in ext_ops {
             *counts.entry(e.qualified_id()).or_default() += 1;
@@ -708,7 +712,7 @@ mod test {
         assert!(lowerer.run(&mut h).unwrap());
 
         let (discard_ops, copy_ops): (Vec<_>, Vec<_>) = h
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| h.get_optype(n).as_extension_op().map(|e| (n, e)))
             .partition(|(n, _)| {
                 successors(Some(*n), |n| h.get_parent(*n)).contains(&discard.node())

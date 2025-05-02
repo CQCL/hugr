@@ -166,7 +166,7 @@ impl ComposablePass for DeadCodeElimPass {
     fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), Infallible> {
         let needed = self.find_needed_nodes(&*hugr);
         let remove = hugr
-            .descendants(hugr.entrypoint())
+            .entry_descendants()
             .filter(|n| !needed.contains(n))
             .collect::<Vec<_>>();
         for n in remove {

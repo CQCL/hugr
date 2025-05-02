@@ -48,7 +48,7 @@ impl<N: HugrNode> CallGraph<N> {
         let non_func_root =
             (!hugr.get_optype(hugr.entrypoint()).is_module()).then_some(hugr.entrypoint());
         let node_to_g = hugr
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| {
                 let weight = match hugr.get_optype(n) {
                     OpType::FuncDecl(_) => CallGraphNode::FuncDecl(n),

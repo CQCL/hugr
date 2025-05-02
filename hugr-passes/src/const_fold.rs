@@ -113,7 +113,7 @@ impl ComposablePass for ConstantFoldPass {
         let mb_root_inp = hugr.get_io(hugr.entrypoint()).map(|[i, _]| i);
 
         let wires_to_break = hugr
-            .nodes()
+            .entry_descendants()
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
             .filter(|(n, ip)| {
                 *n != hugr.entrypoint()
@@ -135,7 +135,7 @@ impl ComposablePass for ConstantFoldPass {
             .collect::<Vec<_>>();
         // Sadly the results immutably borrow the hugr, so we must extract everything we need before mutation
         let terminating_tail_loops = hugr
-            .nodes()
+            .entry_descendants()
             .filter(|n| {
                 results.tail_loop_terminates(*n) == Some(TailLoopTermination::NeverContinues)
             })
