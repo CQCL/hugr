@@ -56,6 +56,9 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         parent: H::Node,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> Result<(), OpType> {
+        if !self.0.contains_node(parent) {
+            return Ok(());
+        }
         match self.0.get_optype(parent) {
             OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => {
                 // Put values onto out-wires of Input node

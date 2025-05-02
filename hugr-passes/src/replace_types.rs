@@ -99,6 +99,9 @@ impl NodeTemplate {
             // Really we should check whether func points at a FuncDecl or FuncDefn and create
             // the appropriate variety of FuncID but it doesn't matter for the purpose of making a Call.
             NodeTemplate::Call(func, type_args) => {
+                if !dfb.hugr().contains_node(func) {
+                    return Err(BuildError::NodeNotFound { node: func });
+                }
                 dfb.call(&FuncID::<true>::from(func), &type_args, inputs)
             }
         }

@@ -226,7 +226,7 @@ mod test {
     };
     use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple};
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DEFAULT_OPTYPE, DFG};
+    use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DFG};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, TypeRow};
     use hugr_core::{Hugr, HugrView, IncomingPort};
@@ -258,7 +258,7 @@ mod test {
 
         cfold.run(&mut hugr.clone()).unwrap();
 
-        let exp_err = ConstFoldError::InvalidEntryPoint(id2.node(), DEFAULT_OPTYPE);
+        let exp_err = ConstFoldError::MissingEntryPoint { node: id2.node() };
         let r: Result<_, Either<Infallible, ConstFoldError>> =
             dce.clone().then(cfold.clone()).run(&mut hugr.clone());
         assert_eq!(r, Err(Either::Right(exp_err.clone())));

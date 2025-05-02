@@ -168,6 +168,13 @@ pub enum BuildError {
     #[error("Error building Conditional node: {0}.")]
     ConditionalError(#[from] conditional::ConditionalBuildError),
 
+    /// Node not found in Hugr
+    #[error("{node} not found in the Hugr")]
+    NodeNotFound {
+        /// Missing node
+        node: Node,
+    },
+
     /// Wire not found in Hugr
     #[error("Wire not found in Hugr: {0}.")]
     WireNotFound(Wire),

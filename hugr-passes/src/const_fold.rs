@@ -40,8 +40,19 @@ pub enum ConstFoldError {
     /// Error raised when a Node is specified as an entry-point but
     /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
     /// a [Conditional](OpType::Conditional).
-    #[error("Node {_0} has OpType {_1} which cannot be an entry-point")]
-    InvalidEntryPoint(Node, OpType),
+    #[error("{node} has OpType {op} which cannot be an entry-point")]
+    InvalidEntryPoint {
+        /// The node which was specified as an entry-point
+        node: Node,
+        /// The OpType of the node
+        op: OpType,
+    },
+    /// The chosen entrypoint is not in the hugr.
+    #[error("Entry-point {node} is not part of the Hugr")]
+    MissingEntryPoint {
+        /// The missing node
+        node: Node,
+    },
 }
 
 impl ConstantFoldPass {
@@ -95,6 +106,9 @@ impl ComposablePass for ConstantFoldPass {
         ));
         let mut m = Machine::new(&hugr);
         for (&n, in_vals) in self.inputs.iter() {
+            if !hugr.contains_node(n) {
+                return Err(ConstFoldError::MissingEntryPoint { node: n });
+            };
             m.prepopulate_inputs(
                 n,
                 in_vals.iter().map(|(p, v)| {
@@ -106,7 +120,7 @@ impl ComposablePass for ConstantFoldPass {
                     (*p, const_with_dummy_loc)
                 }),
             )
-            .map_err(|opty| ConstFoldError::InvalidEntryPoint(n, opty))?;
+            .map_err(|op| ConstFoldError::InvalidEntryPoint { node: n, op })?;
         }
 
         let results = m.run(ConstFoldContext, []);

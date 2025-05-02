@@ -834,7 +834,7 @@ mod test {
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::NestedTemplateError(
                     nested_t,
-                    BuildError::UnexpectedType { node, .. }
+                    BuildError::NodeNotFound { node }
                 )
             )) if nested_t == lin_t && node == discard_fn
         ));
