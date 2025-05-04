@@ -134,7 +134,6 @@ impl<
         nu_inp: InMap,
         nu_out: OutMap,
     ) -> Result<Self, InvalidBoundaryError<HostNode>> {
-        let nu_out = nu_out.into();
         check_valid_boundary(&subgraph, host, &replacement, &nu_inp, &nu_out)?;
         Ok(Self {
             subgraph,
@@ -762,7 +761,7 @@ pub enum WhichNode<HostNode> {
 #[cfg(test)]
 pub(in crate::hugr::patch) mod test {
     use itertools::Itertools;
-    use petgraph::Direction::Outgoing;
+
     use rstest::{fixture, rstest};
 
     use std::collections::{HashMap, HashSet};
@@ -773,7 +772,7 @@ pub(in crate::hugr::patch) mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::hugr::patch::simple_replace::DefaultOutMap;
+
     use crate::hugr::patch::{BoundaryMap, OutputNodeBoundaryMap, PatchVerification};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
