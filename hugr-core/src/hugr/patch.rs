@@ -1,5 +1,6 @@
 //! Rewrite operations on the HUGR - replacement, outlining, etc.
 
+mod boundary_map;
 pub mod consts;
 pub mod inline_call;
 pub mod inline_dfg;
@@ -10,6 +11,7 @@ pub mod replace;
 pub mod simple_replace;
 
 use crate::{Hugr, HugrView};
+pub use boundary_map::{BoundaryMap, OutputNodeBoundaryMap};
 pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
@@ -46,8 +48,8 @@ pub trait PatchVerification {
 ///
 /// ### When to implement
 ///
-/// For patches that work on any `H: HugrMut`, prefer implementing [`PatchHugrMut`] instead. This
-/// will automatically implement this trait.
+/// For patches that work on any `H: HugrMut`, prefer implementing
+/// [`PatchHugrMut`] instead. This will automatically implement this trait.
 pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
     /// The type returned on successful application of the rewrite.
     type Outcome;

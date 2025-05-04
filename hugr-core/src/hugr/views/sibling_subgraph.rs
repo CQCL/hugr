@@ -10,7 +10,7 @@
 //! hierarchy.
 
 use std::cell::OnceCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use itertools::Itertools;
@@ -438,22 +438,22 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                     })
             })
             .collect();
-        let nu_out = self
+        let self_nodes: HashSet<_> = self.nodes().iter().copied().collect();
+        let nu_out: HashMap<_, _> = self
             .outputs
             .iter()
             .zip_eq(rep_outputs)
             .flat_map(|(&(self_source_n, self_source_p), (_, rep_target_p))| {
                 hugr.linked_inputs(self_source_n, self_source_p)
+                    .filter(|&(node, _)| !self_nodes.contains(&node))
                     .map(move |self_target| (self_target, rep_target_p))
             })
             .collect();
 
-        Ok(SimpleReplacement::new(
-            self.clone(),
-            replacement,
-            nu_inp,
-            nu_out,
-        ))
+        Ok(
+            SimpleReplacement::try_new(self.clone(), hugr, replacement, nu_inp, nu_out)
+                .expect("invalid boundary maps"),
+        )
     }
 
     /// Create a new Hugr containing only the subgraph.
