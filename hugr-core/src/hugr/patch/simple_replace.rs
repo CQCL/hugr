@@ -84,6 +84,27 @@ pub struct SimpleReplacement<
     nu_out: OutMap,
 }
 
+impl<HostNode, InMap, OutMap> SimpleReplacement<HostNode, InMap, OutMap> {
+    /// Create a new [`SimpleReplacement`] specification without checking the
+    /// validity of the boundary maps.
+    ///
+    /// Use [`SimpleReplacement::try_new`] to check the validity of the boundary
+    /// maps.
+    pub fn new_unsafe(
+        subgraph: SiblingSubgraph<HostNode>,
+        replacement: Hugr,
+        nu_inp: InMap,
+        nu_out: OutMap,
+    ) -> Self {
+        Self {
+            subgraph,
+            replacement,
+            nu_inp,
+            nu_out,
+        }
+    }
+}
+
 impl<
         HostNode: HugrNode,
         InMap: BoundaryMap<Node, HostNode>,
@@ -135,31 +156,7 @@ impl<
         nu_out: OutMap,
     ) -> Result<Self, InvalidBoundaryError<HostNode>> {
         check_valid_boundary(&subgraph, host, &replacement, &nu_inp, &nu_out)?;
-        Ok(Self {
-            subgraph,
-            replacement,
-            nu_inp,
-            nu_out,
-        })
-    }
-
-    /// Create a new [`SimpleReplacement`] specification without checking the
-    /// validity of the boundary maps.
-    ///
-    /// Use [`SimpleReplacement::try_new`] to check the validity of the boundary
-    /// maps.
-    pub fn new_unsafe(
-        subgraph: SiblingSubgraph<HostNode>,
-        replacement: Hugr,
-        nu_inp: InMap,
-        nu_out: impl Into<OutMap>,
-    ) -> Self {
-        Self {
-            subgraph,
-            replacement,
-            nu_inp,
-            nu_out: nu_out.into(),
-        }
+        Ok(Self::new_unsafe(subgraph, replacement, nu_inp, nu_out))
     }
 
     /// The replacement hugr.

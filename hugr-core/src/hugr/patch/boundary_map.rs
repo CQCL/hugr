@@ -161,7 +161,7 @@ where
 /// `HashMap<(SrcNode, IncomingPort), IncomingPort>`.
 #[derive(Debug, Clone, From)]
 pub struct OutputNodeBoundaryMap<SrcNode, SrcPort = IncomingPort>(
-    HashMap<(SrcNode, SrcPort), IncomingPort>,
+    pub HashMap<(SrcNode, SrcPort), IncomingPort>,
 );
 
 impl<Src, Dst> BoundaryMap<Src, Dst> for OutputNodeBoundaryMap<Src, IncomingPort>
