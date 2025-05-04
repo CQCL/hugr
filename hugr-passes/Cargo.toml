@@ -26,9 +26,6 @@ paste = { workspace = true }
 thiserror = { workspace = true }
 petgraph = { workspace = true }
 
-[features]
-extension_inference = ["hugr-core/extension_inference"]
-
 [dev-dependencies]
 rstest = { workspace = true }
 proptest = { workspace = true }

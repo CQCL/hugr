@@ -120,7 +120,6 @@ impl<N: HugrNode> PatchHugrMut for RemoveConst<N> {
 mod test {
     use super::*;
 
-    use crate::extension::prelude::PRELUDE_ID;
     use crate::{
         builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer},
         extension::prelude::ConstUsize,
@@ -133,10 +132,7 @@ mod test {
         let mut build = ModuleBuilder::new();
         let con_node = build.add_constant(Value::extension(ConstUsize::new(2)));
 
-        let mut dfg_build = build.define_function(
-            "main",
-            Signature::new_endo(type_row![]).with_extension_delta(PRELUDE_ID.clone()),
-        )?;
+        let mut dfg_build = build.define_function("main", Signature::new_endo(type_row![]))?;
         let load_1 = dfg_build.load_const(&con_node);
         let load_2 = dfg_build.load_const(&con_node);
         let tup = dfg_build.make_tuple([load_1, load_2])?;

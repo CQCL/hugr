@@ -9,10 +9,6 @@
 //! HUGR nodes and wire types. This is computed from the union of all extension
 //! required across the HUGR.
 //!
-//! This is distinct from _runtime_ extension requirements, which are defined
-//! more granularly in each function signature by the `runtime_reqs`
-//! field. See the `extension_inference` feature and related modules for that.
-//!
 //! Note: These procedures are only temporary until `hugr-model` is stabilized.
 //! Once that happens, hugrs will no longer be directly deserialized using serde
 //! but instead will be created by the methods in `crate::import`. As these

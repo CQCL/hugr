@@ -1,7 +1,6 @@
 {
   "version": "0.1.0",
   "name": "collections.static_array",
-  "runtime_reqs": [],
   "types": {
     "static_array": {
       "extension": "collections.static_array",
@@ -68,8 +67,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -108,8 +106,7 @@
             {
               "t": "I"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

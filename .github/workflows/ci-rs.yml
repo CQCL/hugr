@@ -108,7 +108,7 @@ jobs:
       - name: Override criterion with the CodSpeed harness
         run: cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
       - name: Build benchmarks
-        run: cargo codspeed build --profile bench --features extension_inference,declarative,llvm,llvm-test
+        run: cargo codspeed build --profile bench --features declarative,llvm,llvm-test
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
         with:

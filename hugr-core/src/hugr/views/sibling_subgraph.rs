@@ -21,7 +21,7 @@ use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
 use crate::core::HugrNode;
-use crate::extension::ExtensionSet;
+use crate::hugr::patch::OutputNodeBoundaryMap;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
@@ -35,15 +35,15 @@ use super::root_checked::RootCheckable;
 ///
 /// A HUGR region in which all nodes share the same parent. Unlike
 /// [`super::SiblingGraph`],  not all nodes of the sibling graph must be
-/// included. A convex subgraph is always an induced subgraph, i.e. it is defined
-/// by a set of nodes and all edges between them.
+/// included. A convex subgraph is always an induced subgraph, i.e. it is
+/// defined by a set of nodes and all edges between them.
 ///
 /// The incoming boundary (resp. outgoing boundary) is given by the input (resp.
-/// output) ports of the subgraph that are linked to nodes outside of the subgraph.
-/// The signature of the subgraph is then given by the types of the incoming
-/// and outgoing boundary ports. Given a replacement with the same signature,
-/// a [`SimpleReplacement`] can be constructed to rewrite the subgraph with the
-/// replacement.
+/// output) ports of the subgraph that are linked to nodes outside of the
+/// subgraph. The signature of the subgraph is then given by the types of the
+/// incoming and outgoing boundary ports. Given a replacement with the same
+/// signature, a [`SimpleReplacement`] can be constructed to rewrite the
+/// subgraph with the replacement.
 ///
 /// The ordering of the nodes in the subgraph is irrelevant to define the convex
 /// subgraph, but it determines the ordering of the boundary signature.
@@ -150,10 +150,10 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ///
     /// ## Arguments
     ///
-    /// The `incoming` and `outgoing` arguments give $B_I$ and $B_O$ respectively.
-    /// Incoming edges must be given by incoming ports and outgoing edges by
-    /// outgoing ports. The ordering of the incoming and outgoing ports defines
-    /// the signature of the subgraph.
+    /// The `incoming` and `outgoing` arguments give $B_I$ and $B_O$
+    /// respectively. Incoming edges must be given by incoming ports and
+    /// outgoing edges by outgoing ports. The ordering of the incoming and
+    /// outgoing ports defines the signature of the subgraph.
     ///
     /// Incoming boundary ports must be unique and partitioned by input
     /// parameter: two ports within the same set of the partition must be
@@ -190,7 +190,8 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ) -> Result<Self, InvalidSubgraph<N>> {
         let pg = hugr.portgraph();
 
-        // Ordering of the edges here is preserved and becomes ordering of the signature.
+        // Ordering of the edges here is preserved and becomes ordering of the
+        // signature.
         let subpg = Subgraph::new_subgraph(pg.clone(), make_boundary(hugr, &inputs, &outputs));
         let nodes = subpg
             .nodes_iter()
@@ -349,11 +350,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        Signature::new(input, output).with_extension_delta(ExtensionSet::union_over(
-            self.nodes
-                .iter()
-                .map(|n| hugr.get_optype(*n).extension_delta()),
-        ))
+        Signature::new(input, output)
     }
 
     /// The parent of the sibling subgraph.
@@ -367,12 +364,12 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// match the signature of the subgraph.
     ///
     /// May return one of the following five errors
-    ///  - [`InvalidReplacement::InvalidDataflowGraph`]: the replacement
-    ///    graph is not a [`crate::ops::OpTag::DataflowParent`]-rooted graph,
+    ///  - [`InvalidReplacement::InvalidDataflowGraph`]: the replacement graph
+    ///    is not a [`crate::ops::OpTag::DataflowParent`]-rooted graph,
     ///  - [`InvalidReplacement::InvalidSignature`]: the signature of the
     ///    replacement DFG does not match the subgraph signature, or
-    ///  - [`InvalidReplacement::NonConvexSubgraph`]: the sibling subgraph is not
-    ///    convex.
+    ///  - [`InvalidReplacement::NonConvexSubgraph`]: the sibling subgraph is
+    ///    not convex.
     ///
     /// At the moment we do not support state order edges. If any are found in
     /// the replacement graph, this will panic.
@@ -450,10 +447,14 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             })
             .collect();
 
-        Ok(
-            SimpleReplacement::try_new(self.clone(), hugr, replacement, nu_inp, nu_out)
-                .expect("invalid boundary maps"),
+        Ok(SimpleReplacement::try_new(
+            self.clone(),
+            hugr,
+            replacement,
+            nu_inp,
+            OutputNodeBoundaryMap::from(nu_out),
         )
+        .expect("invalid boundary maps"))
     }
 
     /// Create a new Hugr containing only the subgraph.
@@ -596,10 +597,10 @@ fn get_edge_type<H: HugrView, P: Into<Port> + Copy>(
 
 /// Whether a subgraph is valid.
 ///
-/// Verifies that input and output ports are valid subgraph boundaries, i.e. they belong
-/// to nodes within the subgraph and are linked to at least one node outside of the subgraph.
-/// This does NOT check convexity proper, i.e. whether the set of nodes form a convex
-/// induced graph.
+/// Verifies that input and output ports are valid subgraph boundaries, i.e.
+/// they belong to nodes within the subgraph and are linked to at least one node
+/// outside of the subgraph. This does NOT check convexity proper, i.e. whether
+/// the set of nodes form a convex induced graph.
 fn validate_subgraph<H: HugrView>(
     hugr: &H,
     nodes: &[H::Node],
@@ -649,8 +650,8 @@ fn validate_subgraph<H: HugrView>(
         Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(n, p))?;
     };
 
-    // Check that every incoming port of a node in the subgraph whose source is not in the subgraph
-    // belongs to inputs.
+    // Check that every incoming port of a node in the subgraph whose source is not
+    // in the subgraph belongs to inputs.
     if nodes.iter().any(|&n| {
         hugr.node_inputs(n).any(|p| {
             hugr.linked_ports(n, p).any(|(n1, _)| {
@@ -660,8 +661,8 @@ fn validate_subgraph<H: HugrView>(
     }) {
         return Err(InvalidSubgraph::NotConvex);
     }
-    // Check that every outgoing port of a node in the subgraph whose target is not in the subgraph
-    // belongs to outputs.
+    // Check that every outgoing port of a node in the subgraph whose target is not
+    // in the subgraph belongs to outputs.
     if nodes.iter().any(|&n| {
         hugr.node_outputs(n).any(|p| {
             hugr.linked_ports(n, p)
@@ -681,7 +682,8 @@ fn validate_subgraph<H: HugrView>(
         return Err(InvalidSubgraphBoundary::EmptyPartition.into());
     }
 
-    // Check edge types are equal within partition and copyable if partition size > 1
+    // Check edge types are equal within partition and copyable if partition size >
+    // 1
     if let Some((i, _)) = inputs.iter().enumerate().find(|(_, ports)| {
         let Some(edge_t) = get_edge_type(hugr, ports) else {
             return true;
@@ -840,10 +842,10 @@ mod tests {
     use crate::builder::inout_sig;
     use crate::hugr::Patch;
     use crate::ops::Const;
-    use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
-    use crate::std_extensions::logic::{self, LogicOp};
+    use crate::std_extensions::arithmetic::float_types::ConstF64;
+    use crate::std_extensions::logic::LogicOp;
     use crate::type_row;
-    use crate::utils::test_quantum_extension::{self, cx_gate, rz_f64};
+    use crate::utils::test_quantum_extension::{cx_gate, rz_f64};
     use crate::{
         builder::{
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
@@ -860,9 +862,9 @@ mod tests {
     impl<N: HugrNode> SiblingSubgraph<N> {
         /// A sibling subgraph from a HUGR.
         ///
-        /// The subgraph is given by the sibling graph of the root. If you wish to
-        /// create a subgraph from another root, wrap the argument `region` in a
-        /// [`super::SiblingGraph`].
+        /// The subgraph is given by the sibling graph of the root. If you wish
+        /// to create a subgraph from another root, wrap the argument
+        /// `region` in a [`super::SiblingGraph`].
         ///
         /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
         /// subgraph is empty.
@@ -884,17 +886,13 @@ mod tests {
     }
 
     /// A Module with a single function from three qubits to three qubits.
-    /// The function applies a CX gate to the first two qubits and a Rz gate (with a constant angle) to the last qubit.
+    /// The function applies a CX gate to the first two qubits and a Rz gate
+    /// (with a constant angle) to the last qubit.
     fn build_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
-                .with_extension_delta(ExtensionSet::from_iter([
-                    test_quantum_extension::EXTENSION_ID,
-                    float_types::EXTENSION_ID,
-                ]))
-                .into(),
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -913,12 +911,7 @@ mod tests {
     /// A bool to bool hugr with three subsequent NOT gates.
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare(
-            "test",
-            Signature::new_endo(vec![bool_t()])
-                .with_extension_delta(logic::EXTENSION_ID)
-                .into(),
-        )?;
+        let func = mod_builder.declare("test", Signature::new_endo(vec![bool_t()]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(LogicOp::Not, dfg.input_wires())?;
@@ -937,9 +930,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new(bool_t(), vec![bool_t(), bool_t()])
-                .with_extension_delta(logic::EXTENSION_ID)
-                .into(),
+            Signature::new(bool_t(), vec![bool_t(), bool_t()]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -957,12 +948,7 @@ mod tests {
     /// A HUGR with a copy
     fn build_hugr_classical() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare(
-            "test",
-            Signature::new_endo(bool_t())
-                .with_extension_delta(logic::EXTENSION_ID)
-                .into(),
-        )?;
+        let func = mod_builder.declare("test", Signature::new_endo(bool_t()).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let in_wire = dfg.input_wires().exactly_one().unwrap();
@@ -1024,12 +1010,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)?;
         assert_eq!(
             sub.signature(&func),
-            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).with_extension_delta(
-                ExtensionSet::from_iter([
-                    test_quantum_extension::EXTENSION_ID,
-                    float_types::EXTENSION_ID,
-                ])
-            )
+            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
         );
         Ok(())
     }
@@ -1218,12 +1199,7 @@ mod tests {
     #[test]
     fn test_unconnected() {
         // test a replacement on a subgraph with a discarded output
-        let mut b = DFGBuilder::new(
-            Signature::new(bool_t(), type_row![])
-                // .with_prelude()
-                .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
-        )
-        .unwrap();
+        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded
@@ -1234,11 +1210,7 @@ mod tests {
         assert_eq!(subg.nodes().len(), 1);
         //  TODO create a valid replacement
         let replacement = {
-            let mut rep_b = DFGBuilder::new(
-                Signature::new_endo(bool_t())
-                    .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
-            )
-            .unwrap();
+            let mut rep_b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
             let inw = rep_b.input_wires().exactly_one().unwrap();
 
             let not_n = rep_b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
@@ -1249,22 +1221,19 @@ mod tests {
         rep.apply(&mut h).unwrap();
     }
 
-    /// Test the behaviour of the sibling subgraph when built from a single node.
+    /// Test the behaviour of the sibling subgraph when built from a single
+    /// node.
     #[test]
     fn single_node_subgraph() {
         // A hugr with a single NOT operation, with disconnected output.
-        let mut b = DFGBuilder::new(
-            Signature::new(bool_t(), type_row![])
-                .with_extension_delta(crate::std_extensions::logic::EXTENSION_ID),
-        )
-        .unwrap();
+        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded
         let h = b.finish_hugr_with_outputs([]).unwrap();
 
-        // When built with `from_node`, the subgraph's signature is the same as the node's.
-        // (bool input, bool output)
+        // When built with `from_node`, the subgraph's signature is the same as the
+        // node's. (bool input, bool output)
         let subg = SiblingSubgraph::from_node(not_n.node(), &h);
         assert_eq!(subg.nodes().len(), 1);
         assert_eq!(
@@ -1272,8 +1241,9 @@ mod tests {
             Signature::new(vec![bool_t()], vec![bool_t()]).io()
         );
 
-        // `from_nodes` is different, is it only uses incoming and outgoing edges to compute the signature.
-        // In this case, the output is disconnected, so it is not part of the subgraph signature.
+        // `from_nodes` is different, is it only uses incoming and outgoing edges to
+        // compute the signature. In this case, the output is disconnected, so
+        // it is not part of the subgraph signature.
         let subg = SiblingSubgraph::try_from_nodes([not_n.node()], &h).unwrap();
         assert_eq!(subg.nodes().len(), 1);
         assert_eq!(

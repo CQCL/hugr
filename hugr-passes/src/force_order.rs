@@ -279,7 +279,7 @@ mod test {
             .iter(&hugr.as_petgraph())
             .filter(|n| rank_map.contains_key(n))
             .collect_vec();
-        hugr.validate_no_extensions().unwrap();
+        hugr.validate().unwrap();
 
         topo_sorted
     }

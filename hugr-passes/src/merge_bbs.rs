@@ -62,14 +62,10 @@ fn mk_rep(
     let mut replacement: Hugr = Hugr::new(cfg.root_optype().clone());
 
     let merged = replacement.add_node_with_parent(replacement.root(), {
-        let mut merged_block = DataflowBlock {
+        DataflowBlock {
             inputs: pred_ty.inputs.clone(),
             ..succ_ty.clone()
-        };
-        merged_block.extension_delta = merged_block
-            .extension_delta
-            .union(pred_ty.extension_delta.clone());
-        merged_block
+        }
     });
     let input = replacement.add_node_with_parent(
         merged,
@@ -225,7 +221,7 @@ mod test {
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [])?;
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
-        let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
+        let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1)?;
         let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
         let br = unary_unit_sum(&mut no_b1);
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;

@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use super::{impl_op_name, OpTag, OpTrait};
 
-use crate::extension::{ExtensionSet, SignatureError};
+use crate::extension::SignatureError;
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
 use crate::{type_row, IncomingPort};
@@ -151,15 +151,15 @@ impl<T: DataflowOpTrait + Clone> OpTrait for T {
     fn description(&self) -> &str {
         DataflowOpTrait::description(self)
     }
+
     fn tag(&self) -> OpTag {
         T::TAG
     }
+
     fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         Some(DataflowOpTrait::signature(self))
     }
-    fn extension_delta(&self) -> ExtensionSet {
-        DataflowOpTrait::signature(self).runtime_reqs.clone()
-    }
+
     fn other_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_input(self)
     }

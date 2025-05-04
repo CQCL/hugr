@@ -188,21 +188,6 @@ class TupleParam(TypeParam):
         return model.Apply("core.tuple", [item_types])
 
 
-@dataclass(frozen=True)
-class ExtensionsParam(TypeParam):
-    """An extension set parameter."""
-
-    def _to_serial(self) -> stys.ExtensionsParam:
-        return stys.ExtensionsParam()
-
-    def __str__(self) -> str:
-        return "Extensions"
-
-    def to_model(self) -> model.Term:
-        # Since extension sets will be deprecated, this is just a placeholder.
-        return model.Apply("compat.ext_set_type")
-
-
 # ------------------------------------------
 # --------------- TypeArg ------------------
 # ------------------------------------------
@@ -278,23 +263,6 @@ class SequenceArg(TypeArg):
         # TODO: We should separate lists and tuples.
         # For now we assume that this is a list.
         return model.List([elem.to_model() for elem in self.elems])
-
-
-@dataclass(frozen=True)
-class ExtensionsArg(TypeArg):
-    """Type argument for an :class:`ExtensionsParam`."""
-
-    extensions: ExtensionSet
-
-    def _to_serial(self) -> stys.ExtensionsArg:
-        return stys.ExtensionsArg(es=self.extensions)
-
-    def __str__(self) -> str:
-        return f"Extensions({comma_sep_str(self.extensions)})"
-
-    def to_model(self) -> model.Term:
-        # Since extension sets will be deprecated, this is just a placeholder.
-        return model.Apply("compat.ext_set")
 
 
 @dataclass(frozen=True)
@@ -518,7 +486,6 @@ class FunctionType(Type):
 
     input: TypeRow
     output: TypeRow
-    runtime_reqs: ExtensionSet = field(default_factory=ExtensionSet)
 
     def type_bound(self) -> TypeBound:
         return TypeBound.Copyable
@@ -527,7 +494,6 @@ class FunctionType(Type):
         return stys.FunctionType(
             input=ser_it(self.input),
             output=ser_it(self.output),
-            runtime_reqs=self.runtime_reqs,
         )
 
     @classmethod
@@ -541,16 +507,14 @@ class FunctionType(Type):
         return cls(input=[], output=[])
 
     @classmethod
-    def endo(
-        cls, tys: TypeRow, runtime_reqs: ExtensionSet | None = None
-    ) -> FunctionType:
+    def endo(cls, tys: TypeRow) -> FunctionType:
         """Function type with the same input and output types.
 
         Example:
             >>> FunctionType.endo([Qubit])
             FunctionType([Qubit], [Qubit])
         """
-        return cls(input=tys, output=tys, runtime_reqs=runtime_reqs or ExtensionSet())
+        return cls(input=tys, output=tys)
 
     def flip(self) -> FunctionType:
         """Return a new function type with input and output types swapped.
@@ -569,16 +533,7 @@ class FunctionType(Type):
         return FunctionType(
             input=[ty.resolve(registry) for ty in self.input],
             output=[ty.resolve(registry) for ty in self.output],
-            runtime_reqs=self.runtime_reqs,
         )
-
-    def with_runtime_reqs(self, runtime_reqs: ExtensionSet) -> FunctionType:
-        """Adds a list of extension requirements to the function type, and
-        returns the new signature.
-        """
-        exts = set(self.runtime_reqs)
-        exts = exts.union(runtime_reqs)
-        return FunctionType(self.input, self.output, [*exts])
 
     def __str__(self) -> str:
         return f"{comma_sep_str(self.input)} -> {comma_sep_str(self.output)}"
@@ -612,15 +567,6 @@ class PolyFuncType(Type):
         return PolyFuncType(
             params=self.params,
             body=self.body.resolve(registry),
-        )
-
-    def with_runtime_reqs(self, runtime_reqs: ExtensionSet) -> PolyFuncType:
-        """Adds a list of extension requirements to the function type, and
-        returns the new signature.
-        """
-        return PolyFuncType(
-            params=self.params,
-            body=self.body.with_runtime_reqs(runtime_reqs),
         )
 
     def __str__(self) -> str:

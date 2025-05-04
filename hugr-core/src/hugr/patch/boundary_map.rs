@@ -27,9 +27,12 @@ use crate::{HugrView, IncomingPort, OutgoingPort};
 ///   given incoming port in the destination HUGR. The set of required nodes in
 ///   the source HUGR is the set of nodes in the keys of the HashMap; this is
 ///   NOT the same set as the domain of definition of the map!
-/// - [`OutputNodeBoundaryMap<SrcNode>`]: a map on incoming ports of the source
-///   HUGR to incoming ports of the output node of the destination HUGR. It
-///   implements From<`HashMap<(SrcNode, IncomingPort), IncomingPort>>.
+/// - [`OutputNodeBoundaryMap<SrcNode, P>`] for P = [`IncomingPort`] or
+///   [`OutgoingPort`]: a map on ports of the source HUGR to incoming ports of
+///   the output node of the destination HUGR. As in the implementation for
+///   HashMaps, if P is `OutgoingPort`, then incoming ports will be mapped to
+///   the image of the unique outgoing port they are linked to. It implements
+///   From<`HashMap<(SrcNode, P), IncomingPort>>.
 pub trait BoundaryMap<SrcNode, DstNode> {
     /// Map an incoming port of the source HUGR to an incoming port of the
     /// destination HUGR.
@@ -157,9 +160,11 @@ where
 /// IncomingPort>`. It implements [`BoundaryMap`] and can be converted from a
 /// `HashMap<(SrcNode, IncomingPort), IncomingPort>`.
 #[derive(Debug, Clone, From)]
-pub struct OutputNodeBoundaryMap<SrcNode>(HashMap<(SrcNode, IncomingPort), IncomingPort>);
+pub struct OutputNodeBoundaryMap<SrcNode, SrcPort = IncomingPort>(
+    HashMap<(SrcNode, SrcPort), IncomingPort>,
+);
 
-impl<Src, Dst> BoundaryMap<Src, Dst> for OutputNodeBoundaryMap<Src>
+impl<Src, Dst> BoundaryMap<Src, Dst> for OutputNodeBoundaryMap<Src, IncomingPort>
 where
     Src: Eq + Hash + Copy,
     Dst: Copy,
@@ -190,5 +195,44 @@ where
         Src: 'a,
     {
         self.0.keys().copied()
+    }
+}
+
+impl<Src, Dst> BoundaryMap<Src, Dst> for OutputNodeBoundaryMap<Src, OutgoingPort>
+where
+    Src: Eq + Hash + Copy,
+    Dst: Copy,
+{
+    fn map_port(
+        &self,
+        src_node: Src,
+        src_port: IncomingPort,
+        _src_hugr: &impl HugrView<Node = Src>,
+        dst_hugr: &impl HugrView<Node = Dst>,
+    ) -> Option<(Dst, IncomingPort)> {
+        let (src_node, src_port) = _src_hugr
+            .single_linked_output(src_node, src_port)
+            .expect("dataflow wire has unique outgoing port");
+        let [_, dst_node] = dst_hugr
+            .get_io(dst_hugr.root())
+            .expect("dst_hugr must be a DFG Hugr");
+        let dst_port = *self.0.get(&(src_node, src_port))?;
+        Some((dst_node, dst_port))
+    }
+
+    fn required_nodes(&self) -> impl Iterator<Item = Src> {
+        self.0.keys().map(|(src, _)| *src)
+    }
+
+    fn all_keys<'a>(
+        &'a self,
+        src_hugr: &'a impl HugrView<Node = Src>,
+    ) -> impl Iterator<Item = (Src, IncomingPort)> + 'a
+    where
+        Src: 'a,
+    {
+        self.0
+            .keys()
+            .flat_map(|&(src, port)| src_hugr.linked_inputs(src, port))
     }
 }
