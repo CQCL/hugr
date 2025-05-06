@@ -1134,7 +1134,7 @@ pub(in crate::hugr::patch) mod test {
             .nodes()
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
-        let s: Vec<Node> = vec![h_node_cx].into_iter().collect();
+        let s = vec![h_node_cx];
         // 2. Construct a new DFG-rooted hugr for the replacement
         let n: Hugr = dfg_hugr2;
         // 3. Construct the input and output matchings
