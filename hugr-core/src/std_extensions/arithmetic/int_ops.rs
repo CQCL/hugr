@@ -14,7 +14,7 @@ use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
 use crate::{
-    extension::{ExtensionId, ExtensionSet, SignatureError},
+    extension::{ExtensionId, SignatureError},
     types::{type_param::TypeArg, Type},
     Extension,
 };
@@ -252,7 +252,6 @@ lazy_static! {
     /// Extension for basic integer operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(ExtensionSet::singleton(super::int_types::EXTENSION_ID));
             IntOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
@@ -377,7 +376,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
+            &Signature::new(int_type(3), int_type(4))
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -386,7 +385,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
+            &Signature::new_endo(int_type(3))
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -396,7 +395,6 @@ mod test {
                 .signature()
                 .as_ref(),
             &Signature::new(int_type(3), sum_ty_with_err(int_type(3)))
-                .with_extension_delta(EXTENSION_ID)
         );
         assert!(
             IntOpDef::iwiden_u
@@ -414,7 +412,6 @@ mod test {
                 .signature()
                 .as_ref(),
             &Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
-                .with_extension_delta(EXTENSION_ID)
         );
 
         assert!(IntOpDef::inarrow_u

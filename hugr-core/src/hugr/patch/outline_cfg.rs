@@ -1,20 +1,20 @@
-//! Rewrite for inserting a CFG-node into the hierarchy containing a subsection of an existing CFG
+//! Rewrite for inserting a CFG-node into the hierarchy containing a subsection
+//! of an existing CFG
 use std::collections::HashSet;
 
 use itertools::Itertools;
 use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
-use crate::extension::ExtensionSet;
-use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::controlflow::BasicBlock;
-use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{DataflowBlock, OpType};
 use crate::PortIndex;
 use crate::{type_row, Node};
+
+use super::{PatchHugrMut, PatchVerification};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.
@@ -31,12 +31,11 @@ impl OutlineCfg {
     }
 
     /// Compute the entry and exit nodes of the CFG which contains
-    /// [`self.blocks`], along with the output neighbour its parent graph and
-    /// the combined extension_deltas of all of the blocks.
-    fn compute_entry_exit_outside_extensions(
+    /// [`self.blocks`], along with the output neighbour its parent graph.
+    fn compute_entry_exit(
         &self,
         h: &impl HugrView<Node = Node>,
-    ) -> Result<(Node, Node, Node, ExtensionSet), OutlineCfgError> {
+    ) -> Result<(Node, Node, Node), OutlineCfgError> {
         let cfg_n = match self
             .blocks
             .iter()
@@ -48,13 +47,12 @@ impl OutlineCfg {
             _ => return Err(OutlineCfgError::NotSiblings),
         };
         let o = h.get_optype(cfg_n);
-        let OpType::CFG(o) = o else {
+        let OpType::CFG(_) = o else {
             return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
         };
         let cfg_entry = h.children(cfg_n).next().unwrap();
         let mut entry = None;
         let mut exit_succ = None;
-        let mut extension_delta = ExtensionSet::new();
         for &n in self.blocks.iter() {
             if n == cfg_entry
                 || h.input_neighbours(n)
@@ -69,7 +67,6 @@ impl OutlineCfg {
                     }
                 }
             }
-            extension_delta = extension_delta.union(o.signature().runtime_reqs.clone());
             let external_succs = h.output_neighbours(n).filter(|s| !self.blocks.contains(s));
             match external_succs.at_most_one() {
                 Ok(None) => (), // No external successors
@@ -85,29 +82,38 @@ impl OutlineCfg {
             };
         }
         match (entry, exit_succ) {
-            (Some(e), Some((x, o))) => Ok((e, x, o, extension_delta)),
+            (Some(e), Some((x, o))) => Ok((e, x, o)),
             (None, _) => Err(OutlineCfgError::NoEntryNode),
             (_, None) => Err(OutlineCfgError::NoExitNode),
         }
     }
 }
 
-impl Rewrite for OutlineCfg {
-    type Node = Node;
+impl PatchVerification for OutlineCfg {
     type Error = OutlineCfgError;
+    type Node = Node;
+    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), OutlineCfgError> {
+        self.compute_entry_exit(h)?;
+        Ok(())
+    }
+
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+        self.blocks.iter().copied()
+    }
+}
+
+impl PatchHugrMut for OutlineCfg {
     /// The newly-created basic block, and the [CFG] node inside it
     ///
     /// [CFG]: OpType::CFG
-    type ApplyResult = (Node, Node);
+    type Outcome = [Node; 2];
 
     const UNCHANGED_ON_FAILURE: bool = true;
-    fn verify(&self, h: &impl HugrView<Node = Node>) -> Result<(), OutlineCfgError> {
-        self.compute_entry_exit_outside_extensions(h)?;
-        Ok(())
-    }
-    fn apply(self, h: &mut impl HugrMut<Node = Node>) -> Result<(Node, Node), OutlineCfgError> {
-        let (entry, exit, outside, extension_delta) =
-            self.compute_entry_exit_outside_extensions(h)?;
+    fn apply_hugr_mut(
+        self,
+        h: &mut impl HugrMut<Node = Node>,
+    ) -> Result<[Node; 2], OutlineCfgError> {
+        let (entry, exit, outside) = self.compute_entry_exit(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
         let OpType::DataflowBlock(DataflowBlock { inputs, .. }) = h.get_optype(entry) else {
@@ -124,17 +130,10 @@ impl Rewrite for OutlineCfg {
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
         let (new_block, cfg_node) = {
-            let mut new_block_bldr = BlockBuilder::new_exts(
-                inputs.clone(),
-                vec![type_row![]],
-                outputs.clone(),
-                extension_delta.clone(),
-            )
-            .unwrap();
+            let mut new_block_bldr =
+                BlockBuilder::new(inputs.clone(), vec![type_row![]], outputs.clone()).unwrap();
             let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
-            let cfg = new_block_bldr
-                .cfg_builder_exts(wires_in, outputs, extension_delta)
-                .unwrap();
+            let cfg = new_block_bldr.cfg_builder(wires_in, outputs).unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
             let unit_sum = new_block_bldr.add_constant(ops::Value::unary_unit_sum());
             let pred_wire = new_block_bldr.load_const(&unit_sum);
@@ -190,11 +189,11 @@ impl Rewrite for OutlineCfg {
             // https://github.com/CQCL/hugr/issues/2029
             let hierarchy = h.hierarchy();
             let inner_exit = hierarchy
-                .children(h.get_pg_index(cfg_node))
+                .children(h.to_portgraph_node(cfg_node))
                 .exactly_one()
                 .ok()
                 .unwrap();
-            let inner_exit = h.get_node(inner_exit);
+            let inner_exit = h.from_portgraph_node(inner_exit);
             //let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
 
             // Entry node must be first
@@ -212,11 +211,7 @@ impl Rewrite for OutlineCfg {
         // 4(b). Reconnect exit edge to the new exit node within the inner CFG
         h.connect(exit, exit_port, inner_exit, 0);
 
-        Ok((new_block, cfg_node))
-    }
-
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
-        self.blocks.iter().copied()
+        Ok([new_block, cfg_node])
     }
 }
 
@@ -361,22 +356,22 @@ mod test {
         } = cond_then_loop_cfg;
         let backup = h.clone();
 
-        let r = h.apply_rewrite(OutlineCfg::new([tail]));
+        let r = h.apply_patch(OutlineCfg::new([tail]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
         assert_eq!(h, backup);
 
-        let r = h.apply_rewrite(OutlineCfg::new([entry, left, right]));
+        let r = h.apply_patch(OutlineCfg::new([entry, left, right]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitNodes(a,b))
             => assert_eq!(HashSet::from([a,b]), HashSet::from_iter([left, right])));
         assert_eq!(h, backup);
 
-        let r = h.apply_rewrite(OutlineCfg::new([left, right, merge]));
+        let r = h.apply_patch(OutlineCfg::new([left, right, merge]));
         assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b))
             => assert_eq!(HashSet::from([a,b]), HashSet::from([left, right])));
         assert_eq!(h, backup);
 
         // The entry node implicitly has an extra incoming edge
-        let r = h.apply_rewrite(OutlineCfg::new([entry, left, right, merge, head]));
+        let r = h.apply_patch(OutlineCfg::new([entry, left, right, merge, head]));
         assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b))
             => assert_eq!(HashSet::from([a,b]), HashSet::from([entry, head])));
         assert_eq!(h, backup);
@@ -497,13 +492,14 @@ mod test {
     ) -> (Node, Node, Node) {
         let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
         assert!(blocks.iter().all(|b| other_blocks.remove(b)));
-        let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
+        let [new_block, new_cfg] = h.apply_patch(OutlineCfg::new(blocks.clone())).unwrap();
 
         for n in other_blocks {
             assert_eq!(h.get_parent(n), Some(cfg))
         }
         assert_eq!(h.get_parent(new_block), Some(cfg));
         assert!(h.get_optype(new_block).is_dataflow_block());
+        #[allow(deprecated)]
         let b = h.base_hugr(); // To cope with `h` potentially being a SiblingMut
         assert_eq!(b.get_parent(new_cfg), Some(new_block));
         for n in blocks {

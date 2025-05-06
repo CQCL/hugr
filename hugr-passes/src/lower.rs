@@ -1,23 +1,20 @@
 use hugr_core::{
-    hugr::{hugrmut::HugrMut, views::SiblingSubgraph, HugrError},
+    hugr::{hugrmut::HugrMut, views::SiblingSubgraph},
     ops::OpType,
     Hugr, Node,
 };
 
+use itertools::Itertools;
 use thiserror::Error;
 
 /// Replace all operations in a HUGR according to a mapping.
 /// New operations must match the signature of the old operations.
 ///
 /// Returns a list of the replaced nodes and their old operations.
-///
-/// # Errors
-///
-/// Returns a [`HugrError`] if any replacement fails.
 pub fn replace_many_ops<S: Into<OpType>>(
     hugr: &mut impl HugrMut<Node = Node>,
     mapping: impl Fn(&OpType) -> Option<S>,
-) -> Result<Vec<(Node, OpType)>, HugrError> {
+) -> Vec<(Node, OpType)> {
     let replacements = hugr
         .nodes()
         .filter_map(|node| {
@@ -28,7 +25,10 @@ pub fn replace_many_ops<S: Into<OpType>>(
 
     replacements
         .into_iter()
-        .map(|(node, new_op)| hugr.replace_op(node, new_op).map(|old_op| (node, old_op)))
+        .map(|(node, new_op)| {
+            let old_op = hugr.replace_op(node, new_op);
+            (node, old_op)
+        })
         .collect()
 }
 
@@ -70,9 +70,11 @@ pub fn lower_ops(
         .map(|(node, replacement)| {
             let subcirc = SiblingSubgraph::from_node(node, hugr);
             let rw = subcirc.create_simple_replacement(hugr, replacement)?;
-            let mut repls = hugr.apply_rewrite(rw)?;
-            debug_assert_eq!(repls.len(), 1);
-            Ok(repls.remove(0))
+            let removed_nodes = hugr.apply_patch(rw)?.removed_nodes;
+            Ok(removed_nodes
+                .into_iter()
+                .exactly_one()
+                .expect("removed exactly one node"))
         })
         .collect()
 }
@@ -92,7 +94,7 @@ mod test {
 
     #[fixture]
     fn noop_hugr() -> Hugr {
-        let mut b = DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
+        let mut b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
         let out = b
             .add_dataflow_op(Noop::new(bool_t()), [b.input_wires().next().unwrap()])
             .unwrap()
@@ -117,8 +119,7 @@ mod test {
             } else {
                 None
             }
-        })
-        .unwrap();
+        });
 
         assert_eq!(replaced.len(), 1);
         let (n, op) = replaced.remove(0);
@@ -140,6 +141,6 @@ mod test {
         });
 
         assert_eq!(lowered.unwrap().len(), 1);
-        assert_eq!(h.node_count(), 3); // DFG, input, output
+        assert_eq!(h.num_nodes(), 3); // DFG, input, output
     }
 }

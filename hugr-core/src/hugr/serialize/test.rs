@@ -6,10 +6,10 @@ use crate::builder::{
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::Noop;
-use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
+use crate::extension::prelude::{bool_t, qb_t, usize_t};
 use crate::extension::simple_op::MakeRegisteredOp;
+use crate::extension::test::SimpleOpDef;
 use crate::extension::ExtensionRegistry;
-use crate::extension::{test::SimpleOpDef, ExtensionSet};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
@@ -300,7 +300,7 @@ fn weighted_hugr_ser() {
 
         let t_row = vec![Type::new_sum([vec![usize_t()], vec![qb_t()]])];
         let mut f_build = module_builder
-            .define_function("main", Signature::new(t_row.clone(), t_row).with_prelude())
+            .define_function("main", Signature::new(t_row.clone(), t_row))
             .unwrap();
 
         let outputs = f_build
@@ -324,7 +324,7 @@ fn weighted_hugr_ser() {
 #[test]
 fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![bool_t(); 2];
-    let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp).with_prelude())?;
+    let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp))?;
     let mut params: [_; 2] = dfg.input_wires_arr();
     for p in params.iter_mut() {
         *p = dfg
@@ -390,8 +390,8 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn function_type() -> Result<(), Box<dyn std::error::Error>> {
-    let fn_ty = Type::new_function(Signature::new_endo(vec![bool_t()]).with_prelude());
-    let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]).with_prelude())?;
+    let fn_ty = Type::new_function(Signature::new_endo(vec![bool_t()]));
+    let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]))?;
     let op = bldr.add_dataflow_op(Noop(fn_ty), bldr.input_wires())?;
     let h = bldr.finish_hugr_with_outputs(op.outputs())?;
 
@@ -482,10 +482,8 @@ fn roundtrip_value(#[case] value: Value) {
 }
 
 fn polyfunctype1() -> PolyFuncType {
-    let mut extension_set = ExtensionSet::new();
-    extension_set.insert_type_var(1);
-    let function_type = Signature::new_endo(type_row![]).with_extension_delta(extension_set);
-    PolyFuncType::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
+    let function_type = Signature::new_endo(type_row![]);
+    PolyFuncType::new([TypeParam::max_nat()], function_type)
 }
 
 fn polyfunctype2() -> PolyFuncTypeRV {
@@ -541,7 +539,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
-#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(PRELUDE_ID)} ]).unwrap())]
+#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}]).unwrap())]
 #[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {

@@ -12,11 +12,9 @@
 pub mod builder;
 pub mod core;
 pub mod envelope;
-#[cfg(feature = "model_unstable")]
 pub mod export;
 pub mod extension;
 pub mod hugr;
-#[cfg(feature = "model_unstable")]
 pub mod import;
 pub mod macros;
 pub mod ops;

@@ -136,7 +136,7 @@ impl NodeTemplate {
     ) -> Result<(), Option<Signature>> {
         let sig = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
-            NodeTemplate::CompoundOp(hugr) => hugr.root_type(),
+            NodeTemplate::CompoundOp(hugr) => hugr.root_optype(),
             NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
@@ -598,9 +598,9 @@ mod test {
         FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
     };
     use hugr_core::extension::prelude::{
-        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder, PRELUDE_ID,
+        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
     };
-    use hugr_core::extension::{simple_op::MakeExtensionOp, ExtensionSet, TypeDefBound, Version};
+    use hugr_core::extension::{simple_op::MakeExtensionOp, TypeDefBound, Version};
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::{IdentList, ValidationError};
     use hugr_core::ops::constant::CustomConst;
@@ -692,12 +692,7 @@ mod test {
         let mut dfb = new(Signature::new(
             vec![value_array_type(64, elem_ty.clone()), i64_t()],
             elem_ty.clone(),
-        )
-        .with_extension_delta(ExtensionSet::from_iter([
-            PRELUDE_ID,
-            value_array::EXTENSION_ID,
-            conversions::EXTENSION_ID,
-        ])))
+        ))
         .unwrap();
         let [val, idx] = dfb.input_wires_arr();
         let [idx] = dfb
@@ -758,8 +753,7 @@ mod test {
         let inps = fb.input_wires();
         let id = fb.finish_with_outputs(inps).unwrap();
 
-        let sig = Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t())
-            .with_extension_delta(ext.name.clone());
+        let sig = Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t());
         let mut fb = mb.define_function("main", sig).unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
         let [indices] = fb
@@ -1028,7 +1022,7 @@ mod test {
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
         // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
         assert_eq!(
-            h.root_type().dataflow_signature().unwrap().io(),
+            h.root_optype().dataflow_signature().unwrap().io(),
             (
                 &vec![list_type(qb_t()); 2].into(),
                 &vec![qb_t(), option_type(qb_t()).into()].into()
@@ -1080,7 +1074,7 @@ mod test {
         repl.replace_consts_parametrized(AK::type_def(), generic_array_const::<AK>);
         let mut h = backup;
         repl.run(&mut h).unwrap();
-        h.validate_no_extensions().unwrap();
+        h.validate().unwrap();
     }
 
     #[test]

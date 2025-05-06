@@ -268,10 +268,7 @@ pub(crate) mod test {
         let in_row = vec![bool_t(), float64_type()];
 
         let hugr = {
-            let mut builder = DFGBuilder::new(
-                Signature::new(in_row.clone(), type_row![]).with_extension_delta(EXTENSION_ID),
-            )
-            .unwrap();
+            let mut builder = DFGBuilder::new(Signature::new(in_row.clone(), type_row![])).unwrap();
 
             let in_wires: [Wire; 2] = builder.input_wires_arr();
             for (ty, w) in in_row.into_iter().zip(in_wires.iter()) {

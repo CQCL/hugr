@@ -25,7 +25,6 @@ EXAMPLE = r"""
 {
     "version": "0.1.0",
     "name": "ext",
-    "runtime_reqs": [],
     "types": {
         "foo": {
             "extension": "ext",
@@ -64,8 +63,7 @@ EXAMPLE = r"""
                             "b": "C"
                         }
                     ],
-                    "output": [],
-                    "runtime_reqs": []
+                    "output": []
                 }
             },
             "lower_funcs": []
@@ -99,7 +97,6 @@ def test_extension():
     ext = Extension(
         version=SemanticVersion(0, 1, 0),
         name="ext",
-        runtime_reqs=set(),
         types={"foo": type_def},
         values={},
         operations={"New": op_def},
@@ -121,7 +118,6 @@ def test_package():
     ext = Extension(
         version=SemanticVersion(0, 1, 0),
         name="ext",
-        runtime_reqs=set(),
         types={},
         values={},
         operations={},

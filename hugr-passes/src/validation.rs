@@ -16,11 +16,8 @@ use hugr_core::HugrView;
 pub enum ValidationLevel {
     /// Do no verification.
     None,
-    /// Validate using [HugrView::validate_no_extensions]. This is useful when you
-    /// do not expect valid Extension annotations on Nodes.
-    WithoutExtensions,
     /// Validate using [HugrView::validate].
-    WithExtensions,
+    Validate,
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -44,8 +41,7 @@ pub enum ValidatePassError {
 impl Default for ValidationLevel {
     fn default() -> Self {
         if cfg!(test) {
-            // Many tests fail when run with Self::WithExtensions
-            Self::WithoutExtensions
+            Self::Validate
         } else {
             Self::None
         }
@@ -86,8 +82,7 @@ impl ValidationLevel {
     {
         match self {
             ValidationLevel::None => Ok(()),
-            ValidationLevel::WithoutExtensions => hugr.validate_no_extensions(),
-            ValidationLevel::WithExtensions => hugr.validate(),
+            ValidationLevel::Validate => hugr.validate(),
         }
         .map_err(|err| mk_err(err, hugr.mermaid_string()).into())
     }

@@ -16,7 +16,7 @@ use std::borrow::Cow;
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
-pub use root_checked::RootChecked;
+pub use root_checked::{check_tag, RootCheckable, RootChecked};
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
@@ -24,12 +24,9 @@ use itertools::Itertools;
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
 
-use super::internal::HugrInternals;
-use super::{
-    Hugr, HugrError, HugrMut, Node, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
-};
+use super::internal::{HugrInternals, HugrMutInternals};
+use super::{Hugr, HugrError, HugrMut, Node, NodeMetadata, ValidationError};
 use crate::extension::ExtensionRegistry;
-use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
@@ -41,85 +38,67 @@ use itertools::Either;
 /// For end users we intend this to be superseded by region-specific APIs.
 pub trait HugrView: HugrInternals {
     /// Return the root node of this view.
-    #[inline]
-    fn root(&self) -> Self::Node {
-        self.root_node()
-    }
+    fn root(&self) -> Self::Node;
 
-    /// Return the type of the HUGR root node.
+    /// Return the optype of the HUGR root node.
     #[inline]
-    fn root_type(&self) -> &OpType {
+    fn root_optype(&self) -> &OpType {
         let node_type = self.get_optype(self.root());
-        // Sadly no way to do this at present
-        // debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
         node_type
     }
 
-    /// Returns whether the node exists.
+    /// Returns `true` if the node exists in the HUGR.
     fn contains_node(&self, node: Self::Node) -> bool;
 
-    /// Validates that a node is valid in the graph.
-    #[inline]
-    fn valid_node(&self, node: Self::Node) -> bool {
-        self.contains_node(node)
-    }
-
-    /// Validates that a node is a valid root descendant in the graph.
-    ///
-    /// To include the root node use [`HugrView::valid_node`] instead.
-    #[inline]
-    fn valid_non_root(&self, node: Self::Node) -> bool {
-        self.root() != node && self.valid_node(node)
-    }
-
     /// Returns the parent of a node.
-    #[inline]
-    fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
-        if !self.valid_non_root(node) {
-            return None;
-        };
-        self.base_hugr()
-            .hierarchy
-            .parent(self.get_pg_index(node))
-            .map(|index| self.get_node(index))
-    }
-
-    /// Returns the operation type of a node.
-    #[inline]
-    fn get_optype(&self, node: Self::Node) -> &OpType {
-        match self.contains_node(node) {
-            true => self.base_hugr().op_types.get(self.get_pg_index(node)),
-            false => &DEFAULT_OPTYPE,
-        }
-    }
+    fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
 
     /// Returns the metadata associated with a node.
     #[inline]
     fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
         match self.contains_node(node) {
-            true => self.get_node_metadata(node)?.get(key.as_ref()),
+            true => self.node_metadata_map(node).get(key.as_ref()),
             false => None,
         }
     }
 
-    /// Retrieve the complete metadata map for a node.
-    fn get_node_metadata(&self, node: Self::Node) -> Option<&NodeMetadataMap> {
-        if !self.valid_node(node) {
-            return None;
-        }
-        self.base_hugr()
-            .metadata
-            .get(self.get_pg_index(node))
-            .as_ref()
+    /// Returns the operation type of a node.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
+    fn get_optype(&self, node: Self::Node) -> &OpType;
+
+    /// Returns the number of nodes in the HUGR.
+    fn num_nodes(&self) -> usize;
+
+    /// Returns the number of edges in the HUGR.
+    fn num_edges(&self) -> usize;
+
+    /// Number of ports in node for a given direction.
+    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize;
+
+    /// Number of inputs to a node.
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Incoming)`.
+    #[inline]
+    fn num_inputs(&self, node: Self::Node) -> usize {
+        self.num_ports(node, Direction::Incoming)
     }
 
-    /// Returns the number of nodes in the hugr.
-    fn node_count(&self) -> usize;
+    /// Number of outputs from a node.
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Outgoing)`.
+    #[inline]
+    fn num_outputs(&self, node: Self::Node) -> usize {
+        self.num_ports(node, Direction::Outgoing)
+    }
 
-    /// Returns the number of edges in the hugr.
-    fn edge_count(&self) -> usize;
-
-    /// Iterates over the nodes in the port graph.
+    /// Iterates over the all the nodes in the HUGR.
+    ///
+    /// This iterator returns every node in the HUGR, including those that are
+    /// not descendants from the root node.
+    ///
+    /// See [`HugrView::descendants`] and [`HugrView::children`] for more specific
+    /// iterators.
     fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Iterator over ports of node in a given direction.
@@ -261,25 +240,14 @@ pub trait HugrView: HugrInternals {
         self.linked_ports(node, port).next().is_some()
     }
 
-    /// Number of ports in node for a given direction.
-    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize;
-
-    /// Number of inputs to a node.
-    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Incoming)`.
-    #[inline]
-    fn num_inputs(&self, node: Self::Node) -> usize {
-        self.num_ports(node, Direction::Incoming)
-    }
-
-    /// Number of outputs from a node.
-    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Outgoing)`.
-    #[inline]
-    fn num_outputs(&self, node: Self::Node) -> usize {
-        self.num_ports(node, Direction::Outgoing)
-    }
-
-    /// Return iterator over the direct children of node.
+    /// Returns an iterator over the direct children of node.
     fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
+
+    /// Returns an iterator over all the descendants of a node,
+    /// including the node itself.
+    ///
+    /// Yields the node itself first, followed by its children in breath-first order.
+    fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Returns the first child of the specified node (if it is a parent).
     /// Useful because `x.children().next()` leaves x borrowed.
@@ -335,13 +303,13 @@ pub trait HugrView: HugrInternals {
     /// In contrast to [`poly_func_type`][HugrView::poly_func_type], this
     /// method always return a concrete [`Signature`].
     fn inner_function_type(&self) -> Option<Cow<'_, Signature>> {
-        self.root_type().inner_function_type()
+        self.root_optype().inner_function_type()
     }
 
     /// Returns the function type defined by this HUGR, i.e. `Some` iff the root is
     /// a [`FuncDecl`][crate::ops::FuncDecl] or [`FuncDefn`][crate::ops::FuncDefn].
     fn poly_func_type(&self) -> Option<PolyFuncType> {
-        match self.root_type() {
+        match self.root_optype() {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
             OpType::FuncDefn(defn) => Some(defn.signature.clone()),
             _ => None,
@@ -364,13 +332,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_config(RenderConfig {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-        })
-    }
+    fn mermaid_string(&self) -> String;
 
     /// Return the mermaid representation of the underlying hierarchical graph.
     ///
@@ -379,35 +341,14 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
-        let hugr = self.base_hugr();
-        let graph = self.portgraph();
-        graph
-            .mermaid_format()
-            .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(render::node_style(self, config))
-            .with_edge_style(render::edge_style(self, config))
-            .finish()
-    }
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String;
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
     /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
     fn dot_string(&self) -> String
     where
-        Self: Sized,
-    {
-        let hugr = self.base_hugr();
-        let graph = self.portgraph();
-        let config = RenderConfig::default();
-        graph
-            .dot_format()
-            .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(render::node_style(self, config))
-            .with_port_style(render::port_style(self, config))
-            .with_edge_style(render::edge_style(self, config))
-            .finish()
-    }
+        Self: Sized;
 
     /// If a node has a static input, return the source node.
     fn static_source(&self, node: Self::Node) -> Option<Self::Node> {
@@ -454,42 +395,19 @@ pub trait HugrView: HugrInternals {
 
     /// Returns the set of extensions used by the HUGR.
     ///
-    /// This set may contain extensions that are no longer required by the HUGR.
-    fn extensions(&self) -> &ExtensionRegistry {
-        &self.base_hugr().extensions
-    }
+    /// This set contains all extensions required to define the operations and
+    /// types in the HUGR.
+    fn extensions(&self) -> &ExtensionRegistry;
 
     /// Check the validity of the underlying HUGR.
-    ///
-    /// This includes checking consistency of extension requirements between
-    /// connected nodes and between parents and children.
-    /// See [`HugrView::validate_no_extensions`] for a version that doesn't check
-    /// extension requirements.
     fn validate(&self) -> Result<(), ValidationError> {
+        #[allow(deprecated)]
         self.base_hugr().validate()
     }
-
-    /// Check the validity of the underlying HUGR, but don't check consistency
-    /// of extension requirements between connected nodes or between parents and
-    /// children.
-    ///
-    /// For a more thorough check, use [`HugrView::validate`].
-    fn validate_no_extensions(&self) -> Result<(), ValidationError> {
-        self.base_hugr().validate_no_extensions()
-    }
-}
-
-/// Trait for views that provides a guaranteed bound on the type of the root node.
-pub trait RootTagged: HugrView {
-    /// The kind of handle that can be used to refer to the root node.
-    ///
-    /// The handle is guaranteed to be able to contain the operation returned by
-    /// [`HugrView::root_type`].
-    type RootHandle: NodeHandle<Self::Node>;
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: RootTagged + Sized {
+pub trait HierarchyView<'a>: HugrView + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
     ///
     /// # Errors
@@ -515,19 +433,6 @@ pub trait ExtractHugr: HugrView + Sized {
     }
 }
 
-/// Check that the node in a HUGR can be represented by the required tag.
-fn check_tag<Required: NodeHandle<N>, N>(
-    hugr: &impl HugrView<Node = N>,
-    node: N,
-) -> Result<(), HugrError> {
-    let actual = hugr.get_optype(node).tag();
-    let required = Required::TAG;
-    if !required.is_superset(actual) {
-        return Err(HugrError::InvalidTag { required, actual });
-    }
-    Ok(())
-}
-
 // Explicit implementation to avoid cloning the Hugr.
 impl ExtractHugr for Hugr {
     fn extract_hugr(self) -> Hugr {
@@ -549,18 +454,48 @@ impl ExtractHugr for &mut Hugr {
 
 impl HugrView for Hugr {
     #[inline]
-    fn contains_node(&self, node: Node) -> bool {
-        self.graph.contains_node(node.pg_index())
+    fn root(&self) -> Self::Node {
+        self.root.into()
     }
 
     #[inline]
-    fn node_count(&self) -> usize {
-        self.graph.node_count()
+    fn contains_node(&self, node: Self::Node) -> bool {
+        self.graph.contains_node(node.into_portgraph())
     }
 
     #[inline]
-    fn edge_count(&self) -> usize {
-        self.graph.link_count()
+    fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
+        if !check_valid_non_root(self, node) {
+            return None;
+        };
+        self.hierarchy
+            .parent(self.to_portgraph_node(node))
+            .map(|index| self.from_portgraph_node(index))
+    }
+
+    #[inline]
+    fn get_optype(&self, node: Node) -> &OpType {
+        // TODO: This currently fails because some methods get the optype of
+        // e.g. a parent outside a region view. We should be able to re-enable
+        // this once we add hugr entrypoints.
+        //panic_invalid_node(self, node);
+        self.op_types.get(self.to_portgraph_node(node))
+    }
+
+    #[inline]
+    fn num_nodes(&self) -> usize {
+        self.portgraph().node_count()
+    }
+
+    #[inline]
+    fn num_edges(&self) -> usize {
+        self.portgraph().link_count()
+    }
+
+    #[inline]
+    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize {
+        self.portgraph()
+            .num_ports(self.to_portgraph_node(node), dir)
     }
 
     #[inline]
@@ -570,12 +505,16 @@ impl HugrView for Hugr {
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
-        self.graph.port_offsets(node.pg_index(), dir).map_into()
+        self.graph
+            .port_offsets(node.into_portgraph(), dir)
+            .map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
-        self.graph.all_port_offsets(node.pg_index()).map_into()
+        self.graph
+            .all_port_offsets(node.into_portgraph())
+            .map_into()
     }
 
     #[inline]
@@ -588,7 +527,7 @@ impl HugrView for Hugr {
 
         let port = self
             .graph
-            .port_index(node.pg_index(), port.pg_offset())
+            .port_index(node.into_portgraph(), port.pg_offset())
             .unwrap();
         self.graph.port_links(port).map(|(_, link)| {
             let port = link.port();
@@ -601,30 +540,72 @@ impl HugrView for Hugr {
     #[inline]
     fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
         self.graph
-            .get_connections(node.pg_index(), other.pg_index())
+            .get_connections(node.into_portgraph(), other.into_portgraph())
             .map(|(p1, p2)| {
                 [p1, p2].map(|link| self.graph.port_offset(link.port()).unwrap().into())
             })
     }
 
     #[inline]
-    fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(node.pg_index(), dir)
+    fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
+        self.hierarchy
+            .children(self.to_portgraph_node(node))
+            .map(|n| self.from_portgraph_node(n))
     }
 
     #[inline]
-    fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
-        self.hierarchy.children(node.pg_index()).map_into()
+    fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
+        self.hierarchy
+            .descendants(self.to_portgraph_node(node))
+            .map(|n| self.from_portgraph_node(n))
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
-        self.graph.neighbours(node.pg_index(), dir).map_into()
+        self.graph.neighbours(node.into_portgraph(), dir).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
-        self.graph.all_neighbours(node.pg_index()).map_into()
+        self.graph.all_neighbours(node.into_portgraph()).map_into()
+    }
+
+    fn mermaid_string(&self) -> String {
+        self.mermaid_string_with_config(RenderConfig {
+            node_indices: true,
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+        })
+    }
+
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
+        let graph = self.portgraph();
+        graph
+            .mermaid_format()
+            .with_hierarchy(&self.hierarchy)
+            .with_node_style(render::node_style(self, config))
+            .with_edge_style(render::edge_style(self, config))
+            .finish()
+    }
+
+    fn dot_string(&self) -> String
+    where
+        Self: Sized,
+    {
+        let graph = self.portgraph();
+        let config = RenderConfig::default();
+        graph
+            .dot_format()
+            .with_hierarchy(&self.hierarchy)
+            .with_node_style(render::node_style(self, config))
+            .with_port_style(render::port_style(self, config))
+            .with_edge_style(render::edge_style(self, config))
+            .finish()
+    }
+
+    #[inline]
+    fn extensions(&self) -> &ExtensionRegistry {
+        &self.extensions
     }
 }
 
@@ -653,7 +634,7 @@ where
         hugr: &impl HugrView<Node = Node>,
     ) -> impl Iterator<Item = (Node, P)> {
         self.filter(move |(n, p)| {
-            let kind = hugr.get_optype(*n).port_kind(*p);
+            let kind = HugrView::get_optype(hugr, *n).port_kind(*p);
             predicate(kind)
         })
     }
@@ -664,4 +645,48 @@ where
     I: Iterator<Item = (Node, P)>,
     P: Into<Port> + Copy,
 {
+}
+
+/// Returns `true` if the node exists in the graph and is not the module at the hierarchy root.
+pub(super) fn check_valid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) -> bool {
+    hugr.contains_node(node) && node != hugr.root()
+}
+
+/// Panic if [`HugrView::contains_node`] fails.
+#[track_caller]
+pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
+    // TODO: When stacking hugr wrappers, this gets called for every layer.
+    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
+    if !hugr.contains_node(node) {
+        panic!("Received an invalid node {node}.",);
+    }
+}
+
+/// Panic if [`check_valid_non_root`] fails.
+#[track_caller]
+pub(super) fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
+    // TODO: When stacking hugr wrappers, this gets called for every layer.
+    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
+    if !check_valid_non_root(hugr, node) {
+        panic!("Received an invalid non-root node {node}.",);
+    }
+}
+
+/// Panic if [`HugrView::valid_node`] fails.
+#[track_caller]
+pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
+    hugr: &H,
+    node: Node,
+    port: impl Into<Port>,
+) {
+    let port = port.into();
+    // TODO: When stacking hugr wrappers, this gets called for every layer.
+    // Should we `cfg!(debug_assertions)` this? Benchmark and see if it matters.
+    if hugr
+        .portgraph()
+        .port_index(node.into_portgraph(), port.pg_offset())
+        .is_none()
+    {
+        panic!("Received an invalid port {port} for node {node} while mutating a HUGR");
+    }
 }

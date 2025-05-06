@@ -224,9 +224,6 @@ impl Package {
         // As a fallback, try to load a hugr json.
         if let Ok(mut hugr) = serde_json::from_value::<Hugr>(val) {
             hugr.resolve_extension_defs(extension_registry)?;
-            if cfg!(feature = "extension_inference") {
-                hugr.infer_extensions(false)?;
-            }
             return Ok(Package::from_hugr(hugr)?);
         }
 
@@ -353,8 +350,7 @@ fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
                 name: "main".to_string(),
                 signature: signature.into_owned().into(),
             },
-        )
-        .expect("Hugr accepts any root node");
+        );
 
         // Wrap it in a module.
         let new_root = hugr.add_node(Module::new().into());

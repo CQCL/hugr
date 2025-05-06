@@ -111,10 +111,8 @@ mod tests {
 
     #[test]
     fn test_build_unwrap() {
-        let mut builder = DFGBuilder::new(
-            Signature::new(Type::from(option_type(bool_t())), bool_t()).with_prelude(),
-        )
-        .unwrap();
+        let mut builder =
+            DFGBuilder::new(Signature::new(Type::from(option_type(bool_t())), bool_t())).unwrap();
 
         let [opt] = builder.input_wires_arr();
 

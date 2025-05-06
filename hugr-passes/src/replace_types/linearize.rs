@@ -1,4 +1,3 @@
-use std::iter::repeat;
 use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::builder::{
@@ -273,7 +272,7 @@ impl Linearizer for DelegatingLinearizer {
                     let mut elems_for_copy = vec![vec![]; num_outports];
                     for (inp, ty) in case_b.input_wires().zip_eq(variant.iter()) {
                         let inp_copies = if ty.copyable() {
-                            repeat(inp).take(num_outports).collect::<Vec<_>>()
+                            std::iter::repeat_n(inp, num_outports).collect::<Vec<_>>()
                         } else {
                             self.copy_discard_op(ty, num_outports)?
                                 .add(&mut case_b, [inp])
@@ -624,10 +623,7 @@ mod test {
             NodeTemplate::SingleOp(copy3.clone()),
             NodeTemplate::SingleOp(discard.clone().into()),
         );
-        let sig3 = Some(
-            Signature::new(lin_t.clone(), vec![lin_t.clone(); 3])
-                .with_extension_delta(ext.name().clone()),
-        );
+        let sig3 = Some(Signature::new(lin_t.clone(), vec![lin_t.clone(); 3]));
         assert_eq!(
             bad_copy,
             Err(LinearizeError::WrongSignature {
@@ -784,11 +780,7 @@ mod test {
         let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
         let discard_fn = {
             let mut fb = dfb
-                .define_function(
-                    "drop",
-                    Signature::new(lin_t.clone(), type_row![])
-                        .with_extension_delta(e.name().clone()),
-                )
+                .define_function("drop", Signature::new(lin_t.clone(), type_row![]))
                 .unwrap();
             let ins = fb.input_wires();
             fb.add_dataflow_op(

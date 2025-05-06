@@ -23,7 +23,7 @@ use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::RowVariable;
-use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
+use crate::types::{CustomType, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
 mod const_fold;
@@ -547,8 +547,6 @@ pub struct Extension {
     pub version: Version,
     /// Unique identifier for the extension.
     pub name: ExtensionId,
-    /// Runtime dependencies this extension has on other extensions.
-    pub runtime_reqs: ExtensionSet,
     /// Types defined by this extension.
     types: BTreeMap<TypeName, TypeDef>,
     /// Operation declarations with serializable definitions.
@@ -572,7 +570,6 @@ impl Extension {
         Self {
             name,
             version,
-            runtime_reqs: Default::default(),
             types: Default::default(),
             operations: Default::default(),
         }
@@ -627,12 +624,6 @@ impl Extension {
             Some(e) => Err(e),
             None => Ok(ext),
         }
-    }
-
-    /// Extend the runtime requirements of this extension with another set of extensions.
-    pub fn add_requirements(&mut self, runtime_reqs: impl Into<ExtensionSet>) {
-        let reqs = mem::take(&mut self.runtime_reqs);
-        self.runtime_reqs = reqs.union(runtime_reqs.into());
     }
 
     /// Allows read-only access to the operations in this Extension
@@ -734,14 +725,6 @@ pub enum ExtensionBuildError {
 #[display("[{}]", _0.iter().join(", "))]
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
-/// A special ExtensionId which indicates that the delta of a non-Function
-/// container node should be computed by extension inference.
-///
-/// See [`infer_extensions`] which lists the container nodes to which this can be applied.
-///
-/// [`infer_extensions`]: crate::hugr::Hugr::infer_extensions
-pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked(".TO_BE_INFERRED");
-
 impl ExtensionSet {
     /// Creates a new empty extension set.
     pub const fn new() -> Self {
@@ -751,14 +734,6 @@ impl ExtensionSet {
     /// Adds a extension to the set.
     pub fn insert(&mut self, extension: ExtensionId) {
         self.0.insert(extension.clone());
-    }
-
-    /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
-    pub fn insert_type_var(&mut self, idx: usize) {
-        // Represent type vars as string representation of variable index.
-        // This is not a legal IdentList or ExtensionId so should not conflict.
-        self.0
-            .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));
     }
 
     /// Returns `true` if the set contains the given extension.
@@ -780,14 +755,6 @@ impl ExtensionSet {
     pub fn singleton(extension: ExtensionId) -> Self {
         let mut set = Self::new();
         set.insert(extension);
-        set
-    }
-
-    /// An ExtensionSet containing a single type variable
-    /// (which must have been declared as a [TypeParam::Extensions])
-    pub fn type_var(idx: usize) -> Self {
-        let mut set = Self::new();
-        set.insert_type_var(idx);
         set
     }
 
@@ -821,22 +788,6 @@ impl ExtensionSet {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
-
-    pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
-        self.iter()
-            .filter_map(as_typevar)
-            .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
-    }
-
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
-        Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
-            None => vec![e.clone()],
-            Some(i) => match t.apply_var(i, &TypeParam::Extensions) {
-                TypeArg::Extensions{es} => es.iter().cloned().collect::<Vec<_>>(),
-                _ => panic!("value for type var was not extension set - type scheme should be validated first"),
-            },
-        }))
-    }
 }
 
 impl From<ExtensionId> for ExtensionSet {
@@ -860,16 +811,6 @@ impl<'a> IntoIterator for &'a ExtensionSet {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
-    }
-}
-
-fn as_typevar(e: &ExtensionId) -> Option<usize> {
-    // Type variables are represented as radix-10 numbers, which are illegal
-    // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
-    // we assume it must be a type variable, and fail fast if it isn't.
-    match e.chars().next() {
-        Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
-        _ => None,
     }
 }
 
@@ -967,16 +908,8 @@ pub mod test {
             type Strategy = BoxedStrategy<Self>;
 
             fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-                (
-                    hash_set(0..10usize, 0..3),
-                    hash_set(any::<ExtensionId>(), 0..3),
-                )
-                    .prop_map(|(vars, extensions)| {
-                        ExtensionSet::union_over(
-                            std::iter::once(extensions.into_iter().collect::<ExtensionSet>())
-                                .chain(vars.into_iter().map(ExtensionSet::type_var)),
-                        )
-                    })
+                hash_set(any::<ExtensionId>(), 0..3)
+                    .prop_map(|extensions| extensions.into_iter().collect::<ExtensionSet>())
                     .boxed()
             }
         }

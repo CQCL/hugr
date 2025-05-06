@@ -3,7 +3,6 @@
 
 use hugr_core::builder::{endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{option_type, UnwrapBuilder};
-use hugr_core::extension::ExtensionSet;
 use hugr_core::ops::constant::CustomConst;
 use hugr_core::ops::{constant::OpaqueValue, Value};
 use hugr_core::ops::{OpTrait, OpType, Tag};
@@ -15,9 +14,9 @@ use hugr_core::std_extensions::collections::array::{
     GenericArrayRepeat, GenericArrayScan, GenericArrayValue,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
+use hugr_core::type_row;
 use hugr_core::std_extensions::collections::value_array::ValueArray;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
-use hugr_core::{type_row, Hugr, HugrView};
 use itertools::Itertools;
 
 use super::{
@@ -127,7 +126,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         };
         // Now array.scan that over the input array to get an array of unit (which can be discarded)
         let array_scan =
-            GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n, runtime_reqs(&map_fn));
+            GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
         let in_type = AK::ty(*n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
@@ -165,9 +164,8 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                 .unwrap();
             dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
         };
-        let repeats =
-            vec![
-                GenericArrayRepeat::<AK>::new(option_ty.clone(), *n, runtime_reqs(&fn_none));
+        let repeats = vec![
+                GenericArrayRepeat::<AK>::new(option_ty.clone(), *n);
                 num_new
             ];
         let fn_none = dfb.add_load_value(Value::function(fn_none).unwrap());
@@ -249,7 +247,6 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .chain(vec![option_array; num_new])
             .collect(),
         *n,
-        runtime_reqs(&copy_elem),
     );
 
     let copy_elem = dfb.add_load_value(Value::function(copy_elem).unwrap());
@@ -277,13 +274,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         dfb.finish_hugr_with_outputs([val]).unwrap()
     };
 
-    let unwrap_scan = GenericArrayScan::<AK>::new(
-        option_ty.clone(),
-        ty.clone(),
-        vec![],
-        *n,
-        runtime_reqs(&unwrap_elem),
-    );
+    let unwrap_scan = GenericArrayScan::<AK>::new(option_ty.clone(), ty.clone(), vec![], *n);
     let unwrap_elem = dfb.add_load_value(Value::function(unwrap_elem).unwrap());
 
     let out_arrays = std::iter::once(out_array1)

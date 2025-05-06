@@ -6,7 +6,7 @@ use std::sync::{Arc, Weak};
 use crate::ops::constant::ValueName;
 use crate::types::TypeName;
 use crate::{
-    extension::{ExtensionId, ExtensionSet},
+    extension::ExtensionId,
     ops::constant::CustomConst,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
@@ -105,7 +105,6 @@ pub struct ConstInt {
 
 impl ConstInt {
     /// Name of the constructor for creating constant integers.
-    #[cfg_attr(not(feature = "model_unstable"), allow(dead_code))]
     pub(crate) const CTR_NAME: &'static str = "arithmetic.int.const";
 
     /// Create a new [`ConstInt`] with a given width and unsigned value
@@ -183,10 +182,6 @@ impl CustomConst for ConstInt {
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(EXTENSION_ID)
     }
 
     fn get_type(&self) -> Type {

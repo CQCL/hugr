@@ -9,10 +9,7 @@ use hugr_core::ops::{CallIndirect, TailLoop};
 use hugr_core::types::{ConstTypeError, TypeRow};
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
-    extension::{
-        prelude::{bool_t, UnpackTuple},
-        ExtensionSet,
-    },
+    extension::prelude::{bool_t, UnpackTuple},
     ops::{handle::NodeHandle, DataflowOpTrait, Tag, Value},
     type_row,
     types::{Signature, SumType, Type},
@@ -176,12 +173,7 @@ fn test_tail_loop_two_iters() {
     let false_w = builder.add_load_value(Value::false_val());
 
     let tlb = builder
-        .tail_loop_builder_exts(
-            [],
-            [(bool_t(), false_w), (bool_t(), true_w)],
-            type_row![],
-            ExtensionSet::new(),
-        )
+        .tail_loop_builder([], [(bool_t(), false_w), (bool_t(), true_w)], type_row![])
         .unwrap();
     assert_eq!(
         tlb.loop_signature().unwrap().signature().as_ref(),

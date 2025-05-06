@@ -9,7 +9,7 @@ use crate::{
     extension::{
         prelude::{bool_t, string_type},
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
-        ExtensionId, ExtensionSet, OpDef, SignatureFunc,
+        ExtensionId, OpDef, SignatureFunc,
     },
     types::Signature,
     Extension,
@@ -111,7 +111,6 @@ lazy_static! {
     /// Extension for basic float operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(ExtensionSet::singleton(super::int_types::EXTENSION_ID));
             FloatOps::load_all_ops(extension, extension_ref).unwrap();
         })
     };

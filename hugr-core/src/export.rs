@@ -1,4 +1,5 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
+use crate::hugr::internal::HugrInternals;
 use crate::{
     extension::{ExtensionId, OpDef, SignatureFunc},
     hugr::IdentList,
@@ -94,7 +95,7 @@ struct Context<'a> {
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
         let mut module = table::Module::default();
-        module.nodes.reserve(hugr.node_count());
+        module.nodes.reserve(hugr.num_nodes());
         let links = Links::new(hugr);
 
         Self {
@@ -831,7 +832,6 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
-            TypeArg::Extensions { .. } => self.make_term_apply("compat.ext_set", &[]),
             TypeArg::Variable { v } => self.export_type_arg_var(v),
         }
     }
@@ -938,7 +938,6 @@ impl<'a> Context<'a> {
                 let types = self.make_term(table::Term::List(parts));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
-            TypeParam::Extensions => self.make_term_apply("compat.ext_set_type", &[]),
         }
     }
 
@@ -999,7 +998,7 @@ impl<'a> Context<'a> {
                 let outer_hugr = std::mem::replace(&mut self.hugr, hugr);
                 let outer_node_to_id = std::mem::take(&mut self.node_to_id);
 
-                let region = match hugr.root_type() {
+                let region = match hugr.root_optype() {
                     OpType::DFG(_) => self.export_dfg(hugr.root(), model::ScopeClosure::Closed),
                     _ => panic!("Value::Function root must be a DFG"),
                 };
@@ -1031,7 +1030,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_node_metadata(&mut self, node: Node) -> &'a [table::TermId] {
-        let metadata_map = self.hugr.get_node_metadata(node);
+        let metadata_map = self.hugr.node_metadata_map(node);
 
         let has_order_edges = {
             fn is_relevant_node(hugr: &Hugr, node: Node) -> bool {
@@ -1049,13 +1048,11 @@ impl<'a> Context<'a> {
                 .any(|(other, _)| is_relevant_node(self.hugr, other))
         };
 
-        let meta_capacity = metadata_map.map_or(0, |map| map.len()) + has_order_edges as usize;
+        let meta_capacity = metadata_map.len() + has_order_edges as usize;
         let mut meta = BumpVec::with_capacity_in(meta_capacity, self.bump);
 
-        if let Some(metadata_map) = metadata_map {
-            for (name, value) in metadata_map {
-                meta.push(self.export_json_meta(name, value));
-            }
+        for (name, value) in metadata_map {
+            meta.push(self.export_json_meta(name, value));
         }
 
         if has_order_edges {
@@ -1176,19 +1173,15 @@ mod test {
     use crate::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::qb_t,
-        std_extensions::arithmetic::float_types,
         types::Signature,
-        utils::test_quantum_extension::{self, cx_gate, h_gate},
+        utils::test_quantum_extension::{cx_gate, h_gate},
         Hugr,
     };
 
     #[fixture]
     fn test_simple_circuit() -> Hugr {
         crate::builder::test::build_main(
-            Signature::new_endo(vec![qb_t(), qb_t()])
-                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
-                .with_extension_delta(float_types::EXTENSION_ID)
-                .into(),
+            Signature::new_endo(vec![qb_t(), qb_t()]).into(),
             |mut f_build| {
                 let wires: Vec<_> = f_build.input_wires().collect();
                 let mut linear = f_build.as_circuit(wires);

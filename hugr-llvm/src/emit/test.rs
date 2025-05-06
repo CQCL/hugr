@@ -4,13 +4,8 @@ use anyhow::{anyhow, Result};
 use hugr_core::builder::{
     BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use hugr_core::extension::prelude::PRELUDE_ID;
-use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
+use hugr_core::extension::ExtensionRegistry;
 use hugr_core::ops::handle::FuncID;
-use hugr_core::std_extensions::arithmetic::{
-    conversions, float_ops, float_types, int_ops, int_types,
-};
-use hugr_core::std_extensions::{collections, logic};
 use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView, Node};
 use inkwell::module::Module;
@@ -150,24 +145,7 @@ impl SimpleHugrConfig {
     ) -> Hugr {
         let mut mod_b = ModuleBuilder::new();
         let func_b = mod_b
-            .define_function(
-                "main",
-                HugrFuncType::new(self.ins, self.outs).with_extension_delta(
-                    ExtensionSet::from_iter([
-                        PRELUDE_ID,
-                        int_types::EXTENSION_ID,
-                        int_ops::EXTENSION_ID,
-                        float_types::EXTENSION_ID,
-                        float_ops::EXTENSION_ID,
-                        conversions::EXTENSION_ID,
-                        logic::EXTENSION_ID,
-                        collections::array::EXTENSION_ID,
-                        collections::list::EXTENSION_ID,
-                        collections::static_array::EXTENSION_ID,
-                        collections::value_array::EXTENSION_ID,
-                    ]),
-                ),
-            )
+            .define_function("main", HugrFuncType::new(self.ins, self.outs))
             .unwrap();
         make(func_b, &self.extensions);
 
@@ -266,7 +244,7 @@ mod test_fns {
 
     use hugr_core::ops::{CallIndirect, Tag, Value};
     use hugr_core::std_extensions::arithmetic::int_ops::{self};
-    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+    use hugr_core::std_extensions::arithmetic::int_types::{self, ConstInt};
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{type_row, Hugr};

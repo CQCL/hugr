@@ -131,7 +131,7 @@ impl ComposablePass for UntuplePass {
         let rewrites_applied = rewrites.len();
         // The rewrites are independent, so we can always apply them all.
         for rewrite in rewrites {
-            hugr.apply_rewrite(rewrite)?;
+            hugr.apply_patch(rewrite)?;
         }
         Ok(UntupleResult { rewrites_applied })
     }
@@ -247,7 +247,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
             .add_dataflow_op(op, replacement.input_wires())
             .unwrap()
             .outputs_arr();
-        outputs.extend(std::iter::repeat(tuple).take(num_other_outputs))
+        outputs.extend(std::iter::repeat_n(tuple, num_other_outputs))
     }
 
     // These should never fail, as we are defining the replacement ourselves.
@@ -278,9 +278,7 @@ mod test {
     /// These can be removed entirely.
     #[fixture]
     fn unused_pack() -> Hugr {
-        let mut h =
-            DFGBuilder::new(Signature::new(vec![bool_t(), bool_t()], vec![]).with_prelude())
-                .unwrap();
+        let mut h = DFGBuilder::new(Signature::new(vec![bool_t(), bool_t()], vec![])).unwrap();
         let mut inps = h.input_wires();
         let b1 = inps.next().unwrap();
         let b2 = inps.next().unwrap();
@@ -295,8 +293,7 @@ mod test {
     /// These can be removed entirely.
     #[fixture]
     fn simple_pack_unpack() -> Hugr {
-        let mut h =
-            DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()]).with_prelude()).unwrap();
+        let mut h = DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()])).unwrap();
         let mut inps = h.input_wires();
         let qb1 = inps.next().unwrap();
         let b2 = inps.next().unwrap();
@@ -315,8 +312,7 @@ mod test {
     /// we just remove everything.
     #[fixture]
     fn ordered_pack_unpack() -> Hugr {
-        let mut h =
-            DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()]).with_prelude()).unwrap();
+        let mut h = DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()])).unwrap();
         let mut inps = h.input_wires();
         let qb1 = inps.next().unwrap();
         let b2 = inps.next().unwrap();
@@ -338,13 +334,10 @@ mod test {
     /// These can be removed entirely.
     #[fixture]
     fn multi_unpack() -> Hugr {
-        let mut h = DFGBuilder::new(
-            Signature::new(
-                vec![bool_t(), bool_t()],
-                vec![bool_t(), bool_t(), bool_t(), bool_t()],
-            )
-            .with_prelude(),
-        )
+        let mut h = DFGBuilder::new(Signature::new(
+            vec![bool_t(), bool_t()],
+            vec![bool_t(), bool_t(), bool_t(), bool_t()],
+        ))
         .unwrap();
         let mut inps = h.input_wires();
         let b1 = inps.next().unwrap();
@@ -369,17 +362,14 @@ mod test {
     /// The unpack operation can be removed, but the pack operation cannot.
     #[fixture]
     fn partial_unpack() -> Hugr {
-        let mut h = DFGBuilder::new(
-            Signature::new(
-                vec![bool_t(), bool_t()],
-                vec![
-                    bool_t(),
-                    bool_t(),
-                    Type::new_tuple(vec![bool_t(), bool_t()]),
-                ],
-            )
-            .with_prelude(),
-        )
+        let mut h = DFGBuilder::new(Signature::new(
+            vec![bool_t(), bool_t()],
+            vec![
+                bool_t(),
+                bool_t(),
+                Type::new_tuple(vec![bool_t(), bool_t()]),
+            ],
+        ))
         .unwrap();
         let mut inps = h.input_wires();
         let b1 = inps.next().unwrap();

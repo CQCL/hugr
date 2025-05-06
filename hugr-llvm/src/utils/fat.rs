@@ -47,7 +47,7 @@ where
     /// Note that while we do check the type of the node's `get_optype`, we
     /// do not verify that it is actually equal to `ot`.
     pub fn new(hugr: &'hugr H, node: H::Node, #[allow(unused)] ot: &OT) -> Self {
-        assert!(hugr.valid_node(node));
+        assert!(hugr.contains_node(node));
         assert!(TryInto::<&OT>::try_into(hugr.get_optype(node)).is_ok());
         // We don't actually check `ot == hugr.get_optype(node)` so as to not require OT: PartialEq`
         Self {
@@ -63,7 +63,7 @@ where
     /// If the node is invalid, or if its `get_optype` is not `OT`, returns
     /// `None`.
     pub fn try_new(hugr: &'hugr H, node: H::Node) -> Option<Self> {
-        (hugr.valid_node(node)).then_some(())?;
+        (hugr.contains_node(node)).then_some(())?;
         Some(Self::new(
             hugr,
             node,
@@ -99,7 +99,7 @@ impl<'hugr, H: HugrView + ?Sized> FatNode<'hugr, OpType, H, H::Node> {
     ///
     /// Panics if the node is not valid in the [Hugr].
     pub fn new_optype(hugr: &'hugr H, node: H::Node) -> Self {
-        assert!(hugr.valid_node(node));
+        assert!(hugr.contains_node(node));
         FatNode::new(hugr, node, hugr.get_optype(node))
     }
 

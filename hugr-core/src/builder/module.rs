@@ -50,10 +50,7 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.0.infer_extensions(false)?;
-        }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.0.validate()?;
         Ok(self.0)
     }
@@ -83,8 +80,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             .clone();
         let body = signature.body().clone();
         self.hugr_mut()
-            .replace_op(f_node, ops::FuncDefn { name, signature })
-            .expect("Replacing a FuncDecl node with a FuncDefn should always be valid");
+            .replace_op(f_node, ops::FuncDefn { name, signature });
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))

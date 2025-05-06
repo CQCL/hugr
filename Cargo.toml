@@ -15,7 +15,7 @@ members = [
 default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
 [workspace.package]
-rust-version = "1.75"
+rust-version = "1.85"
 edition = "2021"
 homepage = "https://github.com/CQCL/hugr"
 repository = "https://github.com/CQCL/hugr"
@@ -58,7 +58,7 @@ regex = "1.10.6"
 regex-syntax = "0.8.3"
 rstest = "0.24.0"
 semver = "1.0.26"
-serde = "1.0.195"
+serde = "1.0.219"
 serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 smol_str = "0.3.1"
@@ -87,8 +87,8 @@ zstd = "0.13.2"
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
 pyo3 = ">= 0.23.4, < 0.25"
-portgraph = { version = ">= 0.13.3, < 0.15" }
-petgraph = { version = ">= 0.7.1, < 0.9", default-features = false }
+portgraph = { version = "0.14.1" }
+petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
 
 [profile.dev.package]
 insta.opt-level = 3

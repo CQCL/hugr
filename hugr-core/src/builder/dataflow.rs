@@ -82,10 +82,7 @@ impl DFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.base.infer_extensions(false)?;
-        }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.base.validate()?;
         Ok(self.base)
     }
@@ -174,9 +171,7 @@ impl FunctionBuilder<Hugr> {
 
         // Update the inner input node
         let types = new_optype.signature.body().input.clone();
-        self.hugr_mut()
-            .replace_op(inp_node, Input { types })
-            .unwrap();
+        self.hugr_mut().replace_op(inp_node, Input { types });
         let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
         let new_port = new_port.next().unwrap();
 
@@ -211,9 +206,7 @@ impl FunctionBuilder<Hugr> {
 
         // Update the inner input node
         let types = new_optype.signature.body().output.clone();
-        self.hugr_mut()
-            .replace_op(out_node, Output { types })
-            .unwrap();
+        self.hugr_mut().replace_op(out_node, Output { types });
         let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
         let new_port = new_port.next().unwrap();
 
@@ -250,15 +243,13 @@ impl FunctionBuilder<Hugr> {
             .expect("FunctionBuilder node must be a FuncDefn");
         let signature = old_optype.inner_signature().into_owned();
         let name = old_optype.name.clone();
-        self.hugr_mut()
-            .replace_op(
-                parent,
-                ops::FuncDefn {
-                    signature: f(signature).into(),
-                    name,
-                },
-            )
-            .expect("Could not replace FunctionBuilder operation");
+        self.hugr_mut().replace_op(
+            parent,
+            ops::FuncDefn {
+                signature: f(signature).into(),
+                name,
+            },
+        );
 
         self.hugr().get_optype(parent).as_func_defn().unwrap()
     }
@@ -424,19 +415,15 @@ pub(crate) mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build = FunctionBuilder::new(
-                "main",
-                Signature::new(vec![bool_t()], vec![bool_t()]).with_prelude(),
-            )?;
+            let mut f_build =
+                FunctionBuilder::new("main", Signature::new(vec![bool_t()], vec![bool_t()]))?;
 
             let [i1] = f_build.input_wires_arr();
             let noop = f_build.add_dataflow_op(Noop(bool_t()), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested = f_build.dfg_builder(
-                Signature::new(type_row![], vec![bool_t()]).with_prelude(),
-                [],
-            )?;
+            let mut nested =
+                f_build.dfg_builder(Signature::new(type_row![], vec![bool_t()]), [])?;
 
             let id = nested.add_dataflow_op(Noop(bool_t()), [i1])?;
 
@@ -451,10 +438,8 @@ pub(crate) mod test {
     #[test]
     fn add_inputs_outputs() {
         let builder = || -> Result<(Hugr, Node), BuildError> {
-            let mut f_build = FunctionBuilder::new(
-                "main",
-                Signature::new(vec![bool_t()], vec![bool_t()]).with_prelude(),
-            )?;
+            let mut f_build =
+                FunctionBuilder::new("main", Signature::new(vec![bool_t()], vec![bool_t()]))?;
             let f_node = f_build.container_node();
 
             let [i0] = f_build.input_wires_arr();
@@ -512,8 +497,8 @@ pub(crate) mod test {
 
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
-        assert_eq!(simple_dfg_hugr.node_count(), 3);
-        assert_matches!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
+        assert_eq!(simple_dfg_hugr.num_nodes(), 3);
+        assert_matches!(simple_dfg_hugr.root_optype().tag(), OpTag::Dfg);
     }
 
     #[test]
@@ -539,7 +524,7 @@ pub(crate) mod test {
         };
 
         let hugr = module_builder.finish_hugr()?;
-        assert_eq!(hugr.node_count(), 7);
+        assert_eq!(hugr.num_nodes(), 7);
 
         assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
         assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));

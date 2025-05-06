@@ -131,8 +131,6 @@ pub(crate) fn collect_signature_exts<RV: MaybeRV>(
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
-    // Note that we do not include the signature's `runtime_reqs` here, as those refer
-    // to _runtime_ requirements that we do not be require to be defined.
     collect_type_row_exts(&signature.input, used_extensions, missing_extensions);
     collect_type_row_exts(&signature.output, used_extensions, missing_extensions);
 }

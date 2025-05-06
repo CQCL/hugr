@@ -5,7 +5,7 @@ use std::sync::{Arc, Weak};
 use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
 use crate::{
-    extension::{ExtensionId, ExtensionSet},
+    extension::ExtensionId,
     ops::constant::CustomConst,
     types::{CustomType, Type, TypeBound},
     Extension,
@@ -65,7 +65,6 @@ impl std::ops::Deref for ConstF64 {
 
 impl ConstF64 {
     /// Name of the constructor for creating constant 64bit floats.
-    #[cfg_attr(not(feature = "model_unstable"), allow(dead_code))]
     pub(crate) const CTR_NAME: &'static str = "arithmetic.float.const_f64";
 
     /// Create a new [`ConstF64`]
@@ -97,10 +96,6 @@ impl CustomConst for ConstF64 {
 
     fn equal_consts(&self, _: &dyn CustomConst) -> bool {
         false
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(EXTENSION_ID)
     }
 }
 

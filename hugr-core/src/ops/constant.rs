@@ -8,7 +8,6 @@ use std::hash::{Hash, Hasher};
 
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
-use crate::extension::ExtensionSet;
 use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
 
@@ -79,10 +78,6 @@ impl StaticTag for Const {
 impl OpTrait for Const {
     fn description(&self) -> &str {
         "Constant value"
-    }
-
-    fn extension_delta(&self) -> ExtensionSet {
-        self.value().extension_reqs()
     }
 
     fn tag(&self) -> OpTag {
@@ -251,7 +246,6 @@ pub enum Value {
 /// use serde_json::json;
 ///
 /// let expected_json = json!({
-///     "extensions": ["prelude"],
 ///     "typ": usize_t(),
 ///     "value": {'c': "ConstUsize", 'v': 1}
 /// });
@@ -259,9 +253,8 @@ pub enum Value {
 /// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 ///
-/// let ev = OpaqueValue::new(CustomSerialized::new(usize_t().clone(), serde_json::Value::Null, ExtensionSet::default()));
+/// let ev = OpaqueValue::new(CustomSerialized::new(usize_t().clone(), serde_json::Value::Null));
 /// let expected_json = json!({
-///     "extensions": [],
 ///     "typ": usize_t(),
 ///     "value": null
 /// });
@@ -297,8 +290,6 @@ impl OpaqueValue {
             pub fn get_type(&self) -> Type;
             /// An identifier of the internal [`CustomConst`].
             pub fn name(&self) -> ValueName;
-            /// The extension(s) defining the internal [`CustomConst`].
-            pub fn extension_reqs(&self) -> ExtensionSet;
         }
     }
 }
@@ -364,7 +355,7 @@ pub enum ConstTypeError {
 /// Hugrs (even functions) inside Consts must be monomorphic
 fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
-        hugr_root_type: h.root_type().clone(),
+        hugr_root_type: h.root_optype().clone(),
     };
     if let Some(pf) = h.poly_func_type() {
         match pf.try_into() {
@@ -523,17 +514,6 @@ impl Value {
         .into()
     }
 
-    /// The extensions required by a [`Value`]
-    pub fn extension_reqs(&self) -> ExtensionSet {
-        match self {
-            Self::Extension { e } => e.extension_reqs().clone(),
-            Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
-            Self::Sum(Sum { values, .. }) => {
-                ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
-            }
-        }
-    }
-
     /// Check the value.
     pub fn validate(&self) -> Result<(), ConstTypeError> {
         match self {
@@ -630,10 +610,6 @@ pub(crate) mod test {
     impl CustomConst for CustomTestValue {
         fn name(&self) -> ValueName {
             format!("CustomTestValue({:?})", self.0).into()
-        }
-
-        fn extension_reqs(&self) -> ExtensionSet {
-            ExtensionSet::singleton(self.0.extension().clone())
         }
 
         fn update_extensions(
@@ -875,8 +851,7 @@ pub(crate) mod test {
             // Dummy extension reference.
             &Weak::default(),
         );
-        let json_const: Value =
-            CustomSerialized::new(typ_int.clone(), 6.into(), ex_id.clone()).into();
+        let json_const: Value = CustomSerialized::new(typ_int.clone(), 6.into()).into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Copyable);
         assert_eq!(json_const.get_type(), classic_t);

@@ -11,8 +11,8 @@ use crate::builder::{
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::Noop;
-use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
-use crate::extension::{Extension, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE};
+use crate::extension::prelude::{bool_t, qb_t, usize_t};
+use crate::extension::{Extension, ExtensionRegistry, TypeDefBound, PRELUDE};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
@@ -35,9 +35,7 @@ use crate::{
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: Signature::new(vec![bool_t()], vec![bool_t(); copies])
-            .with_prelude()
-            .into(),
+        signature: Signature::new(vec![bool_t()], vec![bool_t(); copies]).into(),
     }
     .into();
 
@@ -103,7 +101,7 @@ fn invalid_root() {
     );
 
     // Fix the root
-    b.root = module.pg_index();
+    b.root = module.into_portgraph();
     b.remove_node(root);
     assert_eq!(b.validate(), Ok(()));
 }
@@ -119,7 +117,7 @@ fn leaf_root() {
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: Signature::new_endo(vec![bool_t()]).with_prelude(),
+        signature: Signature::new_endo(vec![bool_t()]),
     }
     .into();
 
@@ -142,7 +140,7 @@ fn children_restrictions() {
     let root = b.root();
     let (_input, copy, _output) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
@@ -185,52 +183,46 @@ fn df_children_restrictions() {
     let (mut b, def) = make_simple_hugr(2);
     let (_input, output, copy) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, Noop(usize_t())).unwrap();
+    b.replace_op(output, Noop(usize_t()));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
     );
 
     // Revert it back to an output, but with the wrong number of ports
-    b.replace_op(output, ops::Output::new(vec![bool_t()]))
-        .unwrap();
+    b.replace_op(output, ops::Output::new(vec![bool_t()]));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
+            => {assert_eq!(parent, def); assert_eq!(child, output.into_portgraph())}
     );
-    b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]))
-        .unwrap();
+    b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]));
 
     // After fixing the output back, replace the copy with an output op
-    b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]))
-        .unwrap();
+    b.replace_op(copy, ops::Output::new(vec![bool_t(), bool_t()]));
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, copy.pg_index())}
+            => {assert_eq!(parent, def); assert_eq!(child, copy.into_portgraph())}
     );
 }
 
 #[test]
 fn test_ext_edge() {
-    let mut h = closed_dfg_root_hugr(
-        Signature::new(vec![bool_t(), bool_t()], vec![bool_t()])
-            .with_extension_delta(TO_BE_INFERRED),
-    );
+    let mut h = closed_dfg_root_hugr(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()]));
     let [input, output] = h.get_io(h.root()).unwrap();
 
     // Nested DFG bool_t() -> bool_t()
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: Signature::new_endo(vec![bool_t()]).with_extension_delta(TO_BE_INFERRED),
+            signature: Signature::new_endo(vec![bool_t()]),
         },
     );
     // this Xor has its 2nd input unconnected
@@ -257,7 +249,6 @@ fn test_ext_edge() {
     );
     //Order edge. This will need metadata indicating its purpose.
     h.add_other_edge(input, sub_dfg);
-    h.infer_extensions(false).unwrap();
     h.validate().unwrap();
 }
 
@@ -292,8 +283,7 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_local_const() {
-    let mut h =
-        closed_dfg_root_hugr(Signature::new_endo(bool_t()).with_extension_delta(TO_BE_INFERRED));
+    let mut h = closed_dfg_root_hugr(Signature::new_endo(bool_t()));
     let [input, output] = h.get_io(h.root()).unwrap();
     let and = h.add_node_with_parent(h.root(), and_op());
     h.connect(input, 0, and, 0);
@@ -315,7 +305,6 @@ fn test_local_const() {
     h.connect(lcst, 0, and, 1);
     assert_eq!(h.static_source(lcst), Some(cst));
     // There is no edge from Input to LoadConstant, but that's OK:
-    h.infer_extensions(false).unwrap();
     h.validate().unwrap();
 }
 
@@ -552,11 +541,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     reg.validate()?;
     let mut def = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
-            [BOUND],
-            Signature::new(vec![], vec![list_of_var.clone()])
-                .with_extension_delta(list::EXTENSION_ID),
-        ),
+        PolyFuncType::new([BOUND], Signature::new(vec![], vec![list_of_var.clone()])),
     )?;
     let empty_list = Value::extension(list::ListValue::new_empty(Type::new_var_use(
         0,
@@ -649,7 +634,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
         "id",
         PolyFuncType::new(
             [TypeParam::new_list(TypeBound::Any)],
-            Signature::new(inner_ft.clone(), ft_usz).with_extension_delta(e.name.clone()),
+            Signature::new(inner_ft.clone(), ft_usz),
         ),
     )?;
     // All the wires here are carrying higher-order Function values
@@ -671,19 +656,15 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: This tests a function call that is polymorphic in an extension set.
+    // Should this be rewritten to be polymorphic in something else or removed?
+
     let e = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-        let params: Vec<TypeParam> = vec![
-            TypeBound::Any.into(),
-            TypeParam::Extensions,
-            TypeBound::Any.into(),
-        ];
-        let evaled_fn = Type::new_function(
-            Signature::new(
-                Type::new_var_use(0, TypeBound::Any),
-                Type::new_var_use(2, TypeBound::Any),
-            )
-            .with_extension_delta(ExtensionSet::type_var(1)),
-        );
+        let params: Vec<TypeParam> = vec![TypeBound::Any.into(), TypeBound::Any.into()];
+        let evaled_fn = Type::new_function(Signature::new(
+            Type::new_var_use(0, TypeBound::Any),
+            Type::new_var_use(1, TypeBound::Any),
+        ));
         // Single-input/output version of the higher-order "eval" operation, with extension param.
         // Note the extension-delta of the eval node includes that of the input function.
         ext.add_op(
@@ -693,9 +674,8 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
                 params.clone(),
                 Signature::new(
                     vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
-                    Type::new_var_use(2, TypeBound::Any),
-                )
-                .with_extension_delta(ExtensionSet::type_var(1)),
+                    Type::new_var_use(1, TypeBound::Any),
+                ),
             ),
             extension_ref,
         )?;
@@ -703,27 +683,23 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     })?;
 
-    fn utou(e: impl Into<ExtensionSet>) -> Type {
-        Type::new_function(Signature::new_endo(usize_t()).with_extension_delta(e.into()))
+    fn utou() -> Type {
+        Type::new_function(Signature::new_endo(usize_t()))
     }
 
     let int_pair = Type::new_tuple(vec![usize_t(); 2]);
-    // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
+    // Root DFG: applies a function int-->int to each element of a pair of two ints
     let mut d = DFGBuilder::new(inout_sig(
-        vec![utou(PRELUDE_ID), int_pair.clone()],
+        vec![utou(), int_pair.clone()],
         vec![int_pair.clone()],
     ))?;
-    // ....by calling a function parametrized<extensions E> (int--e-->int, int_pair) -> int_pair
+    // ....by calling a function (int-->int, int_pair) -> int_pair
     let f = {
-        let es = ExtensionSet::type_var(0);
         let mut f = d.define_function(
             "two_ints",
             PolyFuncType::new(
-                vec![TypeParam::Extensions],
-                Signature::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
-                    .with_extension_delta(EXT_ID)
-                    .with_prelude()
-                    .with_extension_delta(es.clone()),
+                vec![],
+                Signature::new(vec![utou(), int_pair.clone()], int_pair.clone()),
             ),
         )?;
         let [func, tup] = f.input_wires_arr();
@@ -734,14 +710,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         )?;
         let mut cc = c.case_builder(0)?;
         let [i1, i2] = cc.input_wires_arr();
-        let op = e.instantiate_extension_op(
-            "eval",
-            vec![
-                usize_t().into(),
-                TypeArg::Extensions { es },
-                usize_t().into(),
-            ],
-        )?;
+        let op = e.instantiate_extension_op("eval", vec![usize_t().into(), usize_t().into()])?;
         let [f1] = cc.add_dataflow_op(op.clone(), [func, i1])?.outputs_arr();
         let [f2] = cc.add_dataflow_op(op, [func, i2])?.outputs_arr();
         cc.finish_with_outputs([f1, f2])?;
@@ -751,18 +720,10 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let [func, tup] = d.input_wires_arr();
-    let call = d.call(
-        f.handle(),
-        &[TypeArg::Extensions {
-            es: ExtensionSet::singleton(PRELUDE_ID),
-        }],
-        [func, tup],
-    )?;
+    let call = d.call(f.handle(), &[], [func, tup])?;
     let h = d.finish_hugr_with_outputs(call.outputs())?;
     let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
-    let exp_fun_ty = Signature::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
-        .with_extension_delta(EXT_ID)
-        .with_prelude();
+    let exp_fun_ty = Signature::new(vec![utou(), int_pair.clone()], int_pair);
     assert_eq!(call_ty.as_ref(), &exp_fun_ty);
     Ok(())
 }
@@ -794,7 +755,7 @@ fn cfg_children_restrictions() {
     let (mut b, def) = make_simple_hugr(1);
     let (_input, _output, copy) = b
         .hierarchy
-        .children(def.pg_index())
+        .children(def.into_portgraph())
         .map_into()
         .collect_tuple()
         .unwrap();
@@ -806,8 +767,7 @@ fn cfg_children_restrictions() {
         ops::CFG {
             signature: Signature::new(vec![bool_t()], vec![bool_t()]),
         },
-    )
-    .unwrap();
+    );
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { .. })
@@ -821,7 +781,6 @@ fn cfg_children_restrictions() {
             inputs: vec![bool_t()].into(),
             sum_rows: vec![type_row![]],
             other_outputs: vec![bool_t()].into(),
-            extension_delta: ExtensionSet::new(),
         },
     );
     let const_op: ops::Const = ops::Value::unit_sum(0, 1).unwrap().into();
@@ -859,7 +818,7 @@ fn cfg_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
+            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.into_portgraph())}
     );
     b.remove_node(exit2);
 
@@ -869,28 +828,23 @@ fn cfg_children_restrictions() {
         ops::CFG {
             signature: Signature::new(vec![qb_t()], vec![bool_t()]),
         },
-    )
-    .unwrap();
+    );
     b.replace_op(
         block,
         ops::DataflowBlock {
             inputs: vec![qb_t()].into(),
             sum_rows: vec![type_row![]],
             other_outputs: vec![qb_t()].into(),
-            extension_delta: ExtensionSet::new(),
         },
-    )
-    .unwrap();
-    let mut block_children = b.hierarchy.children(block.pg_index());
+    );
+    let mut block_children = b.hierarchy.children(block.into_portgraph());
     let block_input = block_children.next().unwrap().into();
     let block_output = block_children.next_back().unwrap().into();
-    b.replace_op(block_input, ops::Input::new(vec![qb_t()]))
-        .unwrap();
+    b.replace_op(block_input, ops::Input::new(vec![qb_t()]));
     b.replace_op(
         block_output,
         ops::Output::new(vec![Type::new_unit_sum(1), qb_t()]),
-    )
-    .unwrap();
+    );
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
@@ -907,8 +861,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut hugr = CFGBuilder::new(Signature::new_endo(usize_t()))?;
     let unary_pred = hugr.add_constant(Value::unary_unit_sum());
-    let mut entry =
-        hugr.simple_entry_builder_exts(vec![usize_t()].into(), 1, ExtensionSet::new())?;
+    let mut entry = hugr.simple_entry_builder(vec![usize_t()].into(), 1)?;
     let p = entry.load_const(&unary_pred);
     let ins = entry.input_wires();
     let entry = entry.finish_with_outputs(p, ins)?;
@@ -951,220 +904,4 @@ fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     Ok(())
-}
-
-#[cfg(feature = "extension_inference")]
-mod extension_tests {
-    use self::ops::handle::{BasicBlockID, TailLoopID};
-    use rstest::rstest;
-
-    use super::*;
-    use crate::builder::handle::Outputs;
-    use crate::builder::{BlockBuilder, BuildHandle, CFGBuilder, DFGWrapper, TailLoopBuilder};
-    use crate::extension::prelude::PRELUDE_ID;
-    use crate::extension::ExtensionSet;
-    use crate::hugr::test::{lift_op, LIFT_EXT_ID};
-    use crate::macros::const_extension_ids;
-    use crate::Wire;
-    const_extension_ids! {
-        const XA: ExtensionId = "A";
-        const XB: ExtensionId = "BOOL_EXT";
-    }
-
-    #[rstest]
-    #[case::d1(|signature| ops::DFG {signature}.into())]
-    #[case::f1(|sig: Signature| ops::FuncDefn {name: "foo".to_string(), signature: sig.into()}.into())]
-    #[case::c1(|signature| ops::Case {signature}.into())]
-    fn parent_extension_mismatch(
-        #[case] parent_f: impl Fn(Signature) -> OpType,
-        #[values(ExtensionSet::new(), XA.into())] parent_extensions: ExtensionSet,
-    ) {
-        // Child graph adds extension "XB", but the parent (in all cases)
-        // declares a different delta, causing a mismatch.
-
-        let parent = parent_f(
-            Signature::new_endo(usize_t()).with_extension_delta(parent_extensions.clone()),
-        );
-        let mut hugr = Hugr::new(parent);
-
-        let input = hugr.add_node_with_parent(
-            hugr.root(),
-            ops::Input {
-                types: vec![usize_t()].into(),
-            },
-        );
-        let output = hugr.add_node_with_parent(
-            hugr.root(),
-            ops::Output {
-                types: vec![usize_t()].into(),
-            },
-        );
-
-        let lift = hugr.add_node_with_parent(hugr.root(), lift_op(usize_t(), XB));
-
-        hugr.connect(input, 0, lift, 0);
-        hugr.connect(lift, 0, output, 0);
-
-        let result = hugr.validate();
-        assert_eq!(
-            result,
-            Err(ValidationError::ExtensionError(ExtensionError {
-                parent: hugr.root(),
-                parent_extensions,
-                child: lift,
-                child_extensions: ExtensionSet::from_iter([LIFT_EXT_ID, XB]),
-            }))
-        );
-    }
-
-    #[rstest]
-    #[case(XA.into(), false)]
-    #[case(ExtensionSet::new(), false)]
-    #[case(ExtensionSet::from_iter([XA, XB]), true)]
-    fn cfg_extension_mismatch(
-        #[case] parent_extensions: ExtensionSet,
-        #[case] success: bool,
-    ) -> Result<(), BuildError> {
-        let mut cfg = CFGBuilder::new(
-            Signature::new_endo(usize_t()).with_extension_delta(parent_extensions.clone()),
-        )?;
-        let mut bb = cfg.simple_entry_builder_exts(usize_t().into(), 1, XB)?;
-        let pred = bb.add_load_value(Value::unary_unit_sum());
-        let inputs = bb.input_wires();
-        let blk = bb.finish_with_outputs(pred, inputs)?;
-        let exit = cfg.exit_block();
-        cfg.branch(&blk, 0, &exit)?;
-        let root = cfg.hugr().root();
-        let res = cfg.finish_hugr();
-        if success {
-            assert!(res.is_ok())
-        } else {
-            assert_eq!(
-                res,
-                Err(ValidationError::ExtensionError(ExtensionError {
-                    parent: root,
-                    parent_extensions,
-                    child: blk.node(),
-                    child_extensions: XB.into()
-                }))
-            );
-        }
-        Ok(())
-    }
-
-    #[rstest]
-    #[case(XA.into(), false)]
-    #[case(ExtensionSet::new(), false)]
-    #[case(ExtensionSet::from_iter([XA, XB, LIFT_EXT_ID]), true)]
-    fn conditional_extension_mismatch(
-        #[case] parent_extensions: ExtensionSet,
-        #[case] success: bool,
-    ) {
-        // Child graph adds extension "XB", but the parent
-        // declares a different delta, in same cases causing a mismatch.
-        let parent = ops::Conditional {
-            sum_rows: vec![type_row![], type_row![]],
-            other_inputs: vec![usize_t()].into(),
-            outputs: vec![usize_t()].into(),
-            extension_delta: parent_extensions.clone(),
-        };
-        let mut hugr = Hugr::new(parent);
-
-        // First case with no delta should be ok in all cases. Second one may not be.
-        let [_, child] = [None, Some(XB)].map(|case_ext| {
-            let case_exts = if let Some(ex) = &case_ext {
-                ExtensionSet::from_iter([ex.clone(), LIFT_EXT_ID])
-            } else {
-                ExtensionSet::new()
-            };
-            let case = hugr.add_node_with_parent(
-                hugr.root(),
-                ops::Case {
-                    signature: Signature::new_endo(usize_t()).with_extension_delta(case_exts),
-                },
-            );
-
-            let input = hugr.add_node_with_parent(
-                case,
-                ops::Input {
-                    types: vec![usize_t()].into(),
-                },
-            );
-            let output = hugr.add_node_with_parent(
-                case,
-                ops::Output {
-                    types: vec![usize_t()].into(),
-                },
-            );
-            let res = match case_ext {
-                None => input,
-                Some(new_ext) => {
-                    let lift = hugr.add_node_with_parent(case, lift_op(usize_t(), new_ext));
-                    hugr.connect(input, 0, lift, 0);
-                    lift
-                }
-            };
-            hugr.connect(res, 0, output, 0);
-            case
-        });
-        // case is the last-assigned child, i.e. the one that requires 'XB'
-        let result = hugr.validate();
-        let expected = if success {
-            Ok(())
-        } else {
-            Err(ValidationError::ExtensionError(ExtensionError {
-                parent: hugr.root(),
-                parent_extensions,
-                child,
-                child_extensions: ExtensionSet::from_iter([XB, LIFT_EXT_ID]),
-            }))
-        };
-        assert_eq!(result, expected);
-    }
-
-    #[rstest]
-    #[case(make_bb, |bb: &mut DFGWrapper<_,_>, outs| bb.make_tuple(outs))]
-    #[case(make_tailloop, |tl: &mut DFGWrapper<_,_>, outs| tl.make_break(tl.loop_signature().unwrap().clone(), outs))]
-    fn bb_extension_mismatch<T>(
-        #[case] dfg_fn: impl Fn(Type, ExtensionSet) -> DFGWrapper<Hugr, T>,
-        #[case] make_pred: impl Fn(&mut DFGWrapper<Hugr, T>, Outputs) -> Result<Wire, BuildError>,
-        // last one includes prelude because `MakeTuple` is in prelude
-        #[values((ExtensionSet::from_iter([XA,LIFT_EXT_ID]), false), (LIFT_EXT_ID.into(), false), (ExtensionSet::from_iter([XA,XB,LIFT_EXT_ID,PRELUDE_ID]), true))]
-        parent_exts_success: (ExtensionSet, bool),
-    ) -> Result<(), BuildError> {
-        let (parent_extensions, success) = parent_exts_success;
-        let mut dfg = dfg_fn(usize_t(), parent_extensions.clone());
-        let lift = dfg.add_dataflow_op(lift_op(usize_t(), XB), dfg.input_wires())?;
-        let pred = make_pred(&mut dfg, lift.outputs())?;
-        let root = dfg.hugr().root();
-        let res = dfg.finish_hugr_with_outputs([pred]);
-        if success {
-            if res.is_err() {
-                dbg!(&res);
-            }
-            assert!(res.is_ok())
-        } else {
-            assert_eq!(
-                res,
-                Err(BuildError::InvalidHUGR(ValidationError::ExtensionError(
-                    ExtensionError {
-                        parent: root,
-                        parent_extensions,
-                        child: lift.node(),
-                        child_extensions: ExtensionSet::from_iter([XB, LIFT_EXT_ID])
-                    }
-                )))
-            );
-        }
-        Ok(())
-    }
-
-    fn make_bb(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BasicBlockID> {
-        BlockBuilder::new_exts(t.clone(), vec![t.into()], type_row![], es).unwrap()
-    }
-
-    fn make_tailloop(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BuildHandle<TailLoopID>> {
-        let row = TypeRow::from(t);
-        TailLoopBuilder::new_exts(row.clone(), type_row![], row, es).unwrap()
-    }
 }

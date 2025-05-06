@@ -233,7 +233,6 @@ impl OpaqueOp {
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
-        let signature = signature.with_extension_delta(extension.clone());
         Self {
             extension,
             name: name.into(),
@@ -382,10 +381,7 @@ mod test {
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
-        assert_eq!(
-            op.signature().as_ref(),
-            &sig.with_extension_delta(op.extension().clone())
-        );
+        assert_eq!(op.signature().as_ref(), &sig);
     }
 
     #[test]

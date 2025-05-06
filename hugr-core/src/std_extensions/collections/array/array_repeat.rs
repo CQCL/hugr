@@ -7,7 +7,7 @@ use std::sync::{Arc, Weak};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef};
+use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
@@ -56,16 +56,10 @@ impl<AK: ArrayKind> FromStr for GenericArrayRepeatDef<AK> {
 impl<AK: ArrayKind> GenericArrayRepeatDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![
-            TypeParam::max_nat(),
-            TypeBound::Any.into(),
-            TypeParam::Extensions,
-        ];
+        let params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
         let n = TypeArg::new_var_use(0, TypeParam::max_nat());
         let t = Type::new_var_use(1, TypeBound::Any);
-        let es = ExtensionSet::type_var(2);
-        let func =
-            Type::new_function(Signature::new(vec![], vec![t.clone()]).with_extension_delta(es));
+        let func = Type::new_function(Signature::new(vec![], vec![t.clone()]));
         let array_ty =
             AK::instantiate_ty(array_def, n, t).expect("Array type instantiation failed");
         PolyFuncTypeRV::new(params, FuncValueType::new(vec![func], array_ty)).into()
@@ -160,9 +154,6 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayRepeat<AK> {
         vec![
             TypeArg::BoundedNat { n: self.size },
             self.elem_ty.clone().into(),
-            TypeArg::Extensions {
-                es: self.extension_reqs.clone(),
-            },
         ]
     }
 }
@@ -186,8 +177,8 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }, TypeArg::Extensions { es }] => {
-                Ok(GenericArrayRepeat::new(ty.clone(), *n, es.clone()))
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] => {
+                Ok(GenericArrayRepeat::new(ty.clone(), *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
@@ -212,7 +203,7 @@ mod tests {
     #[case(Array)]
     #[case(ValueArray)]
     fn test_repeat_def<AK: ArrayKind>(#[case] _kind: AK) {
-        let op = GenericArrayRepeat::<AK>::new(qb_t(), 2, ExtensionSet::singleton(EXTENSION_ID));
+        let op = GenericArrayRepeat::<AK>::new(qb_t(), 2);
         let optype: OpType = op.clone().into();
         let new_op: GenericArrayRepeat<AK> = optype.cast().unwrap();
         assert_eq!(new_op, op);
@@ -224,8 +215,7 @@ mod tests {
     fn test_repeat<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = qb_t();
-        let es = ExtensionSet::singleton(EXTENSION_ID);
-        let op = GenericArrayRepeat::<AK>::new(element_ty.clone(), size, es.clone());
+        let op = GenericArrayRepeat::<AK>::new(element_ty.clone(), size);
 
         let optype: OpType = op.into();
 
@@ -234,10 +224,7 @@ mod tests {
         assert_eq!(
             sig.io(),
             (
-                &vec![Type::new_function(
-                    Signature::new(vec![], vec![qb_t()]).with_extension_delta(es)
-                )]
-                .into(),
+                &vec![Type::new_function(Signature::new(vec![], vec![qb_t()]))].into(),
                 &vec![AK::ty(size, element_ty.clone())].into(),
             )
         );

@@ -9,18 +9,18 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{SignatureError, TO_BE_INFERRED};
+use crate::extension::SignatureError;
 
 use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, NamedOp, OpName, OpParent, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
 
 use super::internal::HugrInternals;
-use super::views::{HierarchyView, HugrView, SiblingGraph};
+use super::views::HugrView;
 use super::ExtensionError;
 
 /// Structure keeping track of pre-computed information used in the validation
@@ -31,72 +31,19 @@ use super::ExtensionError;
 struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
-    dominators: HashMap<Node, Dominators<Node>>,
+    dominators: HashMap<Node, Dominators<portgraph::NodeIndex>>,
 }
 
 impl Hugr {
-    /// Check the validity of the HUGR, assuming that it has no open extension
-    /// variables.
-    /// TODO: Add a version of validation which allows for open extension
-    /// variables (see github issue #457)
+    /// Check the validity of the HUGR.
     pub fn validate(&self) -> Result<(), ValidationError> {
-        self.validate_no_extensions()?;
-        if cfg!(feature = "extension_inference") {
-            self.validate_extensions()?;
-        }
-        Ok(())
-    }
-
-    /// Check the validity of the HUGR, but don't check consistency of extension
-    /// requirements between connected nodes or between parents and children.
-    pub fn validate_no_extensions(&self) -> Result<(), ValidationError> {
         let mut validator = ValidationContext::new(self);
         validator.validate()
-    }
-
-    /// Validate extensions, i.e. that extension deltas from parent nodes are reflected in their children.
-    pub fn validate_extensions(&self) -> Result<(), ValidationError> {
-        for parent in self.nodes() {
-            let parent_op = self.get_optype(parent);
-            if parent_op.extension_delta().contains(&TO_BE_INFERRED) {
-                return Err(ValidationError::ExtensionsNotInferred { node: parent });
-            }
-            let parent_extensions = match parent_op.inner_function_type() {
-                Some(s) => s.runtime_reqs.clone(),
-                None => match parent_op.tag() {
-                    OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
-                    // ModuleRoot holds but does not execute its children, so allow any extensions
-                    OpTag::ModuleRoot => continue,
-                    _ => {
-                        assert!(self.children(parent).next().is_none(),
-                            "Unknown parent node type {} - not a DataflowParent, Module, Cfg or Conditional",
-                            parent_op);
-                        continue;
-                    }
-                },
-            };
-            for child in self.children(parent) {
-                let child_extensions = self.get_optype(child).extension_delta();
-                if !parent_extensions.is_superset(&child_extensions) {
-                    return Err(ExtensionError {
-                        parent,
-                        parent_extensions,
-                        child,
-                        child_extensions,
-                    }
-                    .into());
-                }
-            }
-        }
-        Ok(())
     }
 }
 
 impl<'a> ValidationContext<'a> {
     /// Create a new validation context.
-    // Allow unused "extension_closure" variable for when
-    // the "extension_inference" feature is disabled.
-    #[allow(unused_variables)]
     pub fn new(hugr: &'a Hugr) -> Self {
         let dominators = HashMap::new();
         Self { hugr, dominators }
@@ -138,10 +85,10 @@ impl<'a> ValidationContext<'a> {
     ///
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
-    fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
+    fn compute_dominator(&self, parent: Node) -> Dominators<portgraph::NodeIndex> {
+        let region = self.hugr.region_portgraph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region.as_petgraph(), entry_node)
+        dominators::simple_fast(&region, entry_node.into_portgraph())
     }
 
     /// Check the constraints on a single node.
@@ -163,7 +110,7 @@ impl<'a> ValidationContext<'a> {
 
         for dir in Direction::BOTH {
             // Check that we have the correct amount of ports and edges.
-            let num_ports = self.hugr.graph.num_ports(node.pg_index(), dir);
+            let num_ports = self.hugr.graph.num_ports(node.into_portgraph(), dir);
             if num_ports != op_type.port_count(dir) {
                 return Err(ValidationError::WrongNumberOfPorts {
                     node,
@@ -316,7 +263,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_children(&self, node: Node, op_type: &OpType) -> Result<(), ValidationError> {
         let flags = op_type.validity_flags();
 
-        if self.hugr.hierarchy().child_count(node.pg_index()) > 0 {
+        if self.hugr.hierarchy().child_count(node.into_portgraph()) > 0 {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
@@ -352,7 +299,8 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             // Additional validations running over the full list of children optypes
-            let children_optypes = all_children.map(|c| (c.pg_index(), self.hugr.get_optype(c)));
+            let children_optypes =
+                all_children.map(|c| (c.into_portgraph(), self.hugr.get_optype(c)));
             if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
@@ -363,9 +311,9 @@ impl<'a> ValidationContext<'a> {
 
             // Additional validations running over the edges of the contained graph
             if let Some(edge_check) = flags.edge_check {
-                for source in self.hugr.hierarchy().children(node.pg_index()) {
+                for source in self.hugr.hierarchy().children(node.into_portgraph()) {
                     for target in self.hugr.graph.output_neighbours(source) {
-                        if self.hugr.hierarchy.parent(target) != Some(node.pg_index()) {
+                        if self.hugr.hierarchy.parent(target) != Some(node.into_portgraph()) {
                             continue;
                         }
                         let source_op = self.hugr.get_optype(source.into());
@@ -411,16 +359,16 @@ impl<'a> ValidationContext<'a> {
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
     fn validate_children_dag(&self, parent: Node, op_type: &OpType) -> Result<(), ValidationError> {
-        if !self.hugr.hierarchy.has_children(parent.pg_index()) {
+        if !self.hugr.hierarchy.has_children(parent.into_portgraph()) {
             // No children, nothing to do
             return Ok(());
         };
 
-        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
-        let postorder = Topo::new(&region.as_petgraph());
+        let region = self.hugr.region_portgraph(parent);
+        let postorder = Topo::new(&region);
         let nodes_visited = postorder
-            .iter(&region.as_petgraph())
-            .filter(|n| *n != parent)
+            .iter(&region)
+            .filter(|n| *n != parent.into_portgraph())
             .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
@@ -500,7 +448,7 @@ impl<'a> ValidationContext<'a> {
                     // Must have an order edge.
                     self.hugr
                         .graph
-                        .get_connections(from.pg_index(), ancestor.pg_index())
+                        .get_connections(from.into_portgraph(), ancestor.into_portgraph())
                         .find(|&(p, _)| {
                             let offset = self.hugr.graph.port_offset(p).unwrap();
                             from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
@@ -537,8 +485,8 @@ impl<'a> ValidationContext<'a> {
                     }
                 };
                 if !dominator_tree
-                    .dominators(ancestor)
-                    .is_some_and(|mut ds| ds.any(|n| n == from_parent))
+                    .dominators(ancestor.into_portgraph())
+                    .is_some_and(|mut ds| ds.any(|n| n == from_parent.into_portgraph()))
                 {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
                         from,
@@ -616,7 +564,12 @@ impl<'a> ValidationContext<'a> {
         // Root nodes are ignored, as they cannot have connected edges.
         if node != self.hugr.root() {
             for dir in Direction::BOTH {
-                for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
+                for (i, port_index) in self
+                    .hugr
+                    .graph
+                    .ports(node.into_portgraph(), dir)
+                    .enumerate()
+                {
                     let port = Port::new(dir, i);
                     self.validate_port(node, port, port_index, op_type, var_decls)?;
                 }

@@ -44,10 +44,10 @@ use std::hash::Hash;
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr_core::hugr::rewrite::outline_cfg::OutlineCfg;
+use hugr_core::hugr::patch::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::sibling::SiblingMut;
-use hugr_core::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use hugr_core::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
+use hugr_core::hugr::views::{HierarchyView, HugrView, RootCheckable, SiblingGraph};
+use hugr_core::hugr::{hugrmut::HugrMut, Patch};
 use hugr_core::ops::handle::{BasicBlockID, CfgID};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
@@ -219,9 +219,12 @@ pub struct IdentityCfgMap<H: HugrView> {
     entry: H::Node,
     exit: H::Node,
 }
-impl<H: RootTagged<RootHandle = CfgID>> IdentityCfgMap<H> {
+impl<H: HugrView> IdentityCfgMap<H> {
     /// Creates an [IdentityCfgMap] for the specified CFG
-    pub fn new(h: H) -> Self {
+    pub fn new(h: impl RootCheckable<H, CfgID<H::Node>>) -> Self {
+        let h = h.try_into_checked().expect("Hugr must be a CFG region");
+        let h = h.into_hugr();
+
         // Panic if malformed enough not to have two children
         let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
@@ -257,7 +260,7 @@ impl<H: HugrMut<Node = Node>> CfgNester<H::Node> for IdentityCfgMap<H> {
         assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
-        let (new_block, new_cfg) = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
+        let [new_block, new_cfg] = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
         debug_assert!([entry_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
@@ -574,9 +577,9 @@ pub(crate) mod test {
     use hugr_core::builder::{
         endo_sig, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
     };
-    use hugr_core::extension::{prelude::usize_t, ExtensionSet};
+    use hugr_core::extension::prelude::usize_t;
 
-    use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
+    use hugr_core::hugr::patch::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::ops::Value;
@@ -609,11 +612,7 @@ pub(crate) mod test {
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
-            cfg_builder.simple_entry_builder_exts(
-                vec![usize_t()].into(),
-                1,
-                ExtensionSet::new(),
-            )?,
+            cfg_builder.simple_entry_builder(vec![usize_t()].into(), 1)?,
             &const_unit,
         )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
@@ -636,7 +635,7 @@ pub(crate) mod test {
         let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.borrow()));
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.as_ref()));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -734,7 +733,7 @@ pub(crate) mod test {
 
         // There's no need to use a view of a region here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's)
-        let v = IdentityCfgMap::new(SiblingGraph::try_new(&h, h.root()).unwrap());
+        let v = IdentityCfgMap::new(SiblingGraph::<Node>::try_new(&h, h.root()).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
@@ -827,7 +826,7 @@ pub(crate) mod test {
 
         let rw = IdentityInsertion::new(final_node, final_node_input);
 
-        let apply_result = h.apply_rewrite(rw);
+        let apply_result = h.apply_patch(rw);
         assert_eq!(
             apply_result,
             Err(IdentityInsertionError::InvalidPortKind(Some(

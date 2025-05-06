@@ -3,7 +3,6 @@ use std::collections::HashSet;
 
 use hugr_core::ops::handle::NodeHandle;
 use hugr_core::ops::Const;
-use hugr_core::std_extensions::arithmetic::{int_ops, int_types};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
@@ -160,7 +159,7 @@ fn test_big() {
         .unwrap();
 
     let mut h = build.finish_hugr_with_outputs(to_int.outputs()).unwrap();
-    assert_eq!(h.node_count(), 8);
+    assert_eq!(h.num_nodes(), 8);
 
     constant_fold_pass(&mut h);
 
@@ -333,7 +332,7 @@ fn test_const_fold_to_nonfinite() {
     assert_fully_folded_with(&h0, |v| {
         v.get_custom_value::<ConstF64>().unwrap().value() == 1.0
     });
-    assert_eq!(h0.node_count(), 5);
+    assert_eq!(h0.num_nodes(), 5);
 
     // HUGR computing 1.0 / 0.0
     let mut build = DFGBuilder::new(noargfn(vec![float64_type()])).unwrap();
@@ -342,7 +341,7 @@ fn test_const_fold_to_nonfinite() {
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
     let mut h1 = build.finish_hugr_with_outputs(x2.outputs()).unwrap();
     constant_fold_pass(&mut h1);
-    assert_eq!(h1.node_count(), 8);
+    assert_eq!(h1.num_nodes(), 8);
 }
 
 #[test]
@@ -1362,7 +1361,7 @@ fn test_tail_loop_unknown() {
 
     constant_fold_pass(&mut h);
     // Must keep the loop, even though we know the output, in case the output doesn't happen
-    assert_eq!(h.node_count(), 12);
+    assert_eq!(h.num_nodes(), 12);
     let tl = h
         .nodes()
         .filter(|n| h.get_optype(*n).is_tail_loop())
@@ -1595,9 +1594,7 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let ad2 = mb.add_alias_def("unused2", INT_TYPES[3].clone())?;
     let mut main = mb.define_function(
         "main",
-        Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2])
-            .with_extension_delta(int_types::EXTENSION_ID)
-            .with_extension_delta(int_ops::EXTENSION_ID),
+        Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2]),
     )?;
     let lc7 = main.load_const(&c7);
     let lc17 = main.load_const(&c17);

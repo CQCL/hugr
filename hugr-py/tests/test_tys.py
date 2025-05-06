@@ -15,8 +15,6 @@ from hugr.tys import (
     BoundedNatArg,
     BoundedNatParam,
     Either,
-    ExtensionsArg,
-    ExtensionsParam,
     ExtType,
     FunctionType,
     ListParam,
@@ -96,7 +94,6 @@ def test_tys_sum_str(ty: Type, string: str, repr_str: str):
             "(Any, Nat(3))",
         ),
         (ListParam(StringParam()), "[String]"),
-        (ExtensionsParam(), "Extensions"),
     ],
 )
 def test_params_str(param: TypeParam, string: str):
@@ -114,7 +111,6 @@ def test_params_str(param: TypeParam, string: str):
             "(Type(Qubit), 3)",
         ),
         (VariableArg(2, StringParam()), "$2"),
-        (ExtensionsArg(["A", "B"]), "Extensions(A, B)"),
     ],
 )
 def test_args_str(arg: TypeArg, string: str):
