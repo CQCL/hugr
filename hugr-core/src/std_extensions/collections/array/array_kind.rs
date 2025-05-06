@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use crate::std_extensions::collections::array::op_builder::GenericArrayOpBuilder;
 use crate::{
+    builder::{BuildError, Dataflow},
     extension::{ExtensionId, SignatureError, TypeDef},
     ops::constant::ValueName,
     types::{CustomType, Type, TypeArg, TypeName},
-    Extension,
+    Extension, Wire,
 };
 
 /// Trait capturing a concrete array implementation in an extension.
@@ -89,5 +91,29 @@ pub trait ArrayKind:
         element_ty: impl Into<TypeArg>,
     ) -> Result<Type, SignatureError> {
         Self::instantiate_ty(Self::type_def(), size, element_ty)
+    }
+
+    /// Adds a operation to a dataflow graph that clones an array of copyable values.
+    ///
+    /// The default implementation uses the array clone operation.
+    fn build_clone<D: Dataflow>(
+        builder: &mut D,
+        elem_ty: Type,
+        size: u64,
+        arr: Wire,
+    ) -> Result<(Wire, Wire), BuildError> {
+        builder.add_generic_array_clone::<Self>(elem_ty, size, arr)
+    }
+
+    /// Adds a operation to a dataflow graph that clones an array of copyable values.
+    ///
+    /// The default implementation uses the array clone operation.
+    fn build_discard<D: Dataflow>(
+        builder: &mut D,
+        elem_ty: Type,
+        size: u64,
+        arr: Wire,
+    ) -> Result<(), BuildError> {
+        builder.add_generic_array_discard::<Self>(elem_ty, size, arr)
     }
 }

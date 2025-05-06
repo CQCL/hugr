@@ -51,6 +51,24 @@ impl ArrayKind for ValueArray {
     fn type_def() -> &'static TypeDef {
         EXTENSION.get_type(&VALUE_ARRAY_TYPENAME).unwrap()
     }
+
+    fn build_clone<D: Dataflow>(
+        _builder: &mut D,
+        _elem_ty: Type,
+        _size: u64,
+        arr: Wire,
+    ) -> Result<(Wire, Wire), BuildError> {
+        Ok((arr, arr))
+    }
+
+    fn build_discard<D: Dataflow>(
+        _builder: &mut D,
+        _elem_ty: Type,
+        _size: u64,
+        _arr: Wire,
+    ) -> Result<(), BuildError> {
+        Ok(())
+    }
 }
 
 /// Value array operation definitions.

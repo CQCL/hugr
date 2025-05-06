@@ -10,11 +10,12 @@ use hugr_core::ops::{OpTrait, OpType, Tag};
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use hugr_core::std_extensions::collections::array::{Array, ArrayKind, GenericArrayValue};
-use hugr_core::std_extensions::collections::list::ListValue;
-use hugr_core::std_extensions::collections::value_array::{
-    value_array_type, VArrayOpDef, VArrayRepeat, VArrayScan, ValueArray,
+use hugr_core::std_extensions::collections::array::{
+    array_type, Array, ArrayClone, ArrayDiscard, ArrayKind, ArrayOpBuilder, GenericArrayOpDef,
+    GenericArrayRepeat, GenericArrayScan, GenericArrayValue,
 };
+use hugr_core::std_extensions::collections::list::ListValue;
+use hugr_core::std_extensions::collections::value_array::ValueArray;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{type_row, Hugr, HugrView};
 use itertools::Itertools;
@@ -100,11 +101,10 @@ fn runtime_reqs(h: &Hugr) -> ExtensionSet {
     h.signature(h.root()).unwrap().runtime_reqs.clone()
 }
 
-/// Handler for copying/discarding value arrays if their elements have become linear.
-/// Included in [ReplaceTypes::default] and [DelegatingLinearizer::default].
+/// Handler for copying/discarding arrays if their elements have become linear.
 ///
-/// [DelegatingLinearizer::default]: super::DelegatingLinearizer::default
-pub fn linearize_value_array(
+/// Generic over the concrete array implementation.
+pub fn linearize_generic_array<AK: ArrayKind>(
     args: &[TypeArg],
     num_outports: usize,
     lin: &CallbackHandler,
@@ -126,8 +126,9 @@ pub fn linearize_value_array(
             dfb.finish_hugr_with_outputs([ret]).unwrap()
         };
         // Now array.scan that over the input array to get an array of unit (which can be discarded)
-        let array_scan = VArrayScan::new(ty.clone(), Type::UNIT, vec![], *n, runtime_reqs(&map_fn));
-        let in_type = value_array_type(*n, ty.clone());
+        let array_scan =
+            GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n, runtime_reqs(&map_fn));
+        let in_type = AK::ty(*n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
             let [in_array] = dfb.input_wires_arr();
@@ -135,14 +136,18 @@ pub fn linearize_value_array(
                 hugr: Box::new(map_fn),
             });
             // scan has one output, an array of unit, so just ignore/discard that
-            dfb.add_dataflow_op(array_scan, [in_array, map_fn]).unwrap();
+            let unit_arr = dfb
+                .add_dataflow_op(array_scan, [in_array, map_fn])
+                .unwrap()
+                .out_wire(0);
+            AK::build_discard(&mut dfb, Type::UNIT, *n, unit_arr).unwrap();
             dfb.finish_hugr_with_outputs([]).unwrap()
         })));
     };
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
     let num_new = num_outports - 1;
-    let array_ty = value_array_type(*n, ty.clone());
+    let array_ty = AK::ty(*n, ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
         array_ty.clone(),
         vec![array_ty.clone(); num_outports],
@@ -161,7 +166,10 @@ pub fn linearize_value_array(
             dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
         };
         let repeats =
-            vec![VArrayRepeat::new(option_ty.clone(), *n, runtime_reqs(&fn_none)); num_new];
+            vec![
+                GenericArrayRepeat::<AK>::new(option_ty.clone(), *n, runtime_reqs(&fn_none));
+                num_new
+            ];
         let fn_none = dfb.add_load_value(Value::function(fn_none).unwrap());
         repeats
             .into_iter()
@@ -175,7 +183,7 @@ pub fn linearize_value_array(
     // 2. use a scan through the input array, copying the element num_outputs times;
     // return the first copy, and put each of the other copies into one of the array<option>
     let i64_t = INT_TYPES[6].to_owned();
-    let option_array = value_array_type(*n, option_ty.clone());
+    let option_array = AK::ty(*n, option_ty.clone());
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];
         io.extend(vec![option_array.clone(); num_new]);
@@ -196,7 +204,7 @@ pub fn linearize_value_array(
         let copy0 = copies.next().unwrap(); // We'll return this directly
 
         // Wrap each remaining copy into an option
-        let set_op = OpType::from(VArrayOpDef::set.to_concrete(option_ty.clone(), *n));
+        let set_op = OpType::from(GenericArrayOpDef::<AK>::set.to_concrete(option_ty.clone(), *n));
         let either_st = set_op.dataflow_signature().unwrap().output[0]
             .as_sum()
             .unwrap()
@@ -234,7 +242,7 @@ pub fn linearize_value_array(
             .unwrap()
     };
     let [in_array] = dfb.input_wires_arr();
-    let scan1 = VArrayScan::new(
+    let scan1 = GenericArrayScan::<AK>::new(
         ty.clone(),
         ty.clone(),
         std::iter::once(i64_t)
@@ -269,7 +277,7 @@ pub fn linearize_value_array(
         dfb.finish_hugr_with_outputs([val]).unwrap()
     };
 
-    let unwrap_scan = VArrayScan::new(
+    let unwrap_scan = GenericArrayScan::<AK>::new(
         option_ty.clone(),
         ty.clone(),
         vec![],
@@ -291,4 +299,63 @@ pub fn linearize_value_array(
     Ok(NodeTemplate::CompoundOp(Box::new(
         dfb.finish_hugr_with_outputs(out_arrays).unwrap(),
     )))
+}
+
+/// Handler for copying/discarding value arrays if their elements have become linear.
+/// Included in [ReplaceTypes::default] and [DelegatingLinearizer::default].
+///
+/// [DelegatingLinearizer::default]: super::DelegatingLinearizer::default
+pub fn linearize_value_array(
+    args: &[TypeArg],
+    num_outports: usize,
+    lin: &CallbackHandler,
+) -> Result<NodeTemplate, LinearizeError> {
+    linearize_generic_array::<ValueArray>(args, num_outports, lin)
+}
+
+/// Handler for copying and discarding of arrays. Only works if the elements are copyable, or
+/// can be copied/discarded via the provided [CallbackHandler].
+///
+/// This should be used when lowering a copyable type to an array.
+pub fn copy_discard_array(
+    args: &[TypeArg],
+    num_outports: usize,
+    lin: &CallbackHandler,
+) -> Result<NodeTemplate, LinearizeError> {
+    // Require known length i.e. usable only after monomorphization, due to no-variables limitation
+    // restriction on NodeTemplate::CompoundOp
+    let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
+        panic!("Illegal TypeArgs to array: {:?}", args)
+    };
+    if ty.copyable() {
+        // For arrays with copyable elements, we can just use the clone/discard ops
+        if num_outports == 0 {
+            Ok(NodeTemplate::SingleOp(
+                ArrayDiscard::new(ty.clone(), *n).unwrap().into(),
+            ))
+        } else if num_outports == 2 {
+            Ok(NodeTemplate::SingleOp(
+                ArrayClone::new(ty.clone(), *n).unwrap().into(),
+            ))
+        } else {
+            let array_ty = array_type(*n, ty.clone());
+            Ok(NodeTemplate::CompoundOp(Box::new({
+                let mut dfb =
+                    DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty; *n as usize]))
+                        .unwrap();
+                let [mut arr] = dfb.input_wires_arr();
+                let mut outs = vec![];
+                for _ in 0..(num_outports - 1) {
+                    let (arr1, arr2) = dfb.add_array_clone(ty.clone(), *n, arr).unwrap();
+                    arr = arr1;
+                    outs.push(arr2);
+                }
+                outs.push(arr);
+                dfb.finish_hugr_with_outputs(outs).unwrap()
+            })))
+        }
+    } else {
+        // For linear elements we have to fall back to the generic linearization implementation
+        linearize_generic_array::<Array>(args, num_outports, lin)
+    }
 }
