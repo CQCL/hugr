@@ -256,7 +256,8 @@ impl SumType {
             _ => None,
         }
     }
-    /// If the sum matches the convention of Option<row>, return the row.
+
+    /// If the sum matches the convention of `Option[row]`, return the row.
     pub fn as_option(&self) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if *size == 2 => Some(TypeRV::EMPTY_TYPEROW_REF),
