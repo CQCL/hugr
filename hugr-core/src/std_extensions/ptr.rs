@@ -44,8 +44,7 @@ impl PtrOpDef {
 
 impl MakeOpDef for PtrOpDef {
     fn opdef_id(&self) -> OpName {
-        let s: &str = self.into();
-        s.into()
+        <&'static str>::from(self).into()
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>

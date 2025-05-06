@@ -78,7 +78,7 @@ pub enum LogicOp {
 
 impl MakeOpDef for LogicOp {
     fn opdef_id(&self) -> OpName {
-        <&Self as Into<&'static str>>::into(self).into()
+        <&'static str>::from(self).into()
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {

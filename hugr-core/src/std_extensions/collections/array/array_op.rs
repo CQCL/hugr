@@ -190,8 +190,9 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayOpDef<AK> {
     fn opdef_id(&self) -> OpName {
-        <&Self as Into<&'static str>>::into(self).into()
+        <&'static str>::from(self).into()
     }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
