@@ -306,6 +306,8 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
     }
 }
 
+/// Produce a mangled name for a monorphized instance of a function.
+///
 /// We do our best to generate unique names. Our strategy is to pick out '$' as
 /// a special character.
 ///
@@ -318,7 +320,7 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
 ///    simple obvious thing.
 ///  - For all TypeArg Constructors we choose a short prefix (e.g. `t` for type)
 ///    and use "t({arg})" as the string representation of that arg.
-fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
+pub fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
     let name = escape_dollar(name);
     format!("${name}${}", TypeArgsList(type_args.as_ref()))
 }
