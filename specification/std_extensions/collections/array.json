@@ -114,8 +114,7 @@
               ],
               "bound": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -162,8 +161,7 @@
               "bound": "A"
             }
           ],
-          "output": [],
-          "runtime_reqs": []
+          "output": []
         }
       },
       "binary": false

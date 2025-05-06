@@ -118,18 +118,15 @@ pub struct GenericArrayRepeat<AK: ArrayKind> {
     pub elem_ty: Type,
     /// Size of the array.
     pub size: u64,
-    /// The extensions required by the function that generates the array elements.
-    pub extension_reqs: ExtensionSet,
     _kind: PhantomData<AK>,
 }
 
 impl<AK: ArrayKind> GenericArrayRepeat<AK> {
     /// Creates a new array repeat op.
-    pub fn new(elem_ty: Type, size: u64, extension_reqs: ExtensionSet) -> Self {
+    pub fn new(elem_ty: Type, size: u64) -> Self {
         GenericArrayRepeat {
             elem_ty,
             size,
-            extension_reqs,
             _kind: PhantomData,
         }
     }
@@ -189,7 +186,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
 mod tests {
     use rstest::rstest;
 
-    use crate::std_extensions::collections::array::{Array, EXTENSION_ID};
+    use crate::std_extensions::collections::array::Array;
     use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         extension::prelude::qb_t,

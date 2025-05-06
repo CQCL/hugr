@@ -357,27 +357,20 @@ pub fn build_all_value_array_ops<B: Dataflow>(builder: B) -> B {
 #[cfg(test)]
 mod test {
     use crate::builder::{DFGBuilder, HugrBuilder};
-    use crate::extension::prelude::PRELUDE_ID;
-    use crate::extension::ExtensionSet;
-    use crate::std_extensions::collections::array::{self};
-    use crate::std_extensions::collections::value_array::{self};
     use crate::types::Signature;
 
     use super::*;
 
     #[test]
     fn all_array_ops() {
-        let sig = Signature::new_endo(Type::EMPTY_TYPEROW)
-            .with_extension_delta(ExtensionSet::from_iter([PRELUDE_ID, array::EXTENSION_ID]));
+        let sig = Signature::new_endo(Type::EMPTY_TYPEROW);
         let builder = DFGBuilder::new(sig).unwrap();
         build_all_array_ops(builder).finish_hugr().unwrap();
     }
 
     #[test]
     fn all_value_array_ops() {
-        let sig = Signature::new_endo(Type::EMPTY_TYPEROW).with_extension_delta(
-            ExtensionSet::from_iter([PRELUDE_ID, value_array::EXTENSION_ID]),
-        );
+        let sig = Signature::new_endo(Type::EMPTY_TYPEROW);
         let builder = DFGBuilder::new(sig).unwrap();
         build_all_value_array_ops(builder).finish_hugr().unwrap();
     }

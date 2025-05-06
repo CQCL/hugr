@@ -7,7 +7,6 @@ use crate::extension::resolution::{
     resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
     WeakExtensionRegistry,
 };
-use crate::extension::ExtensionSet;
 use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
 use crate::ops::Value;
 use crate::types::type_param::TypeArg;
@@ -111,12 +110,6 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
         }
 
         Ok(())
-    }
-
-    /// Returns the extension requirements for the array value.
-    pub fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.values.iter().map(Value::extension_reqs))
-            .union(AK::EXTENSION_ID.into())
     }
 
     /// Update the extensions associated with the internal values.

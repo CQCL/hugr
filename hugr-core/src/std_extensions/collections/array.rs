@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::simple_op::{HasConcrete, MakeOpDef, MakeRegisteredOp};
-use crate::extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound};
+use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
@@ -115,7 +115,6 @@ lazy_static! {
 
 impl ArrayValue {
     /// Name of the constructor for creating constant arrays.
-    #[cfg_attr(not(feature = "model_unstable"), allow(dead_code))]
     pub(crate) const CTR_NAME: &'static str = "collections.array.const";
 }
 
@@ -124,7 +123,6 @@ impl CustomConst for ArrayValue {
     delegate! {
         to self {
             fn name(&self) -> ValueName;
-            fn extension_reqs(&self) -> ExtensionSet;
             fn validate(&self) -> Result<(), CustomCheckFailure>;
             fn update_extensions(
                 &mut self,

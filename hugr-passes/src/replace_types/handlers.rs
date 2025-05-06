@@ -14,8 +14,8 @@ use hugr_core::std_extensions::collections::array::{
     GenericArrayRepeat, GenericArrayScan, GenericArrayValue,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
-use hugr_core::type_row;
 use hugr_core::std_extensions::collections::value_array::ValueArray;
+use hugr_core::type_row;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use itertools::Itertools;
 
@@ -96,10 +96,6 @@ pub fn value_array_const(
     generic_array_const::<ValueArray>(val, repl)
 }
 
-fn runtime_reqs(h: &Hugr) -> ExtensionSet {
-    h.signature(h.root()).unwrap().runtime_reqs.clone()
-}
-
 /// Handler for copying/discarding arrays if their elements have become linear.
 ///
 /// Generic over the concrete array implementation.
@@ -125,8 +121,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             dfb.finish_hugr_with_outputs([ret]).unwrap()
         };
         // Now array.scan that over the input array to get an array of unit (which can be discarded)
-        let array_scan =
-            GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
+        let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
         let in_type = AK::ty(*n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
@@ -164,10 +159,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                 .unwrap();
             dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
         };
-        let repeats = vec![
-                GenericArrayRepeat::<AK>::new(option_ty.clone(), *n);
-                num_new
-            ];
+        let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), *n); num_new];
         let fn_none = dfb.add_load_value(Value::function(fn_none).unwrap());
         repeats
             .into_iter()

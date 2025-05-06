@@ -606,7 +606,6 @@ mod test {
     use hugr_core::ops::constant::CustomConst;
     use hugr_core::ops::constant::OpaqueValue;
     use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
-    use hugr_core::std_extensions::arithmetic::conversions;
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
     use hugr_core::std_extensions::collections::array::Array;
@@ -615,7 +614,7 @@ mod test {
         list_type, list_type_def, ListOp, ListValue,
     };
     use hugr_core::std_extensions::collections::value_array::{
-        self, value_array_type, VArrayOp, VArrayOpDef, VArrayValue, ValueArray,
+        value_array_type, VArrayOp, VArrayOpDef, VArrayValue, ValueArray,
     };
 
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};

@@ -225,7 +225,12 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
                         _ => Err(SignatureError::InvalidTypeArgs.into()),
                     })
                     .collect();
-                Ok(GenericArrayScan::new(src_ty.clone(), tgt_ty.clone(), acc_tys?, *n))
+                Ok(GenericArrayScan::new(
+                    src_ty.clone(),
+                    tgt_ty.clone(),
+                    acc_tys?,
+                    *n,
+                ))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
@@ -265,8 +270,7 @@ mod tests {
         let src_ty = qb_t();
         let tgt_ty = bool_t();
 
-        let op =
-            GenericArrayScan::<AK>::new(src_ty.clone(), tgt_ty.clone(), vec![], size);
+        let op = GenericArrayScan::<AK>::new(src_ty.clone(), tgt_ty.clone(), vec![], size);
         let optype: OpType = op.into();
         let sig = optype.dataflow_signature().unwrap();
 

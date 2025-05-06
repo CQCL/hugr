@@ -160,10 +160,7 @@ mod test {
     use hugr_core::types::Transformable;
     use hugr_core::{
         builder::{Container, DFGBuilder, Dataflow, HugrBuilder},
-        extension::{
-            prelude::{qb_t, usize_t, PRELUDE_ID},
-            ExtensionSet,
-        },
+        extension::prelude::{qb_t, usize_t},
         std_extensions::collections::{
             array::{
                 op_builder::{build_all_array_ops, build_all_value_array_ops},
@@ -183,13 +180,11 @@ mod test {
 
     #[test]
     fn all_value_array_ops() {
-        let sig = Signature::new_endo(Type::EMPTY_TYPEROW).with_extension_delta(
-            ExtensionSet::from_iter([PRELUDE_ID, value_array::EXTENSION_ID, array::EXTENSION_ID]),
-        );
+        let sig = Signature::new_endo(Type::EMPTY_TYPEROW);
         let mut hugr = build_all_value_array_ops(DFGBuilder::new(sig.clone()).unwrap())
             .finish_hugr()
             .unwrap();
-        ValidatingPass::new_default(LinearizeArrayPass::default())
+        ValidatingPass::new(LinearizeArrayPass::default())
             .run(&mut hugr)
             .unwrap();
 
@@ -206,43 +201,33 @@ mod test {
     #[case(qb_t(), 2)]
     #[case(value_array_type(4, usize_t()), 2)]
     fn repeat(#[case] elem_ty: Type, #[case] size: u64) {
-        let reqs =
-            ExtensionSet::from_iter([PRELUDE_ID, value_array::EXTENSION_ID, array::EXTENSION_ID]);
         let mut builder = ModuleBuilder::new();
         let repeat_decl = builder
             .declare(
                 "foo",
-                Signature::new(Type::EMPTY_TYPEROW, elem_ty.clone())
-                    .with_extension_delta(reqs.clone())
-                    .into(),
+                Signature::new(Type::EMPTY_TYPEROW, elem_ty.clone()).into(),
             )
             .unwrap();
         let mut f = builder
             .define_function(
                 "bar",
-                Signature::new(Type::EMPTY_TYPEROW, value_array_type(size, elem_ty.clone()))
-                    .with_extension_delta(reqs.clone()),
+                Signature::new(Type::EMPTY_TYPEROW, value_array_type(size, elem_ty.clone())),
             )
             .unwrap();
         let repeat_f = f.load_func(&repeat_decl, &[]).unwrap();
         let repeat = f
-            .add_dataflow_op(
-                VArrayRepeat::new(elem_ty.clone(), size, reqs.clone()),
-                [repeat_f],
-            )
+            .add_dataflow_op(VArrayRepeat::new(elem_ty.clone(), size), [repeat_f])
             .unwrap();
         let [arr] = repeat.outputs_arr();
         f.set_outputs([arr]).unwrap();
         let mut hugr = builder.finish_hugr().unwrap();
 
         let pass = LinearizeArrayPass::default();
-        ValidatingPass::new_default(pass.clone())
-            .run(&mut hugr)
-            .unwrap();
+        ValidatingPass::new(pass.clone()).run(&mut hugr).unwrap();
         let new_repeat: ArrayRepeat = hugr.get_optype(repeat.node()).cast().unwrap();
         let mut new_elem_ty = elem_ty.clone();
         new_elem_ty.transform(&pass.0).unwrap();
-        assert_eq!(new_repeat, ArrayRepeat::new(new_elem_ty, size, reqs));
+        assert_eq!(new_repeat, ArrayRepeat::new(new_elem_ty, size));
     }
 
     #[rstest]
@@ -250,16 +235,9 @@ mod test {
     #[case(usize_t(), value_array_type(4, usize_t()), 2)]
     #[case(value_array_type(4, usize_t()), value_array_type(8, usize_t()), 2)]
     fn scan(#[case] src_ty: Type, #[case] tgt_ty: Type, #[case] size: u64) {
-        let reqs =
-            ExtensionSet::from_iter([PRELUDE_ID, value_array::EXTENSION_ID, array::EXTENSION_ID]);
         let mut builder = ModuleBuilder::new();
         let scan_decl = builder
-            .declare(
-                "foo",
-                Signature::new(src_ty.clone(), tgt_ty.clone())
-                    .with_extension_delta(reqs.clone())
-                    .into(),
-            )
+            .declare("foo", Signature::new(src_ty.clone(), tgt_ty.clone()).into())
             .unwrap();
         let mut f = builder
             .define_function(
@@ -267,15 +245,14 @@ mod test {
                 Signature::new(
                     value_array_type(size, src_ty.clone()),
                     value_array_type(size, tgt_ty.clone()),
-                )
-                .with_extension_delta(reqs.clone()),
+                ),
             )
             .unwrap();
         let [arr] = f.input_wires_arr();
         let scan_f = f.load_func(&scan_decl, &[]).unwrap();
         let scan = f
             .add_dataflow_op(
-                VArrayScan::new(src_ty.clone(), tgt_ty.clone(), vec![], size, reqs.clone()),
+                VArrayScan::new(src_ty.clone(), tgt_ty.clone(), vec![], size),
                 [arr, scan_f],
             )
             .unwrap();
@@ -284,9 +261,7 @@ mod test {
         let mut hugr = builder.finish_hugr().unwrap();
 
         let pass = LinearizeArrayPass::default();
-        ValidatingPass::new_default(pass.clone())
-            .run(&mut hugr)
-            .unwrap();
+        ValidatingPass::new(pass.clone()).run(&mut hugr).unwrap();
         let new_scan: ArrayScan = hugr.get_optype(scan.node()).cast().unwrap();
         let mut new_src_ty = src_ty.clone();
         let mut new_tgt_ty = tgt_ty.clone();
@@ -295,7 +270,7 @@ mod test {
 
         assert_eq!(
             new_scan,
-            ArrayScan::new(new_src_ty, new_tgt_ty, vec![], size, reqs)
+            ArrayScan::new(new_src_ty, new_tgt_ty, vec![], size)
         );
     }
 
@@ -317,11 +292,7 @@ mod test {
                 value_array_type(size, elem_ty.clone()),
             ),
         };
-        let sig = Signature::new(src, tgt).with_extension_delta(ExtensionSet::from_iter([
-            PRELUDE_ID,
-            value_array::EXTENSION_ID,
-            array::EXTENSION_ID,
-        ]));
+        let sig = Signature::new(src, tgt);
         let mut builder = DFGBuilder::new(sig).unwrap();
         let [arr] = builder.input_wires_arr();
         let op: OpType = match dir {
@@ -334,9 +305,7 @@ mod test {
         let mut hugr = builder.finish_hugr().unwrap();
 
         let pass = LinearizeArrayPass::default();
-        ValidatingPass::new_default(pass.clone())
-            .run(&mut hugr)
-            .unwrap();
+        ValidatingPass::new(pass.clone()).run(&mut hugr).unwrap();
         let new_convert: Noop = hugr.get_optype(convert.node()).cast().unwrap();
         let mut new_elem_ty = elem_ty.clone();
         new_elem_ty.transform(&pass.0).unwrap();
@@ -349,15 +318,13 @@ mod test {
     #[case(value_array_type(2, value_array_type(4, usize_t())))]
     #[case(value_array_type(2, Type::new_tuple(vec![usize_t(), value_array_type(4, usize_t())])))]
     fn implicit_clone(#[case] array_ty: Type) {
-        let sig = Signature::new(array_ty.clone(), vec![array_ty; 2]).with_extension_delta(
-            ExtensionSet::from_iter([PRELUDE_ID, value_array::EXTENSION_ID, array::EXTENSION_ID]),
-        );
+        let sig = Signature::new(array_ty.clone(), vec![array_ty; 2]);
         let mut builder = DFGBuilder::new(sig).unwrap();
         let [arr] = builder.input_wires_arr();
         builder.set_outputs(vec![arr, arr]).unwrap();
 
         let mut hugr = builder.finish_hugr().unwrap();
-        ValidatingPass::new_default(LinearizeArrayPass::default())
+        ValidatingPass::new(LinearizeArrayPass::default())
             .run(&mut hugr)
             .unwrap();
     }
@@ -367,14 +334,12 @@ mod test {
     #[case(value_array_type(2, value_array_type(4, usize_t())))]
     #[case(value_array_type(2, Type::new_tuple(vec![usize_t(), value_array_type(4, usize_t())])))]
     fn implicit_discard(#[case] array_ty: Type) {
-        let sig = Signature::new(array_ty, Type::EMPTY_TYPEROW).with_extension_delta(
-            ExtensionSet::from_iter([PRELUDE_ID, value_array::EXTENSION_ID, array::EXTENSION_ID]),
-        );
+        let sig = Signature::new(array_ty, Type::EMPTY_TYPEROW);
         let mut builder = DFGBuilder::new(sig).unwrap();
         builder.set_outputs(vec![]).unwrap();
 
         let mut hugr = builder.finish_hugr().unwrap();
-        ValidatingPass::new_default(LinearizeArrayPass::default())
+        ValidatingPass::new(LinearizeArrayPass::default())
             .run(&mut hugr)
             .unwrap();
     }
@@ -386,7 +351,7 @@ mod test {
         let c = builder.add_constant(Const::new(array_v.clone().into()));
 
         let mut hugr = builder.finish_hugr().unwrap();
-        ValidatingPass::new_default(LinearizeArrayPass::default())
+        ValidatingPass::new(LinearizeArrayPass::default())
             .run(&mut hugr)
             .unwrap();
 
@@ -412,7 +377,7 @@ mod test {
         let c = builder.add_constant(Const::new(array_v.clone().into()));
 
         let mut hugr = builder.finish_hugr().unwrap();
-        ValidatingPass::new_default(LinearizeArrayPass::default())
+        ValidatingPass::new(LinearizeArrayPass::default())
             .run(&mut hugr)
             .unwrap();
 
