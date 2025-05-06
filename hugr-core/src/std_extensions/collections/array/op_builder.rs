@@ -1,6 +1,7 @@
 //! Builder trait for array operations in the dataflow graph.
 
 use crate::std_extensions::collections::array::GenericArrayOpDef;
+use crate::std_extensions::collections::value_array::ValueArray;
 use crate::{
     builder::{BuildError, Dataflow},
     extension::simple_op::HasConcrete as _,
@@ -11,8 +12,13 @@ use itertools::Itertools as _;
 
 use super::{Array, ArrayKind, GenericArrayClone, GenericArrayDiscard};
 
-/// Trait for building array operations in a dataflow graph.
-pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
+use crate::extension::prelude::{
+    either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _,
+};
+
+/// Trait for building array operations in a dataflow graph that are generic
+/// over the concrete array implementation.
+pub trait GenericArrayOpBuilder: Dataflow {
     /// Adds a new array operation to the dataflow graph and return the wire
     /// representing the new array.
     ///
@@ -28,7 +34,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Returns
     ///
     /// The wire representing the new array.
-    fn add_new_array(
+    fn add_new_generic_array<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         values: impl IntoIterator<Item = Wire>,
@@ -59,7 +65,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Returns
     ///
     /// The wires representing the original and cloned array.
-    fn add_array_clone(
+    fn add_generic_array_clone<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -81,7 +87,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Errors
     ///
     /// If building the operation fails.
-    fn add_array_discard(
+    fn add_generic_array_discard<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -109,7 +115,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     ///
     /// * The wire representing the value at the specified index in the array
     /// * The wire representing the array
-    fn add_array_get(
+    fn add_generic_array_get<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -140,7 +146,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Returns
     ///
     /// The wire representing the updated array after the set operation.
-    fn add_array_set(
+    fn add_generic_array_set<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -174,7 +180,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Returns
     ///
     /// The wire representing the updated array after the swap operation.
-    fn add_array_swap(
+    fn add_generic_array_swap<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -206,7 +212,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Returns
     ///
     /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
-    fn add_array_pop_left(
+    fn add_generic_array_pop_left<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -233,7 +239,7 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Returns
     ///
     /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
-    fn add_array_pop_right(
+    fn add_generic_array_pop_right<AK: ArrayKind>(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -253,7 +259,11 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
-    fn add_array_discard_empty(&mut self, elem_ty: Type, input: Wire) -> Result<(), BuildError> {
+    fn add_generic_array_discard_empty<AK: ArrayKind>(
+        &mut self,
+        elem_ty: Type,
+        input: Wire,
+    ) -> Result<(), BuildError> {
         self.add_dataflow_op(
             GenericArrayOpDef::<AK>::discard_empty
                 .instantiate(&[elem_ty.into()])
@@ -264,86 +274,111 @@ pub trait ArrayOpBuilder<AK: ArrayKind>: Dataflow {
     }
 }
 
-impl<D: Dataflow> ArrayOpBuilder<Array> for D {}
+impl<D: Dataflow> GenericArrayOpBuilder for D {}
 
+/// Helper function to build a Hugr that contains all basic array operations.
+///
+/// Generic over the concrete array implementation.
+pub fn build_all_array_ops_generic<B: Dataflow, AK: ArrayKind>(mut builder: B) -> B {
+    let us0 = builder.add_load_value(ConstUsize::new(0));
+    let us1 = builder.add_load_value(ConstUsize::new(1));
+    let us2 = builder.add_load_value(ConstUsize::new(2));
+    let arr = builder
+        .add_new_generic_array::<AK>(usize_t(), [us1, us2])
+        .unwrap();
+    let [arr] = {
+        let r = builder
+            .add_generic_array_swap::<AK>(usize_t(), 2, arr, us0, us1)
+            .unwrap();
+        let res_sum_ty = {
+            let array_type = AK::ty(2, usize_t());
+            either_type(array_type.clone(), array_type)
+        };
+        builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
+    };
+
+    let ([elem_0], arr) = {
+        let (r, arr) = builder
+            .add_generic_array_get::<AK>(usize_t(), 2, arr, us0)
+            .unwrap();
+        (
+            builder
+                .build_unwrap_sum(1, option_type(usize_t()), r)
+                .unwrap(),
+            arr,
+        )
+    };
+
+    let [_elem_1, arr] = {
+        let r = builder
+            .add_generic_array_set::<AK>(usize_t(), 2, arr, us1, elem_0)
+            .unwrap();
+        let res_sum_ty = {
+            let row = vec![usize_t(), AK::ty(2, usize_t())];
+            either_type(row.clone(), row)
+        };
+        builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
+    };
+
+    let [_elem_left, arr] = {
+        let r = builder
+            .add_generic_array_pop_left::<AK>(usize_t(), 2, arr)
+            .unwrap();
+        builder
+            .build_unwrap_sum(1, option_type(vec![usize_t(), AK::ty(1, usize_t())]), r)
+            .unwrap()
+    };
+    let [_elem_right, arr] = {
+        let r = builder
+            .add_generic_array_pop_right::<AK>(usize_t(), 1, arr)
+            .unwrap();
+        builder
+            .build_unwrap_sum(1, option_type(vec![usize_t(), AK::ty(0, usize_t())]), r)
+            .unwrap()
+    };
+
+    builder
+        .add_generic_array_discard_empty::<AK>(usize_t(), arr)
+        .unwrap();
+    builder
+}
+
+/// Helper function to build a Hugr that contains all basic array operations.
+pub fn build_all_array_ops<B: Dataflow>(builder: B) -> B {
+    build_all_array_ops_generic::<B, Array>(builder)
+}
+
+/// Helper function to build a Hugr that contains all basic array operations.
+pub fn build_all_value_array_ops<B: Dataflow>(builder: B) -> B {
+    build_all_array_ops_generic::<B, ValueArray>(builder)
+}
+
+/// Testing utilities to generate Hugrs that contain array operations.
 #[cfg(test)]
 mod test {
+    use crate::builder::{DFGBuilder, HugrBuilder};
     use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
-    use crate::std_extensions::collections::array::{self, array_type};
-    use crate::{
-        builder::{DFGBuilder, HugrBuilder},
-        extension::prelude::{either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _},
-        types::Signature,
-        Hugr,
-    };
-    use rstest::rstest;
+    use crate::std_extensions::collections::array::{self};
+    use crate::std_extensions::collections::value_array::{self};
+    use crate::types::Signature;
 
     use super::*;
 
-    #[rstest::fixture]
-    #[default(DFGBuilder<Hugr>)]
-    pub fn all_array_ops<B: Dataflow>(
-        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)
-            .with_extension_delta(ExtensionSet::from_iter([
-                PRELUDE_ID,
-                array::EXTENSION_ID
-        ]))).unwrap())]
-        mut builder: B,
-    ) -> B {
-        let us0 = builder.add_load_value(ConstUsize::new(0));
-        let us1 = builder.add_load_value(ConstUsize::new(1));
-        let us2 = builder.add_load_value(ConstUsize::new(2));
-        let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
-        let [arr] = {
-            let r = builder.add_array_swap(usize_t(), 2, arr, us0, us1).unwrap();
-            let res_sum_ty = {
-                let array_type = array_type(2, usize_t());
-                either_type(array_type.clone(), array_type)
-            };
-            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
-        };
-
-        let ([elem_0], arr) = {
-            let (r, arr) = builder.add_array_get(usize_t(), 2, arr, us0).unwrap();
-            (
-                builder
-                    .build_unwrap_sum(1, option_type(usize_t()), r)
-                    .unwrap(),
-                arr,
-            )
-        };
-
-        let [_elem_1, arr] = {
-            let r = builder
-                .add_array_set(usize_t(), 2, arr, us1, elem_0)
-                .unwrap();
-            let res_sum_ty = {
-                let row = vec![usize_t(), array_type(2, usize_t())];
-                either_type(row.clone(), row)
-            };
-            builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
-        };
-
-        let [_elem_left, arr] = {
-            let r = builder.add_array_pop_left(usize_t(), 2, arr).unwrap();
-            builder
-                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(1, usize_t())]), r)
-                .unwrap()
-        };
-        let [_elem_right, arr] = {
-            let r = builder.add_array_pop_right(usize_t(), 1, arr).unwrap();
-            builder
-                .build_unwrap_sum(1, option_type(vec![usize_t(), array_type(0, usize_t())]), r)
-                .unwrap()
-        };
-
-        builder.add_array_discard_empty(usize_t(), arr).unwrap();
-        builder
+    #[test]
+    fn all_array_ops() {
+        let sig = Signature::new_endo(Type::EMPTY_TYPEROW)
+            .with_extension_delta(ExtensionSet::from_iter([PRELUDE_ID, array::EXTENSION_ID]));
+        let builder = DFGBuilder::new(sig).unwrap();
+        build_all_array_ops(builder).finish_hugr().unwrap();
     }
 
-    #[rstest]
-    fn build_all_ops(all_array_ops: DFGBuilder<Hugr>) {
-        all_array_ops.finish_hugr().unwrap();
+    #[test]
+    fn all_value_array_ops() {
+        let sig = Signature::new_endo(Type::EMPTY_TYPEROW).with_extension_delta(
+            ExtensionSet::from_iter([PRELUDE_ID, value_array::EXTENSION_ID]),
+        );
+        let builder = DFGBuilder::new(sig).unwrap();
+        build_all_value_array_ops(builder).finish_hugr().unwrap();
     }
 }
