@@ -12,6 +12,7 @@ use crate::extension::test::SimpleOpDef;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
+use crate::hugr::views::ExtractionResult;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::float64_type;
@@ -174,10 +175,14 @@ fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
 /// equality checking.
 ///
 /// Returns the deserialized HUGR.
-pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
-    let new_hugr = ser_roundtrip_check_schema(hugr, get_schemas(check_schema));
+pub fn check_hugr_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
+    // Transform the whole view into a HUGR.
+    let (mut base, extract_map) = hugr.extract_hugr(hugr.module_root());
+    base.set_entrypoint(extract_map.extracted_node(hugr.entrypoint()));
 
-    check_hugr(hugr, &new_hugr);
+    let new_hugr = ser_roundtrip_check_schema(&base, get_schemas(check_schema));
+
+    check_hugr(&base, &new_hugr);
     new_hugr
 }
 

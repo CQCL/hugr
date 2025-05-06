@@ -24,6 +24,7 @@ use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
 
 use super::internal::{HugrInternals, HugrMutInternals};
+use super::validate::ValidationContext;
 use super::{Hugr, HugrMut, Node, NodeMetadata, ValidationError};
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
@@ -451,9 +452,12 @@ pub trait HugrView: HugrInternals {
     fn extensions(&self) -> &ExtensionRegistry;
 
     /// Check the validity of the underlying HUGR.
-    fn validate(&self) -> Result<(), ValidationError> {
-        #[allow(deprecated)]
-        self.base_hugr().validate()
+    fn validate(&self) -> Result<(), ValidationError<Self::Node>>
+    where
+        Self: Sized,
+    {
+        let mut validator = ValidationContext::new(self);
+        validator.validate()
     }
 
     /// Extracts a HUGR containing the parent node and all its descendants.

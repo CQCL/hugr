@@ -33,6 +33,7 @@ use types_mut::{
 use derive_more::{Display, Error, From};
 
 use super::{Extension, ExtensionId, ExtensionRegistry, ExtensionSet};
+use crate::core::HugrNode;
 use crate::ops::constant::ValueName;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{NamedOp, OpName, OpType, Value};
@@ -78,11 +79,11 @@ pub fn resolve_value_extensions(
 /// Errors that can occur during extension resolution.
 #[derive(Debug, Display, Clone, Error, From, PartialEq)]
 #[non_exhaustive]
-pub enum ExtensionResolutionError {
+pub enum ExtensionResolutionError<N: HugrNode = Node> {
     /// Could not resolve an opaque operation to an extension operation.
     #[display("Error resolving opaque operation: {_0}")]
     #[from]
-    OpaqueOpError(OpaqueOpError),
+    OpaqueOpError(OpaqueOpError<N>),
     /// An operation requires an extension that is not in the given registry.
     #[display(
         "{op}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
@@ -91,7 +92,7 @@ pub enum ExtensionResolutionError {
     )]
     MissingOpExtension {
         /// The node that requires the extension.
-        node: Option<Node>,
+        node: Option<N>,
         /// The operation that requires the extension.
         op: OpName,
         /// The missing extension
@@ -107,7 +108,7 @@ pub enum ExtensionResolutionError {
     )]
     MissingTypeExtension {
         /// The node that requires the extension.
-        node: Option<Node>,
+        node: Option<N>,
         /// The type that requires the extension.
         ty: TypeName,
         /// The missing extension
@@ -149,10 +150,10 @@ pub enum ExtensionResolutionError {
     },
 }
 
-impl ExtensionResolutionError {
+impl<N: HugrNode> ExtensionResolutionError<N> {
     /// Create a new error for missing operation extensions.
     pub fn missing_op_extension(
-        node: Option<Node>,
+        node: Option<N>,
         op: &OpType,
         missing_extension: &ExtensionId,
         extensions: &ExtensionRegistry,
@@ -167,7 +168,7 @@ impl ExtensionResolutionError {
 
     /// Create a new error for missing type extensions.
     pub fn missing_type_extension(
-        node: Option<Node>,
+        node: Option<N>,
         ty: &TypeName,
         missing_extension: &ExtensionId,
         extensions: &WeakExtensionRegistry,
@@ -184,7 +185,7 @@ impl ExtensionResolutionError {
 /// Errors that can occur when collecting extension requirements.
 #[derive(Debug, Display, Clone, Error, From, PartialEq)]
 #[non_exhaustive]
-pub enum ExtensionCollectionError {
+pub enum ExtensionCollectionError<N: HugrNode = Node> {
     /// An operation requires an extension that is not in the given registry.
     #[display(
         "{op}{} contains custom types for which have lost the reference to their defining extensions. Dropped extensions: {}",
@@ -193,7 +194,7 @@ pub enum ExtensionCollectionError {
     )]
     DroppedOpExtensions {
         /// The node that is missing extensions.
-        node: Option<Node>,
+        node: Option<N>,
         /// The operation that is missing extensions.
         op: OpName,
         /// The missing extensions.
@@ -212,10 +213,10 @@ pub enum ExtensionCollectionError {
     },
 }
 
-impl ExtensionCollectionError {
+impl<N: HugrNode> ExtensionCollectionError<N> {
     /// Create a new error when operation extensions have been dropped.
     pub fn dropped_op_extension(
-        node: Option<Node>,
+        node: Option<N>,
         op: &OpType,
         missing_extension: impl IntoIterator<Item = ExtensionId>,
     ) -> Self {

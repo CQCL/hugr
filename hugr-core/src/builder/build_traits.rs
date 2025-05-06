@@ -161,7 +161,7 @@ pub trait Container {
 /// (with varying root node types)
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
-    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>>;
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR

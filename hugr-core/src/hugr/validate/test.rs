@@ -25,7 +25,7 @@ use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
-use crate::{const_extension_ids, test_file, type_row, Direction, IncomingPort, Node};
+use crate::{const_extension_ids, test_file, type_row, Direction, Hugr, IncomingPort, Node};
 
 /// Creates a hugr with a single function definition that copies a bit `copies` times.
 ///
@@ -87,7 +87,7 @@ fn invalid_root() {
     b.set_parent(root, module);
     assert_matches!(
         b.validate(),
-        Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, root)
+        Err(ValidationError::NoParent { node }) => assert_eq!(node, module)
     );
 
     // Fix the root
@@ -189,7 +189,7 @@ fn df_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, output.into_portgraph())}
+            => {assert_eq!(parent, def); assert_eq!(child, output)}
     );
     b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]));
 
@@ -198,7 +198,7 @@ fn df_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, copy.into_portgraph())}
+            => {assert_eq!(parent, def); assert_eq!(child, copy)}
     );
 }
 
@@ -807,7 +807,7 @@ fn cfg_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.into_portgraph())}
+            => {assert_eq!(parent, cfg); assert_eq!(child, exit2)}
     );
     b.remove_node(exit2);
 

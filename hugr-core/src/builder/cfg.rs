@@ -155,7 +155,7 @@ impl CFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for CFGBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
+    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError<Node>> {
         self.base.validate()?;
         Ok(self.base)
     }

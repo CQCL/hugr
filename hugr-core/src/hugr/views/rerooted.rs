@@ -114,7 +114,7 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
                 fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
                 fn extensions(&self) -> &crate::extension::ExtensionRegistry;
-                fn validate(&self) -> Result<(), crate::hugr::ValidationError>;
+                fn validate(&self) -> Result<(), crate::hugr::ValidationError<Self::Node>>;
                 fn extract_hugr(&self, parent: Self::Node) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
         }
     }

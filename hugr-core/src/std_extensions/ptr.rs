@@ -225,6 +225,7 @@ pub(crate) mod test {
     use crate::builder::DFGBuilder;
     use crate::extension::prelude::bool_t;
     use crate::ops::ExtensionOp;
+    use crate::HugrView;
     use crate::{
         builder::{Dataflow, DataflowHugr},
         std_extensions::arithmetic::int_types::INT_TYPES,

@@ -337,7 +337,7 @@ pub enum LoadHugrError {
     Load(#[from] serde_json::Error),
     /// Validation of the loaded Hugr failed.
     #[error(transparent)]
-    Validation(#[from] ValidationError),
+    Validation(#[from] ValidationError<Node>),
     /// Error when resolving extension operations and types.
     #[error(transparent)]
     Extension(#[from] ExtensionResolutionError),

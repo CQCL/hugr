@@ -9,7 +9,7 @@ use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeErr
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE_REGISTRY};
 use crate::hugr::{ExtensionError, HugrView, ValidationError};
-use crate::{Extension, Hugr};
+use crate::{Extension, Hugr, Node};
 
 #[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Package of module HUGRs.
@@ -291,7 +291,7 @@ pub enum PackageValidationError {
         available: Vec<ExtensionId>,
     },
     /// Error raised while validating the package hugrs.
-    Validation(ValidationError),
+    Validation(ValidationError<Node>),
 }
 
 #[cfg(test)]

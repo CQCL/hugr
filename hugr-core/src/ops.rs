@@ -18,12 +18,11 @@ use std::borrow::Cow;
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::types::{EdgeKind, Signature, Substitution};
-use crate::{Direction, OutgoingPort, Port};
+use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use derive_more::Display;
 use handle::NodeHandle;
 use paste::paste;
-use portgraph::NodeIndex;
 
 use enum_dispatch::enum_dispatch;
 
@@ -298,7 +297,7 @@ impl OpType {
     /// Checks whether the operation can contain children nodes.
     #[inline]
     pub fn is_container(&self) -> bool {
-        self.validity_flags().allowed_children != OpTag::None
+        self.validity_flags::<Node>().allowed_children != OpTag::None
     }
 
     /// Cast to an extension operation.
@@ -491,16 +490,16 @@ impl OpParent for ExitBlock {}
 pub trait ValidateOp {
     /// Returns a set of flags describing the validity predicates for this operation.
     #[inline]
-    fn validity_flags(&self) -> validate::OpValidityFlags {
+    fn validity_flags<N: HugrNode>(&self) -> validate::OpValidityFlags<N> {
         Default::default()
     }
 
     /// Validate the ordered list of children.
     #[inline]
-    fn validate_op_children<'a>(
+    fn validate_op_children<'a, N: HugrNode>(
         &self,
-        _children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), validate::ChildrenValidationError> {
+        _children: impl DoubleEndedIterator<Item = (N, &'a OpType)>,
+    ) -> Result<(), validate::ChildrenValidationError<N>> {
         Ok(())
     }
 }

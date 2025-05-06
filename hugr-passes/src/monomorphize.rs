@@ -34,7 +34,7 @@ use crate::ComposablePass;
 /// whenever the names of their parents are unique, but this is not guaranteed.
 pub fn monomorphize(
     hugr: &mut impl HugrMut<Node = Node>,
-) -> Result<(), ValidatePassError<Infallible>> {
+) -> Result<(), ValidatePassError<Node, Infallible>> {
     validate_if_test(MonomorphizePass, hugr)
 }
 

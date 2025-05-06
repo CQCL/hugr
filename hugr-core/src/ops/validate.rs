@@ -7,17 +7,23 @@
 //! require traversing the children.
 
 use itertools::Itertools;
-use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
+use crate::core::HugrNode;
 use crate::types::TypeRow;
+use crate::{Port, PortIndex};
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
 use super::{impl_validate_op, BasicBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp};
 
+/// A function that checks the edges between children of a node.
+///
+/// Part of the [`OpValidityFlags`] struct.
+pub type EdgeCheck<N> = fn(ChildrenEdgeData<N>) -> Result<(), EdgeValidationError<N>>;
+
 /// A set of property flags required for an operation.
 #[non_exhaustive]
-pub struct OpValidityFlags {
+pub struct OpValidityFlags<N: HugrNode> {
     /// The set of valid children operation types.
     pub allowed_children: OpTag,
     /// Additional restrictions on the first child operation.
@@ -35,10 +41,10 @@ pub struct OpValidityFlags {
     /// A validation check for edges between children
     ///
     // Enclosed in an `Option` to avoid iterating over the edges if not needed.
-    pub edge_check: Option<fn(ChildrenEdgeData) -> Result<(), EdgeValidationError>>,
+    pub edge_check: Option<EdgeCheck<N>>,
 }
 
-impl Default for OpValidityFlags {
+impl<N: HugrNode> Default for OpValidityFlags<N> {
     fn default() -> Self {
         // Defaults to flags valid for non-container operations
         Self {
@@ -53,7 +59,7 @@ impl Default for OpValidityFlags {
 }
 
 impl ValidateOp for super::Module {
-    fn validity_flags(&self) -> OpValidityFlags {
+    fn validity_flags<N: HugrNode>(&self) -> OpValidityFlags<N> {
         OpValidityFlags {
             allowed_children: OpTag::ModuleOp,
             requires_children: false,
@@ -63,7 +69,7 @@ impl ValidateOp for super::Module {
 }
 
 impl ValidateOp for super::Conditional {
-    fn validity_flags(&self) -> OpValidityFlags {
+    fn validity_flags<N: HugrNode>(&self) -> OpValidityFlags<N> {
         OpValidityFlags {
             allowed_children: OpTag::Case,
             requires_children: true,
@@ -72,10 +78,10 @@ impl ValidateOp for super::Conditional {
         }
     }
 
-    fn validate_op_children<'a>(
+    fn validate_op_children<'a, N: HugrNode>(
         &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
+        children: impl DoubleEndedIterator<Item = (N, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError<N>> {
         let children = children.collect_vec();
         // The first input to the ɣ-node is a value of Sum type,
         // whose arity matches the number of children of the ɣ-node.
@@ -107,7 +113,7 @@ impl ValidateOp for super::Conditional {
 }
 
 impl ValidateOp for super::CFG {
-    fn validity_flags(&self) -> OpValidityFlags {
+    fn validity_flags<N: HugrNode>(&self) -> OpValidityFlags<N> {
         OpValidityFlags {
             allowed_children: OpTag::ControlFlowChild,
             allowed_first_child: OpTag::DataflowBlock,
@@ -119,10 +125,10 @@ impl ValidateOp for super::CFG {
         }
     }
 
-    fn validate_op_children<'a>(
+    fn validate_op_children<'a, N: HugrNode>(
         &self,
-        mut children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
+        mut children: impl Iterator<Item = (N, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError<N>> {
         let (entry, entry_op) = children.next().unwrap();
         let (exit, exit_op) = children.next().unwrap();
         let entry_op = entry_op
@@ -163,21 +169,21 @@ impl ValidateOp for super::CFG {
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum ChildrenValidationError {
+pub enum ChildrenValidationError<N: HugrNode> {
     /// An CFG graph has an exit operation as a non-second child.
     #[error("Exit basic blocks are only allowed as the second child in a CFG graph")]
-    InternalExitChildren { child: NodeIndex },
+    InternalExitChildren { child: N },
     /// An operation only allowed as the first/second child was found as an intermediate child.
     #[error("A {optype} operation is only allowed as a {expected_position} child")]
     InternalIOChildren {
-        child: NodeIndex,
+        child: N,
         optype: OpType,
         expected_position: &'static str,
     },
     /// The signature of the contained dataflow graph does not match the one of the container.
     #[error("The {node_desc} node of a {container_desc} has a signature of {actual}, which differs from the expected type row {expected}")]
     IOSignatureMismatch {
-        child: NodeIndex,
+        child: N,
         actual: TypeRow,
         expected: TypeRow,
         node_desc: &'static str,
@@ -185,20 +191,20 @@ pub enum ChildrenValidationError {
     },
     /// The signature of a child case in a conditional operation does not match the container's signature.
     #[error("A conditional case has optype {sig}, which differs from the signature of Conditional container", sig=optype.dataflow_signature().unwrap_or_default())]
-    ConditionalCaseSignature { child: NodeIndex, optype: OpType },
+    ConditionalCaseSignature { child: N, optype: OpType },
     /// The conditional container's branching value does not match the number of children.
     #[error("The conditional container's branch Sum input should be a sum with {expected_count} elements, but it had {} elements. Sum rows: {actual_sum_rows:?}",
         actual_sum_rows.len())]
     InvalidConditionalSum {
-        child: NodeIndex,
+        child: N,
         expected_count: usize,
         actual_sum_rows: Vec<TypeRow>,
     },
 }
 
-impl ChildrenValidationError {
+impl<N: HugrNode> ChildrenValidationError<N> {
     /// Returns the node index of the child that caused the error.
-    pub fn child(&self) -> NodeIndex {
+    pub fn child(&self) -> N {
         match self {
             ChildrenValidationError::InternalIOChildren { child, .. } => *child,
             ChildrenValidationError::InternalExitChildren { child, .. } => *child,
@@ -213,21 +219,21 @@ impl ChildrenValidationError {
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum EdgeValidationError {
+pub enum EdgeValidationError<N: HugrNode> {
     /// The dataflow signature of two connected basic blocks does not match.
     #[error("The dataflow signature of two connected basic blocks does not match. The source type was {source_ty} but the target had type {target_types}",
         source_ty = source_types.clone().unwrap_or_default(),
     )]
     CFGEdgeSignatureMismatch {
-        edge: ChildrenEdgeData,
+        edge: ChildrenEdgeData<N>,
         source_types: Option<TypeRow>,
         target_types: TypeRow,
     },
 }
 
-impl EdgeValidationError {
+impl<N: HugrNode> EdgeValidationError<N> {
     /// Returns information on the edge that caused the error.
-    pub fn edge(&self) -> &ChildrenEdgeData {
+    pub fn edge(&self) -> &ChildrenEdgeData<N> {
         match self {
             EdgeValidationError::CFGEdgeSignatureMismatch { edge, .. } => edge,
         }
@@ -236,24 +242,24 @@ impl EdgeValidationError {
 
 /// Auxiliary structure passed as data to [`OpValidityFlags::edge_check`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChildrenEdgeData {
+pub struct ChildrenEdgeData<N: HugrNode> {
     /// Source child.
-    pub source: NodeIndex,
+    pub source: N,
     /// Target child.
-    pub target: NodeIndex,
+    pub target: N,
     /// Operation type of the source child.
     pub source_op: OpType,
     /// Operation type of the target child.
     pub target_op: OpType,
     /// Source port.
-    pub source_port: PortOffset,
+    pub source_port: Port,
     /// Target port.
-    pub target_port: PortOffset,
+    pub target_port: Port,
 }
 
 impl<T: DataflowParent> ValidateOp for T {
     /// Returns the set of allowed parent operation types.
-    fn validity_flags(&self) -> OpValidityFlags {
+    fn validity_flags<N: HugrNode>(&self) -> OpValidityFlags<N> {
         OpValidityFlags {
             allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
@@ -265,10 +271,10 @@ impl<T: DataflowParent> ValidateOp for T {
     }
 
     /// Validate the ordered list of children.
-    fn validate_op_children<'a>(
+    fn validate_op_children<'a, N: HugrNode>(
         &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
+        children: impl DoubleEndedIterator<Item = (N, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError<N>> {
         let sig = self.inner_signature();
         validate_io_nodes(&sig.input, &sig.output, "DataflowParent", children)
     }
@@ -277,12 +283,12 @@ impl<T: DataflowParent> ValidateOp for T {
 /// Checks a that the list of children nodes does not contain Input and Output
 /// nodes outside of the first and second elements respectively, and that those
 /// have the correct signature.
-fn validate_io_nodes<'a>(
+fn validate_io_nodes<'a, N: HugrNode>(
     expected_input: &TypeRow,
     expected_output: &TypeRow,
     container_desc: &'static str,
-    mut children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
-) -> Result<(), ChildrenValidationError> {
+    mut children: impl Iterator<Item = (N, &'a OpType)>,
+) -> Result<(), ChildrenValidationError<N>> {
     // Check that the signature matches with the Input and Output rows.
     let (first, first_optype) = children.next().unwrap();
     let (second, second_optype) = children.next().unwrap();
@@ -333,7 +339,7 @@ fn validate_io_nodes<'a>(
 }
 
 /// Validate an edge between two basic blocks in a CFG sibling graph.
-fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
+fn validate_cfg_edge<N: HugrNode>(edge: ChildrenEdgeData<N>) -> Result<(), EdgeValidationError<N>> {
     let source = &edge
         .source_op
         .as_dataflow_block()
@@ -361,9 +367,10 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 #[cfg(test)]
 mod test {
     use crate::extension::prelude::{usize_t, Noop};
-    use crate::ops;
     use crate::ops::dataflow::IOTrait;
+    use crate::{ops, Node, NodeIndex as _};
     use cool_asserts::assert_matches;
+    use portgraph::NodeIndex;
 
     use super::*;
 
@@ -412,8 +419,10 @@ mod test {
 
     fn make_iter<'a>(
         children: &'a [(usize, &OpType)],
-    ) -> impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)> {
-        children.iter().map(|(n, op)| (NodeIndex::new(*n), *op))
+    ) -> impl DoubleEndedIterator<Item = (Node, &'a OpType)> {
+        children
+            .iter()
+            .map(|(n, op)| (NodeIndex::new(*n).into(), *op))
     }
 }
 
