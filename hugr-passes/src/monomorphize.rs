@@ -335,7 +335,8 @@ mod test {
     use hugr_core::extension::simple_op::MakeRegisteredOp as _;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections;
-    use hugr_core::std_extensions::collections::array::{array_type_parametric, ArrayOpDef};
+    use hugr_core::std_extensions::collections::array::ArrayKind;
+    use hugr_core::std_extensions::collections::value_array::{VArrayOpDef, ValueArray};
     use hugr_core::types::type_param::TypeParam;
     use itertools::Itertools;
 
@@ -480,23 +481,32 @@ mod test {
         let mut outer = FunctionBuilder::new(
             "mainish",
             Signature::new(
-                array_type_parametric(sa(n), array_type_parametric(sa(2), usize_t()).unwrap())
-                    .unwrap(),
+                ValueArray::ty_parametric(
+                    sa(n),
+                    ValueArray::ty_parametric(sa(2), usize_t()).unwrap(),
+                )
+                .unwrap(),
                 vec![usize_t(); 2],
             ),
         )
         .unwrap();
 
-        let arr2u = || array_type_parametric(sa(2), usize_t()).unwrap();
+        let arr2u = || ValueArray::ty_parametric(sa(2), usize_t()).unwrap();
         let pf1t = PolyFuncType::new(
             [TypeParam::max_nat()],
-            Signature::new(array_type_parametric(sv(0), arr2u()).unwrap(), usize_t()),
+            Signature::new(
+                ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
+                usize_t(),
+            ),
         );
         let mut pf1 = outer.define_function("pf1", pf1t).unwrap();
 
         let pf2t = PolyFuncType::new(
             [TypeParam::max_nat(), TypeBound::Copyable.into()],
-            Signature::new(vec![array_type_parametric(sv(0), tv(1)).unwrap()], tv(1)),
+            Signature::new(
+                vec![ValueArray::ty_parametric(sv(0), tv(1)).unwrap()],
+                tv(1),
+            ),
         );
         let mut pf2 = pf1.define_function("pf2", pf2t).unwrap();
 
@@ -510,10 +520,10 @@ mod test {
         let pf2 = {
             let [inw] = pf2.input_wires_arr();
             let [idx] = pf2.call(mono_func.handle(), &[], []).unwrap().outputs_arr();
-            let op_def = collections::array::EXTENSION.get_op("get").unwrap();
+            let op_def = collections::value_array::EXTENSION.get_op("get").unwrap();
             let op = hugr_core::ops::ExtensionOp::new(op_def.clone(), vec![sv(0), tv(1).into()])
                 .unwrap();
-            let [get] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
+            let [get, _] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
             let [got] = pf2
                 .build_unwrap_sum(1, SumType::new([vec![], vec![tv(1)]]), get)
                 .unwrap();
@@ -536,7 +546,7 @@ mod test {
             .call(pf1.handle(), &[sa(n)], outer.input_wires())
             .unwrap()
             .outputs_arr();
-        let popleft = ArrayOpDef::pop_left.to_concrete(arr2u(), n);
+        let popleft = VArrayOpDef::pop_left.to_concrete(arr2u(), n);
         let ar2 = outer
             .add_dataflow_op(popleft.clone(), outer.input_wires())
             .unwrap();

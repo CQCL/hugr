@@ -1,5 +1,6 @@
 //! Definitions of `ArrayOp` and `ArrayOpDef`.
 
+use std::marker::PhantomData;
 use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
@@ -12,25 +13,25 @@ use crate::extension::{
     ExtensionId, OpDef, SignatureError, SignatureFromArgs, SignatureFunc, TypeDef,
 };
 use crate::ops::{ExtensionOp, NamedOp, OpName};
-use crate::std_extensions::collections::array::instantiate_array;
 use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
+use crate::utils::Never;
 use crate::Extension;
 
-use super::{array_type, array_type_def, ARRAY_TYPENAME};
+use super::array_kind::ArrayKind;
 
-/// Array operation definitions.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
+/// Array operation definitions. Generic over the conrete array implementation.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, IntoStaticStr, EnumIter, EnumString)]
 #[allow(non_camel_case_types)]
 #[non_exhaustive]
-pub enum ArrayOpDef {
+pub enum GenericArrayOpDef<AK: ArrayKind> {
     /// Makes a new array, given distinct inputs equal to its length:
     /// `new_array<SIZE><elemty>: (elemty)^SIZE -> array<SIZE, elemty>`
     /// where `SIZE` must be statically known (not a variable)
     new_array,
     /// Copies an element out of the array ([TypeBound::Copyable] elements only):
-    /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>`
+    /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>, array`
     get,
     /// Exchanges an element of the array with an external value:
     /// `set<size, elemty>: array<size, elemty>, index, elemty -> either(elemty, array | elemty, array)`
@@ -53,26 +54,30 @@ pub enum ArrayOpDef {
     /// Allows discarding a 0-element array of linear type.
     /// `discard_empty<elemty>: array<0, elemty> -> ` (no outputs)
     discard_empty,
+    /// Not an actual operation definition, but an unhabitable variant that
+    /// references `AK` to ensure that the type parameter is used.
+    #[strum(disabled)]
+    _phantom(PhantomData<AK>, Never),
 }
 
 /// Static parameters for array operations. Includes array size. Type is part of the type scheme.
 const STATIC_SIZE_PARAM: &[TypeParam; 1] = &[TypeParam::max_nat()];
 
-impl SignatureFromArgs for ArrayOpDef {
+impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
     fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
         let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
-        let array_ty = array_type(n, elem_ty_var.clone());
+        let array_ty = AK::ty(n, elem_ty_var.clone());
         let params = vec![TypeBound::Any.into()];
         let poly_func_ty = match self {
-            ArrayOpDef::new_array => PolyFuncTypeRV::new(
+            GenericArrayOpDef::new_array => PolyFuncTypeRV::new(
                 params,
                 FuncValueType::new(vec![elem_ty_var.clone(); n as usize], array_ty),
             ),
-            ArrayOpDef::pop_left | ArrayOpDef::pop_right => {
-                let popped_array_ty = array_type(n - 1, elem_ty_var.clone());
+            GenericArrayOpDef::pop_left | GenericArrayOpDef::pop_right => {
+                let popped_array_ty = AK::ty(n - 1, elem_ty_var.clone());
                 PolyFuncTypeRV::new(
                     params,
                     FuncValueType::new(
@@ -81,6 +86,7 @@ impl SignatureFromArgs for ArrayOpDef {
                     ),
                 )
             }
+            GenericArrayOpDef::_phantom(_, never) => match *never {},
             _ => unreachable!(
                 "Operation {} should not need custom computation.",
                 self.name()
@@ -94,16 +100,16 @@ impl SignatureFromArgs for ArrayOpDef {
     }
 }
 
-impl ArrayOpDef {
+impl<AK: ArrayKind> GenericArrayOpDef<AK> {
     /// Instantiate a new array operation with the given element type and array size.
-    pub fn to_concrete(self, elem_ty: Type, size: u64) -> ArrayOp {
-        if self == ArrayOpDef::discard_empty {
+    pub fn to_concrete(self, elem_ty: Type, size: u64) -> GenericArrayOp<AK> {
+        if self == GenericArrayOpDef::discard_empty {
             debug_assert_eq!(
                 size, 0,
                 "discard_empty should only be called on empty arrays"
             );
         }
-        ArrayOp {
+        GenericArrayOp {
             def: self,
             elem_ty,
             size,
@@ -116,7 +122,7 @@ impl ArrayOpDef {
         array_def: &TypeDef,
         _extension_ref: &Weak<Extension>,
     ) -> SignatureFunc {
-        use ArrayOpDef::*;
+        use GenericArrayOpDef::*;
         if let new_array | pop_left | pop_right = self {
             // implements SignatureFromArgs
             // signature computed dynamically, so can rely on type definition in extension.
@@ -124,7 +130,7 @@ impl ArrayOpDef {
         } else {
             let size_var = TypeArg::new_var_use(0, TypeParam::max_nat());
             let elem_ty_var = Type::new_var_use(1, TypeBound::Any);
-            let array_ty = instantiate_array(array_def, size_var.clone(), elem_ty_var.clone())
+            let array_ty = AK::instantiate_ty(array_def, size_var.clone(), elem_ty_var.clone())
                 .expect("Array type instantiation failed");
             let standard_params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
 
@@ -137,12 +143,15 @@ impl ArrayOpDef {
                     let params = vec![TypeParam::max_nat(), TypeBound::Copyable.into()];
                     let copy_elem_ty = Type::new_var_use(1, TypeBound::Copyable);
                     let copy_array_ty =
-                        instantiate_array(array_def, size_var, copy_elem_ty.clone())
+                        AK::instantiate_ty(array_def, size_var, copy_elem_ty.clone())
                             .expect("Array type instantiation failed");
                     let option_type: Type = option_type(copy_elem_ty).into();
                     PolyFuncTypeRV::new(
                         params,
-                        FuncValueType::new(vec![copy_array_ty, usize_t], option_type),
+                        FuncValueType::new(
+                            vec![copy_array_ty.clone(), usize_t],
+                            vec![option_type, copy_array_ty],
+                        ),
                     )
                 }
                 set => {
@@ -166,11 +175,12 @@ impl ArrayOpDef {
                 discard_empty => PolyFuncTypeRV::new(
                     vec![TypeBound::Any.into()],
                     FuncValueType::new(
-                        instantiate_array(array_def, 0, Type::new_var_use(0, TypeBound::Any))
+                        AK::instantiate_ty(array_def, 0, Type::new_var_use(0, TypeBound::Any))
                             .expect("Array type instantiation failed"),
                         type_row![],
                     ),
                 ),
+                _phantom(_, never) => match *never {},
                 new_array | pop_left | pop_right => unreachable!(),
             }
             .into()
@@ -178,7 +188,7 @@ impl ArrayOpDef {
     }
 }
 
-impl MakeOpDef for ArrayOpDef {
+impl<AK: ArrayKind> MakeOpDef for GenericArrayOpDef<AK> {
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -187,26 +197,27 @@ impl MakeOpDef for ArrayOpDef {
     }
 
     fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
-        self.signature_from_def(array_type_def(), extension_ref)
+        self.signature_from_def(AK::type_def(), extension_ref)
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&super::EXTENSION)
+        Arc::downgrade(AK::extension())
     }
 
     fn extension(&self) -> ExtensionId {
-        super::EXTENSION_ID
+        AK::EXTENSION_ID
     }
 
     fn description(&self) -> String {
         match self {
-            ArrayOpDef::new_array => "Create a new array from elements",
-            ArrayOpDef::get => "Get an element from an array",
-            ArrayOpDef::set => "Set an element in an array",
-            ArrayOpDef::swap => "Swap two elements in an array",
-            ArrayOpDef::pop_left => "Pop an element from the left of an array",
-            ArrayOpDef::pop_right => "Pop an element from the right of an array",
-            ArrayOpDef::discard_empty => "Discard an empty array",
+            GenericArrayOpDef::new_array => "Create a new array from elements",
+            GenericArrayOpDef::get => "Get an element from an array",
+            GenericArrayOpDef::set => "Set an element in an array",
+            GenericArrayOpDef::swap => "Swap two elements in an array",
+            GenericArrayOpDef::pop_left => "Pop an element from the left of an array",
+            GenericArrayOpDef::pop_right => "Pop an element from the right of an array",
+            GenericArrayOpDef::discard_empty => "Discard an empty array",
+            GenericArrayOpDef::_phantom(_, never) => match *never {},
         }
         .into()
     }
@@ -222,7 +233,7 @@ impl MakeOpDef for ArrayOpDef {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig =
-            self.signature_from_def(extension.get_type(&ARRAY_TYPENAME).unwrap(), extension_ref);
+            self.signature_from_def(extension.get_type(&AK::TYPE_NAME).unwrap(), extension_ref);
         let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
@@ -232,33 +243,33 @@ impl MakeOpDef for ArrayOpDef {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-/// Concrete array operation.
-pub struct ArrayOp {
+/// Concrete array operation. Generic over the actual array implemenation.
+pub struct GenericArrayOp<AK: ArrayKind> {
     /// The operation definition.
-    pub def: ArrayOpDef,
+    pub def: GenericArrayOpDef<AK>,
     /// The element type of the array.
     pub elem_ty: Type,
     /// The size of the array.
     pub size: u64,
 }
 
-impl NamedOp for ArrayOp {
+impl<AK: ArrayKind> NamedOp for GenericArrayOp<AK> {
     fn name(&self) -> OpName {
         self.def.name()
     }
 }
 
-impl MakeExtensionOp for ArrayOp {
+impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
-        let def = ArrayOpDef::from_def(ext_op.def())?;
+        let def = GenericArrayOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        use ArrayOpDef::*;
+        use GenericArrayOpDef::*;
         let ty_arg = TypeArg::Type {
             ty: self.elem_ty.clone(),
         };
@@ -273,30 +284,31 @@ impl MakeExtensionOp for ArrayOp {
             new_array | pop_left | pop_right | get | set | swap => {
                 vec![TypeArg::BoundedNat { n: self.size }, ty_arg]
             }
+            _phantom(_, never) => match never {},
         }
     }
 }
 
-impl MakeRegisteredOp for ArrayOp {
+impl<AK: ArrayKind> MakeRegisteredOp for GenericArrayOp<AK> {
     fn extension_id(&self) -> ExtensionId {
-        super::EXTENSION_ID
+        AK::EXTENSION_ID
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&super::EXTENSION)
+        Arc::downgrade(AK::extension())
     }
 }
 
-impl HasDef for ArrayOp {
-    type Def = ArrayOpDef;
+impl<AK: ArrayKind> HasDef for GenericArrayOp<AK> {
+    type Def = GenericArrayOpDef<AK>;
 }
 
-impl HasConcrete for ArrayOpDef {
-    type Concrete = ArrayOp;
+impl<AK: ArrayKind> HasConcrete for GenericArrayOpDef<AK> {
+    type Concrete = GenericArrayOp<AK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         let (ty, size) = match (self, type_args) {
-            (ArrayOpDef::discard_empty, [TypeArg::Type { ty }]) => (ty.clone(), 0),
+            (GenericArrayOpDef::discard_empty, [TypeArg::Type { ty }]) => (ty.clone(), 0),
             (_, [TypeArg::BoundedNat { n }, TypeArg::Type { ty }]) => (ty.clone(), *n),
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
@@ -307,11 +319,13 @@ impl HasConcrete for ArrayOpDef {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use strum::IntoEnumIterator;
 
     use crate::extension::prelude::usize_t;
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    use crate::std_extensions::collections::array::new_array_op;
+    use crate::std_extensions::collections::array::Array;
+    use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::{bool_t, qb_t},
@@ -320,46 +334,51 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_array_ops() {
-        for def in ArrayOpDef::iter() {
-            let ty = if def == ArrayOpDef::get {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_array_ops<AK: ArrayKind>(#[case] _kind: AK) {
+        for def in GenericArrayOpDef::<AK>::iter() {
+            let ty = if def == GenericArrayOpDef::get {
                 bool_t()
             } else {
                 qb_t()
             };
-            let size = if def == ArrayOpDef::discard_empty {
+            let size = if def == GenericArrayOpDef::discard_empty {
                 0
             } else {
                 2
             };
             let op = def.to_concrete(ty, size);
             let optype: OpType = op.clone().into();
-            let new_op: ArrayOp = optype.cast().unwrap();
+            let new_op: GenericArrayOp<AK> = optype.cast().unwrap();
             assert_eq!(new_op, op);
         }
     }
 
-    #[test]
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
     /// Test building a HUGR involving a new_array operation.
-    fn test_new_array() {
-        let mut b =
-            DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], array_type(2, qb_t()))).unwrap();
+    fn test_new_array<AK: ArrayKind>(#[case] _kind: AK) {
+        let mut b = DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], AK::ty(2, qb_t()))).unwrap();
 
         let [q1, q2] = b.input_wires_arr();
 
-        let op = new_array_op(qb_t(), 2);
+        let op = GenericArrayOpDef::<AK>::new_array.to_concrete(qb_t(), 2);
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
         b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }
 
-    #[test]
-    fn test_get() {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_get<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
-        let op = ArrayOpDef::get.to_concrete(element_ty.clone(), size);
+        let op = GenericArrayOpDef::<AK>::get.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
 
@@ -368,22 +387,28 @@ mod tests {
         assert_eq!(
             sig.io(),
             (
-                &vec![array_type(size, element_ty.clone()), usize_t()].into(),
-                &vec![option_type(element_ty.clone()).into()].into()
+                &vec![AK::ty(size, element_ty.clone()), usize_t()].into(),
+                &vec![
+                    option_type(element_ty.clone()).into(),
+                    AK::ty(size, element_ty.clone())
+                ]
+                .into()
             )
         );
     }
 
-    #[test]
-    fn test_set() {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_set<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
-        let op = ArrayOpDef::set.to_concrete(element_ty.clone(), size);
+        let op = GenericArrayOpDef::<AK>::set.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
 
         let sig = optype.dataflow_signature().unwrap();
-        let array_ty = array_type(size, element_ty.clone());
+        let array_ty = AK::ty(size, element_ty.clone());
         let result_row = vec![element_ty.clone(), array_ty.clone()];
         assert_eq!(
             sig.io(),
@@ -394,16 +419,18 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_swap() {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_swap<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
-        let op = ArrayOpDef::swap.to_concrete(element_ty.clone(), size);
+        let op = GenericArrayOpDef::<AK>::swap.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
 
         let sig = optype.dataflow_signature().unwrap();
-        let array_ty = array_type(size, element_ty.clone());
+        let array_ty = AK::ty(size, element_ty.clone());
         assert_eq!(
             sig.io(),
             (
@@ -413,11 +440,18 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_pops() {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_pops<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
-        for op in [ArrayOpDef::pop_left, ArrayOpDef::pop_right].iter() {
+        for op in [
+            GenericArrayOpDef::<AK>::pop_left,
+            GenericArrayOpDef::<AK>::pop_right,
+        ]
+        .iter()
+        {
             let op = op.to_concrete(element_ty.clone(), size);
 
             let optype: OpType = op.into();
@@ -426,10 +460,10 @@ mod tests {
             assert_eq!(
                 sig.io(),
                 (
-                    &vec![array_type(size, element_ty.clone())].into(),
+                    &vec![AK::ty(size, element_ty.clone())].into(),
                     &vec![option_type(vec![
                         element_ty.clone(),
-                        array_type(size - 1, element_ty.clone())
+                        AK::ty(size - 1, element_ty.clone())
                     ])
                     .into()]
                     .into()
@@ -438,11 +472,13 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_discard_empty() {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_discard_empty<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 0;
         let element_ty = bool_t();
-        let op = ArrayOpDef::discard_empty.to_concrete(element_ty.clone(), size);
+        let op = GenericArrayOpDef::<AK>::discard_empty.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
 
@@ -450,19 +486,18 @@ mod tests {
 
         assert_eq!(
             sig.io(),
-            (
-                &vec![array_type(size, element_ty.clone())].into(),
-                &type_row![]
-            )
+            (&vec![AK::ty(size, element_ty.clone())].into(), &type_row![])
         );
     }
 
-    #[test]
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
     /// Initialize an array operation where the element type is not from the prelude.
-    fn test_non_prelude_op() {
+    fn test_non_prelude_op<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = float64_type();
-        let op = ArrayOpDef::get.to_concrete(element_ty.clone(), size);
+        let op = GenericArrayOpDef::<AK>::get.to_concrete(element_ty.clone(), size);
 
         let optype: OpType = op.into();
 
@@ -471,8 +506,12 @@ mod tests {
         assert_eq!(
             sig.io(),
             (
-                &vec![array_type(size, element_ty.clone()), usize_t()].into(),
-                &vec![option_type(element_ty.clone()).into()].into()
+                &vec![AK::ty(size, element_ty.clone()), usize_t()].into(),
+                &vec![
+                    option_type(element_ty.clone()).into(),
+                    AK::ty(size, element_ty.clone())
+                ]
+                .into()
             )
         );
     }

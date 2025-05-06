@@ -9,6 +9,7 @@ use std::sync::Arc;
 use handlers::list_const;
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
+use hugr_core::std_extensions::collections::value_array::value_array_type_def;
 use thiserror::Error;
 
 use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
@@ -214,6 +215,7 @@ impl Default for ReplaceTypes {
         let mut res = Self::new_empty();
         res.linearize = DelegatingLinearizer::default();
         res.replace_consts_parametrized(array_type_def(), handlers::array_const);
+        res.replace_consts_parametrized(value_array_type_def(), handlers::value_array_const);
         res.replace_consts_parametrized(list_type_def(), list_const);
         res
     }
@@ -590,6 +592,7 @@ impl From<&OpDef> for ParametricOp {
 mod test {
     use std::sync::Arc;
 
+    use crate::replace_types::handlers::generic_array_const;
     use hugr_core::builder::{
         inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
@@ -600,14 +603,20 @@ mod test {
     use hugr_core::extension::{simple_op::MakeExtensionOp, TypeDefBound, Version};
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::{IdentList, ValidationError};
+    use hugr_core::ops::constant::CustomConst;
     use hugr_core::ops::constant::OpaqueValue;
     use hugr_core::ops::{ExtensionOp, NamedOp, OpTrait, OpType, Tag, Value};
-    use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
-    use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-    use hugr_core::std_extensions::collections::{
-        array::{array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue},
-        list::{list_type, list_type_def, ListOp, ListValue},
+    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+    use hugr_core::std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES};
+    use hugr_core::std_extensions::collections::array::Array;
+    use hugr_core::std_extensions::collections::array::{ArrayKind, GenericArrayValue};
+    use hugr_core::std_extensions::collections::list::{
+        list_type, list_type_def, ListOp, ListValue,
     };
+    use hugr_core::std_extensions::collections::value_array::{
+        value_array_type, VArrayOp, VArrayOpDef, VArrayValue, ValueArray,
+    };
+
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
     use hugr_core::{type_row, Extension, HugrView};
     use itertools::Itertools;
@@ -680,7 +689,7 @@ mod test {
         new: impl Fn(Signature) -> Result<T, BuildError>,
     ) -> T {
         let mut dfb = new(Signature::new(
-            vec![array_type(64, elem_ty.clone()), i64_t()],
+            vec![value_array_type(64, elem_ty.clone()), i64_t()],
             elem_ty.clone(),
         ))
         .unwrap();
@@ -689,8 +698,11 @@ mod test {
             .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
             .unwrap()
             .outputs_arr();
-        let [opt] = dfb
-            .add_dataflow_op(ArrayOpDef::get.to_concrete(elem_ty.clone(), 64), [val, idx])
+        let [opt, _] = dfb
+            .add_dataflow_op(
+                VArrayOpDef::get.to_concrete(elem_ty.clone(), 64),
+                [val, idx],
+            )
             .unwrap()
             .outputs_arr();
         let [res] = dfb
@@ -706,7 +718,7 @@ mod test {
         lw.replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.replace_parametrized_type(
             pv,
-            Box::new(|args: &[TypeArg]| Some(array_type(64, just_elem_type(args).clone()))),
+            Box::new(|args: &[TypeArg]| Some(value_array_type(64, just_elem_type(args).clone()))),
         );
         lw.replace_op(
             &read_op(ext, bool_t()),
@@ -835,10 +847,10 @@ mod test {
         // The PackedVec<PackedVec<bool>> becomes an array<i64>
         let [array_get] = ext_ops
             .into_iter()
-            .filter_map(|e| ArrayOp::from_extension_op(e).ok())
+            .filter_map(|e| VArrayOp::from_extension_op(e).ok())
             .collect_array()
             .unwrap();
-        assert_eq!(array_get, ArrayOpDef::get.to_concrete(i64_t(), 64));
+        assert_eq!(array_get, VArrayOpDef::get.to_concrete(i64_t(), 64));
     }
 
     #[test]
@@ -868,7 +880,7 @@ mod test {
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
         lowerer.replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
-            (![usize_t(), i64_t()].contains(ty)).then_some(array_type(10, ty.clone()))
+            (![usize_t(), i64_t()].contains(ty)).then_some(value_array_type(10, ty.clone()))
         });
         {
             let mut h = backup.clone();
@@ -876,7 +888,7 @@ mod test {
             let sig = h.signature(h.root()).unwrap();
             assert_eq!(
                 sig.input(),
-                &TypeRow::from(vec![list_type(usize_t()), array_type(10, bool_t())])
+                &TypeRow::from(vec![list_type(usize_t()), value_array_type(10, bool_t())])
             );
             assert_eq!(sig.input(), sig.output());
         }
@@ -898,7 +910,7 @@ mod test {
             let sig = h.signature(h.root()).unwrap();
             assert_eq!(
                 sig.input(),
-                &TypeRow::from(vec![list_type(i64_t()), array_type(10, bool_t())])
+                &TypeRow::from(vec![list_type(i64_t()), value_array_type(10, bool_t())])
             );
             assert_eq!(sig.input(), sig.output());
             // This will have to update inside the Const
@@ -915,7 +927,7 @@ mod test {
         let mut h = backup;
         lowerer.replace_parametrized_type(
             list_type_def(),
-            Box::new(|args: &[TypeArg]| Some(array_type(4, just_elem_type(args).clone()))),
+            Box::new(|args: &[TypeArg]| Some(value_array_type(4, just_elem_type(args).clone()))),
         );
         lowerer.replace_consts_parametrized(list_type_def(), |opaq, repl| {
             // First recursively transform the contents
@@ -925,7 +937,7 @@ mod test {
             let lv = opaq.value().downcast_ref::<ListValue>().unwrap();
 
             Ok(Some(
-                ArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into(),
+                VArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into(),
             ))
         });
         lowerer.run(&mut h).unwrap();
@@ -934,7 +946,10 @@ mod test {
             h.get_optype(pred.node())
                 .as_load_constant()
                 .map(|lc| lc.constant_type()),
-            Some(&Type::new_sum(vec![Type::from(array_type(4, i64_t())); 2]))
+            Some(&Type::new_sum(vec![
+                Type::from(value_array_type(4, i64_t()));
+                2
+            ]))
         );
     }
 
@@ -1023,17 +1038,19 @@ mod test {
     }
 
     #[rstest]
-    #[case(&[])]
-    #[case(&[3])]
-    #[case(&[5,7,11,13,17,19])]
-    fn array_const(#[case] vals: &[u64]) {
-        use super::handlers::array_const;
-        let mut dfb = DFGBuilder::new(inout_sig(
-            type_row![],
-            array_type(vals.len() as _, usize_t()),
-        ))
-        .unwrap();
-        let c = dfb.add_load_value(ArrayValue::new(
+    #[case(&[], Array)]
+    #[case(&[], ValueArray)]
+    #[case(&[3], Array)]
+    #[case(&[3], ValueArray)]
+    #[case(&[5,7,11,13,17,19], Array)]
+    #[case(&[5,7,11,13,17,19], ValueArray)]
+    fn array_const<AK: ArrayKind>(#[case] vals: &[u64], #[case] _kind: AK)
+    where
+        GenericArrayValue<AK>: CustomConst,
+    {
+        let mut dfb =
+            DFGBuilder::new(inout_sig(type_row![], AK::ty(vals.len() as _, usize_t()))).unwrap();
+        let c = dfb.add_load_value(GenericArrayValue::<AK>::new(
             usize_t(),
             vals.iter().map(|u| ConstUsize::new(*u).into()),
         ));
@@ -1053,7 +1070,7 @@ mod test {
             matches!(h.validate(), Err(ValidationError::IncompatiblePorts {from, to, ..})
              if backup.get_optype(from).is_const() && to == c.node())
         );
-        repl.replace_consts_parametrized(array_type_def(), array_const);
+        repl.replace_consts_parametrized(AK::type_def(), generic_array_const::<AK>);
         let mut h = backup;
         repl.run(&mut h).unwrap();
         h.validate().unwrap();

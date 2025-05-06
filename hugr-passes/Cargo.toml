@@ -25,6 +25,7 @@ lazy_static = { workspace = true }
 paste = { workspace = true }
 thiserror = { workspace = true }
 petgraph = { workspace = true }
+strum = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
