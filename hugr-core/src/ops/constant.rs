@@ -585,6 +585,7 @@ pub(crate) mod test {
     use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::std_extensions::collections::array::{array_type, ArrayValue};
+    use crate::std_extensions::collections::value_array::{value_array_type, VArrayValue};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -755,11 +756,24 @@ pub(crate) mod test {
     }
 
     #[fixture]
+    fn const_value_array_bool() -> Value {
+        VArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
+    }
+
+    #[fixture]
     fn const_array_options() -> Value {
         let some_true = Value::some([Value::true_val()]);
         let none = Value::none(vec![bool_t()]);
         let elem_ty = SumType::new_option(vec![bool_t()]);
         ArrayValue::new(elem_ty.into(), [some_true, none]).into()
+    }
+
+    #[fixture]
+    fn const_value_array_options() -> Value {
+        let some_true = Value::some([Value::true_val()]);
+        let none = Value::none(vec![bool_t()]);
+        let elem_ty = SumType::new_option(vec![bool_t()]);
+        VArrayValue::new(elem_ty.into(), [some_true, none]).into()
     }
 
     #[rstest]
@@ -769,9 +783,19 @@ pub(crate) mod test {
     #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
+        const_value_array_bool(),
+        value_array_type(2, bool_t()),
+        "const:custom:value_array"
+    )]
+    #[case(
         const_array_options(),
         array_type(2, SumType::new_option(vec![bool_t()]).into()),
         "const:custom:array"
+    )]
+    #[case(
+        const_value_array_options(),
+        value_array_type(2, SumType::new_option(vec![bool_t()]).into()),
+        "const:custom:value_array"
     )]
     fn const_type(
         #[case] const_value: Value,
@@ -792,7 +816,9 @@ pub(crate) mod test {
     #[case(const_serialized_usize(), const_usize())]
     #[case(const_tuple_serialized(), const_tuple())]
     #[case(const_array_bool(), const_array_bool())]
+    #[case(const_value_array_bool(), const_value_array_bool())]
     #[case(const_array_options(), const_array_options())]
+    #[case(const_value_array_options(), const_value_array_options())]
     // Opaque constants don't get resolved into concrete types when running miri,
     // as the `typetag` machinery is not available.
     #[cfg_attr(miri, ignore)]

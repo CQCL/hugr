@@ -1212,6 +1212,7 @@ dependencies = [
  "proptest",
  "proptest-recurse",
  "rstest",
+ "strum",
  "thiserror 2.0.12",
 ]
 

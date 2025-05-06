@@ -1,4 +1,4 @@
-//! Definition of the array repeat operation.
+//! Definition of the array discard operation.
 
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -10,63 +10,62 @@ use crate::extension::simple_op::{
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
-use crate::Extension;
+use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
+use crate::{type_row, Extension};
 
 use super::array_kind::ArrayKind;
 
-/// Name of the operation to repeat a value multiple times
-pub const ARRAY_REPEAT_OP_ID: OpName = OpName::new_inline("repeat");
+/// Name of the operation to discard an array
+pub const ARRAY_DISCARD_OP_ID: OpName = OpName::new_inline("discard");
 
-/// Definition of the array repeat op. Generic over the concrete array implementation.
+/// Definition of the array discard op. Generic over the concrete array implementation.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct GenericArrayRepeatDef<AK: ArrayKind>(PhantomData<AK>);
+pub struct GenericArrayDiscardDef<AK: ArrayKind>(PhantomData<AK>);
 
-impl<AK: ArrayKind> GenericArrayRepeatDef<AK> {
-    /// Creates a new array repeat operation definition.
+impl<AK: ArrayKind> GenericArrayDiscardDef<AK> {
+    /// Creates a new array discard operation definition.
     pub fn new() -> Self {
-        GenericArrayRepeatDef(PhantomData)
+        GenericArrayDiscardDef(PhantomData)
     }
 }
 
-impl<AK: ArrayKind> Default for GenericArrayRepeatDef<AK> {
+impl<AK: ArrayKind> Default for GenericArrayDiscardDef<AK> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayRepeatDef<AK> {
+impl<AK: ArrayKind> NamedOp for GenericArrayDiscardDef<AK> {
     fn name(&self) -> OpName {
-        ARRAY_REPEAT_OP_ID
+        ARRAY_DISCARD_OP_ID
     }
 }
 
-impl<AK: ArrayKind> FromStr for GenericArrayRepeatDef<AK> {
+impl<AK: ArrayKind> FromStr for GenericArrayDiscardDef<AK> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == ARRAY_REPEAT_OP_ID {
-            Ok(GenericArrayRepeatDef::new())
+        if s == ARRAY_DISCARD_OP_ID {
+            Ok(GenericArrayDiscardDef::new())
         } else {
             Err(())
         }
     }
 }
 
-impl<AK: ArrayKind> GenericArrayRepeatDef<AK> {
+impl<AK: ArrayKind> GenericArrayDiscardDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
-        let n = TypeArg::new_var_use(0, TypeParam::max_nat());
-        let t = Type::new_var_use(1, TypeBound::Any);
-        let func = Type::new_function(Signature::new(vec![], vec![t.clone()]));
-        let array_ty =
-            AK::instantiate_ty(array_def, n, t).expect("Array type instantiation failed");
-        PolyFuncTypeRV::new(params, FuncValueType::new(vec![func], array_ty)).into()
+        let params = vec![TypeParam::max_nat(), TypeBound::Copyable.into()];
+        let size = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let element_ty = Type::new_var_use(1, TypeBound::Copyable);
+        let array_ty = AK::instantiate_ty(array_def, size, element_ty)
+            .expect("Array type instantiation failed");
+        PolyFuncTypeRV::new(params, FuncValueType::new(array_ty, type_row![])).into()
     }
 }
 
-impl<AK: ArrayKind> MakeOpDef for GenericArrayRepeatDef<AK> {
+impl<AK: ArrayKind> MakeOpDef for GenericArrayDiscardDef<AK> {
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -87,9 +86,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayRepeatDef<AK> {
     }
 
     fn description(&self) -> String {
-        "Creates a new array whose elements are initialised by calling \
-        the given function n times"
-            .into()
+        "Discards an array with copyable elements".into()
     }
 
     /// Add an operation implemented as a [MakeOpDef], which can provide the data
@@ -104,46 +101,44 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayRepeatDef<AK> {
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(&AK::TYPE_NAME).unwrap());
         let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
-
         self.post_opdef(def);
-
         Ok(())
     }
 }
 
-/// Definition of the array repeat op. Generic over the concrete array implementation.
+/// Definition of the array discard op. Generic over the concrete array implementation.
 #[derive(Clone, Debug, PartialEq)]
-pub struct GenericArrayRepeat<AK: ArrayKind> {
-    /// The element type of the resulting array.
+pub struct GenericArrayDiscard<AK: ArrayKind> {
+    /// The element type of the array.
     pub elem_ty: Type,
     /// Size of the array.
     pub size: u64,
     _kind: PhantomData<AK>,
 }
 
-impl<AK: ArrayKind> GenericArrayRepeat<AK> {
-    /// Creates a new array repeat op.
-    pub fn new(elem_ty: Type, size: u64) -> Self {
-        GenericArrayRepeat {
+impl<AK: ArrayKind> GenericArrayDiscard<AK> {
+    /// Creates a new array discard op.
+    pub fn new(elem_ty: Type, size: u64) -> Option<Self> {
+        elem_ty.copyable().then_some(GenericArrayDiscard {
             elem_ty,
             size,
             _kind: PhantomData,
-        }
+        })
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayRepeat<AK> {
+impl<AK: ArrayKind> NamedOp for GenericArrayDiscard<AK> {
     fn name(&self) -> OpName {
-        ARRAY_REPEAT_OP_ID
+        ARRAY_DISCARD_OP_ID
     }
 }
 
-impl<AK: ArrayKind> MakeExtensionOp for GenericArrayRepeat<AK> {
+impl<AK: ArrayKind> MakeExtensionOp for GenericArrayDiscard<AK> {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
-        let def = GenericArrayRepeatDef::<AK>::from_def(ext_op.def())?;
+        let def = GenericArrayDiscardDef::<AK>::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
     }
 
@@ -155,7 +150,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayRepeat<AK> {
     }
 }
 
-impl<AK: ArrayKind> MakeRegisteredOp for GenericArrayRepeat<AK> {
+impl<AK: ArrayKind> MakeRegisteredOp for GenericArrayDiscard<AK> {
     fn extension_id(&self) -> ExtensionId {
         AK::EXTENSION_ID
     }
@@ -165,17 +160,17 @@ impl<AK: ArrayKind> MakeRegisteredOp for GenericArrayRepeat<AK> {
     }
 }
 
-impl<AK: ArrayKind> HasDef for GenericArrayRepeat<AK> {
-    type Def = GenericArrayRepeatDef<AK>;
+impl<AK: ArrayKind> HasDef for GenericArrayDiscard<AK> {
+    type Def = GenericArrayDiscardDef<AK>;
 }
 
-impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
-    type Concrete = GenericArrayRepeat<AK>;
+impl<AK: ArrayKind> HasConcrete for GenericArrayDiscardDef<AK> {
+    type Concrete = GenericArrayDiscard<AK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] => {
-                Ok(GenericArrayRepeat::new(ty.clone(), *n))
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] if ty.copyable() => {
+                Ok(GenericArrayDiscard::new(ty.clone(), *n).unwrap())
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
@@ -186,43 +181,39 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
 mod tests {
     use rstest::rstest;
 
+    use crate::extension::prelude::bool_t;
     use crate::std_extensions::collections::array::Array;
-    use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         extension::prelude::qb_t,
         ops::{OpTrait, OpType},
-        types::Signature,
     };
 
     use super::*;
 
     #[rstest]
     #[case(Array)]
-    #[case(ValueArray)]
-    fn test_repeat_def<AK: ArrayKind>(#[case] _kind: AK) {
-        let op = GenericArrayRepeat::<AK>::new(qb_t(), 2);
+    fn test_discard_def<AK: ArrayKind>(#[case] _kind: AK) {
+        let op = GenericArrayDiscard::<AK>::new(bool_t(), 2).unwrap();
         let optype: OpType = op.clone().into();
-        let new_op: GenericArrayRepeat<AK> = optype.cast().unwrap();
+        let new_op: GenericArrayDiscard<AK> = optype.cast().unwrap();
         assert_eq!(new_op, op);
+
+        assert_eq!(GenericArrayDiscard::<AK>::new(qb_t(), 2), None);
     }
 
     #[rstest]
     #[case(Array)]
-    #[case(ValueArray)]
-    fn test_repeat<AK: ArrayKind>(#[case] _kind: AK) {
+    fn test_discard<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
-        let element_ty = qb_t();
-        let op = GenericArrayRepeat::<AK>::new(element_ty.clone(), size);
-
+        let element_ty = bool_t();
+        let op = GenericArrayDiscard::<AK>::new(element_ty.clone(), size).unwrap();
         let optype: OpType = op.into();
-
         let sig = optype.dataflow_signature().unwrap();
-
         assert_eq!(
             sig.io(),
             (
-                &vec![Type::new_function(Signature::new(vec![], vec![qb_t()]))].into(),
                 &vec![AK::ty(size, element_ty.clone())].into(),
+                &vec![].into(),
             )
         );
     }
