@@ -1131,7 +1131,7 @@ pub(in crate::hugr::patch) mod test {
 
         // 1. Locate the CX in h
         let h_node_cx: Node = h
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
         let s = vec![h_node_cx];
@@ -1139,7 +1139,7 @@ pub(in crate::hugr::patch) mod test {
         let n: Hugr = dfg_hugr2;
         // 3. Construct the input and output matchings
         // 3.1. Locate the Output and its predecessor H in n
-        let [_n_node_input, n_node_output] = n.get_io(n.root()).unwrap();
+        let [_n_node_input, n_node_output] = n.get_io(n.entrypoint()).unwrap();
         let n_node_h = n.input_neighbours(n_node_output).nth(1).unwrap();
         // 3.2. Locate the ports we need to specify as "glue" in n
         let (n_port_0, n_port_1) = n
@@ -1176,7 +1176,7 @@ pub(in crate::hugr::patch) mod test {
 
     #[rstest]
     fn test_output_boundary_map(dfg_hugr2: Hugr) {
-        let [inp, out] = dfg_hugr2.get_io(dfg_hugr2.root()).unwrap();
+        let [inp, out] = dfg_hugr2.get_io(dfg_hugr2.entrypoint()).unwrap();
         let map = [
             ((inp, OutgoingPort::from(0)), IncomingPort::from(0)),
             ((inp, OutgoingPort::from(1)), IncomingPort::from(1)),
