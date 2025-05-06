@@ -224,7 +224,7 @@ impl ListOp {
 }
 
 impl MakeOpDef for ListOp {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         <&Self as Into<&'static str>>::into(self).into()
     }
 
@@ -251,7 +251,7 @@ impl MakeOpDef for ListOp {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), ExtensionBuildError> {
         let sig = self.compute_signature(extension.get_type(&LIST_TYPENAME).unwrap());
-        let def = extension.add_op(self.opdef_name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -338,8 +338,8 @@ pub struct ListOpInst {
 }
 
 impl MakeExtensionOp for ListOpInst {
-    fn name(&self) -> OpName {
-        self.op.opdef_name()
+    fn op_id(&self) -> OpName {
+        self.op.opdef_id()
     }
 
     fn from_extension_op(
@@ -348,7 +348,7 @@ impl MakeExtensionOp for ListOpInst {
         let [TypeArg::Type { ty }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
-        let name = ext_op.unqualified_name();
+        let name = ext_op.unqualified_id();
         let Ok(op) = ListOp::from_str(name) else {
             return Err(OpLoadError::NotMember(name.to_string()));
         };
@@ -370,7 +370,7 @@ impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
     /// registry to validate the element type against.
     pub fn to_extension_op(self) -> Option<ExtensionOp> {
-        ExtensionOp::new(EXTENSION.get_op(&self.name())?.clone(), self.type_args()).ok()
+        ExtensionOp::new(EXTENSION.get_op(&self.op_id())?.clone(), self.type_args()).ok()
     }
 }
 

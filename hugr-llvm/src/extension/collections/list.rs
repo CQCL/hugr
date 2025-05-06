@@ -283,7 +283,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
             args.outputs
                 .finish(ctx.builder(), vec![list, length.into()])?;
         }
-        _ => bail!("Collections: unimplemented op: {}", op.name()),
+        _ => bail!("Collections: unimplemented op: {}", op.op_id()),
     }
     Ok(())
 }
@@ -393,7 +393,7 @@ mod test {
         use hugr_core::extension::simple_op::MakeExtensionOp as _;
 
         let ext_op = list::EXTENSION
-            .instantiate_extension_op(op.name().as_ref(), [qb_t().into()])
+            .instantiate_extension_op(op.op_id().as_ref(), [qb_t().into()])
             .unwrap();
         let es = ExtensionRegistry::new([list::EXTENSION.to_owned(), prelude::PRELUDE.to_owned()]);
         es.validate().unwrap();
@@ -410,7 +410,7 @@ mod test {
             });
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_list_extensions);
-        check_emission!(op.name().as_str(), hugr, llvm_ctx);
+        check_emission!(op.op_id().as_str(), hugr, llvm_ctx);
     }
 
     #[rstest]

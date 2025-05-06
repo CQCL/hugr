@@ -733,7 +733,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 |_| Ok(arg),
             )?])
         }),
-        _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
+        _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.op_id())),
     }
 }
 
@@ -744,7 +744,10 @@ pub(crate) fn get_width_arg<H: HugrView<Node = Node>>(
     op: &impl MakeExtensionOp,
 ) -> Result<u64> {
     let [TypeArg::BoundedNat { n: log_width }] = args.node.args() else {
-        bail!("Expected exactly one BoundedNat parameter to {}", op.name())
+        bail!(
+            "Expected exactly one BoundedNat parameter to {}",
+            op.op_id()
+        )
     };
     Ok(*log_width)
 }
@@ -1272,7 +1275,7 @@ mod test {
         insta.set_snapshot_suffix(format!(
             "{}_{}_{:?}",
             insta.snapshot_suffix().unwrap_or(""),
-            op.name(),
+            op.op_id(),
             args,
         ));
         let concrete = match *args {

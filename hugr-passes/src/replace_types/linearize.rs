@@ -474,7 +474,7 @@ mod test {
         let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         let mut counts = HashMap::<OpName, u32>::new();
         for e in ext_ops {
-            *counts.entry(e.qualified_name()).or_default() += 1;
+            *counts.entry(e.qualified_id()).or_default() += 1;
         }
         assert_eq!(
             counts,
@@ -537,7 +537,7 @@ mod test {
                 .filter_map(|n| {
                     h.get_optype(n)
                         .as_extension_op()
-                        .map(ExtensionOp::qualified_name)
+                        .map(ExtensionOp::qualified_id)
                 })
                 .collect_vec();
             assert_eq!(ext_ops, expected_ext_ops);

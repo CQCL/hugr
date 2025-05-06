@@ -37,7 +37,7 @@ impl FromStr for LoadNatDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == Self.name() {
+        if s == Self.op_id() {
             Ok(Self)
         } else {
             Err(())
@@ -65,7 +65,7 @@ impl ConstFold for LoadNatDef {
 }
 
 impl MakeOpDef for LoadNatDef {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         LOAD_NAT_OP_ID.clone()
     }
 
@@ -118,8 +118,8 @@ impl LoadNat {
 }
 
 impl MakeExtensionOp for LoadNat {
-    fn name(&self) -> OpName {
-        LoadNatDef.opdef_name()
+    fn op_id(&self) -> OpName {
+        LoadNatDef.opdef_id()
     }
 
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>

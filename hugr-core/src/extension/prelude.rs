@@ -597,8 +597,8 @@ impl ConstFold for TupleOpDef {
 }
 
 impl MakeOpDef for TupleOpDef {
-    fn opdef_name(&self) -> OpName {
-        <&Self as Into<&'static str>>::into(self).into()
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
@@ -655,8 +655,8 @@ impl MakeTuple {
 }
 
 impl MakeExtensionOp for MakeTuple {
-    fn name(&self) -> OpName {
-        TupleOpDef::MakeTuple.opdef_name()
+    fn op_id(&self) -> OpName {
+        TupleOpDef::MakeTuple.opdef_id()
     }
 
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
@@ -665,9 +665,7 @@ impl MakeExtensionOp for MakeTuple {
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::MakeTuple {
-            return Err(OpLoadError::NotMember(
-                ext_op.unqualified_name().to_string(),
-            ))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
         let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
@@ -717,8 +715,8 @@ impl UnpackTuple {
 }
 
 impl MakeExtensionOp for UnpackTuple {
-    fn name(&self) -> OpName {
-        TupleOpDef::UnpackTuple.opdef_name()
+    fn op_id(&self) -> OpName {
+        TupleOpDef::UnpackTuple.opdef_id()
     }
 
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
@@ -727,9 +725,7 @@ impl MakeExtensionOp for UnpackTuple {
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::UnpackTuple {
-            return Err(OpLoadError::NotMember(
-                ext_op.unqualified_name().to_string(),
-            ))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
         let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
@@ -776,7 +772,7 @@ impl std::str::FromStr for NoopDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == NoopDef.name() {
+        if s == NoopDef.op_id() {
             Ok(Self)
         } else {
             Err(())
@@ -785,7 +781,7 @@ impl std::str::FromStr for NoopDef {
 }
 
 impl MakeOpDef for NoopDef {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         NOOP_OP_ID
     }
 
@@ -845,8 +841,8 @@ impl Default for Noop {
 }
 
 impl MakeExtensionOp for Noop {
-    fn name(&self) -> OpName {
-        NoopDef.name()
+    fn op_id(&self) -> OpName {
+        NoopDef.op_id()
     }
 
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
@@ -886,7 +882,7 @@ impl std::str::FromStr for BarrierDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == BarrierDef.name() {
+        if s == BarrierDef.op_id() {
             Ok(Self)
         } else {
             Err(())
@@ -895,7 +891,7 @@ impl std::str::FromStr for BarrierDef {
 }
 
 impl MakeOpDef for BarrierDef {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         BARRIER_OP_ID
     }
 
@@ -945,13 +941,13 @@ impl Barrier {
 
 impl NamedOp for Barrier {
     fn name(&self) -> OpName {
-        BarrierDef.name()
+        BarrierDef.op_id()
     }
 }
 
 impl MakeExtensionOp for Barrier {
-    fn name(&self) -> OpName {
-        BarrierDef.name()
+    fn op_id(&self) -> OpName {
+        BarrierDef.op_id()
     }
 
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>

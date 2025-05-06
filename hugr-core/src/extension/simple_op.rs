@@ -30,9 +30,18 @@ pub enum OpLoadError {
 ///
 /// Particularly useful with C-style enums that implement [strum::IntoEnumIterator],
 /// as then all definitions can be added to an extension at once.
+///
+/// [MakeExtensionOp] has a blanket impl for types that impl [MakeOpDef].
 pub trait MakeOpDef {
-    /// TODO docs
-    fn opdef_name(&self) -> OpName;
+    /// The [OpDef::name] which will be used when `Self`  is added to an [Extension]
+    /// or when `Self` is loaded from an [OpDef].
+    ///
+    /// This identifer must be unique within the extension with which the
+    /// [OpDef] is registered. An [ExtensionOp] instantiating this [OpDef] will
+    /// report `self.opdef_id()` as its [ExtensionOp::unqualified_id].
+    ///
+    /// [MakeExtensionOp::op_id] must match this function.
+    fn opdef_id(&self) -> OpName;
 
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
@@ -57,9 +66,9 @@ pub trait MakeOpDef {
         self.init_signature(&self.extension_ref())
     }
 
-    /// Description of the operation. By default, the same as `self.name()`.
+    /// Description of the operation. By default, the same as `self.opdef_id()`.
     fn description(&self) -> String {
-        self.opdef_name().to_string()
+        self.opdef_id().to_string()
     }
 
     /// Edit the opdef before finalising. By default does nothing.
@@ -76,7 +85,7 @@ pub trait MakeOpDef {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), ExtensionBuildError> {
         let def = extension.add_op(
-            self.opdef_name(),
+            self.opdef_id(),
             self.description(),
             self.init_signature(extension_ref),
             extension_ref,
@@ -140,8 +149,12 @@ pub trait HasDef: MakeExtensionOp {
 /// Traits implemented by types which can be loaded from [`ExtensionOp`]s,
 /// i.e. concrete instances of [`OpDef`]s, with defined type arguments.
 pub trait MakeExtensionOp {
-    /// The name of the operation
-    fn name(&self) -> OpName;
+    /// The [OpDef::name] of [ExtensionOp]s from which `Self` can be loaded.
+    ///
+    /// This identifer must be unique within the extension with which the
+    /// [OpDef] is registered. An [ExtensionOp] instantiating this [OpDef] will
+    /// report `self.opdef_id()` as its [ExtensionOp::unqualified_id].
+    fn op_id(&self) -> OpName;
 
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
@@ -180,8 +193,8 @@ pub trait MakeExtensionOp {
 
 /// Blanket implementation for non-polymorphic operations - [OpDef]s with no type parameters.
 impl<T: MakeOpDef> MakeExtensionOp for T {
-    fn name(&self) -> OpName {
-        <Self as MakeOpDef>::opdef_name(self)
+    fn op_id(&self) -> OpName {
+        self.opdef_id()
     }
 
     #[inline]
@@ -239,7 +252,7 @@ impl<T: MakeExtensionOp> RegisteredOp<T> {
     /// Generate an [OpType].
     pub fn to_extension_op(&self) -> Option<ExtensionOp> {
         ExtensionOp::new(
-            self.extension.upgrade()?.get_op(&self.name())?.clone(),
+            self.extension.upgrade()?.get_op(&self.op_id())?.clone(),
             self.type_args(),
         )
         .ok()
@@ -248,7 +261,7 @@ impl<T: MakeExtensionOp> RegisteredOp<T> {
     delegate! {
         to self.op {
             /// Name of the operation - derived from strum serialization.
-            pub fn name(&self) -> OpName;
+            pub fn op_id(&self) -> OpName;
             /// Any type args which define this operation. Default is no type arguments.
             pub fn type_args(&self) -> Vec<TypeArg>;
         }
@@ -306,8 +319,8 @@ mod test {
     }
 
     impl MakeOpDef for DummyEnum {
-        fn opdef_name(&self) -> OpName {
-            <&Self as Into<&'static str>>::into(self).into()
+        fn opdef_id(&self) -> OpName {
+            <&'static str>::from(self).into()
         }
 
         fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
@@ -366,7 +379,7 @@ mod test {
         let o = DummyEnum::Dumb;
 
         assert_eq!(
-            DummyEnum::from_def(EXT.get_op(&o.opdef_name()).unwrap()).unwrap(),
+            DummyEnum::from_def(EXT.get_op(&o.opdef_id()).unwrap()).unwrap(),
             o
         );
 

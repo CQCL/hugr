@@ -86,7 +86,7 @@ impl<'a, H: HugrView<Node = Node>> ExtensionOpMap<'a, H> {
             let handler = handler.clone();
             self.extension_op(
                 op.extension(),
-                op.opdef_name().clone(),
+                op.opdef_id().clone(),
                 move |context, args| {
                     let op = Op::from_extension_op(&args.node())?;
                     handler(context, args, op)
@@ -106,7 +106,7 @@ impl<'a, H: HugrView<Node = Node>> ExtensionOpMap<'a, H> {
         let node = args.node();
         let key = (
             node.def().extension_id().clone(),
-            node.unqualified_name().into(),
+            node.unqualified_id().into(),
         );
         let Some(handler) = self.0.get(&key) else {
             bail!("No extension could emit extension op: {key:?}")

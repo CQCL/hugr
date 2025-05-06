@@ -102,7 +102,7 @@ impl<'a> ValidationContext<'a> {
         if let OpType::OpaqueOp(opaque) = op_type {
             Err(OpaqueOpError::UnresolvedOp(
                 node,
-                opaque.op_name().clone(),
+                opaque.unqualified_id().clone(),
                 opaque.extension().clone(),
             ))?;
         }
@@ -536,7 +536,7 @@ impl<'a> ValidationContext<'a> {
             OpType::OpaqueOp(opaque) => {
                 Err(OpaqueOpError::UnresolvedOp(
                     node,
-                    opaque.op_name().clone(),
+                    opaque.qualified_id(),
                     opaque.extension().clone(),
                 ))?;
             }

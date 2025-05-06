@@ -3,10 +3,9 @@
 use hugr_core::{
     extension::{
         prelude::Noop,
-        simple_op::{HasConcrete, MakeRegisteredOp},
+        simple_op::{HasConcrete, MakeOpDef as _, MakeRegisteredOp},
     },
     hugr::hugrmut::HugrMut,
-    ops::NamedOp,
     std_extensions::collections::{
         array::{
             array_type_def, array_type_parametric, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
@@ -55,7 +54,7 @@ impl Default for LinearizeArrayPass {
         });
         for op_def in ArrayOpDef::iter() {
             pass.replace_parametrized_op(
-                value_array::EXTENSION.get_op(&op_def.name()).unwrap(),
+                value_array::EXTENSION.get_op(&op_def.opdef_id()).unwrap(),
                 move |args| {
                     // `get` is only allowed for copyable elements. Assuming the Hugr was
                     // valid when we started, the only way for the element to become linear
@@ -96,7 +95,7 @@ impl Default for LinearizeArrayPass {
         );
         pass.replace_parametrized_op(
             value_array::EXTENSION
-                .get_op(&VArrayFromArrayDef::new().name())
+                .get_op(&VArrayFromArrayDef::new().opdef_id())
                 .unwrap(),
             |args| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();
@@ -107,7 +106,7 @@ impl Default for LinearizeArrayPass {
         );
         pass.replace_parametrized_op(
             value_array::EXTENSION
-                .get_op(&VArrayToArrayDef::new().name())
+                .get_op(&VArrayToArrayDef::new().opdef_id())
                 .unwrap(),
             |args| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();

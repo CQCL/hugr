@@ -60,7 +60,7 @@ impl<AK: ArrayKind> GenericArrayDiscardDef<AK> {
 }
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayDiscardDef<AK> {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         ARRAY_DISCARD_OP_ID
     }
 
@@ -98,7 +98,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayDiscardDef<AK> {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(&AK::TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
         self.post_opdef(def);
         Ok(())
     }
@@ -126,8 +126,8 @@ impl<AK: ArrayKind> GenericArrayDiscard<AK> {
 }
 
 impl<AK: ArrayKind> MakeExtensionOp for GenericArrayDiscard<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_DISCARD_OP_ID
+    fn op_id(&self) -> OpName {
+        GenericArrayDiscardDef::<AK>::default().opdef_id()
     }
 
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>

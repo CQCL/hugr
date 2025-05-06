@@ -77,7 +77,7 @@ pub enum LogicOp {
 }
 
 impl MakeOpDef for LogicOp {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         <&Self as Into<&'static str>>::into(self).into()
     }
 

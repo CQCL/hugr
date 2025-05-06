@@ -43,7 +43,7 @@ impl PtrOpDef {
 }
 
 impl MakeOpDef for PtrOpDef {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         let s: &str = self.into();
         s.into()
     }
@@ -151,8 +151,8 @@ impl PtrOp {
 }
 
 impl MakeExtensionOp for PtrOp {
-    fn name(&self) -> OpName {
-        self.def.opdef_name()
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
     }
 
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {

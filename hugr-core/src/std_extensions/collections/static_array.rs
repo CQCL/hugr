@@ -213,9 +213,8 @@ impl StaticArrayOpDef {
 }
 
 impl MakeOpDef for StaticArrayOpDef {
-    fn opdef_name(&self) -> OpName {
-        let s: &str = self.into();
-        s.into()
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
@@ -260,7 +259,7 @@ impl MakeOpDef for StaticArrayOpDef {
             extension.get_type(&STATIC_ARRAY_TYPENAME).unwrap(),
             extension_ref,
         );
-        let def = extension.add_op(self.opdef_name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -278,8 +277,8 @@ pub struct StaticArrayOp {
 }
 
 impl MakeExtensionOp for StaticArrayOp {
-    fn name(&self) -> OpName {
-        self.def.opdef_name()
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
     }
 
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>

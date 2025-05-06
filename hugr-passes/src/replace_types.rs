@@ -555,7 +555,7 @@ struct OpHashWrapper {
 impl From<&ExtensionOp> for OpHashWrapper {
     fn from(op: &ExtensionOp) -> Self {
         Self {
-            op_name: op.qualified_name().to_string(),
+            op_name: op.qualified_id().to_string(),
             args: op.args().to_vec(),
         }
     }
@@ -606,9 +606,9 @@ mod test {
     use hugr_core::ops::{ExtensionOp, OpTrait, OpType, Tag, Value};
     use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-    use hugr_core::std_extensions::collections::{
-        array::{array_type, array_type_def, ArrayOp, ArrayOpDef, ArrayValue},
-        list::{list_type, list_type_def, ListOp, ListValue},
+    use hugr_core::std_extensions::collections::array::{Array, ArrayKind, GenericArrayValue};
+    use hugr_core::std_extensions::collections::list::{
+        list_type, list_type_def, ListOp, ListValue,
     };
     use hugr_core::std_extensions::collections::value_array::{
         value_array_type, VArrayOp, VArrayOpDef, VArrayValue, ValueArray,
@@ -789,7 +789,7 @@ mod test {
 
         let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(
-            ext_ops.map(|e| e.unqualified_name()).sorted().collect_vec(),
+            ext_ops.map(|e| e.unqualified_id()).sorted().collect_vec(),
             ["get", "itousize", "lowered_read_bool", "panic",]
         );
     }
@@ -836,7 +836,7 @@ mod test {
         assert_eq!(
             ext_ops
                 .iter()
-                .map(|x| x.unqualified_name())
+                .map(|x| x.unqualified_id())
                 .sorted()
                 .collect_vec(),
             ["get", "itousize", "panic"]
@@ -1027,7 +1027,7 @@ mod test {
         assert_eq!(
             h.nodes()
                 .filter_map(|n| h.get_optype(n).as_extension_op())
-                .map(|x| x.qualified_name())
+                .map(|x| x.qualified_id())
                 .sorted()
                 .collect_vec(),
             ["NoBoundsCheck.read", "collections.list.get"]
@@ -1115,7 +1115,7 @@ mod test {
         let ext_op_names = h
             .nodes()
             .filter_map(|n| h.get_optype(n).as_extension_op())
-            .map(|e| e.unqualified_name())
+            .map(|e| e.unqualified_id())
             .sorted()
             .collect_vec();
         assert_eq!(ext_op_names, ["get", "itousize", "panic",]);

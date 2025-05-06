@@ -137,15 +137,15 @@ impl ExtensionOp {
         self.def.extension_id()
     }
 
-    /// Returns the unqualified name of the operation. e.g. 'iadd'
+    /// Returns the unqualified id of the operation. e.g. 'iadd'
     ///
-    pub fn unqualified_name(&self) -> &OpNameRef {
+    pub fn unqualified_id(&self) -> &OpNameRef {
         self.def.name()
     }
 
-    /// Returns the unqualified name of the operation. e.g. 'arithmetic.iadd'
-    pub fn qualified_name(&self) -> OpName {
-        self.name()
+    /// Returns the qualified id of the operation. e.g. 'arithmetic.iadd'
+    pub fn qualified_id(&self) -> OpName {
+        qualify_name(self.extension_id(), self.unqualified_id())
     }
 }
 
@@ -177,7 +177,7 @@ impl Eq for ExtensionOp {}
 impl NamedOp for ExtensionOp {
     /// The name of the operation.
     fn name(&self) -> OpName {
-        qualify_name(self.def.extension_id(), self.def.name())
+        self.qualified_id()
     }
 }
 
@@ -260,16 +260,20 @@ impl OpaqueOp {
 }
 
 impl NamedOp for OpaqueOp {
-    /// The name of the operation.
     fn name(&self) -> OpName {
-        format!("OpaqueOp:{}", qualify_name(&self.extension, &self.name)).into()
+        format!("OpaqueOp:{}", self.qualified_id()).into()
     }
 }
 
 impl OpaqueOp {
     /// Unique name of the operation.
-    pub fn op_name(&self) -> &OpName {
+    pub fn unqualified_id(&self) -> &OpName {
         &self.name
+    }
+
+    /// Unique name of the operation.
+    pub fn qualified_id(&self) -> OpName {
+        qualify_name(self.extension(), self.unqualified_id())
     }
 
     /// Type arguments.

@@ -44,8 +44,8 @@ pub enum ConvertOpDef {
 }
 
 impl MakeOpDef for ConvertOpDef {
-    fn opdef_name(&self) -> OpName {
-        <&Self as Into<&'static str>>::into(self).into()
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
@@ -150,8 +150,8 @@ impl ConvertOpType {
 }
 
 impl MakeExtensionOp for ConvertOpType {
-    fn name(&self) -> OpName {
-        self.def.opdef_name()
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
     }
 
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {

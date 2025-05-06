@@ -100,7 +100,7 @@ pub enum IntOpDef {
 }
 
 impl MakeOpDef for IntOpDef {
-    fn opdef_name(&self) -> OpName {
+    fn opdef_id(&self) -> OpName {
         <&Self as Into<&'static str>>::into(self).into()
     }
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
@@ -294,8 +294,8 @@ pub struct ConcreteIntOp {
 }
 
 impl MakeExtensionOp for ConcreteIntOp {
-    fn name(&self) -> OpName {
-        self.def.opdef_name()
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
     }
 
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {

@@ -466,8 +466,8 @@ trait CustomConcrete {
 impl CustomConcrete for OpaqueOp {
     type Identifier = OpName;
 
-    fn def_name(&self) -> &OpName {
-        self.op_name()
+    fn def_name(&self) -> &Self::Identifier {
+        self.unqualified_id()
     }
 
     fn type_args(&self) -> &[TypeArg] {
