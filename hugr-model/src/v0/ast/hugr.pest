@@ -81,7 +81,7 @@ term_apply      =  { symbol_name | ("(" ~ symbol_name ~ term* ~ ")") }
 term_list       =  { "[" ~ part* ~ "]" }
 term_tuple      =  { "(" ~ "tuple" ~ part* ~ ")" }
 term_list_type  =  { "(" ~ "list" ~ term ~ ")" }
-term_const_func =  { "(" ~ "fn" ~ term ~ ")" }
+term_const_func =  { "(" ~ "fn" ~ region ~ ")" }
 
 part         = { spliced_term | term }
 spliced_term = { term ~ "..." }

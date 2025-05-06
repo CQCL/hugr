@@ -1,0 +1,13 @@
+---
+source: hugr-model/tests/text.rs
+expression: "roundtrip(include_str!(\"fixtures/model-const-func.edn\"))"
+---
+(hugr 0)
+
+(mod)
+
+(define-alias
+  id
+  (param ?t core.type)
+  (core.const (core.fn [?t] [?t]))
+  (fn (dfg [%x] [%x])))
