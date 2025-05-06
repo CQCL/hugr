@@ -170,12 +170,20 @@ class StringArg(BaseTypeArg):
         return tys.StringArg(value=self.arg)
 
 
-class SequenceArg(BaseTypeArg):
-    tya: Literal["Sequence"] = "Sequence"
+class ListArg(BaseTypeArg):
+    tya: Literal["List"] = "List"
     elems: list[TypeArg]
 
-    def deserialize(self) -> tys.SequenceArg:
-        return tys.SequenceArg(elems=deser_it(self.elems))
+    def deserialize(self) -> tys.ListArg:
+        return tys.ListArg(elems=deser_it(self.elems))
+
+
+class TupleArg(BaseTypeArg):
+    tya: Literal["Tuple"] = "Tuple"
+    elems: list[TypeArg]
+
+    def deserialize(self) -> tys.TupleArg:
+        return tys.TupleArg(elems=deser_it(self.elems))
 
 
 class ExtensionsArg(BaseTypeArg):
@@ -202,7 +210,8 @@ class TypeArg(RootModel):
         TypeTypeArg
         | BoundedNatArg
         | StringArg
-        | SequenceArg
+        | ListArg
+        | TupleArg
         | ExtensionsArg
         | VariableArg,
         WrapValidator(_json_custom_error_validator),

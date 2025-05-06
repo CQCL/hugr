@@ -417,7 +417,7 @@ mod test {
             extension_delta: ExtensionSet::new(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[
-            TypeArg::Sequence {
+            TypeArg::List {
                 elems: vec![usize_t().into(); 3],
             },
             qb_t().into(),

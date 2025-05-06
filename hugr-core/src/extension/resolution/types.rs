@@ -216,7 +216,12 @@ pub(super) fn collect_typearg_exts(
 ) {
     match arg {
         TypeArg::Type { ty } => collect_type_exts(ty, used_extensions, missing_extensions),
-        TypeArg::Sequence { elems } => {
+        TypeArg::List { elems } => {
+            for elem in elems.iter() {
+                collect_typearg_exts(elem, used_extensions, missing_extensions);
+            }
+        }
+        TypeArg::Tuple { elems } => {
             for elem in elems.iter() {
                 collect_typearg_exts(elem, used_extensions, missing_extensions);
             }

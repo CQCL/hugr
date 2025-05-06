@@ -689,7 +689,7 @@ impl<'a> Substitution<'a> {
             .expect("Undeclared type variable - call validate() ?");
         debug_assert!(check_type_arg(arg, &TypeParam::new_list(bound)).is_ok());
         match arg {
-            TypeArg::Sequence { elems } => elems
+            TypeArg::List { elems } => elems
                 .iter()
                 .map(|ta| {
                     match ta {
@@ -932,7 +932,7 @@ pub(crate) mod test {
 
         let coln = e.get_type(&COLN).unwrap();
         let c_of_cpy = coln
-            .instantiate([TypeArg::Sequence {
+            .instantiate([TypeArg::List {
                 elems: vec![Type::from(cpy.clone()).into()],
             }])
             .unwrap();
@@ -947,7 +947,7 @@ pub(crate) mod test {
         );
 
         let mut t = Type::new_extension(
-            coln.instantiate([TypeArg::Sequence {
+            coln.instantiate([TypeArg::List {
                 elems: vec![mk_opt(Type::from(cpy.clone())).into()],
             }])
             .unwrap(),
@@ -966,7 +966,7 @@ pub(crate) mod test {
             (ct == &c_of_cpy).then_some(usize_t())
         });
         let mut t = Type::new_extension(
-            coln.instantiate([TypeArg::Sequence {
+            coln.instantiate([TypeArg::List {
                 elems: vec![Type::from(c_of_cpy.clone()).into(); 2],
             }])
             .unwrap(),
@@ -975,7 +975,7 @@ pub(crate) mod test {
         assert_eq!(
             t,
             Type::new_extension(
-                coln.instantiate([TypeArg::Sequence {
+                coln.instantiate([TypeArg::List {
                     elems: vec![usize_t().into(); 2]
                 }])
                 .unwrap()

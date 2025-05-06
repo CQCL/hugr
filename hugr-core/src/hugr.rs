@@ -458,7 +458,7 @@ mod test {
                     TypeArg::Extensions {
                         es: extensions.into(),
                     },
-                    TypeArg::Sequence {
+                    TypeArg::List {
                         elems: type_row
                             .into()
                             .iter()
