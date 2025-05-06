@@ -526,7 +526,8 @@ pub(in crate::hugr::patch) mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::hugr::patch::PatchVerification;
+    use crate::hugr::patch::simple_replace::OutputBoundaryMap;
+    use crate::hugr::patch::{PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
     use crate::ops::dataflow::DataflowOpTrait;
@@ -537,7 +538,7 @@ pub(in crate::hugr::patch) mod test {
     use crate::std_extensions::logic::LogicOp;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
-    use crate::{IncomingPort, Node, OutgoingPort};
+    use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
     use super::SimpleReplacement;
 
@@ -754,6 +755,17 @@ pub(in crate::hugr::patch) mod test {
             nu_inp,
             nu_out: nu_out.into(),
         };
+
+        // Check output boundary
+        assert_eq!(
+            r.map_host_output((h_outp_node, h_port_2)).unwrap(),
+            ReplacementPort::from((r.get_replacement_io().unwrap()[1], n_port_2))
+        );
+        assert!(r
+            .map_host_output((h_outp_node, OutgoingPort::from(0)))
+            .is_none());
+
+        // Check invalidation set
         assert_eq!(
             HashSet::<_>::from_iter(r.invalidation_set()),
             HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1, h_outp_node]),
@@ -1160,6 +1172,58 @@ pub(in crate::hugr::patch) mod test {
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
         assert_eq!(h.validate(), Ok(()));
+    }
+
+    #[rstest]
+    fn test_output_boundary_map(dfg_hugr2: Hugr) {
+        let [inp, out] = dfg_hugr2.get_io(dfg_hugr2.root()).unwrap();
+        let map = [
+            ((inp, OutgoingPort::from(0)), IncomingPort::from(0)),
+            ((inp, OutgoingPort::from(1)), IncomingPort::from(1)),
+        ]
+        .into_iter()
+        .collect();
+        let map = OutputBoundaryMap::ByOutgoing(map);
+
+        // Basic check: map as just defined
+        assert_eq!(
+            map.get(inp, OutgoingPort::from(0)),
+            Some(IncomingPort::from(0))
+        );
+        assert_eq!(
+            map.get(inp, OutgoingPort::from(1)),
+            Some(IncomingPort::from(1))
+        );
+
+        // Now check the map in terms of incoming ports
+        assert!(map.get(out, IncomingPort::from(0)).is_none());
+        assert_eq!(
+            map.get_as_incoming(out, IncomingPort::from(0), &dfg_hugr2),
+            Some(IncomingPort::from(0))
+        );
+
+        // Finally, check iterators
+        assert_eq!(
+            map.iter().collect::<HashSet<_>>(),
+            HashSet::from_iter([
+                (
+                    (inp, Port::new(Direction::Outgoing, 0)),
+                    IncomingPort::from(0)
+                ),
+                (
+                    (inp, Port::new(Direction::Outgoing, 1)),
+                    IncomingPort::from(1)
+                ),
+            ])
+        );
+        let h_gate = dfg_hugr2.output_neighbours(inp).nth(1).unwrap();
+        assert_eq!(
+            map.iter_as_incoming(&dfg_hugr2).collect::<HashSet<_>>(),
+            HashSet::from_iter([
+                ((out, IncomingPort::from(0)), IncomingPort::from(0)),
+                ((h_gate, IncomingPort::from(0)), IncomingPort::from(1)),
+            ])
+        );
     }
 
     use crate::hugr::patch::replace::Replacement;
