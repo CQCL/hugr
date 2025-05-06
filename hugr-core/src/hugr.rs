@@ -30,7 +30,7 @@ use crate::extension::resolution::{
     WeakExtensionRegistry,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet};
-use crate::ops::{self, NamedOp, OpTag, OpTrait};
+use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
 
@@ -63,7 +63,7 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(crate::ops::Module::new())
+        Self::new()
     }
 }
 
@@ -89,19 +89,50 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Create a new Hugr, with a single root node.
-    pub fn new(root: impl Into<OpType>) -> Self {
-        make_module_hugr(root.into(), 0, 0)
+    /// Create a new Hugr, with a single [`Module`] operation as the root node.
+    pub fn new() -> Self {
+        make_module_hugr(Module::new().into(), 0, 0).unwrap()
     }
 
-    /// Create a new Hugr, with a given root node and preallocated capacity.
+    /// Create a new Hugr, with a given entrypoint operation.
     ///
-    /// If the root optype is [`OpType::Module`], the HUGR module root will
-    /// match the root node. Otherwise, the root node will be a child of the a
-    /// module created at the node hierarchy root. The specific HUGR created depends
-    /// on the operation type, and whether it can be contained
-    pub fn with_capacity(root: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
-        make_module_hugr(root.into(), nodes, ports)
+    /// If the optype is [`OpType::Module`], the HUGR module root will match the
+    /// entrypoint node. Otherwise, the entrypoint will be a child of the a
+    /// module initialized at the node hierarchy root. The specific HUGR created
+    /// depends on the operation type.
+    ///
+    /// # Error
+    ///
+    /// Returns [`HugrError::UnsupportedEntrypoint`] if the entrypoint operation
+    /// requires additional context to be defined. This is the case for
+    /// [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
+    /// since they are context-specific definitions.
+    pub fn new_with_entrypoint(entrypoint_op: impl Into<OpType>) -> Result<Self, HugrError> {
+        Self::with_capacity(entrypoint_op, 0, 0)
+    }
+
+    /// Create a new Hugr, with a given entrypoint operation and preallocated capacity.
+    ///
+    /// If the optype is [`OpType::Module`], the HUGR module root will match the
+    /// entrypoint node. Otherwise, the entrypoint will be a child of the a
+    /// module initialized at the node hierarchy root. The specific HUGR created
+    /// depends on the operation type.
+    ///
+    /// # Error
+    ///
+    /// Returns [`HugrError::UnsupportedEntrypoint`] if the entrypoint operation
+    /// requires additional context to be defined. This is the case for
+    /// [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
+    /// since they are context-specific definitions.
+    pub fn with_capacity(
+        entrypoint_op: impl Into<OpType>,
+        nodes: usize,
+        ports: usize,
+    ) -> Result<Self, HugrError> {
+        let entrypoint_op: OpType = entrypoint_op.into();
+        let op_name = entrypoint_op.name();
+        make_module_hugr(entrypoint_op, nodes, ports)
+            .ok_or(HugrError::UnsupportedEntrypoint { op: op_name })
     }
 
     /// Load a Hugr from a json reader.
@@ -289,6 +320,12 @@ pub enum HugrError {
     /// An invalid port was specified.
     #[error("Invalid port direction {0:?}.")]
     InvalidPortDirection(Direction),
+    /// Cannot initialize a HUGR with the given entrypoint operation type.
+    #[error("Cannot initialize a HUGR with entrypoint type {op}")]
+    UnsupportedEntrypoint {
+        /// The name of the unsupported operation.
+        op: OpName,
+    },
 }
 
 /// Errors that can occur while loading and validating a Hugr json.
@@ -321,7 +358,7 @@ pub enum LoadHugrError {
 /// Some operation types are not allowed and will result in a panic. This is the
 /// case for [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
 /// since they are context-specific operation.
-fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Hugr {
+fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr> {
     let mut graph = MultiPortGraph::with_capacity(nodes, ports);
     let hierarchy = Hierarchy::new();
     let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
@@ -395,28 +432,18 @@ fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Hugr {
     }
     // Other more exotic ops are unsupported, and will cause a panic.
     else {
-        let is_expected = matches!(
+        debug_assert!(matches!(
             root_op,
             OpType::Input(_)
                 | OpType::Output(_)
                 | OpType::DataflowBlock(_)
                 | OpType::ExitBlock(_)
                 | OpType::Case(_)
-        );
-        if is_expected {
-            panic!(
-                "Operation type {} is not allowed as a root type of a Hugr being initialized",
-                root_op.name()
-            )
-        } else {
-            panic!(
-                "Operation type {} should have been allowed in `make_module_hugr`",
-                root_op.name()
-            )
-        }
+        ));
+        return None;
     }
 
-    hugr
+    Some(hugr)
 }
 
 #[cfg(test)]

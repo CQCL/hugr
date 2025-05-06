@@ -2,7 +2,7 @@ use crate::hugr::views::HugrView;
 use crate::types::{Signature, TypeRow};
 
 use crate::ops;
-use crate::ops::handle::CaseID;
+use crate::ops::handle::{CaseID, NodeHandle};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
@@ -153,7 +153,7 @@ impl ConditionalBuilder<Hugr> {
     ) -> Result<Self, BuildError> {
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
         let other_inputs = other_inputs.into();
-        let outputs = outputs.into();
+        let outputs: TypeRow = outputs.into();
 
         let n_out_wires = outputs.len();
         let n_cases = sum_rows.len();
@@ -163,7 +163,7 @@ impl ConditionalBuilder<Hugr> {
             other_inputs,
             outputs,
         };
-        let base = Hugr::new(op);
+        let base = Hugr::new_with_entrypoint(op).expect("Conditional entrypoint should be valid");
         let conditional_node = base.entrypoint();
 
         Ok(ConditionalBuilder {
@@ -178,13 +178,15 @@ impl ConditionalBuilder<Hugr> {
 impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
     pub fn new(signature: Signature) -> Result<Self, BuildError> {
-        let op = ops::Case {
-            signature: signature.clone(),
-        };
-        let base = Hugr::new(op);
-        let root = base.entrypoint();
-        let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
+        // Start by building a conditional with a single case
+        let mut conditional =
+            ConditionalBuilder::new([signature.input.clone()], vec![], signature.output.clone())?;
+        let case = conditional.case_builder(0)?.finish_sub_container()?.node();
 
+        // Extract the half-finished hugr, and wrap it in an owned case builder
+        let mut base = std::mem::take(conditional.hugr_mut());
+        base.set_entrypoint(case);
+        let dfg_builder = DFGBuilder::create(base, case)?;
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }
 }

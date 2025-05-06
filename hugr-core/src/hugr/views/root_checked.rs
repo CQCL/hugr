@@ -111,7 +111,7 @@ mod test {
             signature: Signature::new(vec![], vec![]),
         }
         .into();
-        let mut h = Hugr::new(root_type.clone());
+        let mut h = Hugr::new_with_entrypoint(root_type.clone()).unwrap();
         let cfg_v = RootChecked::<_, CfgID>::check(&h);
         assert_eq!(
             cfg_v.err(),

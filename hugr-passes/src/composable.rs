@@ -276,9 +276,10 @@ mod test {
 
     #[test]
     fn test_validation() {
-        let mut h = Hugr::new(DFG {
+        let mut h = Hugr::new_with_entrypoint(DFG {
             signature: Signature::new(usize_t(), bool_t()),
-        });
+        })
+        .unwrap();
         let inp = h.add_node_with_parent(
             h.entrypoint(),
             Input {

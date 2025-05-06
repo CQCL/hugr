@@ -11,8 +11,8 @@ use crate::{
     ops::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
         AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock,
-        ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
-        Output, Tag, TailLoop, Value, CFG, DFG,
+        ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, OpaqueOp, Output,
+        Tag, TailLoop, Value, CFG, DFG,
     },
     package::Package,
     std_extensions::{
@@ -124,7 +124,7 @@ pub fn import_hugr(
     // For now we use a hashmap, which will be slower.
     let mut ctx = Context {
         module,
-        hugr: Hugr::new(OpType::Module(Module {})),
+        hugr: Hugr::new(),
         link_ports: FxHashMap::default(),
         static_edges: Vec::new(),
         extensions,

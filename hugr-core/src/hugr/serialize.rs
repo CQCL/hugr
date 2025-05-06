@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use self::upgrade::UpgradeError;
 
-use super::{HugrMut, HugrView, NodeMetadataMap};
+use super::{HugrError, HugrMut, HugrView, NodeMetadataMap};
 
 mod upgrade;
 
@@ -133,6 +133,9 @@ pub enum HUGRSerializationError {
     /// First node in node list must be the HUGR root.
     #[error("The first node in the node list has parent {0}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),
+    /// Failed to deserialize the HUGR.
+    #[error(transparent)]
+    HugrError(#[from] HugrError),
 }
 
 impl Serialize for Hugr {
@@ -243,7 +246,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
+        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2)?;
 
         // Since the new Hugr may add some nodes to contain the root (if the
         // encoded file did not have a module at the root), we need a function

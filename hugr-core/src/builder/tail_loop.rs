@@ -81,7 +81,8 @@ impl TailLoopBuilder<Hugr> {
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let base = Hugr::new(tail_loop.clone());
+        let base = Hugr::new_with_entrypoint(tail_loop.clone())
+            .expect("tail_loop entrypoint should be valid");
         let root = base.entrypoint();
         Self::create_with_io(base, root, &tail_loop)
     }

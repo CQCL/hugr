@@ -603,9 +603,10 @@ mod test {
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because it must be empty (not even
         // Input/Output).
-        let mut replacement = Hugr::new(ops::CFG {
+        let mut replacement = Hugr::new_with_entrypoint(ops::CFG {
             signature: Signature::new_endo(just_list.clone()),
-        });
+        })
+        .expect("CFG is a valid entrypoint");
         let r_bb = replacement.add_node_with_parent(
             replacement.entrypoint(),
             DataflowBlock {
@@ -761,7 +762,7 @@ mod test {
         let cond = cond.finish_sub_container().unwrap();
         let h = h.finish_hugr_with_outputs(cond.outputs()).unwrap();
 
-        let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());
+        let mut r_hugr = Hugr::new_with_entrypoint(h.get_optype(cond.node()).clone()).unwrap();
         let r1 = r_hugr.add_node_with_parent(
             r_hugr.entrypoint(),
             Case {

@@ -148,7 +148,7 @@ impl CFGBuilder<Hugr> {
             signature: signature.clone(),
         };
 
-        let base = Hugr::new(cfg_op);
+        let base = Hugr::new_with_entrypoint(cfg_op).expect("CFG entrypoints be valid");
         let cfg_node = base.entrypoint();
         CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }

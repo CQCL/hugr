@@ -91,7 +91,7 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        let base = Hugr::new(dfg_op);
+        let base = Hugr::new_with_entrypoint(dfg_op).expect("DFG entrypoint should be valid");
         let root = base.entrypoint();
         DFGBuilder::create_with_io(base, root, signature)
     }
@@ -166,7 +166,7 @@ impl FunctionBuilder<Hugr> {
             name: name.into(),
         };
 
-        let base = Hugr::new(op);
+        let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");
         let root = base.entrypoint();
 
         let db = DFGBuilder::create_with_io(base, root, body)?;

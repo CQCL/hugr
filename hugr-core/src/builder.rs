@@ -328,9 +328,10 @@ pub(crate) mod test {
     /// only (no wires), given a function type with extension delta.
     // TODO consider taking two type rows and using TO_BE_INFERRED
     pub(crate) fn closed_dfg_root_hugr(signature: Signature) -> Hugr {
-        let mut hugr = Hugr::new(ops::DFG {
+        let mut hugr = Hugr::new_with_entrypoint(ops::DFG {
             signature: signature.clone(),
-        });
+        })
+        .unwrap();
         hugr.add_node_with_parent(
             hugr.entrypoint(),
             ops::Input {

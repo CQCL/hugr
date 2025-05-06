@@ -681,7 +681,7 @@ impl HugrView for Hugr {
         }
 
         let new_entrypoint_op = self.entrypoint_optype().clone();
-        let mut extracted = Hugr::new(new_entrypoint_op);
+        let mut extracted = Hugr::new_with_entrypoint(new_entrypoint_op).unwrap(); // TODO: Handle error
 
         let old_entrypoint = extracted.entrypoint();
         let old_parent = extracted.get_parent(old_entrypoint);
