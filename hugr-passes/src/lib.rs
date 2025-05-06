@@ -25,7 +25,7 @@ pub mod untuple;
 )]
 #[allow(deprecated)]
 pub use monomorphize::remove_polyfuncs;
-pub use monomorphize::{monomorphize, MonomorphizePass};
+pub use monomorphize::{mangle_name, monomorphize, MonomorphizePass};
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;
 pub mod nest_cfgs;

@@ -306,19 +306,20 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
     }
 }
 
-/// We do our best to generate unique names. Our strategy is to pick out '$' as
+/// Produce a mangled name for a monomorphized instance of a function.
+///
+/// Best effort to generate unique names. The strategy is to pick out '$' as
 /// a special character.
 ///
-/// We:
-///  - construct a new name of the form `{func_name}$$arg0$arg1$arg2` etc
-///  - replace any existing `$` in the function name or type args string
-///    representation with `r"\$"`
-///  - We depend on the `Display` impl of `Type` to generate the string
-///    representation of a `TypeArg::Type`. For other constructors we do the
-///    simple obvious thing.
-///  - For all TypeArg Constructors we choose a short prefix (e.g. `t` for type)
-///    and use "t({arg})" as the string representation of that arg.
-fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
+///  - New name of the form `{func_name}$$arg0$arg1$arg2` constructed.
+///  - Existing `$` in the function name or type args string
+///    representation replaced with `r"\$"`.
+///  - `Display` impl of `Type` used to generate the string
+///    representation of a `TypeArg::Type`. Other TypeArgs use `Display`
+///    of inner type.
+///  - For all TypeArg Constructors a short prefix (e.g. `t` for type)
+///    is used as "t({arg})" for the string representation of that arg.
+pub fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
     let name = escape_dollar(name);
     format!("${name}${}", TypeArgsList(type_args.as_ref()))
 }
