@@ -456,23 +456,23 @@ pub trait HugrView: HugrInternals {
         self.base_hugr().validate()
     }
 
-    /// Extracts a HUGR containing the current entrypoint and all its
-    /// descendants.
+    /// Extracts a HUGR containing the parent node and all its descendants.
     ///
-    /// Returns a new HUGR and a map from the nodes in the source HUGR to the nodes
-    /// in the extracted HUGR.
+    /// Returns a new HUGR and a map from the nodes in the source HUGR to the
+    /// nodes in the extracted HUGR. The new HUGR entrypoint corresponds to the
+    /// extracted `parent` node.
     ///
-    /// Edges that connected to nodes outside the entrypoint are not be included
-    /// in the new HUGR.
+    /// Edges that connected to nodes outside the parent node are not be
+    /// included in the new HUGR.
     ///
-    /// If the entrypoint is not a module, the returned HUGR will contain some
+    /// If the parent is not a module, the returned HUGR will contain some
     /// additional nodes to contain the new entrypoint. E.g. if the optype must
     /// be contained in a dataflow region, a module with a function definition
     /// will be created to contain it.
-    ///
-    /// If you need to extract the complete HUGR, move the entrypoint to the
-    /// [`HugrView::module_root`] first.
-    fn extract_hugr(&self) -> (Hugr, impl ExtractionResult<Self::Node> + 'static);
+    fn extract_hugr(
+        &self,
+        parent: Self::Node,
+    ) -> (Hugr, impl ExtractionResult<Self::Node> + 'static);
 }
 
 /// Records the result of extracting a Hugr via [HugrView::extract_hugr].
@@ -674,19 +674,36 @@ impl HugrView for Hugr {
     }
 
     #[inline]
-    fn extract_hugr(&self) -> (Hugr, impl ExtractionResult<Node> + 'static) {
+    fn extract_hugr(&self, target: Node) -> (Hugr, impl ExtractionResult<Node> + 'static) {
         // Shortcircuit if the extracted HUGr is the same as the original
-        if self.entrypoint() == self.module_root().node() {
+        if target == self.module_root().node() {
             return (self.clone(), DefaultNodeMap(HashMap::new()));
         }
 
-        let new_entrypoint_op = self.entrypoint_optype().clone();
-        let mut extracted = Hugr::new_with_entrypoint(new_entrypoint_op).unwrap(); // TODO: Handle error
+        // Initialize a new HUGR with the desired entrypoint operation.
+        // If we cannot create a new hugr with the parent's optype (e.g. if it's a `BasicBlock`),
+        // find the first ancestor that can be extracted and use that instead.
+        //
+        // The final entrypoint will be set to the original `parent`.
+        let mut parent = target;
+        let mut extracted = loop {
+            let parent_op = self.get_optype(parent).clone();
+            if let Ok(hugr) = Hugr::new_with_entrypoint(parent_op) {
+                break hugr;
+            };
+            // If the operation is not extractable, try the parent.
+            // This loop always terminates, since at least the module root is extractable.
+            parent = self
+                .get_parent(parent)
+                .expect("The module root is always extractable");
+        };
 
+        // The entrypoint and its parent in the newly created HUGR.
+        // These will be replaced with nodes from the original HUGR.
         let old_entrypoint = extracted.entrypoint();
         let old_parent = extracted.get_parent(old_entrypoint);
 
-        let inserted = extracted.insert_from_view(old_entrypoint, self);
+        let inserted = extracted.insert_from_view(old_entrypoint, &self.with_entrypoint(parent));
         let new_entrypoint = inserted.inserted_entrypoint;
 
         match old_parent {
@@ -710,7 +727,7 @@ impl HugrView for Hugr {
                     })
                     .collect_vec();
                 // Replace the node
-                extracted.set_entrypoint(new_entrypoint);
+                extracted.set_entrypoint(inserted.node_map[&target]);
                 extracted.remove_node(old_entrypoint);
                 extracted.set_parent(new_entrypoint, old_parent);
                 // Reconnect the inputs and outputs to the new entrypoint
@@ -723,7 +740,7 @@ impl HugrView for Hugr {
             }
             // The entrypoint a module op
             None => {
-                extracted.set_entrypoint(new_entrypoint);
+                extracted.set_entrypoint(inserted.node_map[&target]);
                 extracted.set_module_root(new_entrypoint);
                 extracted.remove_node(old_entrypoint);
             }

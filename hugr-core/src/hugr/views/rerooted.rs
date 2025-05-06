@@ -107,7 +107,7 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
                 fn extensions(&self) -> &crate::extension::ExtensionRegistry;
                 fn validate(&self) -> Result<(), crate::hugr::ValidationError>;
-                fn extract_hugr(&self) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
+                fn extract_hugr(&self, parent: Self::Node) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
         }
     }
 }
@@ -147,8 +147,10 @@ impl<H: HugrMut> HugrMut for Rerooted<H> {
 
 #[cfg(test)]
 mod test {
+    use crate::builder::test::simple_cfg_hugr;
     use crate::builder::{Dataflow, FunctionBuilder, HugrBuilder, SubContainer};
     use crate::hugr::internal::HugrMutInternals;
+    use crate::hugr::views::ExtractionResult;
     use crate::hugr::HugrMut;
     use crate::ops::handle::NodeHandle;
     use crate::ops::{DataflowBlock, OpType};
@@ -193,5 +195,41 @@ mod test {
         assert!(h.get_optype(dfg).is_dataflow_block());
         assert!(h.entrypoint_optype().is_func_defn());
         assert!(h.get_optype(h.module_root().node()).is_module());
+    }
+
+    #[test]
+    fn extract_rerooted() {
+        let mut hugr = simple_cfg_hugr();
+        let cfg = hugr.entrypoint();
+        let basic_block = hugr.first_child(cfg).unwrap();
+        hugr.set_entrypoint(basic_block);
+        assert!(hugr.get_optype(hugr.entrypoint()).is_dataflow_block());
+
+        let rerooted = hugr.with_entrypoint(cfg);
+        assert!(rerooted.get_optype(rerooted.entrypoint()).is_cfg());
+
+        // Extract the basic block
+        let (extracted_hugr, map) = rerooted.extract_hugr(basic_block);
+        let extracted_cfg = map.extracted_node(cfg);
+        let extracted_bb = map.extracted_node(basic_block);
+        assert_eq!(extracted_hugr.entrypoint(), extracted_bb);
+        assert!(extracted_hugr.get_optype(extracted_cfg).is_cfg());
+        assert_eq!(
+            extracted_hugr.first_child(extracted_cfg),
+            Some(extracted_bb)
+        );
+        assert!(extracted_hugr.get_optype(extracted_bb).is_dataflow_block());
+
+        // Extract the cfg (and current entrypoint)
+        let (extracted_hugr, map) = rerooted.extract_hugr(cfg);
+        let extracted_cfg = map.extracted_node(cfg);
+        let extracted_bb = map.extracted_node(basic_block);
+        assert_eq!(extracted_hugr.entrypoint(), extracted_cfg);
+        assert!(extracted_hugr.get_optype(extracted_cfg).is_cfg());
+        assert_eq!(
+            extracted_hugr.first_child(extracted_cfg),
+            Some(extracted_bb)
+        );
+        assert!(extracted_hugr.get_optype(extracted_bb).is_dataflow_block());
     }
 }

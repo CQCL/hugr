@@ -165,7 +165,7 @@ impl<R: PatchHugrMut> PatchHugrMut for Transactional<R> {
         // TODO: This requires a full graph copy on each application.
         // Ideally we'd be able to just restore modified nodes, perhaps using a `HugrMut` wrapper
         // that keeps track of them.
-        let (backup, backup_map) = h.with_entrypoint(h.module_root()).extract_hugr();
+        let (backup, backup_map) = h.extract_hugr(h.module_root());
         let backup_root = backup_map.extracted_node(h.module_root());
         let backup_entrypoint = backup_map.extracted_node(h.entrypoint());
 
