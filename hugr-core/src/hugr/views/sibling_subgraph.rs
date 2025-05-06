@@ -10,7 +10,7 @@
 //! hierarchy.
 
 use std::cell::OnceCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use itertools::Itertools;
@@ -433,14 +433,11 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                     })
             })
             .collect();
-        let nu_out = self
+        let nu_out: HashMap<_, _> = self
             .outputs
             .iter()
             .zip_eq(rep_outputs)
-            .flat_map(|(&(self_source_n, self_source_p), (_, rep_target_p))| {
-                hugr.linked_inputs(self_source_n, self_source_p)
-                    .map(move |self_target| (self_target, rep_target_p))
-            })
+            .map(|(&self_target, (_, rep_target_p))| (self_target, rep_target_p))
             .collect();
 
         Ok(SimpleReplacement::new(
