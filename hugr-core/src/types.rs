@@ -257,6 +257,21 @@ impl SumType {
         }
     }
 
+    /// If the sum matches the convention of `Option[row]`, return the row.
+    pub fn as_option(&self) -> Option<&TypeRowRV> {
+        match self {
+            SumType::Unit { size } if *size == 2 => Some(TypeRV::EMPTY_TYPEROW_REF),
+            SumType::General { rows } if rows.len() == 2 && rows[0].is_empty() => Some(&rows[1]),
+            _ => None,
+        }
+    }
+
+    /// If a sum is an option of a single type, return the type.
+    pub fn as_unary_option(&self) -> Option<&TypeRV> {
+        self.as_option()
+            .and_then(|row| (row.len() == 1).then_some(&row[0]))
+    }
+
     /// Returns an iterator over the variants.
     pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
         match self {
@@ -790,7 +805,7 @@ pub(crate) mod test {
     use std::sync::Weak;
 
     use super::*;
-    use crate::extension::prelude::{qb_t, usize_t};
+    use crate::extension::prelude::{option_type, qb_t, usize_t};
     use crate::extension::TypeDefBound;
     use crate::std_extensions::collections::array::{array_type, array_type_parametric};
     use crate::std_extensions::collections::list::list_type;
@@ -833,6 +848,13 @@ pub(crate) mod test {
     fn as_sum() {
         let t = Type::new_unit_sum(0);
         assert!(t.as_sum().is_some());
+    }
+
+    #[test]
+    fn as_option() {
+        let opt = option_type(usize_t());
+
+        assert_eq!(opt.as_unary_option().unwrap().clone(), usize_t());
     }
 
     #[test]
