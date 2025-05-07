@@ -110,30 +110,28 @@ fn bad_hugr_string() -> String {
     let df = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
     let bad_hugr = df.hugr().clone();
 
-    serde_json::to_string(&bad_hugr).unwrap()
+    bad_hugr.store_str(EnvelopeConfig::text()).unwrap()
 }
 
 #[rstest]
 fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
     cmd.arg("mermaid");
     cmd.arg("--validate");
-    cmd.arg("--hugr-json");
     cmd.write_stdin(bad_hugr_string);
     cmd.assert()
         .failure()
-        .stderr(contains("Error loading hugr"));
+        .stderr(contains("Error validating HUGR"));
 }
 
 #[rstest]
 fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
     val_cmd.write_stdin(bad_hugr_string);
-    val_cmd.arg("--hugr-json");
     val_cmd.arg("-");
 
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error loading hugr"));
+        .stderr(contains("Error validating HUGR"));
 }
 
 #[rstest]

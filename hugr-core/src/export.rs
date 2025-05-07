@@ -1,4 +1,5 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
+use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::{
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -6,7 +7,6 @@ use crate::{
     ops::{
         constant::CustomSerialized, DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value,
     },
-    package::Package,
     std_extensions::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
@@ -29,11 +29,14 @@ use hugr_model::v0::{
 use petgraph::unionfind::UnionFind;
 use std::fmt::Write;
 
-/// Export a [`Package`] to its representation in the model.
-pub fn export_package<'a>(package: &'a Package, bump: &'a Bump) -> table::Package<'a> {
-    let modules = package
-        .modules
-        .iter()
+/// Exports a deconstructed `Package` to its representation in the model.
+pub fn export_package<'a, 'h: 'a>(
+    hugrs: impl IntoIterator<Item = &'h Hugr>,
+    _extensions: &ExtensionRegistry,
+    bump: &'a Bump,
+) -> table::Package<'a> {
+    let modules = hugrs
+        .into_iter()
         .map(|module| export_hugr(module, bump))
         .collect();
     table::Package { modules }

@@ -3,6 +3,7 @@
 pub mod examples;
 
 use criterion::{black_box, criterion_group, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
+use hugr::envelope::EnvelopeConfig;
 #[allow(unused)]
 use hugr::std_extensions::STD_REG;
 use hugr::Hugr;
@@ -17,10 +18,13 @@ trait Serializer {
 struct JsonSer;
 impl Serializer for JsonSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
-        serde_json::to_vec(hugr).unwrap()
+        let mut bytes = Vec::new();
+        hugr.store(bytes.as_mut_slice(), EnvelopeConfig::binary())
+            .unwrap();
+        bytes
     }
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
-        serde_json::from_slice(bytes).unwrap()
+        Hugr::load(bytes, None).unwrap()
     }
 }
 
