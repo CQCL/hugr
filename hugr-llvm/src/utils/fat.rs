@@ -7,7 +7,7 @@ use std::{cmp::Ordering, fmt, hash::Hash, marker::PhantomData, ops::Deref};
 use hugr_core::hugr::views::Rerooted;
 use hugr_core::{
     core::HugrNode,
-    ops::{DataflowBlock, ExitBlock, Input, NamedOp, OpType, Output, CFG},
+    ops::{DataflowBlock, ExitBlock, Input, OpType, Output, CFG},
     types::Type,
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
 };

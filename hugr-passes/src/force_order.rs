@@ -2,11 +2,7 @@
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
 use hugr_core::{
-    hugr::{
-        hugrmut::HugrMut,
-        views::{HierarchyView, SiblingGraph},
-        HugrError,
-    },
+    hugr::{hugrmut::HugrMut, HugrError},
     ops::{OpTag, OpTrait},
     types::EdgeKind,
     HugrView as _, Node,
@@ -58,26 +54,33 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     for dp in dataflow_parents {
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
-        let rank = |n| rank(hugr, n);
-        let sg = SiblingGraph::<Node>::try_new(hugr, dp)?;
-        let petgraph = NodeFiltered::from_fn(sg.as_petgraph(), |x| x != dp && x != i && x != o);
-        let ordered_nodes = ForceOrder::new(&petgraph, &rank)
-            .iter(&petgraph)
-            .filter(|&x| {
-                let expected_edge = Some(EdgeKind::StateOrder);
-                let optype = hugr.get_optype(x);
-                if optype.other_input() == expected_edge || optype.other_output() == expected_edge {
-                    assert_eq!(
-                        optype.other_input(),
-                        optype.other_output(),
-                        "Optype does not have both input and output order edge: {optype}"
-                    );
-                    true
-                } else {
-                    false
-                }
-            })
-            .collect_vec();
+        let ordered_nodes = {
+            let i_pg = hugr.to_portgraph_node(i);
+            let o_pg = hugr.to_portgraph_node(o);
+            let rank = |n| rank(hugr, hugr.from_portgraph_node(n));
+            let region = hugr.region_portgraph(dp);
+            let petgraph = NodeFiltered::from_fn(&region, |x| x != i_pg && x != o_pg);
+            ForceOrder::<_, portgraph::NodeIndex, _, _>::new(&petgraph, &rank)
+                .iter(&petgraph)
+                .filter_map(|x| {
+                    let x = hugr.from_portgraph_node(x);
+                    let expected_edge = Some(EdgeKind::StateOrder);
+                    let optype = hugr.get_optype(x);
+                    if optype.other_input() == expected_edge
+                        || optype.other_output() == expected_edge
+                    {
+                        assert_eq!(
+                            optype.other_input(),
+                            optype.other_output(),
+                            "Optype does not have both input and output order edge: {optype}"
+                        );
+                        Some(x)
+                    } else {
+                        None
+                    }
+                })
+                .collect_vec()
+        };
 
         // we iterate over the topologically sorted nodes, prepending the input
         // node and suffixing the output node.
