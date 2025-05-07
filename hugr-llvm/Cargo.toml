@@ -23,7 +23,7 @@ llvm14-0 = ["inkwell/llvm14-0"]
 
 
 [dependencies]
-inkwell = { version = "0.5.0", default-features = false }
+inkwell = { version = "0.6.0", default-features = false }
 hugr-core = { path = "../hugr-core", version = "0.15.4" }
 anyhow = "1.0.98"
 itertools.workspace = true
