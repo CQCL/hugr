@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.16.0"
+version = "0.15.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -33,9 +33,9 @@ zstd = ["hugr-core/zstd"]
 
 [dependencies]
 hugr-model = { path = "../hugr-model", optional = true, version = "0.19.1" }
-hugr-core = { path = "../hugr-core", version = "0.16.0" }
-hugr-passes = { path = "../hugr-passes", version = "0.16.0" }
-hugr-llvm = { path = "../hugr-llvm", version = "0.16.0", optional = true }
+hugr-core = { path = "../hugr-core", version = "0.15.4" }
+hugr-passes = { path = "../hugr-passes", version = "0.15.4" }
+hugr-llvm = { path = "../hugr-llvm", version = "0.15.4", optional = true }
 
 [dev-dependencies]
 lazy_static = { workspace = true }
