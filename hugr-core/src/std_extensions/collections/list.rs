@@ -28,7 +28,7 @@ use crate::{
         ExtensionId, SignatureError, TypeDef, TypeDefBound,
     },
     ops::constant::CustomConst,
-    ops::{custom::ExtensionOp, NamedOp},
+    ops::custom::ExtensionOp,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeBound,
@@ -224,6 +224,10 @@ impl ListOp {
 }
 
 impl MakeOpDef for ListOp {
+    fn opdef_id(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
@@ -247,7 +251,7 @@ impl MakeOpDef for ListOp {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), ExtensionBuildError> {
         let sig = self.compute_signature(extension.get_type(&LIST_TYPENAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -333,21 +337,18 @@ pub struct ListOpInst {
     elem_type: Type,
 }
 
-impl NamedOp for ListOpInst {
-    fn name(&self) -> OpName {
-        let name: &str = self.op.into();
-        name.into()
-    }
-}
-
 impl MakeExtensionOp for ListOpInst {
+    fn op_id(&self) -> OpName {
+        self.op.opdef_id()
+    }
+
     fn from_extension_op(
         ext_op: &ExtensionOp,
     ) -> Result<Self, crate::extension::simple_op::OpLoadError> {
         let [TypeArg::Type { ty }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
-        let name = ext_op.def().name();
+        let name = ext_op.unqualified_id();
         let Ok(op) = ListOp::from_str(name) else {
             return Err(OpLoadError::NotMember(name.to_string()));
         };
@@ -369,7 +370,7 @@ impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
     /// registry to validate the element type against.
     pub fn to_extension_op(self) -> Option<ExtensionOp> {
-        ExtensionOp::new(EXTENSION.get_op(&self.name())?.clone(), self.type_args()).ok()
+        ExtensionOp::new(EXTENSION.get_op(&self.op_id())?.clone(), self.type_args()).ok()
     }
 }
 

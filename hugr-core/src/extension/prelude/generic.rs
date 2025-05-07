@@ -9,7 +9,6 @@ use crate::extension::OpDef;
 use crate::extension::SignatureFunc;
 use crate::extension::{ConstFold, ExtensionId};
 use crate::ops::ExtensionOp;
-use crate::ops::NamedOp;
 use crate::ops::OpName;
 use crate::type_row;
 use crate::types::FuncValueType;
@@ -28,23 +27,17 @@ use super::{ConstUsize, PRELUDE_ID};
 use crate::types::type_param::TypeParam;
 
 /// Name of the operation for loading generic BoundedNat parameters.
-pub const LOAD_NAT_OP_ID: OpName = OpName::new_inline("load_nat");
+pub static LOAD_NAT_OP_ID: OpName = OpName::new_inline("load_nat");
 
 /// Definition of the load nat operation.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct LoadNatDef;
 
-impl NamedOp for LoadNatDef {
-    fn name(&self) -> OpName {
-        LOAD_NAT_OP_ID
-    }
-}
-
 impl FromStr for LoadNatDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == LoadNatDef.name() {
+        if s == Self.op_id() {
             Ok(Self)
         } else {
             Err(())
@@ -72,6 +65,10 @@ impl ConstFold for LoadNatDef {
 }
 
 impl MakeOpDef for LoadNatDef {
+    fn opdef_id(&self) -> OpName {
+        LOAD_NAT_OP_ID.clone()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -120,13 +117,11 @@ impl LoadNat {
     }
 }
 
-impl NamedOp for LoadNat {
-    fn name(&self) -> OpName {
-        LOAD_NAT_OP_ID
-    }
-}
-
 impl MakeExtensionOp for LoadNat {
+    fn op_id(&self) -> OpName {
+        LoadNatDef.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

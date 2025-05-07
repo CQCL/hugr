@@ -377,7 +377,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
             args.outputs.finish(context.builder(), returns)
         }
     })
-    .extension_op(prelude::PRELUDE_ID, generic::LOAD_NAT_OP_ID, {
+    .extension_op(prelude::PRELUDE_ID, generic::LOAD_NAT_OP_ID.clone(), {
         let pcg = pcg.clone();
         move |context, args| {
             let load_nat = LoadNat::from_extension_op(args.node().as_ref())?;

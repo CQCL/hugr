@@ -8,7 +8,7 @@ use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
-use crate::ops::{ExtensionOp, NamedOp, OpName};
+use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
 use crate::Extension;
@@ -35,18 +35,13 @@ impl<AK: ArrayKind> Default for GenericArrayRepeatDef<AK> {
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayRepeatDef<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_REPEAT_OP_ID
-    }
-}
-
 impl<AK: ArrayKind> FromStr for GenericArrayRepeatDef<AK> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == ARRAY_REPEAT_OP_ID {
-            Ok(GenericArrayRepeatDef::new())
+        let candidate = Self::default();
+        if s == candidate.opdef_id() {
+            Ok(candidate)
         } else {
             Err(())
         }
@@ -67,6 +62,10 @@ impl<AK: ArrayKind> GenericArrayRepeatDef<AK> {
 }
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayRepeatDef<AK> {
+    fn opdef_id(&self) -> OpName {
+        ARRAY_REPEAT_OP_ID
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -103,7 +102,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayRepeatDef<AK> {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(&AK::TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -132,13 +131,11 @@ impl<AK: ArrayKind> GenericArrayRepeat<AK> {
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayRepeat<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_REPEAT_OP_ID
-    }
-}
-
 impl<AK: ArrayKind> MakeExtensionOp for GenericArrayRepeat<AK> {
+    fn op_id(&self) -> OpName {
+        GenericArrayRepeatDef::<AK>::default().opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

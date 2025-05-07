@@ -1,6 +1,7 @@
 use anyhow::{bail, Ok, Result};
 use hugr_core::{
-    ops::{ExtensionOp, NamedOp},
+    extension::simple_op::MakeExtensionOp as _,
+    ops::ExtensionOp,
     std_extensions::collections::list::{self, ListOp, ListValue},
     types::{SumType, Type, TypeArg},
     HugrView, Node,
@@ -282,7 +283,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
             args.outputs
                 .finish(ctx.builder(), vec![list, length.into()])?;
         }
-        _ => bail!("Collections: unimplemented op: {}", op.name()),
+        _ => bail!("Collections: unimplemented op: {}", op.op_id()),
     }
     Ok(())
 }
@@ -369,7 +370,7 @@ mod test {
             prelude::{self, qb_t, usize_t, ConstUsize},
             ExtensionRegistry,
         },
-        ops::{DataflowOpTrait, NamedOp, Value},
+        ops::{DataflowOpTrait, Value},
         std_extensions::collections::list::{self, list_type, ListOp, ListValue},
     };
     use rstest::rstest;
@@ -389,8 +390,10 @@ mod test {
     #[case::insert(ListOp::insert)]
     #[case::length(ListOp::length)]
     fn test_list_emission(mut llvm_ctx: TestContext, #[case] op: ListOp) {
+        use hugr_core::extension::simple_op::MakeExtensionOp as _;
+
         let ext_op = list::EXTENSION
-            .instantiate_extension_op(op.name().as_ref(), [qb_t().into()])
+            .instantiate_extension_op(op.op_id().as_ref(), [qb_t().into()])
             .unwrap();
         let es = ExtensionRegistry::new([list::EXTENSION.to_owned(), prelude::PRELUDE.to_owned()]);
         es.validate().unwrap();
@@ -407,7 +410,7 @@ mod test {
             });
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_list_extensions);
-        check_emission!(op.name().as_str(), hugr, llvm_ctx);
+        check_emission!(op.op_id().as_str(), hugr, llvm_ctx);
     }
 
     #[rstest]

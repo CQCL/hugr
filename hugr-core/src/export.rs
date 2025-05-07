@@ -447,7 +447,7 @@ impl<'a> Context<'a> {
             }
 
             OpType::OpaqueOp(op) => {
-                let node = self.make_named_global_ref(op.extension(), op.op_name());
+                let node = self.make_named_global_ref(op.extension(), op.unqualified_id());
                 let params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));

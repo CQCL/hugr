@@ -365,7 +365,7 @@ mod test {
     };
     use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
     use hugr_core::ops::handle::NodeHandle;
-    use hugr_core::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpName, OpType};
+    use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::value_array::{
         value_array_type, value_array_type_def, VArrayOpDef, VArrayRepeat, VArrayScan,
@@ -474,7 +474,7 @@ mod test {
         let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         let mut counts = HashMap::<OpName, u32>::new();
         for e in ext_ops {
-            *counts.entry(e.name()).or_default() += 1;
+            *counts.entry(e.qualified_id()).or_default() += 1;
         }
         assert_eq!(
             counts,
@@ -534,7 +534,11 @@ mod test {
             let ext_ops = DescendantsGraph::<Node>::try_new(&h, case1)
                 .unwrap()
                 .nodes()
-                .filter_map(|n| h.get_optype(n).as_extension_op().map(ExtensionOp::name))
+                .filter_map(|n| {
+                    h.get_optype(n)
+                        .as_extension_op()
+                        .map(ExtensionOp::qualified_id)
+                })
                 .collect_vec();
             assert_eq!(ext_ops, expected_ext_ops);
         }

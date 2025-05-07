@@ -10,7 +10,7 @@ use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
-use crate::ops::{ExtensionOp, NamedOp, OpName};
+use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
 use crate::Extension;
@@ -34,12 +34,6 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
 impl<AK: ArrayKind> Default for GenericArrayScanDef<AK> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<AK: ArrayKind> NamedOp for GenericArrayScanDef<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_SCAN_OP_ID
     }
 }
 
@@ -97,6 +91,10 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
 }
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayScanDef<AK> {
+    fn opdef_id(&self) -> OpName {
+        ARRAY_SCAN_OP_ID
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -135,7 +133,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayScanDef<AK> {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(&AK::TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.op_id(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -170,13 +168,11 @@ impl<AK: ArrayKind> GenericArrayScan<AK> {
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayScan<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_SCAN_OP_ID
-    }
-}
-
 impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
+    fn op_id(&self) -> OpName {
+        GenericArrayScanDef::<AK>::default().opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

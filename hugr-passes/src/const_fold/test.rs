@@ -1555,7 +1555,7 @@ fn test_cfg(
                         &ConstInt::new_u(4, unfolded_cst).unwrap().into()
                     );
                 } else if let Some(op) = hugr.get_optype(ch).as_extension_op() {
-                    assert_eq!(op.def().name(), "iadd");
+                    assert_eq!(op.unqualified_id(), "iadd");
                 }
             }
         }

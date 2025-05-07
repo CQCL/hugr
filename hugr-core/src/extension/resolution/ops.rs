@@ -73,7 +73,7 @@ pub(crate) fn resolve_op_extensions<'e>(
     // Fail if the Extension is not in the registry, or if the Extension was
     // found but did not have the expected operation.
     let extension = extension.expect("OpaqueOp should have an extension");
-    let Some(def) = extension.get_op(opaque.op_name()) else {
+    let Some(def) = extension.get_op(opaque.unqualified_id()) else {
         return Err(OpaqueOpError::OpNotFoundInExtension {
             node,
             op: opaque.name().clone(),

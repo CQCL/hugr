@@ -6,8 +6,8 @@ use crate::types::{EdgeKind, Signature, Type, TypeRow};
 use crate::Direction;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{impl_op_name, NamedOp, OpTrait, StaticTag};
-use super::{OpName, OpTag};
+use super::OpTag;
+use super::{impl_op_name, OpTrait, StaticTag};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -173,17 +173,8 @@ pub struct ExitBlock {
     pub cfg_outputs: TypeRow,
 }
 
-impl NamedOp for DataflowBlock {
-    fn name(&self) -> OpName {
-        "DataflowBlock".into()
-    }
-}
-
-impl NamedOp for ExitBlock {
-    fn name(&self) -> OpName {
-        "ExitBlock".into()
-    }
-}
+impl_op_name!(DataflowBlock);
+impl_op_name!(ExitBlock);
 
 impl StaticTag for DataflowBlock {
     const TAG: OpTag = OpTag::DataflowBlock;

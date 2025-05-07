@@ -11,6 +11,7 @@ use crate::{
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, OpDef, SignatureFunc,
     },
+    ops::OpName,
     types::Signature,
     Extension,
 };
@@ -48,6 +49,10 @@ pub enum FloatOps {
 }
 
 impl MakeOpDef for FloatOps {
+    fn opdef_id(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }

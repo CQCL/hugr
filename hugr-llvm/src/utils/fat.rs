@@ -2,12 +2,12 @@
 //!
 //! We define a trait [FatExt], an extension trait for [HugrView]. It provides
 //! methods that return [FatNode]s rather than [Node]s.
-use std::{cmp::Ordering, hash::Hash, marker::PhantomData, ops::Deref};
+use std::{cmp::Ordering, fmt, hash::Hash, marker::PhantomData, ops::Deref};
 
 use hugr_core::{
     core::HugrNode,
     hugr::{views::HierarchyView, HugrError},
-    ops::{DataflowBlock, ExitBlock, Input, NamedOp, OpType, Output, CFG},
+    ops::{DataflowBlock, ExitBlock, Input, OpType, Output, CFG},
     types::Type,
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
 };
@@ -307,12 +307,12 @@ impl<OT, H> Clone for FatNode<'_, OT, H> {
     }
 }
 
-impl<OT: NamedOp, H: HugrView + ?Sized> std::fmt::Display for FatNode<'_, OT, H, H::Node>
+impl<OT: fmt::Display, H: HugrView + ?Sized> fmt::Display for FatNode<'_, OT, H, H::Node>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("N<{}:{}>", self.as_ref().name(), self.node))
+        f.write_fmt(format_args!("N<{}:{}>", self.as_ref(), self.node))
     }
 }
 

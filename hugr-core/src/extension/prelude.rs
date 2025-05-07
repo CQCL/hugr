@@ -595,7 +595,12 @@ impl ConstFold for TupleOpDef {
         }
     }
 }
+
 impl MakeOpDef for TupleOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let rv = TypeRV::new_row_var_use(0, TypeBound::Any);
         let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
@@ -649,20 +654,18 @@ impl MakeTuple {
     }
 }
 
-impl NamedOp for MakeTuple {
-    fn name(&self) -> OpName {
-        TupleOpDef::MakeTuple.name()
-    }
-}
-
 impl MakeExtensionOp for MakeTuple {
+    fn op_id(&self) -> OpName {
+        TupleOpDef::MakeTuple.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::MakeTuple {
-            return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
         let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
@@ -711,20 +714,18 @@ impl UnpackTuple {
     }
 }
 
-impl NamedOp for UnpackTuple {
-    fn name(&self) -> OpName {
-        TupleOpDef::UnpackTuple.name()
-    }
-}
-
 impl MakeExtensionOp for UnpackTuple {
+    fn op_id(&self) -> OpName {
+        TupleOpDef::UnpackTuple.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::UnpackTuple {
-            return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
         let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
@@ -760,28 +761,30 @@ impl MakeRegisteredOp for UnpackTuple {
     }
 }
 
+/// Name of the no-op operation.
+pub const NOOP_OP_ID: OpName = OpName::new_inline("Noop");
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 /// A no-op operation definition.
 pub struct NoopDef;
-
-impl NamedOp for NoopDef {
-    fn name(&self) -> OpName {
-        "Noop".into()
-    }
-}
 
 impl std::str::FromStr for NoopDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == NoopDef.name() {
+        if s == NoopDef.op_id() {
             Ok(Self)
         } else {
             Err(())
         }
     }
 }
+
 impl MakeOpDef for NoopDef {
+    fn opdef_id(&self) -> OpName {
+        NOOP_OP_ID
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let tv = Type::new_var_use(0, TypeBound::Any);
         PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(tv)).into()
@@ -836,13 +839,12 @@ impl Default for Noop {
         Self(Type::UNIT)
     }
 }
-impl NamedOp for Noop {
-    fn name(&self) -> OpName {
-        NoopDef.name()
-    }
-}
 
 impl MakeExtensionOp for Noop {
+    fn op_id(&self) -> OpName {
+        NoopDef.op_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -875,17 +877,12 @@ pub struct BarrierDef;
 
 /// Name of the barrier operation.
 pub const BARRIER_OP_ID: OpName = OpName::new_inline("Barrier");
-impl NamedOp for BarrierDef {
-    fn name(&self) -> OpName {
-        BARRIER_OP_ID
-    }
-}
 
 impl std::str::FromStr for BarrierDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == BarrierDef.name() {
+        if s == BarrierDef.op_id() {
             Ok(Self)
         } else {
             Err(())
@@ -894,6 +891,10 @@ impl std::str::FromStr for BarrierDef {
 }
 
 impl MakeOpDef for BarrierDef {
+    fn opdef_id(&self) -> OpName {
+        BARRIER_OP_ID
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list(TypeBound::Any)],
@@ -940,11 +941,15 @@ impl Barrier {
 
 impl NamedOp for Barrier {
     fn name(&self) -> OpName {
-        BarrierDef.name()
+        BarrierDef.op_id()
     }
 }
 
 impl MakeExtensionOp for Barrier {
+    fn op_id(&self) -> OpName {
+        BarrierDef.op_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,

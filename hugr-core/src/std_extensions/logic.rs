@@ -6,7 +6,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
-use crate::ops::Value;
+use crate::ops::{OpName, Value};
 use crate::types::Signature;
 use crate::{
     extension::{
@@ -77,6 +77,10 @@ pub enum LogicOp {
 }
 
 impl MakeOpDef for LogicOp {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
             LogicOp::And | LogicOp::Or | LogicOp::Eq | LogicOp::Xor => {
@@ -168,7 +172,7 @@ pub(crate) mod test {
     use super::{extension, LogicOp};
     use crate::{
         extension::simple_op::{MakeOpDef, MakeRegisteredOp},
-        ops::{NamedOp, Value},
+        ops::Value,
         Extension,
     };
 
@@ -183,7 +187,7 @@ pub(crate) mod test {
 
         for op in LogicOp::iter() {
             assert_eq!(
-                LogicOp::from_def(r.get_op(&op.name()).unwrap(),).unwrap(),
+                LogicOp::from_def(r.get_op(op.into()).unwrap(),).unwrap(),
                 op
             );
         }

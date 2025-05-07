@@ -9,8 +9,7 @@ use crate::extension::prelude::{bool_t, string_type, usize_t};
 use crate::extension::simple_op::{HasConcrete, HasDef};
 use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc};
-use crate::ops::OpName;
-use crate::ops::{custom::ExtensionOp, NamedOp};
+use crate::ops::{ExtensionOp, OpName};
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::types::{TypeArg, TypeRV};
@@ -45,6 +44,10 @@ pub enum ConvertOpDef {
 }
 
 impl MakeOpDef for ConvertOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
@@ -146,13 +149,11 @@ impl ConvertOpType {
     }
 }
 
-impl NamedOp for ConvertOpType {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
-
 impl MakeExtensionOp for ConvertOpType {
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = ConvertOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())

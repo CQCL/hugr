@@ -1,6 +1,6 @@
 use hugr_core::{
     extension::simple_op::MakeExtensionOp,
-    ops::{ExtensionOp, NamedOp, Value},
+    ops::{ExtensionOp, Value},
     std_extensions::logic::{self, LogicOp},
     types::SumType,
     HugrView, Node,
@@ -56,11 +56,11 @@ fn emit_logic_op<'c, H: HugrView<Node = Node>>(
 pub fn add_logic_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
 ) -> CodegenExtsBuilder<'a, H> {
-    cem.extension_op(logic::EXTENSION_ID, LogicOp::Eq.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::And.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::Or.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::Not.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::Xor.name(), emit_logic_op) // Added Xor
+    cem.extension_op(logic::EXTENSION_ID, LogicOp::Eq.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::And.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Or.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Not.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Xor.op_id(), emit_logic_op) // Added Xor
 }
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {

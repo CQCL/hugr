@@ -8,7 +8,7 @@ use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
-use crate::ops::{ExtensionOp, NamedOp, OpName};
+use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
 use crate::{type_row, Extension};
@@ -32,12 +32,6 @@ impl<AK: ArrayKind> GenericArrayDiscardDef<AK> {
 impl<AK: ArrayKind> Default for GenericArrayDiscardDef<AK> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<AK: ArrayKind> NamedOp for GenericArrayDiscardDef<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_DISCARD_OP_ID
     }
 }
 
@@ -66,6 +60,10 @@ impl<AK: ArrayKind> GenericArrayDiscardDef<AK> {
 }
 
 impl<AK: ArrayKind> MakeOpDef for GenericArrayDiscardDef<AK> {
+    fn opdef_id(&self) -> OpName {
+        ARRAY_DISCARD_OP_ID
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -100,7 +98,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayDiscardDef<AK> {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(extension.get_type(&AK::TYPE_NAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
         self.post_opdef(def);
         Ok(())
     }
@@ -127,13 +125,11 @@ impl<AK: ArrayKind> GenericArrayDiscard<AK> {
     }
 }
 
-impl<AK: ArrayKind> NamedOp for GenericArrayDiscard<AK> {
-    fn name(&self) -> OpName {
-        ARRAY_DISCARD_OP_ID
-    }
-}
-
 impl<AK: ArrayKind> MakeExtensionOp for GenericArrayDiscard<AK> {
+    fn op_id(&self) -> OpName {
+        GenericArrayDiscardDef::<AK>::default().opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
