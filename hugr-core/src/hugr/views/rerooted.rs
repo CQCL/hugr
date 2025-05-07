@@ -41,7 +41,15 @@ impl<H: HugrView> HugrInternals for Rerooted<H> {
         = H::Portgraph<'p>
     where
         Self: 'p;
+
+    type RegionPortgraph<'p>
+        = H::RegionPortgraph<'p>
+    where
+        Self: 'p;
+
     type Node = H::Node;
+
+    type RegionPortgraphNodes = H::RegionPortgraphNodes;
 
     super::impls::hugr_internal_methods! {this, &this.hugr}
 }
