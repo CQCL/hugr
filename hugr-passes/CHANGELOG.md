@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.3...hugr-passes-v0.15.4) - 2025-05-07
+
+### New Features
+
+- ReplaceTypes: handlers for array constants + linearization ([#2023](https://github.com/CQCL/hugr/pull/2023))
+
 ## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.2...hugr-passes-v0.15.3) - 2025-04-02
 
 ### New Features

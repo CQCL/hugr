@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.15.3"
+version = "0.15.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -16,7 +16,7 @@ categories = ["compilers"]
 bench = false
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.15.3" }
+hugr-core = { path = "../hugr-core", version = "0.15.4" }
 portgraph = { workspace = true }
 ascent = { version = "0.8.0" }
 derive_more = { workspace = true, features = ["display", "error", "from"] }
