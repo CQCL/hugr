@@ -338,7 +338,7 @@ pub fn decompose_array_fat_pointer<'c>(
 /// Returns a pointer and a struct: The pointer points to the first element of the array (i.e. it
 /// is of type `elem_ty.ptr_type()`). The struct is the fat pointer of the that stores an additional
 /// offset (initialised to be 0).
-fn build_array_alloc<'c, H: HugrView<Node = Node>>(
+pub fn build_array_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &impl ArrayCodegen,
     elem_ty: BasicTypeEnum<'c>,
