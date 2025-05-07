@@ -46,7 +46,7 @@ pub trait HugrInternals {
     // when doing so we are unable to restrict the type to implement petgraph's
     // traits over references (e.g. `&MyGraph : IntoNodeIdentifiers`, which is
     // needed if we want to use petgraph's algorithms on the region graph).
-    // This won't be solvable until we don't do the big petgraph refactor -.-
+    // This won't be solvable until we do the big petgraph refactor -.-
     // In the meantime, just wrap the portgraph in a `FlatRegion` as needed.
     fn region_portgraph(
         &self,
