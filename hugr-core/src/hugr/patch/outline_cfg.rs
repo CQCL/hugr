@@ -17,7 +17,7 @@ use crate::{type_row, Node};
 use super::{PatchHugrMut, PatchVerification};
 
 /// Moves some of the blocks in a Control-flow region into a new CFG-node that
-/// is the only child of a new Basic Block in the original CSG.
+/// is the only child of a new Basic Block in the original region.
 pub struct OutlineCfg {
     blocks: HashSet<Node>,
 }
