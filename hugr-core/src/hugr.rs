@@ -135,6 +135,16 @@ impl Hugr {
             .ok_or(HugrError::UnsupportedEntrypoint { op: op_name })
     }
 
+    /// Reserves enough capacity to insert at least the given number of
+    /// additional nodes and links.
+    ///
+    /// This method does not take into account already allocated free space left
+    /// after node removals, and may overallocate capacity.
+    pub fn reserve(&mut self, nodes: usize, links: usize) {
+        let ports = links * 2;
+        self.graph.reserve(nodes, ports);
+    }
+
     /// Load a Hugr from a json reader.
     ///
     /// Validates the Hugr against the provided extension registry, ensuring all
