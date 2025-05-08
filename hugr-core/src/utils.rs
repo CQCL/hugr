@@ -60,7 +60,10 @@ where
 #[inline]
 #[track_caller]
 pub fn collect_array<const N: usize, T: Debug>(arr: impl IntoIterator<Item = T>) -> [T; N] {
-    try_collect_array(arr).unwrap_or_else(|v| panic!("Expected {} elements, got {:?}", N, v))
+    match try_collect_array(arr) {
+        Ok(v) => v,
+        Err(v) => panic!("Expected {} elements, got {:?}", N, v),
+    }
 }
 
 /// Collect a vector into an array.
