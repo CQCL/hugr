@@ -1,8 +1,10 @@
-WHITESPACE  = _{ " " | "\t" | "\r" | "\n" }
-COMMENT     = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
-identifier  = @{ (ASCII_ALPHA | "_" | "-") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
-symbol_name = @{ !reserved ~ identifier ~ ("." ~ identifier)* }
-link_name   = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
+WHITESPACE         = _{ " " | "\t" | "\r" | "\n" }
+COMMENT            = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
+identifier         = @{ identifier_initial ~ identifier_rest* }
+identifier_initial = @{ ASCII_ALPHA | "_" | "-" }
+identifier_rest    = @{ ASCII_ALPHANUMERIC | "_" | "-" }
+symbol_name        = @{ !(reserved ~ !(identifier_rest | ".")) ~ (identifier ~ ("." ~ identifier)*) }
+link_name          = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 
 literal = { literal_string | literal_float | literal_nat | literal_bytes }
 
