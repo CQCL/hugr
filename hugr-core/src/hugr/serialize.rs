@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use self::upgrade::UpgradeError;
 
-use super::{HugrMut, HugrView, NodeMetadataMap};
+use super::{HugrError, HugrMut, HugrView, NodeMetadataMap};
 
 mod upgrade;
 
@@ -96,6 +96,12 @@ struct SerHugrLatest {
     /// A metadata field with the package identifier that encoded the HUGR.
     #[serde(default)]
     encoder: Option<String>,
+    /// The entrypoint of the HUGR.
+    ///
+    /// For backwards compatibility, if `None` the entrypoint is set to the root
+    /// of the node hierarchy.
+    #[serde(default)]
+    entrypoint: Option<Node>,
 }
 
 /// Errors that can occur while serializing a HUGR.
@@ -127,6 +133,9 @@ pub enum HUGRSerializationError {
     /// First node in node list must be the HUGR root.
     #[error("The first node in the node list has parent {0}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),
+    /// Failed to deserialize the HUGR.
+    #[error(transparent)]
+    HugrError(#[from] HugrError),
 }
 
 impl Serialize for Hugr {
@@ -158,7 +167,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
-        for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
+        for (order, node) in hugr.canonical_order(hugr.module_root()).enumerate() {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
@@ -209,6 +218,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             edges,
             metadata: Some(metadata),
             encoder,
+            entrypoint: Some(node_rekey[&hugr.entrypoint()]),
         })
     }
 }
@@ -221,6 +231,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
             edges,
             metadata,
             encoder: _,
+            entrypoint,
         }: SerHugrLatest,
     ) -> Result<Self, Self::Error> {
         // Root must be first node
@@ -235,17 +246,28 @@ impl TryFrom<SerHugrLatest> for Hugr {
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
+        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2)?;
+
+        // Since the new Hugr may add some nodes to contain the root (if the
+        // encoded file did not have a module at the root), we need a function
+        // to map the node indices.
+        let padding_nodes = hugr.entrypoint.index();
+        let hugr_node =
+            |node: Node| -> Node { portgraph::NodeIndex::new(node.index() + padding_nodes).into() };
 
         for node_ser in nodes {
-            hugr.add_node_with_parent(node_ser.parent, node_ser.op);
+            hugr.add_node_with_parent(hugr_node(node_ser.parent), node_ser.op);
+        }
+
+        if let Some(entrypoint) = entrypoint {
+            hugr.set_entrypoint(entrypoint);
         }
 
         if let Some(metadata) = metadata {
-            for (node, metadata) in metadata.into_iter().enumerate() {
+            for (node_idx, metadata) in metadata.into_iter().enumerate() {
                 if let Some(metadata) = metadata {
-                    let node = portgraph::NodeIndex::new(node);
-                    hugr.metadata[node] = Some(metadata);
+                    let node = hugr_node(portgraph::NodeIndex::new(node_idx).into());
+                    hugr.metadata[node.into_portgraph()] = Some(metadata);
                 }
             }
         }
@@ -271,6 +293,9 @@ impl TryFrom<SerHugrLatest> for Hugr {
             Ok(offset)
         };
         for [(src, from_offset), (dst, to_offset)] in edges {
+            let src = hugr_node(src);
+            let dst = hugr_node(dst);
+
             let src_port = unwrap_offset(src, from_offset, Direction::Outgoing, &hugr)?;
             let dst_port = unwrap_offset(dst, to_offset, Direction::Incoming, &hugr)?;
 

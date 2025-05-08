@@ -9,7 +9,7 @@ use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView
 use crate::extension::ExtensionRegistry;
 use crate::{Direction, Hugr, Node};
 
-use super::views::{panic_invalid_node, panic_invalid_non_root};
+use super::views::{panic_invalid_node, panic_invalid_non_entrypoint};
 use super::HugrView;
 use super::{NodeMetadataMap, OpType};
 use crate::ops::handle::NodeHandle;
@@ -124,13 +124,17 @@ impl HugrInternals for Hugr {
 pub trait HugrMutInternals: HugrView {
     /// Set the node at the root of the HUGR hierarchy.
     ///
-    /// Any node not reachable from this root should be deleted from the HUGR
-    /// after this call.
+    /// Any node not reachable from this root should be manually removed from
+    /// the HUGR.
+    ///
+    /// To set the working entrypoint of the HUGR, use
+    /// [`HugrMut::set_entrypoint`][crate::hugr::HugrMut::set_entrypoint]
+    /// instead.
     ///
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn set_root(&mut self, root: Self::Node);
+    fn set_module_root(&mut self, root: Self::Node);
 
     /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
     ///
@@ -207,6 +211,9 @@ pub trait HugrMutInternals: HugrView {
     ///
     /// Returns the old OpType.
     ///
+    /// If the module root is set to a non-module operation the hugr will
+    /// become invalid.
+    ///
     /// # Panics
     ///
     /// If the node is not in the graph.
@@ -242,9 +249,11 @@ pub trait HugrMutInternals: HugrView {
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
 impl HugrMutInternals for Hugr {
-    fn set_root(&mut self, root: Node) {
-        self.hierarchy.detach(self.root);
-        self.root = root.into_portgraph();
+    fn set_module_root(&mut self, root: Node) {
+        panic_invalid_node(self, root.node());
+        let root = self.to_portgraph_node(root.node());
+        self.hierarchy.detach(root);
+        self.module_root = root;
     }
 
     #[inline]
@@ -318,8 +327,8 @@ impl HugrMutInternals for Hugr {
     }
 
     fn move_after_sibling(&mut self, node: Node, after: Node) {
-        panic_invalid_non_root(self, node);
-        panic_invalid_non_root(self, after);
+        panic_invalid_non_entrypoint(self, node);
+        panic_invalid_non_entrypoint(self, after);
         self.hierarchy.detach(node.into_portgraph());
         self.hierarchy
             .insert_after(node.into_portgraph(), after.into_portgraph())
@@ -327,8 +336,8 @@ impl HugrMutInternals for Hugr {
     }
 
     fn move_before_sibling(&mut self, node: Node, before: Node) {
-        panic_invalid_non_root(self, node);
-        panic_invalid_non_root(self, before);
+        panic_invalid_non_entrypoint(self, node);
+        panic_invalid_non_entrypoint(self, before);
         self.hierarchy.detach(node.into_portgraph());
         self.hierarchy
             .insert_before(node.into_portgraph(), before.into_portgraph())
@@ -340,7 +349,7 @@ impl HugrMutInternals for Hugr {
         std::mem::replace(self.optype_mut(node), op.into())
     }
 
-    fn optype_mut(&mut self, node: Self::Node) -> &mut OpType {
+    fn optype_mut(&mut self, node: Node) -> &mut OpType {
         panic_invalid_node(self, node);
         let node = self.to_portgraph_node(node);
         self.op_types.get_mut(node)
@@ -384,7 +393,7 @@ mod test {
                 builder.finish_hugr_with_outputs([nop_out]).unwrap(),
             )
         };
-        let [i, o] = hugr.get_io(hugr.root()).unwrap();
+        let [i, o] = hugr.get_io(hugr.entrypoint()).unwrap();
         assert_eq!(0..2, hugr.insert_ports(nop, Direction::Incoming, 0, 2));
         assert_eq!(1..3, hugr.insert_ports(nop, Direction::Outgoing, 1, 2));
 

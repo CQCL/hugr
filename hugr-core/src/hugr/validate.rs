@@ -52,9 +52,9 @@ impl<'a> ValidationContext<'a> {
     /// Check the validity of the HUGR.
     pub fn validate(&mut self) -> Result<(), ValidationError> {
         // Root node must be a root in the hierarchy.
-        if !self.hugr.hierarchy().is_root(self.hugr.root) {
+        if !self.hugr.hierarchy().is_root(self.hugr.module_root) {
             return Err(ValidationError::RootNotRoot {
-                node: self.hugr.root(),
+                node: self.hugr.module_root(),
             });
         }
 
@@ -64,7 +64,7 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Hierarchy and children. No type variables declared outside the root.
-        self.validate_subtree(self.hugr.root(), &[])?;
+        self.validate_subtree(self.hugr.entrypoint(), &[])?;
 
         // In tests we take the opportunity to verify that the hugr
         // serialization round-trips. We verify the schema of the serialization
@@ -122,14 +122,7 @@ impl<'a> ValidationContext<'a> {
             }
         }
 
-        if node == self.hugr.root() {
-            // The root node cannot have connected edges
-            if self.hugr.all_linked_inputs(node).next().is_some()
-                || self.hugr.all_linked_outputs(node).next().is_some()
-            {
-                return Err(ValidationError::RootWithEdges { node });
-            }
-        } else {
+        if node != self.hugr.module_root() {
             let Some(parent) = self.hugr.get_parent(node) else {
                 return Err(ValidationError::NoParent { node });
             };
@@ -562,7 +555,7 @@ impl<'a> ValidationContext<'a> {
         // Check port connections.
         //
         // Root nodes are ignored, as they cannot have connected edges.
-        if node != self.hugr.root() {
+        if node != self.hugr.entrypoint() {
             for dir in Direction::BOTH {
                 for (i, port_index) in self
                     .hugr
@@ -600,9 +593,6 @@ pub enum ValidationError {
     /// The root node of the Hugr is not a root in the hierarchy.
     #[error("The root node of the Hugr {node} is not a root in the hierarchy.")]
     RootNotRoot { node: Node },
-    /// The root node of the Hugr should not have any edges.
-    #[error("The root node of the Hugr {node} has edges when it should not.")]
-    RootWithEdges { node: Node },
     /// The node ports do not match the operation signature.
     #[error("The node {node} has an invalid number of ports. The operation {optype} cannot have {actual} {dir:?} ports. Expected {expected}.")]
     WrongNumberOfPorts {

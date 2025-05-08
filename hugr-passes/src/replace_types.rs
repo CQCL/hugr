@@ -74,7 +74,9 @@ impl NodeTemplate {
     ) -> Result<Node, BuildError> {
         match self {
             NodeTemplate::SingleOp(op_type) => Ok(hugr.add_node_with_parent(parent, op_type)),
-            NodeTemplate::CompoundOp(new_h) => Ok(hugr.insert_hugr(parent, *new_h).new_root),
+            NodeTemplate::CompoundOp(new_h) => {
+                Ok(hugr.insert_hugr(parent, *new_h).inserted_entrypoint)
+            }
             NodeTemplate::Call(target, type_args) => {
                 let c = call(hugr, target, type_args)?;
                 let tgt_port = c.called_function_port();
@@ -97,6 +99,9 @@ impl NodeTemplate {
             // Really we should check whether func points at a FuncDecl or FuncDefn and create
             // the appropriate variety of FuncID but it doesn't matter for the purpose of making a Call.
             NodeTemplate::Call(func, type_args) => {
+                if !dfb.hugr().contains_node(func) {
+                    return Err(BuildError::NodeNotFound { node: func });
+                }
                 dfb.call(&FuncID::<true>::from(func), &type_args, inputs)
             }
         }
@@ -107,9 +112,9 @@ impl NodeTemplate {
         let new_optype = match self.clone() {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(new_h) => {
-                let new_root = hugr.insert_hugr(n, *new_h).new_root;
-                let children = hugr.children(new_root).collect::<Vec<_>>();
-                let root_opty = hugr.remove_node(new_root);
+                let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
+                let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
+                let root_opty = hugr.remove_node(new_entrypoint);
                 for ch in children {
                     hugr.set_parent(ch, n);
                 }
@@ -136,7 +141,7 @@ impl NodeTemplate {
     ) -> Result<(), Option<Signature>> {
         let sig = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
-            NodeTemplate::CompoundOp(hugr) => hugr.root_optype(),
+            NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype(),
             NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
@@ -521,11 +526,11 @@ impl ComposablePass for ReplaceTypes {
 
     fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
-        for n in hugr.nodes().collect::<Vec<_>>() {
+        for n in hugr.entry_descendants().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
             let new_dfsig = hugr.get_optype(n).dataflow_signature();
             if let Some(new_sig) = new_dfsig
-                .filter(|_| changed && n != hugr.root())
+                .filter(|_| changed && n != hugr.entrypoint())
                 .map(Cow::into_owned)
             {
                 for outp in new_sig.output_ports() {
@@ -787,7 +792,9 @@ mod test {
 
         assert!(lowerer(&ext).run(&mut h).unwrap());
 
-        let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        let ext_ops = h
+            .entry_descendants()
+            .filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(
             ext_ops.map(|e| e.unqualified_id()).sorted().collect_vec(),
             ["get", "itousize", "lowered_read_bool", "panic",]
@@ -830,7 +837,7 @@ mod test {
         lowerer(&ext).run(&mut h).unwrap();
 
         let ext_ops = h
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| h.get_optype(n).as_extension_op())
             .collect_vec();
         assert_eq!(
@@ -882,7 +889,7 @@ mod test {
         {
             let mut h = backup.clone();
             assert_eq!(lowerer.run(&mut h), Ok(true));
-            let sig = h.signature(h.root()).unwrap();
+            let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
                 &TypeRow::from(vec![list_type(usize_t()), value_array_type(10, bool_t())])
@@ -904,7 +911,7 @@ mod test {
         {
             let mut h = backup.clone();
             assert_eq!(lowerer.run(&mut h), Ok(true));
-            let sig = h.signature(h.root()).unwrap();
+            let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
                 &TypeRow::from(vec![list_type(i64_t()), value_array_type(10, bool_t())])
@@ -912,7 +919,7 @@ mod test {
             assert_eq!(sig.input(), sig.output());
             // This will have to update inside the Const
             let cst = h
-                .nodes()
+                .entry_descendants()
                 .filter_map(|n| h.get_optype(n).as_const())
                 .exactly_one()
                 .ok()
@@ -1018,14 +1025,14 @@ mod test {
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
         // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
         assert_eq!(
-            h.root_optype().dataflow_signature().unwrap().io(),
+            h.entrypoint_optype().dataflow_signature().unwrap().io(),
             (
                 &vec![list_type(qb_t()); 2].into(),
                 &vec![qb_t(), option_type(qb_t()).into()].into()
             )
         );
         assert_eq!(
-            h.nodes()
+            h.entry_descendants()
                 .filter_map(|n| h.get_optype(n).as_extension_op())
                 .map(|x| x.qualified_id())
                 .sorted()
@@ -1093,7 +1100,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
         let read_func = h
             .insert_hugr(
-                h.root(),
+                h.entrypoint(),
                 lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
                     FunctionBuilder::new(
                         "lowered_read",
@@ -1103,7 +1110,7 @@ mod test {
                 .finish_hugr()
                 .unwrap(),
             )
-            .new_root;
+            .inserted_entrypoint;
 
         let mut lw = lowerer(&e);
         lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {
@@ -1113,7 +1120,7 @@ mod test {
 
         assert_eq!(h.output_neighbours(read_func).count(), 2);
         let ext_op_names = h
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| h.get_optype(n).as_extension_op())
             .map(|e| e.unqualified_id())
             .sorted()

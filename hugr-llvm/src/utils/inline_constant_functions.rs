@@ -19,7 +19,7 @@ pub fn inline_constant_functions(hugr: &mut impl HugrMut<Node = Node>) -> Result
 fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Result<bool> {
     let mut const_funs = vec![];
 
-    for n in hugr.nodes() {
+    for n in hugr.entry_descendants() {
         let konst_hugr = {
             let Some(konst) = hugr.get_optype(n).as_const() else {
                 continue;
@@ -27,11 +27,11 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
             let Value::Function { hugr } = konst.value() else {
                 continue;
             };
-            let optype = hugr.get_optype(hugr.root());
+            let optype = hugr.get_optype(hugr.entrypoint());
             if !optype.is_dfg() && !optype.is_func_defn() {
                 bail!(
                     "Constant function has unsupported root: {:?}",
-                    hugr.get_optype(hugr.root())
+                    hugr.get_optype(hugr.entrypoint())
                 )
             }
             hugr.clone()
@@ -65,8 +65,10 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
                 name: const_fn_name(konst_n),
                 signature: polysignature.clone(),
             };
-            func_hugr.replace_op(func_hugr.root(), func_defn);
-            let func_node = hugr.insert_hugr(hugr.root(), func_hugr).new_root;
+            func_hugr.replace_op(func_hugr.entrypoint(), func_defn);
+            let func_node = hugr
+                .insert_hugr(hugr.entrypoint(), func_hugr)
+                .inserted_entrypoint;
             hugr.set_num_ports(func_node, 0, 1);
 
             for lcn in load_constant_ns {
@@ -138,7 +140,7 @@ mod test {
         inline_constant_functions(&mut hugr).unwrap();
         hugr.validate().unwrap();
 
-        for n in hugr.nodes() {
+        for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
                 assert!(!matches!(konst.value(), Value::Function { .. }))
             }
@@ -188,7 +190,7 @@ mod test {
         inline_constant_functions(&mut hugr).unwrap();
         hugr.validate().unwrap();
 
-        for n in hugr.nodes() {
+        for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
                 assert!(!matches!(konst.value(), Value::Function { .. }))
             }

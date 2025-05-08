@@ -46,7 +46,7 @@ pub use header::{EnvelopeConfig, EnvelopeFormat, ZstdConfig, MAGIC_NUMBERS};
 
 use crate::{
     extension::ExtensionRegistry,
-    package::{Package, PackageEncodingError, PackageError},
+    package::{Package, PackageEncodingError},
 };
 use header::EnvelopeHeader;
 use std::io::BufRead;
@@ -184,11 +184,6 @@ pub enum EnvelopeError {
     IO {
         /// The source error.
         source: std::io::Error,
-    },
-    /// Error decoding a package from the payload.
-    Package {
-        /// The source error.
-        source: PackageError,
     },
     /// Error writing a json package to the payload.
     PackageEncoding {

@@ -40,8 +40,19 @@ pub enum ConstFoldError {
     /// Error raised when a Node is specified as an entry-point but
     /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
     /// a [Conditional](OpType::Conditional).
-    #[error("Node {_0} has OpType {_1} which cannot be an entry-point")]
-    InvalidEntryPoint(Node, OpType),
+    #[error("{node} has OpType {op} which cannot be an entry-point")]
+    InvalidEntryPoint {
+        /// The node which was specified as an entry-point
+        node: Node,
+        /// The OpType of the node
+        op: OpType,
+    },
+    /// The chosen entrypoint is not in the hugr.
+    #[error("Entry-point {node} is not part of the Hugr")]
+    MissingEntryPoint {
+        /// The missing node
+        node: Node,
+    },
 }
 
 impl ConstantFoldPass {
@@ -95,6 +106,9 @@ impl ComposablePass for ConstantFoldPass {
         ));
         let mut m = Machine::new(&hugr);
         for (&n, in_vals) in self.inputs.iter() {
+            if !hugr.contains_node(n) {
+                return Err(ConstFoldError::MissingEntryPoint { node: n });
+            };
             m.prepopulate_inputs(
                 n,
                 in_vals.iter().map(|(p, v)| {
@@ -106,17 +120,17 @@ impl ComposablePass for ConstantFoldPass {
                     (*p, const_with_dummy_loc)
                 }),
             )
-            .map_err(|opty| ConstFoldError::InvalidEntryPoint(n, opty))?;
+            .map_err(|op| ConstFoldError::InvalidEntryPoint { node: n, op })?;
         }
 
         let results = m.run(ConstFoldContext, []);
-        let mb_root_inp = hugr.get_io(hugr.root()).map(|[i, _]| i);
+        let mb_root_inp = hugr.get_io(hugr.entrypoint()).map(|[i, _]| i);
 
         let wires_to_break = hugr
-            .nodes()
+            .entry_descendants()
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
             .filter(|(n, ip)| {
-                *n != hugr.root()
+                *n != hugr.entrypoint()
                     && matches!(hugr.get_optype(*n).port_kind(*ip), Some(EdgeKind::Value(_)))
             })
             .filter_map(|(n, ip)| {
@@ -135,7 +149,7 @@ impl ComposablePass for ConstantFoldPass {
             .collect::<Vec<_>>();
         // Sadly the results immutably borrow the hugr, so we must extract everything we need before mutation
         let terminating_tail_loops = hugr
-            .nodes()
+            .entry_descendants()
             .filter(|n| {
                 results.tail_loop_terminates(*n) == Some(TailLoopTermination::NeverContinues)
             })
@@ -172,15 +186,15 @@ impl ComposablePass for ConstantFoldPass {
 }
 
 /// Exhaustively apply constant folding to a HUGR.
-/// If the Hugr is [Module]-rooted, assumes all [FuncDefn] children are reachable.
+/// If the Hugr's entrypoint is its [Module], assumes all [FuncDefn] children are reachable.
 ///
 /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
 /// [Module]: hugr_core::ops::OpType::Module
 pub fn constant_fold_pass<H: HugrMut<Node = Node>>(h: &mut H) {
     let c = ConstantFoldPass::default();
-    let c = if h.get_optype(h.root()).is_module() {
+    let c = if h.get_optype(h.entrypoint()).is_module() {
         let no_inputs: [(IncomingPort, _); 0] = [];
-        h.children(h.root())
+        h.children(h.entrypoint())
             .filter(|n| h.get_optype(*n).is_func_defn())
             .fold(c, |c, n| c.with_inputs(n, no_inputs.iter().cloned()))
     } else {

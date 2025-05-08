@@ -355,7 +355,7 @@ pub enum ConstTypeError {
 /// Hugrs (even functions) inside Consts must be monomorphic
 fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
-        hugr_root_type: h.root_optype().clone(),
+        hugr_root_type: h.entrypoint_optype().clone(),
     };
     if let Some(pf) = h.poly_func_type() {
         match pf.try_into() {

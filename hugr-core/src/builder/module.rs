@@ -22,7 +22,7 @@ pub struct ModuleBuilder<T>(pub(super) T);
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().root()
+        self.0.as_ref().entrypoint()
     }
 
     #[inline]

@@ -92,7 +92,7 @@ impl DeadCodeElimPass {
 
     /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
     /// used to evaluate these nodes.
-    /// The root node is assumed to be an entry point;
+    /// [`HugrView::entrypoint`] is assumed to be an entry point;
     /// for Module roots the client will want to mark some of the FuncDefn children
     /// as entry points too.
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = Node>) -> Self {
@@ -104,7 +104,7 @@ impl DeadCodeElimPass {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
-        q.push_front(h.root());
+        q.push_front(h.entrypoint());
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
@@ -166,7 +166,7 @@ impl ComposablePass for DeadCodeElimPass {
     fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), Infallible> {
         let needed = self.find_needed_nodes(&*hugr);
         let remove = hugr
-            .nodes()
+            .entry_descendants()
             .filter(|n| !needed.contains(n))
             .collect::<Vec<_>>();
         for n in remove {
@@ -224,7 +224,7 @@ mod test {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [block.node(), exit.node(), cst_used.node()]
             );
             assert_eq!(
@@ -265,7 +265,7 @@ mod test {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [
                     block.node(),
                     exit.node(),
@@ -294,7 +294,7 @@ mod test {
                 .run(&mut h)
                 .unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [block.node(), exit.node(), cst_unused, cst_used.node()]
             );
             assert_eq!(

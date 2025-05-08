@@ -18,10 +18,43 @@ use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
-use super::views::{panic_invalid_node, panic_invalid_non_root, panic_invalid_port};
+use super::views::{
+    panic_invalid_node, panic_invalid_non_entrypoint, panic_invalid_port, Rerooted,
+};
 
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrMutInternals {
+    /// Set entrypoint to the HUGR.
+    ///
+    /// This node represents the execution entrypoint of the HUGR. When running
+    /// local graph analysis or optimizations, the region defined under this
+    /// node will be used as the starting point.
+    ///
+    /// To get a borrowed view of the HUGR with a different entrypoint, use
+    /// [HugrView::with_entrypoint] or [HugrMut::with_entrypoint_mut] instead.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
+    fn set_entrypoint(&mut self, root: Self::Node);
+
+    /// Returns a mutable view of the HUGR with a different entrypoint.
+    ///
+    /// Changes to the returned HUGR affect the original one, and overwriting
+    /// the entrypoint sets it both in the wrapper and the wrapped HUGR.
+    ///
+    /// For a non-mut view, use [HugrView::with_entrypoint] instead.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entrypoint node is not valid in the HUGR.
+    fn with_entrypoint_mut(&mut self, entrypoint: Self::Node) -> Rerooted<&mut Self>
+    where
+        Self: Sized,
+    {
+        Rerooted::new(self, entrypoint)
+    }
+
     /// Returns a metadata entry associated with a node.
     ///
     /// # Panics
@@ -220,10 +253,10 @@ pub trait HugrMut: HugrMutInternals {
 /// Contains a map from the nodes in the source HUGR to the nodes in the
 /// target HUGR, using their respective `Node` types.
 pub struct InsertionResult<SourceN = Node, TargetN = Node> {
-    /// The node, after insertion, that was the root of the inserted Hugr.
+    /// The node, after insertion, that was the entrypoint of the inserted Hugr.
     ///
-    /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]
-    pub new_root: TargetN,
+    /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::entrypoint].
+    pub inserted_entrypoint: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
     pub node_map: HashMap<SourceN, TargetN>,
@@ -246,6 +279,12 @@ fn translate_indices<N: HugrNode>(
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
 impl HugrMut for Hugr {
+    #[inline]
+    fn set_entrypoint(&mut self, root: Node) {
+        panic_invalid_node(self, root);
+        self.entrypoint = self.to_portgraph_node(root);
+    }
+
     fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata {
         panic_invalid_node(self, node);
         self.node_metadata_map_mut(node)
@@ -294,14 +333,14 @@ impl HugrMut for Hugr {
     }
 
     fn remove_node(&mut self, node: Node) -> OpType {
-        panic_invalid_non_root(self, node);
+        panic_invalid_non_entrypoint(self, node);
         self.hierarchy.remove(node.into_portgraph());
         self.graph.remove_node(node.into_portgraph());
         self.op_types.take(node.into_portgraph())
     }
 
     fn remove_subtree(&mut self, node: Node) {
-        panic_invalid_non_root(self, node);
+        panic_invalid_non_entrypoint(self, node);
         let mut queue = VecDeque::new();
         queue.push_back(node);
         while let Some(n) = queue.pop_front() {
@@ -360,7 +399,7 @@ impl HugrMut for Hugr {
         root: Self::Node,
         mut other: Hugr,
     ) -> InsertionResult<Node, Self::Node> {
-        let (new_root, node_map) = insert_hugr_internal(self, root, &other);
+        let (new_entrypoint, node_map) = insert_hugr_internal(self, root, &other);
         // Update the optypes and metadata, taking them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
@@ -371,11 +410,11 @@ impl HugrMut for Hugr {
             self.metadata.set(new_node, meta);
         }
         debug_assert_eq!(
-            Some(&new_root.into_portgraph()),
-            node_map.get(&other.root().into_portgraph())
+            Some(&new_entrypoint.into_portgraph()),
+            node_map.get(&other.entrypoint().into_portgraph())
         );
         InsertionResult {
-            new_root,
+            inserted_entrypoint: new_entrypoint,
             node_map: translate_indices(
                 |n| other.from_portgraph_node(n),
                 |n| self.from_portgraph_node(n),
@@ -390,7 +429,7 @@ impl HugrMut for Hugr {
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        let (new_root, node_map) = insert_hugr_internal(self, root, other);
+        let (inserted_entrypoint, node_map) = insert_hugr_internal(self, root, other);
         // Update the optypes and metadata, copying them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
@@ -404,11 +443,11 @@ impl HugrMut for Hugr {
             }
         }
         debug_assert_eq!(
-            Some(&new_root.into_portgraph()),
-            node_map.get(&other.to_portgraph_node(other.root()))
+            Some(&inserted_entrypoint.into_portgraph()),
+            node_map.get(&other.to_portgraph_node(other.entrypoint()))
         );
         InsertionResult {
-            new_root,
+            inserted_entrypoint,
             node_map: translate_indices(
                 |n| other.from_portgraph_node(n),
                 |n| self.from_portgraph_node(n),
@@ -526,11 +565,16 @@ fn insert_hugr_internal<H: HugrView>(
     root: Node,
     other: &H,
 ) -> (Node, HashMap<portgraph::NodeIndex, portgraph::NodeIndex>) {
+    let other_entrypoint = other.to_portgraph_node(other.entrypoint());
+    // TODO: We may need to replicate `portgraph::LinkMut::insert_graph` at the
+    // hugr level to avoid calling `hierarchy()` here.
+    let other_portgraph =
+        portgraph::view::Region::new(other.portgraph(), other.hierarchy(), other_entrypoint);
     let node_map = hugr
         .graph
-        .insert_graph(&other.portgraph())
+        .insert_graph(&other_portgraph)
         .unwrap_or_else(|e| panic!("Internal error while inserting a hugr into another: {e}"));
-    let other_root = node_map[&other.to_portgraph_node(other.root())];
+    let other_root = node_map[&other_entrypoint];
 
     // Update hierarchy and optypes
     hugr.hierarchy
@@ -607,7 +651,7 @@ mod test {
         hugr.use_extension(PRELUDE.to_owned());
 
         // Create the root module definition
-        let module: Node = hugr.root();
+        let module: Node = hugr.entrypoint();
 
         // Start a main function with two nat inputs.
         let f: Node = hugr.add_node_with_parent(
@@ -638,7 +682,7 @@ mod test {
         let mut hugr = Hugr::default();
 
         // Create the root module definition
-        let root: Node = hugr.root();
+        let root: Node = hugr.entrypoint();
 
         assert_eq!(hugr.get_metadata(root, "meta"), None);
 
@@ -656,7 +700,7 @@ mod test {
     fn remove_subtree() {
         let mut hugr = Hugr::default();
         hugr.use_extension(PRELUDE.to_owned());
-        let root = hugr.root();
+        let root = hugr.entrypoint();
         let [foo, bar] = ["foo", "bar"].map(|name| {
             let fd = hugr.add_node_with_parent(
                 root,

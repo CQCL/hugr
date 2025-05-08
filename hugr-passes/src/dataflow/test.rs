@@ -3,8 +3,6 @@ use std::convert::Infallible;
 use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::{inout_sig, CFGBuilder, Container, DataflowHugr, ModuleBuilder};
-use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
-use hugr_core::ops::handle::DfgID;
 use hugr_core::ops::{CallIndirect, TailLoop};
 use hugr_core::types::{ConstTypeError, TypeRow};
 use hugr_core::{
@@ -162,7 +160,7 @@ fn test_tail_loop_always_iterates() {
         Some(TailLoopTermination::NeverBreaks),
         results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.entrypoint()), None);
 }
 
 #[test]
@@ -195,7 +193,7 @@ fn test_tail_loop_two_iters() {
         Some(TailLoopTermination::BreaksAndContinues),
         results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.entrypoint()), None);
 }
 
 #[test]
@@ -258,7 +256,7 @@ fn test_tail_loop_containing_conditional() {
         Some(TailLoopTermination::BreaksAndContinues),
         results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.entrypoint()), None);
 }
 
 #[test]
@@ -394,7 +392,7 @@ fn test_cfg(
     #[case] out1: PartialValue<Void>,
     xor_and_cfg: Hugr,
 ) {
-    let root = xor_and_cfg.root();
+    let root = xor_and_cfg.entrypoint();
     let results = Machine::new(&xor_and_cfg).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
 
     assert_eq!(results.read_out_wire(Wire::new(root, 0)).unwrap(), out0);
@@ -429,7 +427,11 @@ fn test_call(
 
     let results = Machine::new(&hugr).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
 
-    let [res0, res1] = [0, 1].map(|i| results.read_out_wire(Wire::new(hugr.root(), i)).unwrap());
+    let [res0, res1] = [0, 1].map(|i| {
+        results
+            .read_out_wire(Wire::new(hugr.entrypoint(), i))
+            .unwrap()
+    });
     // The two calls alias so both results will be the same:
     assert_eq!(res0, out);
     assert_eq!(res1, out);
@@ -457,17 +459,17 @@ fn test_region() {
         Some(pv_false())
     );
     assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 0)),
+        whole_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), 0)),
         Some(pv_true())
     );
     assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 1)),
+        whole_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), 1)),
         Some(pv_false())
     );
 
-    let subview = DescendantsGraph::<DfgID>::try_new(&hugr, nested.node()).unwrap();
     // Do not provide a value on the second input (constant false in the whole hugr, above)
-    let sub_hugr_results = Machine::new(subview).run(TestContext, [(0.into(), pv_true())]);
+    let sub_hugr_results =
+        Machine::new(hugr.with_entrypoint(nested.node())).run(TestContext, [(0.into(), pv_true())]);
     assert_eq!(
         sub_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
         Some(pv_true())
@@ -478,7 +480,7 @@ fn test_region() {
     );
     for w in [0, 1] {
         assert_eq!(
-            sub_hugr_results.read_out_wire(Wire::new(hugr.root(), w)),
+            sub_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), w)),
             None
         );
     }
@@ -611,7 +613,7 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
             ],
         )
     };
-    let (w1, w2) = (Wire::new(h.root(), 0), Wire::new(h.root(), 1));
+    let (w1, w2) = (Wire::new(h.entrypoint(), 0), Wire::new(h.entrypoint(), 1));
 
     // 1. Test with `which` unknown -> second output unknown
     let results = run(PartialValue::Top);

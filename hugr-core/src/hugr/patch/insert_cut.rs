@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::iter;
 
+use crate::core::HugrNode;
 use crate::hugr::patch::inline_dfg::InlineDFG;
 use crate::hugr::{HugrMut, Node};
 use crate::ops::{DataflowOpTrait, OpTag, OpTrait, OpType};
@@ -74,14 +75,12 @@ pub enum InsertCutError<N = Node> {
     InputOutputMismatch,
 }
 
-impl<N: Copy + std::fmt::Display + std::fmt::Debug + Eq + std::hash::Hash> PatchVerification
-    for InsertCut<N>
-{
+impl<N: HugrNode> PatchVerification for InsertCut<N> {
     type Error = InsertCutError<N>;
     type Node = N;
 
     fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
-        let insert_root = self.insertion.root_optype();
+        let insert_root = self.insertion.entrypoint_optype();
         let Some(dfg) = insert_root.as_dfg() else {
             return Err(InsertCutError::ReplaceNotDfg(insert_root.clone()));
         };
@@ -134,16 +133,16 @@ impl PatchHugrMut for InsertCut<Node> {
         h: &mut impl HugrMut<Node = Node>,
     ) -> Result<Self::Outcome, InsertCutError> {
         let insert_res = h.insert_hugr(self.parent, self.insertion);
-        let inserted_root = insert_res.new_root;
+        let inserted_entrypoint = insert_res.inserted_entrypoint;
         for (i, (target, port)) in self.targets.into_iter().enumerate() {
             let (src_n, src_p) = h
                 .single_linked_output(target, port)
                 .expect("Incoming value edge has single connection.");
             h.disconnect(target, port);
-            h.connect(src_n, src_p, inserted_root, i);
-            h.connect(inserted_root, i, target, port);
+            h.connect(src_n, src_p, inserted_entrypoint, i);
+            h.connect(inserted_entrypoint, i, target, port);
         }
-        let inline = InlineDFG(inserted_root.into());
+        let inline = InlineDFG(inserted_entrypoint.into());
 
         inline.apply(h)?;
         Ok(insert_res.node_map)
@@ -166,7 +165,7 @@ mod tests {
         let dfg_b = DFGBuilder::new(Signature::new_endo(vec![bool_t(), qb_t()])).unwrap();
         let inputs = dfg_b.input().outputs();
         let mut h = dfg_b.finish_hugr_with_outputs(inputs).unwrap();
-        let [i, o] = h.get_io(h.root()).unwrap();
+        let [i, o] = h.get_io(h.entrypoint()).unwrap();
 
         let mut dfg_b = DFGBuilder::new(Signature::new_endo(vec![bool_t(), qb_t()])).unwrap();
         let [b, q] = dfg_b.input().outputs_arr();
@@ -178,18 +177,18 @@ mod tests {
             .unwrap();
 
         let targets: Vec<_> = h.all_linked_inputs(i).collect();
-        let inserter = InsertCut::new(h.root(), targets, replacement);
+        let inserter = InsertCut::new(h.entrypoint(), targets, replacement);
         assert_eq!(
             inserter.invalidation_set().collect::<Vec<Node>>(),
-            vec![h.root(), o]
+            vec![h.entrypoint(), o]
         );
 
         inserter.verify(&h).unwrap();
 
-        assert_eq!(h.num_nodes(), 3);
+        assert_eq!(h.entry_descendants().count(), 3);
         inserter.apply_hugr_mut(&mut h).unwrap();
 
         h.validate().unwrap();
-        assert_eq!(h.num_nodes(), 5);
+        assert_eq!(h.entry_descendants().count(), 5);
     }
 }

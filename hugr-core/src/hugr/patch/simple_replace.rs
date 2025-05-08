@@ -209,7 +209,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Get the input and output nodes of the replacement hugr.
     pub fn get_replacement_io(&self) -> Result<[Node; 2], SimpleReplacementError> {
         self.replacement
-            .get_io(self.replacement.root())
+            .get_io(self.replacement.entrypoint())
             .ok_or(SimpleReplacementError::InvalidParentNode())
     }
 
@@ -448,10 +448,13 @@ impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
         } = self;
 
         // 2. Insert the replacement as a whole.
-        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, replacement);
+        let InsertionResult {
+            inserted_entrypoint: new_entrypoint,
+            node_map,
+        } = h.insert_hugr(parent, replacement);
 
         // remove the Input and Output nodes from the replacement graph
-        let replace_children = h.children(new_root).collect::<Vec<N>>();
+        let replace_children = h.children(new_entrypoint).collect::<Vec<N>>();
         for &io in &replace_children[..2] {
             h.remove_node(io);
         }
@@ -460,7 +463,7 @@ impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
             h.set_parent(child, parent);
         }
         // remove the replacement root (which now has no children and no edges)
-        h.remove_node(new_root);
+        h.remove_node(new_entrypoint);
 
         // 3. Insert all boundary edges.
         for (src, tgt) in boundary_edges {
@@ -715,7 +718,7 @@ pub(in crate::hugr::patch) mod test {
         let mut h: Hugr = simple_hugr;
         // 1. Locate the CX and its successor H's in h
         let h_node_cx: Node = h
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
@@ -725,7 +728,7 @@ pub(in crate::hugr::patch) mod test {
         // 3. Construct the input and output matchings
         // 3.1. Locate the CX and its predecessor H's in n
         let n_node_cx = n
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *n.get_optype(*node) == cx_gate().into())
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
@@ -804,18 +807,15 @@ pub(in crate::hugr::patch) mod test {
 
         // 1. Locate the CX in h
         let h_node_cx: Node = h
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
-        let s: Vec<Node> = vec![h_node_cx].into_iter().collect();
+        let s: Vec<Node> = vec![h_node_cx];
         // 2. Construct a new DFG-rooted hugr for the replacement
         let n: Hugr = dfg_hugr2;
         // 3. Construct the input and output matchings
         // 3.1. Locate the Output and its predecessor H in n
-        let n_node_output = n
-            .nodes()
-            .find(|node: &Node| n.get_optype(*node).tag() == OpTag::Output)
-            .unwrap();
+        let n_node_output = n.get_io(n.entrypoint()).unwrap()[1];
         let (_n_node_input, n_node_h) = n.input_neighbours(n_node_output).collect_tuple().unwrap();
         // 3.2. Locate the ports we need to specify as "glue" in n
         let (n_port_0, n_port_1) = n
@@ -867,7 +867,7 @@ pub(in crate::hugr::patch) mod test {
         let orig = h.clone();
 
         let removal = h
-            .nodes()
+            .entry_descendants()
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect_vec();
         let inputs = h
@@ -932,7 +932,7 @@ pub(in crate::hugr::patch) mod test {
         let orig = h.clone();
 
         let removal = h
-            .nodes()
+            .entry_descendants()
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect_vec();
 
@@ -970,7 +970,7 @@ pub(in crate::hugr::patch) mod test {
         let (mut hugr, nodes) = dfg_hugr_copy_bools;
         let (input_not, output_not_0, output_not_1) = nodes.into_iter().collect_tuple().unwrap();
 
-        let [_input, output] = hugr.get_io(hugr.root()).unwrap();
+        let [_input, output] = hugr.get_io(hugr.entrypoint()).unwrap();
 
         let replacement = {
             let b =
@@ -978,7 +978,7 @@ pub(in crate::hugr::patch) mod test {
             let [w] = b.input_wires_arr();
             b.finish_hugr_with_outputs([w, w]).unwrap()
         };
-        let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
+        let [_repl_input, repl_output] = replacement.get_io(replacement.entrypoint()).unwrap();
 
         let subgraph =
             SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0, output_not_1], &hugr)
@@ -1016,7 +1016,7 @@ pub(in crate::hugr::patch) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.num_nodes(), 3);
+        assert_eq!(hugr.entry_descendants().count(), 3);
     }
 
     /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting
@@ -1028,7 +1028,7 @@ pub(in crate::hugr::patch) mod test {
         let (mut hugr, nodes) = dfg_hugr_half_not_bools;
         let (input_not, output_not_0) = nodes.into_iter().collect_tuple().unwrap();
 
-        let [_input, output] = hugr.get_io(hugr.root()).unwrap();
+        let [_input, output] = hugr.get_io(hugr.entrypoint()).unwrap();
 
         let (replacement, repl_not) = {
             let mut b =
@@ -1038,7 +1038,7 @@ pub(in crate::hugr::patch) mod test {
             let [w_not] = not.outputs_arr();
             (b.finish_hugr_with_outputs([w, w_not]).unwrap(), not.node())
         };
-        let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
+        let [_repl_input, repl_output] = replacement.get_io(replacement.entrypoint()).unwrap();
 
         let subgraph =
             SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0], &hugr).unwrap();
@@ -1075,7 +1075,7 @@ pub(in crate::hugr::patch) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.num_nodes(), 4);
+        assert_eq!(hugr.entry_descendants().count(), 4);
     }
 
     #[rstest]
@@ -1084,7 +1084,7 @@ pub(in crate::hugr::patch) mod test {
 
         let mut h = dfg_hugr2;
         let h_node = h
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == h_gate().into())
             .unwrap();
 
@@ -1106,7 +1106,7 @@ pub(in crate::hugr::patch) mod test {
         .collect();
 
         let nu_out: HashMap<_, _> = vec![(
-            (h.get_io(h.root()).unwrap()[1], IncomingPort::from(1)),
+            (h.get_io(h.entrypoint()).unwrap()[1], IncomingPort::from(1)),
             IncomingPort::from(0),
         )]
         .into_iter()
@@ -1114,12 +1114,12 @@ pub(in crate::hugr::patch) mod test {
 
         let rewrite = SimpleReplacement::new(subgraph, replacement, nu_inp, nu_out);
 
-        assert_eq!(h.num_nodes(), 4);
+        assert_eq!(h.entry_descendants().count(), 4);
 
         rewrite.apply(&mut h).unwrap_or_else(|e| panic!("{e}"));
         h.validate().unwrap_or_else(|e| panic!("{e}"));
 
-        assert_eq!(h.num_nodes(), 6);
+        assert_eq!(h.entry_descendants().count(), 6);
     }
 
     #[rstest]
@@ -1131,7 +1131,7 @@ pub(in crate::hugr::patch) mod test {
 
         // 1. Locate the CX in h
         let h_node_cx: Node = h
-            .nodes()
+            .entry_descendants()
             .find(|node: &Node| *h.get_optype(*node) == cx_gate().into())
             .unwrap();
         let s = vec![h_node_cx];
@@ -1139,7 +1139,7 @@ pub(in crate::hugr::patch) mod test {
         let n: Hugr = dfg_hugr2;
         // 3. Construct the input and output matchings
         // 3.1. Locate the Output and its predecessor H in n
-        let [_n_node_input, n_node_output] = n.get_io(n.root()).unwrap();
+        let [_n_node_input, n_node_output] = n.get_io(n.entrypoint()).unwrap();
         let n_node_h = n.input_neighbours(n_node_output).nth(1).unwrap();
         // 3.2. Locate the ports we need to specify as "glue" in n
         let (n_port_0, n_port_1) = n
@@ -1176,7 +1176,7 @@ pub(in crate::hugr::patch) mod test {
 
     #[rstest]
     fn test_output_boundary_map(dfg_hugr2: Hugr) {
-        let [inp, out] = dfg_hugr2.get_io(dfg_hugr2.root()).unwrap();
+        let [inp, out] = dfg_hugr2.get_io(dfg_hugr2.entrypoint()).unwrap();
         let map = [
             ((inp, OutgoingPort::from(0)), IncomingPort::from(0)),
             ((inp, OutgoingPort::from(1)), IncomingPort::from(1)),
@@ -1232,7 +1232,7 @@ pub(in crate::hugr::patch) mod test {
 
         let mut replacement = s.replacement;
         let (in_, out) = replacement
-            .children(replacement.root())
+            .children(replacement.entrypoint())
             .take(2)
             .collect_tuple()
             .unwrap();

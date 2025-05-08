@@ -115,7 +115,9 @@ pub struct DelegatingLinearizer {
     // including lowering of the copy/discard operations to...whatever.
     copy_discard_parametric: HashMap<
         ParametricType,
-        Arc<dyn Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>>,
+        Arc<
+            dyn Fn(&[TypeArg], usize, &CallbackHandler<'_>) -> Result<NodeTemplate, LinearizeError>,
+        >,
     >,
 }
 
@@ -224,7 +226,7 @@ impl DelegatingLinearizer {
     pub fn register_callback(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler) -> Result<NodeTemplate, LinearizeError>
+        copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler<'_>) -> Result<NodeTemplate, LinearizeError>
             + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
@@ -363,7 +365,6 @@ mod test {
     use hugr_core::extension::{
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
     };
-    use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
@@ -471,7 +472,9 @@ mod test {
 
         assert!(lowerer.run(&mut h).unwrap());
 
-        let ext_ops = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        let ext_ops = h
+            .entry_descendants()
+            .filter_map(|n| h.get_optype(n).as_extension_op());
         let mut counts = HashMap::<OpName, u32>::new();
         for e in ext_ops {
             *counts.entry(e.qualified_id()).or_default() += 1;
@@ -512,7 +515,11 @@ mod test {
         // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
         for (dfg, num_tags, expected_ext_ops) in [
             (inner.node(), 0, vec!["TestExt.discard"]),
-            (h.root(), num_copies, vec!["TestExt.copy"; num_copies - 1]), // 2 copy nodes -> 3 outputs, etc.
+            (
+                h.entrypoint(),
+                num_copies,
+                vec!["TestExt.copy"; num_copies - 1],
+            ), // 2 copy nodes -> 3 outputs, etc.
         ] {
             let [(cond_node, cond)] = h
                 .children(dfg)
@@ -531,9 +538,8 @@ mod test {
             // second is for variant of a LIN_T
             assert_eq!(h.children(case1).count(), 3 + num_tags); // Input, Output, copy/discard
             assert_eq!(count_tags(case1), num_tags);
-            let ext_ops = DescendantsGraph::<Node>::try_new(&h, case1)
-                .unwrap()
-                .nodes()
+            let ext_ops = h
+                .descendants(case1)
                 .filter_map(|n| {
                     h.get_optype(n)
                         .as_extension_op()
@@ -576,7 +582,7 @@ mod test {
         let count_tags = |n| h.children(n).filter(|n| h.get_optype(*n).is_tag()).count();
 
         // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
-        for (dfg, num_tags) in [(inner.node(), 0), (h.root(), num_copies)] {
+        for (dfg, num_tags) in [(inner.node(), 0), (h.entrypoint(), num_copies)] {
             let [cond] = h
                 .children(dfg)
                 .filter(|n| h.get_optype(*n).is_conditional())
@@ -706,7 +712,7 @@ mod test {
         assert!(lowerer.run(&mut h).unwrap());
 
         let (discard_ops, copy_ops): (Vec<_>, Vec<_>) = h
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| h.get_optype(n).as_extension_op().map(|e| (n, e)))
             .partition(|(n, _)| {
                 successors(Some(*n), |n| h.get_parent(*n)).contains(&discard.node())
@@ -803,7 +809,7 @@ mod test {
             .linearizer()
             .register_simple(
                 lin_ct.clone(),
-                NodeTemplate::Call(backup.root(), vec![]),
+                NodeTemplate::Call(backup.entrypoint(), vec![]),
                 NodeTemplate::Call(discard_fn, vec![]),
             )
             .unwrap();
@@ -828,7 +834,7 @@ mod test {
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::NestedTemplateError(
                     nested_t,
-                    BuildError::UnexpectedType { node, .. }
+                    BuildError::NodeNotFound { node }
                 )
             )) if nested_t == lin_t && node == discard_fn
         ));

@@ -142,7 +142,7 @@ fn value_types() {
         .finish_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
         .unwrap();
 
-    let [_, o] = h.get_io(h.root()).unwrap();
+    let [_, o] = h.get_io(h.entrypoint()).unwrap();
     let n1_out_types = h.out_value_types(n1.node()).collect_vec();
 
     assert_eq!(&n1_out_types[..], &[(0.into(), qb_t())]);

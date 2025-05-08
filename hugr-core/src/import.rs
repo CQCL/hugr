@@ -11,8 +11,8 @@ use crate::{
     ops::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
         AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock,
-        ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, Module, OpType, OpaqueOp,
-        Output, Tag, TailLoop, Value, CFG, DFG,
+        ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, OpaqueOp, Output,
+        Tag, TailLoop, Value, CFG, DFG,
     },
     package::Package,
     std_extensions::{
@@ -111,7 +111,7 @@ pub fn import_package(
         .collect::<Result<Vec<_>, _>>()?;
 
     // This does not panic since the import already requires a module root.
-    let package = Package::new(modules).expect("non-module root");
+    let package = Package::new(modules);
     Ok(package)
 }
 
@@ -124,7 +124,7 @@ pub fn import_hugr(
     // For now we use a hashmap, which will be slower.
     let mut ctx = Context {
         module,
-        hugr: Hugr::new(OpType::Module(Module {})),
+        hugr: Hugr::new(),
         link_ports: FxHashMap::default(),
         static_edges: Vec::new(),
         extensions,
@@ -347,7 +347,7 @@ impl<'a> Context<'a> {
         let region_data = self.get_region(self.module.root)?;
 
         for node in region_data.children {
-            self.import_node(*node, self.hugr.root())?;
+            self.import_node(*node, self.hugr.entrypoint())?;
         }
 
         Ok(())
