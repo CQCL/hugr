@@ -243,6 +243,11 @@ pub const CORE_MAKE_ADT: &str = "core.make_adt";
 /// - **Result:** `core.meta`
 pub const CORE_META_DESCRIPTION: &str = "core.meta.description";
 
+/// Metadata to tag a node or region as the entrypoint of a module.
+///
+/// - **Result:** `core.meta`
+pub const CORE_ENTRYPOINT: &str = "core.entrypoint";
+
 /// Constructor for JSON encoded metadata.
 ///
 /// This is included in the model to allow for compatibility with `hugr-core`.

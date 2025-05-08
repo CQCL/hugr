@@ -9,6 +9,7 @@ use hugr_model::v0 as model;
 fn roundtrip(source: &str) -> String {
     let bump = model::bumpalo::Bump::new();
     let package_ast = model::ast::Package::from_str(source).unwrap();
+    println!("{:#?}", package_ast);
     let package_table = package_ast.resolve(&bump).unwrap();
     let core = import_package(&package_table, &std_reg()).unwrap();
     let exported_table = export_package(&core, &bump);
@@ -93,5 +94,13 @@ pub fn test_roundtrip_const() {
 pub fn test_roundtrip_order() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-order.edn"
+    )));
+}
+
+#[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+pub fn test_roundtrip_entrypoint() {
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-entrypoint.edn"
     )));
 }
