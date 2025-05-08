@@ -343,7 +343,7 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         //    don't want.
         // TODO what would an error here mean? e.g. malformed self.replacement??
         let InsertionResult {
-            inserted_entrypoint: new_root,
+            inserted_entrypoint,
             node_map,
         } = h.insert_hugr(parent, self.replacement);
 
@@ -384,15 +384,19 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
         let mut remove_top_sibs = self.removal.iter();
-        for new_node in h.children(new_root).collect::<Vec<HostNode>>().into_iter() {
+        for new_node in h
+            .children(inserted_entrypoint)
+            .collect::<Vec<HostNode>>()
+            .into_iter()
+        {
             if let Some(top_sib) = remove_top_sibs.next() {
                 h.move_before_sibling(new_node, *top_sib);
             } else {
                 h.set_parent(new_node, parent);
             }
         }
-        debug_assert!(h.children(new_root).next().is_none());
-        h.remove_node(new_root);
+        debug_assert!(h.children(inserted_entrypoint).next().is_none());
+        h.remove_node(inserted_entrypoint);
 
         // 6. Transfer to keys of `transfers` children of the corresponding values.
         for (new_parent, &old_parent) in self.adoptions.iter() {

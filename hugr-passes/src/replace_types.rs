@@ -112,9 +112,9 @@ impl NodeTemplate {
         let new_optype = match self.clone() {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(new_h) => {
-                let new_root = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
-                let children = hugr.children(new_root).collect::<Vec<_>>();
-                let root_opty = hugr.remove_node(new_root);
+                let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
+                let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
+                let root_opty = hugr.remove_node(new_entrypoint);
                 for ch in children {
                     hugr.set_parent(ch, n);
                 }
