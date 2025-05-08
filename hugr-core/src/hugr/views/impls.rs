@@ -12,7 +12,7 @@ macro_rules! hugr_internal_methods {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
                 fn portgraph(&self) -> Self::Portgraph<'_>;
-                fn region_portgraph(&self, parent: Self::Node) -> portgraph::view::FlatRegion<'_, impl portgraph::view::LinkView<LinkEndpoint: Eq> + Clone + '_>;
+                fn region_portgraph(&self, parent: Self::Node) -> (portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>, Self::RegionPortgraphNodes);
                 fn hierarchy(&self) -> &portgraph::Hierarchy;
                 fn to_portgraph_node(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
                 fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
@@ -135,7 +135,15 @@ impl<T: HugrView> HugrInternals for &T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
+    where
+        Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, *this}
 }
@@ -149,7 +157,15 @@ impl<T: HugrView> HugrInternals for &mut T {
         = T::Portgraph<'p>
     where
         Self: 'p;
+
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
+    where
+        Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, &**this}
 }
@@ -169,7 +185,15 @@ impl<T: HugrView> HugrInternals for Rc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
+    where
+        Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }
@@ -183,7 +207,15 @@ impl<T: HugrView> HugrInternals for Arc<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
+    where
+        Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }
@@ -197,7 +229,15 @@ impl<T: HugrView> HugrInternals for Box<T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
+    where
+        Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }
@@ -217,7 +257,15 @@ impl<T: HugrView + ToOwned> HugrInternals for Cow<'_, T> {
         = T::Portgraph<'p>
     where
         Self: 'p;
+
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
+    where
+        Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }

@@ -86,7 +86,7 @@ impl<'a> ValidationContext<'a> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<portgraph::NodeIndex> {
-        let region = self.hugr.region_portgraph(parent);
+        let (region, _) = self.hugr.region_portgraph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
         dominators::simple_fast(&region, entry_node.into_portgraph())
     }
@@ -357,7 +357,7 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        let region = self.hugr.region_portgraph(parent);
+        let (region, _) = self.hugr.region_portgraph(parent);
         let postorder = Topo::new(&region);
         let nodes_visited = postorder
             .iter(&region)

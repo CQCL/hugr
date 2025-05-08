@@ -1,6 +1,7 @@
 //! Provides [force_order], a tool for fixing the order of nodes in a Hugr.
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
+use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::{
     hugr::{hugrmut::HugrMut, HugrError},
     ops::{OpTag, OpTrait},
@@ -55,15 +56,15 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
         let ordered_nodes = {
-            let i_pg = hugr.to_portgraph_node(i);
-            let o_pg = hugr.to_portgraph_node(o);
-            let rank = |n| rank(hugr, hugr.from_portgraph_node(n));
-            let region = hugr.region_portgraph(dp);
+            let (region, node_map) = hugr.region_portgraph(dp);
+            let rank = |n| rank(hugr, node_map.from_portgraph(n));
+            let i_pg = node_map.to_portgraph(i);
+            let o_pg = node_map.to_portgraph(o);
             let petgraph = NodeFiltered::from_fn(&region, |x| x != i_pg && x != o_pg);
             ForceOrder::<_, portgraph::NodeIndex, _, _>::new(&petgraph, &rank)
                 .iter(&petgraph)
                 .filter_map(|x| {
-                    let x = hugr.from_portgraph_node(x);
+                    let x = node_map.from_portgraph(x);
                     let expected_edge = Some(EdgeKind::StateOrder);
                     let optype = hugr.get_optype(x);
                     if optype.other_input() == expected_edge

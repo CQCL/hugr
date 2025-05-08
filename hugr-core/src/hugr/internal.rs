@@ -24,19 +24,37 @@ pub trait HugrInternals {
     where
         Self: 'p;
 
+    /// The portgraph graph structure returned by [`HugrInternals::region_portgraph`].
+    type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq> + Clone + 'p
+    where
+        Self: 'p;
+
     /// The type of nodes in the Hugr.
     type Node: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash;
+
+    /// A mapping between HUGR nodes and portgraph nodes in the graph returned by
+    /// [`HugrInternals::region_portgraph`].
+    type RegionPortgraphNodes: PortgraphNodeMap<Self::Node>;
 
     /// Returns a reference to the underlying portgraph.
     fn portgraph(&self) -> Self::Portgraph<'_>;
 
-    /// Returns a flat portgraph view of a region in the HUGR.
-    ///
-    /// This is a subgraph of [`HugrInternals::portgraph`], with a flat hierarchy.
+    /// Returns a flat portgraph view of a region in the HUGR, and a mapping between
+    /// HUGR nodes and portgraph nodes in the graph.
+    //
+    // NOTE: Ideally here we would just return `Self::RegionPortgraph<'_>`, but
+    // when doing so we are unable to restrict the type to implement petgraph's
+    // traits over references (e.g. `&MyGraph : IntoNodeIdentifiers`, which is
+    // needed if we want to use petgraph's algorithms on the region graph).
+    // This won't be solvable until we do the big petgraph refactor -.-
+    // In the meantime, just wrap the portgraph in a `FlatRegion` as needed.
     fn region_portgraph(
         &self,
         parent: Self::Node,
-    ) -> portgraph::view::FlatRegion<'_, impl LinkView<LinkEndpoint: Eq> + Clone + '_>;
+    ) -> (
+        portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
+        Self::RegionPortgraphNodes,
+    );
 
     /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
     /// returned by [`HugrInternals::portgraph`].
@@ -65,13 +83,55 @@ pub trait HugrInternals {
     fn base_hugr(&self) -> &Hugr;
 }
 
+/// A map between hugr nodes and portgraph nodes in the graph returned by
+/// [`HugrInternals::region_portgraph`].
+pub trait PortgraphNodeMap<N>: Clone + Sized + std::fmt::Debug {
+    /// Returns the portgraph index of a HUGR node in the associated region
+    /// graph.
+    ///
+    /// If the node is not in the region, the result is undefined.
+    fn to_portgraph(&self, node: N) -> portgraph::NodeIndex;
+
+    /// Returns the HUGR node for a portgraph node in the associated region
+    /// graph.
+    ///
+    /// If the node is not in the region, the result is undefined.
+    #[allow(clippy::wrong_self_convention)]
+    fn from_portgraph(&self, node: portgraph::NodeIndex) -> N;
+}
+
+/// An identity map between HUGR nodes and portgraph nodes.
+#[derive(
+    Copy, Clone, Debug, Default, Eq, PartialEq, Hash, PartialOrd, Ord, derive_more::Display,
+)]
+pub struct DefaultPGNodeMap;
+
+impl PortgraphNodeMap<Node> for DefaultPGNodeMap {
+    #[inline]
+    fn to_portgraph(&self, node: Node) -> portgraph::NodeIndex {
+        node.into_portgraph()
+    }
+
+    #[inline]
+    fn from_portgraph(&self, node: portgraph::NodeIndex) -> Node {
+        node.into()
+    }
+}
+
 impl HugrInternals for Hugr {
     type Portgraph<'p>
         = &'p MultiPortGraph
     where
         Self: 'p;
 
+    type RegionPortgraph<'p>
+        = &'p MultiPortGraph
+    where
+        Self: 'p;
+
     type Node = Node;
+
+    type RegionPortgraphNodes = DefaultPGNodeMap;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -82,10 +142,14 @@ impl HugrInternals for Hugr {
     fn region_portgraph(
         &self,
         parent: Self::Node,
-    ) -> portgraph::view::FlatRegion<'_, impl LinkView<LinkEndpoint: Eq> + Clone + '_> {
+    ) -> (
+        portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
+        Self::RegionPortgraphNodes,
+    ) {
         let pg = self.portgraph();
         let root = self.to_portgraph_node(parent);
-        portgraph::view::FlatRegion::new_without_root(pg, &self.hierarchy, root)
+        let region = portgraph::view::FlatRegion::new_without_root(pg, &self.hierarchy, root);
+        (region, DefaultPGNodeMap)
     }
 
     #[inline]
