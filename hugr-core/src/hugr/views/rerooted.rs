@@ -22,7 +22,7 @@ impl<H: HugrView> Rerooted<H> {
     ///
     /// # Panics
     ///
-    /// If the new entrypoint is in the HUGR.
+    /// If the new entrypoint is not in the HUGR.
     ///
     /// [`OpTag`]: crate::ops::OpTag
     pub fn new(hugr: H, entrypoint: H::Node) -> Self {
