@@ -13,7 +13,6 @@ pub use partial_value::{AbstractValue, AsConcrete, LoadedFunction, PartialSum, P
 
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
-use hugr_core::types::TypeArg;
 use hugr_core::Hugr;
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
@@ -71,18 +70,6 @@ pub trait ConstLoader<V> {
     /// Produces an abstract value from a Hugr in a [Value::Function], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
     fn value_from_const_hugr(&self, _loc: ConstLocation<Self::Node>, _h: &Hugr) -> Option<V> {
-        None
-    }
-
-    /// Produces an abstract value from a [FuncDefn] or [FuncDecl] node
-    /// (that has been loaded via a [LoadFunction]), if possible.
-    /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
-    ///
-    /// [FuncDefn]: hugr_core::ops::FuncDefn
-    /// [FuncDecl]: hugr_core::ops::FuncDecl
-    /// [LoadFunction]: hugr_core::ops::LoadFunction
-    #[deprecated(note = "Automatically handled by Datalog, implementation will be ignored")]
-    fn value_from_function(&self, _node: Self::Node, _type_args: &[TypeArg]) -> Option<V> {
         None
     }
 }

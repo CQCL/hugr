@@ -10,7 +10,7 @@ use hugr_core::{
     Node,
 };
 
-use hugr_core::hugr::{hugrmut::HugrMut, Hugr, HugrView, OpType};
+use hugr_core::hugr::{hugrmut::HugrMut, HugrView, OpType};
 use itertools::Itertools as _;
 
 use crate::composable::{validate_if_test, ValidatePassError};
@@ -36,40 +36,6 @@ pub fn monomorphize(
     hugr: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, Infallible>> {
     validate_if_test(MonomorphizePass, hugr)
-}
-
-/// Removes any polymorphic [FuncDefn]s from the Hugr. Note that if these have
-/// calls from *monomorphic* code, this will make the Hugr invalid (call [monomorphize]
-/// first).
-///
-/// Deprecated: use [crate::remove_dead_funcs] instead.
-#[deprecated(
-    since = "0.14.1",
-    note = "Use hugr_passes::RemoveDeadFuncsPass instead"
-)]
-pub fn remove_polyfuncs(mut h: Hugr) -> Hugr {
-    #[allow(deprecated)] // we are in a deprecated function, so remove both at same time
-    remove_polyfuncs_ref(&mut h);
-    h
-}
-
-#[deprecated(
-    since = "0.14.1",
-    note = "Use hugr_passes::RemoveDeadFuncsPass instead"
-)]
-fn remove_polyfuncs_ref(h: &mut impl HugrMut<Node = Node>) {
-    let mut pfs_to_delete = Vec::new();
-    let mut to_scan = Vec::from_iter(h.children(h.entrypoint()));
-    while let Some(n) = to_scan.pop() {
-        if is_polymorphic_funcdefn(h.get_optype(n)) {
-            pfs_to_delete.push(n)
-        } else {
-            to_scan.extend(h.children(n));
-        }
-    }
-    for n in pfs_to_delete {
-        h.remove_subtree(n);
-    }
 }
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
@@ -243,10 +209,8 @@ fn instantiate(
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
-/// If the Hugr is [Module](OpType::Module)-rooted,
-/// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
-///     - call [remove_polyfuncs] when no other Hugr will be linked in that might instantiate these
-/// * else, the originals are removed (they are invisible from outside the Hugr).
+/// The original polymorphic [FuncDefn]s are left untouched (including Calls inside them).
+/// Call [crate::remove_dead_funcs] to remove them.
 ///
 /// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
 /// signature then the HUGR will not be modified.
@@ -268,10 +232,6 @@ impl ComposablePass for MonomorphizePass {
         // If the root is a polymorphic function, then there are no external calls, so nothing to do
         if !is_polymorphic_funcdefn(h.get_optype(root)) {
             mono_scan(h, root, None, &mut HashMap::new());
-            if !h.get_optype(root).is_module() {
-                #[allow(deprecated)] // TODO remove in next breaking release and update docs
-                remove_polyfuncs_ref(h);
-            }
         }
         Ok(())
     }
@@ -578,14 +538,15 @@ mod test {
                 &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 4 }, arr2u().into()]), // from pf1<4>
                 &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 2 }, usize_t().into()]), // from both pf1<4> and <5>
                 &mangle_inner_func(&pf2_name, "get_usz"),
-                "mainish"
+                &pf2_name,
+                "mainish",
+                "pf1"
             ]
             .into_iter()
             .sorted()
             .collect_vec()
         );
         for (n, fd) in funcs.into_values() {
-            assert!(!is_polymorphic(fd));
             if n == mono_hugr.entrypoint() {
                 assert_eq!(fd.name, "mainish");
             } else {
@@ -633,7 +594,6 @@ mod test {
         let mono_hugr = hugr;
 
         let mut funcs = list_funcs(&mono_hugr);
-        assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
         #[allow(clippy::unnecessary_to_owned)] // It is necessary
         let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
         assert_eq!(m, mono.handle().node());
