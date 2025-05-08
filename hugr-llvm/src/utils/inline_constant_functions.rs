@@ -1,5 +1,5 @@
 use hugr_core::{
-    hugr::hugrmut::HugrMut,
+    hugr::{hugrmut::HugrMut, internal::HugrMutInternals},
     ops::{FuncDefn, LoadFunction, Value},
     types::PolyFuncType,
     HugrView, Node, NodeIndex as _,
@@ -51,7 +51,7 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
 
     let mut any_changes = false;
 
-    for (konst_n, func_hugr, load_constant_ns) in const_funs {
+    for (konst_n, mut func_hugr, load_constant_ns) in const_funs {
         if !load_constant_ns.is_empty() {
             let polysignature: PolyFuncType = func_hugr
                 .inner_function_type()
@@ -65,11 +65,18 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
                 name: const_fn_name(konst_n),
                 signature: polysignature.clone(),
             };
-            let func_node = hugr.add_node_with_parent(hugr.entrypoint(), func_defn);
-            hugr.insert_hugr(func_node, func_hugr);
+            func_hugr.replace_op(func_hugr.entrypoint(), func_defn);
+            let func_node = hugr
+                .insert_hugr(hugr.entrypoint(), func_hugr)
+                .inserted_entrypoint;
+            hugr.set_num_ports(func_node, 0, 1);
 
             for lcn in load_constant_ns {
                 hugr.replace_op(lcn, LoadFunction::try_new(polysignature.clone(), [])?);
+
+                let src_port = hugr.node_outputs(func_node).next().unwrap();
+                let tgt_port = hugr.node_inputs(lcn).next().unwrap();
+                hugr.connect(func_node, src_port, lcn, tgt_port);
             }
             any_changes = true;
         }
@@ -131,6 +138,7 @@ mod test {
         };
 
         inline_constant_functions(&mut hugr).unwrap();
+        hugr.validate().unwrap();
 
         for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
@@ -180,6 +188,7 @@ mod test {
         };
 
         inline_constant_functions(&mut hugr).unwrap();
+        hugr.validate().unwrap();
 
         for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {

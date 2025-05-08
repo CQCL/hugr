@@ -118,7 +118,7 @@ mod tests {
     fn correct_insertion(dfg_hugr: Hugr) {
         let mut h = dfg_hugr;
 
-        assert_eq!(h.num_nodes(), 10);
+        assert_eq!(h.entry_descendants().count(), 6);
 
         let final_node = h
             .input_neighbours(h.get_io(h.entrypoint()).unwrap()[1])
@@ -131,7 +131,7 @@ mod tests {
 
         let noop_node = h.apply_patch(rw).unwrap();
 
-        assert_eq!(h.num_nodes(), 11);
+        assert_eq!(h.entry_descendants().count(), 7);
 
         let noop: Noop = h.get_optype(noop_node).cast().unwrap();
 

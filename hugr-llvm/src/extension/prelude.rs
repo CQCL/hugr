@@ -309,6 +309,9 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
             Ok(err)
         }
     })
+    .extension_op(prelude::PRELUDE_ID, prelude::NOOP_OP_ID, |context, args| {
+        args.outputs.finish(context.builder(), args.inputs)
+    })
     .simple_extension_op::<TupleOpDef>(|context, args, op| match op {
         TupleOpDef::UnpackTuple => {
             let unpack_tuple = UnpackTuple::from_extension_op(args.node().as_ref())?;
@@ -399,7 +402,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
-    use hugr_core::extension::prelude::EXIT_OP_ID;
+    use hugr_core::extension::prelude::{Noop, EXIT_OP_ID};
     use hugr_core::extension::PRELUDE;
     use hugr_core::types::{Type, TypeArg};
     use hugr_core::{type_row, Hugr};
@@ -496,6 +499,23 @@ mod test {
                 let k1 = builder.add_load_value(konst1);
                 let k2 = builder.add_load_value(konst2);
                 builder.finish_with_outputs([k1, k2]).unwrap()
+            });
+        check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[rstest]
+    fn prelude_noop(prelude_llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(usize_t())
+            .with_outs(usize_t())
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let in_wires = builder.input_wires();
+                let r = builder
+                    .add_dataflow_op(Noop::new(usize_t()), in_wires)
+                    .unwrap()
+                    .outputs();
+                builder.finish_with_outputs(r).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }

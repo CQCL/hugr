@@ -269,7 +269,7 @@ impl SumType {
     /// If a sum is an option of a single type, return the type.
     pub fn as_unary_option(&self) -> Option<&TypeRV> {
         self.as_option()
-            .and_then(|row| (row.len() == 1).then_some(&row[0]))
+            .and_then(|row| row.iter().exactly_one().ok())
     }
 
     /// Returns an iterator over the variants.
@@ -855,6 +855,18 @@ pub(crate) mod test {
         let opt = option_type(usize_t());
 
         assert_eq!(opt.as_unary_option().unwrap().clone(), usize_t());
+        assert_eq!(
+            Type::new_unit_sum(2).as_sum().unwrap().as_unary_option(),
+            None
+        );
+
+        assert_eq!(
+            Type::new_tuple(vec![usize_t()])
+                .as_sum()
+                .unwrap()
+                .as_option(),
+            None
+        );
     }
 
     #[test]

@@ -542,7 +542,7 @@ pub(crate) mod test {
         };
 
         let hugr = module_builder.finish_hugr()?;
-        assert_eq!(hugr.num_nodes(), 7);
+        assert_eq!(hugr.entry_descendants().count(), 7);
 
         assert_eq!(hugr.get_metadata(hugr.entrypoint(), "x"), None);
         assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));

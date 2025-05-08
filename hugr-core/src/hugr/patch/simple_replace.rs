@@ -1016,7 +1016,7 @@ pub(in crate::hugr::patch) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.num_nodes(), 7);
+        assert_eq!(hugr.entry_descendants().count(), 3);
     }
 
     /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting
@@ -1075,7 +1075,7 @@ pub(in crate::hugr::patch) mod test {
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(hugr.validate(), Ok(()));
-        assert_eq!(hugr.num_nodes(), 8);
+        assert_eq!(hugr.entry_descendants().count(), 4);
     }
 
     #[rstest]
@@ -1114,12 +1114,12 @@ pub(in crate::hugr::patch) mod test {
 
         let rewrite = SimpleReplacement::new(subgraph, replacement, nu_inp, nu_out);
 
-        assert_eq!(h.num_nodes(), 8);
+        assert_eq!(h.entry_descendants().count(), 4);
 
         rewrite.apply(&mut h).unwrap_or_else(|e| panic!("{e}"));
         h.validate().unwrap_or_else(|e| panic!("{e}"));
 
-        assert_eq!(h.num_nodes(), 10);
+        assert_eq!(h.entry_descendants().count(), 6);
     }
 
     #[rstest]
