@@ -28,7 +28,7 @@ pub struct InsertCut<N = Node> {
     pub parent: N,
     /// The targets of the existing edges.
     pub targets: Vec<(N, IncomingPort)>,
-    /// The HUGR to insert, must have  DFG parent.
+    /// The HUGR to insert, must have  DFG root.
     pub insertion: Hugr,
 }
 
