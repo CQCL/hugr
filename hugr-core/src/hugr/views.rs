@@ -462,7 +462,7 @@ pub trait HugrView: HugrInternals {
     /// nodes in the extracted HUGR. The new HUGR entrypoint corresponds to the
     /// extracted `parent` node.
     ///
-    /// Edges that connected to nodes outside the parent node are not be
+    /// Edges that connected to nodes outside the parent node are not
     /// included in the new HUGR.
     ///
     /// If the parent is not a module, the returned HUGR will contain some
