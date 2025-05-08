@@ -42,6 +42,13 @@ use super::EnvelopeConfig;
 ///     hugrs: Vec<Hugr>,
 /// }
 /// ```
+///
+/// # Backwards compatibility
+///
+/// When reading an encoded HUGR, the `AsStringEnvelope` deserializer will first
+/// try to decode the value as an string-encoded envelope. If that fails, it
+/// will fallback to decoding the legacy HUGR serde definition. This temporary
+/// compatibility layer is meant to be removed in 0.21.0.
 pub struct AsStringEnvelope;
 
 impl<'de> serde_with::DeserializeAs<'de, Package> for AsStringEnvelope {
@@ -75,7 +82,7 @@ impl<'de> serde_with::DeserializeAs<'de, Hugr> for AsStringEnvelope {
         D: Deserializer<'de>,
     {
         struct Helper;
-        impl de::Visitor<'_> for Helper {
+        impl<'vis> de::Visitor<'vis> for Helper {
             type Value = Hugr;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -88,9 +95,23 @@ impl<'de> serde_with::DeserializeAs<'de, Hugr> for AsStringEnvelope {
             {
                 Hugr::load_str(value, None).map_err(de::Error::custom)
             }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'vis>,
+            {
+                // Backwards compatibility: If the encoded value is not a
+                // string, we may have a legacy HUGR serde structure instead. In that
+                // case, we can add an envelope header and try again.
+                //
+                // TODO: Remove this fallback in 0.21.0
+                let deserializer = serde::de::value::MapAccessDeserializer::new(map);
+                Hugr::serde_deserialize(deserializer).map_err(de::Error::custom)
+            }
         }
 
-        deserializer.deserialize_str(Helper)
+        // TODO: Go back to `deserialize_str` once the fallback is removed.
+        deserializer.deserialize_any(Helper)
     }
 }
 
