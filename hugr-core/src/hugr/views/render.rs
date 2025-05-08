@@ -51,24 +51,30 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
     entrypoint_style.stroke_width = Some("3px".to_string());
 
     if config.node_indices {
-        Box::new(move |n| match Some(n) == config.entrypoint {
-            true => NodeStyle::boxed(format!(
-                "({ni}) [**{name}**]",
-                ni = n.index(),
-                name = node_name(h, n)
-            ))
-            .with_attrs(entrypoint_style.clone()),
-            false => NodeStyle::boxed(format!(
-                "({ni}) {name}",
-                ni = n.index(),
-                name = node_name(h, n)
-            )),
+        Box::new(move |n| {
+            if Some(n) == config.entrypoint {
+                NodeStyle::boxed(format!(
+                    "({ni}) [**{name}**]",
+                    ni = n.index(),
+                    name = node_name(h, n)
+                ))
+                .with_attrs(entrypoint_style.clone())
+            } else {
+                NodeStyle::boxed(format!(
+                    "({ni}) {name}",
+                    ni = n.index(),
+                    name = node_name(h, n)
+                ))
+            }
         })
     } else {
-        Box::new(move |n| match Some(n) == config.entrypoint {
-            true => NodeStyle::boxed(format!("[**{name}**]", name = node_name(h, n)))
-                .with_attrs(entrypoint_style.clone()),
-            false => NodeStyle::boxed(node_name(h, n)),
+        Box::new(move |n| {
+            if Some(n) == config.entrypoint {
+                NodeStyle::boxed(format!("[**{name}**]", name = node_name(h, n)))
+                    .with_attrs(entrypoint_style.clone())
+            } else {
+                NodeStyle::boxed(node_name(h, n))
+            }
         })
     }
 }
