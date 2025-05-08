@@ -1,6 +1,5 @@
 //! Low-level interface for modifying a HUGR.
 
-use core::panic;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
@@ -399,29 +398,19 @@ impl HugrMut for Hugr {
         root: Self::Node,
         mut other: Hugr,
     ) -> InsertionResult<Node, Self::Node> {
-        let (new_entrypoint, node_map) = insert_hugr_internal(self, root, &other);
+        let res = insert_hugr_internal(self, root, &other);
         // Update the optypes and metadata, taking them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in node_map.iter() {
-            let optype = other.op_types.take(node);
-            self.op_types.set(new_node, optype);
-            let meta = other.metadata.take(node);
-            self.metadata.set(new_node, meta);
+        for (&node, &new_node) in res.node_map.iter() {
+            let node_pg = node.into_portgraph();
+            let new_node_pg = new_node.into_portgraph();
+            let optype = other.op_types.take(node_pg);
+            self.op_types.set(new_node_pg, optype);
+            let meta = other.metadata.take(node_pg);
+            self.metadata.set(new_node_pg, meta);
         }
-        debug_assert_eq!(
-            Some(&new_entrypoint.into_portgraph()),
-            node_map.get(&other.entrypoint().into_portgraph())
-        );
-        InsertionResult {
-            inserted_entrypoint: new_entrypoint,
-            node_map: translate_indices(
-                |n| other.from_portgraph_node(n),
-                |n| self.from_portgraph_node(n),
-                node_map,
-            )
-            .collect(),
-        }
+        res
     }
 
     fn insert_from_view<H: HugrView>(
@@ -429,32 +418,21 @@ impl HugrMut for Hugr {
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        let (inserted_entrypoint, node_map) = insert_hugr_internal(self, root, other);
+        let res = insert_hugr_internal(self, root, &other);
         // Update the optypes and metadata, copying them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in node_map.iter() {
-            let node = other.from_portgraph_node(node);
+        for (&node, &new_node) in res.node_map.iter() {
             let nodetype = other.get_optype(node);
-            self.op_types.set(new_node, nodetype.clone());
+            self.op_types
+                .set(new_node.into_portgraph(), nodetype.clone());
             let meta = other.node_metadata_map(node);
             if !meta.is_empty() {
-                self.metadata.set(new_node, Some(meta.clone()));
+                self.metadata
+                    .set(new_node.into_portgraph(), Some(meta.clone()));
             }
         }
-        debug_assert_eq!(
-            Some(&inserted_entrypoint.into_portgraph()),
-            node_map.get(&other.to_portgraph_node(other.entrypoint()))
-        );
-        InsertionResult {
-            inserted_entrypoint,
-            node_map: translate_indices(
-                |n| other.from_portgraph_node(n),
-                |n| self.from_portgraph_node(n),
-                node_map,
-            )
-            .collect(),
-        }
+        res
     }
 
     fn insert_subgraph<H: HugrView>(
@@ -564,36 +542,61 @@ fn insert_hugr_internal<H: HugrView>(
     hugr: &mut Hugr,
     root: Node,
     other: &H,
-) -> (Node, HashMap<portgraph::NodeIndex, portgraph::NodeIndex>) {
-    let other_entrypoint = other.to_portgraph_node(other.entrypoint());
-    // TODO: We may need to replicate `portgraph::LinkMut::insert_graph` at the
-    // hugr level to avoid calling `hierarchy()` here.
-    let other_portgraph =
-        portgraph::view::Region::new(other.portgraph(), other.hierarchy(), other_entrypoint);
-    let node_map = hugr
-        .graph
-        .insert_graph(&other_portgraph)
-        .unwrap_or_else(|e| panic!("Internal error while inserting a hugr into another: {e}"));
-    let other_root = node_map[&other_entrypoint];
+) -> InsertionResult<H::Node, Node> {
+    let new_node_count_hint = other.entry_descendants().size_hint().1.unwrap_or_default();
 
-    // Update hierarchy and optypes
-    hugr.hierarchy
-        .push_child(other_root, root.into_portgraph())
-        .expect("Inserting a newly-created node into the hierarchy should never fail.");
-    for (&node, &new_node) in node_map.iter() {
-        other
-            .children(other.from_portgraph_node(node))
-            .for_each(|child| {
-                hugr.hierarchy
-                    .push_child(node_map[&other.to_portgraph_node(child)], new_node)
-                    .expect("Inserting a newly-created node into the hierarchy should never fail.");
-            });
+    // Insert the nodes from the other graph into this one.
+    let mut node_map = HashMap::with_capacity(new_node_count_hint);
+    hugr.reserve(new_node_count_hint, 0);
+
+    for old in other.entry_descendants() {
+        // We use a dummy optype here. The callers take care of updating the
+        // correct optype, avoiding cloning if possible.
+        let op = OpType::default();
+        let new = hugr.add_node(op);
+        node_map.insert(old, new);
+
+        hugr.set_num_ports(new, other.num_inputs(old), other.num_outputs(old));
+
+        // `entry_descendants` always traverses parents before children, so we
+        // it's safe to assume that the parent is already in the graph.
+        let new_parent = if old == other.entrypoint() {
+            root
+        } else {
+            let old_parent = other.get_parent(old).unwrap();
+            node_map[&old_parent]
+        };
+        hugr.set_parent(new, new_parent);
+
+        // Reconnect the edges to the new node.
+        for tgt in other.node_inputs(old) {
+            for (neigh, src) in other.linked_outputs(old, tgt) {
+                let Some(&neigh) = node_map.get(&neigh) else {
+                    continue;
+                };
+                hugr.connect(neigh, src, new, tgt);
+            }
+        }
+        for src in other.node_outputs(old) {
+            for (neigh, tgt) in other.linked_inputs(old, src) {
+                if neigh == old {
+                    continue;
+                }
+                let Some(&neigh) = node_map.get(&neigh) else {
+                    continue;
+                };
+                hugr.connect(new, src, neigh, tgt);
+            }
+        }
     }
 
     // Merge the extension sets.
     hugr.extensions.extend(other.extensions());
 
-    (other_root.into(), node_map)
+    InsertionResult {
+        inserted_entrypoint: node_map[&other.entrypoint()],
+        node_map,
+    }
 }
 
 /// Internal implementation of the `insert_subgraph` method for AsMut<Hugr>.
