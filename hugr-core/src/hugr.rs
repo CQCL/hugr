@@ -97,7 +97,7 @@ impl Hugr {
     /// Create a new Hugr, with a given entrypoint operation.
     ///
     /// If the optype is [`OpType::Module`], the HUGR module root will match the
-    /// entrypoint node. Otherwise, the entrypoint will be a child of the a
+    /// entrypoint node. Otherwise, the entrypoint will be a descendent of the a
     /// module initialized at the node hierarchy root. The specific HUGR created
     /// depends on the operation type.
     ///
