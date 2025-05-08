@@ -393,7 +393,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string_with_config(&self, config: RenderConfig) -> String;
+    fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String;
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
@@ -640,13 +640,12 @@ impl HugrView for Hugr {
             node_indices: true,
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
-            entrypoint: Some(self.to_portgraph_node(self.entrypoint())),
+            entrypoint: Some(self.entrypoint()),
         })
     }
 
     fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
-        let graph = self.portgraph();
-        graph
+        self.graph
             .mermaid_format()
             .with_hierarchy(&self.hierarchy)
             .with_node_style(render::node_style(self, config))
@@ -658,12 +657,11 @@ impl HugrView for Hugr {
     where
         Self: Sized,
     {
-        let graph = self.portgraph();
         let config = RenderConfig {
-            entrypoint: Some(self.to_portgraph_node(self.entrypoint())),
+            entrypoint: Some(self.entrypoint()),
             ..RenderConfig::default()
         };
-        graph
+        self.graph
             .dot_format()
             .with_hierarchy(&self.hierarchy)
             .with_node_style(render::node_style(self, config))
