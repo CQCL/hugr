@@ -50,7 +50,7 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>> {
         self.0.validate()?;
         Ok(self.0)
     }

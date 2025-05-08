@@ -105,7 +105,7 @@ mod test {
     use super::*;
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
-        let build_result: Result<Hugr, ValidationError> = {
+        let build_result: Result<Hugr, ValidationError<_>> = {
             let mut loop_b = TailLoopBuilder::new(vec![], vec![bool_t()], vec![usize_t()])?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_value(ConstUsize::new(1));

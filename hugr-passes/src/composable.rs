@@ -113,17 +113,20 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMa
 
 /// Error from a [ValidatingPass]
 #[derive(thiserror::Error, Debug)]
-pub enum ValidatePassError<E> {
+pub enum ValidatePassError<N, E>
+where
+    N: HugrNode + 'static,
+{
     #[error("Failed to validate input HUGR: {err}\n{pretty_hugr}")]
     Input {
         #[source]
-        err: ValidationError,
+        err: ValidationError<N>,
         pretty_hugr: String,
     },
     #[error("Failed to validate output HUGR: {err}\n{pretty_hugr}")]
     Output {
         #[source]
-        err: ValidationError,
+        err: ValidationError<N>,
         pretty_hugr: String,
     },
     #[error(transparent)]
@@ -141,17 +144,20 @@ impl<P: ComposablePass> ValidatingPass<P> {
 
     fn validation_impl<E>(
         &self,
-        hugr: &impl HugrView,
-        mk_err: impl FnOnce(ValidationError, String) -> ValidatePassError<E>,
-    ) -> Result<(), ValidatePassError<E>> {
+        hugr: &impl HugrView<Node = P::Node>,
+        mk_err: impl FnOnce(ValidationError<P::Node>, String) -> ValidatePassError<P::Node, E>,
+    ) -> Result<(), ValidatePassError<P::Node, E>> {
         hugr.validate()
             .map_err(|err| mk_err(err, hugr.mermaid_string()))
     }
 }
 
-impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
+impl<P: ComposablePass> ComposablePass for ValidatingPass<P>
+where
+    P::Node: 'static,
+{
     type Node = P::Node;
-    type Error = ValidatePassError<P::Error>;
+    type Error = ValidatePassError<P::Node, P::Error>;
     type Result = P::Result;
 
     fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<P::Result, Self::Error> {
@@ -207,7 +213,7 @@ impl<
 pub(crate) fn validate_if_test<P: ComposablePass>(
     pass: P,
     hugr: &mut impl HugrMut<Node = P::Node>,
-) -> Result<P::Result, ValidatePassError<P::Error>> {
+) -> Result<P::Result, ValidatePassError<P::Node, P::Error>> {
     if cfg!(test) {
         ValidatingPass::new(pass).run(hugr)
     } else {

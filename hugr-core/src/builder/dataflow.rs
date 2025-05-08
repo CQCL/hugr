@@ -99,7 +99,7 @@ impl DFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>> {
         self.base.validate()?;
         Ok(self.base)
     }
@@ -306,7 +306,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T: From<BuildHandle<DfgID>>> SubContainer for
 }
 
 impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>> {
         self.0.finish_hugr()
     }
 }

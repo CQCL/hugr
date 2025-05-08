@@ -128,7 +128,7 @@ impl ComposablePass for RemoveDeadFuncsPass {
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
-) -> Result<(), ValidatePassError<RemoveDeadFuncsError>> {
+) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
     validate_if_test(
         RemoveDeadFuncsPass::default().with_module_entry_points(entry_points),
         h,

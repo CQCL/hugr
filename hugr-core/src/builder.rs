@@ -26,7 +26,7 @@
 //! `CircuitBuilder`.
 //!
 //! ```rust
-//! # use hugr::Hugr;
+//! # use hugr::{Hugr, HugrView};
 //! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
 //! use hugr::extension::prelude::bool_t;
 //! use hugr::std_extensions::logic::{self, LogicOp};
@@ -138,7 +138,7 @@ pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Sig
 pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
-    InvalidHUGR(#[from] ValidationError),
+    InvalidHUGR(#[from] ValidationError<Node>),
     /// SignatureError in trying to construct a node (differs from
     /// [ValidationError::SignatureError] in that we could not construct a node to report about)
     #[error(transparent)]
