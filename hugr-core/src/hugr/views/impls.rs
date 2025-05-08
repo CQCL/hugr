@@ -11,14 +11,8 @@ macro_rules! hugr_internal_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
-                fn portgraph(&self) -> Self::Portgraph<'_>;
                 fn region_portgraph(&self, parent: Self::Node) -> (portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>, Self::RegionPortgraphNodes);
-                fn hierarchy(&self) -> &portgraph::Hierarchy;
-                fn to_portgraph_node(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
-                fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
                 fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap;
-                #[allow(deprecated)]
-                fn base_hugr(&self) -> &crate::Hugr;
             }
         }
     };
@@ -131,11 +125,6 @@ pub(crate) use hugr_mut_methods;
 
 // -------- Immutable borrow
 impl<T: HugrView> HugrInternals for &T {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
@@ -153,11 +142,6 @@ impl<T: HugrView> HugrView for &T {
 
 // -------- Mutable borrow
 impl<T: HugrView> HugrInternals for &mut T {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
@@ -181,11 +165,6 @@ impl<T: HugrMut> HugrMut for &mut T {
 
 // -------- Rc
 impl<T: HugrView> HugrInternals for Rc<T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
@@ -203,11 +182,6 @@ impl<T: HugrView> HugrView for Rc<T> {
 
 // -------- Arc
 impl<T: HugrView> HugrInternals for Arc<T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
@@ -225,11 +199,6 @@ impl<T: HugrView> HugrView for Arc<T> {
 
 // -------- Box
 impl<T: HugrView> HugrInternals for Box<T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
@@ -253,11 +222,6 @@ impl<T: HugrMut> HugrMut for Box<T> {
 
 // -------- Cow
 impl<T: HugrView + ToOwned> HugrInternals for Cow<'_, T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where

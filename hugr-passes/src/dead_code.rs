@@ -1,6 +1,6 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
-use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, Hugr, HugrView, Node};
+use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, HugrView, Node};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
@@ -12,16 +12,16 @@ use crate::ComposablePass;
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
-pub struct DeadCodeElimPass {
+pub struct DeadCodeElimPass<H> {
     /// Nodes that are definitely needed - e.g. FuncDefns, but could be anything.
     /// Hugr Root is assumed to be an entry point even if not mentioned here.
     entry_points: Vec<Node>,
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [PreserveNode::default_for].
-    preserve_callback: Arc<PreserveCallback>,
+    preserve_callback: Arc<PreserveCallback<H>>,
 }
 
-impl Default for DeadCodeElimPass {
+impl<H: HugrView<Node = Node> + 'static> Default for DeadCodeElimPass<H> {
     fn default() -> Self {
         Self {
             entry_points: Default::default(),
@@ -30,7 +30,7 @@ impl Default for DeadCodeElimPass {
     }
 }
 
-impl Debug for DeadCodeElimPass {
+impl<H> Debug for DeadCodeElimPass<H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         // Use "derive Debug" by defining an identical struct without the unprintable fields
 
@@ -51,7 +51,7 @@ impl Debug for DeadCodeElimPass {
 
 /// Callback that identifies nodes that must be preserved even if their
 /// results are not used. For example, (the default) [PreserveNode::default_for].
-pub type PreserveCallback = dyn Fn(&Hugr, Node) -> PreserveNode;
+pub type PreserveCallback<H> = dyn Fn(&H, Node) -> PreserveNode;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 /// Signal that a node must be preserved even when its result is not used
@@ -74,7 +74,7 @@ impl PreserveNode {
     ///   CFGs to be removed.)
     /// * Assumes all TailLoops must be preserved. (One could, for example, use dataflow
     ///   analysis to allow removal of TailLoops that never [Continue](hugr_core::ops::TailLoop::CONTINUE_TAG).)
-    pub fn default_for(h: &Hugr, n: Node) -> PreserveNode {
+    pub fn default_for<H: HugrView<Node = Node>>(h: &H, n: Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
             _ => Self::DeferToChildren,
@@ -82,10 +82,10 @@ impl PreserveNode {
     }
 }
 
-impl DeadCodeElimPass {
+impl<H: HugrView<Node = Node>> DeadCodeElimPass<H> {
     /// Allows setting a callback that determines whether a node must be preserved
     /// (even when its result is not used)
-    pub fn set_preserve_callback(mut self, cb: Arc<PreserveCallback>) -> Self {
+    pub fn set_preserve_callback(mut self, cb: Arc<PreserveCallback<H>>) -> Self {
         self.preserve_callback = cb;
         self
     }
@@ -100,7 +100,7 @@ impl DeadCodeElimPass {
         self
     }
 
-    fn find_needed_nodes(&self, h: impl HugrView<Node = Node>) -> HashSet<Node> {
+    fn find_needed_nodes(&self, h: &H) -> HashSet<Node> {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
@@ -110,7 +110,7 @@ impl DeadCodeElimPass {
                 continue;
             };
             for ch in h.children(n) {
-                if self.must_preserve(&h, &mut must_preserve, ch)
+                if self.must_preserve(h, &mut must_preserve, ch)
                     || matches!(
                         h.get_optype(ch),
                         OpType::Case(_) // Include all Cases in Conditionals
@@ -136,17 +136,12 @@ impl DeadCodeElimPass {
         needed
     }
 
-    fn must_preserve(
-        &self,
-        h: &impl HugrView<Node = Node>,
-        cache: &mut HashMap<Node, bool>,
-        n: Node,
-    ) -> bool {
+    fn must_preserve(&self, h: &H, cache: &mut HashMap<Node, bool>, n: Node) -> bool {
         if let Some(res) = cache.get(&n) {
             return *res;
         }
         #[allow(deprecated)]
-        let res = match self.preserve_callback.as_ref()(h.base_hugr(), n) {
+        let res = match self.preserve_callback.as_ref()(h, n) {
             PreserveNode::MustKeep => true,
             PreserveNode::CanRemoveIgnoringChildren => false,
             PreserveNode::DeferToChildren => {
@@ -158,7 +153,7 @@ impl DeadCodeElimPass {
     }
 }
 
-impl<H: HugrMut<Node = Node>> ComposablePass<H> for DeadCodeElimPass {
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for DeadCodeElimPass<H> {
     type Error = Infallible;
     type Result = ();
 
@@ -182,6 +177,7 @@ mod test {
     use hugr_core::extension::prelude::{usize_t, ConstUsize};
     use hugr_core::ops::{handle::NodeHandle, OpTag, OpTrait};
     use hugr_core::types::Signature;
+    use hugr_core::Hugr;
     use hugr_core::{ops::Value, type_row, HugrView};
     use itertools::Itertools;
 
@@ -210,7 +206,7 @@ mod test {
 
         // Callbacks that allow removing the DFG (and cst_unused)
         for dce in [
-            DeadCodeElimPass::default(),
+            DeadCodeElimPass::<Hugr>::default(),
             // keep the node inside the DFG, but remove the DFG without checking its children:
             DeadCodeElimPass::default().set_preserve_callback(Arc::new(move |h, n| {
                 if n == dfg_unused || h.get_optype(n).is_const() {
@@ -243,7 +239,7 @@ mod test {
             }
         }
         for dce in [
-            DeadCodeElimPass::default()
+            DeadCodeElimPass::<Hugr>::default()
                 .set_preserve_callback(Arc::new(|_, _| PreserveNode::MustKeep)),
             // keeping the unused node in the DFG, means keeping the DFG (which uses its other children)
             DeadCodeElimPass::default()
@@ -256,7 +252,7 @@ mod test {
 
         // Callbacks that keep the DFG but allow removing the unused constant
         for dce in [
-            DeadCodeElimPass::default()
+            DeadCodeElimPass::<Hugr>::default()
                 .set_preserve_callback(Arc::new(move |_, n| keep_if(n == dfg_unused))),
             DeadCodeElimPass::default()
                 .set_preserve_callback(Arc::new(move |_, n| keep_if(n == lc1.node()))),
@@ -288,7 +284,7 @@ mod test {
         {
             let cst_unused = cst_unused.node();
             let mut h = orig.clone();
-            DeadCodeElimPass::default()
+            DeadCodeElimPass::<Hugr>::default()
                 .set_preserve_callback(Arc::new(move |_, n| keep_if(n == cst_unused)))
                 .run(&mut h)
                 .unwrap();

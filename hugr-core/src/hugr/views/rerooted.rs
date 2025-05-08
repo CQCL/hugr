@@ -37,11 +37,6 @@ impl<H: HugrView> Rerooted<H> {
 }
 
 impl<H: HugrView> HugrInternals for Rerooted<H> {
-    type Portgraph<'p>
-        = H::Portgraph<'p>
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = H::RegionPortgraph<'p>
     where

@@ -209,7 +209,8 @@ fn remove_pack_unpack<'h, T: HugrView>(
 ) -> SimpleReplacement<T::Node> {
     let num_unpack_outputs = tuple_types.len() * unpack_nodes.len();
 
-    let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr));
+    let parent = hugr.get_parent(pack_node).expect("pack_node has no parent");
+    let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr, parent));
 
     let mut nodes = unpack_nodes;
     nodes.push(pack_node);

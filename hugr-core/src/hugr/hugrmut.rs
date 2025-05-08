@@ -7,7 +7,6 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
-use crate::hugr::internal::HugrInternals;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType};
 use crate::hugr::{NodeMetadata, Patch};

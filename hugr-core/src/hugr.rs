@@ -30,6 +30,7 @@ use crate::extension::resolution::{
     WeakExtensionRegistry,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::ops::handle::NodeHandle;
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
@@ -306,6 +307,25 @@ impl Hugr {
         // The operation nodes will be left in place.
         // This step is not strictly necessary.
         self.graph.compact_nodes(|_, _| {});
+    }
+
+    /// The underlying portgraph of the HUGR.
+    #[inline]
+    pub(crate) fn portgraph(&self) -> &MultiPortGraph {
+        &self.graph
+    }
+
+    /// Translate a node into an index in [`Hugr::portgraph`]
+    #[inline]
+    pub(crate) fn to_portgraph_node(&self, node: impl NodeHandle<Node>) -> portgraph::NodeIndex {
+        node.node().into_portgraph()
+    }
+
+    /// Translate a node index in [`Hugr::portgraph`] into a HUGR node.
+    #[allow(clippy::wrong_self_convention)]
+    #[inline]
+    pub(crate) fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Node {
+        index.into()
     }
 }
 

@@ -19,11 +19,6 @@ use crate::ops::handle::NodeHandle;
 /// Specifically, this trait provides access to the underlying portgraph
 /// view.
 pub trait HugrInternals {
-    /// The underlying portgraph view type.
-    type Portgraph<'p>: LinkView<LinkEndpoint: Eq> + Clone + 'p
-    where
-        Self: 'p;
-
     /// The portgraph graph structure returned by [`HugrInternals::region_portgraph`].
     type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq> + Clone + 'p
     where
@@ -35,9 +30,6 @@ pub trait HugrInternals {
     /// A mapping between HUGR nodes and portgraph nodes in the graph returned by
     /// [`HugrInternals::region_portgraph`].
     type RegionPortgraphNodes: PortgraphNodeMap<Self::Node>;
-
-    /// Returns a reference to the underlying portgraph.
-    fn portgraph(&self) -> Self::Portgraph<'_>;
 
     /// Returns a flat portgraph view of a region in the HUGR, and a mapping between
     /// HUGR nodes and portgraph nodes in the graph.
@@ -56,31 +48,12 @@ pub trait HugrInternals {
         Self::RegionPortgraphNodes,
     );
 
-    /// Returns the portgraph [Hierarchy](portgraph::Hierarchy) of the graph
-    /// returned by [`HugrInternals::portgraph`].
-    fn hierarchy(&self) -> &portgraph::Hierarchy;
-
-    /// Convert a node to a portgraph node index.
-    fn to_portgraph_node(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex;
-
-    /// Convert a portgraph node index to a node.
-    #[allow(clippy::wrong_self_convention)]
-    fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
-
     /// Returns a metadata entry associated with a node.
     ///
     /// # Panics
     ///
     /// If the node is not in the graph.
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap;
-
-    /// Returns the Hugr at the base of a chain of views.
-    // TODO: This will be removed in a future PR.
-    #[deprecated(
-        since = "0.16.0",
-        note = "This method will be removed in a future PR. Use the individual HugrInternals methods instead."
-    )]
-    fn base_hugr(&self) -> &Hugr;
 }
 
 /// A map between hugr nodes and portgraph nodes in the graph returned by
@@ -119,11 +92,6 @@ impl PortgraphNodeMap<Node> for DefaultPGNodeMap {
 }
 
 impl HugrInternals for Hugr {
-    type Portgraph<'p>
-        = &'p MultiPortGraph
-    where
-        Self: 'p;
-
     type RegionPortgraph<'p>
         = &'p MultiPortGraph
     where
@@ -132,11 +100,6 @@ impl HugrInternals for Hugr {
     type Node = Node;
 
     type RegionPortgraphNodes = DefaultPGNodeMap;
-
-    #[inline]
-    fn portgraph(&self) -> Self::Portgraph<'_> {
-        &self.graph
-    }
 
     #[inline]
     fn region_portgraph(
@@ -150,26 +113,6 @@ impl HugrInternals for Hugr {
         let root = self.to_portgraph_node(parent);
         let region = portgraph::view::FlatRegion::new_without_root(pg, &self.hierarchy, root);
         (region, DefaultPGNodeMap)
-    }
-
-    #[inline]
-    fn hierarchy(&self) -> &portgraph::Hierarchy {
-        &self.hierarchy
-    }
-
-    #[inline]
-    fn base_hugr(&self) -> &Hugr {
-        self
-    }
-
-    #[inline]
-    fn to_portgraph_node(&self, node: impl NodeHandle<Self::Node>) -> portgraph::NodeIndex {
-        node.node().into_portgraph()
-    }
-
-    #[inline]
-    fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node {
-        index.into()
     }
 
     #[inline]

@@ -89,7 +89,7 @@ impl ConstantFoldPass {
     }
 }
 
-impl<H: HugrMut<Node = Node>> ComposablePass<H> for ConstantFoldPass {
+impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     type Error = ConstFoldError;
     type Result = ();
 
@@ -165,7 +165,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ConstantFoldPass {
             hugr.connect(lcst, OutgoingPort::from(0), n, inport);
         }
         // Eliminate dead code not required for the same entry points.
-        DeadCodeElimPass::default()
+        DeadCodeElimPass::<H>::default()
             .with_entry_points(self.inputs.keys().cloned())
             .set_preserve_callback(if self.allow_increase_termination {
                 Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
@@ -189,7 +189,8 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ConstantFoldPass {
 ///
 /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
 /// [Module]: hugr_core::ops::OpType::Module
-pub fn constant_fold_pass<H: HugrMut<Node = Node>>(h: &mut H) {
+pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H>) {
+    let h = h.as_mut();
     let c = ConstantFoldPass::default();
     let c = if h.get_optype(h.entrypoint()).is_module() {
         let no_inputs: [(IncomingPort, _); 0] = [];

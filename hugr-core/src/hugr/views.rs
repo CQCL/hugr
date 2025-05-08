@@ -83,8 +83,8 @@ pub trait HugrView: HugrInternals {
 
     /// A pointer to the module region defined at the root of the HUGR.
     ///
-    /// This node is the root node of the [`HugrInternals::hierarchy`]. It is
-    /// the ancestor of all other nodes in the HUGR.
+    /// This node is the root node of the node hierarchy. It is the ancestor of
+    /// all other nodes in the HUGR.
     ///
     /// Operations applied to a hugr normally start at the
     /// [`HugrView::entrypoint`] instead.
@@ -817,11 +817,7 @@ pub(super) fn panic_invalid_non_entrypoint<H: HugrView + ?Sized>(hugr: &H, node:
 
 /// Panic if [`HugrView::valid_node`] fails.
 #[track_caller]
-pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
-    hugr: &H,
-    node: Node,
-    port: impl Into<Port>,
-) {
+pub(super) fn panic_invalid_port(hugr: &Hugr, node: Node, port: impl Into<Port>) {
     let port = port.into();
     if hugr
         .portgraph()
