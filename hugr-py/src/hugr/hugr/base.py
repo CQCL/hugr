@@ -16,26 +16,21 @@ from typing import (
 )
 
 import hugr.model as model
+import hugr.ops as ops
 from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
 from hugr.exceptions import ParentBeforeChild
 from hugr.ops import (
     CFG,
-    AliasDecl,
-    AliasDefn,
     Call,
     Conditional,
     Const,
     Custom,
     DataflowOp,
-    DfParentOp,
-    FuncDecl,
     FuncDefn,
     IncompleteOp,
-    Input,
     Module,
     Op,
-    Output,
 )
 from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
@@ -140,14 +135,36 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             case None | Module():
                 pass
             # Ops that can be defined directly in the root module.
-            case FuncDefn() | FuncDecl() | Const() | AliasDecl() | AliasDefn():
+            case (
+                ops.FuncDefn()
+                | ops.FuncDecl()
+                | ops.Const()
+                | ops.AliasDecl()
+                | ops.AliasDefn()
+            ):
                 self.entrypoint = self.add_node(entrypoint_op, self.module_root)
             # Exclude these two from the `DataflowOp` case below.
-            case Input() | Output():
+            case ops.Input() | ops.Output():
                 msg = f"Cannot create a new HUGR with entrypoint {entrypoint_op}"
                 raise ValueError(msg)
-            # Some
-            case DataflowOp():
+            # Dataflow operations
+            #
+            # NOTE: This is functionally equivalent to matching on `DataflowOp()`
+            # directly, but calling `isinstance(_, DataflowOp)` errors out in
+            # `python <=3.11` due to how runtime_checkable Protocols were implemented.
+            # See <https://github.com/python/cpython/issues/102433>
+            case (
+                ops.Custom()
+                | ops.Tag()
+                | ops.DFG()
+                | ops.CFG()
+                | ops.LoadConst()
+                | ops.Conditional()
+                | ops.TailLoop()
+                | ops.CallIndirect()
+                | ops.LoadFunc()
+                | ops.AsExtOp()
+            ):
                 from hugr.build import Function
 
                 inputs, outputs = None, None
@@ -157,11 +174,23 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                     outputs = sig.output
                 except IncompleteOp:
                     match entrypoint_op:
-                        case DfParentOp():
-                            inputs = entrypoint_op._inputs()
                         case CFG():
                             inputs = entrypoint_op.inputs
                         case Conditional():
+                            inputs = entrypoint_op._inputs()
+                        # See NOTE above about `isinstance(_, DataflowOp)`.
+                        case (
+                            ops.Custom()
+                            | ops.Tag()
+                            | ops.DFG()
+                            | ops.CFG()
+                            | ops.LoadConst()
+                            | ops.Conditional()
+                            | ops.TailLoop()
+                            | ops.CallIndirect()
+                            | ops.LoadFunc()
+                            | ops.AsExtOp()
+                        ):
                             inputs = entrypoint_op._inputs()
                         case _:
                             raise
