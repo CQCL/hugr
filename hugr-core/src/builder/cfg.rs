@@ -224,7 +224,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             self.hugr_mut().add_node_with_parent(parent, op)
         };
 
-        BlockBuilder::create(self.hugr_mut(), block_n, true)
+        BlockBuilder::create_with_io(self.hugr_mut(), block_n)
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with
@@ -317,16 +317,26 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 
     /// Create a new BlockBuilder.
     ///
+    /// See [`BlockBuilder::create_with_io`] if you need to initialize the input
+    /// and output nodes.
+    ///
     /// # Parameters
     /// - `base`: The base HUGR to build on.
     /// - `block_n`: The block we are building.
-    /// - `add_io`: Whether to initialize the inputs and outputs nodes for to the block.
-    fn create(base: B, block_n: Node, add_io: bool) -> Result<Self, BuildError> {
-        if !add_io {
-            let db = DFGBuilder::create(base, block_n)?;
-            return Ok(BlockBuilder::from_dfg_builder(db));
-        }
+    fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
+        let db = DFGBuilder::create(base, block_n)?;
+        Ok(BlockBuilder::from_dfg_builder(db))
+    }
 
+    /// Create a new BlockBuilder, initializing the input and output nodes.
+    ///
+    /// See [`BlockBuilder::create`] if you don't need to initialize the input
+    /// and output nodes.
+    ///
+    /// # Parameters
+    /// - `base`: The base HUGR to build on.
+    /// - `block_n`: The block we are building.
+    fn create_with_io(base: B, block_n: Node) -> Result<Self, BuildError> {
         let block_op = base
             .as_ref()
             .get_optype(block_n)
@@ -382,7 +392,7 @@ impl BlockBuilder<Hugr> {
         let mut base = std::mem::take(cfg.hugr_mut());
         let root = block.node();
         base.set_entrypoint(root);
-        Self::create(base, root, false)
+        Self::create(base, root)
     }
 
     /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
