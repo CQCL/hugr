@@ -1114,31 +1114,7 @@ fn emit_const_int<'c, H: HugrView<Node = Node>>(
     Ok(ty.const_int(k.value_u(), false).as_basic_value_enum())
 }
 
-/// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
-/// ops, types, and constants.
-///
-/// Any ops that panic will do so using [DefaultPreludeCodegen].
-#[deprecated]
-pub fn add_int_extensions<'a, H: HugrView<Node = Node> + 'a>(
-    cem: CodegenExtsBuilder<'a, H>,
-) -> CodegenExtsBuilder<'a, H> {
-    cem.add_extension(IntCodegenExtension(DefaultPreludeCodegen))
-}
-
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
-    /// ops, types, and constants.
-    ///
-    /// Any ops that panic will do so using [DefaultPreludeCodegen].
-    ///
-    /// # Deprecated
-    ///
-    /// This method is deprecated in favor of [Self::add_default_int_extensions].
-    #[deprecated]
-    pub fn add_int_extensions(self) -> Self {
-        self.add_default_int_extensions()
-    }
-
     /// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
     /// ops, types, and constants.
     ///

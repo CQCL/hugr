@@ -164,17 +164,6 @@ pub enum EnvelopeError {
     #[display("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
     #[from(ignore)]
     ZstdUnsupported,
-    /// Tried to encode a package with multiple HUGRs, when only 1 was expected.
-    #[display(
-            "Packages with multiple HUGRs are currently unsupported. Tried to encode {count} HUGRs, when 1 was expected."
-        )]
-    #[from(ignore)]
-    /// Deprecated: Packages with multiple HUGRs is a legacy feature that is no longer supported.
-    #[deprecated(since = "0.15.2", note = "Multiple HUGRs are supported via packages.")]
-    MultipleHugrs {
-        /// The number of HUGRs in the package.
-        count: usize,
-    },
     /// JSON serialization error.
     SerdeError {
         /// The source error.

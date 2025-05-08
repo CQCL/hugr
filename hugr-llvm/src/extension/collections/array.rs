@@ -892,7 +892,9 @@ mod test {
     use hugr_core::extension::prelude::either_type;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::collections::array::op_builder::build_all_array_ops;
-    use hugr_core::std_extensions::collections::array::{self, array_type, ArrayRepeat, ArrayScan};
+    use hugr_core::std_extensions::collections::array::{
+        self, array_type, ArrayOpBuilder, ArrayRepeat, ArrayScan,
+    };
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::types::Type;
     use hugr_core::{
@@ -919,7 +921,7 @@ mod test {
         check_emission,
         emit::test::SimpleHugrConfig,
         test::{exec_ctx, llvm_ctx, TestContext},
-        utils::{ArrayOpBuilder, IntOpBuilder, LogicOpBuilder},
+        utils::{IntOpBuilder, LogicOpBuilder},
     };
 
     #[rstest]
