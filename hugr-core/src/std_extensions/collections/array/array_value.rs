@@ -19,6 +19,7 @@ use super::array_kind::ArrayKind;
 pub struct GenericArrayValue<AK: ArrayKind> {
     values: Vec<Value>,
     typ: Type,
+    #[serde(skip)]
     _kind: PhantomData<AK>,
 }
 
