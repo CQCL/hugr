@@ -1,8 +1,8 @@
 use crate::hugr::views::HugrView;
 use crate::types::{Signature, TypeRow};
 
-use crate::ops;
 use crate::ops::handle::{CaseID, NodeHandle};
+use crate::ops::{self};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
@@ -204,6 +204,14 @@ mod test {
     };
 
     use super::*;
+
+    #[test]
+    fn basic_conditional_case() -> Result<(), BuildError> {
+        let case_b = CaseBuilder::new(Signature::new_endo(vec![usize_t(), usize_t()]))?;
+        let [in0, in1] = case_b.input_wires_arr();
+        case_b.finish_with_outputs([in0, in1])?;
+        Ok(())
+    }
 
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {

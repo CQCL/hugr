@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops;
+use crate::ops::{self, OpParent};
 use crate::ops::{DataflowParent, Input, Output};
 use crate::{Direction, IncomingPort, OutgoingPort, Wire};
 
@@ -59,15 +59,16 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
 
     /// Returns a new DFGBuilder with the given base and parent node.
     ///
+    /// The parent node may be any `DataflowParent` node.
+    ///
     /// If `parent` doesn't have input and output nodes, use
     /// [`DFGBuilder::create_with_io`] instead.
     pub(super) fn create(base: T, parent: Node) -> Result<Self, BuildError> {
         let sig = base
             .as_ref()
             .get_optype(parent)
-            .as_dataflow_block()
-            .expect("Parent must be a dataflow block")
-            .inner_signature();
+            .inner_function_type()
+            .expect("DFG parent must have an inner function signature.");
         let num_in_wires = sig.input_count();
         let num_out_wires = sig.output_count();
 
