@@ -1,0 +1,50 @@
+---
+source: hugr-core/tests/model.rs
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entrypoint.edn\"))"
+---
+(hugr 0)
+
+(mod)
+
+(import core.fn)
+
+(import core.entrypoint)
+
+(define-func main (core.fn [] [])
+  (dfg (signature (core.fn [] [])) (meta core.entrypoint)))
+
+(mod)
+
+(import core.fn)
+
+(import core.entrypoint)
+
+(define-func wrapper_dfg (core.fn [] [])
+  (dfg (signature (core.fn [] [])) (meta core.entrypoint)))
+
+(mod)
+
+(import core.make_adt)
+
+(import core.ctrl)
+
+(import core.fn)
+
+(import core.entrypoint)
+
+(import core.adt)
+
+(define-func wrapper_cfg (core.fn [] [])
+  (dfg
+    (signature (core.fn [] []))
+    (cfg
+      (signature (core.fn [] []))
+      (cfg [%0] [%1]
+        (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+        (meta core.entrypoint)
+        (block [%0] [%1]
+          (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+          (dfg [] [%2]
+            (signature (core.fn [] [(core.adt [[]])]))
+            ((core.make_adt _ _ 0) [] [%2]
+              (signature (core.fn [] [(core.adt [[]])])))))))))

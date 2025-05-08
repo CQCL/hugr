@@ -120,7 +120,7 @@ impl<'a> Context<'a> {
         self.symbols.enter(self.module.root);
         self.links.enter(self.module.root);
 
-        let hugr_children = self.hugr.children(self.hugr.entrypoint());
+        let hugr_children = self.hugr.children(self.hugr.module_root());
         let mut children = Vec::with_capacity(hugr_children.size_hint().0);
 
         for child in hugr_children.clone() {
@@ -291,9 +291,11 @@ impl<'a> Context<'a> {
             }
 
             OpType::DFG(_) => {
-                regions = self
-                    .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, model::ScopeClosure::Open)]);
+                regions = self.bump.alloc_slice_copy(&[self.export_dfg(
+                    node,
+                    model::ScopeClosure::Open,
+                    false,
+                )]);
                 table::Operation::Dfg
             }
 
@@ -313,18 +315,22 @@ impl<'a> Context<'a> {
             }
 
             OpType::DataflowBlock(_) => {
-                regions = self
-                    .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, model::ScopeClosure::Open)]);
+                regions = self.bump.alloc_slice_copy(&[self.export_dfg(
+                    node,
+                    model::ScopeClosure::Open,
+                    false,
+                )]);
                 table::Operation::Block
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
                 let symbol = this.export_poly_func_type(name, &func.signature);
-                regions = this
-                    .bump
-                    .alloc_slice_copy(&[this.export_dfg(node, model::ScopeClosure::Closed)]);
+                regions = this.bump.alloc_slice_copy(&[this.export_dfg(
+                    node,
+                    model::ScopeClosure::Closed,
+                    false,
+                )]);
                 table::Operation::DefineFunc(symbol)
             }),
 
@@ -426,9 +432,11 @@ impl<'a> Context<'a> {
             }
 
             OpType::TailLoop(_) => {
-                regions = self
-                    .bump
-                    .alloc_slice_copy(&[self.export_dfg(node, model::ScopeClosure::Open)]);
+                regions = self.bump.alloc_slice_copy(&[self.export_dfg(
+                    node,
+                    model::ScopeClosure::Open,
+                    false,
+                )]);
                 table::Operation::TailLoop
             }
 
@@ -479,7 +487,12 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
-        let meta = self.export_node_metadata(node);
+        let meta = {
+            let mut meta = Vec::new();
+            self.export_node_json_metadata(node, &mut meta);
+            self.export_node_order_metadata(node, &mut meta);
+            self.bump.alloc_slice_copy(&meta)
+        };
 
         self.module.nodes[node_id.index()] = table::Node {
             operation,
@@ -532,7 +545,7 @@ impl<'a> Context<'a> {
             }
 
             for (name, value) in opdef.iter_misc() {
-                meta.push(self.export_json_meta(name, value));
+                meta.push(self.make_json_meta(name, value));
             }
 
             self.bump.alloc_slice_copy(&meta)
@@ -574,7 +587,12 @@ impl<'a> Context<'a> {
     /// Creates a data flow region from the given node's children.
     ///
     /// `Input` and `Output` nodes are used to determine the source and target ports of the region.
-    pub fn export_dfg(&mut self, node: Node, closure: model::ScopeClosure) -> table::RegionId {
+    pub fn export_dfg(
+        &mut self,
+        node: Node,
+        closure: model::ScopeClosure,
+        export_json_meta: bool,
+    ) -> table::RegionId {
         let region = self.module.insert_region(table::Region::default());
 
         self.symbols.enter(region);
@@ -586,7 +604,13 @@ impl<'a> Context<'a> {
         let mut targets: &[_] = &[];
         let mut input_types = None;
         let mut output_types = None;
+
         let mut meta = Vec::new();
+
+        if export_json_meta {
+            self.export_node_json_metadata(node, &mut meta);
+        }
+        self.export_node_entrypoint_metadata(node, &mut meta);
 
         let children = self.hugr.children(node);
         let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
@@ -672,6 +696,10 @@ impl<'a> Context<'a> {
         let mut source = None;
         let mut targets: &[_] = &[];
 
+        let mut meta = Vec::new();
+        self.export_node_json_metadata(node, &mut meta);
+        self.export_node_entrypoint_metadata(node, &mut meta);
+
         let children = self.hugr.children(node);
         let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 1, self.bump);
 
@@ -728,7 +756,7 @@ impl<'a> Context<'a> {
             sources: self.bump.alloc_slice_copy(&[source.unwrap()]),
             targets,
             children: region_children.into_bump_slice(),
-            meta: &[], // TODO: Export metadata
+            meta: self.bump.alloc_slice_copy(&meta),
             signature,
             scope,
         };
@@ -746,7 +774,7 @@ impl<'a> Context<'a> {
                 panic!("expected a `Case` node as a child of a `Conditional` node");
             };
 
-            regions.push(self.export_dfg(child, model::ScopeClosure::Open));
+            regions.push(self.export_dfg(child, model::ScopeClosure::Open, true));
         }
 
         regions.into_bump_slice()
@@ -1000,7 +1028,7 @@ impl<'a> Context<'a> {
 
                 let region = match hugr.entrypoint_optype() {
                     OpType::DFG(_) => {
-                        self.export_dfg(hugr.entrypoint(), model::ScopeClosure::Closed)
+                        self.export_dfg(hugr.entrypoint(), model::ScopeClosure::Closed, true)
                     }
                     _ => panic!("Value::Function root must be a DFG"),
                 };
@@ -1031,41 +1059,43 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn export_node_metadata(&mut self, node: Node) -> &'a [table::TermId] {
+    fn export_node_json_metadata(&mut self, node: Node, meta: &mut Vec<table::TermId>) {
         let metadata_map = self.hugr.node_metadata_map(node);
-
-        let has_order_edges = {
-            fn is_relevant_node(hugr: &Hugr, node: Node) -> bool {
-                let optype = hugr.get_optype(node);
-                !optype.is_input() && !optype.is_output()
-            }
-
-            let optype = self.hugr.get_optype(node);
-
-            Direction::BOTH
-                .iter()
-                .filter(|dir| optype.other_port_kind(**dir) == Some(EdgeKind::StateOrder))
-                .filter_map(|dir| optype.other_port(*dir))
-                .flat_map(|port| self.hugr.linked_ports(node, port))
-                .any(|(other, _)| is_relevant_node(self.hugr, other))
-        };
-
-        let meta_capacity = metadata_map.len() + has_order_edges as usize;
-        let mut meta = BumpVec::with_capacity_in(meta_capacity, self.bump);
+        meta.reserve(metadata_map.len());
 
         for (name, value) in metadata_map {
-            meta.push(self.export_json_meta(name, value));
+            meta.push(self.make_json_meta(name, value));
         }
+    }
+
+    fn export_node_order_metadata(&mut self, node: Node, meta: &mut Vec<table::TermId>) {
+        fn is_relevant_node(hugr: &Hugr, node: Node) -> bool {
+            let optype = hugr.get_optype(node);
+            !optype.is_input() && !optype.is_output()
+        }
+
+        let optype = self.hugr.get_optype(node);
+
+        let has_order_edges = Direction::BOTH
+            .iter()
+            .filter(|dir| optype.other_port_kind(**dir) == Some(EdgeKind::StateOrder))
+            .filter_map(|dir| optype.other_port(*dir))
+            .flat_map(|port| self.hugr.linked_ports(node, port))
+            .any(|(other, _)| is_relevant_node(self.hugr, other));
 
         if has_order_edges {
             let key = self.make_term(model::Literal::Nat(node.index() as u64).into());
             meta.push(self.make_term_apply(model::ORDER_HINT_KEY, &[key]));
         }
-
-        meta.into_bump_slice()
     }
 
-    pub fn export_json_meta(&mut self, name: &str, value: &serde_json::Value) -> table::TermId {
+    fn export_node_entrypoint_metadata(&mut self, node: Node, meta: &mut Vec<table::TermId>) {
+        if self.hugr.entrypoint() == node {
+            meta.push(self.make_term_apply(model::CORE_ENTRYPOINT, &[]));
+        }
+    }
+
+    pub fn make_json_meta(&mut self, name: &str, value: &serde_json::Value) -> table::TermId {
         let value = serde_json::to_string(value).expect("json values are always serializable");
         let value = self.make_term(model::Literal::Str(value.into()).into());
         let name = self.make_term(model::Literal::Str(name.into()).into());
