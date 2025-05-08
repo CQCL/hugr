@@ -38,8 +38,8 @@ use super::EnvelopeConfig;
 /// struct A {
 ///     #[serde_as(as = "AsStringEnvelope")]
 ///     package: Package,
-///     #[serde_as(as = "AsStringEnvelope")]
-///     package: Hugr,
+///     #[serde_as(as = "Vec<AsStringEnvelope>")]
+///     hugrs: Vec<Hugr>,
 /// }
 /// ```
 pub struct AsStringEnvelope;
