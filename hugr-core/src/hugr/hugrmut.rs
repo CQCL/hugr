@@ -428,7 +428,7 @@ impl HugrMut for Hugr {
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, &other, other.entry_descendants(), |&n| {
+        let node_map = insert_hugr_internal(self, other, other.entry_descendants(), |&n| {
             if n == other.entrypoint() {
                 Some(root)
             } else {
@@ -462,7 +462,7 @@ impl HugrMut for Hugr {
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
     ) -> HashMap<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, &other, subgraph.nodes().iter().cloned(), |_| {
+        let node_map = insert_hugr_internal(self, other, subgraph.nodes().iter().cloned(), |_| {
             Some(root)
         });
         // Update the optypes and metadata, copying them from the other graph.
