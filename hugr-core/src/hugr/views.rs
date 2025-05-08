@@ -675,7 +675,7 @@ impl HugrView for Hugr {
 
     #[inline]
     fn extract_hugr(&self, target: Node) -> (Hugr, impl ExtractionResult<Node> + 'static) {
-        // Shortcircuit if the extracted HUGr is the same as the original
+        // Shortcircuit if the extracted HUGR is the same as the original
         if target == self.module_root().node() {
             return (self.clone(), DefaultNodeMap(HashMap::new()));
         }
