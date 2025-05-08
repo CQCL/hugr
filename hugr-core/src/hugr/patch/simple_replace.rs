@@ -147,6 +147,21 @@ impl<N: HugrNode> OutputBoundaryMap<N> {
             }
         }
     }
+
+    fn map_nodes<M: HugrNode>(&self, node_map: impl Fn(N) -> M) -> OutputBoundaryMap<M> {
+        match self {
+            OutputBoundaryMap::ByIncoming(map) => OutputBoundaryMap::ByIncoming(
+                map.iter()
+                    .map(|(&(node, port), &val)| ((node_map(node), port), val))
+                    .collect(),
+            ),
+            OutputBoundaryMap::ByOutgoing(map) => OutputBoundaryMap::ByOutgoing(
+                map.iter()
+                    .map(|(&(node, port), &val)| ((node_map(node), port), val))
+                    .collect(),
+            ),
+        }
+    }
 }
 
 impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
@@ -391,6 +406,38 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         incoming_boundary
             .chain(outgoing_boundary)
             .chain(host_to_host_boundary)
+    }
+
+    /// Map the host nodes in `self` according to `node_map`.
+    ///
+    /// `node_map` must map nodes in the current HUGR of the subgraph to
+    /// its equivalent nodes in some `new_hugr`.
+    ///
+    /// This converts a replacement that acts on nodes of type `HostNode` to
+    /// a replacement that acts on `new_hugr`, with nodes of type `N`.
+    ///
+    /// This does not check convexity. It is up to the caller to ensure that
+    /// the mapped replacement obtained from this applies on a convex subgraph
+    /// of the new HUGR.
+    pub(crate) fn map_host_nodes<N: HugrNode>(
+        &self,
+        node_map: impl Fn(HostNode) -> N,
+    ) -> SimpleReplacement<N> {
+        let Self {
+            subgraph,
+            replacement,
+            nu_inp,
+            nu_out,
+        } = self;
+        let nu_inp = nu_inp
+            .iter()
+            .map(|(&repl_node_port, &(host_node, host_port))| {
+                (repl_node_port, (node_map(host_node), host_port))
+            })
+            .collect();
+        let nu_out = nu_out.map_nodes(&node_map);
+        let subgraph = subgraph.map_nodes(node_map);
+        SimpleReplacement::new(subgraph, replacement.clone(), nu_inp, nu_out)
     }
 }
 

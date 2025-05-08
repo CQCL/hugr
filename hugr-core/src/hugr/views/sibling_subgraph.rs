@@ -356,6 +356,32 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr.get_parent(self.nodes[0]).expect("invalid subgraph")
     }
 
+    /// Map the nodes in the subgraph according to `node_map`.
+    ///
+    /// This does not check convexity. It is up to the caller to ensure that
+    /// the mapped subgraph obtained from this is convex in the new Hugr.
+    pub(crate) fn map_nodes<N2: HugrNode>(
+        &self,
+        node_map: impl Fn(N) -> N2,
+    ) -> SiblingSubgraph<N2> {
+        let nodes = self.nodes.iter().map(|&n| node_map(n)).collect_vec();
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|part| part.iter().map(|&(n, p)| (node_map(n), p)).collect_vec())
+            .collect_vec();
+        let outputs = self
+            .outputs
+            .iter()
+            .map(|&(n, p)| (node_map(n), p))
+            .collect_vec();
+        SiblingSubgraph {
+            nodes,
+            inputs,
+            outputs,
+        }
+    }
+
     /// Construct a [`SimpleReplacement`] to replace `self` with `replacement`.
     ///
     /// `replacement` must be a hugr with DFG root and its signature must
