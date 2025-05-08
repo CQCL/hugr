@@ -1,33 +1,31 @@
 {
     "version": "live",
-    "nodes":
-    [
+    "nodes": [
+        {
+            "parent": 0,
+            "op": "Module"
+        },
         {
             "parent": 0,
             "input_extensions": null,
             "op": "Const",
-            "v":
-            {
+            "v": {
                 "v": "Sum",
                 "tag": 1,
-                "typ":
-                {
+                "typ": {
                     "t": "Sum",
                     "s": "Unit",
                     "size": 2
                 },
-                "vs":
-                [
+                "vs": [
                     {
                         "v": "Tuple",
-                        "vs":
-                        []
+                        "vs": []
                     }
                 ]
             }
         }
     ],
-    "edges":
-    [],
+    "edges": [],
     "encoder": null
 }

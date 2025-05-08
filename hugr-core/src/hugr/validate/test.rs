@@ -64,7 +64,8 @@ fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, No
 
 #[test]
 fn invalid_root() {
-    let mut b = Hugr::new_with_entrypoint(LogicOp::Not).unwrap();
+    let build = DFGBuilder::new(Signature::default()).unwrap();
+    let mut b = build.finish_hugr().unwrap();
     let root = b.module_root();
     assert_eq!(b.validate(), Ok(()));
 
@@ -92,14 +93,6 @@ fn invalid_root() {
 
     // Fix the root
     b.remove_node(module);
-    assert_eq!(b.validate(), Ok(()));
-}
-
-#[test]
-fn leaf_root() {
-    let leaf_op: OpType = Noop(usize_t()).into();
-
-    let b = Hugr::new_with_entrypoint(leaf_op).unwrap();
     assert_eq!(b.validate(), Ok(()));
 }
 

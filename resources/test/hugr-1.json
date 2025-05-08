@@ -1,39 +1,35 @@
 {
     "version": "live",
-    "nodes":
-    [
+    "nodes": [
+        {
+            "parent": 0,
+            "op": "Module"
+        },
         {
             "parent": 0,
             "input_extensions": null,
             "op": "Const",
-            "v":
-            {
+            "v": {
                 "v": "Extension",
-                "extensions":
-                [
+                "extensions": [
                     "arithmetic.float.types"
                 ],
-                "typ":
-                {
+                "typ": {
                     "t": "Opaque",
                     "extension": "arithmetic.float.types",
                     "id": "float64",
-                    "args":
-                    [],
+                    "args": [],
                     "bound": "C"
                 },
-                "value":
-                {
+                "value": {
                     "c": "ConstF64",
-                    "v":
-                    {
+                    "v": {
                         "value": 42.0
                     }
                 }
             }
         }
     ],
-    "edges":
-    [],
+    "edges": [],
     "encoder": null
 }

@@ -358,6 +358,9 @@ pub enum LoadHugrError {
 
 /// Create a new Hugr, with a given root node and preallocated capacity.
 ///
+/// The root operation must be region root, i.e., define a node that can be
+/// assigned as the parent of other nodes.
+///
 /// If the root optype is [`OpType::Module`], the HUGR module root will match
 /// the root node.
 ///
@@ -366,13 +369,25 @@ pub enum LoadHugrError {
 /// whether it can be contained in a module, function definition, etc.
 ///
 /// Some operation types are not allowed and will result in a panic. This is the
-/// case for [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
-/// since they are context-specific operation.
+/// case for [`OpType::Case`] and [`OpType::DataflowBlock`] since they are
+/// context-specific operation.
 fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr> {
     let mut graph = MultiPortGraph::with_capacity(nodes, ports);
     let hierarchy = Hierarchy::new();
     let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
     let extensions = root_op.used_extensions().unwrap_or_default();
+
+    // Filter out operations that are not region roots.
+    let tag = root_op.tag();
+    let container_tags = [
+        OpTag::ModuleRoot,
+        OpTag::DataflowParent,
+        OpTag::Cfg,
+        OpTag::Conditional,
+    ];
+    if !container_tags.iter().any(|t| t.is_superset(tag)) {
+        return None;
+    }
 
     let module = graph.add_node(0, 0);
     op_types[module] = OpType::Module(ops::Module::new());
@@ -389,7 +404,6 @@ fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr>
     let module: Node = module.into();
 
     // Now the behaviour depends on the root node type.
-    let tag = root_op.tag();
     if root_op.is_module() {
         // The hugr is already a module, nothing to do.
     }

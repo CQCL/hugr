@@ -28,6 +28,9 @@ pub trait HugrMut: HugrMutInternals {
     /// local graph analysis or optimizations, the region defined under this
     /// node will be used as the starting point.
     ///
+    /// For the hugr to remain valid, the entrypoint must be a region-container
+    /// node, i.e. a node that can have children in the hierarchy.
+    ///
     /// To get a borrowed view of the HUGR with a different entrypoint, use
     /// [HugrView::with_entrypoint] or [HugrMut::with_entrypoint_mut] instead.
     ///
