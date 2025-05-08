@@ -71,7 +71,7 @@ impl<H: HugrView> HugrView for Rerooted<H> {
             node_indices: true,
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
-            entrypoint: Some(self.to_portgraph_node(self.entrypoint())),
+            entrypoint: Some(self.entrypoint()),
         })
     }
 
@@ -108,7 +108,7 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
                 fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
                 fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
-                fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig) -> String;
+                fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig<Self::Node>) -> String;
                 fn dot_string(&self) -> String;
                 fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
                 fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;

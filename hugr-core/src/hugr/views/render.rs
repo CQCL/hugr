@@ -6,12 +6,12 @@ use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
 
 use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
-use crate::HugrView;
+use crate::{Hugr, HugrView, Node};
 
 /// Configuration for rendering a HUGR graph.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct RenderConfig {
+pub struct RenderConfig<N = Node> {
     /// Show the node index in the graph nodes.
     pub node_indices: bool,
     /// Show port offsets in the graph edges.
@@ -19,10 +19,10 @@ pub struct RenderConfig {
     /// Show type labels on edges.
     pub type_labels_in_edges: bool,
     /// A node to highlight as the graph entrypoint.
-    pub entrypoint: Option<NodeIndex>,
+    pub entrypoint: Option<N>,
 }
 
-impl Default for RenderConfig {
+impl<N> Default for RenderConfig<N> {
     fn default() -> Self {
         Self {
             node_indices: true,
@@ -34,7 +34,7 @@ impl Default for RenderConfig {
 }
 
 /// Formatter method to compute a node style.
-pub(super) fn node_style<H: HugrView + ?Sized>(
+pub(super) fn node_style<H: HugrView<Node = Node> + ?Sized>(
     h: &H,
     config: RenderConfig,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
@@ -49,10 +49,11 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
     let mut entrypoint_style = PresentationStyle::default();
     entrypoint_style.stroke = Some("#832561".to_string());
     entrypoint_style.stroke_width = Some("3px".to_string());
+    let entrypoint = config.entrypoint.map(|n| n.into_portgraph());
 
     if config.node_indices {
         Box::new(move |n| {
-            if Some(n) == config.entrypoint {
+            if Some(n) == entrypoint {
                 NodeStyle::boxed(format!(
                     "({ni}) [**{name}**]",
                     ni = n.index(),
@@ -69,7 +70,7 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
         })
     } else {
         Box::new(move |n| {
-            if Some(n) == config.entrypoint {
+            if Some(n) == entrypoint {
                 NodeStyle::boxed(format!("[**{name}**]", name = node_name(h, n)))
                     .with_attrs(entrypoint_style.clone())
             } else {
@@ -80,14 +81,14 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
 }
 
 /// Formatter method to compute a port style.
-pub(super) fn port_style<H: HugrView + ?Sized>(
-    h: &H,
+pub(super) fn port_style(
+    h: &Hugr,
     _config: RenderConfig,
 ) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
-    let graph = h.portgraph();
+    let graph = &h.graph;
     Box::new(move |port| {
         let node = graph.port_node(port).unwrap();
-        let optype = h.get_optype(h.from_portgraph_node(node));
+        let optype = h.get_optype(node.into());
         let offset = graph.port_offset(port).unwrap();
         match optype.port_kind(offset).unwrap() {
             EdgeKind::Function(pf) => PortStyle::new(html_escape::encode_text(&format!("{}", pf))),
@@ -107,7 +108,7 @@ pub(super) fn port_style<H: HugrView + ?Sized>(
 #[allow(clippy::type_complexity)]
 pub(super) fn edge_style<H: HugrView + ?Sized>(
     h: &H,
-    config: RenderConfig,
+    config: RenderConfig<H::Node>,
 ) -> Box<
     dyn FnMut(
             <H::Portgraph<'_> as LinkView>::LinkEndpoint,
