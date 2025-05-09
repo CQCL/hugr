@@ -447,23 +447,33 @@ impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
             ..
         } = self;
 
+        // Nodes to remove from the replacement hugr
+        let repl_io = replacement
+            .get_io(replacement.entrypoint())
+            .expect("replacement is DFG-rooted");
+        let repl_entrypoint = replacement.entrypoint();
+
         // 2. Insert the replacement as a whole.
         let InsertionResult {
             inserted_entrypoint: new_entrypoint,
-            node_map,
+            mut node_map,
         } = h.insert_hugr(parent, replacement);
 
-        // remove the Input and Output nodes from the replacement graph
-        let replace_children = h.children(new_entrypoint).collect::<Vec<N>>();
-        for &io in &replace_children[..2] {
-            h.remove_node(io);
+        // remove the Input and Output from h and node_map
+        for node in repl_io {
+            let node_h = node_map[&node];
+            h.remove_node(node_h);
+            node_map.remove(&node);
         }
-        // make all replacement top level children children of the parent
-        for &child in &replace_children[2..] {
+
+        // make all (remaining) replacement top level children children of the parent
+        for child in h.children(new_entrypoint).collect_vec() {
             h.set_parent(child, parent);
         }
-        // remove the replacement root (which now has no children and no edges)
+
+        // remove the replacement entrypoint from h and node_map
         h.remove_node(new_entrypoint);
+        node_map.remove(&repl_entrypoint);
 
         // 3. Insert all boundary edges.
         for (src, tgt) in boundary_edges {
@@ -529,7 +539,7 @@ pub(in crate::hugr::patch) mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::hugr::patch::simple_replace::OutputBoundaryMap;
+    use crate::hugr::patch::simple_replace::{Outcome, OutputBoundaryMap};
     use crate::hugr::patch::{PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
@@ -843,7 +853,20 @@ pub(in crate::hugr::patch) mod test {
             nu_inp,
             nu_out: nu_out.into(),
         };
-        h.apply_patch(r).unwrap();
+        let Outcome {
+            node_map,
+            removed_nodes,
+        } = h.apply_patch(r).unwrap();
+
+        assert_eq!(
+            node_map.into_keys().collect::<HashSet<_>>(),
+            [n_node_h].into_iter().collect::<HashSet<_>>(),
+        );
+        assert_eq!(
+            removed_nodes.into_keys().collect::<HashSet<_>>(),
+            [h_node_cx].into_iter().collect::<HashSet<_>>(),
+        );
+
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
         // ┤ H ├┤ H ├
