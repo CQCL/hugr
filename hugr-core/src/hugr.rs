@@ -494,6 +494,7 @@ mod test {
 
     use super::{Hugr, HugrView};
 
+    use crate::envelope::{EnvelopeError, PackageEncodingError};
     use crate::test_file;
     use cool_asserts::assert_matches;
 
@@ -523,7 +524,12 @@ mod test {
             BufReader::new(File::open(test_file!("hugr-0.hugr")).unwrap()),
             None,
         );
-        assert_matches!(hugr, Err(_));
+        assert_matches!(
+            hugr,
+            Err(EnvelopeError::PackageEncoding {
+                source: PackageEncodingError::JsonEncoding(_)
+            })
+        );
     }
 
     #[test]
