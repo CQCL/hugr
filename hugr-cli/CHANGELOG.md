@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.15.4...hugr-cli-v0.20.0) - 2025-05-09
+
+### New Features
+
+- [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
+- [**breaking**] Add Hugr entrypoints ([#2147](https://github.com/CQCL/hugr/pull/2147))
+- [**breaking**] Validate any HugrView, make errors generic ([#2155](https://github.com/CQCL/hugr/pull/2155))
+
 ## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-cli-v0.15.2...hugr-cli-v0.15.3) - 2025-04-02
 
 ### Documentation

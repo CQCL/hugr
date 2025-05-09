@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.19.1...hugr-model-v0.20.0) - 2025-05-09
+
+### New Features
+
+- [**breaking**] Mark all Error enums as non_exhaustive ([#2056](https://github.com/CQCL/hugr/pull/2056))
+- [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
+
 ## [0.19.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.18.1...hugr-model-v0.19.0) - 2025-05-07
 
 ### New Features

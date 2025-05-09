@@ -1,6 +1,27 @@
 # Changelog
 
 
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.4...hugr-passes-v0.20.0) - 2025-05-09
+
+### New Features
+
+- [**breaking**] Mark all Error enums as non_exhaustive ([#2056](https://github.com/CQCL/hugr/pull/2056))
+- [**breaking**] Handle CallIndirect in Dataflow Analysis ([#2059](https://github.com/CQCL/hugr/pull/2059))
+- [**breaking**] ComposablePass trait allowing sequencing and validation ([#1895](https://github.com/CQCL/hugr/pull/1895))
+- [**breaking**] ReplaceTypes: allow lowering ops into a Call to a function already in the Hugr ([#2094](https://github.com/CQCL/hugr/pull/2094))
+- [**breaking**] Hugrmut on generic nodes ([#2111](https://github.com/CQCL/hugr/pull/2111))
+- [**breaking**] Remove `RootTagged` from the hugr view trait hierarchy ([#2122](https://github.com/CQCL/hugr/pull/2122))
+- [**breaking**] Split Rewrite trait into VerifyPatch and ApplyPatch ([#2070](https://github.com/CQCL/hugr/pull/2070))
+- [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
+- [**breaking**] Cleanup core trait definitions ([#2126](https://github.com/CQCL/hugr/pull/2126))
+- [**breaking**] Removed runtime extension sets. ([#2145](https://github.com/CQCL/hugr/pull/2145))
+- [**breaking**] Improved array lowering ([#2109](https://github.com/CQCL/hugr/pull/2109))
+- export mangle name function ([#2152](https://github.com/CQCL/hugr/pull/2152))
+- [**breaking**] Make `NamedOp` private. Add `MakeExtensionOp::name` and `MakeOpDef::opdef_name` ([#2138](https://github.com/CQCL/hugr/pull/2138))
+- [**breaking**] Add Hugr entrypoints ([#2147](https://github.com/CQCL/hugr/pull/2147))
+- [**breaking**] Return a node mapping in HugrInternals::region_portgraph ([#2164](https://github.com/CQCL/hugr/pull/2164))
+- [**breaking**] Validate any HugrView, make errors generic ([#2155](https://github.com/CQCL/hugr/pull/2155))
+
 ## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.3...hugr-passes-v0.15.4) - 2025-05-07
 
 ### New Features

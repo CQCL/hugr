@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-v0.15.4...hugr-v0.20.0) - 2025-05-09
+
+### Bug Fixes
+
+- [**breaking**] Don't expose `HugrMutInternals` ([#2071](https://github.com/CQCL/hugr/pull/2071))
+- `as_unary_option` indexing bug ([#2163](https://github.com/CQCL/hugr/pull/2163))
+- Skip phantom data for array value serialisation ([#2166](https://github.com/CQCL/hugr/pull/2166))
+- Remove deleted nodes from node_map in `SimpleReplacement` ([#2176](https://github.com/CQCL/hugr/pull/2176))
+
+### New Features
+
+- [**breaking**] Handle CallIndirect in Dataflow Analysis ([#2059](https://github.com/CQCL/hugr/pull/2059))
+- [**breaking**] ComposablePass trait allowing sequencing and validation ([#1895](https://github.com/CQCL/hugr/pull/1895))
+- [**breaking**] ReplaceTypes: allow lowering ops into a Call to a function already in the Hugr ([#2094](https://github.com/CQCL/hugr/pull/2094))
+- export mangle name function ([#2152](https://github.com/CQCL/hugr/pull/2152))
+- [**breaking**] Allow generic Nodes in HugrMut insert operations ([#2075](https://github.com/CQCL/hugr/pull/2075))
+- [**breaking**] Mark all Error enums as non_exhaustive ([#2056](https://github.com/CQCL/hugr/pull/2056))
+- Make NodeHandle generic ([#2092](https://github.com/CQCL/hugr/pull/2092))
+- [**breaking**] remove ExtensionValue ([#2093](https://github.com/CQCL/hugr/pull/2093))
+- [**breaking**] Hugrmut on generic nodes ([#2111](https://github.com/CQCL/hugr/pull/2111))
+- [**breaking**] Cleanup core trait definitions ([#2126](https://github.com/CQCL/hugr/pull/2126))
+- [**breaking**] Accept outgoing ports in SimpleReplacement nu_out ([#2151](https://github.com/CQCL/hugr/pull/2151))
+- [**breaking**] Improved array lowering ([#2109](https://github.com/CQCL/hugr/pull/2109))
+- [**breaking**] Make `NamedOp` private. Add `MakeExtensionOp::name` and `MakeOpDef::opdef_name` ([#2138](https://github.com/CQCL/hugr/pull/2138))
+- InsertCut patch for inserting HUGR across edges. ([#2153](https://github.com/CQCL/hugr/pull/2153))
+- [**breaking**] Add Hugr entrypoints ([#2147](https://github.com/CQCL/hugr/pull/2147))
+- [**breaking**] Return a node mapping in HugrInternals::region_portgraph ([#2164](https://github.com/CQCL/hugr/pull/2164))
+- [**breaking**] Validate any HugrView, make errors generic ([#2155](https://github.com/CQCL/hugr/pull/2155))
+- Reimplement `insert_hugr` using only `HugrView` ([#2174](https://github.com/CQCL/hugr/pull/2174))
+- [**breaking**] Removed model_unstable feature flag ([#2120](https://github.com/CQCL/hugr/pull/2120))
+- [**breaking**] Remove `RootTagged` from the hugr view trait hierarchy ([#2122](https://github.com/CQCL/hugr/pull/2122))
+- [**breaking**] Split Rewrite trait into VerifyPatch and ApplyPatch ([#2070](https://github.com/CQCL/hugr/pull/2070))
+- [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
+- [**breaking**] Removed runtime extension sets. ([#2145](https://github.com/CQCL/hugr/pull/2145))
+
+### Refactor
+
+- do not use .portgraph in mermaid/graphviz ([#2177](https://github.com/CQCL/hugr/pull/2177))
+
 ## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-v0.15.3...hugr-v0.15.4) - 2025-05-07
 
 ### New Features
