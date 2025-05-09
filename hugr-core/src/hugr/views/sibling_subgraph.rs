@@ -228,12 +228,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         };
         let parent = hugr
             .get_parent(*node)
-            .ok_or(InvalidSubgraph::NoSharedParent {
-                first_node: *node,
-                first_parent: None,
-                other_node: *node,
-                other_parent: None,
-            })?;
+            .ok_or(InvalidSubgraph::OrphanNode { orphan: *node })?;
 
         let checker = TopoConvexChecker::new(hugr, parent);
         Self::try_from_nodes_with_checker(nodes, hugr, &checker)
@@ -540,12 +535,7 @@ fn pick_parent<'a, N: HugrNode>(
         return Err(InvalidSubgraph::EmptySubgraph);
     };
     let Some(parent) = hugr.get_parent(node) else {
-        return Err(InvalidSubgraph::NoSharedParent {
-            first_node: node,
-            first_parent: None,
-            other_node: node,
-            other_parent: None,
-        });
+        return Err(InvalidSubgraph::OrphanNode { orphan: node });
     };
 
     Ok(parent)
@@ -684,13 +674,17 @@ fn validate_subgraph<H: HugrView>(
     // Check all nodes share parent
     if !nodes.iter().map(|&n| hugr.get_parent(n)).all_equal() {
         let first_node = nodes[0];
-        let first_parent = hugr.get_parent(first_node);
+        let first_parent = hugr
+            .get_parent(first_node)
+            .ok_or(InvalidSubgraph::OrphanNode { orphan: first_node })?;
         let other_node = *nodes
             .iter()
             .skip(1)
-            .find(|&&n| hugr.get_parent(n) != first_parent)
+            .find(|&&n| hugr.get_parent(n) != Some(first_parent))
             .unwrap();
-        let other_parent = hugr.get_parent(other_node);
+        let other_parent = hugr
+            .get_parent(other_node)
+            .ok_or(InvalidSubgraph::OrphanNode { orphan: other_node })?;
         return Err(InvalidSubgraph::NoSharedParent {
             first_node,
             first_parent,
@@ -855,19 +849,23 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
     NotConvex,
     /// Not all nodes have the same parent.
     #[error(
-        "Not a sibling subgraph. {first_node} has parent {}, but {other_node} has parent {}.",
-        first_parent.map_or("None".to_string(), |n| n.to_string()),
-        other_parent.map_or("None".to_string(), |n| n.to_string())
+        "Not a sibling subgraph. {first_node} has parent {first_parent}, but {other_node} has parent {other_parent}.",
     )]
     NoSharedParent {
         /// The first node.
         first_node: N,
         /// The parent of the first node.
-        first_parent: Option<N>,
+        first_parent: N,
         /// The other node.
         other_node: N,
         /// The parent of the other node.
-        other_parent: Option<N>,
+        other_parent: N,
+    },
+    /// Not all nodes have the same parent.
+    #[error("Not a sibling subgraph. {orphan} has no parent")]
+    OrphanNode {
+        /// The orphan node.
+        orphan: N,
     },
     /// Empty subgraphs are not supported.
     #[error("Empty subgraphs are not supported.")]
