@@ -24,7 +24,7 @@ pub(super) fn from_json_reader(
 
     // TODO: We don't currently store transitive extension dependencies in the
     // package's extensions. For example, if we use a `collections.list` const
-    // value but don't use anything `prelude` we would not include `prelude` in
+    // value but don't use anything in `prelude` we would not include `prelude` in
     // the package's extensions. But this would then fail when loading the
     // extensions, as we _need_ the prelude to load the `collections.list` op
     // definitions here.
