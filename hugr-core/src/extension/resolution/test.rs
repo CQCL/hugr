@@ -23,6 +23,7 @@ use crate::std_extensions::arithmetic::float_types::{self, float64_type, ConstF6
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
+use crate::std_extensions::std_reg;
 use crate::types::type_param::TypeParam;
 use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
 use crate::{type_row, Extension, Hugr, HugrView};
@@ -117,7 +118,12 @@ fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -
 /// Check that the extensions added during building coincide with read-only collected extensions
 /// and that they survive a serialization roundtrip.
 fn check_extension_resolution(mut hugr: Hugr) {
+    // Extensions used by the hugr, used to check that the roundtrip preserves them.
     let build_extensions = hugr.extensions().clone();
+
+    // Extensions used for resolution.
+    let mut resolution_extensions = std_reg();
+    resolution_extensions.extend(&build_extensions);
 
     // Check that the read-only methods collect the same extensions.
     let collected_exts = ExtensionRegistry::new(hugr.nodes().flat_map(|node| {
@@ -132,7 +138,7 @@ fn check_extension_resolution(mut hugr: Hugr) {
     );
 
     // Check that the mutable methods collect the same extensions.
-    hugr.resolve_extension_defs(&build_extensions).unwrap();
+    hugr.resolve_extension_defs(&resolution_extensions).unwrap();
     assert_eq!(
         hugr.extensions(),
         &build_extensions,
@@ -143,7 +149,7 @@ fn check_extension_resolution(mut hugr: Hugr) {
     // Roundtrip serialize so all weak references are dropped.
     let ser = hugr.store_str(EnvelopeConfig::text()).unwrap();
 
-    let deser_hugr = Hugr::load_str(&ser, Some(&build_extensions)).unwrap();
+    let deser_hugr = Hugr::load_str(&ser, Some(&resolution_extensions)).unwrap();
 
     assert_eq!(
         deser_hugr.extensions(),

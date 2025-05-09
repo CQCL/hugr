@@ -116,7 +116,7 @@ impl EnvelopeConfig {
     /// If the `zstd` feature is enabled, this will use zstd compression.
     pub const fn binary() -> Self {
         Self {
-            format: EnvelopeFormat::Model,
+            format: EnvelopeFormat::ModelWithExtensions,
             zstd: None,
         }
     }
