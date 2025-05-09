@@ -89,8 +89,7 @@ impl ConstantFoldPass {
     }
 }
 
-impl ComposablePass for ConstantFoldPass {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for ConstantFoldPass {
     type Error = ConstFoldError;
     type Result = ();
 
@@ -100,7 +99,7 @@ impl ComposablePass for ConstantFoldPass {
     ///
     /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
     /// was of an invalid [OpType]
-    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<(), ConstFoldError> {
+    fn run(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));

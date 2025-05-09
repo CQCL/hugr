@@ -121,12 +121,11 @@ impl Default for LinearizeArrayPass {
     }
 }
 
-impl ComposablePass for LinearizeArrayPass {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for LinearizeArrayPass {
     type Error = ReplaceTypesError;
     type Result = bool;
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<Self::Result, Self::Error> {
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         self.0.run(hugr)
     }
 }

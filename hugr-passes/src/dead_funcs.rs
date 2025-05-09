@@ -82,11 +82,10 @@ impl RemoveDeadFuncsPass {
     }
 }
 
-impl ComposablePass for RemoveDeadFuncsPass {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Error = RemoveDeadFuncsError;
     type Result = ();
-    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), RemoveDeadFuncsError> {
+    fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let reachable = reachable_funcs(
             &CallGraph::new(hugr),
             hugr,
