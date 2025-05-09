@@ -52,6 +52,7 @@ use crate::{extension::ExtensionRegistry, package::Package};
 use header::EnvelopeHeader;
 use std::io::BufRead;
 use std::io::Write;
+use std::str::FromStr;
 
 #[allow(unused_imports)]
 use itertools::Itertools as _;
@@ -219,6 +220,16 @@ pub enum EnvelopeError {
         /// The source error.
         source: hugr_model::v0::binary::WriteError,
     },
+    /// Error reading a HUGR model payload.
+    ModelTextRead {
+        /// The source error.
+        source: hugr_model::v0::ast::ParseError,
+    },
+    /// Error reading a HUGR model payload.
+    ModelTextResolve {
+        /// The source error.
+        source: hugr_model::v0::ast::ResolveError,
+    },
 }
 
 /// Internal implementation of [`read_envelope`] to call with/without the zstd decompression wrapper.
@@ -233,6 +244,7 @@ fn read_impl(
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             decode_model(payload, registry, header.format)
         }
+        EnvelopeFormat::ModelText => decode_model_ast(payload, registry, header.format),
     }
 }
 
@@ -273,6 +285,41 @@ fn decode_model(
     Ok(import_package(&model_package, &extension_registry)?)
 }
 
+/// Read a HUGR model text payload from a reader.
+///
+/// Parameters:
+/// - `stream`: The reader to read the envelope from.
+/// - `extension_registry`: An extension registry with additional extensions to use when
+///   decoding the HUGR, if they are not already included in the package.
+/// - `format`: The format of the payload.
+fn decode_model_ast(
+    mut stream: impl BufRead,
+    extension_registry: &ExtensionRegistry,
+    format: EnvelopeFormat,
+) -> Result<Package, EnvelopeError> {
+    use crate::import::import_package;
+    use hugr_model::v0::bumpalo::Bump;
+
+    if format.model_version() != Some(0) {
+        return Err(EnvelopeError::FormatUnsupported {
+            format,
+            feature: None,
+        });
+    }
+
+    // Read the package into a string, then parse it.
+    //
+    // Due to how `to_string` works, we cannot append extensions after the package.
+    let mut buffer = String::new();
+    stream.read_to_string(&mut buffer)?;
+    let ast_package = hugr_model::v0::ast::Package::from_str(&buffer)?;
+
+    let bump = Bump::default();
+    let model_package = ast_package.resolve(&bump)?;
+
+    Ok(import_package(&model_package, extension_registry)?)
+}
+
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
 fn write_impl<'h>(
     writer: impl Write,
@@ -283,7 +330,7 @@ fn write_impl<'h>(
     match config.format {
         #[allow(deprecated)]
         EnvelopeFormat::PackageJson => package_json::to_json_writer(hugrs, extensions, writer)?,
-        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
+        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions | EnvelopeFormat::ModelText => {
             encode_model(writer, hugrs, extensions, config.format)?
         }
     }
@@ -309,7 +356,17 @@ fn encode_model<'h>(
 
     let bump = Bump::default();
     let model_package = export_package(hugrs, extensions, &bump);
-    write_to_writer(&model_package, &mut writer)?;
+
+    match format {
+        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
+            write_to_writer(&model_package, &mut writer)?;
+        }
+        EnvelopeFormat::ModelText => {
+            let model_package = model_package.as_ast().unwrap();
+            writeln!(writer, "{model_package}")?;
+        }
+        _ => unreachable!(),
+    }
 
     if format.append_extensions() {
         serde_json::to_writer(writer, &extensions.iter().collect_vec())?;
