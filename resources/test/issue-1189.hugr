@@ -1,0 +1,141 @@
+HUGRiHJv?@{
+    "modules": [
+        {
+            "version": "live",
+            "nodes": [
+                {
+                    "parent": 0,
+                    "op": "CFG",
+                    "signature": {
+                        "t": "G",
+                        "input": [
+                            {
+                                "t": "Sum",
+                                "s": "Unit",
+                                "size": 1
+                            },
+                            {
+                                "t": "Sum",
+                                "s": "Unit",
+                                "size": 2
+                            }
+                        ],
+                        "output": [
+                            {
+                                "t": "Sum",
+                                "s": "Unit",
+                                "size": 2
+                            }
+                        ],
+                        "runtime_reqs": []
+                    }
+                },
+                {
+                    "parent": 0,
+                    "op": "DataflowBlock",
+                    "inputs": [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        },
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 1
+                        }
+                    ],
+                    "other_outputs": [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        }
+                    ],
+                    "sum_rows": [
+                        []
+                    ],
+                    "extension_delta": []
+                },
+                {
+                    "parent": 1,
+                    "op": "Input",
+                    "types": [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        },
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 1
+                        }
+                    ]
+                },
+                {
+                    "parent": 1,
+                    "op": "Output",
+                    "types": [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 1
+                        },
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        }
+                    ]
+                },
+                {
+                    "parent": 0,
+                    "op": "ExitBlock",
+                    "cfg_outputs": [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        }
+                    ]
+                }
+            ],
+            "edges": [
+                [
+                    [
+                        2,
+                        1
+                    ],
+                    [
+                        3,
+                        0
+                    ]
+                ],
+                [
+                    [
+                        2,
+                        0
+                    ],
+                    [
+                        3,
+                        1
+                    ]
+                ],
+                [
+                    [
+                        1,
+                        0
+                    ],
+                    [
+                        4,
+                        0
+                    ]
+                ]
+            ],
+            "metadata": null,
+            "encoder": "hugr-py v0.2.1"
+        }
+    ],
+    "extensions": []
+}

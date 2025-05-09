@@ -8,12 +8,14 @@ use std::hash::{Hash, Hasher};
 
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
+use crate::envelope::serde_with::AsStringEnvelope;
 use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
 
 use delegate::delegate;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use smol_str::SmolStr;
 use thiserror::Error;
 
@@ -192,6 +194,7 @@ impl From<Sum> for SerialSum {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "v")]
 /// A value that can be stored as a static constant. Representing core types and
@@ -204,9 +207,9 @@ pub enum Value {
         e: OpaqueValue,
     },
     /// A higher-order function value.
-    // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
     Function {
         /// A Hugr defining the function.
+        #[serde_as(as = "Box<AsStringEnvelope>")]
         hugr: Box<Hugr>,
     },
     /// A Sum variant, with a tag indicating the index of the variant and its

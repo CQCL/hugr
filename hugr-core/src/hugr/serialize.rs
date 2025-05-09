@@ -138,8 +138,11 @@ pub enum HUGRSerializationError {
     HugrError(#[from] HugrError),
 }
 
-impl Serialize for Hugr {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl Hugr {
+    /// Serializes the HUGR using a serde encoder.
+    ///
+    /// This is an internal API, used to generate the JSON variant of the HUGR envelope format.
+    pub(crate) fn serde_serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -147,10 +150,11 @@ impl Serialize for Hugr {
         let versioned = Versioned::new_latest(shg);
         versioned.serialize(serializer)
     }
-}
 
-impl<'de> Deserialize<'de> for Hugr {
-    fn deserialize<D>(deserializer: D) -> Result<Hugr, D::Error>
+    /// Deserializes the HUGR using a serde decoder.
+    ///
+    /// This is an internal API, used to read the JSON variant of the HUGR envelope format.
+    pub(crate) fn serde_deserialize<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
     where
         D: Deserializer<'de>,
     {

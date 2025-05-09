@@ -10,13 +10,14 @@ pub mod validate;
 pub mod views;
 
 use std::collections::VecDeque;
-use std::io::Read;
+use std::io;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 pub use ident::{IdentList, InvalidIdentifier};
+use itertools::Itertools;
 pub use patch::{Patch, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
@@ -25,6 +26,7 @@ use thiserror::Error;
 
 pub use self::views::HugrView;
 use crate::core::NodeIndex;
+use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
     WeakExtensionRegistry,
@@ -32,6 +34,7 @@ use crate::extension::resolution::{
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
+use crate::package::Package;
 use crate::{Direction, Node};
 
 /// The Hugr data structure.
@@ -145,20 +148,53 @@ impl Hugr {
         self.graph.reserve(nodes, ports);
     }
 
-    /// Load a Hugr from a json reader.
+    /// Read a Package from a HUGR envelope.
+    pub fn load(
+        reader: impl io::BufRead,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<Self, EnvelopeError> {
+        let pkg = Package::load(reader, extensions)?;
+        match pkg.modules.into_iter().exactly_one() {
+            Ok(hugr) => Ok(hugr),
+            Err(e) => Err(EnvelopeError::ExpectedSingleHugr { count: e.count() }),
+        }
+    }
+
+    /// Read a Package from a HUGR envelope encoded in a string.
     ///
-    /// Validates the Hugr against the provided extension registry, ensuring all
-    /// operations are resolved.
-    pub fn load_json(
-        reader: impl Read,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Self, LoadHugrError> {
-        let mut hugr: Hugr = serde_json::from_reader(reader)?;
+    /// Note that not all envelopes are valid strings. In the general case,
+    /// it is recommended to use `Package::load` with a bytearray instead.
+    pub fn load_str(
+        envelope: impl AsRef<str>,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<Self, EnvelopeError> {
+        Self::load(envelope.as_ref().as_bytes(), extensions)
+    }
 
-        hugr.resolve_extension_defs(extension_registry)?;
-        hugr.validate()?;
+    /// Store the Package in a HUGR envelope.
+    pub fn store(
+        &self,
+        writer: impl io::Write,
+        config: EnvelopeConfig,
+    ) -> Result<(), EnvelopeError> {
+        envelope::write_envelope_impl(writer, [self], &self.extensions, config)
+    }
 
-        Ok(hugr)
+    /// Store the Package in a HUGR envelope encoded in a string.
+    ///
+    /// Note that not all envelopes are valid strings. In the general case,
+    /// it is recommended to use `Package::store` with a bytearray instead.
+    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
+        if !config.format.ascii_printable() {
+            return Err(EnvelopeError::NonASCIIFormat {
+                format: config.format,
+            });
+        }
+
+        let mut buf = Vec::new();
+        self.store(&mut buf, config)?;
+        Ok(String::from_utf8(buf).expect("Envelope is valid utf8"))
     }
 
     /// Given a Hugr that has been deserialized, collect all extensions used to
@@ -338,24 +374,6 @@ pub enum HugrError {
     },
 }
 
-/// Errors that can occur while loading and validating a Hugr json.
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum LoadHugrError {
-    /// Error while loading the Hugr from JSON.
-    #[error("Error while loading the Hugr from JSON: {0}")]
-    Load(#[from] serde_json::Error),
-    /// Validation of the loaded Hugr failed.
-    #[error(transparent)]
-    Validation(#[from] ValidationError<Node>),
-    /// Error when resolving extension operations and types.
-    #[error(transparent)]
-    Extension(#[from] ExtensionResolutionError),
-    /// Error when inferring runtime extensions.
-    #[error(transparent)]
-    RuntimeInference(#[from] ExtensionError),
-}
-
 /// Create a new Hugr, with a given root node and preallocated capacity.
 ///
 /// The root operation must be region root, i.e., define a node that can be
@@ -475,8 +493,8 @@ mod test {
     use std::{fs::File, io::BufReader};
 
     use super::{Hugr, HugrView};
-    use crate::extension::PRELUDE_REGISTRY;
 
+    use crate::envelope::{EnvelopeError, PackageEncodingError};
     use crate::test_file;
     use cool_asserts::assert_matches;
 
@@ -502,20 +520,25 @@ mod test {
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_0() {
         // https://github.com/CQCL/hugr/issues/1091 bad case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-0.json")).unwrap()),
-            &PRELUDE_REGISTRY,
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-0.hugr")).unwrap()),
+            None,
         );
-        assert_matches!(hugr, Err(_));
+        assert_matches!(
+            hugr,
+            Err(EnvelopeError::PackageEncoding {
+                source: PackageEncodingError::JsonEncoding(_)
+            })
+        );
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_1() {
         // https://github.com/CQCL/hugr/issues/1091 good case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-1.json")).unwrap()),
-            &PRELUDE_REGISTRY,
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-1.hugr")).unwrap()),
+            None,
         );
         assert_matches!(&hugr, Ok(_));
     }
@@ -524,20 +547,21 @@ mod test {
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_2() {
         // https://github.com/CQCL/hugr/issues/1185 bad case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-2.json")).unwrap()),
-            &PRELUDE_REGISTRY,
-        );
-        assert_matches!(hugr, Err(_));
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-2.hugr")).unwrap()),
+            None,
+        )
+        .unwrap();
+        assert_matches!(hugr.validate(), Err(_));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_3() {
         // https://github.com/CQCL/hugr/issues/1185 good case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-3.json")).unwrap()),
-            &PRELUDE_REGISTRY,
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-3.hugr")).unwrap()),
+            None,
         );
         assert_matches!(&hugr, Ok(_));
     }

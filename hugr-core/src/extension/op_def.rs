@@ -4,11 +4,14 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Weak};
 
+use serde_with::serde_as;
+
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
     SignatureError,
 };
 
+use crate::envelope::serde_with::AsStringEnvelope;
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
@@ -265,6 +268,7 @@ impl Debug for SignatureFunc {
 
 /// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
 /// that implements the operation using a set of other extensions.
+#[serde_as]
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
 pub enum LowerFunc {
@@ -277,6 +281,7 @@ pub enum LowerFunc {
         /// [OpDef]
         ///
         /// [ExtensionOp]: crate::ops::ExtensionOp
+        #[serde_as(as = "AsStringEnvelope")]
         hugr: Hugr,
     },
     /// Custom binary function that can (fallibly) compute a Hugr

@@ -32,6 +32,15 @@ use portgraph::LinkView;
 use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
 use rstest::rstest;
 
+/// A serde-serializable hugr. Used for testing.
+#[derive(Debug, serde::Serialize)]
+#[serde(transparent)]
+pub(super) struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")] pub &'h Hugr);
+/// A serde-deserializable hugr. Used for testing.
+#[derive(Debug, serde::Deserialize)]
+#[serde(transparent)]
+pub(super) struct HugrDeser(#[serde(deserialize_with = "Hugr::serde_deserialize")] pub Hugr);
+
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingLatest {
@@ -157,10 +166,10 @@ fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
 }
 
 /// Serialize and deserialize a value, validating against a schema.
-fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
-    g: &T,
+fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwned>(
+    g: &TSer,
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
-) -> T {
+) -> TDeser {
     let val = serde_json::to_value(g).unwrap();
     NamedSchema::check_schemas(&val, schemas);
     serde_json::from_value(val).unwrap()
@@ -180,18 +189,19 @@ pub fn check_hugr_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
     let (mut base, extract_map) = hugr.extract_hugr(hugr.module_root());
     base.set_entrypoint(extract_map.extracted_node(hugr.entrypoint()));
 
-    let new_hugr = ser_roundtrip_check_schema(&base, get_schemas(check_schema));
+    let new_hugr: HugrDeser =
+        ser_roundtrip_check_schema(&HugrSer(&base), get_schemas(check_schema));
 
-    check_hugr(&base, &new_hugr);
-    new_hugr
+    check_hugr(&base, &new_hugr.0);
+    new_hugr.0
 }
 
 /// Deserialize a HUGR json, ensuring that it is valid against the schema.
 pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schema: bool) -> Hugr {
-    let new_hugr = ser_deserialize_check_schema(value, get_schemas(check_schema));
+    let new_hugr: HugrDeser = ser_deserialize_check_schema(value, get_schemas(check_schema));
 
-    check_hugr(hugr, &new_hugr);
-    new_hugr
+    check_hugr(hugr, &new_hugr.0);
+    new_hugr.0
 }
 
 /// Check that two HUGRs are equivalent, up to node renumbering.
@@ -431,10 +441,13 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
     let hugr = builder.finish_hugr_with_outputs([w])?;
 
-    let ser = serde_json::to_vec(&hugr)?;
-    let deser = Hugr::load_json(ser.as_slice(), hugr.extensions())?;
+    let ser = serde_json::to_string(&HugrSer(&hugr))?;
+    let deser: HugrDeser = serde_json::from_str(&ser)?;
 
-    assert_eq!(hugr, deser);
+    let mut hugr_deser = deser.0;
+    hugr_deser.resolve_extension_defs(hugr.extensions())?;
+
+    assert_eq!(hugr, hugr_deser);
 
     Ok(())
 }

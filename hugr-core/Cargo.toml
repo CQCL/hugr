@@ -51,6 +51,7 @@ regex = { workspace = true }
 # Rc used here for Extension, but unfortunately we must turn the feature on globally
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
+serde_with = { workspace = true }
 serde_yaml = { workspace = true, optional = true }
 smol_str = { workspace = true, features = ["serde"] }
 static_assertions = { workspace = true }

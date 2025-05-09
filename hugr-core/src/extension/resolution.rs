@@ -1,7 +1,6 @@
 //! Utilities for resolving operations and types present in a HUGR, and updating
 //! the list of used extensions. The functionalities of this module can be
-//! called from the type methods [`crate::Hugr::resolve_extension_defs`],
-//! [`crate::ops::OpType::used_extensions`], and
+//! called from the type methods [`crate::ops::OpType::used_extensions`] and
 //! [`crate::types::Signature::used_extensions`].
 //!
 //! When listing "used extensions" we only care about _definitional_ extension
@@ -12,8 +11,8 @@
 //! Note: These procedures are only temporary until `hugr-model` is stabilized.
 //! Once that happens, hugrs will no longer be directly deserialized using serde
 //! but instead will be created by the methods in `crate::import`. As these
-//! (will) automatically resolve extensions as the operations are created,
-//! we will no longer require this post-facto resolution step.
+//! (will) automatically resolve extensions as the operations are created, we
+//! will no longer require this post-facto resolution step.
 
 mod extension;
 mod ops;

@@ -875,9 +875,10 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
 fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     // load test file where input node of entry block has types in reversed
     // order compared to parent CFG node.
-    let hugr: Hugr = serde_json::from_reader(BufReader::new(
-        File::open(test_file!("issue-1189.json")).unwrap(),
-    ))
+    let hugr: Hugr = Hugr::load(
+        BufReader::new(File::open(test_file!("issue-1189.hugr")).unwrap()),
+        None,
+    )
     .unwrap();
     assert_matches!(
         hugr.validate(),

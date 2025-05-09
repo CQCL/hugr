@@ -3,7 +3,6 @@
   "nodes": [
     {
       "parent": 0,
-      "input_extensions": [],
       "op": "Module"
     }
   ],
@@ -11,5 +10,6 @@
   "metadata": [
     null
   ],
-  "encoder": "hugr-rs v0.1.0"
+  "encoder": "hugr-rs v0.15.4",
+  "entrypoint": 0
 }

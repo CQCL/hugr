@@ -102,8 +102,7 @@ impl ExtensionOp {
     /// [`ExtensionOp`].
     ///
     /// Regenerating the [`ExtensionOp`] back from the [`OpaqueOp`] requires a
-    /// registry with the appropriate extension. See
-    /// [`crate::Hugr::resolve_extension_defs`].
+    /// registry with the appropriate extension.
     ///
     /// For a non-cloning version of this operation, use [`OpaqueOp::from`].
     pub fn make_opaque(&self) -> OpaqueOp {

@@ -5,7 +5,7 @@ use hugr::envelope::{read_envelope, EnvelopeError};
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
 use crate::CliError;
@@ -57,12 +57,23 @@ impl HugrInputArgs {
 
     /// Read a hugr JSON file from the input.
     ///
-    /// If [HugrInputArgs::hugr_json] is `false`, [HugrInputArgs::get_package] should be called instead as
-    /// reading an input envelope as a HUGR json will fail.
+    /// This is a legacy option for reading old HUGR JSON files when the
+    /// [HugrInputArgs::hugr_json] flag is used.
+    ///
+    /// For most cases, [HugrInputArgs::get_package] should be called instead.
     pub fn get_hugr(&mut self) -> Result<Hugr, CliError> {
         let extensions = self.load_extensions()?;
         let mut buffer = BufReader::new(&mut self.input);
-        let hugr = Hugr::load_json(&mut buffer, &extensions)?;
+
+        /// Wraps the hugr JSON so that it defines a valid envelope.
+        const PREPEND: &str = r#"HUGRiHJv?@{"modules": ["#;
+        const APPEND: &str = r#"],"extensions": []}"#;
+
+        let mut envelope = PREPEND.to_string();
+        buffer.read_to_string(&mut envelope)?;
+        envelope.push_str(APPEND);
+
+        let hugr = Hugr::load_str(envelope, Some(&extensions))?;
         Ok(hugr)
     }
 
