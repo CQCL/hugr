@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use crate::core::HugrNode;
 use crate::types::TypeRow;
-use crate::{Port, PortIndex};
+use crate::{Node, Port, PortIndex};
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
 use super::{impl_validate_op, BasicBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp};
@@ -23,7 +23,7 @@ pub type EdgeCheck<N> = fn(ChildrenEdgeData<N>) -> Result<(), EdgeValidationErro
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
-pub struct OpValidityFlags<N: HugrNode> {
+pub struct OpValidityFlags<N: HugrNode = Node> {
     /// The set of valid children operation types.
     pub allowed_children: OpTag,
     /// Additional restrictions on the first child operation.

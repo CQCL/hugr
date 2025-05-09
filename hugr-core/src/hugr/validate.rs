@@ -13,7 +13,9 @@ use crate::extension::SignatureError;
 
 use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{ExtensionOp, OpaqueOpError};
-use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
+use crate::ops::validate::{
+    ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, OpValidityFlags,
+};
 use crate::ops::{FuncDefn, NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::EdgeKind;
@@ -128,6 +130,17 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     parent,
                     parent_optype: parent_optype.clone(),
                     allowed_children,
+                });
+            }
+        }
+
+        // Entrypoints must be region containers.
+        if node == self.hugr.entrypoint() {
+            let validity_flags: OpValidityFlags = op_type.validity_flags();
+            if validity_flags.allowed_children == OpTag::None {
+                return Err(ValidationError::EntrypointNotContainer {
+                    node,
+                    optype: op_type.clone(),
                 });
             }
         }
@@ -694,6 +707,9 @@ pub enum ValidationError<N: HugrNode> {
     /// [Type]: crate::types::Type
     #[error(transparent)]
     ConstTypeError(#[from] ConstTypeError),
+    /// The HUGR entrypoint must be a region container.
+    #[error("The HUGR entrypoint ({node}) must be a region container, but '{}' does not accept children.", optype.name())]
+    EntrypointNotContainer { node: N, optype: OpType },
 }
 
 /// Errors related to the inter-graph edge validations.
