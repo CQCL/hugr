@@ -182,20 +182,7 @@ impl PatchHugrMut for OutlineCfg {
 
         // 5. Children of new CFG.
         let inner_exit = {
-            // These operations do not fit within any CSG/SiblingMut
-            // so we need to access the Hugr directly.
-            //
-            // TODO: This is a temporary hack that won't be needed once Hugr Root Pointers get implemented.
-            // The commented line below are the correct ones, but they don't work yet.
-            // https://github.com/CQCL/hugr/issues/2029
-            let hierarchy = h.hierarchy();
-            let inner_exit = hierarchy
-                .children(h.to_portgraph_node(cfg_node))
-                .exactly_one()
-                .ok()
-                .unwrap();
-            let inner_exit = h.from_portgraph_node(inner_exit);
-            //let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
+            let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
 
             // Entry node must be first
             h.move_before_sibling(entry, inner_exit);

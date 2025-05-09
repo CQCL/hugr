@@ -83,8 +83,8 @@ pub trait HugrView: HugrInternals {
 
     /// A pointer to the module region defined at the root of the HUGR.
     ///
-    /// This node is the root node of the [`HugrInternals::hierarchy`]. It is
-    /// the ancestor of all other nodes in the HUGR.
+    /// This node is the root node of the node hierarchy. It is the ancestor of
+    /// all other nodes in the HUGR.
     ///
     /// Operations applied to a hugr normally start at the
     /// [`HugrView::entrypoint`] instead.
@@ -536,31 +536,28 @@ impl HugrView for Hugr {
         if !check_valid_non_root(self, node) {
             return None;
         };
-        self.hierarchy
-            .parent(self.to_portgraph_node(node))
-            .map(|index| self.from_portgraph_node(index))
+        self.hierarchy.parent(node.into_portgraph()).map(Into::into)
     }
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
         panic_invalid_node(self, node);
-        self.op_types.get(self.to_portgraph_node(node))
+        self.op_types.get(node.into_portgraph())
     }
 
     #[inline]
     fn num_nodes(&self) -> usize {
-        self.portgraph().node_count()
+        self.graph.node_count()
     }
 
     #[inline]
     fn num_edges(&self) -> usize {
-        self.portgraph().link_count()
+        self.graph.link_count()
     }
 
     #[inline]
     fn num_ports(&self, node: Self::Node, dir: Direction) -> usize {
-        self.portgraph()
-            .num_ports(self.to_portgraph_node(node), dir)
+        self.graph.num_ports(node.into_portgraph(), dir)
     }
 
     #[inline]
@@ -613,16 +610,12 @@ impl HugrView for Hugr {
 
     #[inline]
     fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
-        self.hierarchy
-            .children(self.to_portgraph_node(node))
-            .map(|n| self.from_portgraph_node(n))
+        self.hierarchy.children(node.into_portgraph()).map_into()
     }
 
     #[inline]
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
-        self.hierarchy
-            .descendants(self.to_portgraph_node(node))
-            .map(|n| self.from_portgraph_node(n))
+        self.hierarchy.descendants(node.into_portgraph()).map_into()
     }
 
     #[inline]
@@ -817,14 +810,10 @@ pub(super) fn panic_invalid_non_entrypoint<H: HugrView + ?Sized>(hugr: &H, node:
 
 /// Panic if [`HugrView::valid_node`] fails.
 #[track_caller]
-pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
-    hugr: &H,
-    node: Node,
-    port: impl Into<Port>,
-) {
+pub(super) fn panic_invalid_port(hugr: &Hugr, node: Node, port: impl Into<Port>) {
     let port = port.into();
     if hugr
-        .portgraph()
+        .graph
         .port_index(node.into_portgraph(), port.pg_offset())
         .is_none()
     {

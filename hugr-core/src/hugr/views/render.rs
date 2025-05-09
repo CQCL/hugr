@@ -2,7 +2,7 @@
 //! into dot or mermaid format.
 
 use portgraph::render::{EdgeStyle, NodeStyle, PortStyle, PresentationStyle};
-use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
+use portgraph::{LinkView, MultiPortGraph, NodeIndex, PortIndex, PortView};
 
 use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
@@ -34,12 +34,12 @@ impl<N> Default for RenderConfig<N> {
 }
 
 /// Formatter method to compute a node style.
-pub(super) fn node_style<H: HugrView<Node = Node> + ?Sized>(
-    h: &H,
+pub(super) fn node_style(
+    h: &Hugr,
     config: RenderConfig,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
-    fn node_name<H: HugrView + ?Sized>(h: &H, n: NodeIndex) -> String {
-        match h.get_optype(h.from_portgraph_node(n)) {
+    fn node_name(h: &Hugr, n: NodeIndex) -> String {
+        match h.get_optype(n.into()) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.name),
             OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.name),
             op => op.name().to_string(),
@@ -106,20 +106,20 @@ pub(super) fn port_style(
 
 /// Formatter method to compute an edge style.
 #[allow(clippy::type_complexity)]
-pub(super) fn edge_style<H: HugrView + ?Sized>(
-    h: &H,
-    config: RenderConfig<H::Node>,
+pub(super) fn edge_style(
+    h: &Hugr,
+    config: RenderConfig<Node>,
 ) -> Box<
     dyn FnMut(
-            <H::Portgraph<'_> as LinkView>::LinkEndpoint,
-            <H::Portgraph<'_> as LinkView>::LinkEndpoint,
+            <MultiPortGraph as LinkView>::LinkEndpoint,
+            <MultiPortGraph as LinkView>::LinkEndpoint,
         ) -> EdgeStyle
         + '_,
 > {
-    let graph = h.portgraph();
+    let graph = &h.graph;
     Box::new(move |src, tgt| {
         let src_node = graph.port_node(src).unwrap();
-        let src_optype = h.get_optype(h.from_portgraph_node(src_node));
+        let src_optype = h.get_optype(src_node.into());
         let src_offset = graph.port_offset(src).unwrap();
         let tgt_offset = graph.port_offset(tgt).unwrap();
 

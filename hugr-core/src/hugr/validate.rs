@@ -33,7 +33,7 @@ use super::ExtensionError;
 pub(super) struct ValidationContext<'a, H: HugrView> {
     hugr: &'a H,
     /// Dominator tree for each CFG region, using the container node as index.
-    dominators: HashMap<H::Node, Dominators<portgraph::NodeIndex>>,
+    dominators: HashMap<H::Node, (Dominators<portgraph::NodeIndex>, H::RegionPortgraphNodes)>,
 }
 
 impl<'a, H: HugrView> ValidationContext<'a, H> {
@@ -79,10 +79,14 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
     ///
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
-    fn compute_dominator(&self, parent: H::Node) -> Dominators<portgraph::NodeIndex> {
+    fn compute_dominator(
+        &self,
+        parent: H::Node,
+    ) -> (Dominators<portgraph::NodeIndex>, H::RegionPortgraphNodes) {
         let (region, node_map) = self.hugr.region_portgraph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region, node_map.to_portgraph(entry_node))
+        let doms = dominators::simple_fast(&region, node_map.to_portgraph(entry_node));
+        (doms, node_map)
     }
 
     /// Check the constraints on a single node.
@@ -363,11 +367,11 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             return Ok(());
         };
 
-        let (region, _) = self.hugr.region_portgraph(parent);
+        let (region, node_map) = self.hugr.region_portgraph(parent);
         let postorder = Topo::new(&region);
         let nodes_visited = postorder
             .iter(&region)
-            .filter(|n| *n != self.hugr.to_portgraph_node(parent))
+            .filter(|n| *n != node_map.to_portgraph(parent))
             .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
@@ -471,17 +475,17 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 }
                 err_entered_func.map_or(Ok(()), Err)?;
                 // Check domination
-                let dominator_tree = match self.dominators.get(&ancestor_parent) {
+                let (dominator_tree, node_map) = match self.dominators.get(&ancestor_parent) {
                     Some(tree) => tree,
                     None => {
-                        let tree = self.compute_dominator(ancestor_parent);
-                        self.dominators.insert(ancestor_parent, tree);
+                        let (tree, node_map) = self.compute_dominator(ancestor_parent);
+                        self.dominators.insert(ancestor_parent, (tree, node_map));
                         self.dominators.get(&ancestor_parent).unwrap()
                     }
                 };
                 if !dominator_tree
-                    .dominators(self.hugr.to_portgraph_node(ancestor))
-                    .is_some_and(|mut ds| ds.any(|n| n == self.hugr.to_portgraph_node(from_parent)))
+                    .dominators(node_map.to_portgraph(ancestor))
+                    .is_some_and(|mut ds| ds.any(|n| n == node_map.to_portgraph(from_parent)))
                 {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
                         from,
