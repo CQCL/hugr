@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.12.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.5...hugr-py-v0.12.0) (2025-05-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* `ArrayOpBuilder` was moved from
+* Functions that manipulate runtime extension sets have been removed from the Rust and Python code. Extension set parameters were removed from operations.   Closes https://github.com/CQCL/hugr/issues/1906
+* `values` field in `Extension` and `ExtensionValue` struct/class removed in rust and python. Use 0-input ops that return constant values.
+
+### Features
+
+* Improved array lowering ([#2109](https://github.com/CQCL/hugr/issues/2109)) ([1bc91c1](https://github.com/CQCL/hugr/commit/1bc91c197519f4a81f5fff1bf9df5905a1d1559e))
+* remove ExtensionValue ([#2093](https://github.com/CQCL/hugr/issues/2093)) ([70881b7](https://github.com/CQCL/hugr/commit/70881b7c5a55613f0304f41ee7cae8236a8bd668))
+* Removed runtime extension sets. ([#2145](https://github.com/CQCL/hugr/issues/2145)) ([cd7ef68](https://github.com/CQCL/hugr/commit/cd7ef68120b5b903b12ac2fcbbf5fae812e3e70f))
+
 ## [0.11.5](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.4...hugr-py-v0.11.5) (2025-04-16)
 
 
