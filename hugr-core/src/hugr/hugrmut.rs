@@ -282,7 +282,7 @@ impl HugrMut for Hugr {
     #[inline]
     fn set_entrypoint(&mut self, root: Node) {
         panic_invalid_node(self, root);
-        self.entrypoint = self.to_portgraph_node(root);
+        self.entrypoint = root.into_portgraph();
     }
 
     fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata {
@@ -498,12 +498,8 @@ impl HugrMut for Hugr {
         let node_map = portgraph::view::Subgraph::with_nodes(&mut self.graph, nodes)
             .copy_in_parent()
             .expect("Is a MultiPortGraph");
-        let node_map = translate_indices(
-            |n| self.from_portgraph_node(n),
-            |n| self.from_portgraph_node(n),
-            node_map,
-        )
-        .collect::<BTreeMap<_, _>>();
+        let node_map =
+            translate_indices(Into::into, Into::into, node_map).collect::<BTreeMap<_, _>>();
 
         for node in self.children(root).collect::<Vec<_>>() {
             self.set_parent(*node_map.get(&node).unwrap(), new_parent);

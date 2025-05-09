@@ -109,9 +109,9 @@ impl HugrInternals for Hugr {
         portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
         Self::RegionPortgraphNodes,
     ) {
-        let pg = self.portgraph();
-        let root = self.to_portgraph_node(parent);
-        let region = portgraph::view::FlatRegion::new_without_root(pg, &self.hierarchy, root);
+        let root = parent.into_portgraph();
+        let region =
+            portgraph::view::FlatRegion::new_without_root(&self.graph, &self.hierarchy, root);
         (region, DefaultPGNodeMap)
     }
 
@@ -258,7 +258,7 @@ pub trait HugrMutInternals: HugrView {
 impl HugrMutInternals for Hugr {
     fn set_module_root(&mut self, root: Node) {
         panic_invalid_node(self, root.node());
-        let root = self.to_portgraph_node(root.node());
+        let root = root.into_portgraph();
         self.hierarchy.detach(root);
         self.module_root = root;
     }
@@ -358,7 +358,7 @@ impl HugrMutInternals for Hugr {
 
     fn optype_mut(&mut self, node: Node) -> &mut OpType {
         panic_invalid_node(self, node);
-        let node = self.to_portgraph_node(node);
+        let node = node.into_portgraph();
         self.op_types.get_mut(node)
     }
 

@@ -116,10 +116,10 @@ pub(super) fn edge_style(
         ) -> EdgeStyle
         + '_,
 > {
-    let graph = h.portgraph();
+    let graph = &h.graph;
     Box::new(move |src, tgt| {
         let src_node = graph.port_node(src).unwrap();
-        let src_optype = h.get_optype(h.from_portgraph_node(src_node));
+        let src_optype = h.get_optype(src_node.into());
         let src_offset = graph.port_offset(src).unwrap();
         let tgt_offset = graph.port_offset(tgt).unwrap();
 
