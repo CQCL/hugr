@@ -1,11 +1,10 @@
 //! Bundles of hugr modules along with the extension required to load them.
 
 use derive_more::{Display, Error, From};
-use itertools::Itertools;
 use std::io;
 
 use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeError};
-use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE_REGISTRY};
+use crate::extension::{ExtensionRegistry, PRELUDE_REGISTRY};
 use crate::hugr::{HugrView, ValidationError};
 use crate::{Hugr, Node};
 
@@ -23,24 +22,25 @@ pub struct Package {
 impl Package {
     /// Create a new package from a list of hugrs.
     ///
-    /// Collects the extensions used in the modules and stores them in top-level
-    /// `extensions` attribute.
+    /// The hugr extensions are not automatically added to the package. Make
+    /// sure to manually include any non-standard extensions to
+    /// [`Package::extensions`].
     pub fn new(modules: impl IntoIterator<Item = Hugr>) -> Self {
         let modules: Vec<Hugr> = modules.into_iter().collect();
-        let mut extensions = ExtensionRegistry::default();
-        for module in &modules {
-            extensions.extend(module.extensions());
-        }
         Self {
             modules,
-            extensions,
+            extensions: ExtensionRegistry::default(),
         }
     }
 
     /// Create a new package containing a single HUGR.
+    ///
+    /// The hugr extensions are not automatically added to the package. Make
+    /// sure to manually include any non-standard extensions to
+    /// [`Package::extensions`].
     pub fn from_hugr(hugr: Hugr) -> Self {
         Package {
-            extensions: hugr.extensions().clone(),
+            extensions: ExtensionRegistry::default(),
             modules: vec![hugr],
         }
     }
@@ -51,19 +51,6 @@ impl Package {
     pub fn validate(&self) -> Result<(), PackageValidationError> {
         for hugr in self.modules.iter() {
             hugr.validate()?;
-
-            let missing_exts = hugr
-                .extensions()
-                .ids()
-                .filter(|id| !self.extensions.contains(id))
-                .cloned()
-                .collect_vec();
-            if !missing_exts.is_empty() {
-                return Err(PackageValidationError::MissingExtension {
-                    missing: missing_exts,
-                    available: self.extensions.ids().cloned().collect(),
-                });
-            }
         }
         Ok(())
     }
@@ -126,18 +113,6 @@ impl AsRef<[Hugr]> for Package {
 #[derive(Debug, Display, From, Error)]
 #[non_exhaustive]
 pub enum PackageValidationError {
-    /// Error raised while processing the package extensions.
-    #[display("The package modules use the extension{} {} not present in the defined set. The declared extensions are {}",
-            if missing.len() > 1 {"s"} else {""},
-            missing.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
-            available.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
-        )]
-    MissingExtension {
-        /// The missing extensions.
-        missing: Vec<ExtensionId>,
-        /// The available extensions.
-        available: Vec<ExtensionId>,
-    },
     /// Error raised while validating the package hugrs.
     Validation(ValidationError<Node>),
 }

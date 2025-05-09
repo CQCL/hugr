@@ -193,7 +193,6 @@ fn test_package_validation(package_string: String, mut val_cmd: Command) {
     // package with float extension and hugr that uses floats can validate
     val_cmd.write_stdin(package_string);
     val_cmd.arg("-");
-    val_cmd.arg("--no-std");
 
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
