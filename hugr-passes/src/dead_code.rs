@@ -158,12 +158,11 @@ impl DeadCodeElimPass {
     }
 }
 
-impl ComposablePass for DeadCodeElimPass {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for DeadCodeElimPass {
     type Error = Infallible;
     type Result = ();
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), Infallible> {
+    fn run(&self, hugr: &mut H) -> Result<(), Infallible> {
         let needed = self.find_needed_nodes(&*hugr);
         let remove = hugr
             .entry_descendants()

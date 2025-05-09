@@ -519,12 +519,11 @@ impl ReplaceTypes {
     }
 }
 
-impl ComposablePass for ReplaceTypes {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Error = ReplaceTypesError;
     type Result = bool;
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<bool, ReplaceTypesError> {
+    fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
         for n in hugr.entry_descendants().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;

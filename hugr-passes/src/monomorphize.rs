@@ -222,12 +222,11 @@ fn instantiate(
 #[derive(Debug, Clone)]
 pub struct MonomorphizePass;
 
-impl ComposablePass for MonomorphizePass {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Error = Infallible;
     type Result = ();
 
-    fn run(&self, h: &mut impl HugrMut<Node = Node>) -> Result<(), Self::Error> {
+    fn run(&self, h: &mut H) -> Result<(), Self::Error> {
         let root = h.entrypoint();
         // If the root is a polymorphic function, then there are no external calls, so nothing to do
         if !is_polymorphic_funcdefn(h.get_optype(root)) {
