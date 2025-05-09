@@ -1,33 +1,38 @@
-{
-    "version": "v3",
-    "nodes": [
+HUGRiHJv?@{
+    "modules": [
         {
-            "parent": 0,
-            "op": "Module"
-        },
-        {
-            "parent": 0,
-            "input_extensions": null,
-            "op": "Const",
-            "v": {
-                "v": "Extension",
-                "extensions": [
-                    "arithmetic.float.types"
-                ],
-                "typ": {
-                    "t": "Opaque",
-                    "extension": "arithmetic.float.types",
-                    "id": "float64",
-                    "args": [],
-                    "bound": "C"
+            "version": "v3",
+            "nodes": [
+                {
+                    "parent": 0,
+                    "op": "Module"
                 },
-                "value": {
-                    "c": "ConstF64",
-                    "v": 42
+                {
+                    "parent": 0,
+                    "input_extensions": null,
+                    "op": "Const",
+                    "v": {
+                        "v": "Extension",
+                        "extensions": [
+                            "arithmetic.float.types"
+                        ],
+                        "typ": {
+                            "t": "Opaque",
+                            "extension": "arithmetic.float.types",
+                            "id": "float64",
+                            "args": [],
+                            "bound": "C"
+                        },
+                        "value": {
+                            "c": "ConstF64",
+                            "v": 42
+                        }
+                    }
                 }
-            }
+            ],
+            "edges": [],
+            "encoder": null
         }
     ],
-    "edges": [],
-    "encoder": null
+    "extensions": []
 }
