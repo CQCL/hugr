@@ -9,7 +9,6 @@ use hugr_model::v0 as model;
 fn roundtrip(source: &str) -> String {
     let bump = model::bumpalo::Bump::new();
     let package_ast = model::ast::Package::from_str(source).unwrap();
-    println!("{:#?}", package_ast);
     let package_table = package_ast.resolve(&bump).unwrap();
     let core = import_package(&package_table, &std_reg()).unwrap();
     let exported_table = export_package(&core, &bump);
