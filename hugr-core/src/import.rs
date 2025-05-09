@@ -216,30 +216,41 @@ impl<'a> Context<'a> {
         self.record_links(node, Direction::Incoming, node_data.inputs);
         self.record_links(node, Direction::Outgoing, node_data.outputs);
 
-        // Import the JSON metadata
         for meta_item in node_data.meta {
-            let Some([name_arg, json_arg]) =
-                self.match_symbol(*meta_item, model::COMPAT_META_JSON)?
-            else {
-                continue;
-            };
+            self.import_node_metadata(node, *meta_item)?;
+        }
 
+        Ok(node)
+    }
+
+    fn import_node_metadata(
+        &mut self,
+        node: Node,
+        meta_item: table::TermId,
+    ) -> Result<(), ImportError> {
+        // Import the JSON metadata
+        if let Some([name_arg, json_arg]) = self.match_symbol(meta_item, model::COMPAT_META_JSON)? {
             let table::Term::Literal(model::Literal::Str(name)) = self.get_term(name_arg)? else {
-                return Err(table::ModelError::TypeError(*meta_item).into());
+                return Err(table::ModelError::TypeError(meta_item).into());
             };
 
             let table::Term::Literal(model::Literal::Str(json_str)) = self.get_term(json_arg)?
             else {
-                return Err(table::ModelError::TypeError(*meta_item).into());
+                return Err(table::ModelError::TypeError(meta_item).into());
             };
 
             let json_value: NodeMetadata = serde_json::from_str(json_str)
-                .map_err(|_| table::ModelError::TypeError(*meta_item))?;
+                .map_err(|_| table::ModelError::TypeError(meta_item))?;
 
             self.hugr.set_metadata(node, name, json_value);
         }
 
-        Ok(node)
+        // Set the entrypoint
+        if let Some([]) = self.match_symbol(meta_item, model::CORE_ENTRYPOINT)? {
+            self.hugr.set_entrypoint(node);
+        }
+
+        Ok(())
     }
 
     /// Associate links with the ports of the given node in the given direction.
@@ -654,6 +665,10 @@ impl<'a> Context<'a> {
 
         self.create_order_edges(region)?;
 
+        for meta_item in region_data.meta {
+            self.import_node_metadata(node, *meta_item)?;
+        }
+
         self.region_scope = prev_region;
 
         Ok(())
@@ -954,6 +969,10 @@ impl<'a> Context<'a> {
                 .hugr
                 .add_node_with_parent(node, OpType::ExitBlock(ExitBlock { cfg_outputs }));
             self.record_links(exit, Direction::Incoming, region_data.targets);
+        }
+
+        for meta_item in region_data.meta {
+            self.import_node_metadata(node, *meta_item)?;
         }
 
         self.region_scope = prev_region;

@@ -95,3 +95,11 @@ pub fn test_roundtrip_order() {
         "../../hugr-model/tests/fixtures/model-order.edn"
     )));
 }
+
+#[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+pub fn test_roundtrip_entrypoint() {
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-entrypoint.edn"
+    )));
+}

@@ -1,10 +1,34 @@
-WHITESPACE  = _{ " " | "\t" | "\r" | "\n" }
-COMMENT     = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
-identifier  = @{ (ASCII_ALPHA | "_" | "-") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
-symbol_name = @{ identifier ~ ("." ~ identifier)* }
-link_name   = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
+WHITESPACE         = _{ " " | "\t" | "\r" | "\n" }
+COMMENT            = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
+identifier         = @{ identifier_initial ~ identifier_rest* }
+identifier_initial = @{ ASCII_ALPHA | "_" | "-" }
+identifier_rest    = @{ ASCII_ALPHANUMERIC | "_" | "-" }
+symbol_name        = @{ !(reserved ~ !(identifier_rest | ".")) ~ (identifier ~ ("." ~ identifier)*) }
+link_name          = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 
 literal = { literal_string | literal_float | literal_nat | literal_bytes }
+
+reserved = @{
+    "mod"
+  | "hugr"
+  | "bytes"
+  | "tuple"
+  | "list"
+  | "meta"
+  | "signature"
+  | "dfg"
+  | "cfg"
+  | "block"
+  | "define-func"
+  | "declare-func"
+  | "declare-operation"
+  | "declare-ctr"
+  | "declare-alias"
+  | "tail-loop"
+  | "cond"
+  | "import"
+  | "..."
+}
 
 literal_string         = ${ "\"" ~ (literal_string_raw | literal_string_escape | literal_string_unicode)* ~ "\"" }
 literal_string_raw     = @{ (!("\\" | "\"") ~ ANY)+ }
@@ -68,7 +92,6 @@ term = {
     term_wildcard
   | term_var
   | term_list
-  | term_list_type
   | literal
   | term_tuple
   | term_const_func
@@ -80,7 +103,6 @@ term_var        =  { "?" ~ identifier }
 term_apply      =  { symbol_name | ("(" ~ symbol_name ~ term* ~ ")") }
 term_list       =  { "[" ~ part* ~ "]" }
 term_tuple      =  { "(" ~ "tuple" ~ part* ~ ")" }
-term_list_type  =  { "(" ~ "list" ~ term ~ ")" }
 term_const_func =  { "(" ~ "fn" ~ term ~ ")" }
 
 part         = { spliced_term | term }
