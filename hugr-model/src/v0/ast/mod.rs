@@ -34,6 +34,7 @@ mod python;
 mod resolve;
 mod view;
 
+pub use parse::ParseError;
 pub use resolve::ResolveError;
 
 /// A package in the hugr AST.
