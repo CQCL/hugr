@@ -19,7 +19,6 @@ env:
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
-  HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
   # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
   LLVM_VERSION: "14.0"

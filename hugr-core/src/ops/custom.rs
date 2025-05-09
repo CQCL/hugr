@@ -168,7 +168,10 @@ impl From<ExtensionOp> for OpaqueOp {
 
 impl PartialEq for ExtensionOp {
     fn eq(&self, other: &Self) -> bool {
-        Arc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args
+        self.args() == other.args()
+            && self.signature() == other.signature()
+            && self.def.name() == other.def.name()
+            && self.def.extension_id() == other.def.extension_id()
     }
 }
 

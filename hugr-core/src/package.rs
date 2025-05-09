@@ -4,8 +4,9 @@ use derive_more::{Display, Error, From};
 use std::io;
 
 use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeError};
-use crate::extension::{ExtensionRegistry, PRELUDE_REGISTRY};
+use crate::extension::ExtensionRegistry;
 use crate::hugr::{HugrView, ValidationError};
+use crate::std_extensions::STD_REG;
 use crate::{Hugr, Node};
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -60,7 +61,7 @@ impl Package {
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, EnvelopeError> {
-        let extensions = extensions.unwrap_or(&PRELUDE_REGISTRY);
+        let extensions = extensions.unwrap_or(&STD_REG);
         let (_, pkg) = read_envelope(reader, extensions)?;
         Ok(pkg)
     }
