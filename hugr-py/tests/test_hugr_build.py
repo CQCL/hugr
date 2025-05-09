@@ -20,8 +20,9 @@ def test_stable_indices():
     h = Hugr(ops.DFG([]))
 
     nodes = [h.add_node(Not, num_outs=1) for _ in range(3)]
-    assert len(h) == 4
-    assert list(iter(h)) == [Node(i) for i in range(4)]
+    assert len(h) == 8
+    assert len(list(h.descendants())) == 4
+    assert list(iter(h)) == [Node(i) for i in range(8)]
     assert all(data is not None for node, data in h.nodes())
 
     assert len(list(nodes[0].outputs())) == 1
@@ -33,12 +34,13 @@ def test_stable_indices():
     assert h.num_outgoing(nodes[0]) == 1
     assert h.num_incoming(nodes[1]) == 1
 
+    assert nodes[1] in h.children(h.entrypoint)
     assert h.delete_node(nodes[1]) is not None
     assert h._nodes[nodes[1].idx] is None
-    assert nodes[1] not in h.children(h.root)
+    assert nodes[1] not in h.children(h.entrypoint)
 
-    assert len(h) == 3
-    assert len(h._nodes) == 4
+    assert len(h) == 7
+    assert len(h._nodes) == 8
     assert h._free_nodes == [nodes[1]]
 
     assert h.num_outgoing(nodes[0]) == 0
@@ -52,9 +54,9 @@ def test_stable_indices():
     new_n = h.add_node(Not)
     assert new_n == nodes[1]
 
-    assert len(h) == 4
+    assert len(h) == 8
     assert h._free_nodes == []
-    assert list(iter(h)) == [Node(i) for i in range(4)]
+    assert list(iter(h)) == [Node(i) for i in range(len(h))]
     assert all(data is not None for node, data in h.nodes())
 
 
@@ -146,11 +148,11 @@ def test_insert():
     nt = h1.add(Not(a1))
     h1.set_outputs(nt)
 
-    assert len(h1.hugr) == 4
+    assert len(h1.hugr) == 8
 
     new_h = Hugr(ops.DFG([]))
-    mapping = h1.hugr.insert_hugr(new_h, h1.hugr.root)
-    assert mapping == {new_h.root: Node(4)}
+    mapping = h1.hugr.insert_hugr(new_h, h1.hugr.entrypoint)
+    assert mapping == {new_h.entrypoint: Node(8)}
 
 
 def test_insert_nested(snapshot):

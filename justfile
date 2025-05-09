@@ -15,7 +15,7 @@ check:
 # Run all the tests.
 test: test-rust test-python
 # Run all rust tests.
-test-rust:
+test-rust *TEST_ARGS:
     @# We cannot use --workspace --all-features as `hugr-model`s pyo3 feature cannot be
     @# built into a binary build (without using `maturin`)
     @#
@@ -23,12 +23,12 @@ test-rust:
     HUGR_TEST_SCHEMA=1 cargo test \
         --workspace \
         --exclude 'hugr-py' \
-        --features 'hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd'
+        --features 'hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd' {{TEST_ARGS}}
 # Run all python tests.
-test-python:
+test-python *PYTEST_ARGS:
     uv run maturin develop --uv
     cargo build -p hugr-cli
-    HUGR_RENDER_DOT=1 uv run pytest
+    HUGR_RENDER_DOT=1 uv run pytest {{PYTEST_ARGS}}
 
 # Run all the benchmarks.
 bench language="[rust|python]": (_run_lang language \
