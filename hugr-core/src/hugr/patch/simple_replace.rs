@@ -539,7 +539,7 @@ pub(in crate::hugr::patch) mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::hugr::patch::simple_replace::OutputBoundaryMap;
+    use crate::hugr::patch::simple_replace::{Outcome, OutputBoundaryMap};
     use crate::hugr::patch::{PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
@@ -853,7 +853,20 @@ pub(in crate::hugr::patch) mod test {
             nu_inp,
             nu_out: nu_out.into(),
         };
-        h.apply_patch(r).unwrap();
+        let Outcome {
+            node_map,
+            removed_nodes,
+        } = h.apply_patch(r).unwrap();
+
+        assert_eq!(
+            node_map.into_keys().collect::<HashSet<_>>(),
+            [n_node_h].into_iter().collect::<HashSet<_>>(),
+        );
+        assert_eq!(
+            removed_nodes.into_keys().collect::<HashSet<_>>(),
+            [h_node_cx].into_iter().collect::<HashSet<_>>(),
+        );
+
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
         // ┤ H ├┤ H ├
