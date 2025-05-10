@@ -29,6 +29,7 @@
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
 //! use hugr::extension::prelude::{bool_t, qb_t};
+//! use hugr::envelope::EnvelopeConfig;
 //! use hugr::hugr::Hugr;
 //! use hugr::type_row;
 //! use hugr::types::FuncValueType;
@@ -123,7 +124,7 @@
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().unwrap();
-//! let serialized = serde_json::to_string(&h).unwrap();
+//! let serialized = h.store_str(EnvelopeConfig::text()).unwrap();
 //! println!("{}", serialized);
 //! ```
 

@@ -12,10 +12,11 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
+use crate::core::HugrNode;
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
 use crate::types::{type_param::TypeArg, Signature};
-use crate::{ops, IncomingPort, Node};
+use crate::{ops, IncomingPort};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -101,8 +102,7 @@ impl ExtensionOp {
     /// [`ExtensionOp`].
     ///
     /// Regenerating the [`ExtensionOp`] back from the [`OpaqueOp`] requires a
-    /// registry with the appropriate extension. See
-    /// [`crate::Hugr::resolve_extension_defs`].
+    /// registry with the appropriate extension.
     ///
     /// For a non-cloning version of this operation, use [`OpaqueOp::from`].
     pub fn make_opaque(&self) -> OpaqueOp {
@@ -316,14 +316,14 @@ impl DataflowOpTrait for OpaqueOp {
 /// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub enum OpaqueOpError {
+pub enum OpaqueOpError<N: HugrNode> {
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation '{op}' in {node} not found in Extension {extension}. Available operations: {}",
             available_ops.iter().join(", ")
     )]
     OpNotFoundInExtension {
         /// The node where the error occurred.
-        node: Node,
+        node: N,
         /// The missing operation.
         op: OpName,
         /// The extension where the operation was expected.
@@ -335,7 +335,7 @@ pub enum OpaqueOpError {
     #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
     #[allow(missing_docs)]
     SignatureMismatch {
-        node: Node,
+        node: N,
         extension: ExtensionId,
         op: OpName,
         stored: Signature,
@@ -345,14 +345,14 @@ pub enum OpaqueOpError {
     #[error("Error in signature of operation '{name}' in {node}: {cause}")]
     #[allow(missing_docs)]
     SignatureError {
-        node: Node,
+        node: N,
         name: OpName,
         #[source]
         cause: SignatureError,
     },
     /// Unresolved operation encountered during validation.
     #[error("Unexpected unresolved opaque operation '{1}' in {0}, from Extension {2}.")]
-    UnresolvedOp(Node, OpName, ExtensionId),
+    UnresolvedOp(N, OpName, ExtensionId),
     /// Error updating the extension registry in the Hugr while resolving opaque ops.
     #[error("Error updating extension registry: {0}")]
     ExtensionRegistryError(#[from] crate::extension::ExtensionRegistryError),
@@ -367,6 +367,7 @@ mod test {
     use crate::extension::ExtensionRegistry;
     use crate::std_extensions::arithmetic::conversions::{self};
     use crate::std_extensions::STD_REG;
+    use crate::Node;
     use crate::{
         extension::{
             prelude::{bool_t, qb_t, usize_t},

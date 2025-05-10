@@ -22,7 +22,7 @@ pub struct ModuleBuilder<T>(pub(super) T);
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().root()
+        self.0.as_ref().entrypoint()
     }
 
     #[inline]
@@ -50,7 +50,7 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>> {
         self.0.validate()?;
         Ok(self.0)
     }

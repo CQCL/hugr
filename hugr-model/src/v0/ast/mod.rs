@@ -41,6 +41,7 @@ pub use resolve::ResolveError;
 /// See [`table::Package`] for the table representation.
 ///
 /// [`table::Package`]: crate::v0::table::Package
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Package {
     /// The sequence of modules in the package.
     pub modules: Vec<Module>,

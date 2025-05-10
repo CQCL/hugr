@@ -3,25 +3,22 @@
 use core::{f64, panic};
 use std::sync::Arc;
 
-use cool_asserts::assert_matches;
 use itertools::Itertools;
 use rstest::rstest;
 
 use crate::builder::{
-    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-    HugrBuilder, ModuleBuilder,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
+use crate::envelope::EnvelopeConfig;
 use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize};
 use crate::extension::resolution::WeakExtensionRegistry;
-use crate::extension::resolution::{
-    resolve_op_extensions, resolve_op_types_extensions, ExtensionCollectionError,
-};
+use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
 use crate::extension::{
     ExtensionId, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
 };
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::constant::CustomConst;
-use crate::ops::{CallIndirect, ExtensionOp, Input, OpTrait, OpType, Tag, Value};
+use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
 use crate::std_extensions::arithmetic::float_types::{self, float64_type, ConstF64};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
@@ -144,8 +141,9 @@ fn check_extension_resolution(mut hugr: Hugr) {
     );
 
     // Roundtrip serialize so all weak references are dropped.
-    let ser = serde_json::to_string(&hugr).unwrap();
-    let deser_hugr = Hugr::load_json(ser.as_bytes(), &build_extensions).unwrap();
+    let ser = hugr.store_str(EnvelopeConfig::text()).unwrap();
+
+    let deser_hugr = Hugr::load_str(&ser, Some(&build_extensions)).unwrap();
 
     assert_eq!(
         deser_hugr.extensions(),
@@ -190,8 +188,8 @@ fn resolve_hugr_extensions_simple() {
     );
 
     // Serialization roundtrip to drop the weak pointers.
-    let ser = serde_json::to_string(&hugr).unwrap();
-    let deser_hugr = Hugr::load_json(ser.as_bytes(), &build_extensions).unwrap();
+    let ser = hugr.store_str(EnvelopeConfig::text()).unwrap();
+    let deser_hugr = Hugr::load_str(&ser, Some(&build_extensions)).unwrap();
 
     assert_eq!(
         deser_hugr.extensions(),
@@ -360,45 +358,6 @@ fn resolve_call() {
     }
 
     check_extension_resolution(hugr);
-}
-
-/// Fail when collecting extensions but the weak pointers are not resolved.
-#[rstest]
-fn dropped_weak_extensions() {
-    let (_ext_a, op_a) = make_extension("dummy.a", "op_a");
-    let mut func = FunctionBuilder::new(
-        "dummy_fn",
-        Signature::new(vec![float64_type(), bool_t()], vec![]),
-    )
-    .unwrap();
-    let [_func_i0, func_i1] = func.input_wires_arr();
-    func.add_dataflow_op(op_a, vec![func_i1]).unwrap();
-
-    let hugr = func.finish_hugr().unwrap();
-
-    // Do a serialization roundtrip to drop the references.
-    let ser = serde_json::to_string(&hugr).unwrap();
-    let hugr: Hugr = serde_json::from_str(&ser).unwrap();
-
-    let op_collection = hugr
-        .nodes()
-        .try_for_each(|node| hugr.get_optype(node).used_extensions().map(|_| ()));
-    assert_matches!(
-        op_collection,
-        Err(ExtensionCollectionError::DroppedOpExtensions { .. })
-    );
-
-    let op_collection = hugr.nodes().try_for_each(|node| {
-        let op = hugr.get_optype(node);
-        if let Some(sig) = op.dataflow_signature() {
-            sig.used_extensions()?;
-        }
-        Ok(())
-    });
-    assert_matches!(
-        op_collection,
-        Err(ExtensionCollectionError::DroppedSignatureExtensions { .. })
-    );
 }
 
 /// Test the [`ExtensionRegistry::new_cyclic`] and [`ExtensionRegistry::new_with_extension_resolution`] methods.

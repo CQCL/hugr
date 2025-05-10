@@ -1,7 +1,7 @@
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::bool_t,
-    hugr::serialize::test::check_hugr_deserialize,
+    hugr::serialize::test::{check_hugr_deserialize, HugrSer},
     std_extensions::logic::LogicOp,
     types::Signature,
 };
@@ -64,7 +64,7 @@ fn serial_upgrade(#[case] name: String, #[case] hugr: Hugr) {
             .write(true)
             .open(&path)
             .unwrap();
-        serde_json::to_writer_pretty(f, &hugr).unwrap();
+        serde_json::to_writer_pretty(f, &HugrSer(&hugr)).unwrap();
     }
 
     let val = serde_json::from_reader(std::fs::File::open(&path).unwrap()).unwrap();

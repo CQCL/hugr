@@ -38,11 +38,11 @@ fn reachable_funcs<'a, H: HugrView>(
 ) -> Result<impl Iterator<Item = H::Node> + 'a, RemoveDeadFuncsError<H::Node>> {
     let g = cg.graph();
     let mut entry_points = entry_points.into_iter();
-    let searcher = if h.get_optype(h.root()).is_module() {
+    let searcher = if h.get_optype(h.entrypoint()).is_module() {
         let mut d = Dfs::new(g, 0.into());
         d.stack.clear();
         for n in entry_points {
-            if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.root()) {
+            if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.entrypoint()) {
                 return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
             }
             d.stack.push(cg.node_index(n).unwrap())
@@ -53,11 +53,11 @@ fn reachable_funcs<'a, H: HugrView>(
             // Can't be a child of the module root as there isn't a module root!
             return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
         }
-        Dfs::new(g, cg.node_index(h.root()).unwrap())
+        Dfs::new(g, cg.node_index(h.entrypoint()).unwrap())
     };
     Ok(searcher.iter(g).map(|i| match g.node_weight(i).unwrap() {
         CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
-        CallGraphNode::NonFuncRoot => h.root(),
+        CallGraphNode::NonFuncRoot => h.entrypoint(),
     }))
 }
 
@@ -82,11 +82,10 @@ impl RemoveDeadFuncsPass {
     }
 }
 
-impl ComposablePass for RemoveDeadFuncsPass {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Error = RemoveDeadFuncsError;
     type Result = ();
-    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), RemoveDeadFuncsError> {
+    fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let reachable = reachable_funcs(
             &CallGraph::new(hugr),
             hugr,
@@ -94,7 +93,7 @@ impl ComposablePass for RemoveDeadFuncsPass {
         )?
         .collect::<HashSet<_>>();
         let unreachable = hugr
-            .nodes()
+            .entry_descendants()
             .filter(|n| {
                 OpTag::Function.is_superset(hugr.get_optype(*n).tag()) && !reachable.contains(n)
             })
@@ -128,7 +127,7 @@ impl ComposablePass for RemoveDeadFuncsPass {
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
-) -> Result<(), ValidatePassError<RemoveDeadFuncsError>> {
+) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
     validate_if_test(
         RemoveDeadFuncsPass::default().with_module_entry_points(entry_points),
         h,
@@ -179,7 +178,7 @@ mod test {
         let mut hugr = hb.finish_hugr()?;
 
         let avail_funcs = hugr
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| {
                 hugr.get_optype(n)
                     .as_func_defn()

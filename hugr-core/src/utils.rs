@@ -58,8 +58,12 @@ where
 ///
 /// See also [`try_collect_array`] for a non-panicking version.
 #[inline]
+#[track_caller]
 pub fn collect_array<const N: usize, T: Debug>(arr: impl IntoIterator<Item = T>) -> [T; N] {
-    try_collect_array(arr).unwrap_or_else(|v| panic!("Expected {} elements, got {:?}", N, v))
+    match try_collect_array(arr) {
+        Ok(v) => v,
+        Err(v) => panic!("Expected {} elements, got {:?}", N, v),
+    }
 }
 
 /// Collect a vector into an array.
@@ -77,6 +81,7 @@ pub fn collect_array<const N: usize, T: Debug>(arr: impl IntoIterator<Item = T>)
 ///
 /// See also [`collect_array`].
 #[inline]
+#[track_caller]
 pub fn try_collect_array<const N: usize, T>(
     arr: impl IntoIterator<Item = T>,
 ) -> Result<[T; N], Vec<T>> {
@@ -291,7 +296,7 @@ pub(crate) mod test {
     pub(crate) fn assert_fully_folded_with(h: &Hugr, check_value: impl Fn(&Value) -> bool) {
         let mut node_count = 0;
 
-        for node in h.children(h.root()) {
+        for node in h.children(h.entrypoint()) {
             let op = h.get_optype(node);
             match op {
                 OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,

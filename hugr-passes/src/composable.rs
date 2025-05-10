@@ -4,46 +4,41 @@ use std::{error::Error, marker::PhantomData};
 
 use hugr_core::core::HugrNode;
 use hugr_core::hugr::{hugrmut::HugrMut, ValidationError};
-use hugr_core::HugrView;
 use itertools::Either;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
 /// e.g. by [ValidatingPass]
-pub trait ComposablePass: Sized {
-    type Node: HugrNode;
+pub trait ComposablePass<H: HugrMut>: Sized {
     type Error: Error;
     type Result; // Would like to default to () but currently unstable
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<Self::Result, Self::Error>;
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error>;
 
     fn map_err<E2: Error>(
         self,
         f: impl Fn(Self::Error) -> E2,
-    ) -> impl ComposablePass<Result = Self::Result, Error = E2, Node = Self::Node> {
+    ) -> impl ComposablePass<H, Result = Self::Result, Error = E2> {
         ErrMapper::new(self, f)
     }
 
     /// Returns a [ComposablePass] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
-    fn then<P: ComposablePass<Node = Self::Node>, E: ErrorCombiner<Self::Error, P::Error>>(
+    fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
-    ) -> impl ComposablePass<Result = (Self::Result, P::Result), Error = E, Node = Self::Node> {
+    ) -> impl ComposablePass<H, Result = (Self::Result, P::Result), Error = E> {
         struct Sequence<E, P1, P2>(P1, P2, PhantomData<E>);
-        impl<E, P1, P2> ComposablePass for Sequence<E, P1, P2>
+        impl<H, E, P1, P2> ComposablePass<H> for Sequence<E, P1, P2>
         where
-            P1: ComposablePass,
-            P2: ComposablePass<Node = P1::Node>,
+            H: HugrMut,
+            P1: ComposablePass<H>,
+            P2: ComposablePass<H>,
             E: ErrorCombiner<P1::Error, P2::Error>,
         {
-            type Node = P1::Node;
             type Error = E;
             type Result = (P1::Result, P2::Result);
 
-            fn run(
-                &self,
-                hugr: &mut impl HugrMut<Node = Self::Node>,
-            ) -> Result<Self::Result, Self::Error> {
+            fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
                 let res1 = self.0.run(hugr).map_err(E::from_first)?;
                 let res2 = self.1.run(hugr).map_err(E::from_second)?;
                 Ok((res1, res2))
@@ -91,20 +86,21 @@ impl<A: Error, B: Error> ErrorCombiner<A, B> for Either<A, B> {
 // by ! (never_type) as (unlike Infallible) ! converts Into anything
 
 // ErrMapper ------------------------------
-struct ErrMapper<P, E, F>(P, F, PhantomData<E>);
+struct ErrMapper<P, H, E, F>(P, F, PhantomData<(E, H)>);
 
-impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ErrMapper<P, E, F> {
+impl<H: HugrMut, P: ComposablePass<H>, E: Error, F: Fn(P::Error) -> E> ErrMapper<P, H, E, F> {
     fn new(pass: P, err_fn: F) -> Self {
         Self(pass, err_fn, PhantomData)
     }
 }
 
-impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMapper<P, E, F> {
-    type Node = P::Node;
+impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> ComposablePass<H>
+    for ErrMapper<P, H, E, F>
+{
     type Error = E;
     type Result = P::Result;
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<P::Result, Self::Error> {
+    fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.0.run(hugr).map_err(&self.1)
     }
 }
@@ -113,17 +109,20 @@ impl<P: ComposablePass, E: Error, F: Fn(P::Error) -> E> ComposablePass for ErrMa
 
 /// Error from a [ValidatingPass]
 #[derive(thiserror::Error, Debug)]
-pub enum ValidatePassError<E> {
+pub enum ValidatePassError<N, E>
+where
+    N: HugrNode + 'static,
+{
     #[error("Failed to validate input HUGR: {err}\n{pretty_hugr}")]
     Input {
         #[source]
-        err: ValidationError,
+        err: ValidationError<N>,
         pretty_hugr: String,
     },
     #[error("Failed to validate output HUGR: {err}\n{pretty_hugr}")]
     Output {
         #[source]
-        err: ValidationError,
+        err: ValidationError<N>,
         pretty_hugr: String,
     },
     #[error(transparent)]
@@ -132,29 +131,31 @@ pub enum ValidatePassError<E> {
 
 /// Runs an underlying pass, but with validation of the Hugr
 /// both before and afterwards.
-pub struct ValidatingPass<P>(P);
+pub struct ValidatingPass<P, H>(P, PhantomData<H>);
 
-impl<P: ComposablePass> ValidatingPass<P> {
+impl<P: ComposablePass<H>, H: HugrMut> ValidatingPass<P, H> {
     pub fn new(underlying: P) -> Self {
-        Self(underlying)
+        Self(underlying, PhantomData)
     }
 
     fn validation_impl<E>(
         &self,
-        hugr: &impl HugrView,
-        mk_err: impl FnOnce(ValidationError, String) -> ValidatePassError<E>,
-    ) -> Result<(), ValidatePassError<E>> {
+        hugr: &H,
+        mk_err: impl FnOnce(ValidationError<H::Node>, String) -> ValidatePassError<H::Node, E>,
+    ) -> Result<(), ValidatePassError<H::Node, E>> {
         hugr.validate()
             .map_err(|err| mk_err(err, hugr.mermaid_string()))
     }
 }
 
-impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
-    type Node = P::Node;
-    type Error = ValidatePassError<P::Error>;
+impl<P: ComposablePass<H>, H: HugrMut> ComposablePass<H> for ValidatingPass<P, H>
+where
+    H::Node: 'static,
+{
+    type Error = ValidatePassError<H::Node, P::Error>;
     type Result = P::Result;
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<P::Result, Self::Error> {
+    fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Input {
             err,
             pretty_hugr,
@@ -172,13 +173,14 @@ impl<P: ComposablePass> ComposablePass for ValidatingPass<P> {
 /// [ComposablePass] that executes a first pass that returns a `bool`
 /// result; and then, if-and-only-if that first result was true,
 /// executes a second pass
-pub struct IfThen<E, A, B>(A, B, PhantomData<E>);
+pub struct IfThen<E, H, A, B>(A, B, PhantomData<(E, H)>);
 
 impl<
-        A: ComposablePass<Result = bool>,
-        B: ComposablePass<Node = A::Node>,
+        A: ComposablePass<H, Result = bool>,
+        B: ComposablePass<H>,
+        H: HugrMut,
         E: ErrorCombiner<A::Error, B::Error>,
-    > IfThen<E, A, B>
+    > IfThen<E, H, A, B>
 {
     /// Make a new instance given the [ComposablePass] to run first
     /// and (maybe) second
@@ -188,26 +190,26 @@ impl<
 }
 
 impl<
-        A: ComposablePass<Result = bool>,
-        B: ComposablePass<Node = A::Node>,
+        A: ComposablePass<H, Result = bool>,
+        B: ComposablePass<H>,
+        H: HugrMut,
         E: ErrorCombiner<A::Error, B::Error>,
-    > ComposablePass for IfThen<E, A, B>
+    > ComposablePass<H> for IfThen<E, H, A, B>
 {
-    type Node = A::Node;
     type Error = E;
     type Result = Option<B::Result>;
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Self::Node>) -> Result<Self::Result, Self::Error> {
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         let res: bool = self.0.run(hugr).map_err(ErrorCombiner::from_first)?;
         res.then(|| self.1.run(hugr).map_err(ErrorCombiner::from_second))
             .transpose()
     }
 }
 
-pub(crate) fn validate_if_test<P: ComposablePass>(
+pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
     pass: P,
-    hugr: &mut impl HugrMut<Node = P::Node>,
-) -> Result<P::Result, ValidatePassError<P::Error>> {
+    hugr: &mut H,
+) -> Result<P::Result, ValidatePassError<H::Node, P::Error>> {
     if cfg!(test) {
         ValidatingPass::new(pass).run(hugr)
     } else {
@@ -226,7 +228,7 @@ mod test {
     };
     use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple};
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DEFAULT_OPTYPE, DFG};
+    use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DFG};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, TypeRow};
     use hugr_core::{Hugr, HugrView, IncomingPort};
@@ -258,7 +260,7 @@ mod test {
 
         cfold.run(&mut hugr.clone()).unwrap();
 
-        let exp_err = ConstFoldError::InvalidEntryPoint(id2.node(), DEFAULT_OPTYPE);
+        let exp_err = ConstFoldError::MissingEntryPoint { node: id2.node() };
         let r: Result<_, Either<Infallible, ConstFoldError>> =
             dce.clone().then(cfold.clone()).run(&mut hugr.clone());
         assert_eq!(r, Err(Either::Right(exp_err.clone())));
@@ -276,17 +278,18 @@ mod test {
 
     #[test]
     fn test_validation() {
-        let mut h = Hugr::new(DFG {
+        let mut h = Hugr::new_with_entrypoint(DFG {
             signature: Signature::new(usize_t(), bool_t()),
-        });
+        })
+        .unwrap();
         let inp = h.add_node_with_parent(
-            h.root(),
+            h.entrypoint(),
             Input {
                 types: usize_t().into(),
             },
         );
         let outp = h.add_node_with_parent(
-            h.root(),
+            h.entrypoint(),
             Output {
                 types: bool_t().into(),
             },
@@ -296,11 +299,11 @@ mod test {
         let err = backup.validate().unwrap_err();
 
         let no_inputs: [(IncomingPort, _); 0] = [];
-        let cfold = ConstantFoldPass::default().with_inputs(backup.root(), no_inputs);
+        let cfold = ConstantFoldPass::default().with_inputs(backup.entrypoint(), no_inputs);
         cfold.run(&mut h).unwrap();
         assert_eq!(h, backup); // Did nothing
 
-        let r = ValidatingPass(cfold).run(&mut h);
+        let r = ValidatingPass::new(cfold).run(&mut h);
         assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if e == err));
     }
 
@@ -327,7 +330,7 @@ mod test {
             let mut repl = ReplaceTypes::default();
             let usize_custom_t = usize_t().as_extension().unwrap().clone();
             repl.replace_type(usize_custom_t, INT_TYPES[6].clone());
-            let ifthen = IfThen::<Either<_, _>, _, _>::new(repl, untup.clone());
+            let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup.clone());
 
             let mut h = h.clone();
             let r = validate_if_test(ifthen, &mut h).unwrap();
@@ -337,7 +340,7 @@ mod test {
                     rewrites_applied: 1
                 })
             );
-            let [tuple_in, tuple_out] = h.children(h.root()).collect_array().unwrap();
+            let [tuple_in, tuple_out] = h.children(h.entrypoint()).collect_array().unwrap();
             assert_eq!(h.output_neighbours(tuple_in).collect_vec(), [tuple_out; 2]);
         }
 
@@ -345,13 +348,13 @@ mod test {
         let mut repl = ReplaceTypes::default();
         let i32_custom_t = INT_TYPES[5].as_extension().unwrap().clone();
         repl.replace_type(i32_custom_t, INT_TYPES[6].clone());
-        let ifthen = IfThen::<Either<_, _>, _, _>::new(repl, untup);
+        let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup);
         let mut h = h;
         let r = validate_if_test(ifthen, &mut h).unwrap();
         assert_eq!(r, None);
-        assert_eq!(h.children(h.root()).count(), 4);
+        assert_eq!(h.children(h.entrypoint()).count(), 4);
         let mktup = h
-            .output_neighbours(h.first_child(h.root()).unwrap())
+            .output_neighbours(h.first_child(h.entrypoint()).unwrap())
             .next()
             .unwrap();
         assert_eq!(h.get_optype(mktup), &OpType::from(MakeTuple::new(tr)));

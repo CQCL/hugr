@@ -25,9 +25,7 @@ use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
-use crate::{
-    const_extension_ids, test_file, type_row, Direction, IncomingPort, Node, OutgoingPort,
-};
+use crate::{const_extension_ids, test_file, type_row, Direction, Hugr, IncomingPort, Node};
 
 /// Creates a hugr with a single function definition that copies a bit `copies` times.
 ///
@@ -40,7 +38,7 @@ fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     .into();
 
     let mut b = Hugr::default();
-    let root = b.root();
+    let root = b.entrypoint();
 
     let def = b.add_node_with_parent(root, def_op);
     let _ = add_df_children(&mut b, def, copies);
@@ -66,8 +64,9 @@ fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, No
 
 #[test]
 fn invalid_root() {
-    let mut b = Hugr::new(LogicOp::Not);
-    let root = b.root();
+    let build = DFGBuilder::new(Signature::default()).unwrap();
+    let mut b = build.finish_hugr().unwrap();
+    let root = b.module_root();
     assert_eq!(b.validate(), Ok(()));
 
     // Change the number of ports in the root
@@ -76,15 +75,7 @@ fn invalid_root() {
         b.validate(),
         Err(ValidationError::WrongNumberOfPorts { node, .. }) => assert_eq!(node, root)
     );
-    b.set_num_ports(root, 2, 2);
-
-    // Connect it to itself
-    b.connect(root, 0, root, 0);
-    assert_matches!(
-        b.validate(),
-        Err(ValidationError::RootWithEdges { node, .. }) => assert_eq!(node, root)
-    );
-    b.disconnect(root, OutgoingPort::from(0));
+    b.set_num_ports(root, 0, 0);
 
     // Add another hierarchy root
     let module = b.add_node(ops::Module::new().into());
@@ -97,20 +88,11 @@ fn invalid_root() {
     b.set_parent(root, module);
     assert_matches!(
         b.validate(),
-        Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, root)
+        Err(ValidationError::NoParent { node }) => assert_eq!(node, module)
     );
 
     // Fix the root
-    b.root = module.into_portgraph();
-    b.remove_node(root);
-    assert_eq!(b.validate(), Ok(()));
-}
-
-#[test]
-fn leaf_root() {
-    let leaf_op: OpType = Noop(usize_t()).into();
-
-    let b = Hugr::new(leaf_op);
+    b.remove_node(module);
     assert_eq!(b.validate(), Ok(()));
 }
 
@@ -121,8 +103,8 @@ fn dfg_root() {
     }
     .into();
 
-    let mut b = Hugr::new(dfg_op);
-    let root = b.root();
+    let mut b = Hugr::new_with_entrypoint(dfg_op).unwrap();
+    let root = b.entrypoint();
     add_df_children(&mut b, root, 1);
     assert_eq!(b.validate(), Ok(()));
 }
@@ -137,7 +119,7 @@ fn simple_hugr() {
 /// General children restrictions.
 fn children_restrictions() {
     let (mut b, def) = make_simple_hugr(2);
-    let root = b.root();
+    let root = b.entrypoint();
     let (_input, copy, _output) = b
         .hierarchy
         .children(def.into_portgraph())
@@ -200,7 +182,7 @@ fn df_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, output.into_portgraph())}
+            => {assert_eq!(parent, def); assert_eq!(child, output)}
     );
     b.replace_op(output, ops::Output::new(vec![bool_t(), bool_t()]));
 
@@ -209,18 +191,18 @@ fn df_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
-            => {assert_eq!(parent, def); assert_eq!(child, copy.into_portgraph())}
+            => {assert_eq!(parent, def); assert_eq!(child, copy)}
     );
 }
 
 #[test]
 fn test_ext_edge() {
     let mut h = closed_dfg_root_hugr(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()]));
-    let [input, output] = h.get_io(h.root()).unwrap();
+    let [input, output] = h.get_io(h.entrypoint()).unwrap();
 
     // Nested DFG bool_t() -> bool_t()
     let sub_dfg = h.add_node_with_parent(
-        h.root(),
+        h.entrypoint(),
         ops::DFG {
             signature: Signature::new_endo(vec![bool_t()]),
         },
@@ -284,8 +266,8 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_local_const() {
     let mut h = closed_dfg_root_hugr(Signature::new_endo(bool_t()));
-    let [input, output] = h.get_io(h.root()).unwrap();
-    let and = h.add_node_with_parent(h.root(), and_op());
+    let [input, output] = h.get_io(h.entrypoint()).unwrap();
+    let and = h.add_node_with_parent(h.entrypoint(), and_op());
     h.connect(input, 0, and, 0);
     h.connect(and, 0, output, 0);
     assert_eq!(
@@ -298,8 +280,8 @@ fn test_local_const() {
     );
     let const_op: ops::Const = ops::Value::from_bool(true).into();
     // Second input of Xor from a constant
-    let cst = h.add_node_with_parent(h.root(), const_op);
-    let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: bool_t() });
+    let cst = h.add_node_with_parent(h.entrypoint(), const_op);
+    let lcst = h.add_node_with_parent(h.entrypoint(), ops::LoadConstant { datatype: bool_t() });
 
     h.connect(cst, 0, lcst, 0);
     h.connect(lcst, 0, and, 1);
@@ -311,10 +293,10 @@ fn test_local_const() {
 #[test]
 fn dfg_with_cycles() {
     let mut h = closed_dfg_root_hugr(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()]));
-    let [input, output] = h.get_io(h.root()).unwrap();
-    let or = h.add_node_with_parent(h.root(), or_op());
-    let not1 = h.add_node_with_parent(h.root(), LogicOp::Not);
-    let not2 = h.add_node_with_parent(h.root(), LogicOp::Not);
+    let [input, output] = h.get_io(h.entrypoint()).unwrap();
+    let or = h.add_node_with_parent(h.entrypoint(), or_op());
+    let not1 = h.add_node_with_parent(h.entrypoint(), LogicOp::Not);
+    let not2 = h.add_node_with_parent(h.entrypoint(), LogicOp::Not);
     h.connect(input, 0, or, 0);
     h.connect(or, 0, not1, 0);
     h.connect(not1, 0, or, 1);
@@ -331,7 +313,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
     let row: TypeRow = vec![t].into();
 
     let def = b.add_node_with_parent(
-        b.root(),
+        b.entrypoint(),
         ops::FuncDefn {
             name: "main".into(),
             signature: Signature::new(row.clone(), row.clone()).into(),
@@ -789,7 +771,7 @@ fn cfg_children_restrictions() {
         let input = b.add_node_with_parent(block, ops::Input::new(vec![bool_t()]));
         let output =
             b.add_node_with_parent(block, ops::Output::new(vec![tag_type.clone(), bool_t()]));
-        let tag_def = b.add_node_with_parent(b.root(), const_op);
+        let tag_def = b.add_node_with_parent(b.entrypoint(), const_op);
         let tag = b.add_node_with_parent(block, ops::LoadConstant { datatype: tag_type });
 
         b.connect(tag_def, 0, tag, 0);
@@ -818,7 +800,7 @@ fn cfg_children_restrictions() {
     assert_matches!(
         b.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.into_portgraph())}
+            => {assert_eq!(parent, cfg); assert_eq!(child, exit2)}
     );
     b.remove_node(exit2);
 
@@ -893,14 +875,15 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
 fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     // load test file where input node of entry block has types in reversed
     // order compared to parent CFG node.
-    let hugr: Hugr = serde_json::from_reader(BufReader::new(
-        File::open(test_file!("issue-1189.json")).unwrap(),
-    ))
+    let hugr: Hugr = Hugr::load(
+        BufReader::new(File::open(test_file!("issue-1189.hugr")).unwrap()),
+        None,
+    )
     .unwrap();
     assert_matches!(
         hugr.validate(),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch{..}, .. })
-            => assert_eq!(parent, hugr.root())
+            => assert_eq!(parent, hugr.entrypoint())
     );
 
     Ok(())

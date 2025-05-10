@@ -11,7 +11,7 @@ fn roundtrip(source: &str) -> String {
     let package_ast = model::ast::Package::from_str(source).unwrap();
     let package_table = package_ast.resolve(&bump).unwrap();
     let core = import_package(&package_table, &std_reg()).unwrap();
-    let exported_table = export_package(&core, &bump);
+    let exported_table = export_package(&core.modules, &core.extensions, &bump);
     let exported_ast = exported_table.as_ast().unwrap();
     exported_ast.to_string()
 }
@@ -93,5 +93,13 @@ pub fn test_roundtrip_const() {
 pub fn test_roundtrip_order() {
     insta::assert_snapshot!(roundtrip(include_str!(
         "../../hugr-model/tests/fixtures/model-order.edn"
+    )));
+}
+
+#[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+pub fn test_roundtrip_entrypoint() {
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-entrypoint.edn"
     )));
 }

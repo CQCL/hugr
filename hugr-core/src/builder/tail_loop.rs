@@ -81,8 +81,9 @@ impl TailLoopBuilder<Hugr> {
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let base = Hugr::new(tail_loop.clone());
-        let root = base.root();
+        let base = Hugr::new_with_entrypoint(tail_loop.clone())
+            .expect("tail_loop entrypoint should be valid");
+        let root = base.entrypoint();
         Self::create_with_io(base, root, &tail_loop)
     }
 }
@@ -104,7 +105,7 @@ mod test {
     use super::*;
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
-        let build_result: Result<Hugr, ValidationError> = {
+        let build_result: Result<Hugr, ValidationError<_>> = {
             let mut loop_b = TailLoopBuilder::new(vec![], vec![bool_t()], vec![usize_t()])?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_value(ConstUsize::new(1));

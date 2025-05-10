@@ -1,6 +1,7 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
-use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, Hugr, HugrView, Node};
+use hugr_core::hugr::internal::HugrInternals;
+use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, HugrView};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
@@ -12,16 +13,16 @@ use crate::ComposablePass;
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
-pub struct DeadCodeElimPass {
+pub struct DeadCodeElimPass<H: HugrView> {
     /// Nodes that are definitely needed - e.g. FuncDefns, but could be anything.
     /// Hugr Root is assumed to be an entry point even if not mentioned here.
-    entry_points: Vec<Node>,
+    entry_points: Vec<H::Node>,
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [PreserveNode::default_for].
-    preserve_callback: Arc<PreserveCallback>,
+    preserve_callback: Arc<PreserveCallback<H>>,
 }
 
-impl Default for DeadCodeElimPass {
+impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
     fn default() -> Self {
         Self {
             entry_points: Default::default(),
@@ -30,14 +31,14 @@ impl Default for DeadCodeElimPass {
     }
 }
 
-impl Debug for DeadCodeElimPass {
+impl<H: HugrView> Debug for DeadCodeElimPass<H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         // Use "derive Debug" by defining an identical struct without the unprintable fields
 
         #[allow(unused)] // Rust ignores the derive-Debug in figuring out what's used
         #[derive(Debug)]
-        struct DCEDebug<'a> {
-            entry_points: &'a Vec<Node>,
+        struct DCEDebug<'a, N> {
+            entry_points: &'a Vec<N>,
         }
 
         Debug::fmt(
@@ -51,7 +52,7 @@ impl Debug for DeadCodeElimPass {
 
 /// Callback that identifies nodes that must be preserved even if their
 /// results are not used. For example, (the default) [PreserveNode::default_for].
-pub type PreserveCallback = dyn Fn(&Hugr, Node) -> PreserveNode;
+pub type PreserveCallback<H> = dyn Fn(&H, <H as HugrInternals>::Node) -> PreserveNode;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 /// Signal that a node must be preserved even when its result is not used
@@ -74,7 +75,7 @@ impl PreserveNode {
     ///   CFGs to be removed.)
     /// * Assumes all TailLoops must be preserved. (One could, for example, use dataflow
     ///   analysis to allow removal of TailLoops that never [Continue](hugr_core::ops::TailLoop::CONTINUE_TAG).)
-    pub fn default_for(h: &Hugr, n: Node) -> PreserveNode {
+    pub fn default_for<H: HugrView>(h: &H, n: H::Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
             _ => Self::DeferToChildren,
@@ -82,35 +83,35 @@ impl PreserveNode {
     }
 }
 
-impl DeadCodeElimPass {
+impl<H: HugrView> DeadCodeElimPass<H> {
     /// Allows setting a callback that determines whether a node must be preserved
     /// (even when its result is not used)
-    pub fn set_preserve_callback(mut self, cb: Arc<PreserveCallback>) -> Self {
+    pub fn set_preserve_callback(mut self, cb: Arc<PreserveCallback<H>>) -> Self {
         self.preserve_callback = cb;
         self
     }
 
     /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
     /// used to evaluate these nodes.
-    /// The root node is assumed to be an entry point;
+    /// [`HugrView::entrypoint`] is assumed to be an entry point;
     /// for Module roots the client will want to mark some of the FuncDefn children
     /// as entry points too.
-    pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = Node>) -> Self {
+    pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = H::Node>) -> Self {
         self.entry_points.extend(entry_points);
         self
     }
 
-    fn find_needed_nodes(&self, h: impl HugrView<Node = Node>) -> HashSet<Node> {
+    fn find_needed_nodes(&self, h: &H) -> HashSet<H::Node> {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
-        q.push_front(h.root());
+        q.push_front(h.entrypoint());
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
             };
             for ch in h.children(n) {
-                if self.must_preserve(&h, &mut must_preserve, ch)
+                if self.must_preserve(h, &mut must_preserve, ch)
                     || matches!(
                         h.get_optype(ch),
                         OpType::Case(_) // Include all Cases in Conditionals
@@ -136,17 +137,12 @@ impl DeadCodeElimPass {
         needed
     }
 
-    fn must_preserve(
-        &self,
-        h: &impl HugrView<Node = Node>,
-        cache: &mut HashMap<Node, bool>,
-        n: Node,
-    ) -> bool {
+    fn must_preserve(&self, h: &H, cache: &mut HashMap<H::Node, bool>, n: H::Node) -> bool {
         if let Some(res) = cache.get(&n) {
             return *res;
         }
         #[allow(deprecated)]
-        let res = match self.preserve_callback.as_ref()(h.base_hugr(), n) {
+        let res = match self.preserve_callback.as_ref()(h, n) {
             PreserveNode::MustKeep => true,
             PreserveNode::CanRemoveIgnoringChildren => false,
             PreserveNode::DeferToChildren => {
@@ -158,15 +154,14 @@ impl DeadCodeElimPass {
     }
 }
 
-impl ComposablePass for DeadCodeElimPass {
-    type Node = Node;
+impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
     type Error = Infallible;
     type Result = ();
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), Infallible> {
+    fn run(&self, hugr: &mut H) -> Result<(), Infallible> {
         let needed = self.find_needed_nodes(&*hugr);
         let remove = hugr
-            .nodes()
+            .entry_descendants()
             .filter(|n| !needed.contains(n))
             .collect::<Vec<_>>();
         for n in remove {
@@ -183,6 +178,7 @@ mod test {
     use hugr_core::extension::prelude::{usize_t, ConstUsize};
     use hugr_core::ops::{handle::NodeHandle, OpTag, OpTrait};
     use hugr_core::types::Signature;
+    use hugr_core::Hugr;
     use hugr_core::{ops::Value, type_row, HugrView};
     use itertools::Itertools;
 
@@ -211,7 +207,7 @@ mod test {
 
         // Callbacks that allow removing the DFG (and cst_unused)
         for dce in [
-            DeadCodeElimPass::default(),
+            DeadCodeElimPass::<Hugr>::default(),
             // keep the node inside the DFG, but remove the DFG without checking its children:
             DeadCodeElimPass::default().set_preserve_callback(Arc::new(move |h, n| {
                 if n == dfg_unused || h.get_optype(n).is_const() {
@@ -224,7 +220,7 @@ mod test {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [block.node(), exit.node(), cst_used.node()]
             );
             assert_eq!(
@@ -244,7 +240,7 @@ mod test {
             }
         }
         for dce in [
-            DeadCodeElimPass::default()
+            DeadCodeElimPass::<Hugr>::default()
                 .set_preserve_callback(Arc::new(|_, _| PreserveNode::MustKeep)),
             // keeping the unused node in the DFG, means keeping the DFG (which uses its other children)
             DeadCodeElimPass::default()
@@ -257,7 +253,7 @@ mod test {
 
         // Callbacks that keep the DFG but allow removing the unused constant
         for dce in [
-            DeadCodeElimPass::default()
+            DeadCodeElimPass::<Hugr>::default()
                 .set_preserve_callback(Arc::new(move |_, n| keep_if(n == dfg_unused))),
             DeadCodeElimPass::default()
                 .set_preserve_callback(Arc::new(move |_, n| keep_if(n == lc1.node()))),
@@ -265,7 +261,7 @@ mod test {
             let mut h = orig.clone();
             dce.run(&mut h).unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [
                     block.node(),
                     exit.node(),
@@ -289,12 +285,12 @@ mod test {
         {
             let cst_unused = cst_unused.node();
             let mut h = orig.clone();
-            DeadCodeElimPass::default()
+            DeadCodeElimPass::<Hugr>::default()
                 .set_preserve_callback(Arc::new(move |_, n| keep_if(n == cst_unused)))
                 .run(&mut h)
                 .unwrap();
             assert_eq!(
-                h.children(h.root()).collect_vec(),
+                h.children(h.entrypoint()).collect_vec(),
                 [block.node(), exit.node(), cst_unused, cst_used.node()]
             );
             assert_eq!(

@@ -18,13 +18,6 @@ pub mod merge_bbs;
 mod monomorphize;
 pub mod untuple;
 
-// TODO: Deprecated re-export. Remove on a breaking release.
-#[deprecated(
-    since = "0.14.1",
-    note = "Use `hugr_passes::RemoveDeadFuncsPass` instead."
-)]
-#[allow(deprecated)]
-pub use monomorphize::remove_polyfuncs;
 pub use monomorphize::{mangle_name, monomorphize, MonomorphizePass};
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;

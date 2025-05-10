@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops;
+use crate::ops::{self, OpParent};
 use crate::ops::{DataflowParent, Input, Output};
 use crate::{Direction, IncomingPort, OutgoingPort, Wire};
 
@@ -27,25 +27,19 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
+    /// Returns a new DFGBuilder with the given base and parent node.
+    ///
+    /// Sets up the input and output nodes of the region. If `parent` already has
+    /// input and output nodes, use [`DFGBuilder::create`] instead.
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
         signature: Signature,
     ) -> Result<Self, BuildError> {
-        let num_in_wires = signature.input().len();
-        let num_out_wires = signature.output().len();
-        /* For a given dataflow graph with extension requirements IR -> IR + dR,
-         - The output node's extension requirements are IR + dR -> IR + dR
-           (but we expect no output wires)
+        debug_assert_eq!(base.as_ref().children(parent).count(), 0);
 
-         - The input node's extension requirements are IR -> IR, though we
-           expect no input wires. We must avoid the case where the difference
-           in extensions is an open variable, as it would be if the requirements
-           were 0 -> IR.
-           N.B. This means that for input nodes, we can't infer the extensions
-           from the input wires as we normally expect, but have to infer the
-           output wires and make use of the equality between the two.
-        */
+        let num_in_wires = signature.input_count();
+        let num_out_wires = signature.output_count();
         let input = ops::Input {
             types: signature.input().clone(),
         };
@@ -54,6 +48,29 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         };
         base.as_mut().add_node_with_parent(parent, input);
         base.as_mut().add_node_with_parent(parent, output);
+
+        Ok(Self {
+            base,
+            dfg_node: parent,
+            num_in_wires,
+            num_out_wires,
+        })
+    }
+
+    /// Returns a new DFGBuilder with the given base and parent node.
+    ///
+    /// The parent node may be any `DataflowParent` node.
+    ///
+    /// If `parent` doesn't have input and output nodes, use
+    /// [`DFGBuilder::create_with_io`] instead.
+    pub(super) fn create(base: T, parent: Node) -> Result<Self, BuildError> {
+        let sig = base
+            .as_ref()
+            .get_optype(parent)
+            .inner_function_type()
+            .expect("DFG parent must have an inner function signature.");
+        let num_in_wires = sig.input_count();
+        let num_out_wires = sig.output_count();
 
         Ok(Self {
             base,
@@ -75,14 +92,14 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        let base = Hugr::new(dfg_op);
-        let root = base.root();
+        let base = Hugr::new_with_entrypoint(dfg_op).expect("DFG entrypoint should be valid");
+        let root = base.entrypoint();
         DFGBuilder::create_with_io(base, root, signature)
     }
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>> {
         self.base.validate()?;
         Ok(self.base)
     }
@@ -143,15 +160,15 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        let signature = signature.into();
+        let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
         let op = ops::FuncDefn {
             signature,
             name: name.into(),
         };
 
-        let base = Hugr::new(op);
-        let root = base.root();
+        let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");
+        let root = base.entrypoint();
 
         let db = DFGBuilder::create_with_io(base, root, body)?;
         Ok(Self::from_dfg_builder(db))
@@ -289,7 +306,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T: From<BuildHandle<DfgID>>> SubContainer for
 }
 
 impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>> {
         self.0.finish_hugr()
     }
 }
@@ -497,8 +514,9 @@ pub(crate) mod test {
 
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
-        assert_eq!(simple_dfg_hugr.num_nodes(), 3);
-        assert_matches!(simple_dfg_hugr.root_optype().tag(), OpTag::Dfg);
+        assert_eq!(simple_dfg_hugr.num_nodes(), 7);
+        assert_eq!(simple_dfg_hugr.entry_descendants().count(), 3);
+        assert_matches!(simple_dfg_hugr.entrypoint_optype().tag(), OpTag::Dfg);
     }
 
     #[test]
@@ -524,9 +542,9 @@ pub(crate) mod test {
         };
 
         let hugr = module_builder.finish_hugr()?;
-        assert_eq!(hugr.num_nodes(), 7);
+        assert_eq!(hugr.entry_descendants().count(), 7);
 
-        assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
+        assert_eq!(hugr.get_metadata(hugr.entrypoint(), "x"), None);
         assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));
         assert_eq!(hugr.get_metadata(f_node, "x").cloned(), Some(json!("hi")));
 

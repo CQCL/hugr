@@ -1,12 +1,9 @@
 //! Provides [force_order], a tool for fixing the order of nodes in a Hugr.
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
+use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::{
-    hugr::{
-        hugrmut::HugrMut,
-        views::{HierarchyView, SiblingGraph},
-        HugrError,
-    },
+    hugr::{hugrmut::HugrMut, HugrError},
     ops::{OpTag, OpTrait},
     types::EdgeKind,
     HugrView as _, Node,
@@ -58,26 +55,33 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     for dp in dataflow_parents {
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
-        let rank = |n| rank(hugr, n);
-        let sg = SiblingGraph::<Node>::try_new(hugr, dp)?;
-        let petgraph = NodeFiltered::from_fn(sg.as_petgraph(), |x| x != dp && x != i && x != o);
-        let ordered_nodes = ForceOrder::new(&petgraph, &rank)
-            .iter(&petgraph)
-            .filter(|&x| {
-                let expected_edge = Some(EdgeKind::StateOrder);
-                let optype = hugr.get_optype(x);
-                if optype.other_input() == expected_edge || optype.other_output() == expected_edge {
-                    assert_eq!(
-                        optype.other_input(),
-                        optype.other_output(),
-                        "Optype does not have both input and output order edge: {optype}"
-                    );
-                    true
-                } else {
-                    false
-                }
-            })
-            .collect_vec();
+        let ordered_nodes = {
+            let (region, node_map) = hugr.region_portgraph(dp);
+            let rank = |n| rank(hugr, node_map.from_portgraph(n));
+            let i_pg = node_map.to_portgraph(i);
+            let o_pg = node_map.to_portgraph(o);
+            let petgraph = NodeFiltered::from_fn(&region, |x| x != i_pg && x != o_pg);
+            ForceOrder::<_, portgraph::NodeIndex, _, _>::new(&petgraph, &rank)
+                .iter(&petgraph)
+                .filter_map(|x| {
+                    let x = node_map.from_portgraph(x);
+                    let expected_edge = Some(EdgeKind::StateOrder);
+                    let optype = hugr.get_optype(x);
+                    if optype.other_input() == expected_edge
+                        || optype.other_output() == expected_edge
+                    {
+                        assert_eq!(
+                            optype.other_input(),
+                            optype.other_output(),
+                            "Optype does not have both input and output order edge: {optype}"
+                        );
+                        Some(x)
+                    } else {
+                        None
+                    }
+                })
+                .collect_vec()
+        };
 
         // we iterate over the topologically sorted nodes, prepending the input
         // node and suffixing the output node.
@@ -268,7 +272,10 @@ mod test {
     type RankMap = HashMap<Node, i64>;
 
     fn force_order_test_impl(hugr: &mut Hugr, rank_map: RankMap) -> Vec<Node> {
-        force_order(hugr, hugr.root(), |_, n| *rank_map.get(&n).unwrap_or(&0)).unwrap();
+        force_order(hugr, hugr.entrypoint(), |_, n| {
+            *rank_map.get(&n).unwrap_or(&0)
+        })
+        .unwrap();
 
         let topo_sorted = Topo::new(&hugr.as_petgraph())
             .iter(&hugr.as_petgraph())
@@ -322,7 +329,7 @@ mod test {
             let unit = builder.add_load_value(Value::unary_unit_sum());
             builder.finish_hugr_with_outputs([unit]).unwrap()
         };
-        let root = hugr.root();
+        let root = hugr.entrypoint();
         force_order(&mut hugr, root, |_, _| 0).unwrap();
     }
 
@@ -347,7 +354,7 @@ mod test {
             let other_unit = builder.add_load_value(Value::unary_unit_sum());
             builder.finish_hugr_with_outputs([out, other_unit]).unwrap()
         };
-        let root = hugr.root();
+        let root = hugr.entrypoint();
 
         force_order(&mut hugr, root, |_, _| 0).unwrap();
     }

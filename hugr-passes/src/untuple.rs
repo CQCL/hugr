@@ -121,13 +121,12 @@ impl UntuplePass {
     }
 }
 
-impl ComposablePass for UntuplePass {
-    type Node = Node;
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
     type Error = UntupleError;
     type Result = UntupleResult;
 
-    fn run(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<Self::Result, Self::Error> {
-        let rewrites = self.find_rewrites(hugr, self.parent.unwrap_or(hugr.root()));
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        let rewrites = self.find_rewrites(hugr, self.parent.unwrap_or(hugr.entrypoint()));
         let rewrites_applied = rewrites.len();
         // The rewrites are independent, so we can always apply them all.
         for rewrite in rewrites {
@@ -210,7 +209,8 @@ fn remove_pack_unpack<'h, T: HugrView>(
 ) -> SimpleReplacement<T::Node> {
     let num_unpack_outputs = tuple_types.len() * unpack_nodes.len();
 
-    let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr));
+    let parent = hugr.get_parent(pack_node).expect("pack_node has no parent");
+    let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr, parent));
 
     let mut nodes = unpack_nodes;
     nodes.push(pack_node);
@@ -398,7 +398,7 @@ mod test {
     ) {
         let pass = UntuplePass::default().recursive(UntupleRecursive::NonRecursive);
 
-        let parent = hugr.root();
+        let parent = hugr.entrypoint();
         let res = pass
             .set_parent(parent)
             .run(&mut hugr)

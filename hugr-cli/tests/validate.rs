@@ -48,7 +48,7 @@ fn test_package(#[default(bool_t())] id_type: Type) -> Package {
     df.finish_with_outputs([i]).unwrap();
     let hugr = module.hugr().clone(); // unvalidated
 
-    Package::new(vec![hugr]).unwrap()
+    Package::new(vec![hugr])
 }
 
 #[fixture]
@@ -110,30 +110,28 @@ fn bad_hugr_string() -> String {
     let df = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
     let bad_hugr = df.hugr().clone();
 
-    serde_json::to_string(&bad_hugr).unwrap()
+    bad_hugr.store_str(EnvelopeConfig::text()).unwrap()
 }
 
 #[rstest]
 fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
     cmd.arg("mermaid");
     cmd.arg("--validate");
-    cmd.arg("--hugr-json");
     cmd.write_stdin(bad_hugr_string);
     cmd.assert()
         .failure()
-        .stderr(contains("has an unconnected port"));
+        .stderr(contains("Error validating HUGR"));
 }
 
 #[rstest]
 fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
     val_cmd.write_stdin(bad_hugr_string);
-    val_cmd.arg("--hugr-json");
     val_cmd.arg("-");
 
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Node(1)").and(contains("unconnected port")));
+        .stderr(contains("Error validating HUGR"));
 }
 
 #[rstest]
@@ -195,7 +193,6 @@ fn test_package_validation(package_string: String, mut val_cmd: Command) {
     // package with float extension and hugr that uses floats can validate
     val_cmd.write_stdin(package_string);
     val_cmd.arg("-");
-    val_cmd.arg("--no-std");
 
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }

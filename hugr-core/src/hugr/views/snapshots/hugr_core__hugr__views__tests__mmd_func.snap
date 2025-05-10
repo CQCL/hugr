@@ -3,9 +3,13 @@ source: hugr-core/src/hugr/views/tests.rs
 expression: h.mermaid_string()
 ---
 graph LR
-    subgraph 0 ["(0) FuncDefn: #quot;test#quot;"]
+    subgraph 0 ["(0) Module"]
         direction LR
-        1["(1) Input"]
-        2["(2) Output"]
-        1--"0:0<br>Bool"-->2
+        subgraph 1 ["(1) [**FuncDefn: #quot;test#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            2--"0:0<br>Bool"-->3
+        end
     end

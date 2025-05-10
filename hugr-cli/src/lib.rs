@@ -60,8 +60,7 @@ use clap::{crate_version, Parser};
 use clap_verbosity_flag::log::Level;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use hugr::envelope::EnvelopeError;
-use hugr::hugr::LoadHugrError;
-use hugr::package::{PackageEncodingError, PackageValidationError};
+use hugr::package::PackageValidationError;
 use std::ffi::OsString;
 
 pub mod extensions;
@@ -97,12 +96,6 @@ pub enum CliError {
     /// Error parsing input.
     #[display("Error parsing package: {_0}")]
     Parse(serde_json::Error),
-    /// Package load error.
-    #[display("Error parsing package: {_0}")]
-    PackageLoad(PackageEncodingError),
-    /// Hugr load error.
-    #[display("Error loading hugr: {_0}")]
-    HugrLoad(LoadHugrError),
     #[display("Error validating HUGR: {_0}")]
     /// Errors produced by the `validate` subcommand.
     Validate(PackageValidationError),

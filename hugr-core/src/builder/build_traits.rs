@@ -94,7 +94,7 @@ pub trait Container {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature = signature.into();
+        let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
         let f_node = self.add_child_node(ops::FuncDefn {
             name: name.into(),
@@ -161,7 +161,7 @@ pub trait Container {
 /// (with varying root node types)
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
-    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>>;
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR
@@ -228,9 +228,9 @@ pub trait Dataflow: Container {
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let optype = hugr.get_optype(hugr.root()).clone();
+        let optype = hugr.get_optype(hugr.entrypoint()).clone();
         let num_outputs = optype.value_output_count();
-        let node = self.add_hugr(hugr).new_root;
+        let node = self.add_hugr(hugr).inserted_entrypoint;
 
         wire_up_inputs(input_wires, node, self)
             .map_err(|error| BuildError::OperationWiring { op: optype, error })?;
@@ -250,8 +250,8 @@ pub trait Dataflow: Container {
         hugr: &impl HugrView,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let node = self.add_hugr_view(hugr).new_root;
-        let optype = hugr.get_optype(hugr.root()).clone();
+        let node = self.add_hugr_view(hugr).inserted_entrypoint;
+        let optype = hugr.get_optype(hugr.entrypoint()).clone();
         let num_outputs = optype.value_output_count();
 
         wire_up_inputs(input_wires, node, self)
@@ -284,6 +284,7 @@ pub trait Dataflow: Container {
     /// # Panics
     ///
     /// Panics if the number of input Wires does not match the size of the array.
+    #[track_caller]
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
         collect_array(self.input_wires())
     }
@@ -676,7 +677,7 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     nodetype: impl Into<OpType>,
     inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let op = nodetype.into();
+    let op: OpType = nodetype.into();
     let num_outputs = op.value_output_count();
     let op_node = data_builder.add_child_node(op.clone());
 

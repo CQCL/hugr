@@ -56,6 +56,9 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         parent: H::Node,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> Result<(), OpType> {
+        if !self.0.contains_node(parent) {
+            return Ok(());
+        }
         match self.0.get_optype(parent) {
             OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => {
                 // Put values onto out-wires of Input node
@@ -104,7 +107,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         context: impl DFContext<V, Node = H::Node>,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> AnalysisResults<V, H> {
-        let root = self.0.root();
+        let root = self.0.entrypoint();
         if self.0.get_optype(root).is_module() {
             assert!(
                 in_values.into_iter().next().is_none(),
@@ -161,7 +164,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
 
-        node(n) <-- for n in hugr.nodes();
+        node(n) <-- for n in hugr.entry_descendants();
 
         in_wire(n, p) <-- node(n), for (p,_) in hugr.in_value_types(*n); // Note, gets connected inports only
         out_wire(n, p) <-- node(n), for (p,_) in hugr.out_value_types(*n); // (and likewise)

@@ -4,7 +4,7 @@ use crate::core::HugrNode;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
 use crate::types::EdgeKind;
-use crate::Port;
+use crate::{NodeIndex, Port};
 
 use petgraph::visit as pv;
 
@@ -62,17 +62,19 @@ where
 impl<T> pv::NodeIndexable for PetgraphWrapper<'_, T>
 where
     T: HugrView,
+    // TODO: Define a trait for nodes that are equivalent to usizes, and implement it for `Node`
+    T::Node: NodeIndex + From<portgraph::NodeIndex>,
 {
     fn node_bound(&self) -> usize {
         HugrView::num_nodes(self.hugr)
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
-        self.hugr.to_portgraph_node(ix).into()
+        ix.index()
     }
 
     fn from_index(&self, ix: usize) -> Self::NodeId {
-        self.hugr.from_portgraph_node(portgraph::NodeIndex::new(ix))
+        portgraph::NodeIndex::new(ix).into()
     }
 }
 
@@ -229,9 +231,9 @@ mod test {
         let (hugr, cx1, cx2) = sample_hugr();
         let wrapper = PetgraphWrapper::from(&hugr);
 
-        assert_eq!(wrapper.node_count(), 5);
-        assert_eq!(wrapper.node_bound(), 5);
-        assert_eq!(wrapper.edge_count(), 7);
+        assert_eq!(wrapper.node_count(), 9);
+        assert_eq!(wrapper.node_bound(), 9);
+        assert_eq!(wrapper.edge_count(), 11);
 
         let cx1_index = cx1.node().into_portgraph().index();
         assert_eq!(wrapper.to_index(cx1.node()), cx1_index);

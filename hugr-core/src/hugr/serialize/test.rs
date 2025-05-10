@@ -12,6 +12,7 @@ use crate::extension::test::SimpleOpDef;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
+use crate::hugr::views::ExtractionResult;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::float64_type;
@@ -30,6 +31,15 @@ use lazy_static::lazy_static;
 use portgraph::LinkView;
 use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
 use rstest::rstest;
+
+/// A serde-serializable hugr. Used for testing.
+#[derive(Debug, serde::Serialize)]
+#[serde(transparent)]
+pub(super) struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")] pub &'h Hugr);
+/// A serde-deserializable hugr. Used for testing.
+#[derive(Debug, serde::Deserialize)]
+#[serde(transparent)]
+pub(super) struct HugrDeser(#[serde(deserialize_with = "Hugr::serde_deserialize")] pub Hugr);
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
@@ -156,10 +166,10 @@ fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
 }
 
 /// Serialize and deserialize a value, validating against a schema.
-fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
-    g: &T,
+fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwned>(
+    g: &TSer,
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
-) -> T {
+) -> TDeser {
     let val = serde_json::to_value(g).unwrap();
     NamedSchema::check_schemas(&val, schemas);
     serde_json::from_value(val).unwrap()
@@ -174,19 +184,24 @@ fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
 /// equality checking.
 ///
 /// Returns the deserialized HUGR.
-pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
-    let new_hugr = ser_roundtrip_check_schema(hugr, get_schemas(check_schema));
+pub fn check_hugr_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
+    // Transform the whole view into a HUGR.
+    let (mut base, extract_map) = hugr.extract_hugr(hugr.module_root());
+    base.set_entrypoint(extract_map.extracted_node(hugr.entrypoint()));
 
-    check_hugr(hugr, &new_hugr);
-    new_hugr
+    let new_hugr: HugrDeser =
+        ser_roundtrip_check_schema(&HugrSer(&base), get_schemas(check_schema));
+
+    check_hugr(&base, &new_hugr.0);
+    new_hugr.0
 }
 
 /// Deserialize a HUGR json, ensuring that it is valid against the schema.
 pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schema: bool) -> Hugr {
-    let new_hugr = ser_deserialize_check_schema(value, get_schemas(check_schema));
+    let new_hugr: HugrDeser = ser_deserialize_check_schema(value, get_schemas(check_schema));
 
-    check_hugr(hugr, &new_hugr);
-    new_hugr
+    check_hugr(hugr, &new_hugr.0);
+    new_hugr.0
 }
 
 /// Check that two HUGRs are equivalent, up to node renumbering.
@@ -197,7 +212,8 @@ pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
     let mut h_canon = lhs.clone();
     h_canon.canonicalize_nodes(|_, _| {});
 
-    assert_eq!(rhs.root, h_canon.root);
+    assert_eq!(rhs.module_root(), h_canon.module_root());
+    assert_eq!(rhs.entrypoint(), h_canon.entrypoint());
     assert_eq!(rhs.hierarchy, h_canon.hierarchy);
     assert_eq!(rhs.metadata, h_canon.metadata);
 
@@ -258,7 +274,7 @@ fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
 fn simpleser() {
     let mut g = MultiPortGraph::new();
 
-    let root = g.add_node(0, 0);
+    let entrypoint = g.add_node(0, 0);
     let a = g.add_node(1, 1);
     let b = g.add_node(3, 2);
     let c = g.add_node(1, 1);
@@ -273,17 +289,18 @@ fn simpleser() {
     let mut h = Hierarchy::new();
     let mut op_types = UnmanagedDenseMap::new();
 
-    op_types[root] = gen_optype(&g, root);
+    op_types[entrypoint] = gen_optype(&g, entrypoint);
 
     for n in [a, b, c] {
-        h.push_child(n, root).unwrap();
+        h.push_child(n, entrypoint).unwrap();
         op_types[n] = gen_optype(&g, n);
     }
 
     let hugr = Hugr {
         graph: g,
         hierarchy: h,
-        root,
+        module_root: entrypoint,
+        entrypoint,
         op_types,
         metadata: Default::default(),
         extensions: ExtensionRegistry::default(),
@@ -402,7 +419,7 @@ fn function_type() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     let mut hugr = closed_dfg_root_hugr(Signature::new(vec![qb_t()], vec![qb_t()]));
-    let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
+    let [old_in, out] = hugr.get_io(hugr.entrypoint()).unwrap();
     hugr.connect(old_in, 0, out, 0);
 
     // Now add a new input
@@ -424,10 +441,13 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
     let hugr = builder.finish_hugr_with_outputs([w])?;
 
-    let ser = serde_json::to_vec(&hugr)?;
-    let deser = Hugr::load_json(ser.as_slice(), hugr.extensions())?;
+    let ser = serde_json::to_string(&HugrSer(&hugr))?;
+    let deser: HugrDeser = serde_json::from_str(&ser)?;
 
-    assert_eq!(hugr, deser);
+    let mut hugr_deser = deser.0;
+    hugr_deser.resolve_extension_defs(hugr.extensions())?;
+
+    assert_eq!(hugr, hugr_deser);
 
     Ok(())
 }

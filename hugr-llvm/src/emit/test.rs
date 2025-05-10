@@ -694,7 +694,6 @@ mod test_fns {
                         .unwrap()
                 };
                 let [out_int] = tail_l.outputs_arr();
-                println!("{}", builder.hugr().mermaid_string());
                 builder
                     .finish_with_outputs([out_int])
                     .unwrap_or_else(|e| panic!("{e}"))

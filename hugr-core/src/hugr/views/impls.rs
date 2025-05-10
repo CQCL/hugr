@@ -11,14 +11,8 @@ macro_rules! hugr_internal_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
-                fn portgraph(&self) -> Self::Portgraph<'_>;
-                fn region_portgraph(&self, parent: Self::Node) -> portgraph::view::FlatRegion<'_, impl portgraph::view::LinkView<LinkEndpoint: Eq> + Clone + '_>;
-                fn hierarchy(&self) -> &portgraph::Hierarchy;
-                fn to_portgraph_node(&self, node: impl crate::ops::handle::NodeHandle<Self::Node>) -> portgraph::NodeIndex;
-                fn from_portgraph_node(&self, index: portgraph::NodeIndex) -> Self::Node;
+                fn region_portgraph(&self, parent: Self::Node) -> (portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>, Self::RegionPortgraphNodes);
                 fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap;
-                #[allow(deprecated)]
-                fn base_hugr(&self) -> &crate::Hugr;
             }
         }
     };
@@ -30,8 +24,9 @@ macro_rules! hugr_view_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
-                fn root(&self) -> Self::Node;
-                fn root_optype(&self) -> &crate::ops::OpType;
+                fn entrypoint(&self) -> Self::Node;
+                fn entrypoint_optype(&self) -> &crate::ops::OpType;
+                fn module_root(&self) -> Self::Node;
                 fn contains_node(&self, node: Self::Node) -> bool;
                 fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
                 fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::hugr::NodeMetadata>;
@@ -61,17 +56,16 @@ macro_rules! hugr_view_methods {
                 fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
                 fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
-                fn input_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
-                fn output_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn mermaid_string(&self) -> String;
-                fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig) -> String;
+                fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig<Self::Node>) -> String;
                 fn dot_string(&self) -> String;
                 fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
                 fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
                 fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
                 fn extensions(&self) -> &crate::extension::ExtensionRegistry;
-                fn validate(&self) -> Result<(), crate::hugr::ValidationError>;
+                fn validate(&self) -> Result<(), crate::hugr::ValidationError<Self::Node>>;
+                fn extract_hugr(&self, parent: Self::Node) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
             }
         }
     }
@@ -83,7 +77,7 @@ macro_rules! hugr_mut_internal_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
-                fn set_root(&mut self, root: Self::Node);
+                fn set_module_root(&mut self, root: Self::Node);
                 fn set_num_ports(&mut self, node: Self::Node, incoming: usize, outgoing: usize);
                 fn add_ports(&mut self, node: Self::Node, direction: crate::Direction, amount: isize) -> std::ops::Range<usize>;
                 fn insert_ports(&mut self, node: Self::Node, direction: crate::Direction, index: usize, amount: usize) -> std::ops::Range<usize>;
@@ -105,6 +99,7 @@ macro_rules! hugr_mut_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
+                fn set_entrypoint(&mut self, root: Self::Node);
                 fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::hugr::NodeMetadata;
                 fn set_metadata(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::hugr::NodeMetadata>);
                 fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
@@ -130,11 +125,14 @@ pub(crate) use hugr_mut_methods;
 
 // -------- Immutable borrow
 impl<T: HugrView> HugrInternals for &T {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
     where
         Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, *this}
 }
@@ -144,11 +142,14 @@ impl<T: HugrView> HugrView for &T {
 
 // -------- Mutable borrow
 impl<T: HugrView> HugrInternals for &mut T {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
     where
         Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, &**this}
 }
@@ -164,11 +165,14 @@ impl<T: HugrMut> HugrMut for &mut T {
 
 // -------- Rc
 impl<T: HugrView> HugrInternals for Rc<T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
     where
         Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }
@@ -178,11 +182,14 @@ impl<T: HugrView> HugrView for Rc<T> {
 
 // -------- Arc
 impl<T: HugrView> HugrInternals for Arc<T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
     where
         Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }
@@ -192,11 +199,14 @@ impl<T: HugrView> HugrView for Arc<T> {
 
 // -------- Box
 impl<T: HugrView> HugrInternals for Box<T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
     where
         Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }
@@ -212,11 +222,14 @@ impl<T: HugrMut> HugrMut for Box<T> {
 
 // -------- Cow
 impl<T: HugrView + ToOwned> HugrInternals for Cow<'_, T> {
-    type Portgraph<'p>
-        = T::Portgraph<'p>
+    type RegionPortgraph<'p>
+        = T::RegionPortgraph<'p>
     where
         Self: 'p;
+
     type Node = T::Node;
+
+    type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
     hugr_internal_methods! {this, this.as_ref()}
 }
@@ -242,8 +255,7 @@ where
 mod test {
     use std::{rc::Rc, sync::Arc};
 
-    use crate::hugr::views::{DescendantsGraph, HierarchyView};
-    use crate::{Hugr, HugrView, Node};
+    use crate::{Hugr, HugrView};
 
     struct ViewWrapper<H>(H);
     impl<H: HugrView> ViewWrapper<H> {
@@ -258,10 +270,9 @@ mod test {
         let v = ViewWrapper(&h);
         let c = h.nodes().count();
         assert_eq!(v.nodes().count(), c);
-        let v2 = ViewWrapper(DescendantsGraph::<Node>::try_new(&h, h.root()).unwrap());
-        // v2 owns the DescendantsGraph, but that only borrows `h`, so we still have both
+
+        let v2 = ViewWrapper(h.with_entrypoint(h.entrypoint()));
         assert_eq!(v2.nodes().count(), v.nodes().count());
-        // And we can borrow the DescendantsGraph, even just a reference to that counts as a HugrView
         assert_eq!(ViewWrapper(&v2.0).nodes().count(), v.nodes().count());
 
         let vh = ViewWrapper(h);

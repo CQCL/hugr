@@ -3,6 +3,7 @@
 pub mod examples;
 
 use criterion::{black_box, criterion_group, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
+use hugr::envelope::{EnvelopeConfig, EnvelopeFormat};
 #[allow(unused)]
 use hugr::std_extensions::STD_REG;
 use hugr::Hugr;
@@ -17,10 +18,16 @@ trait Serializer {
 struct JsonSer;
 impl Serializer for JsonSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
-        serde_json::to_vec(hugr).unwrap()
+        let mut cfg = EnvelopeConfig::default();
+        cfg.format = EnvelopeFormat::PackageJson;
+        cfg.zstd = None;
+
+        let mut bytes = Vec::new();
+        hugr.store(&mut bytes, cfg).unwrap();
+        bytes
     }
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
-        serde_json::from_slice(bytes).unwrap()
+        Hugr::load(bytes, None).unwrap()
     }
 }
 
@@ -28,18 +35,17 @@ struct CapnpSer;
 
 impl Serializer for CapnpSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
-        let bump = bumpalo::Bump::new();
-        let module = hugr_core::export::export_hugr(hugr, &bump);
-        let package = hugr_model::v0::table::Package {
-            modules: vec![module],
-        };
-        hugr_model::v0::binary::write_to_vec(&package)
+        let mut cfg = EnvelopeConfig::default();
+        cfg.format = EnvelopeFormat::ModelWithExtensions;
+        cfg.zstd = Some(Default::default());
+
+        let mut bytes = Vec::new();
+        hugr.store(&mut bytes, cfg).unwrap();
+        bytes
     }
 
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
-        let bump = bumpalo::Bump::new();
-        let package = hugr_model::v0::binary::read_from_slice(bytes, &bump).unwrap();
-        hugr_core::import::import_hugr(&package.modules[0], &STD_REG).unwrap()
+        Hugr::load(bytes, None).unwrap()
     }
 }
 

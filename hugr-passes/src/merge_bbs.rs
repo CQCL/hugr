@@ -23,7 +23,7 @@ where
     let checked = cfg.try_into_checked().expect("Hugr must be a CFG region");
     let cfg = checked.into_hugr();
 
-    let mut worklist = cfg.children(cfg.root()).collect::<Vec<_>>();
+    let mut worklist = cfg.children(cfg.entrypoint()).collect::<Vec<_>>();
     while let Some(n) = worklist.pop() {
         // Consider merging n with its successor
         let Ok(succ) = cfg.output_neighbours(n).exactly_one() else {
@@ -32,7 +32,7 @@ where
         if cfg.input_neighbours(succ).count() != 1 {
             continue;
         };
-        if cfg.children(cfg.root()).take(2).contains(&succ) {
+        if cfg.children(cfg.entrypoint()).take(2).contains(&succ) {
             // If succ is...
             //   - the entry block, that has an implicit extra in-edge, so cannot merge with n.
             //   - the exit block, nodes in n should move *outside* the CFG - a separate pass.
@@ -59,9 +59,10 @@ fn mk_rep(
     let succ_sig = succ_ty.inner_signature();
 
     // Make a Hugr with just a single CFG root node having the same signature.
-    let mut replacement: Hugr = Hugr::new(cfg.root_optype().clone());
+    let mut replacement: Hugr = Hugr::new_with_entrypoint(cfg.entrypoint_optype().clone())
+        .expect("Replacement should have a CFG entrypoint");
 
-    let merged = replacement.add_node_with_parent(replacement.root(), {
+    let merged = replacement.add_node_with_parent(replacement.entrypoint(), {
         DataflowBlock {
             inputs: pred_ty.inputs.clone(),
             ..succ_ty.clone()
@@ -251,10 +252,10 @@ mod test {
         h.branch(&test_block, 1, &h.exit_block())?;
 
         let mut h = h.finish_hugr()?;
-        let r = h.root();
+        let r = h.entrypoint();
         merge_basic_blocks(&mut h);
         h.validate().unwrap();
-        assert_eq!(r, h.root());
+        assert_eq!(r, h.entrypoint());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
         let [entry, exit] = h
             .children(r)
@@ -264,7 +265,7 @@ mod test {
             .unwrap();
         // Check the Noop('s) is/are in the right block(s)
         let nops = h
-            .nodes()
+            .entry_descendants()
             .filter(|n| h.get_optype(*n).cast::<Noop>().is_some());
         let (entry_nop, expected_backedge_target) = if self_loop {
             assert_eq!(h.children(r).count(), 2);
@@ -289,7 +290,7 @@ mod test {
         );
         // And the Noop in the entry block is consumed by the custom Test op
         let tst = find_unique(
-            h.nodes(),
+            h.entry_descendants(),
             |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(entry));
@@ -350,14 +351,20 @@ mod test {
         h.validate()?;
 
         // Should only be one BB left
-        let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
+        let [bb, _exit] = h
+            .children(h.entrypoint())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
         let tst = find_unique(
-            h.nodes(),
+            h.entry_descendants(),
             |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(bb));
 
-        let inp = find_unique(h.nodes(), |n| matches!(h.get_optype(*n), OpType::Input(_)));
+        let inp = find_unique(h.entry_descendants(), |n| {
+            matches!(h.get_optype(*n), OpType::Input(_))
+        });
         let mut tst_inputs = h.input_neighbours(tst).collect::<Vec<_>>();
         tst_inputs.remove(tst_inputs.iter().find_position(|n| **n == inp).unwrap().0);
         let [other_input] = tst_inputs.try_into().unwrap();

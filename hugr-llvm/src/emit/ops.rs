@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Result};
+use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
     constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
     LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, CFG,
@@ -70,10 +71,10 @@ where
         debug_assert!(i.out_value_types().count() == self.inputs.as_ref().unwrap().len());
         debug_assert!(o.in_value_types().count() == self.outputs.as_ref().unwrap().len());
 
-        let region_graph = node.hugr().region_portgraph(node.node());
+        let (region_graph, node_map) = node.hugr().region_portgraph(node.node());
         let topo = Topo::new(&region_graph);
         for n in topo.iter(&region_graph) {
-            let node = node.hugr().fat_optype(node.hugr().from_portgraph_node(n));
+            let node = node.hugr().fat_optype(node_map.from_portgraph(n));
             let inputs_rmb = context.node_ins_rmb(node)?;
             let inputs = inputs_rmb.read(context.builder(), [])?;
             let outputs = context.node_outs_rmb(node)?.promise();

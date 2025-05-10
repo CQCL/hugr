@@ -12,7 +12,7 @@ use hugr_core::{HugrView, IncomingPort};
 /// All `(node, in_port)` pairs are returned where `in_port` is a value port
 /// connected to a node with a parent other than the parent of `node`.
 pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, IncomingPort)> + '_ {
-    hugr.nodes().flat_map(move |node| {
+    hugr.entry_descendants().flat_map(move |node| {
         hugr.in_value_types(node).filter_map(move |(in_p, _)| {
             let parent = hugr.get_parent(node);
             hugr.linked_outputs(node, in_p)

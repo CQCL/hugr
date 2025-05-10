@@ -41,13 +41,14 @@
 // https://github.com/JelteF/derive_more/pull/454.
 
 mod header;
+mod package_json;
+pub mod serde_with;
 
 pub use header::{EnvelopeConfig, EnvelopeFormat, ZstdConfig, MAGIC_NUMBERS};
+pub use package_json::PackageEncodingError;
 
-use crate::{
-    extension::ExtensionRegistry,
-    package::{Package, PackageEncodingError, PackageError},
-};
+use crate::Hugr;
+use crate::{extension::ExtensionRegistry, package::Package};
 use header::EnvelopeHeader;
 use std::io::BufRead;
 use std::io::Write;
@@ -90,8 +91,21 @@ pub fn read_envelope(
 /// It is recommended to use a buffered writer for better performance.
 /// See [`std::io::BufWriter`] for more information.
 pub fn write_envelope(
-    mut writer: impl Write,
+    writer: impl Write,
     package: &Package,
+    config: EnvelopeConfig,
+) -> Result<(), EnvelopeError> {
+    write_envelope_impl(writer, &package.modules, &package.extensions, config)
+}
+
+/// Write a deconstructed HUGR package into an envelope, using the specified configuration.
+///
+/// It is recommended to use a buffered writer for better performance.
+/// See [`std::io::BufWriter`] for more information.
+pub(crate) fn write_envelope_impl<'h>(
+    mut writer: impl Write,
+    hugrs: impl IntoIterator<Item = &'h Hugr>,
+    extensions: &ExtensionRegistry,
     config: EnvelopeConfig,
 ) -> Result<(), EnvelopeError> {
     let header = config.make_header();
@@ -101,11 +115,11 @@ pub fn write_envelope(
         #[cfg(feature = "zstd")]
         Some(zstd) => {
             let writer = zstd::Encoder::new(writer, zstd.level())?.auto_finish();
-            write_impl(writer, package, config)?;
+            write_impl(writer, hugrs, extensions, config)?;
         }
         #[cfg(not(feature = "zstd"))]
         Some(_) => return Err(EnvelopeError::ZstdUnsupported),
-        None => write_impl(writer, package, config)?,
+        None => write_impl(writer, hugrs, extensions, config)?,
     }
 
     Ok(())
@@ -164,14 +178,14 @@ pub enum EnvelopeError {
     #[display("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
     #[from(ignore)]
     ZstdUnsupported,
-    /// Tried to encode a package with multiple HUGRs, when only 1 was expected.
-    #[display(
-            "Packages with multiple HUGRs are currently unsupported. Tried to encode {count} HUGRs, when 1 was expected."
-        )]
+    /// Expected the envelope to contain a single HUGR.
+    #[display("Expected an envelope containing a single hugr, but it contained {}.", if *count == 0 {
+        "none".to_string()
+    } else {
+        count.to_string()
+    })]
     #[from(ignore)]
-    /// Deprecated: Packages with multiple HUGRs is a legacy feature that is no longer supported.
-    #[deprecated(since = "0.15.2", note = "Multiple HUGRs are supported via packages.")]
-    MultipleHugrs {
+    ExpectedSingleHugr {
         /// The number of HUGRs in the package.
         count: usize,
     },
@@ -184,11 +198,6 @@ pub enum EnvelopeError {
     IO {
         /// The source error.
         source: std::io::Error,
-    },
-    /// Error decoding a package from the payload.
-    Package {
-        /// The source error.
-        source: PackageError,
     },
     /// Error writing a json package to the payload.
     PackageEncoding {
@@ -220,7 +229,7 @@ fn read_impl(
 ) -> Result<Package, EnvelopeError> {
     match header.format {
         #[allow(deprecated)]
-        EnvelopeFormat::PackageJson => Ok(Package::from_json_reader(payload, registry)?),
+        EnvelopeFormat::PackageJson => Ok(package_json::from_json_reader(payload, registry)?),
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             decode_model(payload, registry, header.format)
         }
@@ -265,24 +274,26 @@ fn decode_model(
 }
 
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
-fn write_impl(
+fn write_impl<'h>(
     writer: impl Write,
-    package: &Package,
+    hugrs: impl IntoIterator<Item = &'h Hugr>,
+    extensions: &ExtensionRegistry,
     config: EnvelopeConfig,
 ) -> Result<(), EnvelopeError> {
     match config.format {
         #[allow(deprecated)]
-        EnvelopeFormat::PackageJson => package.to_json_writer(writer)?,
+        EnvelopeFormat::PackageJson => package_json::to_json_writer(hugrs, extensions, writer)?,
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
-            encode_model(writer, package, config.format)?
+            encode_model(writer, hugrs, extensions, config.format)?
         }
     }
     Ok(())
 }
 
-fn encode_model(
+fn encode_model<'h>(
     mut writer: impl Write,
-    package: &Package,
+    hugrs: impl IntoIterator<Item = &'h Hugr>,
+    extensions: &ExtensionRegistry,
     format: EnvelopeFormat,
 ) -> Result<(), EnvelopeError> {
     use hugr_model::v0::{binary::write_to_writer, bumpalo::Bump};
@@ -297,11 +308,11 @@ fn encode_model(
     }
 
     let bump = Bump::default();
-    let model_package = export_package(package, &bump);
+    let model_package = export_package(hugrs, extensions, &bump);
     write_to_writer(&model_package, &mut writer)?;
 
     if format.append_extensions() {
-        serde_json::to_writer(writer, &package.extensions.iter().collect_vec())?;
+        serde_json::to_writer(writer, &extensions.iter().collect_vec())?;
     }
 
     Ok(())

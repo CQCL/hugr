@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::views::check_valid_non_root;
+use crate::hugr::views::check_valid_non_entrypoint;
 use crate::hugr::HugrMut;
 use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
@@ -189,7 +189,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
         // equality of OpType/Signature, e.g. to ease changing of Input/Output
         // node signatures too.
         let removed = h.get_optype(parent).tag();
-        let replacement = self.replacement.root_optype().tag();
+        let replacement = self.replacement.entrypoint_optype().tag();
         if removed != replacement {
             return Err(ReplaceError::WrongRootNodeTag {
                 removed,
@@ -267,7 +267,7 @@ impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
             e.check_src(h, WhichEdgeSpec::HostToHost)?;
         }
         self.mu_out.iter().try_for_each(|e| {
-            match check_valid_non_root(&self.replacement, e.src) {
+            match check_valid_non_entrypoint(&self.replacement, e.src) {
                 true => e.check_src(&self.replacement, WhichEdgeSpec::ReplToHost),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Outgoing,
@@ -277,7 +277,7 @@ impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
         })?;
         // Edge targets...
         self.mu_inp.iter().try_for_each(|e| {
-            match check_valid_non_root(&self.replacement, e.tgt) {
+            match check_valid_non_entrypoint(&self.replacement, e.tgt) {
                 true => e.check_tgt(&self.replacement, WhichEdgeSpec::HostToRepl),
                 false => Err(ReplaceError::BadEdgeSpec(
                     Direction::Incoming,
@@ -342,7 +342,10 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         // 1. Add all the new nodes. Note this includes replacement.root(), which we
         //    don't want.
         // TODO what would an error here mean? e.g. malformed self.replacement??
-        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement);
+        let InsertionResult {
+            inserted_entrypoint,
+            node_map,
+        } = h.insert_hugr(parent, self.replacement);
 
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| node_map.get(&n).copied();
@@ -381,15 +384,19 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
         let mut remove_top_sibs = self.removal.iter();
-        for new_node in h.children(new_root).collect::<Vec<HostNode>>().into_iter() {
+        for new_node in h
+            .children(inserted_entrypoint)
+            .collect::<Vec<HostNode>>()
+            .into_iter()
+        {
             if let Some(top_sib) = remove_top_sibs.next() {
                 h.move_before_sibling(new_node, *top_sib);
             } else {
                 h.set_parent(new_node, parent);
             }
         }
-        debug_assert!(h.children(new_root).next().is_none());
-        h.remove_node(new_root);
+        debug_assert!(h.children(inserted_entrypoint).next().is_none());
+        h.remove_node(inserted_entrypoint);
 
         // 6. Transfer to keys of `transfers` children of the corresponding values.
         for (new_parent, &old_parent) in self.adoptions.iter() {
@@ -600,11 +607,12 @@ mod test {
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because it must be empty (not even
         // Input/Output).
-        let mut replacement = Hugr::new(ops::CFG {
+        let mut replacement = Hugr::new_with_entrypoint(ops::CFG {
             signature: Signature::new_endo(just_list.clone()),
-        });
+        })
+        .expect("CFG is a valid entrypoint");
         let r_bb = replacement.add_node_with_parent(
-            replacement.root(),
+            replacement.entrypoint(),
             DataflowBlock {
                 inputs: vec![listy.clone()].into(),
                 sum_rows: vec![type_row![]],
@@ -681,7 +689,7 @@ mod test {
     }
 
     fn find_node(h: &Hugr, s: &str) -> crate::Node {
-        h.nodes()
+        h.entry_descendants()
             .filter(|n| format!("{}", h.get_optype(*n)).contains(s))
             .exactly_one()
             .ok()
@@ -758,15 +766,15 @@ mod test {
         let cond = cond.finish_sub_container().unwrap();
         let h = h.finish_hugr_with_outputs(cond.outputs()).unwrap();
 
-        let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());
+        let mut r_hugr = Hugr::new_with_entrypoint(h.get_optype(cond.node()).clone()).unwrap();
         let r1 = r_hugr.add_node_with_parent(
-            r_hugr.root(),
+            r_hugr.entrypoint(),
             Case {
                 signature: utou.clone(),
             },
         );
         let r2 = r_hugr.add_node_with_parent(
-            r_hugr.root(),
+            r_hugr.entrypoint(),
             Case {
                 signature: utou.clone(),
             },
@@ -798,7 +806,7 @@ mod test {
         // Root node type needs to be that of common parent of the removed nodes:
         let mut rep2 = rep.clone();
         rep2.replacement
-            .replace_op(rep2.replacement.root(), h.root_optype().clone());
+            .replace_op(rep2.replacement.entrypoint(), h.entrypoint_optype().clone());
         assert_eq!(
             check_same_errors(rep2),
             ReplaceError::WrongRootNodeTag {
@@ -809,7 +817,7 @@ mod test {
         // Removed nodes...
         assert_eq!(
             check_same_errors(Replacement {
-                removal: vec![h.root()],
+                removal: vec![h.module_root()],
                 ..rep.clone()
             }),
             ReplaceError::CantReplaceRoot
@@ -824,10 +832,10 @@ mod test {
         // Adoptions...
         assert_eq!(
             check_same_errors(Replacement {
-                adoptions: HashMap::from([(r1, case1), (rep.replacement.root(), case2)]),
+                adoptions: HashMap::from([(r1, case1), (rep.replacement.entrypoint(), case2)]),
                 ..rep.clone()
             }),
-            ReplaceError::InvalidAdoptingParent(rep.replacement.root())
+            ReplaceError::InvalidAdoptingParent(rep.replacement.entrypoint())
         );
         assert_eq!(
             check_same_errors(Replacement {
@@ -873,7 +881,7 @@ mod test {
         );
         let bad_order_edge = NewEdgeSpec {
             src: cond.node(),
-            tgt: h.get_io(h.root()).unwrap()[1],
+            tgt: h.get_io(h.entrypoint()).unwrap()[1],
             kind: NewEdgeKind::ControlFlow { src_pos: 0.into() },
         };
         assert_matches!(
