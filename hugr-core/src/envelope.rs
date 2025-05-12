@@ -311,8 +311,12 @@ fn decode_model_ast(
 
     let mut extension_registry = extension_registry.clone();
     if format == EnvelopeFormat::ModelTextWithExtensions {
-        let extra_extensions: Vec<Extension> =
-            serde_json::from_reader::<_, Vec<Extension>>(&mut stream)?;
+        let deserializer = serde_json::Deserializer::from_reader(&mut stream);
+        // Deserialize the first json object, leaving the rest of the reader unconsumed.
+        let extra_extensions = deserializer
+            .into_iter::<Vec<Extension>>()
+            .next()
+            .unwrap_or(Ok(vec![]))?;
         for ext in extra_extensions {
             extension_registry.register_updated(ext);
         }
@@ -495,34 +499,24 @@ pub(crate) mod test {
     }
 
     #[rstest]
-    //#[case::empty(Package::default())] // Not currently supported
-    #[case::simple(simple_package())]
-    //#[case::multi(multi_module_package())] // Not currently supported
-    fn module_exts_roundtrip(#[case] package: Package) {
+    // Empty packages
+    #[case::empty_model(Package::default(), EnvelopeFormat::Model)]
+    #[case::empty_model_exts(Package::default(), EnvelopeFormat::ModelWithExtensions)]
+    #[case::empty_text(Package::default(), EnvelopeFormat::ModelText)]
+    #[case::empty_text_exts(Package::default(), EnvelopeFormat::ModelTextWithExtensions)]
+    // Single hugrs
+    #[case::simple_bin(simple_package(), EnvelopeFormat::Model)]
+    #[case::simple_bin_exts(simple_package(), EnvelopeFormat::ModelWithExtensions)]
+    #[case::simple_text(simple_package(), EnvelopeFormat::ModelText)]
+    #[case::simple_text_exts(simple_package(), EnvelopeFormat::ModelTextWithExtensions)]
+    // Multiple hugrs
+    #[case::multi_bin(multi_module_package(), EnvelopeFormat::Model)]
+    #[case::multi_bin_exts(multi_module_package(), EnvelopeFormat::ModelWithExtensions)]
+    #[case::multi_text(multi_module_package(), EnvelopeFormat::ModelText)]
+    #[case::multi_text_exts(multi_module_package(), EnvelopeFormat::ModelTextWithExtensions)]
+    fn model_roundtrip(#[case] package: Package, #[case] format: EnvelopeFormat) {
         let mut buffer = Vec::new();
-        let config = EnvelopeConfig {
-            format: EnvelopeFormat::ModelWithExtensions,
-            zstd: None,
-        };
-        package.store(&mut buffer, config).unwrap();
-        let (decoded_config, new_package) =
-            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
-
-        assert_eq!(config.format, decoded_config.format);
-        assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
-        assert_eq!(package, new_package);
-    }
-
-    #[rstest]
-    //#[case::empty(Package::default())] // Not currently supported
-    #[case::simple(simple_package())]
-    //#[case::multi(multi_module_package())] // Not currently supported
-    fn module_roundtrip(#[case] package: Package) {
-        let mut buffer = Vec::new();
-        let config = EnvelopeConfig {
-            format: EnvelopeFormat::Model,
-            zstd: None,
-        };
+        let config = EnvelopeConfig { format, zstd: None };
         package.store(&mut buffer, config).unwrap();
 
         let (decoded_config, new_package) =
