@@ -52,11 +52,13 @@ use crate::{extension::ExtensionRegistry, package::Package};
 use header::EnvelopeHeader;
 use std::io::BufRead;
 use std::io::Write;
+use std::str::FromStr;
 
 #[allow(unused_imports)]
 use itertools::Itertools as _;
 
 use crate::import::ImportError;
+use crate::{import::import_package, Extension};
 
 /// Read a HUGR envelope from a reader.
 ///
@@ -219,6 +221,16 @@ pub enum EnvelopeError {
         /// The source error.
         source: hugr_model::v0::binary::WriteError,
     },
+    /// Error reading a HUGR model payload.
+    ModelTextRead {
+        /// The source error.
+        source: hugr_model::v0::ast::ParseError,
+    },
+    /// Error reading a HUGR model payload.
+    ModelTextResolve {
+        /// The source error.
+        source: hugr_model::v0::ast::ResolveError,
+    },
 }
 
 /// Internal implementation of [`read_envelope`] to call with/without the zstd decompression wrapper.
@@ -232,6 +244,9 @@ fn read_impl(
         EnvelopeFormat::PackageJson => Ok(package_json::from_json_reader(payload, registry)?),
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             decode_model(payload, registry, header.format)
+        }
+        EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
+            decode_model_ast(payload, registry, header.format)
         }
     }
 }
@@ -248,7 +263,6 @@ fn decode_model(
     extension_registry: &ExtensionRegistry,
     format: EnvelopeFormat,
 ) -> Result<Package, EnvelopeError> {
-    use crate::{import::import_package, Extension};
     use hugr_model::v0::bumpalo::Bump;
 
     if format.model_version() != Some(0) {
@@ -262,13 +276,61 @@ fn decode_model(
     let model_package = hugr_model::v0::binary::read_from_reader(&mut stream, &bump)?;
 
     let mut extension_registry = extension_registry.clone();
-    if format.append_extensions() {
+    if format == EnvelopeFormat::ModelWithExtensions {
         let extra_extensions: Vec<Extension> =
             serde_json::from_reader::<_, Vec<Extension>>(stream)?;
         for ext in extra_extensions {
             extension_registry.register_updated(ext);
         }
     }
+
+    Ok(import_package(&model_package, &extension_registry)?)
+}
+
+/// Read a HUGR model text payload from a reader.
+///
+/// Parameters:
+/// - `stream`: The reader to read the envelope from.
+/// - `extension_registry`: An extension registry with additional extensions to use when
+///   decoding the HUGR, if they are not already included in the package.
+/// - `format`: The format of the payload.
+fn decode_model_ast(
+    mut stream: impl BufRead,
+    extension_registry: &ExtensionRegistry,
+    format: EnvelopeFormat,
+) -> Result<Package, EnvelopeError> {
+    use crate::import::import_package;
+    use hugr_model::v0::bumpalo::Bump;
+
+    if format.model_version() != Some(0) {
+        return Err(EnvelopeError::FormatUnsupported {
+            format,
+            feature: None,
+        });
+    }
+
+    let mut extension_registry = extension_registry.clone();
+    if format == EnvelopeFormat::ModelTextWithExtensions {
+        let deserializer = serde_json::Deserializer::from_reader(&mut stream);
+        // Deserialize the first json object, leaving the rest of the reader unconsumed.
+        let extra_extensions = deserializer
+            .into_iter::<Vec<Extension>>()
+            .next()
+            .unwrap_or(Ok(vec![]))?;
+        for ext in extra_extensions {
+            extension_registry.register_updated(ext);
+        }
+    }
+
+    // Read the package into a string, then parse it.
+    //
+    // Due to how `to_string` works, we cannot append extensions after the package.
+    let mut buffer = String::new();
+    stream.read_to_string(&mut buffer)?;
+    let ast_package = hugr_model::v0::ast::Package::from_str(&buffer)?;
+
+    let bump = Bump::default();
+    let model_package = ast_package.resolve(&bump)?;
 
     Ok(import_package(&model_package, &extension_registry)?)
 }
@@ -283,7 +345,10 @@ fn write_impl<'h>(
     match config.format {
         #[allow(deprecated)]
         EnvelopeFormat::PackageJson => package_json::to_json_writer(hugrs, extensions, writer)?,
-        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
+        EnvelopeFormat::Model
+        | EnvelopeFormat::ModelWithExtensions
+        | EnvelopeFormat::ModelText
+        | EnvelopeFormat::ModelTextWithExtensions => {
             encode_model(writer, hugrs, extensions, config.format)?
         }
     }
@@ -307,11 +372,27 @@ fn encode_model<'h>(
         });
     }
 
+    // Prepend extensions for binary model.
+    if format == EnvelopeFormat::ModelTextWithExtensions {
+        serde_json::to_writer(&mut writer, &extensions.iter().collect_vec())?;
+    }
+
     let bump = Bump::default();
     let model_package = export_package(hugrs, extensions, &bump);
-    write_to_writer(&model_package, &mut writer)?;
 
-    if format.append_extensions() {
+    match format {
+        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
+            write_to_writer(&model_package, &mut writer)?;
+        }
+        EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
+            let model_package = model_package.as_ast().unwrap();
+            writeln!(writer, "{model_package}")?;
+        }
+        _ => unreachable!(),
+    }
+
+    // Apend extensions for binary model.
+    if format == EnvelopeFormat::ModelWithExtensions {
         serde_json::to_writer(writer, &extensions.iter().collect_vec())?;
     }
 
@@ -418,34 +499,24 @@ pub(crate) mod test {
     }
 
     #[rstest]
-    //#[case::empty(Package::default())] // Not currently supported
-    #[case::simple(simple_package())]
-    //#[case::multi(multi_module_package())] // Not currently supported
-    fn module_exts_roundtrip(#[case] package: Package) {
+    // Empty packages
+    #[case::empty_model(Package::default(), EnvelopeFormat::Model)]
+    #[case::empty_model_exts(Package::default(), EnvelopeFormat::ModelWithExtensions)]
+    #[case::empty_text(Package::default(), EnvelopeFormat::ModelText)]
+    #[case::empty_text_exts(Package::default(), EnvelopeFormat::ModelTextWithExtensions)]
+    // Single hugrs
+    #[case::simple_bin(simple_package(), EnvelopeFormat::Model)]
+    #[case::simple_bin_exts(simple_package(), EnvelopeFormat::ModelWithExtensions)]
+    #[case::simple_text(simple_package(), EnvelopeFormat::ModelText)]
+    #[case::simple_text_exts(simple_package(), EnvelopeFormat::ModelTextWithExtensions)]
+    // Multiple hugrs
+    #[case::multi_bin(multi_module_package(), EnvelopeFormat::Model)]
+    #[case::multi_bin_exts(multi_module_package(), EnvelopeFormat::ModelWithExtensions)]
+    #[case::multi_text(multi_module_package(), EnvelopeFormat::ModelText)]
+    #[case::multi_text_exts(multi_module_package(), EnvelopeFormat::ModelTextWithExtensions)]
+    fn model_roundtrip(#[case] package: Package, #[case] format: EnvelopeFormat) {
         let mut buffer = Vec::new();
-        let config = EnvelopeConfig {
-            format: EnvelopeFormat::ModelWithExtensions,
-            zstd: None,
-        };
-        package.store(&mut buffer, config).unwrap();
-        let (decoded_config, new_package) =
-            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
-
-        assert_eq!(config.format, decoded_config.format);
-        assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
-        assert_eq!(package, new_package);
-    }
-
-    #[rstest]
-    //#[case::empty(Package::default())] // Not currently supported
-    #[case::simple(simple_package())]
-    //#[case::multi(multi_module_package())] // Not currently supported
-    fn module_roundtrip(#[case] package: Package) {
-        let mut buffer = Vec::new();
-        let config = EnvelopeConfig {
-            format: EnvelopeFormat::Model,
-            zstd: None,
-        };
+        let config = EnvelopeConfig { format, zstd: None };
         package.store(&mut buffer, config).unwrap();
 
         let (decoded_config, new_package) =
