@@ -8,9 +8,9 @@ use hugr::builder::{
 };
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};
 use hugr::ops::OpName;
-use hugr::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Signature;
-use hugr::{type_row, CircuitUnit, Extension, Hugr, Node};
+use hugr::{CircuitUnit, Extension, Hugr, Node, type_row};
 use lazy_static::lazy_static;
 
 pub fn simple_dfg_hugr() -> Hugr {
@@ -59,14 +59,14 @@ lazy_static! {
             |ext, extension_ref| {
                 ext.add_op(
                     OpName::new_inline("H"),
-                    "".into(),
+                    String::new(),
                     Signature::new_endo(qb_t()),
                     extension_ref,
                 )
                 .unwrap();
                 ext.add_op(
                     OpName::new_inline("Rz"),
-                    "".into(),
+                    String::new(),
                     Signature::new(vec![qb_t(), float64_type()], vec![qb_t()]),
                     extension_ref,
                 )
@@ -74,7 +74,7 @@ lazy_static! {
 
                 ext.add_op(
                     OpName::new_inline("CX"),
-                    "".into(),
+                    String::new(),
                     Signature::new_endo(vec![qb_t(), qb_t()]),
                     extension_ref,
                 )

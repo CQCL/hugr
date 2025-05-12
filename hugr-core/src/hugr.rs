@@ -29,12 +29,12 @@ pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::{
-    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
+    resolve_op_types_extensions,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
-pub use crate::ops::{OpType, DEFAULT_OPTYPE};
+pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::package::Package;
 use crate::{Direction, Node};
 
@@ -94,6 +94,7 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 /// Public API for HUGRs.
 impl Hugr {
     /// Create a new Hugr, with a single [`Module`] operation as the root node.
+    #[must_use]
     pub fn new() -> Self {
         make_module_hugr(Module::new().into(), 0, 0).unwrap()
     }
@@ -185,7 +186,7 @@ impl Hugr {
     ///
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::store` with a bytearray instead.
-    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {
@@ -347,7 +348,9 @@ impl Hugr {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
+#[error(
+    "Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}"
+)]
 /// An error in the extension deltas.
 pub struct ExtensionError {
     parent: Node,
@@ -360,7 +363,7 @@ pub struct ExtensionError {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
-    /// The node was not of the required [OpTag]
+    /// The node was not of the required [`OpTag`]
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
@@ -490,14 +493,63 @@ fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr>
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use std::{fs::File, io::BufReader};
 
-    use super::{Hugr, HugrView};
+    use super::*;
 
     use crate::envelope::{EnvelopeError, PackageEncodingError};
+    use crate::ops::OpaqueOp;
     use crate::test_file;
     use cool_asserts::assert_matches;
+    use portgraph::LinkView;
+
+    /// Check that two HUGRs are equivalent, up to node renumbering.
+    pub(crate) fn check_hugr_equality(lhs: &Hugr, rhs: &Hugr) {
+        // Original HUGR, with canonicalized node indices
+        //
+        // The internal port indices may still be different.
+        let mut lhs = lhs.clone();
+        lhs.canonicalize_nodes(|_, _| {});
+        let mut rhs = rhs.clone();
+        rhs.canonicalize_nodes(|_, _| {});
+
+        assert_eq!(rhs.module_root(), lhs.module_root());
+        assert_eq!(rhs.entrypoint(), lhs.entrypoint());
+        assert_eq!(rhs.hierarchy, lhs.hierarchy);
+        assert_eq!(rhs.metadata, lhs.metadata);
+
+        // Extension operations may have been downgraded to opaque operations.
+        for node in rhs.nodes() {
+            let new_op = rhs.get_optype(node);
+            let old_op = lhs.get_optype(node);
+            if !new_op.is_const() {
+                match (new_op, old_op) {
+                    (OpType::ExtensionOp(ext), OpType::OpaqueOp(opaque))
+                    | (OpType::OpaqueOp(opaque), OpType::ExtensionOp(ext)) => {
+                        let ext_opaque: OpaqueOp = ext.clone().into();
+                        assert_eq!(ext_opaque, opaque.clone());
+                    }
+                    _ => assert_eq!(new_op, old_op),
+                }
+            }
+        }
+
+        // Check that the graphs are equivalent up to port renumbering.
+        let new_graph = &rhs.graph;
+        let old_graph = &lhs.graph;
+        assert_eq!(new_graph.node_count(), old_graph.node_count());
+        assert_eq!(new_graph.port_count(), old_graph.port_count());
+        assert_eq!(new_graph.link_count(), old_graph.link_count());
+        for n in old_graph.nodes_iter() {
+            assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
+            assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
+            assert_eq!(
+                new_graph.output_neighbours(n).collect_vec(),
+                old_graph.output_neighbours(n).collect_vec()
+            );
+        }
+    }
 
     #[test]
     fn impls_send_and_sync() {

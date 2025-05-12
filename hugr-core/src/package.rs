@@ -3,9 +3,10 @@
 use derive_more::{Display, Error, From};
 use std::io;
 
-use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeError};
-use crate::extension::{ExtensionRegistry, PRELUDE_REGISTRY};
+use crate::envelope::{EnvelopeConfig, EnvelopeError, read_envelope, write_envelope};
+use crate::extension::ExtensionRegistry;
 use crate::hugr::{HugrView, ValidationError};
+use crate::std_extensions::STD_REG;
 use crate::{Hugr, Node};
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -49,7 +50,7 @@ impl Package {
     ///
     /// Ensures that the top-level extension list is a superset of the extensions used in the modules.
     pub fn validate(&self) -> Result<(), PackageValidationError> {
-        for hugr in self.modules.iter() {
+        for hugr in &self.modules {
             hugr.validate()?;
         }
         Ok(())
@@ -60,7 +61,7 @@ impl Package {
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, EnvelopeError> {
-        let extensions = extensions.unwrap_or(&PRELUDE_REGISTRY);
+        let extensions = extensions.unwrap_or(&STD_REG);
         let (_, pkg) = read_envelope(reader, extensions)?;
         Ok(pkg)
     }
@@ -89,7 +90,7 @@ impl Package {
     ///
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::store` with a bytearray instead.
-    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {

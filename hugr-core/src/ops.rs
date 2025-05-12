@@ -11,7 +11,7 @@ pub mod tag;
 pub mod validate;
 use crate::core::HugrNode;
 use crate::extension::resolution::{
-    collect_op_extension, collect_op_types_extensions, ExtensionCollectionError,
+    ExtensionCollectionError, collect_op_extension, collect_op_types_extensions,
 };
 use std::borrow::Cow;
 
@@ -27,11 +27,11 @@ use paste::paste;
 use enum_dispatch::enum_dispatch;
 
 pub use constant::{Const, Value};
-pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
+pub use controlflow::{BasicBlock, CFG, Case, Conditional, DataflowBlock, ExitBlock, TailLoop};
 pub use custom::{ExtensionOp, OpaqueOp};
 pub use dataflow::{
-    Call, CallIndirect, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction, Output,
-    DFG,
+    Call, CallIndirect, DFG, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction,
+    Output,
 };
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 use smol_str::SmolStr;
@@ -77,12 +77,12 @@ macro_rules! impl_op_ref_try_into {
         paste! {
             impl OpType {
                 #[doc = "If is an instance of `" $Op "` return a reference to it."]
-                pub fn [<as_ $sname:snake>](&self) -> Option<&$Op> {
+                #[must_use] pub fn [<as_ $sname:snake>](&self) -> Option<&$Op> {
                     TryInto::<&$Op>::try_into(self).ok()
                 }
 
                 #[doc = "Returns `true` if the operation is an instance of `" $Op "`."]
-                pub fn [<is_ $sname:snake>](&self) -> bool {
+                #[must_use] pub fn [<is_ $sname:snake>](&self) -> bool {
                     self.[<as_ $sname:snake>]().is_some()
                 }
             }
@@ -126,7 +126,7 @@ impl_op_ref_try_into!(CFG, cfg);
 impl_op_ref_try_into!(Conditional);
 impl_op_ref_try_into!(Case);
 
-/// The default OpType (as returned by [Default::default])
+/// The default `OpType` (as returned by [`Default::default`])
 pub const DEFAULT_OPTYPE: OpType = OpType::Module(Module::new());
 
 impl Default for OpType {
@@ -148,6 +148,7 @@ impl OpType {
     /// If not None, a single extra port of that kind will be present on
     /// the given direction after any dataflow or constant ports.
     #[inline]
+    #[must_use]
     pub fn other_port_kind(&self, dir: Direction) -> Option<EdgeKind> {
         match dir {
             Direction::Incoming => self.other_input(),
@@ -162,6 +163,7 @@ impl OpType {
     /// given direction after any dataflow ports and before any
     /// [`OpType::other_port_kind`] ports.
     #[inline]
+    #[must_use]
     pub fn static_port_kind(&self, dir: Direction) -> Option<EdgeKind> {
         match dir {
             Direction::Incoming => self.static_input(),
@@ -201,12 +203,13 @@ impl OpType {
     /// See `[OpType::other_port_kind]`.
     ///
     /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
+    #[must_use]
     pub fn other_port(&self, dir: Direction) -> Option<Port> {
         let df_count = self.value_port_count(dir);
         let non_df_count = self.non_df_port_count(dir);
         // if there is a static input it comes before the non_df_ports
         let static_input =
-            (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
+            usize::from(dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag()));
         if self.other_port_kind(dir).is_some() && non_df_count >= 1 {
             Some(Port::new(dir, df_count + static_input))
         } else {
@@ -217,6 +220,7 @@ impl OpType {
     /// The non-dataflow input port for the operation, not described by the signature.
     /// See `[OpType::other_port]`.
     #[inline]
+    #[must_use]
     pub fn other_input_port(&self) -> Option<IncomingPort> {
         self.other_port(Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
@@ -225,6 +229,7 @@ impl OpType {
     /// The non-dataflow output port for the operation, not described by the signature.
     /// See `[OpType::other_port]`.
     #[inline]
+    #[must_use]
     pub fn other_output_port(&self) -> Option<OutgoingPort> {
         self.other_port(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
@@ -234,6 +239,7 @@ impl OpType {
     ///
     /// See [`OpType::static_input_port`] and [`OpType::static_output_port`].
     #[inline]
+    #[must_use]
     pub fn static_port(&self, dir: Direction) -> Option<Port> {
         self.static_port_kind(dir)?;
         Some(Port::new(dir, self.value_port_count(dir)))
@@ -242,6 +248,7 @@ impl OpType {
     /// If the op has a static input ([`Call`], [`LoadConstant`], and [`LoadFunction`]), the port of
     /// that input.
     #[inline]
+    #[must_use]
     pub fn static_input_port(&self) -> Option<IncomingPort> {
         self.static_port(Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
@@ -249,6 +256,7 @@ impl OpType {
 
     /// If the op has a static output ([`Const`], [`FuncDefn`], [`FuncDecl`]), the port of that output.
     #[inline]
+    #[must_use]
     pub fn static_output_port(&self) -> Option<OutgoingPort> {
         self.static_port(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
@@ -256,46 +264,52 @@ impl OpType {
 
     /// The number of Value ports in given direction.
     #[inline]
+    #[must_use]
     pub fn value_port_count(&self, dir: portgraph::Direction) -> usize {
         self.dataflow_signature()
-            .map(|sig| sig.port_count(dir))
-            .unwrap_or(0)
+            .map_or(0, |sig| sig.port_count(dir))
     }
 
     /// The number of Value input ports.
     #[inline]
+    #[must_use]
     pub fn value_input_count(&self) -> usize {
         self.value_port_count(Direction::Incoming)
     }
 
     /// The number of Value output ports.
     #[inline]
+    #[must_use]
     pub fn value_output_count(&self) -> usize {
         self.value_port_count(Direction::Outgoing)
     }
 
     /// Returns the number of ports for the given direction.
     #[inline]
+    #[must_use]
     pub fn port_count(&self, dir: Direction) -> usize {
         let has_static_port = self.static_port_kind(dir).is_some();
         let non_df_count = self.non_df_port_count(dir);
-        self.value_port_count(dir) + has_static_port as usize + non_df_count
+        self.value_port_count(dir) + usize::from(has_static_port) + non_df_count
     }
 
     /// Returns the number of inputs ports for the operation.
     #[inline]
+    #[must_use]
     pub fn input_count(&self) -> usize {
         self.port_count(Direction::Incoming)
     }
 
     /// Returns the number of outputs ports for the operation.
     #[inline]
+    #[must_use]
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
 
     /// Checks whether the operation can contain children nodes.
     #[inline]
+    #[must_use]
     pub fn is_container(&self) -> bool {
         self.validity_flags::<Node>().allowed_children != OpTag::None
     }
@@ -308,6 +322,7 @@ impl OpType {
     }
 
     /// Returns the extension where the operation is defined, if any.
+    #[must_use]
     pub fn extension_id(&self) -> Option<&ExtensionId> {
         match self {
             OpType::OpaqueOp(opaque) => Some(opaque.extension()),
@@ -352,7 +367,7 @@ pub type OpName = SmolStr;
 pub type OpNameRef = str;
 
 #[enum_dispatch]
-/// Trait for setting name of OpType variants.
+/// Trait for setting name of `OpType` variants.
 // Separate to OpTrait to allow simple definition via impl_op_name
 pub(crate) trait NamedOp {
     /// The name of the operation.
@@ -361,7 +376,7 @@ pub(crate) trait NamedOp {
 
 /// Trait statically querying the tag of an operation.
 ///
-/// This is implemented by all OpType variants, and always contains the dynamic
+/// This is implemented by all `OpType` variants, and always contains the dynamic
 /// tag returned by `OpType::tag(&self)`.
 pub trait StaticTag {
     /// The name of the operation.
@@ -369,7 +384,7 @@ pub trait StaticTag {
 }
 
 #[enum_dispatch]
-/// Trait implemented by all OpType variants.
+/// Trait implemented by all `OpType` variants.
 pub trait OpTrait: Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
@@ -435,14 +450,16 @@ pub trait OpTrait: Sized + Clone {
 
     /// Get the number of non-dataflow multiports.
     fn non_df_port_count(&self, dir: Direction) -> usize {
-        match dir {
-            Direction::Incoming => self.other_input(),
-            Direction::Outgoing => self.other_output(),
-        }
-        .is_some() as usize
+        usize::from(
+            match dir {
+                Direction::Incoming => self.other_input(),
+                Direction::Outgoing => self.other_output(),
+            }
+            .is_some(),
+        )
     }
 
-    /// Apply a type-level substitution to this OpType, i.e. replace
+    /// Apply a type-level substitution to this `OpType`, i.e. replace
     /// [type variables](crate::types::TypeArg::new_var_use) with new types.
     fn substitute(&self, _subst: &Substitution) -> Self {
         self.clone()
@@ -504,7 +521,7 @@ pub trait ValidateOp {
     }
 }
 
-/// Macro used for default implementation of ValidateOp
+/// Macro used for default implementation of `ValidateOp`
 macro_rules! impl_validate_op {
     ($i: ident) => {
         impl $crate::ops::ValidateOp for $i {}

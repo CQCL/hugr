@@ -16,7 +16,7 @@ use std::collections::HashMap;
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use rerooted::Rerooted;
-pub use root_checked::{check_tag, RootCheckable, RootChecked};
+pub use root_checked::{RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
 use itertools::Itertools;
@@ -69,7 +69,7 @@ pub trait HugrView: HugrInternals {
 
     /// Returns a non-mutable view of the HUGR with a different entrypoint.
     ///
-    /// For a mutable view, use [HugrMut::with_entrypoint_mut] instead.
+    /// For a mutable view, use [`HugrMut::with_entrypoint_mut`] instead.
     ///
     /// # Panics
     ///
@@ -99,9 +99,10 @@ pub trait HugrView: HugrInternals {
     /// Returns the metadata associated with a node.
     #[inline]
     fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
-        match self.contains_node(node) {
-            true => self.node_metadata_map(node).get(key.as_ref()),
-            false => None,
+        if self.contains_node(node) {
+            self.node_metadata_map(node).get(key.as_ref())
+        } else {
+            None
         }
     }
 
@@ -150,7 +151,7 @@ pub trait HugrView: HugrInternals {
 
     /// Iterator over output ports of node.
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`
-    /// but preserves knowledge that the ports are [OutgoingPort]s.
+    /// but preserves knowledge that the ports are [`OutgoingPort`]s.
     #[inline]
     fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = OutgoingPort> + Clone {
         self.node_ports(node, Direction::Outgoing)
@@ -159,7 +160,7 @@ pub trait HugrView: HugrInternals {
 
     /// Iterator over inputs ports of node.
     /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`
-    /// but preserves knowledge that the ports are [IncomingPort]s.
+    /// but preserves knowledge that the ports are [`IncomingPort`]s.
     #[inline]
     fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = IncomingPort> + Clone {
         self.node_ports(node, Direction::Incoming)
@@ -227,7 +228,7 @@ pub trait HugrView: HugrInternals {
         self.linked_ports(node, port).exactly_one().ok()
     }
 
-    /// If there is exactly one OutgoingPort connected to this IncomingPort, return
+    /// If there is exactly one `OutgoingPort` connected to this `IncomingPort`, return
     /// it and its node.
     fn single_linked_output(
         &self,
@@ -238,7 +239,7 @@ pub trait HugrView: HugrInternals {
             .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
 
-    /// If there is exactly one IncomingPort connected to this OutgoingPort, return
+    /// If there is exactly one `IncomingPort` connected to this `OutgoingPort`, return
     /// it and its node.
     fn single_linked_input(
         &self,
@@ -250,7 +251,7 @@ pub trait HugrView: HugrInternals {
     }
     /// Iterator over the nodes and output ports connected to a given *input* port.
     /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
-    /// that the linked ports are [OutgoingPort]s.
+    /// that the linked ports are [`OutgoingPort`]s.
     fn linked_outputs(
         &self,
         node: Self::Node,
@@ -262,7 +263,7 @@ pub trait HugrView: HugrInternals {
 
     /// Iterator over the nodes and input ports connected to a given *output* port
     /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
-    /// that the linked ports are [IncomingPort]s.
+    /// that the linked ports are [`IncomingPort`]s.
     fn linked_inputs(
         &self,
         node: Self::Node,
@@ -428,7 +429,7 @@ pub trait HugrView: HugrInternals {
     fn value_types(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
         let sig = self.signature(node).unwrap_or_default();
         self.node_ports(node, dir)
-            .flat_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
+            .filter_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
     }
 
     /// Iterator over all incoming ports that have Value type, along
@@ -479,7 +480,7 @@ pub trait HugrView: HugrInternals {
     ) -> (Hugr, impl ExtractionResult<Self::Node> + 'static);
 }
 
-/// Records the result of extracting a Hugr via [HugrView::extract_hugr].
+/// Records the result of extracting a Hugr via [`HugrView::extract_hugr`].
 ///
 /// Contains a map from the nodes in the source HUGR to the nodes in the extracted
 /// HUGR, using their respective `Node` types.
@@ -535,7 +536,7 @@ impl HugrView for Hugr {
     fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
         if !check_valid_non_root(self, node) {
             return None;
-        };
+        }
         self.hierarchy.parent(node.into_portgraph()).map(Into::into)
     }
 
@@ -685,7 +686,7 @@ impl HugrView for Hugr {
             let parent_op = self.get_optype(parent).clone();
             if let Ok(hugr) = Hugr::new_with_entrypoint(parent_op) {
                 break hugr;
-            };
+            }
             // If the operation is not extractable, try the parent.
             // This loop always terminates, since at least the module root is extractable.
             parent = self
@@ -751,7 +752,7 @@ where
     Self: Sized,
 {
     /// Filter an iterator of node-ports to only dataflow dependency specifying
-    /// ports (Value and StateOrder)
+    /// ports (Value and `StateOrder`)
     fn dataflow_ports_only(
         self,
         hugr: &impl HugrView<Node = Node>,
@@ -795,17 +796,16 @@ pub(super) fn check_valid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node
 /// Panic if [`HugrView::contains_node`] fails.
 #[track_caller]
 pub(super) fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    if !hugr.contains_node(node) {
-        panic!("Received an invalid node {node}.",);
-    }
+    assert!(hugr.contains_node(node), "Received an invalid node {node}.",);
 }
 
 /// Panic if [`check_valid_non_entrypoint`] fails.
 #[track_caller]
 pub(super) fn panic_invalid_non_entrypoint<H: HugrView + ?Sized>(hugr: &H, node: H::Node) {
-    if !check_valid_non_entrypoint(hugr, node) {
-        panic!("Received an invalid non-entrypoint node {node}.",);
-    }
+    assert!(
+        check_valid_non_entrypoint(hugr, node),
+        "Received an invalid non-entrypoint node {node}.",
+    );
 }
 
 /// Panic if [`HugrView::valid_node`] fails.

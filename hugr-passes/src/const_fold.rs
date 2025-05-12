@@ -7,35 +7,35 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
+    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
     hugr::hugrmut::HugrMut,
     ops::{
-        constant::OpaqueValue, Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value,
+        Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value, constant::OpaqueValue,
     },
     types::EdgeKind,
-    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
 };
 use value_handle::ValueHandle;
 
 use crate::dataflow::{
-    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
-    TailLoopTermination,
+    ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
+    partial_from_const,
 };
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
-use crate::{composable::validate_if_test, ComposablePass};
+use crate::{ComposablePass, composable::validate_if_test};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
-    ///   - a FuncDefn child of the root, if the root is a module; or
+    ///   - a `FuncDefn` child of the root, if the root is a module; or
     ///   - the root, if the root is not a Module
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
 #[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
-/// Errors produced by [ConstantFoldPass].
+/// Errors produced by [`ConstantFoldPass`].
 pub enum ConstFoldError {
     /// Error raised when a Node is specified as an entry-point but
     /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
@@ -44,7 +44,7 @@ pub enum ConstFoldError {
     InvalidEntryPoint {
         /// The node which was specified as an entry-point
         node: Node,
-        /// The OpType of the node
+        /// The `OpType` of the node
         op: OpType,
     },
     /// The chosen entrypoint is not in the hugr.
@@ -56,18 +56,19 @@ pub enum ConstFoldError {
 }
 
 impl ConstantFoldPass {
-    /// Allows the pass to remove potentially-non-terminating [TailLoop]s and [CFG] if their
+    /// Allows the pass to remove potentially-non-terminating [`TailLoop`]s and [`CFG`] if their
     /// result (if/when they do terminate) is either known or not needed.
     ///
-    /// [TailLoop]: hugr_core::ops::TailLoop
-    /// [CFG]: hugr_core::ops::CFG
+    /// [`TailLoop`]: hugr_core::ops::TailLoop
+    /// [`CFG`]: hugr_core::ops::CFG
+    #[must_use]
     pub fn allow_increase_termination(mut self) -> Self {
         self.allow_increase_termination = true;
         self
     }
 
     /// Specifies a number of external inputs to an entry point of the Hugr.
-    /// In normal use, for Module-rooted Hugrs, `node` is a FuncDefn child of the root;
+    /// In normal use, for Module-rooted Hugrs, `node` is a `FuncDefn` child of the root;
     /// or for non-Module-rooted Hugrs, `node` is the root of the Hugr. (This is not
     /// enforced, but it must be a container and not a module itself.)
     ///
@@ -97,17 +98,17 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     ///
     /// # Errors
     ///
-    /// [ConstFoldError::InvalidEntryPoint] if an entry-point added by [Self::with_inputs]
-    /// was of an invalid [OpType]
+    /// [`ConstFoldError::InvalidEntryPoint`] if an entry-point added by [`Self::with_inputs`]
+    /// was of an invalid [`OpType`]
     fn run(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
         let mut m = Machine::new(&hugr);
-        for (&n, in_vals) in self.inputs.iter() {
+        for (&n, in_vals) in &self.inputs {
             if !hugr.contains_node(n) {
                 return Err(ConstFoldError::MissingEntryPoint { node: n });
-            };
+            }
             m.prepopulate_inputs(
                 n,
                 in_vals.iter().map(|(p, v)| {
@@ -166,7 +167,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         }
         // Eliminate dead code not required for the same entry points.
         DeadCodeElimPass::<H>::default()
-            .with_entry_points(self.inputs.keys().cloned())
+            .with_entry_points(self.inputs.keys().copied())
             .set_preserve_callback(if self.allow_increase_termination {
                 Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
             } else {
@@ -185,10 +186,10 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
 }
 
 /// Exhaustively apply constant folding to a HUGR.
-/// If the Hugr's entrypoint is its [Module], assumes all [FuncDefn] children are reachable.
+/// If the Hugr's entrypoint is its [`Module`], assumes all [`FuncDefn`] children are reachable.
 ///
-/// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
-/// [Module]: hugr_core::ops::OpType::Module
+/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
+/// [`Module`]: hugr_core::ops::OpType::Module
 pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H>) {
     let h = h.as_mut();
     let c = ConstantFoldPass::default();
@@ -200,7 +201,7 @@ pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H
     } else {
         c
     };
-    validate_if_test(c, h).unwrap()
+    validate_if_test(c, h).unwrap();
 }
 
 struct ConstFoldContext;

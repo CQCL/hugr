@@ -9,7 +9,7 @@ pub mod int_types;
 #[cfg(test)]
 mod test {
     use crate::{
-        std_extensions::arithmetic::int_types::{int_type, INT_TYPES},
+        std_extensions::arithmetic::int_types::{INT_TYPES, int_type},
         types::type_param::TypeArg,
     };
 
@@ -20,8 +20,8 @@ mod test {
         for i in 0..LOG_WIDTH_BOUND {
             assert_eq!(
                 INT_TYPES[i as usize],
-                int_type(TypeArg::BoundedNat { n: i as u64 })
-            )
+                int_type(TypeArg::BoundedNat { n: u64::from(i) })
+            );
         }
     }
 }

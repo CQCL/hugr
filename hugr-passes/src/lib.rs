@@ -1,4 +1,5 @@
 //! Compilation passes acting on the HUGR program representation.
+#![expect(missing_docs)] // TODO: Fix...
 
 pub mod call_graph;
 pub mod composable;
@@ -8,7 +9,7 @@ pub mod dataflow;
 pub mod dead_code;
 pub use dead_code::DeadCodeElimPass;
 mod dead_funcs;
-pub use dead_funcs::{remove_dead_funcs, RemoveDeadFuncsError, RemoveDeadFuncsPass};
+pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs};
 pub mod force_order;
 mod half_node;
 pub mod linearize_array;
@@ -18,7 +19,7 @@ pub mod merge_bbs;
 mod monomorphize;
 pub mod untuple;
 
-pub use monomorphize::{mangle_name, monomorphize, MonomorphizePass};
+pub use monomorphize::{MonomorphizePass, mangle_name, monomorphize};
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;
 pub mod nest_cfgs;

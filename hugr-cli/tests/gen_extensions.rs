@@ -36,7 +36,7 @@ fn test_extension_dump(mut cmd: Command) {
         "collections/list.json",
     ];
     // check all paths exist
-    for path in expected_paths.iter() {
+    for path in &expected_paths {
         let full_path = temp_dir.join(path);
         assert!(full_path.exists());
     }

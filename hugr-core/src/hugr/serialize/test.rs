@@ -2,19 +2,20 @@
 
 use super::*;
 use crate::builder::{
-    endo_sig, inout_sig, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
-    DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    ModuleBuilder, endo_sig, inout_sig, test::closed_dfg_root_hugr,
 };
+use crate::extension::ExtensionRegistry;
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::test::SimpleOpDef;
-use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrMutInternals;
+use crate::hugr::test::check_hugr_equality;
 use crate::hugr::validate::ValidationError;
 use crate::hugr::views::ExtractionResult;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
-use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
+use crate::ops::{self, DFG, Input, Module, Output, Value, dataflow::IOTrait};
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
@@ -23,13 +24,12 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
-use crate::{type_row, OutgoingPort};
+use crate::{OutgoingPort, type_row};
 
 use itertools::Itertools;
 use jsonschema::{Draft, Validator};
 use lazy_static::lazy_static;
-use portgraph::LinkView;
-use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, LinkMut, PortMut, UnmanagedDenseMap, multiportgraph::MultiPortGraph};
 use rstest::rstest;
 
 /// A serde-serializable hugr. Used for testing.
@@ -68,7 +68,7 @@ impl NamedSchema {
             // errors don't necessarily implement Debug
             eprintln!("Schema failed to validate: {}", self.name);
             for error in errors {
-                eprintln!("Validation error: {}", error);
+                eprintln!("Validation error: {error}");
                 eprintln!("Instance path: {}", error.instance_path);
             }
             panic!("Serialization test failed.");
@@ -154,7 +154,7 @@ impl From<Type> for SerTestingLatest {
 
 #[test]
 fn empty_hugr_serialize() {
-    check_hugr_roundtrip(&Hugr::default(), true);
+    check_hugr_json_roundtrip(&Hugr::default(), true);
 }
 
 fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
@@ -184,7 +184,7 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
 /// equality checking.
 ///
 /// Returns the deserialized HUGR.
-pub fn check_hugr_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
+fn check_hugr_json_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
     // Transform the whole view into a HUGR.
     let (mut base, extract_map) = hugr.extract_hugr(hugr.module_root());
     base.set_entrypoint(extract_map.extracted_node(hugr.entrypoint()));
@@ -192,7 +192,7 @@ pub fn check_hugr_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
     let new_hugr: HugrDeser =
         ser_roundtrip_check_schema(&HugrSer(&base), get_schemas(check_schema));
 
-    check_hugr(&base, &new_hugr.0);
+    check_hugr_equality(&base, &new_hugr.0);
     new_hugr.0
 }
 
@@ -200,53 +200,8 @@ pub fn check_hugr_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
 pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schema: bool) -> Hugr {
     let new_hugr: HugrDeser = ser_deserialize_check_schema(value, get_schemas(check_schema));
 
-    check_hugr(hugr, &new_hugr.0);
+    check_hugr_equality(hugr, &new_hugr.0);
     new_hugr.0
-}
-
-/// Check that two HUGRs are equivalent, up to node renumbering.
-pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
-    // Original HUGR, with canonicalized node indices
-    //
-    // The internal port indices may still be different.
-    let mut h_canon = lhs.clone();
-    h_canon.canonicalize_nodes(|_, _| {});
-
-    assert_eq!(rhs.module_root(), h_canon.module_root());
-    assert_eq!(rhs.entrypoint(), h_canon.entrypoint());
-    assert_eq!(rhs.hierarchy, h_canon.hierarchy);
-    assert_eq!(rhs.metadata, h_canon.metadata);
-
-    // Extension operations may have been downgraded to opaque operations.
-    for node in rhs.nodes() {
-        let new_op = rhs.get_optype(node);
-        let old_op = h_canon.get_optype(node);
-        if !new_op.is_const() {
-            match (new_op, old_op) {
-                (OpType::ExtensionOp(ext), OpType::OpaqueOp(opaque))
-                | (OpType::OpaqueOp(opaque), OpType::ExtensionOp(ext)) => {
-                    let ext_opaque: OpaqueOp = ext.clone().into();
-                    assert_eq!(ext_opaque, opaque.clone());
-                }
-                _ => assert_eq!(new_op, old_op),
-            }
-        }
-    }
-
-    // Check that the graphs are equivalent up to port renumbering.
-    let new_graph = &rhs.graph;
-    let old_graph = &h_canon.graph;
-    assert_eq!(new_graph.node_count(), old_graph.node_count());
-    assert_eq!(new_graph.port_count(), old_graph.port_count());
-    assert_eq!(new_graph.link_count(), old_graph.link_count());
-    for n in old_graph.nodes_iter() {
-        assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
-        assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
-        assert_eq!(
-            new_graph.output_neighbours(n).collect_vec(),
-            old_graph.output_neighbours(n).collect_vec()
-        );
-    }
 }
 
 fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
@@ -306,7 +261,7 @@ fn simpleser() {
         extensions: ExtensionRegistry::default(),
     };
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
 }
 
 #[test]
@@ -335,7 +290,7 @@ fn weighted_hugr_ser() {
         module_builder.finish_hugr().unwrap()
     };
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
 }
 
 #[test]
@@ -343,7 +298,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![bool_t(); 2];
     let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp))?;
     let mut params: [_; 2] = dfg.input_wires_arr();
-    for p in params.iter_mut() {
+    for p in &mut params {
         *p = dfg
             .add_dataflow_op(Noop(bool_t()), [*p])
             .unwrap()
@@ -351,7 +306,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     }
     let hugr = dfg.finish_hugr_with_outputs(params)?;
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
     Ok(())
 }
 
@@ -370,7 +325,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     let hugr = dfg.finish_hugr_with_outputs([wire])?;
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
     Ok(())
 }
 
@@ -412,7 +367,7 @@ fn function_type() -> Result<(), Box<dyn std::error::Error>> {
     let op = bldr.add_dataflow_op(Noop(fn_ty), bldr.input_wires())?;
     let h = bldr.finish_hugr_with_outputs(op.outputs())?;
 
-    check_hugr_roundtrip(&h, true);
+    check_hugr_json_roundtrip(&h, true);
     Ok(())
 }
 
@@ -430,7 +385,7 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     hugr.remove_node(old_in);
     hugr.validate()?;
 
-    let rhs: Hugr = check_hugr_roundtrip(&hugr, true);
+    let rhs: Hugr = check_hugr_json_roundtrip(&hugr, true);
     rhs.validate()?;
     Ok(())
 }
@@ -532,7 +487,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     [TypeParam::new_list(TypeBound::Any)],
     Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
-    check_testing_roundtrip(poly_func_type)
+    check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
@@ -546,7 +501,7 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
-    check_testing_roundtrip(poly_func_type)
+    check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
@@ -614,27 +569,27 @@ mod proptest {
     proptest! {
         #[test]
         fn prop_roundtrip_type(t:  Type) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_poly_func_type(t: PolyFuncTypeRV) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_value(t: Value) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_optype(op: NodeSer ) {
-            check_testing_roundtrip(op)
+            check_testing_roundtrip(op);
         }
 
         #[test]
         fn prop_roundtrip_opdef(opdef: SimpleOpDef) {
-            check_testing_roundtrip(opdef)
+            check_testing_roundtrip(opdef);
         }
     }
 }

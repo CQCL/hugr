@@ -1,7 +1,7 @@
 //! Input/output arguments for the HUGR CLI.
 
 use clio::Input;
-use hugr::envelope::{read_envelope, EnvelopeError};
+use hugr::envelope::{EnvelopeError, read_envelope};
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
@@ -43,7 +43,7 @@ impl HugrInputArgs {
     /// Read a hugr envelope from the input and return the package encoded
     /// within.
     ///
-    /// If [HugrInputArgs::hugr_json] is `true`, [HugrInputArgs::get_hugr] should be called instead as
+    /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
     /// reading the input as a package will fail.
     pub fn get_package(&mut self) -> Result<Package, CliError> {
         let extensions = self.load_extensions()?;
@@ -58,9 +58,9 @@ impl HugrInputArgs {
     /// Read a hugr JSON file from the input.
     ///
     /// This is a legacy option for reading old HUGR JSON files when the
-    /// [HugrInputArgs::hugr_json] flag is used.
+    /// [`HugrInputArgs::hugr_json`] flag is used.
     ///
-    /// For most cases, [HugrInputArgs::get_package] should be called instead.
+    /// For most cases, [`HugrInputArgs::get_package`] should be called instead.
     pub fn get_hugr(&mut self) -> Result<Hugr, CliError> {
         let extensions = self.load_extensions()?;
         let mut buffer = BufReader::new(&mut self.input);
@@ -79,8 +79,8 @@ impl HugrInputArgs {
 
     /// Return a register with the selected extensions.
     ///
-    /// This includes the standard extensions if [HugrInputArgs::no_std] is `false`,
-    /// and the extensions loaded from the paths in [HugrInputArgs::extensions].
+    /// This includes the standard extensions if [`HugrInputArgs::no_std`] is `false`,
+    /// and the extensions loaded from the paths in [`HugrInputArgs::extensions`].
     pub fn load_extensions(&self) -> Result<ExtensionRegistry, CliError> {
         let mut reg = if self.no_std {
             hugr::extension::PRELUDE_REGISTRY.to_owned()

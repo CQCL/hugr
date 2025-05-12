@@ -56,7 +56,7 @@
 //!   [INPUT]                    Input file. Defaults to `-` for stdin.
 //! ```
 
-use clap::{crate_version, Parser};
+use clap::{Parser, crate_version};
 use clap_verbosity_flag::log::Level;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use hugr::envelope::EnvelopeError;
@@ -119,6 +119,7 @@ pub struct OtherArgs {
 
 impl OtherArgs {
     /// Test whether a `level` message should be output.
+    #[must_use]
     pub fn verbosity(&self, level: Level) -> bool {
         self.verbose.log_level_filter() >= level
     }

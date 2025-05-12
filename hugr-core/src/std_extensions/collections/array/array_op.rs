@@ -5,6 +5,7 @@ use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Extension;
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
@@ -17,7 +18,6 @@ use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
 use crate::utils::Never;
-use crate::Extension;
 
 use super::array_kind::ArrayKind;
 
@@ -30,7 +30,7 @@ pub enum GenericArrayOpDef<AK: ArrayKind> {
     /// `new_array<SIZE><elemty>: (elemty)^SIZE -> array<SIZE, elemty>`
     /// where `SIZE` must be statically known (not a variable)
     new_array,
-    /// Copies an element out of the array ([TypeBound::Copyable] elements only):
+    /// Copies an element out of the array ([`TypeBound::Copyable`] elements only):
     /// `get<size,elemty>: array<size, elemty>, index -> option<elemty>, array`
     get,
     /// Exchanges an element of the array with an external value:
@@ -102,6 +102,7 @@ impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
 
 impl<AK: ArrayKind> GenericArrayOpDef<AK> {
     /// Instantiate a new array operation with the given element type and array size.
+    #[must_use]
     pub fn to_concrete(self, elem_ty: Type, size: u64) -> GenericArrayOp<AK> {
         if self == GenericArrayOpDef::discard_empty {
             debug_assert_eq!(
@@ -122,7 +123,9 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
         array_def: &TypeDef,
         _extension_ref: &Weak<Extension>,
     ) -> SignatureFunc {
-        use GenericArrayOpDef::*;
+        use GenericArrayOpDef::{
+            _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap,
+        };
         if let new_array | pop_left | pop_right = self {
             // implements SignatureFromArgs
             // signature computed dynamically, so can rely on type definition in extension.
@@ -226,8 +229,8 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayOpDef<AK> {
         .into()
     }
 
-    /// Add an operation implemented as an [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as an [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the list type def while computing the signature,
     // to avoid recursive loops initializing the extension.
@@ -271,7 +274,9 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        use GenericArrayOpDef::*;
+        use GenericArrayOpDef::{
+            _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap,
+        };
         let ty_arg = TypeArg::Type {
             ty: self.elem_ty.clone(),
         };
@@ -329,7 +334,7 @@ mod tests {
     use crate::std_extensions::collections::array::Array;
     use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
         extension::prelude::{bool_t, qb_t},
         ops::{OpTrait, OpType},
     };
@@ -448,12 +453,10 @@ mod tests {
     fn test_pops<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
-        for op in [
+        for op in &[
             GenericArrayOpDef::<AK>::pop_left,
             GenericArrayOpDef::<AK>::pop_right,
-        ]
-        .iter()
-        {
+        ] {
             let op = op.to_concrete(element_ty.clone(), size);
 
             let optype: OpType = op.into();
@@ -463,11 +466,13 @@ mod tests {
                 sig.io(),
                 (
                     &vec![AK::ty(size, element_ty.clone())].into(),
-                    &vec![option_type(vec![
-                        element_ty.clone(),
-                        AK::ty(size - 1, element_ty.clone())
-                    ])
-                    .into()]
+                    &vec![
+                        option_type(vec![
+                            element_ty.clone(),
+                            AK::ty(size - 1, element_ty.clone())
+                        ])
+                        .into()
+                    ]
                     .into()
                 )
             );

@@ -4,7 +4,7 @@ use hugr::extension::prelude::{qb_t, usize_t};
 use hugr::ops::AliasDecl;
 use hugr::types::{Signature, Type, TypeBound};
 
-use criterion::{black_box, criterion_group, AxisScale, Criterion, PlotConfiguration};
+use criterion::{AxisScale, Criterion, PlotConfiguration, black_box, criterion_group};
 
 /// Construct a complex type.
 fn make_complex_type() -> Type {
@@ -22,7 +22,7 @@ fn bench_construction(c: &mut Criterion) {
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     group.bench_function("construction", |b| {
-        b.iter(|| black_box(make_complex_type()))
+        b.iter(|| black_box(make_complex_type()));
     });
 
     group.finish();

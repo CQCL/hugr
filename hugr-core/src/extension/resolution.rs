@@ -32,12 +32,12 @@ use types_mut::{
 use derive_more::{Display, Error, From};
 
 use super::{Extension, ExtensionId, ExtensionRegistry, ExtensionSet};
+use crate::Node;
 use crate::core::HugrNode;
 use crate::ops::constant::ValueName;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{NamedOp, OpName, OpType, Value};
 use crate::types::{CustomType, FuncTypeBase, MaybeRV, TypeArg, TypeBase, TypeName};
-use crate::Node;
 
 /// Update all weak Extension pointers inside a type.
 pub fn resolve_type_extensions<RV: MaybeRV>(
@@ -86,7 +86,7 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
     /// An operation requires an extension that is not in the given registry.
     #[display(
         "{op}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
-        node.map(|n| format!(" in {}", n)).unwrap_or_default(),
+        node.map(|n| format!(" in {n}")).unwrap_or_default(),
         available_extensions.join(", ")
     )]
     MissingOpExtension {
@@ -102,7 +102,7 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
     /// A type references an extension that is not in the given registry.
     #[display(
         "Type {ty}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
-        node.map(|n| format!(" in {}", n)).unwrap_or_default(),
+        node.map(|n| format!(" in {n}")).unwrap_or_default(),
         available_extensions.join(", ")
     )]
     MissingTypeExtension {
@@ -140,7 +140,9 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
         wrong_extension: ExtensionId,
     },
     /// The type of an `OpaqueValue` has types which do not reference their defining extensions.
-    #[display("The type of the opaque value '{value}' requires extensions {missing_extensions}, but does not reference their definition.")]
+    #[display(
+        "The type of the opaque value '{value}' requires extensions {missing_extensions}, but does not reference their definition."
+    )]
     InvalidConstTypes {
         /// The value that has invalid types.
         value: ValueName,
@@ -188,7 +190,7 @@ pub enum ExtensionCollectionError<N: HugrNode = Node> {
     /// An operation requires an extension that is not in the given registry.
     #[display(
         "{op}{} contains custom types for which have lost the reference to their defining extensions. Dropped extensions: {}",
-        if let Some(node) = node { format!(" ({})", node) } else { "".to_string() },
+        if let Some(node) = node { format!(" ({node})") } else { String::new() },
         missing_extensions.join(", ")
     )]
     DroppedOpExtensions {

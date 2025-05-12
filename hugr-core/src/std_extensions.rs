@@ -10,6 +10,7 @@ pub mod logic;
 pub mod ptr;
 
 /// Extension registry with all standard extensions and prelude.
+#[must_use]
 pub fn std_reg() -> ExtensionRegistry {
     let reg = ExtensionRegistry::new([
         crate::extension::prelude::PRELUDE.clone(),

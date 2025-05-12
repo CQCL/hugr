@@ -7,11 +7,11 @@
 //! updates the weak links to point to the correct extensions.
 
 use super::{ExtensionCollectionError, WeakExtensionRegistry};
+use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
-use crate::Node;
 
 /// Collects every extension used te define the types in an operation.
 ///
@@ -40,7 +40,7 @@ pub(crate) fn collect_op_types_extensions(
             for arg in ext.args() {
                 collect_typearg_exts(arg, &mut used, &mut missing);
             }
-            collect_signature_exts(&ext.signature(), &mut used, &mut missing)
+            collect_signature_exts(&ext.signature(), &mut used, &mut missing);
         }
         OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
         OpType::FuncDecl(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
@@ -68,17 +68,17 @@ pub(crate) fn collect_op_types_extensions(
             for arg in op.args() {
                 collect_typearg_exts(arg, &mut used, &mut missing);
             }
-            collect_signature_exts(&op.signature(), &mut used, &mut missing)
+            collect_signature_exts(&op.signature(), &mut used, &mut missing);
         }
         OpType::Tag(t) => {
-            for variant in t.variants.iter() {
-                collect_type_row_exts(variant, &mut used, &mut missing)
+            for variant in &t.variants {
+                collect_type_row_exts(variant, &mut used, &mut missing);
             }
         }
         OpType::DataflowBlock(db) => {
             collect_type_row_exts(&db.inputs, &mut used, &mut missing);
             collect_type_row_exts(&db.other_outputs, &mut used, &mut missing);
-            for row in db.sum_rows.iter() {
+            for row in &db.sum_rows {
                 collect_type_row_exts(row, &mut used, &mut missing);
             }
         }
@@ -94,7 +94,7 @@ pub(crate) fn collect_op_types_extensions(
             collect_signature_exts(&cfg.signature, &mut used, &mut missing);
         }
         OpType::Conditional(cond) => {
-            for row in cond.sum_rows.iter() {
+            for row in &cond.sum_rows {
                 collect_type_row_exts(row, &mut used, &mut missing);
             }
             collect_type_row_exts(&cond.other_inputs, &mut used, &mut missing);
@@ -105,16 +105,15 @@ pub(crate) fn collect_op_types_extensions(
         }
         // Ignore optypes that do not store a signature.
         OpType::Module(_) | OpType::AliasDecl(_) | OpType::AliasDefn(_) => {}
-    };
+    }
 
-    match missing.is_empty() {
-        true => {
-            // We know there are no missing extensions, so this should not fail.
-            Ok(used.try_into().expect("All extensions are valid"))
-        }
-        false => Err(ExtensionCollectionError::dropped_op_extension(
+    if missing.is_empty() {
+        // We know there are no missing extensions, so this should not fail.
+        Ok(used.try_into().expect("All extensions are valid"))
+    } else {
+        Err(ExtensionCollectionError::dropped_op_extension(
             node, op, missing,
-        )),
+        ))
     }
 }
 
@@ -187,7 +186,7 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
             collect_type_row_exts(&f.output, used_extensions, missing_extensions);
         }
         TypeEnum::Sum(SumType::General { rows }) => {
-            for row in rows.iter() {
+            for row in rows {
                 collect_type_row_exts(row, used_extensions, missing_extensions);
             }
         }
@@ -215,7 +214,7 @@ pub(super) fn collect_typearg_exts(
     match arg {
         TypeArg::Type { ty } => collect_type_exts(ty, used_extensions, missing_extensions),
         TypeArg::Sequence { elems } => {
-            for elem in elems.iter() {
+            for elem in elems {
                 collect_typearg_exts(elem, used_extensions, missing_extensions);
             }
         }
@@ -248,7 +247,7 @@ fn collect_value_exts(
         }
         Value::Sum(s) => {
             if let SumType::General { rows } = &s.sum_type {
-                for row in rows.iter() {
+                for row in rows {
                     collect_type_row_exts(row, used_extensions, missing_extensions);
                 }
             }

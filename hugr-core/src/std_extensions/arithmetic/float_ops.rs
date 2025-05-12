@@ -6,14 +6,14 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use super::float_types::float64_type;
 use crate::{
+    Extension,
     extension::{
+        ExtensionId, OpDef, SignatureFunc,
         prelude::{bool_t, string_type},
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
-        ExtensionId, OpDef, SignatureFunc,
     },
     ops::OpName,
     types::Signature,
-    Extension,
 };
 use lazy_static::lazy_static;
 mod const_fold;
@@ -58,7 +58,7 @@ impl MakeOpDef for FloatOps {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -108,7 +108,7 @@ impl MakeOpDef for FloatOps {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
@@ -123,7 +123,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for FloatOps {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -184,9 +184,7 @@ mod test {
 
             assert!(
                 res_val.abs_diff_eq(expected, f64::EPSILON),
-                "expected {:?}, got {:?}",
-                expected,
-                res_val
+                "expected {expected:?}, got {res_val:?}"
             );
         }
     }

@@ -3,8 +3,8 @@
 use std::{borrow::Cow, rc::Rc, sync::Arc};
 
 use super::HugrView;
-use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::HugrMut;
+use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 
 macro_rules! hugr_internal_methods {
     // The extra ident here is because invocations of the macro cannot pass `self` as argument

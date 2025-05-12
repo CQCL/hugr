@@ -103,7 +103,7 @@ mod test {
     use crate::hugr::HugrError;
     use crate::ops::handle::{CfgID, DfgID};
     use crate::ops::{OpTag, OpType};
-    use crate::{ops, types::Signature, Hugr};
+    use crate::{Hugr, ops, types::Signature};
 
     #[test]
     fn root_checked() {
