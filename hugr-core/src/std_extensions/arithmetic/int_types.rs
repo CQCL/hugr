@@ -6,13 +6,13 @@ use std::sync::{Arc, Weak};
 use crate::ops::constant::ValueName;
 use crate::types::TypeName;
 use crate::{
+    Extension,
     extension::ExtensionId,
     ops::constant::CustomConst,
     types::{
-        type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomType, Type, TypeBound,
+        type_param::{TypeArg, TypeArgError, TypeParam},
     },
-    Extension,
 };
 use lazy_static::lazy_static;
 /// The extension identifier.
@@ -23,7 +23,7 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 /// Identifier for the integer type.
 pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
 
-/// Integer type of a given bit width (specified by the TypeArg).  Depending on
+/// Integer type of a given bit width (specified by the `TypeArg`).  Depending on
 /// the operation, the semantic interpretation may be unsigned integer, signed
 /// integer or bit string.
 pub fn int_custom_type(
@@ -39,9 +39,9 @@ pub fn int_custom_type(
     )
 }
 
-/// Integer type of a given bit width (specified by the TypeArg).
+/// Integer type of a given bit width (specified by the `TypeArg`).
 ///
-/// Constructed from [int_custom_type].
+/// Constructed from [`int_custom_type`].
 pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
     int_custom_type(width_arg.into(), &Arc::<Extension>::downgrade(&EXTENSION)).into()
 }
@@ -49,13 +49,14 @@ pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
 lazy_static! {
     /// Array of valid integer types, indexed by log width of the integer.
     pub static ref INT_TYPES: [Type; LOG_WIDTH_BOUND as usize] = (0..LOG_WIDTH_BOUND)
-        .map(|i| int_type(TypeArg::BoundedNat { n: i as u64 }))
+        .map(|i| int_type(TypeArg::BoundedNat { n: u64::from(i) }))
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
 }
 
-/// Returns whether `n` is a valid `log_width` for an [int_type].
+/// Returns whether `n` is a valid `log_width` for an [`int_type`].
+#[must_use]
 pub const fn is_valid_log_width(n: u8) -> bool {
     n < LOG_WIDTH_BOUND
 }
@@ -151,16 +152,19 @@ impl ConstInt {
     }
 
     /// Returns the number of bits of the constant
+    #[must_use]
     pub fn log_width(&self) -> u8 {
         self.log_width
     }
 
     /// Returns the value of the constant as an unsigned integer
+    #[must_use]
     pub fn value_u(&self) -> u64 {
         self.value
     }
 
     /// Returns the value of the constant as a signed integer
+    #[must_use]
     pub fn value_s(&self) -> i64 {
         if self.log_width == LOG_WIDTH_MAX {
             self.value as i64
@@ -299,7 +303,7 @@ mod test {
                     ConstInt::new_s(log_width, v).expect("guaranteed to be in bounds")
                 });
                 let unsigned_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
-                    (0..2u64.pow(log_width as u32)).prop_map(move |v| {
+                    (0..2u64.pow(u32::from(log_width))).prop_map(move |v| {
                         ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds")
                     })
                 });
@@ -310,7 +314,7 @@ mod test {
 
         fn any_signed_int_with_log_width() -> impl Strategy<Value = (u8, i64)> {
             (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
-                let width = 2u64.pow(log_width as u32);
+                let width = 2u64.pow(u32::from(log_width));
                 let max_val = ((1u64 << (width - 1)) - 1u64) as i64;
                 let min_val = -max_val - 1;
                 prop_oneof![(min_val..=max_val), Just(min_val), Just(max_val)]
@@ -325,22 +329,22 @@ mod test {
                     0 => (-1, 0),
                     1 => (-2, 1),
                     2 => (-8, 7),
-                    3 => (i8::MIN as i64, i8::MAX as i64),
-                    4 => (i16::MIN as i64, i16::MAX as i64),
-                    5 => (i32::MIN as i64, i32::MAX as i64),
+                    3 => (i64::from(i8::MIN), i64::from(i8::MAX)),
+                    4 => (i64::from(i16::MIN), i64::from(i16::MAX)),
+                    5 => (i64::from(i32::MIN), i64::from(i32::MAX)),
                     6 => (i64::MIN, i64::MAX),
                     _ => unreachable!(),
                 };
-                let width = 2i64.pow(log_width as u32);
+                let width = 2i64.pow(u32::from(log_width));
                 // the left hand side counts the number of valid values as follows:
                 //  - use i128 to be able to hold the number of valid i64s
                 //  - there are exactly `max` valid positive values;
                 //  - there are exactly `-min` valid negative values;
                 //  - there are exactly 1 zero values.
-                prop_assert_eq!((max as i128) - (min as i128) + 1, 1 << width);
+                prop_assert_eq!(i128::from(max) - i128::from(min) + 1, 1 << width);
                 prop_assert!(x >= min);
                 prop_assert!(x <= max);
-                prop_assert!(ConstInt::new_s(log_width, x).is_ok())
+                prop_assert!(ConstInt::new_s(log_width, x).is_ok());
             }
         }
     }

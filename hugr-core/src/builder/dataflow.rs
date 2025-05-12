@@ -15,7 +15,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Wire};
 use crate::types::{PolyFuncType, Signature, Type};
 
 use crate::Node;
-use crate::{hugr::HugrMut, Hugr};
+use crate::{Hugr, hugr::HugrMut};
 
 /// Builder for a [`ops::DFG`] node.
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +27,7 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
-    /// Returns a new DFGBuilder with the given base and parent node.
+    /// Returns a new `DFGBuilder` with the given base and parent node.
     ///
     /// Sets up the input and output nodes of the region. If `parent` already has
     /// input and output nodes, use [`DFGBuilder::create`] instead.
@@ -57,7 +57,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         })
     }
 
-    /// Returns a new DFGBuilder with the given base and parent node.
+    /// Returns a new `DFGBuilder` with the given base and parent node.
     ///
     /// The parent node may be any `DataflowParent` node.
     ///
@@ -152,7 +152,7 @@ impl<B, T> DFGWrapper<B, T> {
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a FuncDefn rooted HUGR
+    /// Initialize a builder for a `FuncDefn` rooted HUGR
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
@@ -246,7 +246,7 @@ impl FunctionBuilder<Hugr> {
 
     /// Update the function builder's parent signature.
     ///
-    /// Internal function used in [add_input] and [add_output].
+    /// Internal function used in [`add_input`] and [`add_output`].
     ///
     /// Does not update the input and output nodes.
     ///
@@ -320,20 +320,20 @@ pub(crate) mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{
-        endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
+        BuilderWiringError, DataflowSubContainer, ModuleBuilder, endo_sig, inout_sig,
     };
+    use crate::extension::SignatureError;
     use crate::extension::prelude::Noop;
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
-    use crate::extension::SignatureError;
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{handle::NodeHandle, OpTag};
+    use crate::ops::{OpTag, handle::NodeHandle};
     use crate::ops::{OpTrait, Value};
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
     use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
-    use crate::{builder::test::n_identity, type_row, Wire};
+    use crate::{Wire, builder::test::n_identity, type_row};
 
     use super::super::test::simple_dfg_hugr;
     use super::*;

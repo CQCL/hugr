@@ -5,17 +5,17 @@
 //! Depending on the type of HUGR you want to build, you may want to use one of
 //! the following builders:
 //!
-//! - [ModuleBuilder]: For building a module with function declarations and
+//! - [`ModuleBuilder`]: For building a module with function declarations and
 //!   definitions.
-//! - [DFGBuilder]: For building a dataflow graph.
-//! - [FunctionBuilder]: A `DFGBuilder` specialised in defining functions with a
+//! - [`DFGBuilder`]: For building a dataflow graph.
+//! - [`FunctionBuilder`]: A `DFGBuilder` specialised in defining functions with a
 //!   dataflow graph.
-//! - [CFGBuilder]: For building a control flow graph.
-//! - [ConditionalBuilder]: For building a conditional node.
-//! - [TailLoopBuilder]: For building a tail-loop node.
+//! - [`CFGBuilder`]: For building a control flow graph.
+//! - [`ConditionalBuilder`]: For building a conditional node.
+//! - [`TailLoopBuilder`]: For building a tail-loop node.
 //!
-//! Additionally, the [CircuitBuilder] provides an alternative to the
-//! [DFGBuilder] when working with circuits, where some inputs of operations directly
+//! Additionally, the [`CircuitBuilder`] provides an alternative to the
+//! [`DFGBuilder`] when working with circuits, where some inputs of operations directly
 //! correspond to some outputs and operations can be directly appended using
 //! unit indices.
 //!
@@ -87,8 +87,8 @@
 //! ```
 use thiserror::Error;
 
-use crate::extension::simple_op::OpLoadError;
 use crate::extension::SignatureError;
+use crate::extension::simple_op::OpLoadError;
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
@@ -122,12 +122,12 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 mod circuit;
 pub use circuit::{CircuitBuildError, CircuitBuilder};
 
-/// Return a FunctionType with the same input and output types (specified).
+/// Return a `FunctionType` with the same input and output types (specified).
 pub fn endo_sig(types: impl Into<TypeRow>) -> Signature {
     Signature::new_endo(types)
 }
 
-/// Return a FunctionType with the specified input and output types.
+/// Return a `FunctionType` with the specified input and output types.
 pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Signature {
     Signature::new(inputs, outputs)
 }
@@ -139,8 +139,8 @@ pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError<Node>),
-    /// SignatureError in trying to construct a node (differs from
-    /// [ValidationError::SignatureError] in that we could not construct a node to report about)
+    /// `SignatureError` in trying to construct a node (differs from
+    /// [`ValidationError::SignatureError`] in that we could not construct a node to report about)
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// Tried to add a malformed [Const]
@@ -152,8 +152,10 @@ pub enum BuildError {
     #[error("CFG entry node already built for CFG node: {0}.")]
     EntryBuiltError(Node),
     /// We don't allow creating `BasicBlockBuilder<Hugr>`s when the sum-rows
-    /// are not homogeneous. Use a CFGBuilder and create a valid graph instead.
-    #[error("Cannot initialize hugr for a BasicBlockBuilder with complex sum-rows. Use a CFGBuilder instead.")]
+    /// are not homogeneous. Use a `CFGBuilder` and create a valid graph instead.
+    #[error(
+        "Cannot initialize hugr for a BasicBlockBuilder with complex sum-rows. Use a CFGBuilder instead."
+    )]
     BasicBlockTooComplex,
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node} does not have type {op_desc} as expected.")]
@@ -179,7 +181,7 @@ pub enum BuildError {
     #[error("Wire not found in Hugr: {0}.")]
     WireNotFound(Wire),
 
-    /// Error in CircuitBuilder
+    /// Error in `CircuitBuilder`
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit::CircuitBuildError),
 
@@ -222,7 +224,9 @@ pub enum BuilderWiringError {
         src_offset: Port,
     },
     /// The ancestors of an inter-graph edge are not related.
-    #[error("Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NoRelationIntergraph {
         src: Node,
@@ -231,7 +235,9 @@ pub enum BuilderWiringError {
         dst_offset: Port,
     },
     /// Inter-Graph edges can only carry copyable data.
-    #[error("Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NonCopyableIntergraph {
         src: Node,
@@ -246,12 +252,12 @@ pub enum BuilderWiringError {
 pub(crate) mod test {
     use rstest::fixture;
 
+    use crate::Hugr;
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::hugr::{views::HugrView, HugrMut};
+    use crate::hugr::{HugrMut, views::HugrView};
     use crate::ops;
     use crate::package::Package;
     use crate::types::{PolyFuncType, Signature};
-    use crate::Hugr;
 
     use super::handle::BuildHandle;
     use super::{

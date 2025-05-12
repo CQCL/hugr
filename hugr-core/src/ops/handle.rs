@@ -1,7 +1,7 @@
 //! Handles to nodes in HUGR.
+use crate::Node;
 use crate::core::HugrNode;
 use crate::types::{Type, TypeBound};
-use crate::Node;
 
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
@@ -29,6 +29,7 @@ pub trait NodeHandle<N = Node>: Clone {
     }
 
     /// Checks whether the handle can hold an operation with the given tag.
+    #[must_use]
     fn can_hold(tag: OpTag) -> bool {
         Self::TAG.is_superset(tag)
     }
@@ -43,7 +44,7 @@ pub trait ContainerHandle<N = Node>: NodeHandle<N> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [DataflowOp](crate::ops::dataflow).
+/// Handle to a [`DataflowOp`](crate::ops::dataflow).
 pub struct DataflowOpID<N = Node>(N);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
@@ -71,8 +72,8 @@ pub struct ModuleID<N = Node>(N);
 pub struct FuncID<const DEF: bool, N = Node>(N);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to an [AliasDefn](crate::ops::OpType::AliasDefn)
-/// or [AliasDecl](crate::ops::OpType::AliasDecl) node.
+/// Handle to an [`AliasDefn`](crate::ops::OpType::AliasDefn)
+/// or [`AliasDecl`](crate::ops::OpType::AliasDecl) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
@@ -83,12 +84,12 @@ pub struct AliasID<const DEF: bool, N = Node> {
 }
 
 impl<const DEF: bool, N> AliasID<DEF, N> {
-    /// Construct new AliasID
+    /// Construct new `AliasID`
     pub fn new(node: N, name: SmolStr, bound: TypeBound) -> Self {
         Self { node, name, bound }
     }
 
-    /// Construct new AliasID
+    /// Construct new `AliasID`
     pub fn get_alias_type(&self) -> Type {
         Type::new_alias(AliasDecl::new(self.name.clone(), self.bound))
     }
@@ -103,7 +104,7 @@ impl<const DEF: bool, N> AliasID<DEF, N> {
 pub struct ConstID<N = Node>(N);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [DataflowBlock](crate::ops::DataflowBlock) or [Exit](crate::ops::ExitBlock) node.
+/// Handle to a [`DataflowBlock`](crate::ops::DataflowBlock) or [Exit](crate::ops::ExitBlock) node.
 pub struct BasicBlockID<N = Node>(N);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
@@ -111,7 +112,7 @@ pub struct BasicBlockID<N = Node>(N);
 pub struct CaseID<N = Node>(N);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [TailLoop](crate::ops::TailLoop) node.
+/// Handle to a [`TailLoop`](crate::ops::TailLoop) node.
 pub struct TailLoopID<N = Node>(N);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
@@ -123,9 +124,9 @@ pub struct ConditionalID<N = Node>(N);
 pub struct DataflowParentID<N = Node>(N);
 
 /// Implements the `NodeHandle` trait for a tuple struct that contains just a
-/// NodeIndex. Takes the name of the struct, and the corresponding OpTag.
+/// `NodeIndex`. Takes the name of the struct, and the corresponding `OpTag`.
 ///
-/// Optionally, the name of the field containing the NodeIndex can be specified
+/// Optionally, the name of the field containing the `NodeIndex` can be specified
 /// as a third argument. Otherwise, it is assumed to be a tuple struct 0th item.
 macro_rules! impl_nodehandle {
     ($name:ident, $tag:expr) => {

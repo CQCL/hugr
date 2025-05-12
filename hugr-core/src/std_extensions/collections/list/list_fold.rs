@@ -1,14 +1,14 @@
 //! Folding definitions for list operations.
 
+use crate::IncomingPort;
 use crate::extension::prelude::{
-    const_fail, const_none, const_ok, const_ok_tuple, const_some, ConstUsize,
+    ConstUsize, const_fail, const_none, const_ok, const_ok_tuple, const_some,
 };
 use crate::extension::{ConstFold, ConstFoldResult, OpDef};
 use crate::ops::Value;
-use crate::types::type_param::TypeArg;
 use crate::types::Type;
+use crate::types::type_param::TypeArg;
 use crate::utils::sorted_consts;
-use crate::IncomingPort;
 
 use super::{ListOp, ListValue};
 
@@ -35,15 +35,14 @@ impl ConstFold for PopFold {
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
 
-        match list.0.pop() {
-            Some(elem) => Some(vec![(0.into(), list.into()), (1.into(), const_some(elem))]),
-            None => {
-                let elem_type = list.1.clone();
-                Some(vec![
-                    (0.into(), list.into()),
-                    (1.into(), const_none(elem_type)),
-                ])
-            }
+        if let Some(elem) = list.0.pop() {
+            Some(vec![(0.into(), list.into()), (1.into(), const_some(elem))])
+        } else {
+            let elem_type = list.1.clone();
+            Some(vec![
+                (0.into(), list.into()),
+                (1.into(), const_none(elem_type)),
+            ])
         }
     }
 }

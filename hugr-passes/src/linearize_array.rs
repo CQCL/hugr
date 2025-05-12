@@ -1,6 +1,7 @@
 //! Provides [LinearizeArrayPass] which turns 'value_array`s into regular linear `array`s.
 
 use hugr_core::{
+    Node,
     extension::{
         prelude::Noop,
         simple_op::{HasConcrete, MakeOpDef as _, MakeRegisteredOp},
@@ -8,22 +9,21 @@ use hugr_core::{
     hugr::hugrmut::HugrMut,
     std_extensions::collections::{
         array::{
-            array_type_def, array_type_parametric, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
-            ArrayScanDef, ArrayValue, ARRAY_REPEAT_OP_ID, ARRAY_SCAN_OP_ID,
+            ARRAY_REPEAT_OP_ID, ARRAY_SCAN_OP_ID, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
+            ArrayScanDef, ArrayValue, array_type_def, array_type_parametric,
         },
         value_array::{self, VArrayFromArrayDef, VArrayToArrayDef, VArrayValue, ValueArray},
     },
     types::Transformable,
-    Node,
 };
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
 use crate::{
-    replace_types::{
-        handlers::copy_discard_array, DelegatingLinearizer, NodeTemplate, ReplaceTypesError,
-    },
     ComposablePass, ReplaceTypes,
+    replace_types::{
+        DelegatingLinearizer, NodeTemplate, ReplaceTypesError, handlers::copy_discard_array,
+    },
 };
 
 /// A HUGR -> HUGR pass that turns 'value_array`s into regular linear `array`s.
@@ -47,9 +47,9 @@ impl Default for LinearizeArrayPass {
             let mut ty = v.get_element_type().clone();
             let mut contents = v.get_contents().iter().cloned().collect_vec();
             ty.transform(replacer).unwrap();
-            contents.iter_mut().for_each(|v| {
+            for v in &mut contents {
                 replacer.change_value(v).unwrap();
-            });
+            }
             Ok(Some(ArrayValue::new(ty, contents).into()))
         });
         for op_def in ArrayOpDef::iter() {
@@ -65,12 +65,11 @@ impl Default for LinearizeArrayPass {
                     // that takes a function ptr to copy the element? For now, let's just
                     // error out and make sure we're not emitting `get`s for nested value
                     // arrays.
-                    if op_def == ArrayOpDef::get && !args[1].as_type().unwrap().copyable() {
-                        panic!(
-                            "Cannot linearise arrays in this Hugr: \
+                    assert!(
+                        op_def != ArrayOpDef::get || args[1].as_type().unwrap().copyable(),
+                        "Cannot linearise arrays in this Hugr: \
                             Contains a `get` operation on nested value arrays"
-                        );
-                    }
+                    );
                     Some(NodeTemplate::SingleOp(
                         op_def.instantiate(args).unwrap().into(),
                     ))
@@ -132,6 +131,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LinearizeArrayPass {
 
 impl LinearizeArrayPass {
     /// Returns a new [`LinearizeArrayPass`] that handles all standard extensions.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -150,29 +150,29 @@ mod test {
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{Const, OpType};
     use hugr_core::std_extensions::collections::array::{
-        self, array_type, ArrayValue, Direction, FROM, INTO,
+        self, ArrayValue, Direction, FROM, INTO, array_type,
     };
     use hugr_core::std_extensions::collections::value_array::{
         VArrayFromArray, VArrayRepeat, VArrayScan, VArrayToArray, VArrayValue,
     };
     use hugr_core::types::Transformable;
     use hugr_core::{
+        HugrView,
         builder::{Container, DFGBuilder, Dataflow, HugrBuilder},
         extension::prelude::{qb_t, usize_t},
         std_extensions::collections::{
             array::{
-                op_builder::{build_all_array_ops, build_all_value_array_ops},
                 ArrayRepeat, ArrayScan,
+                op_builder::{build_all_array_ops, build_all_value_array_ops},
             },
             value_array::{self, value_array_type},
         },
         types::{Signature, Type},
-        HugrView,
     };
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::{composable::ValidatingPass, ComposablePass};
+    use crate::{ComposablePass, composable::ValidatingPass};
 
     use super::LinearizeArrayPass;
 

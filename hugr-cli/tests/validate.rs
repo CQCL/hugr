@@ -5,7 +5,7 @@
 #![cfg(all(test, not(miri)))]
 
 use assert_cmd::Command;
-use assert_fs::{fixture::FileWriteStr, NamedTempFile};
+use assert_fs::{NamedTempFile, fixture::FileWriteStr};
 use hugr::builder::{DFGBuilder, DataflowSubContainer, ModuleBuilder};
 use hugr::envelope::EnvelopeConfig;
 use hugr::package::Package;

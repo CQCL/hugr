@@ -1,20 +1,20 @@
-//! Provides [force_order], a tool for fixing the order of nodes in a Hugr.
+//! Provides [`force_order`], a tool for fixing the order of nodes in a Hugr.
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::{
-    hugr::{hugrmut::HugrMut, HugrError},
+    HugrView as _, Node,
+    hugr::{HugrError, hugrmut::HugrMut},
     ops::{OpTag, OpTrait},
     types::EdgeKind,
-    HugrView as _, Node,
 };
 use itertools::Itertools as _;
 use petgraph::{
+    Direction::Incoming,
     visit::{
         GraphBase, GraphRef, IntoNeighbors as _, IntoNeighborsDirected, IntoNodeIdentifiers,
         NodeFiltered, VisitMap, Visitable, Walker,
     },
-    Direction::Incoming,
 };
 
 /// Insert order edges into a Hugr according to a rank function.
@@ -41,7 +41,7 @@ pub fn force_order<H: HugrMut<Node = Node>>(
     force_order_by_key(hugr, root, rank)
 }
 
-/// As [force_order], but allows a generic [Ord] choice for the result of the
+/// As [`force_order`], but allows a generic [Ord] choice for the result of the
 /// `rank` function.
 pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     hugr: &mut H,
@@ -105,7 +105,7 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     Ok(())
 }
 
-/// An adaption of [petgraph::visit::Topo]. We differ only in that we sort nodes
+/// An adaption of [`petgraph::visit::Topo`]. We differ only in that we sort nodes
 /// by the rank function before adding them to the internal work stack. This
 /// ensures we visit lower ranked nodes before higher ranked nodes whenever the
 /// topology of the graph allows.
@@ -207,15 +207,15 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use hugr_core::builder::{endo_sig, BuildHandle, Dataflow, DataflowHugr};
+    use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr, endo_sig};
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::{self, Value};
     use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, Type};
-    use hugr_core::{builder::DFGBuilder, hugr::Hugr};
     use hugr_core::{HugrView, Wire};
+    use hugr_core::{builder::DFGBuilder, hugr::Hugr};
 
     use petgraph::visit::Topo;
 
@@ -334,7 +334,7 @@ mod test {
     }
 
     #[test]
-    /// test for https://github.com/CQCL/hugr/issues/2005
+    /// test for <https://github.com/CQCL/hugr/issues/2005>
     fn call_indirect_bug() {
         let fn_type = Signature::new(Type::UNIT, vec![Type::UNIT]);
         let mut hugr = {

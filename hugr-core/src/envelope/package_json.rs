@@ -3,8 +3,8 @@ use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use std::io;
 
-use crate::extension::resolution::ExtensionResolutionError;
 use crate::extension::ExtensionRegistry;
+use crate::extension::resolution::ExtensionResolutionError;
 use crate::hugr::ExtensionError;
 use crate::package::Package;
 use crate::{Extension, Hugr};
@@ -49,7 +49,7 @@ pub(super) fn to_json_writer<'h>(
 ) -> Result<(), PackageEncodingError> {
     let pkg_ser = PackageSer {
         modules: hugrs.into_iter().map(HugrSer).collect(),
-        extensions: extensions.iter().map(|e| e.as_ref()).collect(),
+        extensions: extensions.iter().map(std::convert::AsRef::as_ref).collect(),
     };
     serde_json::to_writer(writer, &pkg_ser)?;
     Ok(())

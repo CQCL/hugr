@@ -3,11 +3,11 @@
 use std::{error::Error, marker::PhantomData};
 
 use hugr_core::core::HugrNode;
-use hugr_core::hugr::{hugrmut::HugrMut, ValidationError};
+use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
-/// e.g. by [ValidatingPass]
+/// e.g. by [`ValidatingPass`]
 pub trait ComposablePass<H: HugrMut>: Sized {
     type Error: Error;
     type Result; // Would like to default to () but currently unstable
@@ -21,7 +21,7 @@ pub trait ComposablePass<H: HugrMut>: Sized {
         ErrMapper::new(self, f)
     }
 
-    /// Returns a [ComposablePass] that does "`self` then `other`", so long as
+    /// Returns a [`ComposablePass`] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
     fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
@@ -107,7 +107,7 @@ impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> Composabl
 
 // ValidatingPass ------------------------------
 
-/// Error from a [ValidatingPass]
+/// Error from a [`ValidatingPass`]
 #[derive(thiserror::Error, Debug)]
 pub enum ValidatePassError<N, E>
 where
@@ -170,19 +170,19 @@ where
 }
 
 // IfThen ------------------------------
-/// [ComposablePass] that executes a first pass that returns a `bool`
+/// [`ComposablePass`] that executes a first pass that returns a `bool`
 /// result; and then, if-and-only-if that first result was true,
 /// executes a second pass
 pub struct IfThen<E, H, A, B>(A, B, PhantomData<(E, H)>);
 
 impl<
-        A: ComposablePass<H, Result = bool>,
-        B: ComposablePass<H>,
-        H: HugrMut,
-        E: ErrorCombiner<A::Error, B::Error>,
-    > IfThen<E, H, A, B>
+    A: ComposablePass<H, Result = bool>,
+    B: ComposablePass<H>,
+    H: HugrMut,
+    E: ErrorCombiner<A::Error, B::Error>,
+> IfThen<E, H, A, B>
 {
-    /// Make a new instance given the [ComposablePass] to run first
+    /// Make a new instance given the [`ComposablePass`] to run first
     /// and (maybe) second
     pub fn new(fst: A, opt_snd: B) -> Self {
         Self(fst, opt_snd, PhantomData)
@@ -190,11 +190,11 @@ impl<
 }
 
 impl<
-        A: ComposablePass<H, Result = bool>,
-        B: ComposablePass<H>,
-        H: HugrMut,
-        E: ErrorCombiner<A::Error, B::Error>,
-    > ComposablePass<H> for IfThen<E, H, A, B>
+    A: ComposablePass<H, Result = bool>,
+    B: ComposablePass<H>,
+    H: HugrMut,
+    E: ErrorCombiner<A::Error, B::Error>,
+> ComposablePass<H> for IfThen<E, H, A, B>
 {
     type Error = E;
     type Result = Option<B::Result>;
@@ -226,9 +226,9 @@ mod test {
         Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
         ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize, MakeTuple, UnpackTuple};
+    use hugr_core::extension::prelude::{ConstUsize, MakeTuple, UnpackTuple, bool_t, usize_t};
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::ops::{handle::NodeHandle, Input, OpType, Output, DFG};
+    use hugr_core::ops::{DFG, Input, OpType, Output, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, TypeRow};
     use hugr_core::{Hugr, HugrView, IncomingPort};
@@ -237,7 +237,7 @@ mod test {
     use crate::untuple::{UntupleRecursive, UntupleResult};
     use crate::{DeadCodeElimPass, ReplaceTypes, UntuplePass};
 
-    use super::{validate_if_test, ComposablePass, IfThen, ValidatePassError, ValidatingPass};
+    use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass, validate_if_test};
 
     #[test]
     fn test_then() {

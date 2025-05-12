@@ -21,6 +21,8 @@ test-utils = ["insta", "rstest", "portgraph"]
 default = ["llvm14-0"]
 llvm14-0 = ["inkwell/llvm14-0"]
 
+[lints]
+workspace = true
 
 [dependencies]
 inkwell = { version = "0.6.0", default-features = false }

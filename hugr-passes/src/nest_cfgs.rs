@@ -46,21 +46,21 @@ use thiserror::Error;
 
 use hugr_core::hugr::patch::outline_cfg::OutlineCfg;
 use hugr_core::hugr::views::{HugrView, RootCheckable};
-use hugr_core::hugr::{hugrmut::HugrMut, Patch};
-use hugr_core::ops::handle::CfgID;
+use hugr_core::hugr::{Patch, hugrmut::HugrMut};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
+use hugr_core::ops::handle::CfgID;
 use hugr_core::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
 ///
-/// `T` is the type of basic block; this can just be a BasicBlock (e.g. [`hugr_core::Node`]) in the Hugr,
-/// or an [IdentityCfgMap] if the extra level of indirection is not required. However, since
+/// `T` is the type of basic block; this can just be a `BasicBlock` (e.g. [`hugr_core::Node`]) in the Hugr,
+/// or an [`IdentityCfgMap`] if the extra level of indirection is not required. However, since
 /// SESE regions are bounded by edges between pairs of such `T`, such splitting may allow the
 /// algorithm to identify more regions than existed in the underlying CFG, without mutating the
 /// underlying CFG just for the analysis - the splitting (and/or merging) can then be performed by
-/// [CfgNester::nest_sese_region] only as necessary for regions actually nested.
+/// [`CfgNester::nest_sese_region`] only as necessary for regions actually nested.
 pub trait CfgNodeMap<T> {
     /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume control arrives here from "outside".
     fn entry_node(&self) -> T;
@@ -72,7 +72,7 @@ pub trait CfgNodeMap<T> {
     fn predecessors(&self, node: T) -> impl Iterator<Item = T>;
 }
 
-/// Extension of [CfgNodeMap] to that can perform (mutable/destructive)
+/// Extension of [`CfgNodeMap`] to that can perform (mutable/destructive)
 /// nesting of regions detected.
 pub trait CfgNester<T>: CfgNodeMap<T> {
     /// Given an entry edge and exit edge defining a SESE region, mutates the
@@ -90,7 +90,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 ) {
     let edge_classes = EdgeClassifier::get_edge_classes(view);
     let mut rem_edges: HashMap<usize, HashSet<(T, T)>> = HashMap::new();
-    for (e, cls) in edge_classes.iter() {
+    for (e, cls) in &edge_classes {
         rem_edges.entry(*cls).or_default().insert(*e);
     }
 
@@ -131,8 +131,8 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
                         if prev_e.1 != e.0 || view.successors(e.0).count() > 1 {
                             // Traversal and nesting of the subregion's *contents* were completed in the
                             // recursive call above, so only processed nodes are moved into descendant CFGs
-                            e = (view.nest_sese_region(prev_e, e), e.1)
-                        };
+                            e = (view.nest_sese_region(prev_e, e), e.1);
+                        }
                     }
                 }
                 stack.push(e.1);
@@ -147,7 +147,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 }
 
 /// Search the entire Hugr looking for CFGs, and transform each
-/// into as deeply-nested form as possible (as per [transform_cfg_to_nested]).
+/// into as deeply-nested form as possible (as per [`transform_cfg_to_nested`]).
 ///
 /// This search may be expensive, although if it finds much/many CFGs,
 /// the analysis/transformation on them is likely to be more expensive still!
@@ -157,7 +157,7 @@ pub fn transform_all_cfgs(h: &mut Hugr) {
         if h.get_optype(n).tag() == OpTag::Cfg {
             transform_cfg_to_nested(&mut IdentityCfgMap::new(h.with_entrypoint_mut(n)));
         }
-        node_stack.extend(h.children(n))
+        node_stack.extend(h.children(n));
     }
 }
 
@@ -219,7 +219,7 @@ pub struct IdentityCfgMap<H: HugrView> {
     exit: H::Node,
 }
 impl<H: HugrView> IdentityCfgMap<H> {
-    /// Creates an [IdentityCfgMap] for the specified CFG
+    /// Creates an [`IdentityCfgMap`] for the specified CFG
     pub fn new(h: impl RootCheckable<H, CfgID<H::Node>>) -> Self {
         let h = h.try_into_checked().expect("Hugr must be a CFG region");
         let h = h.into_hugr();
@@ -256,17 +256,23 @@ impl<H: HugrMut<Node = Node>> CfgNester<H::Node> for IdentityCfgMap<H> {
     ) -> H::Node {
         // The algorithm only calls with entry/exit edges for a SESE region; panic if they don't
         let blocks = region_blocks(self, entry_edge, exit_edge).unwrap();
-        assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
-            .iter()
-            .all(|n| self.h.get_parent(*n) == Some(self.h.entrypoint())));
+        assert!(
+            [entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
+                .iter()
+                .all(|n| self.h.get_parent(*n) == Some(self.h.entrypoint()))
+        );
         let [new_block, new_cfg] = OutlineCfg::new(blocks).apply(&mut self.h).unwrap();
-        debug_assert!([entry_edge.0, exit_edge.1]
-            .iter()
-            .all(|n| self.h.get_parent(*n) == Some(self.h.entrypoint())));
+        debug_assert!(
+            [entry_edge.0, exit_edge.1]
+                .iter()
+                .all(|n| self.h.get_parent(*n) == Some(self.h.entrypoint()))
+        );
 
-        debug_assert!([entry_edge.1, exit_edge.0]
-            .iter()
-            .all(|n| self.h.get_parent(*n) == Some(new_cfg)));
+        debug_assert!(
+            [entry_edge.1, exit_edge.0]
+                .iter()
+                .all(|n| self.h.get_parent(*n) == Some(new_cfg))
+        );
         new_block
     }
 }
@@ -309,7 +315,7 @@ pub fn region_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
                         exit_edge.1,
                     ));
                 }
-                queue.extend(internal_succs)
+                queue.extend(internal_succs);
             } else {
                 queue.extend(v.successors(n));
             }
@@ -329,7 +335,7 @@ pub fn region_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
             entry_edge.0,
             entry_edge.1,
         ));
-    };
+    }
     if !extra.is_empty() {
         return Err(RegionBlocksError::UnexpectedEntryEdges(extra));
     }
@@ -337,7 +343,7 @@ pub fn region_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
     Ok(blocks)
 }
 
-/// Records an undirected Depth First Search over a CfgView,
+/// Records an undirected Depth First Search over a `CfgView`,
 ///   restricted to nodes forwards-reachable from the entry.
 /// That is, the DFS traversal goes both ways along the edges of the CFG.
 /// *Undirected* DFS classifies all edges into *only two* categories
@@ -398,7 +404,7 @@ enum Bracket<T> {
 /// out of the middle of the list - which isn't really possible, so instead we
 /// track deleted items (in an external set) and the remaining number (here).
 ///
-/// Note - we could put the items deleted from *this* BracketList here, and merge in concat().
+/// Note - we could put the items deleted from *this* `BracketList` here, and merge in `concat()`.
 /// That would be cleaner, but repeated set-merging would be slower than adding the
 /// deleted items to a single set in the `TraversalState`
 struct BracketList<T> {
@@ -448,9 +454,9 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
     }
 }
 
-/// Mutable state updated during traversal of the UndirectedDFSTree by the cycle equivalence algorithm.
+/// Mutable state updated during traversal of the `UndirectedDFSTree` by the cycle equivalence algorithm.
 pub struct EdgeClassifier<T> {
-    /// Edges we have marked as deleted, allowing constant-time deletion without searching BracketList
+    /// Edges we have marked as deleted, allowing constant-time deletion without searching `BracketList`
     deleted_backedges: HashSet<Bracket<T>>,
     /// Key is DFS num of highest ancestor
     ///   to which backedges reached from >1 sibling subtree;
@@ -509,9 +515,9 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
         let mut bs = BracketList::new();
         for (tgt, brs) in child_results {
             if tgt < min_dfs_target[0].unwrap_or(usize::MAX) {
-                min_dfs_target = [Some(tgt), min_dfs_target[0]]
+                min_dfs_target = [Some(tgt), min_dfs_target[0]];
             } else if tgt < min_dfs_target[1].unwrap_or(usize::MAX) {
-                min_dfs_target[1] = Some(tgt)
+                min_dfs_target[1] = Some(tgt);
             }
             bs.concat(brs);
         }
@@ -541,7 +547,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
         }
         // And capping backedges
         for src in self.capping_edges.remove(&n_dfs).unwrap_or_default() {
-            bs.delete(&Bracket::Capping(n_dfs, src), &mut self.deleted_backedges)
+            bs.delete(&Bracket::Capping(n_dfs, src), &mut self.deleted_backedges);
         }
 
         // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
@@ -570,21 +576,21 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use hugr_core::builder::{
-        endo_sig, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
+        BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder, endo_sig,
     };
     use hugr_core::extension::prelude::usize_t;
 
+    use hugr_core::Node;
     use hugr_core::hugr::patch::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr_core::hugr::views::RootChecked;
-    use hugr_core::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use hugr_core::ops::Value;
+    use hugr_core::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use hugr_core::types::{EdgeKind, Signature};
     use hugr_core::utils::depth;
-    use hugr_core::Node;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
-        for (k, v) in h.into_iter() {
+        for (k, v) in h {
             res.entry(v).or_insert_with(Vec::new).push(k);
         }
         res.into_values().map(sorted).collect()

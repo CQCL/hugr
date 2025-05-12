@@ -1,16 +1,16 @@
 use super::{
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
-    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
+use crate::ops::{self, DataflowBlock, DataflowParent, ExitBlock, OpType, handle::NodeHandle};
 use crate::types::Signature;
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
-use crate::{hugr::HugrMut, type_row, Hugr};
+use crate::{Hugr, hugr::HugrMut, type_row};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph.
@@ -228,7 +228,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with
-    /// `inputs` and `outputs` , plus a UnitSum type (a Sum of `n_cases` unit
+    /// `inputs` and `outputs` , plus a `UnitSum` type (a Sum of `n_cases` unit
     /// types) to select the successor.
     ///
     /// # Errors
@@ -265,7 +265,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with
-    /// `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
+    /// `outputs` and a `UnitSum` type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -315,7 +315,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
 
-    /// Create a new BlockBuilder.
+    /// Create a new `BlockBuilder`.
     ///
     /// See [`BlockBuilder::create_with_io`] if you need to initialize the input
     /// and output nodes.
@@ -328,7 +328,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 
-    /// Create a new BlockBuilder, initializing the input and output nodes.
+    /// Create a new `BlockBuilder`, initializing the input and output nodes.
     ///
     /// See [`BlockBuilder::create`] if you don't need to initialize the input
     /// and output nodes.
@@ -395,7 +395,7 @@ impl BlockBuilder<Hugr> {
         Self::create(base, root)
     }
 
-    /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
+    /// [Set outputs](BlockBuilder::set_outputs) and [`finish_hugr`](`BlockBuilder::finish_hugr`).
     pub fn finish_hugr_with_outputs(
         mut self,
         branch_wire: Wire,
@@ -411,8 +411,8 @@ pub(crate) mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::hugr::validate::InterGraphEdgeError;
     use crate::hugr::ValidationError;
+    use crate::hugr::validate::InterGraphEdgeError;
     use crate::type_row;
     use cool_asserts::assert_matches;
 

@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use crate::std_extensions::collections::array::op_builder::GenericArrayOpBuilder;
 use crate::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{ExtensionId, SignatureError, TypeDef},
     ops::constant::ValueName,
     types::{CustomType, Type, TypeArg, TypeName},
-    Extension, Wire,
 };
 
 /// Trait capturing a concrete array implementation in an extension.
@@ -49,7 +49,7 @@ pub trait ArrayKind:
     /// Returns the definition for the array type.
     fn type_def() -> &'static TypeDef;
 
-    /// Instantiates an array [CustomType] from its definition given a size and
+    /// Instantiates an array [`CustomType`] from its definition given a size and
     /// element type argument.
     fn instantiate_custom_ty(
         array_def: &TypeDef,
@@ -69,7 +69,7 @@ pub trait ArrayKind:
         Self::instantiate_custom_ty(array_def, size, element_ty).map(Into::into)
     }
 
-    /// Instantiates an array [CustomType] given a size and element type argument.
+    /// Instantiates an array [`CustomType`] given a size and element type argument.
     fn custom_ty(size: impl Into<TypeArg>, element_ty: impl Into<TypeArg>) -> CustomType {
         Self::instantiate_custom_ty(Self::type_def(), size, element_ty)
             .expect("array parameters are valid")
@@ -79,6 +79,7 @@ pub trait ArrayKind:
     ///
     /// This method is equivalent to [`ArrayKind::ty_parametric`], but uses concrete
     /// arguments types to ensure no errors are possible.
+    #[must_use]
     fn ty(size: u64, element_ty: Type) -> Type {
         Self::custom_ty(size, element_ty).into()
     }

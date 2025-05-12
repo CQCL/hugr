@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
-use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
+use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
@@ -12,8 +12,8 @@ use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
 use super::{
-    partial_from_const, row_contains_bottom, AbstractValue, AnalysisResults, DFContext,
-    LoadedFunction, PartialValue,
+    AbstractValue, AnalysisResults, DFContext, LoadedFunction, PartialValue, partial_from_const,
+    row_contains_bottom,
 };
 
 type PV<V, N> = PartialValue<V, N>;
@@ -21,13 +21,13 @@ type PV<V, N> = PartialValue<V, N>;
 type NodeInputs<V, N> = Vec<(IncomingPort, PV<V, N>)>;
 
 /// Basic structure for performing an analysis. Usage:
-/// 1. Make a new instance via [Self::new()]
-/// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] and/or
-///    [Self::prepopulate_inputs] with initial values.
+/// 1. Make a new instance via [`Self::new()`]
+/// 2. (Optionally) zero or more calls to [`Self::prepopulate_wire`] and/or
+///    [`Self::prepopulate_inputs`] with initial values.
 ///    For example, to analyse a [Module](OpType::Module)-rooted Hugr,
-///    [Self::prepopulate_inputs] can be used on each externally-callable
-///    [FuncDefn](OpType::FuncDefn) to set all inputs to [PartialValue::Top].
-/// 3. Call [Self::run] to produce [AnalysisResults]
+///    [`Self::prepopulate_inputs`] can be used on each externally-callable
+///    [`FuncDefn`](OpType::FuncDefn) to set all inputs to [`PartialValue::Top`].
+/// 3. Call [`Self::run`] to produce [`AnalysisResults`]
 pub struct Machine<H: HugrView, V: AbstractValue>(H, HashMap<H::Node, NodeInputs<V, H::Node>>);
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
@@ -47,9 +47,9 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     }
 
     /// Provide initial values for the inputs to a container node
-    /// (a [DataflowParent](hugr_core::ops::OpTag::DataflowParent), [CFG](hugr_core::ops::CFG)
+    /// (a [`DataflowParent`](hugr_core::ops::OpTag::DataflowParent), [CFG](hugr_core::ops::CFG)
     /// or [Conditional](hugr_core::ops::Conditional)).
-    /// Any inputs not given values by `in_values`, are set to [PartialValue::Top].
+    /// Any inputs not given values by `in_values`, are set to [`PartialValue::Top`].
     /// Multiple calls for the same `parent` will `join` values for corresponding ports.
     pub fn prepopulate_inputs(
         &mut self,
@@ -90,10 +90,10 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached).
-    /// As a shortcut, for Hugrs whose root is a [FuncDefn](OpType::FuncDefn),
+    /// As a shortcut, for Hugrs whose root is a [`FuncDefn`](OpType::FuncDefn),
     /// [CFG](OpType::CFG), [DFG](OpType::DFG), [Conditional](OpType::Conditional)
-    /// or [TailLoop] only (that is: *not* [Module](OpType::Module),
-    /// [DataflowBlock](OpType::DataflowBlock) or [Case](OpType::Case)),
+    /// or [`TailLoop`] only (that is: *not* [Module](OpType::Module),
+    /// [`DataflowBlock`](OpType::DataflowBlock) or [Case](OpType::Case)),
     /// `in_values` may provide initial values for the root-node inputs,
     ///  equivalent to calling `prepopulate_inputs` with the root node.
     ///
@@ -112,7 +112,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
             assert!(
                 in_values.into_iter().next().is_none(),
                 "No inputs possible for Module"
-            )
+            );
         } else {
             let mut p = in_values.into_iter().peekable();
             // We must provide some inputs to the root so that they are Top rather than Bottom.
@@ -122,7 +122,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
             // (outputs from the Input node) before we run_datalog, but we would need to have
             // a separate store of output-wire values in self to keep prepopulate_wire working.)
             if p.peek().is_some() || !self.1.contains_key(&root) {
-                self.prepopulate_inputs(root, p).unwrap()
+                self.prepopulate_inputs(root, p).unwrap();
             }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
@@ -185,7 +185,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Prepopulate in_wire_value from in_wire_value_proto.
         in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
-        in_wire_value(n, p, v) <-- for (n, p, v) in in_wire_value_proto.iter(),
+        in_wire_value(n, p, v) <-- for (n, p, v) in &in_wire_value_proto,
           node(n),
           if let Some(sig) = hugr.signature(*n),
           if sig.input_ports().contains(p);
@@ -384,11 +384,11 @@ impl<N: PartialEq + PartialOrd> Lattice for LatticeWrapper<N> {
     fn meet_mut(&mut self, other: Self) -> bool {
         if *self == other || *self == LatticeWrapper::Bottom || other == LatticeWrapper::Top {
             return false;
-        };
+        }
         if *self == LatticeWrapper::Top || other == LatticeWrapper::Bottom {
             *self = other;
             return true;
-        };
+        }
         // Both are `Value`s and not equal
         *self = LatticeWrapper::Bottom;
         true
@@ -397,11 +397,11 @@ impl<N: PartialEq + PartialOrd> Lattice for LatticeWrapper<N> {
     fn join_mut(&mut self, other: Self) -> bool {
         if *self == other || *self == LatticeWrapper::Top || other == LatticeWrapper::Bottom {
             return false;
-        };
+        }
         if *self == LatticeWrapper::Bottom || other == LatticeWrapper::Top {
             *self = other;
             return true;
-        };
+        }
         // Both are `Value`s and are not equal
         *self = LatticeWrapper::Top;
         true

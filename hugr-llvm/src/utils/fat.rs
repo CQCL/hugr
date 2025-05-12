@@ -1,30 +1,30 @@
-//! We define a type [FatNode], named for analogy with a "fat pointer".
+//! We define a type [`FatNode`], named for analogy with a "fat pointer".
 //!
-//! We define a trait [FatExt], an extension trait for [HugrView]. It provides
-//! methods that return [FatNode]s rather than [Node]s.
+//! We define a trait [`FatExt`], an extension trait for [`HugrView`]. It provides
+//! methods that return [`FatNode`]s rather than [Node]s.
 use std::{cmp::Ordering, fmt, hash::Hash, marker::PhantomData, ops::Deref};
 
 use hugr_core::hugr::views::Rerooted;
 use hugr_core::{
-    core::HugrNode,
-    ops::{DataflowBlock, ExitBlock, Input, OpType, Output, CFG},
-    types::Type,
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
+    core::HugrNode,
+    ops::{CFG, DataflowBlock, ExitBlock, Input, OpType, Output},
+    types::Type,
 };
 use itertools::Itertools as _;
 
-/// A Fat Node is a [Node] along with a reference to the [HugrView] whence it
-/// originates. It carries a type `OT`, the [OpType] of that node. `OT` may be
-/// general, i.e. exactly [OpType], or specifec, e.g. [FuncDefn].
+/// A Fat Node is a [Node] along with a reference to the [`HugrView`] whence it
+/// originates. It carries a type `OT`, the [`OpType`] of that node. `OT` may be
+/// general, i.e. exactly [`OpType`], or specifec, e.g. [`FuncDefn`].
 ///
 /// We provide a [Deref<Target=OT>] impl, so it can be used in place of `OT`.
 ///
-/// We provide [PartialEq], [Eq], [PartialOrd], [Ord], [Hash], so that this type
+/// We provide [`PartialEq`], [Eq], [`PartialOrd`], [Ord], [Hash], so that this type
 /// can be used in containers. Note that these implementations use only the
-/// stored node, so will silently malfunction if used with [FatNode]s from
+/// stored node, so will silently malfunction if used with [`FatNode`]s from
 /// different base [Hugr]s. Note that [Node] has this same behaviour.
 ///
-/// [FuncDefn]: [hugr_core::ops::FuncDefn]
+/// [`FuncDefn`]: [hugr_core::ops::FuncDefn]
 #[derive(Debug)]
 pub struct FatNode<'hugr, OT = OpType, H = Hugr, N = Node>
 where
@@ -39,7 +39,7 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
-    /// Create a `FatNode` from a [HugrView] and a [Node].
+    /// Create a `FatNode` from a [`HugrView`] and a [Node].
     ///
     /// Panics if the node is not valid in the `Hugr` or if it's `get_optype` is
     /// not an `OT`.
@@ -57,7 +57,7 @@ where
         }
     }
 
-    /// Tries to create a `FatNode` from a [HugrView] and a node (typically a
+    /// Tries to create a `FatNode` from a [`HugrView`] and a node (typically a
     /// [Node]).
     ///
     /// If the node is invalid, or if its `get_optype` is not `OT`, returns
@@ -88,14 +88,14 @@ impl<'hugr, OT, H, N: HugrNode> FatNode<'hugr, OT, H, N> {
         self.node
     }
 
-    /// Gets the [HugrView] of the `FatNode`.
+    /// Gets the [`HugrView`] of the `FatNode`.
     pub fn hugr(&self) -> &'hugr H {
         self.hugr
     }
 }
 
 impl<'hugr, H: HugrView + ?Sized> FatNode<'hugr, OpType, H, H::Node> {
-    /// Creates a new general `FatNode` from a [HugrView] and a [Node].
+    /// Creates a new general `FatNode` from a [`HugrView`] and a [Node].
     ///
     /// Panics if the node is not valid in the [Hugr].
     pub fn new_optype(hugr: &'hugr H, node: H::Node) -> Self {
@@ -127,7 +127,7 @@ impl<'hugr, H: HugrView + ?Sized> FatNode<'hugr, OpType, H, H::Node> {
 }
 
 impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
-    /// If there is exactly one OutgoingPort connected to this IncomingPort,
+    /// If there is exactly one `OutgoingPort` connected to this `IncomingPort`,
     /// return it and its node.
     #[allow(clippy::type_complexity)]
     pub fn single_linked_output(
@@ -141,18 +141,24 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn out_value_types(&self) -> impl Iterator<Item = (OutgoingPort, Type)> + 'hugr {
+    pub fn out_value_types(
+        &self,
+    ) -> impl Iterator<Item = (OutgoingPort, Type)> + 'hugr + use<'hugr, OT, H> {
         self.hugr.out_value_types(self.node)
     }
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn in_value_types(&self) -> impl Iterator<Item = (IncomingPort, Type)> + 'hugr {
+    pub fn in_value_types(
+        &self,
+    ) -> impl Iterator<Item = (IncomingPort, Type)> + 'hugr + use<'hugr, OT, H> {
         self.hugr.in_value_types(self.node)
     }
 
     /// Return iterator over the direct children of node.
-    pub fn children(&self) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr {
+    pub fn children(
+        &self,
+    ) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr + use<'hugr, OT, H> {
         self.hugr
             .children(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))
@@ -175,20 +181,20 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
     }
 
     /// Iterator over output ports of node.
-    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + 'hugr {
+    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + 'hugr + use<'hugr, OT, H> {
         self.hugr.node_outputs(self.node)
     }
 
     /// Iterates over the output neighbours of the `node`.
     pub fn output_neighbours(
         &self,
-    ) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr {
+    ) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr + use<'hugr, OT, H> {
         self.hugr
             .output_neighbours(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))
     }
 
-    /// Returns a view of the internal [HugrView] with this [Node] as entrypoint.
+    /// Returns a view of the internal [`HugrView`] with this [Node] as entrypoint.
     pub fn as_entrypoint(&self) -> Rerooted<&H>
     where
         H: Sized,
@@ -326,13 +332,13 @@ impl<OT, H> NodeIndex for &FatNode<'_, OT, H> {
     }
 }
 
-/// An extension trait for [HugrView] which provides methods that delegate to
-/// [HugrView] and then return the result in [FatNode] form. See for example
-/// [FatExt::fat_io].
+/// An extension trait for [`HugrView`] which provides methods that delegate to
+/// [`HugrView`] and then return the result in [`FatNode`] form. See for example
+/// [`FatExt::fat_io`].
 ///
-/// TODO: Add the remaining [HugrView] equivalents that make sense.
+/// TODO: Add the remaining [`HugrView`] equivalents that make sense.
 pub trait FatExt: HugrView {
-    /// Try to create a specific [FatNode] for a given [Node].
+    /// Try to create a specific [`FatNode`] for a given [Node].
     fn try_fat<OT>(&self, node: Self::Node) -> Option<FatNode<OT, Self, Self::Node>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
@@ -340,13 +346,13 @@ pub trait FatExt: HugrView {
         FatNode::try_new(self, node)
     }
 
-    /// Create a general [FatNode] for a given [Node].
+    /// Create a general [`FatNode`] for a given [Node].
     fn fat_optype(&self, node: Self::Node) -> FatNode<OpType, Self, Self::Node> {
         FatNode::new_optype(self, node)
     }
 
-    /// Try to create [Input] and [Output] [FatNode]s for a given [Node]. This
-    /// will succeed only for DataFlow Parent Nodes.
+    /// Try to create [Input] and [Output] [`FatNode`]s for a given [Node]. This
+    /// will succeed only for `DataFlow` Parent Nodes.
     #[allow(clippy::type_complexity)]
     fn fat_io(
         &self,
@@ -358,7 +364,7 @@ pub trait FatExt: HugrView {
         self.fat_optype(node).get_io()
     }
 
-    /// Create general [FatNode]s for each of a [Node]'s children.
+    /// Create general [`FatNode`]s for each of a [Node]'s children.
     fn fat_children(
         &self,
         node: Self::Node,
@@ -366,7 +372,7 @@ pub trait FatExt: HugrView {
         self.children(node).map(|x| self.fat_optype(x))
     }
 
-    /// Try to create a specific [FatNode] for the root of a [HugrView].
+    /// Try to create a specific [`FatNode`] for the root of a [`HugrView`].
     fn fat_root<OT>(&self) -> Option<FatNode<OT, Self, Self::Node>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,

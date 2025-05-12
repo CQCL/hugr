@@ -5,11 +5,11 @@
 //! <https://docs.rs/serde_with/latest/serde_with>.
 
 use serde::Deserializer;
-use serde::{de, Serializer};
+use serde::{Serializer, de};
 use serde_with::SerializeAs;
 
-use crate::package::Package;
 use crate::Hugr;
+use crate::package::Package;
 
 use super::EnvelopeConfig;
 

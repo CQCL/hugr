@@ -1,8 +1,8 @@
-//! Rewrite operations involving Const and LoadConst operations
+//! Rewrite operations involving Const and `LoadConst` operations
 
 use std::iter;
 
-use crate::{core::HugrNode, hugr::HugrMut, HugrView, Node};
+use crate::{HugrView, Node, core::HugrNode, hugr::HugrMut};
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -123,7 +123,7 @@ mod test {
     use crate::{
         builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer},
         extension::prelude::ConstUsize,
-        ops::{handle::NodeHandle, Value},
+        ops::{Value, handle::NodeHandle},
         type_row,
         types::Signature,
     };

@@ -1,9 +1,9 @@
 use crate::{
-    extension::{prelude::ConstString, ConstFold, ConstFoldResult, OpDef},
+    IncomingPort,
+    extension::{ConstFold, ConstFoldResult, OpDef, prelude::ConstString},
     ops,
     std_extensions::arithmetic::float_types::ConstF64,
     utils::sorted_consts,
-    IncomingPort,
 };
 
 use super::FloatOps;
@@ -13,7 +13,7 @@ pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
 
     match op {
         fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
-            def.set_constant_folder(BinaryFold::from_op(op))
+            def.set_constant_folder(BinaryFold::from_op(op));
         }
         feq | fne | flt | fgt | fle | fge => def.set_constant_folder(CmpFold::from_op(*op)),
         fneg | fabs | ffloor | fceil | fround => def.set_constant_folder(UnaryFold::from_op(op)),

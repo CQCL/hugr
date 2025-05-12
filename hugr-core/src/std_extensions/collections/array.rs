@@ -25,13 +25,13 @@ use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{CustomCheckFailure, Type, TypeBound, TypeName};
 use crate::{Extension, Wire};
 
-pub use array_clone::{GenericArrayClone, GenericArrayCloneDef, ARRAY_CLONE_OP_ID};
-pub use array_conversion::{Direction, GenericArrayConvert, GenericArrayConvertDef, FROM, INTO};
-pub use array_discard::{GenericArrayDiscard, GenericArrayDiscardDef, ARRAY_DISCARD_OP_ID};
+pub use array_clone::{ARRAY_CLONE_OP_ID, GenericArrayClone, GenericArrayCloneDef};
+pub use array_conversion::{Direction, FROM, GenericArrayConvert, GenericArrayConvertDef, INTO};
+pub use array_discard::{ARRAY_DISCARD_OP_ID, GenericArrayDiscard, GenericArrayDiscardDef};
 pub use array_kind::ArrayKind;
 pub use array_op::{GenericArrayOp, GenericArrayOpDef};
-pub use array_repeat::{GenericArrayRepeat, GenericArrayRepeatDef, ARRAY_REPEAT_OP_ID};
-pub use array_scan::{GenericArrayScan, GenericArrayScanDef, ARRAY_SCAN_OP_ID};
+pub use array_repeat::{ARRAY_REPEAT_OP_ID, GenericArrayRepeat, GenericArrayRepeatDef};
+pub use array_scan::{ARRAY_SCAN_OP_ID, GenericArrayScan, GenericArrayScanDef};
 pub use array_value::GenericArrayValue;
 
 use op_builder::GenericArrayOpBuilder;
@@ -137,8 +137,9 @@ impl CustomConst for ArrayValue {
     }
 }
 
-/// Gets the [TypeDef] for arrays. Note that instantiations are more easily
-/// created via [array_type] and [array_type_parametric]
+/// Gets the [`TypeDef`] for arrays. Note that instantiations are more easily
+/// created via [`array_type`] and [`array_type_parametric`]
+#[must_use]
 pub fn array_type_def() -> &'static TypeDef {
     Array::type_def()
 }
@@ -147,6 +148,7 @@ pub fn array_type_def() -> &'static TypeDef {
 ///
 /// This method is equivalent to [`array_type_parametric`], but uses concrete
 /// arguments types to ensure no errors are possible.
+#[must_use]
 pub fn array_type(size: u64, element_ty: Type) -> Type {
     Array::ty(size, element_ty)
 }
@@ -165,6 +167,7 @@ pub fn array_type_parametric(
 pub const NEW_ARRAY_OP_ID: OpName = OpName::new_inline("new_array");
 
 /// Initialize a new array op of element type `element_ty` of length `size`
+#[must_use]
 pub fn new_array_op(element_ty: Type, size: u64) -> ExtensionOp {
     let op = ArrayOpDef::new_array.to_concrete(element_ty, size);
     op.to_extension_op().unwrap()
@@ -402,13 +405,13 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 mod test {
-    use crate::builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig};
     use crate::extension::prelude::qb_t;
 
     use super::{array_type, new_array_op};
 
     #[test]
-    /// Test building a HUGR involving a new_array operation.
+    /// Test building a HUGR involving a `new_array` operation.
     fn test_new_array() {
         let mut b =
             DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], array_type(2, qb_t()))).unwrap();

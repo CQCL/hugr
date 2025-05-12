@@ -1,6 +1,6 @@
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr_core::builder::{
     BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
 };
@@ -107,6 +107,7 @@ impl<'c> Emission<'c> {
 }
 
 impl SimpleHugrConfig {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ins: Default::default(),
@@ -238,16 +239,16 @@ mod test_fns {
 
     use hugr_core::builder::DataflowSubContainer;
     use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
-    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize};
     use hugr_core::extension::PRELUDE_REGISTRY;
+    use hugr_core::extension::prelude::{ConstUsize, bool_t, usize_t};
     use hugr_core::ops::constant::CustomConst;
 
     use hugr_core::ops::{CallIndirect, Tag, Value};
+    use hugr_core::std_extensions::STD_REG;
     use hugr_core::std_extensions::arithmetic::int_ops::{self};
     use hugr_core::std_extensions::arithmetic::int_types::{self, ConstInt};
-    use hugr_core::std_extensions::STD_REG;
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{type_row, Hugr};
+    use hugr_core::{Hugr, type_row};
 
     use itertools::Itertools;
     use rstest::{fixture, rstest};
@@ -650,7 +651,7 @@ mod test_fns {
                                 ([type_row![], type_row![]], eq_0),
                                 vec![(just_input.clone(), loop_int_w)],
                                 vec![
-                                    HugrSumType::new(vec![vec![just_input.clone()], vec![]]).into()
+                                    HugrSumType::new(vec![vec![just_input.clone()], vec![]]).into(),
                                 ]
                                 .into(),
                             )

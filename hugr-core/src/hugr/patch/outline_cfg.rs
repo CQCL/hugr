@@ -5,14 +5,14 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use thiserror::Error;
 
+use crate::PortIndex;
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::controlflow::BasicBlock;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{DataflowBlock, OpType};
-use crate::PortIndex;
-use crate::{type_row, Node};
+use crate::{Node, type_row};
 
 use super::{PatchHugrMut, PatchVerification};
 
@@ -23,7 +23,7 @@ pub struct OutlineCfg {
 }
 
 impl OutlineCfg {
-    /// Create a new OutlineCfg rewrite that will move the provided blocks.
+    /// Create a new `OutlineCfg` rewrite that will move the provided blocks.
     pub fn new(blocks: impl IntoIterator<Item = Node>) -> Self {
         Self {
             blocks: HashSet::from_iter(blocks),
@@ -53,7 +53,7 @@ impl OutlineCfg {
         let cfg_entry = h.children(cfg_n).next().unwrap();
         let mut entry = None;
         let mut exit_succ = None;
-        for &n in self.blocks.iter() {
+        for &n in &self.blocks {
             if n == cfg_entry
                 || h.input_neighbours(n)
                     .any(|pred| !self.blocks.contains(&pred))
@@ -79,7 +79,7 @@ impl OutlineCfg {
                     }
                 },
                 Err(ext) => return Err(OutlineCfgError::MultipleExitEdges(n, ext.collect())),
-            };
+            }
         }
         match (entry, exit_succ) {
             (Some(e), Some((x, o))) => Ok((e, x, o)),
@@ -203,7 +203,7 @@ impl PatchHugrMut for OutlineCfg {
     }
 }
 
-/// Errors that can occur in expressing an OutlineCfg rewrite.
+/// Errors that can occur in expressing an `OutlineCfg` rewrite.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum OutlineCfgError {
@@ -483,7 +483,7 @@ mod test {
         let [new_block, new_cfg] = h.apply_patch(OutlineCfg::new(blocks.clone())).unwrap();
 
         for n in other_blocks {
-            assert_eq!(h.get_parent(n), Some(cfg))
+            assert_eq!(h.get_parent(n), Some(cfg));
         }
         assert_eq!(h.get_parent(new_block), Some(cfg));
         assert!(h.get_optype(new_block).is_dataflow_block());

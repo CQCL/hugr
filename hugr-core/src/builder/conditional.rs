@@ -4,17 +4,17 @@ use crate::types::{Signature, TypeRow};
 use crate::ops::handle::{CaseID, NodeHandle};
 use crate::ops::{self};
 
+use super::HugrBuilder;
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
-use super::HugrBuilder;
 use super::{
+    BuildError, ConditionalID,
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
-    BuildError, ConditionalID,
 };
 
 use crate::Node;
-use crate::{hugr::HugrMut, Hugr};
+use crate::{Hugr, hugr::HugrMut};
 
 use std::collections::HashSet;
 
@@ -198,7 +198,7 @@ mod test {
 
     use crate::extension::prelude::usize_t;
     use crate::{
-        builder::{test::n_identity, Dataflow},
+        builder::{Dataflow, test::n_identity},
         ops::Value,
         type_row,
     };

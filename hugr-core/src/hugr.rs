@@ -28,12 +28,12 @@ pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::{
-    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
+    resolve_op_types_extensions,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
-pub use crate::ops::{OpType, DEFAULT_OPTYPE};
+pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::package::Package;
 use crate::{Direction, Node};
 
@@ -93,6 +93,7 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 /// Public API for HUGRs.
 impl Hugr {
     /// Create a new Hugr, with a single [`Module`] operation as the root node.
+    #[must_use]
     pub fn new() -> Self {
         make_module_hugr(Module::new().into(), 0, 0).unwrap()
     }
@@ -184,7 +185,7 @@ impl Hugr {
     ///
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::store` with a bytearray instead.
-    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {
@@ -346,7 +347,9 @@ impl Hugr {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
+#[error(
+    "Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}"
+)]
 /// An error in the extension deltas.
 pub struct ExtensionError {
     parent: Node,
@@ -359,7 +362,7 @@ pub struct ExtensionError {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
-    /// The node was not of the required [OpTag]
+    /// The node was not of the required [`OpTag`]
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },

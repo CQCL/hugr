@@ -8,7 +8,7 @@ use crate::{NodeIndex, Port};
 
 use petgraph::visit as pv;
 
-/// Wrapper for a HugrView that implements petgraph's traits.
+/// Wrapper for a `HugrView` that implements petgraph's traits.
 ///
 /// It can be used to apply petgraph's algorithms to a Hugr.
 #[derive(Debug)]
@@ -184,7 +184,7 @@ where
     }
 }
 
-/// Reference to a Hugr node and its associated OpType.
+/// Reference to a Hugr node and its associated `OpType`.
 #[derive(Debug, Clone, Copy)]
 pub struct HugrNodeRef<'a, N> {
     node: N,
@@ -220,9 +220,9 @@ mod test {
         EdgeCount, GetAdjacencyMatrix, IntoNodeReferences, NodeCount, NodeIndexable, NodeRef,
     };
 
+    use crate::HugrView;
     use crate::hugr::views::tests::sample_hugr;
     use crate::ops::handle::NodeHandle;
-    use crate::HugrView;
 
     use super::PetgraphWrapper;
 

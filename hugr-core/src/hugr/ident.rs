@@ -8,8 +8,10 @@ use thiserror::Error;
 
 pub static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
 lazy_static! {
-    pub static ref PATH_REGEX: Regex =
-        Regex::new(&format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR)).unwrap();
+    pub static ref PATH_REGEX: Regex = Regex::new(&format!(
+        r"^{PATH_COMPONENT_REGEX_STR}(\.{PATH_COMPONENT_REGEX_STR})*$"
+    ))
+    .unwrap();
 }
 
 #[derive(
@@ -29,9 +31,9 @@ lazy_static! {
 pub struct IdentList(SmolStr);
 
 impl IdentList {
-    /// Makes an IdentList, checking the supplied string is well-formed
+    /// Makes an `IdentList`, checking the supplied string is well-formed
     pub fn new(n: impl Into<SmolStr>) -> Result<Self, InvalidIdentifier> {
-        let n = n.into();
+        let n: SmolStr = n.into();
         if PATH_REGEX.is_match(n.as_str()) {
             Ok(IdentList(n))
         } else {
@@ -54,6 +56,7 @@ impl IdentList {
     ///    None
     /// );
     /// ```
+    #[must_use]
     pub fn split_last(&self) -> Option<(IdentList, SmolStr)> {
         let (prefix, suffix) = self.0.rsplit_once('.')?;
         let prefix = Self::new_unchecked(prefix);
@@ -61,20 +64,22 @@ impl IdentList {
         Some((prefix, suffix))
     }
 
-    /// Create a new [IdentList] *without* doing the well-formedness check.
+    /// Create a new [`IdentList`] *without* doing the well-formedness check.
     /// This is a backdoor to be used sparingly, as we rely upon callers to
-    /// validate names themselves. In tests, instead the [crate::const_extension_ids]
+    /// validate names themselves. In tests, instead the [`crate::const_extension_ids`]
     /// macro is strongly encouraged as this ensures the name validity check
     /// is done properly.
     ///
     /// Panics if the string is longer than 23 characters.
+    #[must_use]
     pub const fn new_unchecked(n: &str) -> Self {
         IdentList(SmolStr::new_inline(n))
     }
 
-    /// Create a new [IdentList] *without* doing the well-formedness check.
-    /// The same caveats apply as for [Self::new_unchecked], except that strings
+    /// Create a new [`IdentList`] *without* doing the well-formedness check.
+    /// The same caveats apply as for [`Self::new_unchecked`], except that strings
     /// are not constrained in length.
+    #[must_use]
     pub const fn new_static_unchecked(n: &'static str) -> Self {
         IdentList(SmolStr::new_static(n))
     }
@@ -90,7 +95,7 @@ impl std::ops::Deref for IdentList {
     type Target = str;
 
     fn deref(&self) -> &str {
-        self.0.deref()
+        &self.0
     }
 }
 
@@ -104,7 +109,7 @@ impl TryInto<IdentList> for &str {
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[error("Invalid identifier {0}")]
-/// Error indicating a string was not valid as an [IdentList]
+/// Error indicating a string was not valid as an [`IdentList`]
 pub struct InvalidIdentifier(SmolStr);
 
 #[cfg(test)]
@@ -130,7 +135,7 @@ mod test {
         proptest! {
             #[test]
             fn arbitrary_identlist_valid((IdentList(ident_list)): IdentList) {
-                assert!(IdentList::new(ident_list).is_ok())
+                assert!(IdentList::new(ident_list).is_ok());
             }
         }
     }

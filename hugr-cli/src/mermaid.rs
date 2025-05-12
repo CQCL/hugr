@@ -4,11 +4,11 @@ use std::io::Write;
 use clap::Parser;
 use clap_verbosity_flag::log::Level;
 use clio::Output;
-use hugr::package::PackageValidationError;
 use hugr::HugrView;
+use hugr::package::PackageValidationError;
 
-use crate::hugr_io::HugrInputArgs;
 use crate::OtherArgs;
+use crate::hugr_io::HugrInputArgs;
 
 /// Dump the standard extensions.
 #[derive(Parser, Debug)]
@@ -39,9 +39,10 @@ pub struct MermaidArgs {
 impl MermaidArgs {
     /// Write the mermaid diagram to the output.
     pub fn run_print(&mut self) -> Result<(), crate::CliError> {
-        match self.input_args.hugr_json {
-            true => self.run_print_hugr(),
-            false => self.run_print_envelope(),
+        if self.input_args.hugr_json {
+            self.run_print_hugr()
+        } else {
+            self.run_print_envelope()
         }
     }
 
@@ -73,6 +74,7 @@ impl MermaidArgs {
     }
 
     /// Test whether a `level` message should be output.
+    #[must_use]
     pub fn verbosity(&self, level: Level) -> bool {
         self.other_args.verbosity(level)
     }

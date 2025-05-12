@@ -163,6 +163,7 @@ pub enum Operation {
 
 impl Operation {
     /// The name of the symbol introduced by this operation, if any.
+    #[must_use]
     pub fn symbol_name(&self) -> Option<&SymbolName> {
         if let Operation::Import(symbol_name) = self {
             Some(symbol_name)
@@ -172,6 +173,7 @@ impl Operation {
     }
 
     /// The symbol declared or defined by this operation, if any.
+    #[must_use]
     pub fn symbol(&self) -> Option<&Symbol> {
         match self {
             Operation::DefineFunc(symbol)

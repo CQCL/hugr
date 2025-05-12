@@ -52,6 +52,7 @@ where
     K: Copy + Eq + Hash,
 {
     /// Create a new empty link table.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             links: FxIndexSet::default(),

@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use super::{Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, Term};
 use pyo3::{
+    Bound, PyAny, PyResult,
     exceptions::PyTypeError,
     types::{PyAnyMethods, PyStringMethods as _, PyTypeMethods as _},
-    Bound, PyAny, PyResult,
 };
 
 impl<'py> pyo3::FromPyObject<'py> for Term {
@@ -42,7 +42,7 @@ impl<'py> pyo3::FromPyObject<'py> for Term {
                 return Err(PyTypeError::new_err(format!(
                     "Unknown Term type: {}.",
                     name.to_str()?
-                )))
+                )));
             }
         })
     }

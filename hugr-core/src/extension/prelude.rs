@@ -8,13 +8,13 @@ use lazy_static::lazy_static;
 
 use crate::extension::const_fold::fold_out_row;
 use crate::extension::simple_op::{
-    try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+    MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name,
 };
 use crate::extension::{
     ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDefBound,
 };
-use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::OpName;
+use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::{NamedOp, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
@@ -22,12 +22,12 @@ use crate::types::{
     TypeName, TypeRV, TypeRow, TypeRowRV,
 };
 use crate::utils::sorted_consts;
-use crate::{type_row, Extension};
+use crate::{Extension, type_row};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
-use super::resolution::{resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry};
 use super::ExtensionRegistry;
+use super::resolution::{ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions};
 
 mod unwrap_builder;
 
@@ -157,14 +157,17 @@ pub(crate) fn qb_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
 }
 
 /// Qubit type.
+#[must_use]
 pub fn qb_t() -> Type {
     qb_custom_t(&Arc::downgrade(&PRELUDE)).into()
 }
 /// Unsigned size type.
+#[must_use]
 pub fn usize_t() -> Type {
     usize_custom_t(&Arc::downgrade(&PRELUDE)).into()
 }
 /// Boolean type - Sum of two units.
+#[must_use]
 pub fn bool_t() -> Type {
     Type::new_unit_sum(2)
 }
@@ -172,7 +175,7 @@ pub fn bool_t() -> Type {
 /// Name of the prelude panic operation.
 ///
 /// This operation can have any input and any output wires; it is instantiated
-/// with two [TypeArg::Sequence]s representing these. The first input to the
+/// with two [`TypeArg::Sequence`]s representing these. The first input to the
 /// operation is always an error type; the remaining inputs correspond to the
 /// first sequence of types in its instantiation; the outputs correspond to the
 /// second sequence of types in its instantiation. Note that the inputs and
@@ -186,7 +189,7 @@ pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 /// Name of the prelude exit operation.
 ///
 /// This operation can have any input and any output wires; it is instantiated
-/// with two [TypeArg::Sequence]s representing these. The first input to the
+/// with two [`TypeArg::Sequence`]s representing these. The first input to the
 /// operation is always an error type; the remaining inputs correspond to the
 /// first sequence of types in its instantiation; the outputs correspond to the
 /// second sequence of types in its instantiation. Note that the inputs and
@@ -215,6 +218,7 @@ fn string_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
 }
 
 /// String type.
+#[must_use]
 pub fn string_type() -> Type {
     string_custom_type(&Arc::downgrade(&PRELUDE)).into()
 }
@@ -225,11 +229,13 @@ pub struct ConstString(String);
 
 impl ConstString {
     /// Creates a new [`ConstString`].
+    #[must_use]
     pub fn new(value: String) -> Self {
         Self(value)
     }
 
     /// Returns the value of the constant.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.0
     }
@@ -268,6 +274,7 @@ fn error_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
 }
 
 /// Unspecified opaque error type.
+#[must_use]
 pub fn error_type() -> Type {
     error_custom_type(&Arc::downgrade(&PRELUDE)).into()
 }
@@ -297,23 +304,24 @@ pub fn either_type(ty_left: impl Into<TypeRowRV>, ty_right: impl Into<TypeRowRV>
 
 /// A constant optional value with a given value.
 ///
-/// See [option_type].
+/// See [`option_type`].
+#[must_use]
 pub fn const_some(value: Value) -> Value {
     const_some_tuple([value])
 }
 
 /// A constant optional value with a row of values.
 ///
-/// For single values, use [const_some].
+/// For single values, use [`const_some`].
 ///
-/// See [option_type].
+/// See [`option_type`].
 pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
     const_right_tuple(TypeRow::new(), values)
 }
 
 /// A constant optional value with no value.
 ///
-/// See [option_type].
+/// See [`option_type`].
 pub fn const_none(ty: impl Into<TypeRowRV>) -> Value {
     const_left_tuple([], ty)
 }
@@ -322,7 +330,7 @@ pub fn const_none(ty: impl Into<TypeRowRV>) -> Value {
 ///
 /// In fallible computations, this represents a failure.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_left(value: Value, ty_right: impl Into<TypeRowRV>) -> Value {
     const_left_tuple([value], ty_right)
 }
@@ -331,7 +339,7 @@ pub fn const_left(value: Value, ty_right: impl Into<TypeRowRV>) -> Value {
 ///
 /// In fallible computations, this represents a failure.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_left_tuple(
     values: impl IntoIterator<Item = Value>,
     ty_right: impl Into<TypeRowRV>,
@@ -350,7 +358,7 @@ pub fn const_left_tuple(
 ///
 /// In fallible computations, this represents a successful result.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_right(ty_left: impl Into<TypeRowRV>, value: Value) -> Value {
     const_right_tuple(ty_left, [value])
 }
@@ -359,7 +367,7 @@ pub fn const_right(ty_left: impl Into<TypeRowRV>, value: Value) -> Value {
 ///
 /// In fallible computations, this represents a successful result.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_right_tuple(
     ty_left: impl Into<TypeRowRV>,
     values: impl IntoIterator<Item = Value>,
@@ -376,14 +384,14 @@ pub fn const_right_tuple(
 
 /// A constant Either value with a success variant.
 ///
-/// Alias for [const_right].
+/// Alias for [`const_right`].
 pub fn const_ok(value: Value, ty_fail: impl Into<TypeRowRV>) -> Value {
     const_right(ty_fail, value)
 }
 
 /// A constant Either with a row of success values.
 ///
-/// Alias for [const_right_tuple].
+/// Alias for [`const_right_tuple`].
 pub fn const_ok_tuple(
     values: impl IntoIterator<Item = Value>,
     ty_fail: impl Into<TypeRowRV>,
@@ -393,14 +401,14 @@ pub fn const_ok_tuple(
 
 /// A constant Either value with a failure variant.
 ///
-/// Alias for [const_left].
+/// Alias for [`const_left`].
 pub fn const_fail(value: Value, ty_ok: impl Into<TypeRowRV>) -> Value {
     const_left(value, ty_ok)
 }
 
 /// A constant Either with a row of failure values.
 ///
-/// Alias for [const_left_tuple].
+/// Alias for [`const_left_tuple`].
 pub fn const_fail_tuple(
     values: impl IntoIterator<Item = Value>,
     ty_ok: impl Into<TypeRowRV>,
@@ -414,11 +422,13 @@ pub struct ConstUsize(u64);
 
 impl ConstUsize {
     /// Creates a new [`ConstUsize`].
+    #[must_use]
     pub fn new(value: u64) -> Self {
         Self(value)
     }
 
     /// Returns the value of the constant.
+    #[must_use]
     pub fn value(&self) -> u64 {
         self.0
     }
@@ -471,7 +481,7 @@ impl ConstError {
     /// Returns an "either" value with a failure variant.
     ///
     /// args:
-    ///     ty_ok: The type of the success variant.
+    ///     `ty_ok`: The type of the success variant.
     pub fn as_either(self, ty_ok: impl Into<TypeRowRV>) -> Value {
         const_fail(self.into(), ty_ok)
     }
@@ -518,7 +528,7 @@ pub struct ConstExternalSymbol {
 }
 
 impl ConstExternalSymbol {
-    /// Construct a new [ConstExternalSymbol].
+    /// Construct a new [`ConstExternalSymbol`].
     pub fn new(symbol: impl Into<String>, typ: impl Into<Type>, constant: bool) -> Self {
         Self {
             symbol: symbol.into(),
@@ -630,7 +640,7 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -648,7 +658,8 @@ impl MakeOpDef for TupleOpDef {
 pub struct MakeTuple(pub TypeRow);
 
 impl MakeTuple {
-    /// Create a new MakeTuple operation.
+    /// Create a new `MakeTuple` operation.
+    #[must_use]
     pub fn new(tys: TypeRow) -> Self {
         Self(tys)
     }
@@ -693,7 +704,7 @@ impl MakeExtensionOp for MakeTuple {
 
 impl MakeRegisteredOp for MakeTuple {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -708,7 +719,8 @@ impl MakeRegisteredOp for MakeTuple {
 pub struct UnpackTuple(pub TypeRow);
 
 impl UnpackTuple {
-    /// Create a new UnpackTuple operation.
+    /// Create a new `UnpackTuple` operation.
+    #[must_use]
     pub fn new(tys: TypeRow) -> Self {
         Self(tys)
     }
@@ -753,7 +765,7 @@ impl MakeExtensionOp for UnpackTuple {
 
 impl MakeRegisteredOp for UnpackTuple {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -799,7 +811,7 @@ impl MakeOpDef for NoopDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -829,6 +841,7 @@ pub struct Noop(pub Type);
 
 impl Noop {
     /// Create a new Noop operation.
+    #[must_use]
     pub fn new(ty: Type) -> Self {
         Self(ty)
     }
@@ -863,7 +876,7 @@ impl MakeExtensionOp for Noop {
 
 impl MakeRegisteredOp for Noop {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -912,7 +925,7 @@ impl MakeOpDef for BarrierDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -984,7 +997,7 @@ impl MakeExtensionOp for Barrier {
 
 impl MakeRegisteredOp for Barrier {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -995,11 +1008,11 @@ impl MakeRegisteredOp for Barrier {
 #[cfg(test)]
 mod test {
     use crate::builder::inout_sig;
-    use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+    use crate::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
     use crate::{
-        builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
-        utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
+        utils::test_quantum_extension::cx_gate,
     };
 
     use super::*;
@@ -1194,8 +1207,10 @@ mod test {
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", string_type(), false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, true)));
 
-        assert!(ConstExternalSymbol::new("", Type::UNIT, true)
-            .validate()
-            .is_err())
+        assert!(
+            ConstExternalSymbol::new("", Type::UNIT, true)
+                .validate()
+                .is_err()
+        );
     }
 }

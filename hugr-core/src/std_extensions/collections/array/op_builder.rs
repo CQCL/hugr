@@ -3,17 +3,17 @@
 use crate::std_extensions::collections::array::GenericArrayOpDef;
 use crate::std_extensions::collections::value_array::ValueArray;
 use crate::{
+    Wire,
     builder::{BuildError, Dataflow},
     extension::simple_op::HasConcrete as _,
     types::Type,
-    Wire,
 };
 use itertools::Itertools as _;
 
 use super::{Array, ArrayKind, GenericArrayClone, GenericArrayDiscard};
 
 use crate::extension::prelude::{
-    either_type, option_type, usize_t, ConstUsize, UnwrapBuilder as _,
+    ConstUsize, UnwrapBuilder as _, either_type, option_type, usize_t,
 };
 
 /// Trait for building array operations in a dataflow graph that are generic

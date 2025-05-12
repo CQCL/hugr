@@ -4,6 +4,7 @@ use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Extension;
 use crate::extension::prelude::sum_with_error;
 use crate::extension::prelude::{bool_t, string_type, usize_t};
 use crate::extension::simple_op::{HasConcrete, HasDef};
@@ -13,7 +14,6 @@ use crate::ops::{ExtensionOp, OpName};
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::types::{TypeArg, TypeRV};
-use crate::Extension;
 
 use super::float_types::float64_type;
 use super::int_types::{get_log_width, int_tv};
@@ -53,7 +53,7 @@ impl MakeOpDef for ConvertOpDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -104,21 +104,23 @@ impl MakeOpDef for ConvertOpDef {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
 impl ConvertOpDef {
-    /// Initialize a [ConvertOpType] from a [ConvertOpDef] which requires no
+    /// Initialize a [`ConvertOpType`] from a [`ConvertOpDef`] which requires no
     /// integer widths set.
+    #[must_use]
     pub fn without_log_width(self) -> ConvertOpType {
         ConvertOpType {
             def: self,
             log_width: None,
         }
     }
-    /// Initialize a [ConvertOpType] from a [ConvertOpDef] which requires one
+    /// Initialize a [`ConvertOpType`] from a [`ConvertOpDef`] which requires one
     /// integer width set.
+    #[must_use]
     pub fn with_log_width(self, log_width: u8) -> ConvertOpType {
         ConvertOpType {
             def: self,
@@ -133,17 +135,19 @@ pub struct ConvertOpType {
     def: ConvertOpDef,
     /// The integer width parameter of the conversion op, if any. This is interpreted
     /// differently, depending on `def`. The integer types in the inputs and
-    /// outputs of the op will have [int_type]s of this width.
+    /// outputs of the op will have [`int_type`]s of this width.
     log_width: Option<u8>,
 }
 
 impl ConvertOpType {
-    /// Returns the generic [ConvertOpDef] of this [ConvertOpType].
+    /// Returns the generic [`ConvertOpDef`] of this [`ConvertOpType`].
+    #[must_use]
     pub fn def(&self) -> &ConvertOpDef {
         &self.def
     }
 
-    /// Returns the integer width parameters of this [ConvertOpType], if any.
+    /// Returns the integer width parameters of this [`ConvertOpType`], if any.
+    #[must_use]
     pub fn log_widths(&self) -> &[u8] {
         self.log_width.as_slice()
     }
@@ -160,7 +164,10 @@ impl MakeExtensionOp for ConvertOpType {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        self.log_width.iter().map(|&n| (n as u64).into()).collect()
+        self.log_width
+            .iter()
+            .map(|&n| u64::from(n).into())
+            .collect()
     }
 }
 
@@ -175,7 +182,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for ConvertOpType {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -207,10 +214,10 @@ impl HasDef for ConvertOpType {
 mod test {
     use rstest::rstest;
 
+    use crate::IncomingPort;
     use crate::extension::prelude::ConstUsize;
     use crate::ops::Value;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
-    use crate::IncomingPort;
 
     use super::*;
 

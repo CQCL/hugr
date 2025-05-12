@@ -1,31 +1,31 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     convert::Infallible,
     fmt::Write,
 };
 
 use hugr_core::{
+    Node,
     ops::{Call, FuncDefn, LoadFunction, OpTrait},
     types::{Signature, Substitution, TypeArg},
-    Node,
 };
 
-use hugr_core::hugr::{hugrmut::HugrMut, HugrView, OpType};
+use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::composable::{validate_if_test, ValidatePassError};
 use crate::ComposablePass;
+use crate::composable::{ValidatePassError, validate_if_test};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
 /// If the Hugr is [Module](OpType::Module)-rooted,
-/// * then the original polymorphic [FuncDefn]s are left untouched (including Calls inside them)
-///     - [crate::remove_dead_funcs] can be used when no other Hugr will be linked in that might instantiate these
+/// * then the original polymorphic [`FuncDefn`]s are left untouched (including Calls inside them)
+///     - [`crate::remove_dead_funcs`] can be used when no other Hugr will be linked in that might instantiate these
 /// * else, the originals are removed (they are invisible from outside the Hugr); however, note
 ///   that this behaviour is expected to change in a future release to match Module-rooted Hugrs.
 ///
-/// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
+/// If the Hugr is [`FuncDefn`](OpType::FuncDefn)-rooted with polymorphic
 /// signature then the HUGR will not be modified.
 ///
 /// Monomorphic copies of polymorphic functions will be added to the HUGR as
@@ -69,7 +69,7 @@ fn mono_scan(
         debug_assert!(!ch_op.is_func_defn() || subst_into.is_none()); // If substituting, should have flattened already
         if is_polymorphic_funcdefn(ch_op) {
             continue;
-        };
+        }
         // Perform substitution, and recurse into containers (mono_scan does nothing if no children)
         let ch = if let Some(ref mut inst) = subst_into {
             let new_ch =
@@ -110,7 +110,7 @@ fn mono_scan(
         };
         if type_args.is_empty() {
             continue;
-        };
+        }
         let fn_inp = ch_op.static_input_port().unwrap();
         let tgt = h.static_source(old_ch).unwrap(); // Use old_ch as edges not copied yet
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache);
@@ -146,7 +146,7 @@ fn instantiate(
                 h.replace_op(n, fd);
                 h.move_after_sibling(n, poly_func);
             } else {
-                to_scan.extend(h.children(n))
+                to_scan.extend(h.children(n));
             }
         }
         HashMap::new()
@@ -183,13 +183,13 @@ fn instantiate(
     // by doing this during recursion, but we'd need to be careful with nonlocal edges -
     // 'ext' edges by copying every node before recursing on any of them,
     // 'dom' edges would *also* require recursing in dominator-tree preorder.
-    for (&old_ch, &new_ch) in node_map.iter() {
+    for (&old_ch, &new_ch) in &node_map {
         for in_port in h.node_inputs(old_ch).collect::<Vec<_>>() {
             // Edges from monomorphized functions to their calls already added during mono_scan()
             // as these depend not just on the original FuncDefn but also the TypeArgs
             if h.linked_outputs(new_ch, in_port).next().is_some() {
                 continue;
-            };
+            }
             let srcs = h.linked_outputs(old_ch, in_port).collect::<Vec<_>>();
             for (src, outport) in srcs {
                 // Sources could be a mixture of within this polymorphic FuncDefn, and Static edges from outside
@@ -209,10 +209,10 @@ fn instantiate(
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
-/// The original polymorphic [FuncDefn]s are left untouched (including Calls inside them).
-/// Call [crate::remove_dead_funcs] to remove them.
+/// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside them).
+/// Call [`crate::remove_dead_funcs`] to remove them.
 ///
-/// If the Hugr is [FuncDefn](OpType::FuncDefn)-rooted with polymorphic
+/// If the Hugr is [`FuncDefn`](OpType::FuncDefn)-rooted with polymorphic
 /// signature then the HUGR will not be modified.
 ///
 /// Monomorphic copies of polymorphic functions will be added to the HUGR as
@@ -249,7 +249,7 @@ impl std::fmt::Display for TypeArgsList<'_> {
 }
 
 fn escape_dollar(str: impl AsRef<str>) -> String {
-    str.as_ref().replace("$", "\\$")
+    str.as_ref().replace('$', "\\$")
 }
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -274,9 +274,9 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
 ///  - Existing `$` in the function name or type args string
 ///    representation replaced with `r"\$"`.
 ///  - `Display` impl of `Type` used to generate the string
-///    representation of a `TypeArg::Type`. Other TypeArgs use `Display`
+///    representation of a `TypeArg::Type`. Other `TypeArgs` use `Display`
 ///    of inner type.
-///  - For all TypeArg Constructors a short prefix (e.g. `t` for type)
+///  - For all `TypeArg` Constructors a short prefix (e.g. `t` for type)
 ///    is used as "t({arg})" for the string representation of that arg.
 pub fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
     let name = escape_dollar(name);
@@ -304,7 +304,7 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, UnwrapBuilder};
+    use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
@@ -404,7 +404,7 @@ mod test {
             mangle_name("triple", &[pair_type(usize_t()).into()]),
         ];
 
-        for n in expected_mangled_names.iter() {
+        for n in &expected_mangled_names {
             assert!(!is_polymorphic(funcs.remove(n).unwrap().1));
         }
 
@@ -655,7 +655,7 @@ mod test {
     #[rstest]
     #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
     #[case::type_unit(vec![Type::UNIT.into()], "$foo$$t(Unit)")]
-    #[case::type_int(vec![INT_TYPES[2].to_owned().into()], "$foo$$t(int(2))")]
+    #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$t(int(2))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq($n(0)$t(Unit))")]
