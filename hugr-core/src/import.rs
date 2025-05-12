@@ -568,13 +568,7 @@ impl<'a> Context<'a> {
                 // to declare operations as a node, in which case the description will be attached
                 // to that node as metadata.
 
-                let optype = OpType::OpaqueOp(OpaqueOp::new(
-                    extension,
-                    name,
-                    String::default(),
-                    args,
-                    signature,
-                ));
+                let optype = OpType::OpaqueOp(OpaqueOp::new(extension, name, args, signature));
 
                 let node = self.make_node(node_id, optype, parent)?;
 
