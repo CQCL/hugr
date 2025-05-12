@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 use itertools::Itertools;
 use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView};
 
+use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::{Direction, Hugr, Node};
 
@@ -88,6 +89,21 @@ impl PortgraphNodeMap<Node> for DefaultPGNodeMap {
     #[inline]
     fn from_portgraph(&self, node: portgraph::NodeIndex) -> Node {
         node.into()
+    }
+}
+
+impl<N: HugrNode> PortgraphNodeMap<N> for std::collections::HashMap<N, Node> {
+    #[inline]
+    fn to_portgraph(&self, node: N) -> portgraph::NodeIndex {
+        self[&node].into_portgraph()
+    }
+
+    #[inline]
+    fn from_portgraph(&self, node: portgraph::NodeIndex) -> N {
+        let node = node.into();
+        self.iter()
+            .find_map(|(&k, &v)| (v == node).then_some(k))
+            .expect("Portgraph node not found in map")
     }
 }
 
