@@ -184,9 +184,7 @@ mod test {
 
             assert!(
                 res_val.abs_diff_eq(expected, f64::EPSILON),
-                "expected {:?}, got {:?}",
-                expected,
-                res_val
+                "expected {expected:?}, got {res_val:?}"
             );
         }
     }

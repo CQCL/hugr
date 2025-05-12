@@ -293,8 +293,7 @@ impl TypeArg {
             } => {
                 assert!(
                     !matches!(cached_decl, TypeParam::Type { .. }),
-                    "Malformed TypeArg::Variable {} - should be inconstructible",
-                    cached_decl
+                    "Malformed TypeArg::Variable {cached_decl} - should be inconstructible"
                 );
 
                 check_typevar_decl(var_decls, *idx, cached_decl)

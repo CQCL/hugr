@@ -62,7 +62,7 @@ where
 pub fn collect_array<const N: usize, T: Debug>(arr: impl IntoIterator<Item = T>) -> [T; N] {
     match try_collect_array(arr) {
         Ok(v) => v,
-        Err(v) => panic!("Expected {} elements, got {:?}", N, v),
+        Err(v) => panic!("Expected {N} elements, got {v:?}"),
     }
 }
 

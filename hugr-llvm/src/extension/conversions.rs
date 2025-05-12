@@ -126,10 +126,7 @@ fn build_trunc_op<'c, H: HugrView<Node = Node>>(
 
         let err_msg = Value::extension(ConstError::new(
             2,
-            format!(
-                "Float value too big to convert to int of given width ({})",
-                width
-            ),
+            format!("Float value too big to convert to int of given width ({width})"),
         ));
 
         let err_val = emit_value(ctx, &err_msg)?;

@@ -499,7 +499,7 @@ impl Value {
                 let Ok(t) = mono_fn_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
-                format!("const:function:[{}]", t)
+                format!("const:function:[{t}]")
             }
             Self::Sum(Sum {
                 tag,

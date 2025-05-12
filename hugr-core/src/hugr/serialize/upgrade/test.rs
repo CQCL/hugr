@@ -31,8 +31,7 @@ fn test_case_dir_exists() {
     let test_case_dir: &Path = &TEST_CASE_DIR;
     assert!(
         test_case_dir.exists(),
-        "Upgrade test case directory does not exist: {:?}",
-        test_case_dir
+        "Upgrade test case directory does not exist: {test_case_dir:?}"
     );
 }
 
@@ -56,7 +55,7 @@ pub fn hugr_with_named_op() -> Hugr {
 #[case("empty_hugr", empty_hugr())]
 #[case("hugr_with_named_op", hugr_with_named_op())]
 fn serial_upgrade(#[case] name: String, #[case] hugr: Hugr) {
-    let path = TEST_CASE_DIR.join(format!("{}.json", name));
+    let path = TEST_CASE_DIR.join(format!("{name}.json"));
     if !path.exists() {
         let f = OpenOptions::new()
             .create(true)

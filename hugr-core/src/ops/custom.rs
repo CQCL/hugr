@@ -240,7 +240,7 @@ pub struct OpaqueOp {
 }
 
 fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
-    format!("{}.{}", res_id, name).into()
+    format!("{res_id}.{name}").into()
 }
 
 impl OpaqueOp {

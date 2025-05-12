@@ -92,7 +92,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
 ///
 /// Returns the defined extension.
 fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -> Arc<Extension> {
-    let ext = Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
+    Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
         let type_def = ext
             .add_type(
                 type_name.into(),
@@ -111,8 +111,7 @@ fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -
             extension_ref,
         )
         .unwrap();
-    });
-    ext
+    })
 }
 
 /// Check that the extensions added during building coincide with read-only collected extensions

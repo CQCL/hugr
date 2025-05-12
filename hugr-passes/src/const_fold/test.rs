@@ -1549,7 +1549,7 @@ fn test_cfg(
                 HashSet::from(["Input", "Output", "Leaf", "Const", "LoadConst"]);
             for ch in hugr.children(blk) {
                 let tag = format!("{:?}", hugr.get_optype(ch).tag());
-                assert!(expected_tags.remove(tag.as_str()), "Not found: {}", tag);
+                assert!(expected_tags.remove(tag.as_str()), "Not found: {tag}");
                 if let Some(cst) = hugr.get_optype(ch).as_const() {
                     assert_eq!(
                         cst.value(),

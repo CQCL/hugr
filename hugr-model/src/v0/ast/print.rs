@@ -81,7 +81,7 @@ impl<'a> Printer<'a> {
     }
 
     fn int(&mut self, value: u64) {
-        self.text(format!("{}", value));
+        self.text(format!("{value}"));
     }
 
     fn string(&mut self, string: &str) {
@@ -217,11 +217,11 @@ fn print_symbol_name<'a>(printer: &mut Printer<'a>, name: &'a SymbolName) {
 }
 
 fn print_var_name<'a>(printer: &mut Printer<'a>, name: &'a VarName) {
-    printer.text(format!("{}", name))
+    printer.text(format!("{name}"))
 }
 
 fn print_link_name<'a>(printer: &mut Printer<'a>, name: &'a LinkName) {
-    printer.text(format!("{}", name))
+    printer.text(format!("{name}"))
 }
 
 fn print_port_lists<'a>(

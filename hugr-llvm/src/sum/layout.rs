@@ -57,7 +57,7 @@ fn size_of_type<'c>(t: impl BasicType<'c>) -> Option<u64> {
 struct BasicTypeOrd<'c>(
     BasicTypeEnum<'c>,
     #[debug(skip)] u64,
-    #[debug(skip)] Cow<'c, String>,
+    #[debug(skip)] Cow<'c, str>,
 );
 
 impl<'c> From<BasicTypeEnum<'c>> for BasicTypeOrd<'c> {

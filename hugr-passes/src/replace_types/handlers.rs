@@ -107,7 +107,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
     let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
-        panic!("Illegal TypeArgs to array: {:?}", args)
+        panic!("Illegal TypeArgs to array: {args:?}")
     };
     if num_outports == 0 {
         // "Simple" discard - first map each element to unit (via type-specific discard):
@@ -308,7 +308,7 @@ pub fn copy_discard_array(
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
     let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
-        panic!("Illegal TypeArgs to array: {:?}", args)
+        panic!("Illegal TypeArgs to array: {args:?}")
     };
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops

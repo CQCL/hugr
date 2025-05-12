@@ -124,7 +124,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
 
                     let mk_out_const = |i, mb_v: Result<Value, _>| {
                         mb_v.and_then(|v| Value::sum(i, [v], sum_type))
-                            .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            .unwrap_or_else(|e| panic!("Invalid computed sum, {e}"))
                     };
                     let n0val: u64 = n0.value_u();
                     let out_const: Value = if n0val >> (1 << logwidth1) != 0 {
@@ -151,7 +151,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let sum_type = sum_with_error(int_out_type.clone());
                     let mk_out_const = |i, mb_v: Result<Value, _>| {
                         mb_v.and_then(|v| Value::sum(i, [v], sum_type))
-                            .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            .unwrap_or_else(|e| panic!("Invalid computed sum, {e}"))
                     };
                     let n0val: i64 = n0.value_s();
                     let ub = 1i64 << ((1 << logwidth1) - 1);

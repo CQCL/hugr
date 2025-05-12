@@ -1,4 +1,5 @@
 //! Compilation passes acting on the HUGR program representation.
+#![expect(missing_docs)] // TODO: Fix...
 
 pub mod call_graph;
 pub mod composable;

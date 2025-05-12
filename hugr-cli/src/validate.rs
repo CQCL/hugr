@@ -45,7 +45,7 @@ impl ValArgs {
         };
 
         if self.verbosity(Level::Info) {
-            eprintln!("{}", VALID_PRINT);
+            eprintln!("{VALID_PRINT}");
         }
 
         Ok(result)

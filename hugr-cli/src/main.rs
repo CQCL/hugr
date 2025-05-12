@@ -31,7 +31,7 @@ fn run_validate(mut args: validate::ValArgs) {
 
     if let Err(e) = result {
         if args.verbosity(Level::Error) {
-            eprintln!("{}", e);
+            eprintln!("{e}");
         }
         std::process::exit(1);
     }
@@ -43,7 +43,7 @@ fn run_mermaid(mut args: mermaid::MermaidArgs) {
 
     if let Err(e) = result {
         if args.other_args.verbosity(Level::Error) {
-            eprintln!("{}", e);
+            eprintln!("{e}");
         }
         std::process::exit(1);
     }

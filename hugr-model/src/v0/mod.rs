@@ -464,7 +464,7 @@ impl LinkName {
     /// Create a new link name from a link index.
     pub fn new_index(index: LinkIndex) -> Self {
         // TODO: Should named and numbered links have different namespaces?
-        Self(format!("{}", index).into())
+        Self(format!("{index}").into())
     }
 }
 

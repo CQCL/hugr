@@ -8,8 +8,10 @@ use thiserror::Error;
 
 pub static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
 lazy_static! {
-    pub static ref PATH_REGEX: Regex =
-        Regex::new(&format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR)).unwrap();
+    pub static ref PATH_REGEX: Regex = Regex::new(&format!(
+        r"^{PATH_COMPONENT_REGEX_STR}(\.{PATH_COMPONENT_REGEX_STR})*$"
+    ))
+    .unwrap();
 }
 
 #[derive(
@@ -31,7 +33,7 @@ pub struct IdentList(SmolStr);
 impl IdentList {
     /// Makes an IdentList, checking the supplied string is well-formed
     pub fn new(n: impl Into<SmolStr>) -> Result<Self, InvalidIdentifier> {
-        let n = n.into();
+        let n: SmolStr = n.into();
         if PATH_REGEX.is_match(n.as_str()) {
             Ok(IdentList(n))
         } else {

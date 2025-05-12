@@ -91,9 +91,9 @@ pub(super) fn port_style(
         let optype = h.get_optype(node.into());
         let offset = graph.port_offset(port).unwrap();
         match optype.port_kind(offset).unwrap() {
-            EdgeKind::Function(pf) => PortStyle::new(html_escape::encode_text(&format!("{}", pf))),
+            EdgeKind::Function(pf) => PortStyle::new(html_escape::encode_text(&format!("{pf}"))),
             EdgeKind::Const(ty) | EdgeKind::Value(ty) => {
-                PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
+                PortStyle::new(html_escape::encode_text(&format!("{ty}")))
             }
             EdgeKind::StateOrder => match graph.port_links(port).count() > 0 {
                 true => PortStyle::text("", false),
@@ -137,8 +137,8 @@ pub(super) fn edge_style(
         // Compute the label for the edge, given the setting flags.
         fn type_label(e: EdgeKind) -> Option<String> {
             match e {
-                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(format!("{}", ty)),
-                EdgeKind::Function(pf) => Some(format!("{}", pf)),
+                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(format!("{ty}")),
+                EdgeKind::Function(pf) => Some(format!("{pf}")),
                 _ => None,
             }
         }

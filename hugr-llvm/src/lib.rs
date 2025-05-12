@@ -61,6 +61,8 @@
 //! [BasicValueEnum]: [inkwell::values::BasicValueEnum]
 //! [BasicValue]: [inkwell::values::BasicValue]
 //!
+#![expect(missing_docs)] // TODO: Fix...
+
 pub mod custom;
 pub mod emit;
 pub mod extension;

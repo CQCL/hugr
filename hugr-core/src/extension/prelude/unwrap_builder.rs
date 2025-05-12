@@ -45,7 +45,7 @@ pub trait UnwrapBuilder: Dataflow {
         input: Wire,
     ) -> Result<[Wire; N], BuildError> {
         self.build_expect_sum(tag, sum_type, input, |i| {
-            format!("Expected variant {} but got variant {}", tag, i)
+            format!("Expected variant {tag} but got variant {i}")
         })
     }
 
