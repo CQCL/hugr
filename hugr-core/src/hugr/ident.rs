@@ -59,7 +59,7 @@ impl IdentList {
     #[must_use]
     pub fn split_last(&self) -> Option<(IdentList, SmolStr)> {
         let (prefix, suffix) = self.0.rsplit_once('.')?;
-        let prefix = Self::new_unchecked(prefix);
+        let prefix = Self(SmolStr::new(prefix));
         let suffix = suffix.into();
         Some((prefix, suffix))
     }
