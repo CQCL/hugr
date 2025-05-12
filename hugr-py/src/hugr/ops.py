@@ -315,7 +315,6 @@ class Custom(DataflowOp):
 
     op_name: str
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
-    description: str = ""
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
 
@@ -325,7 +324,6 @@ class Custom(DataflowOp):
             extension=self.extension,
             name=self.op_name,
             signature=self.signature._to_serial(),
-            description=self.description,
             args=ser_it(self.args),
         )
 
