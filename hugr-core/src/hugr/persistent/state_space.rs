@@ -10,15 +10,15 @@ use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use super::{
-    find_conflicting_node, Commit, PersistentHugr, PersistentReplacement, PointerEqResolver,
+    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, find_conflicting_node,
 };
 use crate::{
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
     hugr::{
         internal::HugrInternals,
         patch::{HostPort, ReplacementPort},
     },
     ops::OpType,
-    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
 };
 
 /// A copyable handle to a [`Commit`] vertex within a [`CommitStateSpace`]

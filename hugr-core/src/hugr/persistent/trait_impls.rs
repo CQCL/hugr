@@ -4,19 +4,19 @@ use itertools::{Either, Itertools};
 use portgraph::render::{DotFormat, MermaidFormat};
 
 use crate::{
+    Direction, Hugr, HugrView, Node, Port,
     hugr::{
+        Patch, SimpleReplacementError,
         internal::HugrInternals,
         views::{
-            render::{self, RenderConfig},
             ExtractionResult,
+            render::{self, RenderConfig},
         },
-        Patch, SimpleReplacementError,
     },
-    Direction, Hugr, HugrView, Node, Port,
 };
 
 use super::{
-    state_space::CommitData, InvalidCommit, PatchNode, PersistentHugr, PersistentReplacement,
+    InvalidCommit, PatchNode, PersistentHugr, PersistentReplacement, state_space::CommitData,
 };
 
 impl Patch<PersistentHugr> for PersistentReplacement {
@@ -338,7 +338,7 @@ impl HugrView for PersistentHugr {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::hugr::persistent::{state_space::CommitId, CommitStateSpace};
+    use crate::hugr::persistent::{CommitStateSpace, state_space::CommitId};
 
     use super::super::tests::test_state_space;
     use super::*;

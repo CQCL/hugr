@@ -3,15 +3,15 @@ use std::collections::{BTreeMap, HashMap};
 use rstest::*;
 
 use crate::{
-    builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+    IncomingPort, Node, OutgoingPort, SimpleReplacement,
+    builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
     extension::prelude::bool_t,
-    hugr::{patch::Patch, persistent::PatchNode, views::SiblingSubgraph, Hugr, HugrView},
+    hugr::{Hugr, HugrView, patch::Patch, persistent::PatchNode, views::SiblingSubgraph},
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
-    IncomingPort, Node, OutgoingPort, SimpleReplacement,
 };
 
-use super::{state_space::CommitId, CommitStateSpace};
+use super::{CommitStateSpace, state_space::CommitId};
 
 /// Creates a simple test Hugr with a DFG that contains a small boolean circuit
 ///
