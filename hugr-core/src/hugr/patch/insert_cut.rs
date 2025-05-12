@@ -156,7 +156,7 @@ mod tests {
     use super::*;
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{bool_t, qb_t, Noop},
+        extension::prelude::{Noop, bool_t, qb_t},
         types::Signature,
     };
 

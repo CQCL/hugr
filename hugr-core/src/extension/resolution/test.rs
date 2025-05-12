@@ -10,22 +10,23 @@ use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::envelope::EnvelopeConfig;
-use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize};
+use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
 use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
 use crate::extension::{
-    ExtensionId, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
+    ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound,
 };
-use crate::ops::constant::test::CustomTestValue;
 use crate::ops::constant::CustomConst;
+use crate::ops::constant::test::CustomTestValue;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
-use crate::std_extensions::arithmetic::float_types::{self, float64_type, ConstF64};
+use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
+use crate::std_extensions::std_reg;
 use crate::types::type_param::TypeParam;
 use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
-use crate::{type_row, Extension, Hugr, HugrView};
+use crate::{Extension, Hugr, HugrView, type_row};
 
 #[rstest]
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
@@ -76,7 +77,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
     let ext = Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
         ext.add_op(
             op_name.into(),
-            "".to_string(),
+            String::new(),
             Signature::new_endo(vec![bool_t()]),
             extension_ref,
         )
@@ -91,12 +92,12 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
 ///
 /// Returns the defined extension.
 fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -> Arc<Extension> {
-    let ext = Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
+    Extension::new_test_arc(ExtensionId::new_unchecked(name), |ext, extension_ref| {
         let type_def = ext
             .add_type(
                 type_name.into(),
                 vec![],
-                "".to_string(),
+                String::new(),
                 TypeDefBound::any(),
                 extension_ref,
             )
@@ -105,19 +106,23 @@ fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -
 
         ext.add_op(
             op_name.into(),
-            "".to_string(),
+            String::new(),
             Signature::new(vec![typ.into()], vec![usize_t()]),
             extension_ref,
         )
         .unwrap();
-    });
-    ext
+    })
 }
 
 /// Check that the extensions added during building coincide with read-only collected extensions
 /// and that they survive a serialization roundtrip.
 fn check_extension_resolution(mut hugr: Hugr) {
+    // Extensions used by the hugr, used to check that the roundtrip preserves them.
     let build_extensions = hugr.extensions().clone();
+
+    // Extensions used for resolution.
+    let mut resolution_extensions = std_reg();
+    resolution_extensions.extend(&build_extensions);
 
     // Check that the read-only methods collect the same extensions.
     let collected_exts = ExtensionRegistry::new(hugr.nodes().flat_map(|node| {
@@ -132,7 +137,7 @@ fn check_extension_resolution(mut hugr: Hugr) {
     );
 
     // Check that the mutable methods collect the same extensions.
-    hugr.resolve_extension_defs(&build_extensions).unwrap();
+    hugr.resolve_extension_defs(&resolution_extensions).unwrap();
     assert_eq!(
         hugr.extensions(),
         &build_extensions,
@@ -143,7 +148,7 @@ fn check_extension_resolution(mut hugr: Hugr) {
     // Roundtrip serialize so all weak references are dropped.
     let ser = hugr.store_str(EnvelopeConfig::text()).unwrap();
 
-    let deser_hugr = Hugr::load_str(&ser, Some(&build_extensions)).unwrap();
+    let deser_hugr = Hugr::load_str(&ser, Some(&resolution_extensions)).unwrap();
 
     assert_eq!(
         deser_hugr.extensions(),
@@ -335,8 +340,8 @@ fn resolve_call() {
     let generic_type_1 = TypeArg::Type { ty: float64_type() };
     let generic_type_2 = TypeArg::Type { ty: int_type(6) };
     let expected_exts = [
-        float_types::EXTENSION_ID.to_owned(),
-        int_types::EXTENSION_ID.to_owned(),
+        float_types::EXTENSION_ID.clone(),
+        int_types::EXTENSION_ID.clone(),
     ]
     .into_iter()
     .collect::<ExtensionSet>();

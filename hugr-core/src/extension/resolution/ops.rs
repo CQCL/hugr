@@ -8,10 +8,10 @@
 use std::sync::Arc;
 
 use super::{Extension, ExtensionCollectionError, ExtensionResolutionError};
+use crate::Node;
 use crate::extension::ExtensionRegistry;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpType};
-use crate::Node;
 
 /// Returns the extension in the registry required by the operation.
 ///
@@ -102,7 +102,7 @@ pub(crate) fn resolve_op_extensions<'e>(
             stored: opaque.signature().into_owned(),
         }
         .into());
-    };
+    }
 
     // Replace the opaque operation with the resolved extension operation.
     *op = ext_op.into();

@@ -10,7 +10,7 @@ use hugr_core::{Direction, HugrView, Node};
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
-/// So for BBs with multiple preds + succs, we generate TWO HalfNode's with a single edge between
+/// So for BBs with multiple preds + succs, we generate TWO `HalfNode`'s with a single edge between
 /// them; that single edge can then be a region boundary that did not exist before.
 /// TODO: this unfortunately doesn't capture all cases: when a node has multiple preds and succs,
 /// we could "merge" *any subset* of the in-edges into a single in-edge via an extra empty BB;
@@ -78,7 +78,7 @@ impl<H: HugrView> CfgNodeMap<HalfNode<H::Node>> for HalfNodeView<H> {
         match h {
             HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
             HalfNode::X(ni) => ps.push(HalfNode::N(ni)),
-        };
+        }
         if h == self.entry_node() {
             ps.push(self.exit_node());
         }
@@ -89,14 +89,14 @@ impl<H: HugrView> CfgNodeMap<HalfNode<H::Node>> for HalfNodeView<H> {
         match n {
             HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),
             HalfNode::N(ni) | HalfNode::X(ni) => succs.extend(self.bb_succs(ni).map(HalfNode::N)),
-        };
+        }
         succs.into_iter()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::super::nest_cfgs::{test::*, EdgeClassifier};
+    use super::super::nest_cfgs::{EdgeClassifier, test::*};
     use super::{HalfNode, HalfNodeView};
     use hugr_core::builder::BuildError;
     use hugr_core::ops::handle::NodeHandle;

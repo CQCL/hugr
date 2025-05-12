@@ -9,15 +9,15 @@ use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
 use crate::types::Signature;
 use crate::{
+    Extension, IncomingPort,
     extension::{
-        prelude::bool_t,
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, OpDef, SignatureFunc,
+        prelude::bool_t,
+        simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name},
     },
     ops,
     types::type_param::TypeArg,
     utils::sorted_consts,
-    Extension, IncomingPort,
 };
 use lazy_static::lazy_static;
 /// Name of extension false value.
@@ -111,7 +111,7 @@ impl MakeOpDef for LogicOp {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
@@ -138,7 +138,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for LogicOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -169,11 +169,11 @@ fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
 pub(crate) mod test {
     use std::sync::Arc;
 
-    use super::{extension, LogicOp};
+    use super::{LogicOp, extension};
     use crate::{
+        Extension,
         extension::simple_op::{MakeOpDef, MakeRegisteredOp},
         ops::Value,
-        Extension,
     };
 
     use rstest::rstest;

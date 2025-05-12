@@ -4,24 +4,24 @@
 use std::collections::HashSet;
 
 use hugr_core::{
+    HugrView, Node,
     hugr::hugrmut::HugrMut,
     ops::{OpTag, OpTrait},
-    HugrView, Node,
 };
 use petgraph::visit::{Dfs, Walker};
 
 use crate::{
-    composable::{validate_if_test, ValidatePassError},
     ComposablePass,
+    composable::{ValidatePassError, validate_if_test},
 };
 
 use super::call_graph::{CallGraph, CallGraphNode};
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-/// Errors produced by [RemoveDeadFuncsPass].
+/// Errors produced by [`RemoveDeadFuncsPass`].
 pub enum RemoveDeadFuncsError<N = Node> {
-    /// The specified entry point is not a FuncDefn node or is not a child of the root.
+    /// The specified entry point is not a `FuncDefn` node or is not a child of the root.
     #[error(
         "Entrypoint for RemoveDeadFuncsPass {node} was not a function definition in the root module"
     )]
@@ -45,7 +45,7 @@ fn reachable_funcs<'a, H: HugrView>(
             if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.entrypoint()) {
                 return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
             }
-            d.stack.push(cg.node_index(n).unwrap())
+            d.stack.push(cg.node_index(n).unwrap());
         }
         d
     } else {
@@ -78,11 +78,11 @@ impl Default for RemoveDeadFuncsPass {
 }
 
 impl RemoveDeadFuncsPass {
-    /// Adds new entry points - these must be [FuncDefn] nodes
-    /// that are children of the [Module] at the root of the Hugr.
+    /// Adds new entry points - these must be [`FuncDefn`] nodes
+    /// that are children of the [`Module`] at the root of the Hugr.
     ///
-    /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
-    /// [Module]: hugr_core::ops::OpType::Module
+    /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
+    /// [`Module`]: hugr_core::ops::OpType::Module
     pub fn with_module_entry_points(
         mut self,
         entry_points: impl IntoIterator<Item = Node>,
@@ -117,7 +117,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
         let reachable = reachable_funcs(
             &CallGraph::new(hugr),
             hugr,
-            self.entry_points.iter().cloned().chain(exports),
+            self.entry_points.iter().copied().chain(exports),
         )?
         .collect::<HashSet<_>>();
         let unreachable = hugr
@@ -133,10 +133,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     }
 }
 
-/// Deletes from the Hugr any functions that are not used by either [Call] or
-/// [LoadFunction] nodes in reachable parts.
+/// Deletes from the Hugr any functions that are not used by either [`Call`] or
+/// [`LoadFunction`] nodes in reachable parts.
 ///
-/// For [Module]-rooted Hugrs, all top-level functions with [FuncDefn::link_name] set,
+/// For [`Module`]-rooted Hugrs, all top-level functions with [FuncDefn::link_name] set,
 /// will be used as entry points.
 ///
 pub fn remove_dead_funcs(
@@ -155,7 +155,7 @@ mod test {
     use hugr_core::builder::{
         Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::{extension::prelude::usize_t, types::Signature, HugrView};
+    use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
 
     use super::RemoveDeadFuncsPass;
     use crate::ComposablePass;

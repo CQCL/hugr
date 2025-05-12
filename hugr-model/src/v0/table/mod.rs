@@ -29,7 +29,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 mod view;
-use super::{ast, Literal, RegionKind};
+use super::{Literal, RegionKind, ast};
 pub use view::View;
 
 /// A package consisting of a sequence of [`Module`]s.
@@ -47,11 +47,12 @@ impl Package<'_> {
     /// Convert the package to the [ast] representation.
     ///
     /// [ast]: crate::v0::ast
+    #[must_use]
     pub fn as_ast(&self) -> Option<ast::Package> {
         let modules = self
             .modules
             .iter()
-            .map(|module| module.as_ast())
+            .map(Module::as_ast)
             .collect::<Option<_>>()?;
         Some(ast::Package { modules })
     }
@@ -77,6 +78,7 @@ pub struct Module<'a> {
 impl<'a> Module<'a> {
     /// Return the node data for a given node id.
     #[inline]
+    #[must_use]
     pub fn get_node(&self, node_id: NodeId) -> Option<&Node<'a>> {
         self.nodes.get(node_id.index())
     }
@@ -96,6 +98,7 @@ impl<'a> Module<'a> {
 
     /// Return the term data for a given term id.
     #[inline]
+    #[must_use]
     pub fn get_term(&self, term_id: TermId) -> Option<&Term<'a>> {
         self.terms.get(term_id.index())
     }
@@ -115,6 +118,7 @@ impl<'a> Module<'a> {
 
     /// Return the region data for a given region id.
     #[inline]
+    #[must_use]
     pub fn get_region(&self, region_id: RegionId) -> Option<&Region<'a>> {
         self.regions.get(region_id.index())
     }
@@ -140,6 +144,7 @@ impl<'a> Module<'a> {
     /// Convert the module to the [ast] representation.
     ///
     /// [ast]: crate::v0::ast
+    #[must_use]
     pub fn as_ast(&self) -> Option<ast::Module> {
         let root = self.view(self.root)?;
         Some(ast::Module { root })
@@ -238,6 +243,7 @@ pub enum Operation<'a> {
 
 impl<'a> Operation<'a> {
     /// Returns the symbol introduced by the operation, if any.
+    #[must_use]
     pub fn symbol(&self) -> Option<&'a str> {
         match self {
             Operation::DefineFunc(symbol) => Some(symbol.name),
@@ -394,25 +400,25 @@ macro_rules! define_index {
             /// # Panics
             ///
             /// Panics if the index is 2^32 or larger.
-            pub fn new(index: usize) -> Self {
+            #[must_use] pub fn new(index: usize) -> Self {
                 assert!(index < u32::MAX as usize, "index out of bounds");
                 Self(index as u32)
             }
 
             /// Returns the index as a `usize` to conveniently use it as a slice index.
             #[inline]
-            pub fn index(self) -> usize {
+            #[must_use] pub fn index(self) -> usize {
                 self.0 as usize
             }
 
             /// Convert a slice of this index type into a slice of `u32`s.
-            pub fn unwrap_slice(slice: &[Self]) -> &[u32] {
+            #[must_use] pub fn unwrap_slice(slice: &[Self]) -> &[u32] {
                 // SAFETY: This type is just a newtype around `u32`.
                 unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const u32, slice.len()) }
             }
 
             /// Convert a slice of `u32`s into a slice of this index type.
-            pub fn wrap_slice(slice: &[u32]) -> &[Self] {
+            #[must_use] pub fn wrap_slice(slice: &[u32]) -> &[Self] {
                 // SAFETY: This type is just a newtype around `u32`.
                 unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const Self, slice.len()) }
             }

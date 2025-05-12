@@ -1,11 +1,11 @@
 use hugr_core::{
+    HugrView, Node, NodeIndex as _,
     hugr::{hugrmut::HugrMut, internal::HugrMutInternals},
     ops::{FuncDefn, LoadFunction, Value},
     types::PolyFuncType,
-    HugrView, Node, NodeIndex as _,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 
 fn const_fn_name(konst_n: Node) -> String {
     format!("const_fun_{}", konst_n.index())
@@ -85,6 +85,7 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
 #[cfg(test)]
 mod test {
     use hugr_core::{
+        Hugr, HugrView, Wire,
         builder::{
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
@@ -92,7 +93,6 @@ mod test {
         extension::prelude::qb_t,
         ops::{CallIndirect, Const, Value},
         types::Signature,
-        Hugr, HugrView, Wire,
     };
 
     use super::inline_constant_functions;
@@ -139,7 +139,7 @@ mod test {
 
         for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
-                assert!(!matches!(konst.value(), Value::Function { .. }))
+                assert!(!matches!(konst.value(), Value::Function { .. }));
             }
         }
     }
@@ -189,7 +189,7 @@ mod test {
 
         for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
-                assert!(!matches!(konst.value(), Value::Function { .. }))
+                assert!(!matches!(konst.value(), Value::Function { .. }));
             }
         }
     }

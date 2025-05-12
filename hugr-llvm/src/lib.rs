@@ -47,7 +47,7 @@
 //! * [Values](inkwell::values): The things `Instruction`s take and return. They
 //!   can be the parameters of functions, the results of instructions,
 //!   constants, symbol references to globals, and other more esoteric things.
-//!   Mostly we use [BasicValueEnum] or [BasicValue].
+//!   Mostly we use [`BasicValueEnum`] or [`BasicValue`].
 //!
 //! * [Types](inkwell::types): Every `Value` has a type. For example `i32`,
 //!   `f64`, `ptr`. In particular types are used to construct constant values.
@@ -55,12 +55,14 @@
 //! * [Builder](inkwell::builder::Builder): This is the mechanism by which one
 //!   inserts instructions into a basic block into a basic block. A builder has
 //!   a "current position" where the next instruction will be inserted. It has
-//!   many functions such as [inkwell::builder::Builder::build_call] which are
+//!   many functions such as [`inkwell::builder::Builder::build_call`] which are
 //!   used to create and insert instructions.
 //!
-//! [BasicValueEnum]: [inkwell::values::BasicValueEnum]
-//! [BasicValue]: [inkwell::values::BasicValue]
+//! [`BasicValueEnum`]: [inkwell::values::BasicValueEnum]
+//! [`BasicValue`]: [inkwell::values::BasicValue]
 //!
+#![expect(missing_docs)] // TODO: Fix...
+
 pub mod custom;
 pub mod emit;
 pub mod extension;
@@ -69,6 +71,7 @@ pub mod types;
 pub mod utils;
 
 #[allow(unreachable_code)]
+#[must_use]
 pub fn llvm_version() -> &'static str {
     #[cfg(feature = "llvm14-0")]
     return "llvm14";

@@ -84,9 +84,9 @@
 //! [AST]: crate::v0::ast
 use ordered_float::OrderedFloat;
 #[cfg(feature = "pyo3")]
-use pyo3::types::PyAnyMethods as _;
-#[cfg(feature = "pyo3")]
 use pyo3::PyTypeInfo as _;
+#[cfg(feature = "pyo3")]
+use pyo3::types::PyAnyMethods as _;
 use smol_str::SmolStr;
 use std::sync::Arc;
 use table::LinkIndex;
@@ -462,9 +462,10 @@ impl LinkName {
     }
 
     /// Create a new link name from a link index.
+    #[must_use]
     pub fn new_index(index: LinkIndex) -> Self {
         // TODO: Should named and numbered links have different namespaces?
-        Self(format!("{}", index).into())
+        Self(format!("{index}").into())
     }
 }
 

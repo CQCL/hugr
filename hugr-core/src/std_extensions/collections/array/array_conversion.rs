@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -11,7 +12,6 @@ use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDe
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
-use crate::Extension;
 
 use super::array_kind::ArrayKind;
 
@@ -42,6 +42,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
     GenericArrayConvertDef<AK, DIR, OtherAK>
 {
     /// Creates a new array conversion definition.
+    #[must_use]
     pub fn new() -> Self {
         GenericArrayConvertDef(PhantomData, PhantomData)
     }
@@ -127,8 +128,8 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeOpDef
         }
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.
@@ -163,6 +164,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
     GenericArrayConvert<AK, DIR, OtherAK>
 {
     /// Creates a new array conversion op.
+    #[must_use]
     pub fn new(elem_ty: Type, size: u64) -> Self {
         GenericArrayConvert {
             elem_ty,

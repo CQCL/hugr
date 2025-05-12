@@ -498,7 +498,6 @@ class ExtensionOp(DataflowOp):
     extension: ExtensionId
     name: str
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
-    description: str = ""
     args: list[stys.TypeArg] = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:

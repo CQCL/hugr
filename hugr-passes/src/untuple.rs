@@ -4,10 +4,10 @@ use std::collections::VecDeque;
 
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
-use hugr_core::hugr::views::SiblingSubgraph;
 use hugr_core::hugr::SimpleReplacementError;
+use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::views::SiblingSubgraph;
+use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, SimpleReplacement};
@@ -54,7 +54,7 @@ pub struct UntuplePass {
 
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
 #[non_exhaustive]
-/// Errors produced by [UntuplePass].
+/// Errors produced by [`UntuplePass`].
 pub enum UntupleError {
     /// Rewriting the circuit failed.
     RewriteError(SimpleReplacementError),
@@ -69,6 +69,7 @@ pub struct UntupleResult {
 
 impl UntuplePass {
     /// Create a new untuple pass with the given configuration.
+    #[must_use]
     pub fn new(recursive: UntupleRecursive) -> Self {
         Self {
             recursive,
@@ -83,6 +84,7 @@ impl UntuplePass {
     }
 
     /// Sets whether the pass should traverse the HUGR recursively.
+    #[must_use]
     pub fn recursive(mut self, recursive: UntupleRecursive) -> Self {
         self.recursive = recursive;
         self
@@ -136,21 +138,21 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
     }
 }
 
-/// Returns true if the given optype is a MakeTuple operation.
+/// Returns true if the given optype is a `MakeTuple` operation.
 ///
-/// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
+/// Boilerplate required due to <https://github.com/CQCL/hugr/issues/1496>
 fn is_make_tuple(optype: &OpType) -> bool {
     optype.cast::<MakeTuple>().is_some()
 }
 
-/// Returns true if the given optype is an UnpackTuple operation.
+/// Returns true if the given optype is an `UnpackTuple` operation.
 ///
-/// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
+/// Boilerplate required due to <https://github.com/CQCL/hugr/issues/1496>
 fn is_unpack_tuple(optype: &OpType) -> bool {
     optype.cast::<UnpackTuple>().is_some()
 }
 
-/// If this is a MakeTuple operation followed by some number of UnpackTuple operations
+/// If this is a `MakeTuple` operation followed by some number of `UnpackTuple` operations
 /// on the same region, return a rewrite to remove them.
 ///
 /// Otherwise, return None.
@@ -247,7 +249,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
             .add_dataflow_op(op, replacement.input_wires())
             .unwrap()
             .outputs_arr();
-        outputs.extend(std::iter::repeat_n(tuple, num_other_outputs))
+        outputs.extend(std::iter::repeat_n(tuple, num_other_outputs));
     }
 
     // These should never fail, as we are defining the replacement ourselves.
@@ -266,11 +268,11 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use hugr_core::extension::prelude::{bool_t, qb_t, UnpackTuple};
+    use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
 
+    use hugr_core::Hugr;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::types::Signature;
-    use hugr_core::Hugr;
     use rstest::{fixture, rstest};
 
     /// A simple pack operation with unused output.
@@ -352,7 +354,9 @@ mod test {
         let [b3, b4] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
 
         // The last one's outputs are disconnected.
-        UnpackTuple::new(vec![bool_t(), bool_t()].into());
+        // TODO: Adding this causes the test to fail due to a `NonCovex` error.
+        //let op = UnpackTuple::new(vec![bool_t(), bool_t()].into());
+        //let _ = h.add_dataflow_op(op, [tuple]).unwrap();
 
         h.finish_hugr_with_outputs([b1, b2, b3, b4]).unwrap()
     }

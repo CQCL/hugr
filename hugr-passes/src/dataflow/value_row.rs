@@ -27,14 +27,14 @@ impl<V: AbstractValue, N: Clone> ValueRow<V, N> {
         Self(vec![v])
     }
 
-    /// The first value in this ValueRow must be a sum;
-    /// returns a new ValueRow given by unpacking the elements of the specified variant of said first value,
+    /// The first value in this `ValueRow` must be a sum;
+    /// returns a new `ValueRow` given by unpacking the elements of the specified variant of said first value,
     /// then appending the rest of the values in this row.
     pub fn unpack_first(
         &self,
         variant: usize,
         len: usize,
-    ) -> Option<impl Iterator<Item = PartialValue<V, N>>> {
+    ) -> Option<impl Iterator<Item = PartialValue<V, N>> + use<V, N>> {
         let vals = self[0].variant_values(variant, len)?;
         Some(vals.into_iter().chain(self.0[1..].to_owned()))
     }

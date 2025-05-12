@@ -2,7 +2,7 @@
 #![allow(clippy::unit_arg)]
 use hugr::hugr::views::SiblingSubgraph;
 
-use criterion::{black_box, criterion_group, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
+use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, black_box, criterion_group};
 
 use super::hugr::circuit;
 
@@ -12,7 +12,7 @@ fn bench_singleton_subgraph(c: &mut Criterion) {
 
     let num_layers = [10, 100, 1000];
 
-    for layers in num_layers.into_iter() {
+    for layers in num_layers {
         let (hugr, layer_ids) = circuit(layers);
 
         // Get a subgraph with a single node.
@@ -22,7 +22,7 @@ fn bench_singleton_subgraph(c: &mut Criterion) {
             |b, &layers| {
                 // Pick a node from the middle of the circuit.
                 let node = layer_ids[layers / 2].cx1;
-                b.iter(|| black_box(SiblingSubgraph::try_from_nodes([node], &hugr)))
+                b.iter(|| black_box(SiblingSubgraph::try_from_nodes([node], &hugr)));
             },
         );
     }
@@ -36,7 +36,7 @@ fn bench_fewnode_subgraph(c: &mut Criterion) {
 
     let num_layers = [10, 100, 1000];
 
-    for layers in num_layers.into_iter() {
+    for layers in num_layers {
         let (hugr, layer_ids) = circuit(layers);
 
         // Get a subgraph with a fixed number of nodes in the middle of the circuit.
@@ -51,7 +51,7 @@ fn bench_fewnode_subgraph(c: &mut Criterion) {
                     .take(4)
                     .flat_map(|ids| [ids.h, ids.cx1, ids.cx2])
                     .collect();
-                b.iter(|| black_box(SiblingSubgraph::try_from_nodes(nodes.clone(), &hugr)))
+                b.iter(|| black_box(SiblingSubgraph::try_from_nodes(nodes.clone(), &hugr)));
             },
         );
     }
@@ -65,7 +65,7 @@ fn bench_multinode_subgraph(c: &mut Criterion) {
 
     let num_layers = [10, 100, 1000];
 
-    for layers in num_layers.into_iter() {
+    for layers in num_layers {
         let (hugr, layer_ids) = circuit(layers);
 
         // Get a subgraph with a single node.
@@ -75,7 +75,7 @@ fn bench_multinode_subgraph(c: &mut Criterion) {
             |b, &_layers| {
                 // Pick all the hadamard nodes
                 let nodes: Vec<_> = layer_ids.iter().map(|ids| ids.h).collect();
-                b.iter(|| black_box(SiblingSubgraph::try_from_nodes(nodes.clone(), &hugr)))
+                b.iter(|| black_box(SiblingSubgraph::try_from_nodes(nodes.clone(), &hugr)));
             },
         );
     }

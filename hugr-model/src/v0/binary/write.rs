@@ -32,6 +32,7 @@ pub fn write_to_writer(package: &table::Package, writer: impl Write) -> Result<(
 }
 
 /// Writes a package to a byte vector.
+#[must_use]
 pub fn write_to_vec(package: &table::Package) -> Vec<u8> {
     let mut message = capnp::message::Builder::new_default();
     let builder = message.init_root();

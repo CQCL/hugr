@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr_core::{
-    ops::{DataflowBlock, ExitBlock, OpType, CFG},
-    types::SumType,
     HugrView, Node, NodeIndex,
+    ops::{CFG, DataflowBlock, ExitBlock, OpType},
+    types::SumType,
 };
 use inkwell::{basic_block::BasicBlock, values::BasicValueEnum};
 use itertools::Itertools as _;
 
 use crate::{
     emit::{
-        func::{EmitFuncContext, RowMailBox, RowPromise},
         EmitOpArgs,
+        func::{EmitFuncContext, RowMailBox, RowPromise},
     },
     sum::LLVMSumValue,
     utils::fat::FatNode,
@@ -64,9 +64,9 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
         let (entry_node, exit_node) = node.get_entry_exit();
         Ok(CfgEmitter {
             bbs,
-            node,
             inputs,
             outputs,
+            node,
             entry_node,
             exit_node,
         })
@@ -109,7 +109,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
         for child_node in self.node.children() {
             let (inputs, outputs) = (vec![], RowMailBox::new_empty().promise());
             match child_node.as_ref() {
-                OpType::DataflowBlock(ref dfb) => self.emit_dataflow_block(
+                OpType::DataflowBlock(dfb) => self.emit_dataflow_block(
                     context,
                     EmitOpArgs {
                         node: child_node.into_ot(dfb),
@@ -117,7 +117,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
                         outputs,
                     },
                 ),
-                OpType::ExitBlock(ref eb) => self.emit_exit_block(
+                OpType::ExitBlock(eb) => self.emit_exit_block(
                     context,
                     EmitOpArgs {
                         node: child_node.into_ot(eb),
@@ -130,7 +130,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
                 // technically not allowed, but there is no harm in allowing it.
                 OpType::Const(_) => Ok(()),
                 OpType::FuncDecl(_) => Ok(()),
-                OpType::FuncDefn(ref fd) => {
+                OpType::FuncDefn(fd) => {
                     context.push_todo_func(child_node.into_ot(fd));
                     Ok(())
                 }
@@ -218,8 +218,8 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer, SubContainer};
-    use hugr_core::extension::prelude::{self, bool_t};
     use hugr_core::extension::ExtensionRegistry;
+    use hugr_core::extension::prelude::{self, bool_t};
     use hugr_core::ops::Value;
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
     use hugr_core::type_row;
@@ -229,7 +229,7 @@ mod test {
 
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::test::{llvm_ctx, TestContext};
+    use crate::test::{TestContext, llvm_ctx};
 
     use crate::check_emission;
     use crate::types::HugrType;

@@ -1,4 +1,4 @@
-use hugr_core::{ops::OpType, HugrView, Node};
+use hugr_core::{HugrView, Node, ops::OpType};
 use inkwell::values::BasicValueEnum;
 
 use crate::utils::fat::FatNode;
@@ -6,9 +6,9 @@ use crate::utils::fat::FatNode;
 use super::func::RowPromise;
 
 /// A type used whenever emission is delegated to a function, for example in
-/// [crate::custom::extension_op::ExtensionOpMap::emit_extension_op].
+/// [`crate::custom::extension_op::ExtensionOpMap::emit_extension_op`].
 pub struct EmitOpArgs<'c, 'hugr, OT, H> {
-    /// The [HugrView] and [hugr_core::Node] we are emitting
+    /// The [`HugrView`] and [`hugr_core::Node`] we are emitting
     pub node: FatNode<'hugr, OT, H>,
     /// The values that should be used for all Value input ports of the node
     pub inputs: Vec<BasicValueEnum<'c>>,
@@ -17,14 +17,15 @@ pub struct EmitOpArgs<'c, 'hugr, OT, H> {
 }
 
 impl<'hugr, OT, H> EmitOpArgs<'_, 'hugr, OT, H> {
-    /// Get the internal [FatNode]
+    /// Get the internal [`FatNode`]
+    #[must_use]
     pub fn node(&self) -> FatNode<'hugr, OT, H> {
         self.node
     }
 }
 
 impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
-    /// Attempt to specialise the internal [FatNode].
+    /// Attempt to specialise the internal [`FatNode`].
     pub fn try_into_ot<OT>(self) -> Result<EmitOpArgs<'c, 'hugr, OT, H>, Self>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
@@ -48,10 +49,10 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
         }
     }
 
-    /// Specialise the internal [FatNode].
+    /// Specialise the internal [`FatNode`].
     ///
-    /// Panics if `OT` is not the [HugrView::get_optype] of the internal
-    /// [hugr_core::Node].
+    /// Panics if `OT` is not the [`HugrView::get_optype`] of the internal
+    /// [`hugr_core::Node`].
     pub fn into_ot<OTInto: PartialEq + 'c>(self, ot: &OTInto) -> EmitOpArgs<'c, 'hugr, OTInto, H>
     where
         for<'a> &'a OpType: TryInto<&'a OTInto>,

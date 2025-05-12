@@ -1,17 +1,17 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
+use hugr_core::Node;
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
-    constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
-    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, CFG,
+    CFG, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
+    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, constant::Sum,
 };
-use hugr_core::Node;
 use hugr_core::{
-    types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
+    types::{SumType, Type, TypeEnum},
 };
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, CallableValue};
-use itertools::{zip_eq, Itertools};
+use itertools::{Itertools, zip_eq};
 use petgraph::visit::Walker;
 
 use crate::{
@@ -20,9 +20,8 @@ use crate::{
 };
 
 use super::{
-    deaggregate_call_result,
+    EmitOpArgs, deaggregate_call_result,
     func::{EmitFuncContext, RowPromise},
-    EmitOpArgs,
 };
 
 mod cfg;
@@ -62,8 +61,8 @@ where
         use petgraph::visit::Topo;
         let node = self.node;
         if !OpTag::DataflowParent.is_superset(node.tag()) {
-            Err(anyhow!("Not a dataflow parent"))?
-        };
+            Err(anyhow!("Not a dataflow parent"))?;
+        }
 
         let (i, o): (FatNode<Input, H>, FatNode<Output, H>) = node
             .get_io()
@@ -364,21 +363,21 @@ fn emit_optype<'c, H: HugrView<Node = Node>>(
 ) -> Result<()> {
     let node = args.node();
     match node.as_ref() {
-        OpType::Tag(ref tag) => emit_tag(context, args.into_ot(tag)),
+        OpType::Tag(tag) => emit_tag(context, args.into_ot(tag)),
         OpType::DFG(_) => emit_dataflow_parent(context, args),
 
-        OpType::ExtensionOp(ref co) => context.emit_extension_op(args.into_ot(co)),
-        OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
-        OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
-        OpType::CallIndirect(ref cl) => emit_call_indirect(context, args.into_ot(cl)),
-        OpType::LoadFunction(ref lf) => emit_load_function(context, args.into_ot(lf)),
-        OpType::Conditional(ref co) => emit_conditional(context, args.into_ot(co)),
-        OpType::CFG(ref cfg) => emit_cfg(context, args.into_ot(cfg)),
+        OpType::ExtensionOp(co) => context.emit_extension_op(args.into_ot(co)),
+        OpType::LoadConstant(lc) => emit_load_constant(context, args.into_ot(lc)),
+        OpType::Call(cl) => emit_call(context, args.into_ot(cl)),
+        OpType::CallIndirect(cl) => emit_call_indirect(context, args.into_ot(cl)),
+        OpType::LoadFunction(lf) => emit_load_function(context, args.into_ot(lf)),
+        OpType::Conditional(co) => emit_conditional(context, args.into_ot(co)),
+        OpType::CFG(cfg) => emit_cfg(context, args.into_ot(cfg)),
         // Const is allowed, but requires no work here. FuncDecl is technically
         // not allowed, but there is no harm in allowing it.
         OpType::Const(_) => Ok(()),
         OpType::FuncDecl(_) => Ok(()),
-        OpType::FuncDefn(ref fd) => {
+        OpType::FuncDefn(fd) => {
             context.push_todo_func(node.into_ot(fd));
             Ok(())
         }

@@ -1,7 +1,7 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, HugrView};
+use hugr_core::{HugrView, hugr::hugrmut::HugrMut, ops::OpType};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
@@ -14,11 +14,11 @@ use crate::ComposablePass;
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
 pub struct DeadCodeElimPass<H: HugrView> {
-    /// Nodes that are definitely needed - e.g. FuncDefns, but could be anything.
+    /// Nodes that are definitely needed - e.g. `FuncDefns`, but could be anything.
     /// Hugr Root is assumed to be an entry point even if not mentioned here.
     entry_points: Vec<H::Node>,
     /// Callback identifying nodes that must be preserved even if their
-    /// results are not used. Defaults to [PreserveNode::default_for].
+    /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
     include_exports: bool,
 }
@@ -53,7 +53,7 @@ impl<H: HugrView> Debug for DeadCodeElimPass<H> {
 }
 
 /// Callback that identifies nodes that must be preserved even if their
-/// results are not used. For example, (the default) [PreserveNode::default_for].
+/// results are not used. For example, (the default) [`PreserveNode::default_for`].
 pub type PreserveCallback<H> = dyn Fn(&H, <H as HugrInternals>::Node) -> PreserveNode;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -70,13 +70,13 @@ pub enum PreserveNode {
 }
 
 impl PreserveNode {
-    /// A conservative default for a given node. Just examines the node's [OpType]:
-    /// * Assumes all Calls must be preserved. (One could scan the called FuncDefn, but would
-    ///   also need to check for cycles in the [CallGraph](super::call_graph::CallGraph).)
+    /// A conservative default for a given node. Just examines the node's [`OpType`]:
+    /// * Assumes all Calls must be preserved. (One could scan the called `FuncDefn`, but would
+    ///   also need to check for cycles in the [`CallGraph`](super::call_graph::CallGraph).)
     /// * Assumes all CFGs must be preserved. (One could, for example, allow acyclic
     ///   CFGs to be removed.)
-    /// * Assumes all TailLoops must be preserved. (One could, for example, use dataflow
-    ///   analysis to allow removal of TailLoops that never [Continue](hugr_core::ops::TailLoop::CONTINUE_TAG).)
+    /// * Assumes all `TailLoops` must be preserved. (One could, for example, use dataflow
+    ///   analysis to allow removal of `TailLoops` that never [Continue](hugr_core::ops::TailLoop::CONTINUE_TAG).)
     pub fn default_for<H: HugrView>(h: &H, n: H::Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
@@ -96,7 +96,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
     /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
     /// used to evaluate these nodes.
     /// [`HugrView::entrypoint`] is assumed to be an entry point;
-    /// if the entrypoint is a Module, then any public
+    /// if the entrypoint is the `Module` root, then any public
     /// [FuncDefn](OpType::FuncDefn)s and [Const](OpType::Const)s are also considered entry points
     /// by default, but these can be removed by [Self::include_module_exports]`(false)`.
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = H::Node>) -> Self {
@@ -114,7 +114,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
     fn find_needed_nodes(&self, h: &H) -> HashSet<H::Node> {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
-        let mut q = VecDeque::from_iter(self.entry_points.iter().cloned());
+        let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
         if self.include_exports && h.entrypoint() == h.module_root() {
             q.extend(h.children(h.module_root()).filter(|ch| {
@@ -126,7 +126,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
-            };
+            }
             for ch in h.children(n) {
                 if self.must_preserve(h, &mut must_preserve, ch)
                     || matches!(
@@ -191,12 +191,12 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use hugr_core::extension::prelude::{usize_t, ConstUsize};
-    use hugr_core::ops::{handle::NodeHandle, OpTag, OpTrait};
-    use hugr_core::types::Signature;
     use hugr_core::Hugr;
-    use hugr_core::{ops::Value, type_row, HugrView};
+    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
+    use hugr_core::extension::prelude::{ConstUsize, usize_t};
+    use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
+    use hugr_core::types::Signature;
+    use hugr_core::{HugrView, ops::Value, type_row};
     use itertools::Itertools;
 
     use crate::ComposablePass;

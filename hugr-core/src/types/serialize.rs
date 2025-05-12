@@ -2,8 +2,8 @@ use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeBase, TypeBound, T
 
 use super::custom::CustomType;
 
-use crate::extension::prelude::{qb_t, usize_t};
 use crate::extension::SignatureError;
+use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -23,10 +23,10 @@ impl<RV: MaybeRV> From<TypeBase<RV>> for SerSimpleType {
     fn from(value: TypeBase<RV>) -> Self {
         if value == qb_t() {
             return SerSimpleType::Q;
-        };
+        }
         if value == usize_t() {
             return SerSimpleType::I;
-        };
+        }
         match value.0 {
             TypeEnum::Extension(o) => SerSimpleType::Opaque(o),
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),

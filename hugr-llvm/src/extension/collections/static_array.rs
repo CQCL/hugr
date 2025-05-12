@@ -1,49 +1,50 @@
 use std::hash::Hasher as _;
 
 use hugr_core::{
+    HugrView, Node,
     extension::{
         prelude::{option_type, usize_t},
         simple_op::HasConcrete as _,
     },
-    ops::{constant::TryHash, ExtensionOp},
+    ops::{ExtensionOp, constant::TryHash},
     std_extensions::collections::static_array::{
         self, StaticArrayOp, StaticArrayOpDef, StaticArrayValue,
     },
-    HugrView, Node,
 };
 use inkwell::{
+    AddressSpace, IntPredicate,
     builder::Builder,
     context::Context,
     types::{BasicType, BasicTypeEnum, StructType},
     values::{ArrayValue, BasicValue, BasicValueEnum, IntValue, PointerValue},
-    AddressSpace, IntPredicate,
 };
 use itertools::Itertools as _;
 
 use crate::{
-    emit::{emit_value, EmitFuncContext, EmitOpArgs},
-    types::{HugrType, TypingSession},
     CodegenExtension, CodegenExtsBuilder,
+    emit::{EmitFuncContext, EmitOpArgs, emit_value},
+    types::{HugrType, TypingSession},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, derive_more::From)]
-/// A [CodegenExtension] that lowers the
-/// [hugr_core::std_extensions::collections::static_array].
+/// A [`CodegenExtension`] that lowers the
+/// [`hugr_core::std_extensions::collections::static_array`].
 ///
 /// All behaviour is delegated to `SACG`.
 pub struct StaticArrayCodegenExtension<SACG>(SACG);
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [StaticArrayCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
+    /// Add a [`StaticArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
     /// as the implementation.
     pub fn add_static_array_extensions(self, ccg: impl StaticArrayCodegen + 'static) -> Self {
         self.add_extension(StaticArrayCodegenExtension::from(ccg))
     }
 
-    /// Add a [StaticArrayCodegenExtension] to the given [CodegenExtsBuilder] using
-    /// [DefaultStaticArrayCodegen] as the implementation.
+    /// Add a [`StaticArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using
+    /// [`DefaultStaticArrayCodegen`] as the implementation.
+    #[must_use]
     pub fn add_default_static_array_extensions(self) -> Self {
         self.add_static_array_extensions(DefaultStaticArrayCodegen)
     }
@@ -151,11 +152,11 @@ fn build_read_len<'c>(
     Ok(builder.build_load(len_ptr, "")?.into_int_value())
 }
 
-/// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::static_array]
-/// types, [hugr_core::ops::constant::CustomConst]s, and ops.
+/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::static_array`]
+/// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait StaticArrayCodegen: Clone {
     /// Return the llvm type of
-    /// [hugr_core::std_extensions::collections::static_array::STATIC_ARRAY_TYPENAME].
+    /// [`hugr_core::std_extensions::collections::static_array::STATIC_ARRAY_TYPENAME`].
     ///
     /// By default a static array of llvm type `t` and length `l` is stored in a
     /// global of type `struct { i64, [t * l] }``
@@ -183,10 +184,10 @@ pub trait StaticArrayCodegen: Clone {
     }
 
     /// Emit a
-    /// [hugr_core::std_extensions::collections::static_array::StaticArrayValue].
+    /// [`hugr_core::std_extensions::collections::static_array::StaticArrayValue`].
     ///
     /// Note that the type of the return value must match the type returned by
-    /// [Self::static_array_type].
+    /// [`Self::static_array_type`].
     ///
     /// By default a global is created and we return a pointer to it.
     fn static_array_value<'c, H: HugrView<Node = Node>>(
@@ -252,7 +253,7 @@ pub trait StaticArrayCodegen: Clone {
         Ok(gv.as_pointer_value().const_cast(canonical_type).into())
     }
 
-    /// Emit a [hugr_core::std_extensions::collections::static_array::StaticArrayOp].
+    /// Emit a [`hugr_core::std_extensions::collections::static_array::StaticArrayOp`].
     fn static_array_op<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
@@ -345,7 +346,7 @@ pub trait StaticArrayCodegen: Clone {
 }
 
 #[derive(Debug, Clone)]
-/// An implementation of [StaticArrayCodegen] that uses all default
+/// An implementation of [`StaticArrayCodegen`] that uses all default
 /// implementations.
 pub struct DefaultStaticArrayCodegen;
 
@@ -394,14 +395,14 @@ mod test {
     use super::*;
     use float_types::float64_type;
     use hugr_core::extension::prelude::ConstUsize;
-    use hugr_core::ops::constant::CustomConst;
     use hugr_core::ops::OpType;
     use hugr_core::ops::Value;
+    use hugr_core::ops::constant::CustomConst;
     use hugr_core::std_extensions::arithmetic::float_types::{self, ConstF64};
     use rstest::rstest;
 
     use hugr_core::extension::simple_op::MakeRegisteredOp;
-    use hugr_core::extension::{prelude::bool_t, ExtensionRegistry};
+    use hugr_core::extension::{ExtensionRegistry, prelude::bool_t};
     use hugr_core::{builder::SubContainer as _, type_row};
     use static_array::StaticArrayOpBuilder as _;
 
@@ -409,7 +410,7 @@ mod test {
     use crate::test::single_op_hugr;
     use crate::{
         emit::test::SimpleHugrConfig,
-        test::{exec_ctx, llvm_ctx, TestContext},
+        test::{TestContext, exec_ctx, llvm_ctx},
     };
     use hugr_core::builder::{Dataflow as _, DataflowSubContainer as _};
 
@@ -436,7 +437,7 @@ mod test {
 
     #[rstest]
     #[case(0, StaticArrayValue::try_new("a", usize_t(), (0..10).map(|x| ConstUsize::new(x).into())).unwrap())]
-    #[case(1, StaticArrayValue::try_new("b", float64_type(), (0..10).map(|x| ConstF64::new(x as f64).into())).unwrap())]
+    #[case(1, StaticArrayValue::try_new("b", float64_type(), (0..10).map(|x| ConstF64::new(f64::from(x)).into())).unwrap())]
     #[case(2, StaticArrayValue::try_new("c", bool_t(), (0..10).map(|x| Value::from_bool(x % 2 == 0))).unwrap())]
     #[case(3, StaticArrayValue::try_new("d", option_type(usize_t()).into(), (0..10).map(|x| Value::some([ConstUsize::new(x)]))).unwrap())]
     fn static_array_const_codegen(
@@ -476,7 +477,7 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(ExtensionRegistry::new(vec![
-                static_array::EXTENSION.to_owned()
+                static_array::EXTENSION.to_owned(),
             ]))
             .finish(|mut builder| {
                 let arr = builder.add_load_value(
@@ -527,7 +528,7 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(ExtensionRegistry::new(vec![
-                static_array::EXTENSION.to_owned()
+                static_array::EXTENSION.to_owned(),
             ]))
             .finish(|mut builder| {
                 let arr = builder
@@ -552,7 +553,7 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(ExtensionRegistry::new(vec![
-                static_array::EXTENSION.to_owned()
+                static_array::EXTENSION.to_owned(),
             ]))
             .finish(|mut builder| {
                 let inner_arrs: Vec<Value> = (0..10)

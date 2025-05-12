@@ -31,10 +31,10 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::Extension;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::ops::OpName;
 use crate::types::TypeName;
-use crate::Extension;
 
 use super::{
     ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionRegistryError, ExtensionSet,
@@ -238,9 +238,7 @@ pub enum ExtensionDeclarationError {
     /// Operation definitions with no signature are not currently supported.
     ///
     /// TODO: Support this.
-    #[error(
-        "Operation {op} in extension {ext} has no signature. This is not currently supported."
-    )]
+    #[error("Operation {op} in extension {ext} has no signature. This is not currently supported.")]
     MissingSignature {
         /// The extension containing the operation.
         ext: ExtensionId,

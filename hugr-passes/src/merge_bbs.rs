@@ -10,7 +10,7 @@ use itertools::Itertools;
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
+use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, Output};
 use hugr_core::{Hugr, HugrView, Node};
 
 /// Merge any basic blocks that are direct children of the specified CFG
@@ -31,13 +31,13 @@ where
         };
         if cfg.input_neighbours(succ).count() != 1 {
             continue;
-        };
+        }
         if cfg.children(cfg.entrypoint()).take(2).contains(&succ) {
             // If succ is...
             //   - the entry block, that has an implicit extra in-edge, so cannot merge with n.
             //   - the exit block, nodes in n should move *outside* the CFG - a separate pass.
             continue;
-        };
+        }
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
         let node_map = cfg.apply_patch(rep).unwrap();
         let merged_bb = *node_map.get(&merge_bb).unwrap();
@@ -88,7 +88,7 @@ fn mk_rep(
         },
     );
     for (i, _) in pred_ty.inputs.iter().enumerate() {
-        replacement.connect(input, i, dfg1, i)
+        replacement.connect(input, i, dfg1, i);
     }
 
     let dfg2 = replacement.add_node_with_parent(
@@ -98,7 +98,7 @@ fn mk_rep(
         },
     );
     for (i, _) in succ_sig.output.iter().enumerate() {
-        replacement.connect(dfg2, i, output, i)
+        replacement.connect(dfg2, i, output, i);
     }
 
     // At the junction, must unpack the first (tuple, branch predicate) output
@@ -107,10 +107,10 @@ fn mk_rep(
     replacement.connect(dfg1, 0, unp, 0);
     let other_start = tuple_elems.len();
     for (i, _) in tuple_elems.iter().enumerate() {
-        replacement.connect(unp, i, dfg2, i)
+        replacement.connect(unp, i, dfg2, i);
     }
     for (i, _) in pred_ty.other_outputs.iter().enumerate() {
-        replacement.connect(dfg1, i + 1, dfg2, i + other_start)
+        replacement.connect(dfg1, i + 1, dfg2, i + other_start);
     }
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
     // edge-maps as both source and target of the new edge are in the replacement Hugr
@@ -164,12 +164,12 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
-    use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize};
+    use hugr_core::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder, endo_sig, inout_sig};
+    use hugr_core::extension::prelude::{ConstUsize, qb_t, usize_t};
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::{LoadConstant, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
+    use hugr_core::{Extension, Hugr, HugrView, Wire, const_extension_ids, type_row};
 
     use super::merge_basic_blocks;
 

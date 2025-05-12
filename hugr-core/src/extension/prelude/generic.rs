@@ -1,12 +1,12 @@
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
+use crate::extension::OpDef;
+use crate::extension::SignatureFunc;
 use crate::extension::prelude::usize_custom_t;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::OpDef;
-use crate::extension::SignatureFunc;
 use crate::extension::{ConstFold, ExtensionId};
 use crate::ops::ExtensionOp;
 use crate::ops::OpName;
@@ -19,14 +19,14 @@ use crate::extension::SignatureError;
 
 use crate::types::PolyFuncTypeRV;
 
-use crate::types::type_param::TypeArg;
 use crate::Extension;
+use crate::types::type_param::TypeArg;
 
 use super::PRELUDE;
 use super::{ConstUsize, PRELUDE_ID};
 use crate::types::type_param::TypeParam;
 
-/// Name of the operation for loading generic BoundedNat parameters.
+/// Name of the operation for loading generic `BoundedNat` parameters.
 pub static LOAD_NAT_OP_ID: OpName = OpName::new_inline("load_nat");
 
 /// Definition of the load nat operation.
@@ -37,11 +37,7 @@ impl FromStr for LoadNatDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == Self.op_id() {
-            Ok(Self)
-        } else {
-            Err(())
-        }
+        if s == Self.op_id() { Ok(Self) } else { Err(()) }
     }
 }
 
@@ -106,12 +102,14 @@ pub struct LoadNat {
 }
 
 impl LoadNat {
-    /// Creates a new [LoadNat] operation.
+    /// Creates a new [`LoadNat`] operation.
+    #[must_use]
     pub fn new(nat: TypeArg) -> Self {
         LoadNat { nat }
     }
 
     /// Returns the nat type argument that should be loaded.
+    #[must_use]
     pub fn get_nat(self) -> TypeArg {
         self.nat
     }
@@ -163,12 +161,12 @@ impl HasConcrete for LoadNatDef {
 #[cfg(test)]
 mod tests {
     use crate::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{usize_t, ConstUsize},
-        ops::{constant, OpType},
+        HugrView, OutgoingPort,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+        extension::prelude::{ConstUsize, usize_t},
+        ops::{OpType, constant},
         type_row,
         types::TypeArg,
-        HugrView, OutgoingPort,
     };
 
     use super::LoadNat;
@@ -190,7 +188,7 @@ mod tests {
             let node_optype = result.get_optype(child);
             // The only node in the HUGR besides Input and Output should be LoadNat.
             if !node_optype.is_input() && !node_optype.is_output() {
-                assert_eq!(node_optype, &exp_optype)
+                assert_eq!(node_optype, &exp_optype);
             }
         }
     }
@@ -202,14 +200,13 @@ mod tests {
 
         let optype: OpType = op.into();
 
-        match optype {
-            OpType::ExtensionOp(ext_op) => {
-                let result = ext_op.constant_fold(&[]);
-                let exp_port: OutgoingPort = 0.into();
-                let exp_val: constant::Value = ConstUsize::new(5).into();
-                assert_eq!(result, Some(vec![(exp_port, exp_val)]))
-            }
-            _ => panic!(),
+        if let OpType::ExtensionOp(ext_op) = optype {
+            let result = ext_op.constant_fold(&[]);
+            let exp_port: OutgoingPort = 0.into();
+            let exp_val: constant::Value = ConstUsize::new(5).into();
+            assert_eq!(result, Some(vec![(exp_port, exp_val)]));
+        } else {
+            panic!()
         }
     }
 }

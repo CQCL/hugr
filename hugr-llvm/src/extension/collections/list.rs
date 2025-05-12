@@ -1,22 +1,22 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{Ok, Result, bail};
 use hugr_core::{
+    HugrView, Node,
     extension::simple_op::MakeExtensionOp as _,
     ops::ExtensionOp,
     std_extensions::collections::list::{self, ListOp, ListValue},
     types::{SumType, Type, TypeArg},
-    HugrView, Node,
 };
 use inkwell::values::FunctionValue;
 use inkwell::{
+    AddressSpace,
     types::{BasicType, BasicTypeEnum, FunctionType},
     values::{BasicValueEnum, PointerValue},
-    AddressSpace,
 };
 
 use crate::emit::func::{build_ok_or_else, build_option};
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
-    emit::{emit_value, func::EmitFuncContext, EmitOpArgs},
+    emit::{EmitOpArgs, emit_value, func::EmitFuncContext},
     types::TypingSession,
 };
 
@@ -34,9 +34,9 @@ pub enum ListRtFunc {
 }
 
 impl ListRtFunc {
-    /// The signature of a given [ListRtFunc].
+    /// The signature of a given [`ListRtFunc`].
     ///
-    /// Requires a [ListCodegen] to determine the type of lists.
+    /// Requires a [`ListCodegen`] to determine the type of lists.
     pub fn signature<'c>(
         self,
         ts: TypingSession<'c, '_>,
@@ -80,9 +80,9 @@ impl ListRtFunc {
         }
     }
 
-    /// Returns the extern function corresponding to this [ListRtFunc].
+    /// Returns the extern function corresponding to this [`ListRtFunc`].
     ///
-    /// Requires a [ListCodegen] to determine the function signature.
+    /// Requires a [`ListCodegen`] to determine the function signature.
     pub fn get_extern<'c, H: HugrView<Node = Node>>(
         self,
         ctx: &EmitFuncContext<'c, '_, H>,
@@ -109,10 +109,10 @@ impl From<ListOp> for ListRtFunc {
     }
 }
 
-/// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::list]
-/// types, [hugr_core::ops::constant::CustomConst]s, and ops.
+/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::list`]
+/// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait ListCodegen: Clone {
-    /// Return the llvm type of [hugr_core::std_extensions::collections::list::LIST_TYPENAME].
+    /// Return the llvm type of [`hugr_core::std_extensions::collections::list::LIST_TYPENAME`].
     fn list_type<'c>(&self, session: TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
         session
             .iw_context()
@@ -121,7 +121,7 @@ pub trait ListCodegen: Clone {
             .into()
     }
 
-    /// Return the name of a given [ListRtFunc].
+    /// Return the name of a given [`ListRtFunc`].
     fn rt_func_name(&self, func: ListRtFunc) -> String {
         match func {
             ListRtFunc::New => "__rt__list__new",
@@ -136,7 +136,7 @@ pub trait ListCodegen: Clone {
     }
 }
 
-/// A trivial implementation of [ListCodegen] which passes all methods
+/// A trivial implementation of [`ListCodegen`] which passes all methods
 /// through to their default implementations.
 #[derive(Default, Clone)]
 pub struct DefaultListCodegen;
@@ -182,14 +182,15 @@ impl<CCG: ListCodegen> CodegenExtension for ListCodegenExtension<CCG> {
 }
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [ListCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
+    /// Add a [`ListCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
     /// as the implementation.
+    #[must_use]
     pub fn add_default_list_extensions(self) -> Self {
         self.add_list_extensions(DefaultListCodegen)
     }
 
-    /// Add a [ListCodegenExtension] to the given [CodegenExtsBuilder] using
-    /// [DefaultListCodegen] as the implementation.
+    /// Add a [`ListCodegenExtension`] to the given [`CodegenExtsBuilder`] using
+    /// [`DefaultListCodegen`] as the implementation.
     pub fn add_list_extensions(self, ccg: impl ListCodegen + 'a) -> Self {
         self.add_extension(ListCodegenExtension::from(ccg))
     }
@@ -367,11 +368,11 @@ mod test {
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::{
-            prelude::{self, qb_t, usize_t, ConstUsize},
             ExtensionRegistry,
+            prelude::{self, ConstUsize, qb_t, usize_t},
         },
         ops::{DataflowOpTrait, Value},
-        std_extensions::collections::list::{self, list_type, ListOp, ListValue},
+        std_extensions::collections::list::{self, ListOp, ListValue, list_type},
     };
     use rstest::rstest;
 
@@ -379,7 +380,7 @@ mod test {
         check_emission,
         custom::CodegenExtsBuilder,
         emit::test::SimpleHugrConfig,
-        test::{llvm_ctx, TestContext},
+        test::{TestContext, llvm_ctx},
     };
 
     #[rstest]

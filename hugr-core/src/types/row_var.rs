@@ -1,12 +1,12 @@
 //! Classes for row variables (i.e. Type variables that can stand for multiple types)
 
 use super::type_param::TypeParam;
-use super::{check_typevar_decl, Substitution, TypeBase, TypeBound};
+use super::{Substitution, TypeBase, TypeBound, check_typevar_decl};
 use crate::extension::SignatureError;
 
 #[cfg(test)]
-use proptest::prelude::{any, BoxedStrategy, Strategy};
-/// Describes a row variable - a type variable bound with a [TypeParam::List] of [TypeParam::Type]
+use proptest::prelude::{BoxedStrategy, Strategy, any};
+/// Describes a row variable - a type variable bound with a [`TypeParam::List`] of [`TypeParam::Type`]
 /// of the specified bound (checked in validation)
 // The serde derives here are not used except as markers
 // so that other types containing this can also #derive-serde the same way.
@@ -42,11 +42,11 @@ pub trait MaybeRV:
     fn arb() -> BoxedStrategy<Self>;
 }
 
-/// Has no instances - used as parameter to [Type] to rule out the possibility
-/// of there being any [TypeEnum::RowVar]s
+/// Has no instances - used as parameter to [`Type`] to rule out the possibility
+/// of there being any [`TypeEnum::RowVar`]s
 ///
-/// [TypeEnum::RowVar]: super::TypeEnum::RowVar
-/// [Type]: super::Type
+/// [`TypeEnum::RowVar`]: super::TypeEnum::RowVar
+/// [`Type`]: super::Type
 // The serde derives here are not used except as markers
 // so that other types containing this can also #derive-serde the same way.
 #[derive(

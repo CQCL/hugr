@@ -112,7 +112,7 @@ mod tests {
 
     use super::super::simple_replace::test::dfg_hugr;
     use super::*;
-    use crate::{extension::prelude::qb_t, Hugr};
+    use crate::{Hugr, extension::prelude::qb_t};
 
     #[rstest]
     fn correct_insertion(dfg_hugr: Hugr) {

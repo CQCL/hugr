@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -11,7 +12,6 @@ use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDe
 use crate::ops::{ExtensionOp, NamedOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
-use crate::Extension;
 
 use super::array_kind::ArrayKind;
 
@@ -24,6 +24,7 @@ pub struct GenericArrayCloneDef<AK: ArrayKind>(PhantomData<AK>);
 
 impl<AK: ArrayKind> GenericArrayCloneDef<AK> {
     /// Creates a new clone operation definition.
+    #[must_use]
     pub fn new() -> Self {
         GenericArrayCloneDef(PhantomData)
     }
@@ -91,8 +92,8 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayCloneDef<AK> {
         "Clones an array with copyable elements".into()
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.

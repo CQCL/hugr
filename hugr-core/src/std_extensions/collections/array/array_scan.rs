@@ -6,6 +6,7 @@ use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -13,7 +14,6 @@ use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDe
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
-use crate::Extension;
 
 use super::array_kind::ArrayKind;
 
@@ -26,6 +26,7 @@ pub struct GenericArrayScanDef<AK: ArrayKind>(PhantomData<AK>);
 
 impl<AK: ArrayKind> GenericArrayScanDef<AK> {
     /// Creates a new array scan operation definition.
+    #[must_use]
     pub fn new() -> Self {
         GenericArrayScanDef(PhantomData)
     }
@@ -122,8 +123,8 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayScanDef<AK> {
             .into()
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.
@@ -157,6 +158,7 @@ pub struct GenericArrayScan<AK: ArrayKind> {
 
 impl<AK: ArrayKind> GenericArrayScan<AK> {
     /// Creates a new array scan op.
+    #[must_use]
     pub fn new(src_ty: Type, tgt_ty: Type, acc_tys: Vec<Type>, size: u64) -> Self {
         GenericArrayScan {
             src_ty,
@@ -212,8 +214,12 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::Sequence { elems: acc_tys }] =>
-            {
+            [
+                TypeArg::BoundedNat { n },
+                TypeArg::Type { ty: src_ty },
+                TypeArg::Type { ty: tgt_ty },
+                TypeArg::Sequence { elems: acc_tys },
+            ] => {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
                     .map(|acc_ty| match acc_ty {

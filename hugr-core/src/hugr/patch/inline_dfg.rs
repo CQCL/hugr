@@ -9,11 +9,11 @@ use crate::{IncomingPort, Node, OutgoingPort, PortIndex};
 /// Structure identifying an `InlineDFG` rewrite from the spec
 pub struct InlineDFG(pub DfgID);
 
-/// Errors from an [InlineDFG] rewrite.
+/// Errors from an [`InlineDFG`] rewrite.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum InlineDFGError {
-    /// Node to inline was not a DFG. (E.g. node has been overwritten since the DfgID originated.)
+    /// Node to inline was not a DFG. (E.g. node has been overwritten since the `DfgID` originated.)
     #[error("{node} was not a DFG")]
     NotDFG {
         /// The node we tried to inline
@@ -36,10 +36,10 @@ impl PatchVerification for InlineDFG {
         let n = self.0.node();
         if h.get_optype(n).as_dfg().is_none() {
             return Err(InlineDFGError::NotDFG { node: n });
-        };
+        }
         if n == h.entrypoint() {
             return Err(InlineDFGError::CantInlineEntrypoint { node: n });
-        };
+        }
         Ok(())
     }
 
@@ -69,7 +69,7 @@ impl PatchHugrMut for InlineDFG {
         };
         let parent = h.get_parent(n).unwrap();
         let [input, output] = h.get_io(n).unwrap();
-        for ch in h.children(n).skip(2).collect::<Vec<_>>().into_iter() {
+        for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
         // DFG Inputs. Deal with Order inputs first
@@ -87,7 +87,7 @@ impl PatchHugrMut for InlineDFG {
         for inp in h.node_inputs(n).collect::<Vec<_>>() {
             if inp == oth_in {
                 continue;
-            };
+            }
             // Hugr is invalid if there is no output linked to the DFG input.
             let (src_n, src_p) = h.single_linked_output(n, inp).unwrap();
             h.disconnect(n, inp); // These disconnects allow permutations to work trivially.
@@ -99,7 +99,7 @@ impl PatchHugrMut for InlineDFG {
                 h.connect(src_n, src_p, tgt_n, tgt_p);
             }
             // Ensure order-successors of Input node execute after any node producing an input
-            for (tgt, _) in input_ord_succs.iter() {
+            for (tgt, _) in &input_ord_succs {
                 h.add_other_edge(src_n, *tgt);
             }
         }
@@ -117,7 +117,7 @@ impl PatchHugrMut for InlineDFG {
         for outport in h.node_outputs(n).collect::<Vec<_>>() {
             if outport == oth_out {
                 continue;
-            };
+            }
             let inpp = IncomingPort::from(outport.index());
             // Hugr is invalid if the Output node has no corresponding input
             let (src_n, src_p) = h.single_linked_output(output, inpp).unwrap();
@@ -126,7 +126,7 @@ impl PatchHugrMut for InlineDFG {
             for (tgt_n, tgt_p) in h.linked_inputs(n, outport).collect::<Vec<_>>() {
                 h.connect(src_n, src_p, tgt_n, tgt_p);
                 // Ensure order-predecessors of Output node execute before any node consuming a DFG output
-                for (src, _) in output_ord_preds.iter() {
+                for (src, _) in &output_ord_preds {
                     h.add_other_edge(*src, tgt_n);
                 }
             }
@@ -147,8 +147,8 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{
-        endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        SubContainer,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
+        endo_sig, inout_sig,
     };
     use crate::extension::prelude::qb_t;
     use crate::hugr::HugrMut;
@@ -159,7 +159,7 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension;
-    use crate::{type_row, Direction, HugrView, Port};
+    use crate::{Direction, HugrView, Port, type_row};
     use crate::{Hugr, Wire};
 
     use super::InlineDFG;
@@ -262,7 +262,7 @@ mod test {
         let mut h = h.finish_hugr_with_outputs(cx.outputs())?;
         assert_eq!(find_dfgs(&h), vec![h.entrypoint(), swap.node()]);
         assert_eq!(h.entry_descendants().count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
-                                                      // No permutation outside the swap DFG:
+        // No permutation outside the swap DFG:
         assert_eq!(
             h.node_connections(p_h.node(), swap.node())
                 .collect::<Vec<_>>(),

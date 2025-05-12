@@ -537,11 +537,6 @@
                 "signature": {
                     "$ref": "#/$defs/FunctionType"
                 },
-                "description": {
-                    "default": "",
-                    "title": "Description",
-                    "type": "string"
-                },
                 "args": {
                     "items": {
                         "$ref": "#/$defs/TypeArg"

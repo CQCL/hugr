@@ -43,7 +43,7 @@ pub fn ensure_no_nonlocal_edges<H: HugrView>(hugr: &H) -> Result<(), NonLocalEdg
 mod test {
     use hugr_core::{
         builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer},
-        extension::prelude::{bool_t, Noop},
+        extension::prelude::{Noop, bool_t},
         ops::handle::NodeHandle,
         type_row,
         types::Signature,

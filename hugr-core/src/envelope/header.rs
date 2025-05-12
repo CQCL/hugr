@@ -7,13 +7,13 @@ use super::EnvelopeError;
 
 /// Magic number identifying the start of an envelope.
 ///
-/// In ascii, this is "HUGRiHJv". The second half is a randomly generated string
+/// In ascii, this is "`HUGRiHJv`". The second half is a randomly generated string
 /// to avoid accidental collisions with other file formats.
 pub const MAGIC_NUMBERS: &[u8] = "HUGRiHJv".as_bytes();
 
 /// Header at the start of a binary envelope file.
 ///
-/// See the [crate::envelope] module documentation for the binary format.
+/// See the [`crate::envelope`] module documentation for the binary format.
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Default, derive_more::Display)]
 #[display("EnvelopeHeader({format}{})",
     if *zstd { ", zstd compressed" } else { "" },
@@ -33,11 +33,31 @@ pub(super) struct EnvelopeHeader {
 pub enum EnvelopeFormat {
     /// `hugr-model` v0 binary capnproto message.
     Model = 1,
-    /// `hugr-model` v0 binary capnproto message followed by a json-encoded [crate::extension::ExtensionRegistry].
-    //
-    // This is a temporary format required until the model adds support for extensions.
+    /// `hugr-model` v0 binary capnproto message followed by a json-encoded
+    /// [`crate::extension::ExtensionRegistry`].
+    ///
+    /// This is a temporary format required until the model adds support for
+    /// extensions.
     ModelWithExtensions = 2,
-    /// Json-encoded [crate::package::Package]
+    /// Human-readable S-expression encoding using [`hugr_model::v0`].
+    ///
+    /// Uses a printable ascii value as the discriminant so the envelope can be
+    /// read as text.
+    ///
+    /// :caution: This format does not yet support extension encoding, so it should
+    /// be avoided.
+    //
+    // TODO: Update comment once extension encoding is supported.
+    ModelText = 40, // '(' in ascii
+    /// Human-readable S-expression encoding using [`hugr_model::v0`].
+    ///
+    /// Uses a printable ascii value as the discriminant so the envelope can be
+    /// read as text.
+    ///
+    /// This is a temporary format required until the model adds support for
+    /// extensions.
+    ModelTextWithExtensions = 41, // ')' in ascii
+    /// Json-encoded [`crate::package::Package`]
     ///
     /// Uses a printable ascii value as the discriminant so the envelope can be
     /// read as text.
@@ -50,15 +70,14 @@ pub enum EnvelopeFormat {
 static_assertions::assert_eq_size!(EnvelopeFormat, u8);
 
 impl EnvelopeFormat {
-    /// Returns whether to encode the extensions as json after the hugr payload.
-    pub fn append_extensions(self) -> bool {
-        matches!(self, Self::ModelWithExtensions)
-    }
-
     /// If the format is a model format, returns its version number.
+    #[must_use]
     pub fn model_version(self) -> Option<u32> {
         match self {
-            Self::Model | Self::ModelWithExtensions => Some(0),
+            Self::Model
+            | Self::ModelWithExtensions
+            | Self::ModelText
+            | Self::ModelTextWithExtensions => Some(0),
             _ => None,
         }
     }
@@ -66,8 +85,12 @@ impl EnvelopeFormat {
     /// Returns whether the encoding format is ASCII-printable.
     ///
     /// If true, the encoded envelope can be read as text.
+    #[must_use]
     pub fn ascii_printable(self) -> bool {
-        matches!(self, Self::PackageJson)
+        matches!(
+            self,
+            Self::PackageJson | Self::ModelText | Self::ModelTextWithExtensions
+        )
     }
 }
 
@@ -104,6 +127,7 @@ impl EnvelopeConfig {
     }
 
     /// Default configuration for a plain-text envelope.
+    #[must_use]
     pub const fn text() -> Self {
         Self {
             format: EnvelopeFormat::PackageJson,
@@ -114,10 +138,11 @@ impl EnvelopeConfig {
     /// Default configuration for a binary envelope.
     ///
     /// If the `zstd` feature is enabled, this will use zstd compression.
+    #[must_use]
     pub const fn binary() -> Self {
         Self {
-            format: EnvelopeFormat::Model,
-            zstd: None,
+            format: EnvelopeFormat::ModelWithExtensions,
+            zstd: Some(ZstdConfig::default_level()),
         }
     }
 }
@@ -137,9 +162,16 @@ pub struct ZstdConfig {
 }
 
 impl ZstdConfig {
+    /// Create a new zstd configuration with default compression level.
+    #[must_use]
+    pub const fn default_level() -> Self {
+        Self { level: None }
+    }
+
     /// Returns the zstd compression level to pass to the zstd library.
     ///
-    /// Uses [zstd::DEFAULT_COMPRESSION_LEVEL] if the level is not set.
+    /// Uses [`zstd::DEFAULT_COMPRESSION_LEVEL`] if the level is not set.
+    #[must_use]
     pub fn level(&self) -> i32 {
         #[allow(unused_assignments, unused_mut)]
         let mut default = 0;
@@ -147,7 +179,7 @@ impl ZstdConfig {
         {
             default = zstd::DEFAULT_COMPRESSION_LEVEL;
         }
-        self.level.map_or(default, |l| l.get() as i32)
+        self.level.map_or(default, |l| i32::from(l.get()))
     }
 }
 
@@ -158,16 +190,17 @@ impl EnvelopeHeader {
     pub fn config(&self) -> EnvelopeConfig {
         EnvelopeConfig {
             format: self.format,
-            zstd: match self.zstd {
-                true => Some(ZstdConfig { level: None }),
-                false => None,
+            zstd: if self.zstd {
+                Some(ZstdConfig { level: None })
+            } else {
+                None
             },
         }
     }
 
     /// Write an envelope header to a writer.
     ///
-    /// See the [crate::envelope] module documentation for the binary format.
+    /// See the [`crate::envelope`] module documentation for the binary format.
     pub fn write(&self, writer: &mut impl Write) -> Result<(), EnvelopeError> {
         // The first 8 bytes are the magic number in little-endian.
         writer.write_all(MAGIC_NUMBERS)?;
@@ -176,7 +209,7 @@ impl EnvelopeHeader {
         writer.write_all(&format_bytes)?;
         // Next is the flags byte.
         let mut flags = 0b01000000u8;
-        flags |= self.zstd as u8;
+        flags |= u8::from(self.zstd);
         writer.write_all(&[flags])?;
 
         Ok(())
@@ -185,7 +218,7 @@ impl EnvelopeHeader {
     /// Reads an envelope header from a reader.
     ///
     /// Consumes exactly 10 bytes from the reader.
-    /// See the [crate::envelope] module documentation for the binary format.
+    /// See the [`crate::envelope`] module documentation for the binary format.
     pub fn read(reader: &mut impl Read) -> Result<EnvelopeHeader, EnvelopeError> {
         // The first 8 bytes are the magic number in little-endian.
         let mut magic = [0; 8];
@@ -224,6 +257,8 @@ mod tests {
     #[rstest]
     #[case(EnvelopeFormat::Model)]
     #[case(EnvelopeFormat::ModelWithExtensions)]
+    #[case(EnvelopeFormat::ModelText)]
+    #[case(EnvelopeFormat::ModelTextWithExtensions)]
     #[case(EnvelopeFormat::PackageJson)]
     fn header_round_trip(#[case] format: EnvelopeFormat) {
         // With zstd compression

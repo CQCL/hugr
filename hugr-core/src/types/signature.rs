@@ -13,7 +13,7 @@ use super::{
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
-    collect_signature_exts, ExtensionCollectionError, WeakExtensionRegistry,
+    ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -23,13 +23,13 @@ use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arb
 
 #[derive(Clone, Debug, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
-/// Describes the edges required to/from a node or inside a [FuncDefn] (when ROWVARS=[NoRV]);
-/// or (when ROWVARS=[RowVariable]) the type of a higher-order [function value] or the inputs/outputs from an OpDef
+/// Describes the edges required to/from a node or inside a [`FuncDefn`] (when ROWVARS=[`NoRV`]);
+/// or (when ROWVARS=[`RowVariable`]) the type of a higher-order [`function value`] or the inputs/outputs from an `OpDef`
 ///
-/// ROWVARS specifies whether it may contain [RowVariable]s or not.
+/// ROWVARS specifies whether it may contain [`RowVariable`]s or not.
 ///
-/// [function value]: crate::ops::constant::Value::Function
-/// [FuncDefn]: crate::ops::FuncDefn
+/// [`function value`]: crate::ops::constant::Value::Function
+/// [`FuncDefn`]: crate::ops::FuncDefn
 pub struct FuncTypeBase<ROWVARS: MaybeRV> {
     /// Value inputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
@@ -40,16 +40,16 @@ pub struct FuncTypeBase<ROWVARS: MaybeRV> {
 }
 
 /// The concept of "signature" in the spec - the edges required to/from a node
-/// or within a [FuncDefn], also the target (value) of a call (static).
+/// or within a [`FuncDefn`], also the target (value) of a call (static).
 ///
-/// [FuncDefn]: crate::ops::FuncDefn
+/// [`FuncDefn`]: crate::ops::FuncDefn
 pub type Signature = FuncTypeBase<NoRV>;
 
-/// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
-/// used for [OpDef]'s and passable as a value round a Hugr (see [Type::new_function])
+/// A function that may contain [`RowVariable`]s and thus has potentially-unknown arity;
+/// used for [`OpDef`]'s and passable as a value round a Hugr (see [`Type::new_function`])
 /// but not a valid node type.
 ///
-/// [OpDef]: crate::extension::OpDef
+/// [`OpDef`]: crate::extension::OpDef
 pub type FuncValueType = FuncTypeBase<RowVariable>;
 
 impl<RV: MaybeRV> FuncTypeBase<RV> {
@@ -76,26 +76,30 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     }
 
     /// True if both inputs and outputs are necessarily empty.
-    /// (For [FuncValueType], even after any possible substitution of row variables)
+    /// (For [`FuncValueType`], even after any possible substitution of row variables)
     #[inline(always)]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.input.is_empty() && self.output.is_empty()
     }
 
     #[inline]
     /// Returns a row of the value inputs of the function.
+    #[must_use]
     pub fn input(&self) -> &TypeRowBase<RV> {
         &self.input
     }
 
     #[inline]
     /// Returns a row of the value outputs of the function.
+    #[must_use]
     pub fn output(&self) -> &TypeRowBase<RV> {
         &self.output
     }
 
     #[inline]
     /// Returns a tuple with the input and output rows of the function.
+    #[must_use]
     pub fn io(&self) -> (&TypeRowBase<RV>, &TypeRowBase<RV>) {
         (&self.input, &self.output)
     }
@@ -128,7 +132,8 @@ impl<RV: MaybeRV> Transformable for FuncTypeBase<RV> {
 }
 
 impl FuncValueType {
-    /// If this FuncValueType contains any row variables, return one.
+    /// If this `FuncValueType` contains any row variables, return one.
+    #[must_use]
     pub fn find_rowvar(&self) -> Option<RowVariable> {
         self.input
             .iter()
@@ -200,6 +205,7 @@ impl Signature {
 
     /// Returns the number of ports in the signature.
     #[inline]
+    #[must_use]
     pub fn port_count(&self, dir: Direction) -> usize {
         match dir {
             Direction::Incoming => self.input.len(),
@@ -209,18 +215,21 @@ impl Signature {
 
     /// Returns the number of input ports in the signature.
     #[inline]
+    #[must_use]
     pub fn input_count(&self) -> usize {
         self.port_count(Direction::Incoming)
     }
 
     /// Returns the number of output ports in the signature.
     #[inline]
+    #[must_use]
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
 
     /// Returns a slice of the types for the given direction.
     #[inline]
+    #[must_use]
     pub fn types(&self, dir: Direction) -> &[Type] {
         match dir {
             Direction::Incoming => &self.input,
@@ -230,32 +239,34 @@ impl Signature {
 
     /// Returns a slice of the input types.
     #[inline]
+    #[must_use]
     pub fn input_types(&self) -> &[Type] {
         self.types(Direction::Incoming)
     }
 
     /// Returns a slice of the output types.
     #[inline]
+    #[must_use]
     pub fn output_types(&self) -> &[Type] {
         self.types(Direction::Outgoing)
     }
 
     /// Returns the `Port`s in the signature for a given direction.
     #[inline]
-    pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
+    pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> + use<> {
         (0..self.port_count(dir)).map(move |i| Port::new(dir, i))
     }
 
     /// Returns the incoming `Port`s in the signature.
     #[inline]
-    pub fn input_ports(&self) -> impl Iterator<Item = IncomingPort> {
+    pub fn input_ports(&self) -> impl Iterator<Item = IncomingPort> + use<> {
         self.ports(Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
     }
 
     /// Returns the outgoing `Port`s in the signature.
     #[inline]
-    pub fn output_ports(&self) -> impl Iterator<Item = OutgoingPort> {
+    pub fn output_ports(&self) -> impl Iterator<Item = OutgoingPort> + use<> {
         self.ports(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
     }
@@ -310,7 +321,7 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTy
 mod test {
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::type_row;
-    use crate::types::{test::FnTransformer, CustomType, TypeEnum};
+    use crate::types::{CustomType, TypeEnum, test::FnTransformer};
 
     use super::*;
     #[test]

@@ -1,7 +1,7 @@
 use hugr_core::{
+    Wire,
     builder::{BuildError, Dataflow},
     std_extensions::logic::LogicOp,
-    Wire,
 };
 
 pub trait LogicOpBuilder: Dataflow {

@@ -1,12 +1,12 @@
 use super::{
-    build_traits::{define_function_link_name, HugrBuilder},
-    dataflow::{DFGBuilder, FunctionBuilder},
     BuildError, Container,
+    build_traits::{HugrBuilder, define_function_link_name},
+    dataflow::{DFGBuilder, FunctionBuilder},
 };
 
+use crate::hugr::ValidationError;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
-use crate::hugr::ValidationError;
 use crate::ops;
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::types::{PolyFuncType, Type, TypeBound};
@@ -194,7 +194,7 @@ mod test {
 
     use crate::extension::prelude::usize_t;
     use crate::{
-        builder::{test::n_identity, Dataflow, DataflowSubContainer},
+        builder::{Dataflow, DataflowSubContainer, test::n_identity},
         types::Signature,
     };
 

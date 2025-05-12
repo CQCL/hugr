@@ -57,8 +57,8 @@ mod test {
     use super::*;
     use crate::{
         extension::{
-            prelude::usize_t, CustomSignatureFunc, CustomValidator, OpDef, SignatureError,
-            ValidateTypeArgs,
+            CustomSignatureFunc, CustomValidator, OpDef, SignatureError, ValidateTypeArgs,
+            prelude::usize_t,
         },
         types::{FuncValueType, Signature, TypeArg},
     };

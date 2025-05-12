@@ -1,7 +1,7 @@
 use hugr_core::{
+    Hugr, Node,
     hugr::{hugrmut::HugrMut, views::SiblingSubgraph},
     ops::OpType,
-    Hugr, Node,
 };
 
 use itertools::Itertools;
@@ -82,11 +82,11 @@ pub fn lower_ops(
 #[cfg(test)]
 mod test {
     use hugr_core::{
+        HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{bool_t, Noop},
+        extension::prelude::{Noop, bool_t},
         std_extensions::logic::LogicOp,
         types::Signature,
-        HugrView,
     };
 
     use super::*;

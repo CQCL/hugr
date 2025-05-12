@@ -81,7 +81,7 @@ macro_rules! type_row {
 #[allow(unused_imports)]
 pub use type_row;
 
-/// Declare 'const' variables holding new ExtensionIds, validating
+/// Declare 'const' variables holding new `ExtensionIds`, validating
 /// that they are well-formed as separate tests - hence, usable at the top level
 /// of a test module only. Example:
 /// ```rust

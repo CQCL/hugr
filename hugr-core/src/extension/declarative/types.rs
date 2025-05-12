@@ -9,10 +9,10 @@
 
 use std::sync::Weak;
 
+use crate::Extension;
 use crate::extension::{TypeDef, TypeDefBound};
 use crate::types::type_param::TypeParam;
 use crate::types::{TypeBound, TypeName};
-use crate::Extension;
 
 use serde::{Deserialize, Serialize};
 
@@ -76,7 +76,7 @@ impl TypeDeclaration {
     }
 }
 
-/// A declarative TypeBound definition.
+/// A declarative `TypeBound` definition.
 ///
 /// Equivalent to a [`TypeDefBound`]. Provides human-friendly serialization, using
 /// the full names.
@@ -108,7 +108,7 @@ impl From<TypeDefBoundDeclaration> for TypeDefBound {
 
 /// A declarative type parameter definition.
 ///
-/// Only supports [TypeParam::String]s for now.
+/// Only supports [`TypeParam::String`]s for now.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 enum TypeParamDeclaration {

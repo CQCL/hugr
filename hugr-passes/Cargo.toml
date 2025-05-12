@@ -12,6 +12,9 @@ description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
+[lints]
+workspace = true
+
 [lib]
 bench = false
 

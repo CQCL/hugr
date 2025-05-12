@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use delegate::delegate;
 use hugr_core::{
+    HugrView, Node,
     ops::{FuncDecl, FuncDefn, OpType},
     types::PolyFuncType,
-    HugrView, Node,
 };
 use inkwell::{
     builder::Builder,
@@ -68,7 +68,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     }
 
     /// Creates a new  `EmitModuleContext`. We take ownership of the [Module],
-    /// and return it in [EmitModuleContext::finish].
+    /// and return it in [`EmitModuleContext::finish`].
     pub fn new(
         iw_context: &'c Context,
         module: Module<'c>,
@@ -78,8 +78,8 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         Self {
             iw_context,
             module,
-            namer,
             extensions,
+            namer,
         }
     }
 
@@ -90,12 +90,12 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         &self.module
     }
 
-    /// Returns a reference to the inner [CodegenExtsMap].
+    /// Returns a reference to the inner [`CodegenExtsMap`].
     pub fn extensions(&self) -> Rc<CodegenExtsMap<'a, H>> {
         self.extensions.clone()
     }
 
-    /// Returns a [TypingSession] constructed from it's members.
+    /// Returns a [`TypingSession`] constructed from it's members.
     pub fn typing_session(&self) -> TypingSession<'c, 'a> {
         self.extensions
             .type_converter
@@ -118,7 +118,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
                 "Function '{}' has wrong type: expected: {func_ty} actual: {}",
                 name.as_ref(),
                 func.get_type()
-            ))?
+            ))?;
         }
         Ok(func)
     }
@@ -137,9 +137,9 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         self.get_func_impl(name, llvm_func_ty, None)
     }
 
-    /// Adds or gets the [FunctionValue] in the [Module] corresponding to the given [FuncDefn].
+    /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDefn`].
     ///
-    /// The name of the result is mangled by [EmitModuleContext::name_func].
+    /// The name of the result is mangled by [`EmitModuleContext::name_func`].
     pub fn get_func_defn<'hugr>(
         &self,
         node: FatNode<'hugr, FuncDefn, H>,
@@ -150,9 +150,9 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         self.get_hugr_func_impl(&node.name, node.node(), &node.signature)
     }
 
-    /// Adds or gets the [FunctionValue] in the [Module] corresponding to the given [FuncDecl].
+    /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDecl`].
     ///
-    /// The name of the result is mangled by [EmitModuleContext::name_func].
+    /// The name of the result is mangled by [`EmitModuleContext::name_func`].
     pub fn get_func_decl<'hugr>(
         &self,
         node: FatNode<'hugr, FuncDecl, H>,
@@ -163,14 +163,14 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         self.get_hugr_func_impl(&node.name, node.node(), &node.signature)
     }
 
-    /// Adds or get the [FunctionValue] in the [Module] with the given symbol
+    /// Adds or get the [`FunctionValue`] in the [Module] with the given symbol
     /// and function type.
     ///
-    /// The name undergoes no mangling. The [FunctionValue] will have
-    /// [Linkage::External].
+    /// The name undergoes no mangling. The [`FunctionValue`] will have
+    /// [`Linkage::External`].
     ///
     /// If this function is called multiple times with the same arguments it
-    /// will return the same [FunctionValue].
+    /// will return the same [`FunctionValue`].
     ///
     /// If a function with the given name exists but the type does not match
     /// then an Error is returned.
@@ -182,7 +182,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         self.get_func_impl(symbol, typ, Some(Linkage::External))
     }
 
-    /// Adds or gets the [GlobalValue] in the [Module] corresponding to the
+    /// Adds or gets the [`GlobalValue`] in the [Module] corresponding to the
     /// given symbol and LLVM type.
     ///
     /// The name will not be mangled.
@@ -213,13 +213,13 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
             if global_type != typ.as_any_type_enum() {
                 Err(anyhow!(
                     "Global '{symbol}' has wrong type: expected: {typ} actual: {global_type}"
-                ))?
+                ))?;
             }
             if global.is_constant() != constant {
                 Err(anyhow!(
                     "Global '{symbol}' has wrong constant-ness: expected: {constant} actual: {}",
                     global.is_constant()
-                ))?
+                ))?;
             }
             Ok(global)
         } else {
@@ -237,7 +237,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
 
 type EmissionSet = HashSet<Node>;
 
-/// Emits [HugrView]s into an LLVM [Module].
+/// Emits [`HugrView`]s into an LLVM [Module].
 pub struct EmitHugr<'c, 'a, H>
 where
     'a: 'c,
@@ -258,7 +258,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         }
     }
 
-    /// Creates a new  `EmitHugr`. We take ownership of the [Module], and return it in [Self::finish].
+    /// Creates a new  `EmitHugr`. We take ownership of the [Module], and return it in [`Self::finish`].
     pub fn new(
         iw_context: &'c Context,
         module: Module<'c>,
@@ -272,13 +272,13 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         }
     }
 
-    /// Emits a FuncDefn into the inner [Module].
+    /// Emits a `FuncDefn` into the inner [Module].
     ///
     /// `node` need not be a child of a hugr [Module](hugr_core::ops::Module), but it will
     /// be emitted as a top-level function in the inner [Module]. Indeed, there
     /// are only top-level functions in LLVM IR.
     ///
-    /// Any child [FuncDefn] will also be emitted.
+    /// Any child [`FuncDefn`] will also be emitted.
     ///
     /// It is safe to emit the same node multiple times: the second and further
     /// emissions will be no-ops.
@@ -287,7 +287,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     /// [Module] and it differs from what would be emitted, then we fail.
     pub fn emit_func(mut self, node: FatNode<'_, FuncDefn, H>) -> Result<Self> {
         let mut worklist: EmissionSet = [node.node()].into_iter().collect();
-        let pop = |wl: &mut EmissionSet| wl.iter().next().cloned().map(|x| wl.take(&x).unwrap());
+        let pop = |wl: &mut EmissionSet| wl.iter().next().copied().map(|x| wl.take(&x).unwrap());
 
         while let Some(next_node) = pop(&mut worklist) {
             use crate::utils::fat::FatExt as _;
@@ -306,14 +306,14 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
 
     /// Emits all children of a hugr [Module](hugr_core::ops::Module).
     ///
-    /// Note that type aliases are not supported, and that [hugr_core::ops::Const]
-    /// and [hugr_core::ops::FuncDecl] nodes are not emitted directly, but instead by
-    /// emission of ops with static edges from them. So [FuncDefn] are the only
+    /// Note that type aliases are not supported, and that [`hugr_core::ops::Const`]
+    /// and [`hugr_core::ops::FuncDecl`] nodes are not emitted directly, but instead by
+    /// emission of ops with static edges from them. So [`FuncDefn`] are the only
     /// interesting children.
     pub fn emit_module(mut self, node: FatNode<'_, hugr_core::ops::Module, H>) -> Result<Self> {
         for c in node.children() {
             match c.as_ref() {
-                OpType::FuncDefn(ref fd) => {
+                OpType::FuncDefn(fd) => {
                     let fat_ot = c.into_ot(fd);
                     self = self.emit_func(fat_ot)?;
                 }
@@ -365,7 +365,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
 /// For functions with multiple return values, we return a struct containing
 /// all the return values.
 ///
-/// `inkwell` provides a helper [Builder::build_aggregate_return] to construct
+/// `inkwell` provides a helper [`Builder::build_aggregate_return`] to construct
 /// the return value, see `EmitHugr::emit_func_impl`. This function performs the
 /// inverse.
 pub fn deaggregate_call_result<'c>(

@@ -21,9 +21,9 @@ pub trait LLVMCustomTypeFn<'a>:
 }
 
 impl<
-        'a,
-        F: for<'c> Fn(TypingSession<'c, 'a>, &CustomType) -> Result<BasicTypeEnum<'c>> + 'a + ?Sized,
-    > LLVMCustomTypeFn<'a> for F
+    'a,
+    F: for<'c> Fn(TypingSession<'c, 'a>, &CustomType) -> Result<BasicTypeEnum<'c>> + 'a + ?Sized,
+> LLVMCustomTypeFn<'a> for F
 {
 }
 

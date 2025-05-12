@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use hugr_core::{HugrView, PortIndex, Wire};
 
 use super::{
-    datalog::InWire, partial_value::ExtractValueError, AbstractValue, AsConcrete, PartialValue,
+    AbstractValue, AsConcrete, PartialValue, datalog::InWire, partial_value::ExtractValueError,
 };
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
-/// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
+/// Methods allow inspection, specifically [`read_out_wire`](Self::read_out_wire).
 pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
     pub(super) hugr: H,
     pub(super) in_wire_value: Vec<InWire<V, H::Node>>,
@@ -27,11 +27,11 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
         self.out_wire_values.get(&w).cloned()
     }
 
-    /// Tells whether a [TailLoop] node can terminate, i.e. whether
+    /// Tells whether a [`TailLoop`] node can terminate, i.e. whether
     /// `Break` and/or `Continue` tags may be returned by the nested DFG.
-    /// Returns `None` if the specified `node` is not a [TailLoop].
+    /// Returns `None` if the specified `node` is not a [`TailLoop`].
     ///
-    /// [TailLoop]: hugr_core::ops::TailLoop
+    /// [`TailLoop`]: hugr_core::ops::TailLoop
     pub fn tail_loop_terminates(&self, node: H::Node) -> Option<TailLoopTermination> {
         self.hugr.get_optype(node).as_tail_loop()?;
         let [_, out] = self.hugr.get_io(node).unwrap();
@@ -43,13 +43,13 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
         ))
     }
 
-    /// Tells whether a [Case] node is reachable, i.e. whether the predicate
-    /// to its parent [Conditional] may possibly have the tag corresponding to the [Case].
-    /// Returns `None` if the specified `case` is not a [Case], or is not within a [Conditional]
-    /// (e.g. a [Case]-rooted Hugr).
+    /// Tells whether a [`Case`] node is reachable, i.e. whether the predicate
+    /// to its parent [`Conditional`] may possibly have the tag corresponding to the [`Case`].
+    /// Returns `None` if the specified `case` is not a [`Case`], or is not within a [`Conditional`]
+    /// (e.g. a [`Case`]-rooted Hugr).
     ///
-    /// [Case]: hugr_core::ops::Case
-    /// [Conditional]: hugr_core::ops::Conditional
+    /// [`Case`]: hugr_core::ops::Case
+    /// [`Conditional`]: hugr_core::ops::Conditional
     pub fn case_reachable(&self, case: H::Node) -> Option<bool> {
         self.hugr.get_optype(case).as_case()?;
         let cond = self.hugr.get_parent(case)?;
@@ -61,12 +61,12 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
         )
     }
 
-    /// Tells us if a block ([DataflowBlock] or [ExitBlock]) in a [CFG] is known
+    /// Tells us if a block ([`DataflowBlock`] or [`ExitBlock`]) in a [`CFG`] is known
     /// to be reachable. (Returns `None` if argument is not a child of a CFG.)
     ///
-    /// [CFG]: hugr_core::ops::CFG
-    /// [DataflowBlock]: hugr_core::ops::DataflowBlock
-    /// [ExitBlock]: hugr_core::ops::ExitBlock
+    /// [`CFG`]: hugr_core::ops::CFG
+    /// [`DataflowBlock`]: hugr_core::ops::DataflowBlock
+    /// [`ExitBlock`]: hugr_core::ops::ExitBlock
     pub fn bb_reachable(&self, bb: H::Node) -> Option<bool> {
         let cfg = self.hugr.get_parent(bb)?; // Not really required...??
         self.hugr.get_optype(cfg).as_cfg()?;
@@ -80,7 +80,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
 
     /// Reads a concrete representation of the value on an output wire, if the lattice value
     /// computed for the wire can be turned into such. (The lattice value must be either a
-    /// [PartialValue::Value] or a [PartialValue::PartialSum] with a single possible tag.)
+    /// [`PartialValue::Value`] or a [`PartialValue::PartialSum`] with a single possible tag.)
     ///
     /// # Errors
     /// `None` if the analysis did not produce a result for that wire, or if
