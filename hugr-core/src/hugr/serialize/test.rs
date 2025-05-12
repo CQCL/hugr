@@ -219,16 +219,16 @@ pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
 
     // Extension operations may have been downgraded to opaque operations.
     for node in rhs.nodes() {
-        let new_op = rhs.get_optype(node);
-        let old_op = h_canon.get_optype(node);
-        if !new_op.is_const() {
-            match (new_op, old_op) {
+        let rhs_op = rhs.get_optype(node);
+        let lhs_op = h_canon.get_optype(node);
+        if !rhs_op.is_const() {
+            match (rhs_op, lhs_op) {
                 (OpType::ExtensionOp(ext), OpType::OpaqueOp(opaque))
                 | (OpType::OpaqueOp(opaque), OpType::ExtensionOp(ext)) => {
                     let ext_opaque: OpaqueOp = ext.clone().into();
                     assert_eq!(ext_opaque, opaque.clone());
                 }
-                _ => assert_eq!(new_op, old_op),
+                _ => assert_eq!(lhs_op, rhs_op),
             }
         }
     }
@@ -551,7 +551,8 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 
 #[rstest]
 #[case(ops::Module::new())]
-#[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1()})]
+#[case(ops::FuncDefn::new("polyfunc1", polyfunctype1(), "pf1".to_string()))]
+#[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1(), link_name: None})]
 #[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]

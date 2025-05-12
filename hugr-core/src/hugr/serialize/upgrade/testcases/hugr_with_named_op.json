@@ -32,7 +32,8 @@
             }
           ]
         }
-      }
+      },
+      "link_name": "main"
     },
     {
       "parent": 1,
