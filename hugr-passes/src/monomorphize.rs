@@ -307,7 +307,7 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::{monomorphize, remove_dead_funcs};
+    use crate::{monomorphize, remove_dead_funcs, ComposablePass, RemoveDeadFuncsPass};
 
     use super::{is_polymorphic, mangle_inner_func, mangle_name};
 
@@ -414,7 +414,10 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly, [mn.node()])?;
+        RemoveDeadFuncsPass::default()
+            .include_module_exports(false)
+            .with_module_entry_points([mn.node()])
+            .run(&mut nopoly)?;
         let mut funcs = list_funcs_link_name(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -617,12 +620,13 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let foo = {
                 let builder = module_builder
-                    .define_function(
+                    .define_function_link_name(
                         "foo",
                         PolyFuncType::new(
                             [TypeBound::Any.into()],
                             Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
                         ),
+                        None,
                     )
                     .unwrap();
                 let inputs = builder.input_wires();
@@ -653,7 +657,7 @@ mod test {
         };
 
         monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs(&mut hugr, []).unwrap();
+        remove_dead_funcs(&mut hugr).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
