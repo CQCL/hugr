@@ -6,7 +6,12 @@ use crate::{
     IncomingPort, Node, OutgoingPort, SimpleReplacement,
     builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
     extension::prelude::bool_t,
-    hugr::{Hugr, HugrView, patch::Patch, persistent::PatchNode, views::SiblingSubgraph},
+    hugr::{
+        Hugr, HugrView,
+        patch::Patch,
+        persistent::{Commit, PatchNode},
+        views::SiblingSubgraph,
+    },
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
 };
@@ -372,5 +377,41 @@ fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4]))
             "[commit1, commit2] + [commit3] are incompatible. Got {:?}",
             result
         );
+    }
+}
+
+// same test as above, but using try_add_commit instead of try_add_replacement
+#[rstest]
+fn test_try_add_commit(test_state_space: (CommitStateSpace, [CommitId; 4])) {
+    let (state_space, [commit1, commit2, commit3, commit4]) = test_state_space;
+
+    // Create a persistent hugr and add first replacement
+    let persistent_hugr = state_space.try_extract_hugr([commit1, commit2]).unwrap();
+
+    {
+        let mut persistent_hugr = persistent_hugr.clone();
+        let repl4 = state_space
+            .get_commit(commit4)
+            .replacement()
+            .unwrap()
+            .clone();
+        let new_commit = Commit::try_from_replacement(repl4, &state_space).unwrap();
+        let commit4 = persistent_hugr
+            .try_add_commit(new_commit)
+            .expect("commit4 is compatible");
+
+        assert_eq!(persistent_hugr.inserted_nodes(commit4).count(), 2);
+    }
+    {
+        let mut persistent_hugr = persistent_hugr.clone();
+        let repl3 = state_space
+            .get_commit(commit3)
+            .replacement()
+            .unwrap()
+            .clone();
+        let new_commit = Commit::try_from_replacement(repl3, &state_space).unwrap();
+        persistent_hugr
+            .try_add_commit(new_commit)
+            .expect_err("commit3 is incompatible with [commit1, commit2]");
     }
 }

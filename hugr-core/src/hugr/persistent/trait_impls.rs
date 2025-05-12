@@ -343,6 +343,7 @@ mod tests {
     use super::super::tests::test_state_space;
     use super::*;
 
+    use portgraph::PortView;
     use rstest::rstest;
 
     #[rstest]
@@ -396,6 +397,10 @@ mod tests {
             assert_eq!(
                 extracted_hugr.children(node_map[&n]).collect_vec(),
                 hugr.children(n).map(|c| node_map[&c]).collect_vec()
+            );
+            assert_eq!(
+                extracted_hugr.descendants(node_map[&n]).collect_vec(),
+                hugr.descendants(n).map(|c| node_map[&c]).collect_vec()
             );
         }
     }
@@ -454,5 +459,31 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[rstest]
+    fn test_extract_hugr(test_state_space: (CommitStateSpace, [CommitId; 4])) {
+        let (state_space, [commit1, commit2, _commit3, commit4]) = test_state_space;
+
+        let hugr = state_space
+            .try_extract_hugr([commit1, commit2, commit4])
+            .unwrap();
+        let extracted_hugr = hugr.to_hugr();
+
+        assert_eq!(
+            hugr.module_root(),
+            PatchNode(state_space.base(), state_space.base_hugr().module_root())
+        );
+
+        assert_eq!(hugr.num_nodes(), extracted_hugr.num_nodes());
+        assert_eq!(hugr.num_edges(), extracted_hugr.num_edges());
+
+        let (pg, _) = hugr.region_portgraph(hugr.entrypoint());
+
+        assert_eq!(pg.node_count(), hugr.children(hugr.entrypoint()).count());
+
+        let (new_hugr, _) = hugr.extract_hugr(hugr.entrypoint());
+
+        assert_eq!(new_hugr.num_nodes(), extracted_hugr.num_nodes());
     }
 }
