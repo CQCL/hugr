@@ -1586,7 +1586,18 @@ impl<'a> Context<'a> {
             return Ok(None);
         }
 
-        Ok((*args).try_into().ok())
+        if args.len() > N {
+            return Ok(None);
+        }
+
+        let result = std::array::from_fn(|i| {
+            (i + args.len())
+                .checked_sub(N)
+                .map(|i| args[i])
+                .unwrap_or_default()
+        });
+
+        Ok(Some(result))
     }
 
     fn expect_symbol<const N: usize>(
