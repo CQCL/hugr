@@ -173,7 +173,10 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
             .extension_op(
                 array::EXTENSION_ID,
                 array::ARRAY_CLONE_OP_ID,
-                |context, args| args.outputs.finish(context.builder(), args.inputs),
+                |context, args| {
+                    args.outputs
+                        .finish(context.builder(), vec![args.inputs[0]; 2])
+                },
             )
             .extension_op(
                 array::EXTENSION_ID,
@@ -339,7 +342,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 ts.llvm_sum_type(st.clone())?
             };
 
-            let exit_rmb = ctx.new_row_mail_box([res_hugr_ty], "")?;
+            let exit_rmb = ctx.new_row_mail_box(sig.output().iter(), "")?;
 
             let exit_block = ctx.build_positioned_new_block("", None, |ctx, bb| {
                 outputs.finish(ctx.builder(), exit_rmb.read_vec(ctx.builder(), [])?)?;
@@ -357,7 +360,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                         builder.build_load(elem_addr, "")
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v])?;
-                    exit_rmb.write(ctx.builder(), [success_v.into()])?;
+                    exit_rmb.write(ctx.builder(), [success_v.into(), array_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -366,7 +369,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 ctx.build_positioned_new_block("", Some(success_block), |ctx, bb| {
                     let builder = ctx.builder();
                     let failure_v = res_sum_ty.build_tag(builder, 0, vec![])?;
-                    exit_rmb.write(ctx.builder(), [failure_v.into()])?;
+                    exit_rmb.write(ctx.builder(), [failure_v.into(), array_v.into()])?;
                     builder.build_unconditional_branch(exit_block)?;
                     Ok(bb)
                 })?;
@@ -739,6 +742,7 @@ mod test {
     use itertools::Itertools as _;
     use rstest::rstest;
 
+    use crate::extension::collections::stack_array::{ArrayCodegenExtension, DefaultArrayCodegen};
     use crate::{
         check_emission,
         emit::test::SimpleHugrConfig,
@@ -758,7 +762,7 @@ mod test {
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -777,7 +781,7 @@ mod test {
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -797,7 +801,7 @@ mod test {
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -814,7 +818,7 @@ mod test {
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -873,7 +877,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
         });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -978,7 +982,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
                 .add_default_int_extensions()
                 .add_logic_extensions()
         });
@@ -1085,7 +1089,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
                 .add_default_int_extensions()
                 .add_logic_extensions()
         });
@@ -1142,7 +1146,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
                 .add_default_int_extensions()
                 .add_logic_extensions()
         });
@@ -1212,7 +1216,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
                 .add_default_int_extensions()
         });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1265,7 +1269,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
                 .add_default_int_extensions()
         });
         assert_eq!(value, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1336,7 +1340,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
                 .add_default_int_extensions()
         });
         let expected: u64 = (inc..size + inc).sum();
@@ -1392,7 +1396,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
                 .add_default_int_extensions()
         });
         let expected: u64 = (0..size).sum();
