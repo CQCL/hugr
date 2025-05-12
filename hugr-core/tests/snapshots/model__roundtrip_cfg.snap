@@ -28,7 +28,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cfg.
             (core.fn [(core.ctrl [?0])] [(core.ctrl [?0]) (core.ctrl [?0])]))
           (dfg [%4] [%5]
             (signature (core.fn [?0] [(core.adt [[?0] [?0]])]))
-            ((core.make_adt _ _ 0) [%4] [%5]
+            ((core.make_adt 0) [%4] [%5]
               (signature (core.fn [?0] [(core.adt [[?0] [?0]])])))))))))
 
 (define-func example.cfg_order (param ?0 core.type) (core.fn [?0] [?0])
@@ -42,11 +42,11 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cfg.
           (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])]))
           (dfg [%4] [%5]
             (signature (core.fn [?0] [(core.adt [[?0]])]))
-            ((core.make_adt _ _ 0) [%4] [%5]
+            ((core.make_adt 0) [%4] [%5]
               (signature (core.fn [?0] [(core.adt [[?0]])])))))
         (block [%6] [%3]
           (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])]))
           (dfg [%7] [%8]
             (signature (core.fn [?0] [(core.adt [[?0]])]))
-            ((core.make_adt _ _ 0) [%7] [%8]
+            ((core.make_adt 0) [%7] [%8]
               (signature (core.fn [?0] [(core.adt [[?0]])])))))))))

@@ -176,10 +176,19 @@ impl<'a> Context<'a> {
     }
 
     pub fn make_term(&mut self, term: table::Term<'a>) -> table::TermId {
-        // Wildcard terms do not all represent the same term, so we should not deduplicate them.
+        // There is a canonical id for wildcard terms.
         if term == table::Term::Wildcard {
-            return self.module.insert_term(term);
+            return table::TermId::default();
         }
+
+        // We can omit a prefix of wildcard terms for symbol applications.
+        let term = match term {
+            table::Term::Apply(symbol, args) => {
+                let prefix = args.iter().take_while(|arg| !arg.is_valid()).count();
+                table::Term::Apply(symbol, &args[prefix..])
+            }
+            term => term,
+        };
 
         *self
             .term_map

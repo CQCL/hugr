@@ -46,5 +46,5 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entr
           (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
           (dfg [] [%2]
             (signature (core.fn [] [(core.adt [[]])]))
-            ((core.make_adt _ _ 0) [] [%2]
+            ((core.make_adt 0) [] [%2]
               (signature (core.fn [] [(core.adt [[]])])))))))))
