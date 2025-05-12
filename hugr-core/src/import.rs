@@ -1586,6 +1586,9 @@ impl<'a> Context<'a> {
             return Ok(None);
         }
 
+        // We allow the match even if the symbol is applied to fewer arguments
+        // than parameters. In that case, the arguments are padded with wildcards
+        // at the beginning.
         if args.len() > N {
             return Ok(None);
         }
