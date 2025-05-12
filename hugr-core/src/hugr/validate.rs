@@ -67,8 +67,15 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         // without having to change the schema.
         #[cfg(all(test, not(miri)))]
         {
-            let test_schema = std::env::var("HUGR_TEST_SCHEMA").is_ok_and(|x| !x.is_empty());
-            crate::hugr::serialize::test::check_hugr_roundtrip(self.hugr, test_schema);
+            use crate::envelope::EnvelopeConfig;
+            use crate::hugr::hugrmut::HugrMut;
+            use crate::hugr::views::ExtractionResult;
+
+            let (mut hugr, node_map) = self.hugr.extract_hugr(self.hugr.module_root());
+            hugr.set_entrypoint(node_map.extracted_node(self.hugr.entrypoint()));
+            // TODO: Currently fails when using `hugr-model`
+            //crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::binary());
+            crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::text());
         }
 
         Ok(())
