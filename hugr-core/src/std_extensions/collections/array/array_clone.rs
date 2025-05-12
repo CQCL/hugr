@@ -24,6 +24,7 @@ pub struct GenericArrayCloneDef<AK: ArrayKind>(PhantomData<AK>);
 
 impl<AK: ArrayKind> GenericArrayCloneDef<AK> {
     /// Creates a new clone operation definition.
+    #[must_use]
     pub fn new() -> Self {
         GenericArrayCloneDef(PhantomData)
     }
@@ -91,8 +92,8 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayCloneDef<AK> {
         "Clones an array with copyable elements".into()
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.

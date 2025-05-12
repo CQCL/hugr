@@ -1,13 +1,13 @@
 //! An extension for working with static arrays.
 //!
 //! The extension `collections.static_arrays` models globally available constant
-//! arrays of [TypeBound::Copyable] values.
+//! arrays of [`TypeBound::Copyable`] values.
 //!
 //! The type `static_array<T>` is parameterised by its element type. Note that
 //! unlike `collections.array.array` the length of a static array is not tracked
 //! in type args.
 //!
-//! The [CustomConst] [StaticArrayValue] is the only manner by which a value of
+//! The [`CustomConst`] [`StaticArrayValue`] is the only manner by which a value of
 //! `static_array` type can be obtained.
 //!
 //! Operations provided:
@@ -54,7 +54,7 @@ pub const STATIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("static_array")
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, derive_more::From)]
-/// Statically sized array of values, all of the same [TypeBound::Copyable]
+/// Statically sized array of values, all of the same [`TypeBound::Copyable`]
 /// type.
 pub struct StaticArrayValue {
     /// The contents of the `StaticArrayValue`.
@@ -65,16 +65,18 @@ pub struct StaticArrayValue {
 
 impl StaticArrayValue {
     /// Returns the type of values inside the `[StaticArrayValue]`.
+    #[must_use]
     pub fn get_element_type(&self) -> &Type {
         self.value.get_element_type()
     }
 
     /// Returns the values contained inside the `[StaticArrayValue]`.
+    #[must_use]
     pub fn get_contents(&self) -> &[Value] {
         self.value.get_contents()
     }
 
-    /// Create a new [CustomConst] for an array of values of type `typ`.
+    /// Create a new [`CustomConst`] for an array of values of type `typ`.
     /// That all values are of type `typ` is not checked here.
     pub fn try_new(
         name: impl ToString,
@@ -93,12 +95,13 @@ impl StaticArrayValue {
         })
     }
 
-    /// Create a new [CustomConst] for an empty array of values of type `typ`.
+    /// Create a new [`CustomConst`] for an empty array of values of type `typ`.
     pub fn try_new_empty(name: impl ToString, typ: Type) -> Result<Self, ConstTypeError> {
         Self::try_new(name, typ, iter::empty())
     }
 
     /// Returns the type of the `[StaticArrayValue]` as a `[CustomType]`.`
+    #[must_use]
     pub fn custom_type(&self) -> CustomType {
         static_array_custom_type(self.get_element_type().clone())
     }
@@ -140,7 +143,7 @@ lazy_static! {
     /// Extension for array operations.
     pub static ref EXTENSION: Arc<Extension> = {
         use TypeBound::Copyable;
-        Extension::new_arc(EXTENSION_ID.to_owned(), VERSION, |extension, extension_ref| {
+        Extension::new_arc(EXTENSION_ID.clone(), VERSION, |extension, extension_ref| {
             extension.add_type(
                     STATIC_ARRAY_TYPENAME,
                     vec![Copyable.into()],
@@ -163,7 +166,7 @@ fn instantiate_const_static_array_custom_type(
         .unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// Instantiate a new `static_array` [CustomType] given an element type.
+/// Instantiate a new `static_array` [`CustomType`] given an element type.
 pub fn static_array_custom_type(element_ty: impl Into<TypeArg>) -> CustomType {
     instantiate_const_static_array_custom_type(
         EXTENSION.get_type(&STATIC_ARRAY_TYPENAME).unwrap(),
@@ -196,7 +199,7 @@ pub enum StaticArrayOpDef {
 
 impl StaticArrayOpDef {
     fn signature_from_def(&self, def: &TypeDef, _: &sync::Weak<Extension>) -> SignatureFunc {
-        use TypeBound::*;
+        use TypeBound::Copyable;
         let t_param = TypeParam::from(Copyable);
         let elem_ty = Type::new_var_use(0, Copyable);
         let array_ty: Type =
@@ -236,7 +239,7 @@ impl MakeOpDef for StaticArrayOpDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn description(&self) -> String {
@@ -330,7 +333,7 @@ impl HasConcrete for StaticArrayOpDef {
 
 impl MakeRegisteredOp for StaticArrayOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> sync::Weak<Extension> {

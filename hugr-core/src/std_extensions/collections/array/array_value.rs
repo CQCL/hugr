@@ -24,10 +24,10 @@ pub struct GenericArrayValue<AK: ArrayKind> {
 }
 
 impl<AK: ArrayKind> GenericArrayValue<AK> {
-    /// Create a new [CustomConst] for an array of values of type `typ`.
+    /// Create a new [`CustomConst`] for an array of values of type `typ`.
     /// That all values are of type `typ` is not checked here.
     ///
-    /// [CustomConst]: crate::ops::constant::CustomConst
+    /// [`CustomConst`]: crate::ops::constant::CustomConst
     pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
         Self {
             values: contents.into_iter().collect_vec(),
@@ -36,9 +36,10 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
         }
     }
 
-    /// Create a new [CustomConst] for an empty array of values of type `typ`.
+    /// Create a new [`CustomConst`] for an empty array of values of type `typ`.
     ///
-    /// [CustomConst]: crate::ops::constant::CustomConst
+    /// [`CustomConst`]: crate::ops::constant::CustomConst
+    #[must_use]
     pub fn new_empty(typ: Type) -> Self {
         Self {
             values: vec![],
@@ -48,26 +49,31 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
     }
 
     /// Returns the type of the `[GenericArrayValue]` as a `[CustomType]`.`
+    #[must_use]
     pub fn custom_type(&self) -> CustomType {
         AK::custom_ty(self.values.len() as u64, self.typ.clone())
     }
 
     /// Returns the type of the `[GenericArrayValue]`.
+    #[must_use]
     pub fn get_type(&self) -> Type {
         self.custom_type().into()
     }
 
     /// Returns the type of values inside the `[ArrayValue]`.
+    #[must_use]
     pub fn get_element_type(&self) -> &Type {
         &self.typ
     }
 
     /// Returns the values contained inside the `[ArrayValue]`.
+    #[must_use]
     pub fn get_contents(&self) -> &[Value] {
         &self.values
     }
 
     /// Returns the name of the value.
+    #[must_use]
     pub fn name(&self) -> ValueName {
         AK::VALUE_NAME
     }

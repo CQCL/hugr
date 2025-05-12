@@ -24,6 +24,7 @@ pub struct GenericArrayDiscardDef<AK: ArrayKind>(PhantomData<AK>);
 
 impl<AK: ArrayKind> GenericArrayDiscardDef<AK> {
     /// Creates a new array discard operation definition.
+    #[must_use]
     pub fn new() -> Self {
         GenericArrayDiscardDef(PhantomData)
     }
@@ -87,8 +88,8 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayDiscardDef<AK> {
         "Discards an array with copyable elements".into()
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.
@@ -116,6 +117,7 @@ pub struct GenericArrayDiscard<AK: ArrayKind> {
 
 impl<AK: ArrayKind> GenericArrayDiscard<AK> {
     /// Creates a new array discard op.
+    #[must_use]
     pub fn new(elem_ty: Type, size: u64) -> Option<Self> {
         elem_ty.copyable().then_some(GenericArrayDiscard {
             elem_ty,

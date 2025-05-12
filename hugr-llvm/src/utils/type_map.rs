@@ -1,4 +1,4 @@
-//! Provides a generic mapping from [HugrType] into some domain.
+//! Provides a generic mapping from [`HugrType`] into some domain.
 use std::collections::HashMap;
 
 use hugr_core::{
@@ -32,16 +32,16 @@ impl<'a, TM: TypeMapping, F: for<'c> TypeMapFnHelper<'c, TM> + 'a> TypeMappingFn
     }
 }
 
-/// Defines a mapping from [HugrType] to `OutV`;
+/// Defines a mapping from [`HugrType`] to `OutV`;
 pub trait TypeMapping {
-    /// Auxiliary data provided when mapping from a [HugrType].
+    /// Auxiliary data provided when mapping from a [`HugrType`].
     type InV<'c>: Clone;
     /// The target type of the mapping.
     type OutV<'c>;
-    /// The target type when mapping from [HugrSumType]s. This type must be
+    /// The target type when mapping from [`HugrSumType`]s. This type must be
     /// convertible to `OutV` via `sum_into_out`.
     type SumOutV<'c>;
-    /// The target type when mapping from [HugrFuncType]s. This type must be
+    /// The target type when mapping from [`HugrFuncType`]s. This type must be
     /// convertible to `OutV` via `func_into_out`.
     type FuncOutV<'c>;
 
@@ -112,7 +112,7 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
             .is_none()
     }
 
-    /// Map `hugr_type` using the [TypeMapping] `TM`, the registered callbacks,
+    /// Map `hugr_type` using the [`TypeMapping`] `TM`, the registered callbacks,
     /// and the auxiliary data `inv`.
     pub fn map_type<'c>(&self, hugr_type: &HugrType, inv: TM::InV<'c>) -> Result<TM::OutV<'c>> {
         match hugr_type.as_type_enum() {
@@ -133,7 +133,7 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
         }
     }
 
-    /// As `map_type`, but maps a [HugrSumType] to an [TypeMapping::SumOutV].
+    /// As `map_type`, but maps a [`HugrSumType`] to an [`TypeMapping::SumOutV`].
     pub fn map_sum_type<'c>(
         &self,
         sum_type: &HugrSumType,
@@ -154,7 +154,7 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
         )
     }
 
-    /// As `map_type`, but maps a [HugrSumType] to an [TypeMapping::FuncOutV].
+    /// As `map_type`, but maps a [`HugrSumType`] to an [`TypeMapping::FuncOutV`].
     pub fn map_function_type<'c>(
         &self,
         func_type: &HugrFuncType,

@@ -78,13 +78,13 @@ impl ExtensionRegistry {
     /// Create a new empty extension registry.
     pub fn new(extensions: impl IntoIterator<Item = Arc<Extension>>) -> Self {
         let mut res = Self::default();
-        for ext in extensions.into_iter() {
+        for ext in extensions {
             res.register_updated(ext);
         }
         res
     }
 
-    /// Load an ExtensionRegistry serialized as json.
+    /// Load an `ExtensionRegistry` serialized as json.
     ///
     /// After deserialization, updates all the internal `Weak<Extension>`
     /// references to point to the newly created [`Arc`]s in the registry,
@@ -226,12 +226,12 @@ impl ExtensionRegistry {
         self.exts.remove(name)
     }
 
-    /// Constructs a new ExtensionRegistry from a list of [`Extension`]s while
+    /// Constructs a new `ExtensionRegistry` from a list of [`Extension`]s while
     /// giving you a [`WeakExtensionRegistry`] to the allocation. This allows
     /// you to add [`Weak`] self-references to the [`Extension`]s while
     /// constructing them, before wrapping them in [`Arc`]s.
     ///
-    /// This is similar to [`Arc::new_cyclic`], but for ExtensionRegistries.
+    /// This is similar to [`Arc::new_cyclic`], but for `ExtensionRegistries`.
     ///
     /// Calling [`Weak::upgrade`] on a weak reference in the
     /// [`WeakExtensionRegistry`] inside your closure will return an extension
@@ -343,7 +343,7 @@ impl Extend<Arc<Extension>> for ExtensionRegistry {
     }
 }
 
-/// Encode/decode ExtensionRegistry as a list of extensions.
+/// Encode/decode `ExtensionRegistry` as a list of extensions.
 ///
 /// Any `Weak<Extension>` references inside the registry will be left unresolved.
 /// Prefer using [`ExtensionRegistry::load_json`] when deserializing.
@@ -385,7 +385,7 @@ pub enum SignatureError {
     /// Extension mismatch
     #[error("Definition extension ({0}) and instantiation extension ({1}) do not match.")]
     ExtensionMismatch(ExtensionId, ExtensionId),
-    /// When the type arguments of the node did not match the params declared by the OpDef
+    /// When the type arguments of the node did not match the params declared by the `OpDef`
     #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
     /// Invalid type arguments
@@ -399,7 +399,7 @@ pub enum SignatureError {
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
-    /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
+    /// The bound recorded for a `CustomType` doesn't match what the `TypeDef` would compute
     #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
     WrongBound {
         actual: TypeBound,
@@ -428,10 +428,10 @@ pub enum SignatureError {
         cached: Signature,
         expected: Signature,
     },
-    /// The result of the type application stored in a [LoadFunction]
+    /// The result of the type application stored in a [`LoadFunction`]
     /// is not what we get by applying the type-args to the polymorphic function
     ///
-    /// [LoadFunction]: crate::ops::dataflow::LoadFunction
+    /// [`LoadFunction`]: crate::ops::dataflow::LoadFunction
     #[error(
         "Incorrect result of type application in LoadFunction - cached {cached} but expected {expected}"
     )]
@@ -568,6 +568,7 @@ impl Extension {
     ///
     /// See [`Extension::new_arc`] for a more ergonomic way to create boxed
     /// extensions.
+    #[must_use]
     pub fn new(name: ExtensionId, version: Version) -> Self {
         Self {
             name,
@@ -615,7 +616,7 @@ impl Extension {
         let ext = Arc::new_cyclic(|extension_ref| {
             let mut ext = Self::new(name, version);
             match init(&mut ext, extension_ref) {
-                Ok(_) => ext,
+                Ok(()) => ext,
                 Err(e) => {
                     error = Some(e);
                     ext
@@ -629,21 +630,25 @@ impl Extension {
     }
 
     /// Allows read-only access to the operations in this Extension
+    #[must_use]
     pub fn get_op(&self, name: &OpNameRef) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(name)
     }
 
     /// Allows read-only access to the types in this Extension
+    #[must_use]
     pub fn get_type(&self, type_name: &TypeNameRef) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
     /// Returns the name of the extension.
+    #[must_use]
     pub fn name(&self) -> &ExtensionId {
         &self.name
     }
 
     /// Returns the version of the extension.
+    #[must_use]
     pub fn version(&self) -> &Version {
         &self.version
     }
@@ -731,6 +736,7 @@ pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
+    #[must_use]
     pub const fn new() -> Self {
         Self(BTreeSet::new())
     }
@@ -741,21 +747,25 @@ impl ExtensionSet {
     }
 
     /// Returns `true` if the set contains the given extension.
+    #[must_use]
     pub fn contains(&self, extension: &ExtensionId) -> bool {
         self.0.contains(extension)
     }
 
     /// Returns `true` if the set is a subset of `other`.
+    #[must_use]
     pub fn is_subset(&self, other: &Self) -> bool {
         self.0.is_subset(&other.0)
     }
 
     /// Returns `true` if the set is a superset of `other`.
+    #[must_use]
     pub fn is_superset(&self, other: &Self) -> bool {
         self.0.is_superset(&other.0)
     }
 
     /// Create a extension set with a single element.
+    #[must_use]
     pub fn singleton(extension: ExtensionId) -> Self {
         let mut set = Self::new();
         set.insert(extension);
@@ -763,32 +773,35 @@ impl ExtensionSet {
     }
 
     /// Returns the union of two extension sets.
+    #[must_use]
     pub fn union(mut self, other: Self) -> Self {
         self.0.extend(other.0);
         self
     }
 
-    /// Returns the union of an arbitrary collection of [ExtensionSet]s
+    /// Returns the union of an arbitrary collection of [`ExtensionSet`]s
     pub fn union_over(sets: impl IntoIterator<Item = Self>) -> Self {
         // `union` clones the receiver, which we do not need to do here
         let mut res = ExtensionSet::new();
         for s in sets {
-            res.0.extend(s.0)
+            res.0.extend(s.0);
         }
         res
     }
 
     /// The things in other which are in not in self
+    #[must_use]
     pub fn missing_from(&self, other: &Self) -> Self {
         ExtensionSet::from_iter(other.0.difference(&self.0).cloned())
     }
 
-    /// Iterate over the contained ExtensionIds
+    /// Iterate over the contained `ExtensionIds`
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.iter()
     }
 
-    /// True if this set contains no [ExtensionId]s
+    /// True if this set contains no [`ExtensionId`]s
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -911,7 +924,7 @@ pub mod test {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
 
-            fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+            fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
                 hash_set(any::<ExtensionId>(), 0..3)
                     .prop_map(|extensions| extensions.into_iter().collect::<ExtensionSet>())
                     .boxed()

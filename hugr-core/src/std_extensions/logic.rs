@@ -111,7 +111,7 @@ impl MakeOpDef for LogicOp {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
@@ -138,7 +138,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for LogicOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {

@@ -26,6 +26,7 @@ pub struct Module {
 
 impl Module {
     /// Construct a new Module.
+    #[must_use]
     pub const fn new() -> Self {
         Self {}
     }
@@ -38,7 +39,7 @@ impl StaticTag for Module {
 }
 
 impl OpTrait for Module {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "The root of a module, parent of all other `OpType`s"
     }
 
@@ -72,7 +73,7 @@ impl DataflowParent for FuncDefn {
 }
 
 impl OpTrait for FuncDefn {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A function definition"
     }
 
@@ -104,7 +105,7 @@ impl StaticTag for FuncDecl {
 }
 
 impl OpTrait for FuncDecl {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "External function declaration, linked at runtime"
     }
 
@@ -134,7 +135,7 @@ impl StaticTag for AliasDefn {
     const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDefn {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A type alias definition"
     }
 
@@ -167,6 +168,7 @@ impl AliasDecl {
     }
 
     /// Returns a reference to the name of this [`AliasDecl`].
+    #[must_use]
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
@@ -177,7 +179,7 @@ impl StaticTag for AliasDecl {
     const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDecl {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A type alias declaration"
     }
 

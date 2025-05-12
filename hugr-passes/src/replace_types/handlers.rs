@@ -1,5 +1,5 @@
-//! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
-//! and [DelegatingLinearizer::register_callback](super::DelegatingLinearizer::register_callback)
+//! Callbacks for use with [`ReplaceTypes::replace_consts_parametrized`]
+//! and [`DelegatingLinearizer::register_callback`](super::DelegatingLinearizer::register_callback)
 
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig};
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
@@ -23,9 +23,9 @@ use super::{
     CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
 };
 
-/// Handler for [ListValue] constants that updates the element type and
-/// recursively [ReplaceTypes::change_value]s the elements of the list.
-/// Included in [ReplaceTypes::default].
+/// Handler for [`ListValue`] constants that updates the element type and
+/// recursively [`ReplaceTypes::change_value`]s the elements of the list.
+/// Included in [`ReplaceTypes::default`].
 pub fn list_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -40,15 +40,15 @@ pub fn list_const(
     }
 
     let mut vals: Vec<Value> = lv.get_contents().to_vec();
-    for v in vals.iter_mut() {
+    for v in &mut vals {
         repl.change_value(v)?;
     }
     Ok(Some(ListValue::new(elem_t, vals).into()))
 }
 
-/// Handler for [GenericArrayValue] constants that recursively
-/// [ReplaceTypes::change_value]s the elements of the list.
-/// Included in [ReplaceTypes::default].
+/// Handler for [`GenericArrayValue`] constants that recursively
+/// [`ReplaceTypes::change_value`]s the elements of the list.
+/// Included in [`ReplaceTypes::default`].
 pub fn generic_array_const<AK: ArrayKind>(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -66,17 +66,17 @@ where
     }
 
     let mut vals: Vec<Value> = av.get_contents().to_vec();
-    for v in vals.iter_mut() {
+    for v in &mut vals {
         repl.change_value(v)?;
     }
     Ok(Some(GenericArrayValue::<AK>::new(elem_t, vals).into()))
 }
 
-/// Handler for [ArrayValue] constants that recursively
-/// [ReplaceTypes::change_value]s the elements of the list.
-/// Included in [ReplaceTypes::default].
+/// Handler for [`ArrayValue`] constants that recursively
+/// [`ReplaceTypes::change_value`]s the elements of the list.
+/// Included in [`ReplaceTypes::default`].
 ///
-/// [ArrayValue]: hugr_core::std_extensions::collections::array::ArrayValue
+/// [`ArrayValue`]: hugr_core::std_extensions::collections::array::ArrayValue
 pub fn array_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -84,11 +84,11 @@ pub fn array_const(
     generic_array_const::<Array>(val, repl)
 }
 
-/// Handler for [VArrayValue] constants that recursively
-/// [ReplaceTypes::change_value]s the elements of the list.
-/// Included in [ReplaceTypes::default].
+/// Handler for [`VArrayValue`] constants that recursively
+/// [`ReplaceTypes::change_value`]s the elements of the list.
+/// Included in [`ReplaceTypes::default`].
 ///
-/// [VArrayValue]: hugr_core::std_extensions::collections::value_array::VArrayValue
+/// [`VArrayValue`]: hugr_core::std_extensions::collections::value_array::VArrayValue
 pub fn value_array_const(
     val: &OpaqueValue,
     repl: &ReplaceTypes,
@@ -137,7 +137,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             AK::build_discard(&mut dfb, Type::UNIT, *n, unit_arr).unwrap();
             dfb.finish_hugr_with_outputs([]).unwrap()
         })));
-    };
+    }
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
     let num_new = num_outports - 1;
@@ -172,7 +172,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 
     // 2. use a scan through the input array, copying the element num_outputs times;
     // return the first copy, and put each of the other copies into one of the array<option>
-    let i64_t = INT_TYPES[6].to_owned();
+    let i64_t = INT_TYPES[6].clone();
     let option_array = AK::ty(*n, option_ty.clone());
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];
@@ -285,9 +285,9 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 }
 
 /// Handler for copying/discarding value arrays if their elements have become linear.
-/// Included in [ReplaceTypes::default] and [DelegatingLinearizer::default].
+/// Included in [`ReplaceTypes::default`] and [`DelegatingLinearizer::default`].
 ///
-/// [DelegatingLinearizer::default]: super::DelegatingLinearizer::default
+/// [`DelegatingLinearizer::default`]: super::DelegatingLinearizer::default
 pub fn linearize_value_array(
     args: &[TypeArg],
     num_outports: usize,
@@ -297,7 +297,7 @@ pub fn linearize_value_array(
 }
 
 /// Handler for copying and discarding of arrays. Only works if the elements are copyable, or
-/// can be copied/discarded via the provided [CallbackHandler].
+/// can be copied/discarded via the provided [`CallbackHandler`].
 ///
 /// This should be used when lowering a copyable type to an array.
 pub fn copy_discard_array(

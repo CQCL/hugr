@@ -76,6 +76,7 @@ pub enum OpTag {
 impl OpTag {
     /// Returns true if this tag is more general than `other`.
     #[inline]
+    #[must_use]
     pub const fn is_superset(self, other: OpTag) -> bool {
         // We cannot call iter().any() or even do for loops in const fn yet.
         // So we have to write this ugly code.
@@ -95,7 +96,7 @@ impl OpTag {
 
     /// Returns the infimum of the set of tags that strictly contain this tag
     ///
-    /// Tags are sets of operations. The parent_tags of T define the immediate
+    /// Tags are sets of operations. The `parent_tags` of T define the immediate
     /// supersets of T. In mathematical terms:
     /// ```text
     /// R ∈ parent_tags(T) if R ⊃ T and ∄ Q st. R ⊃ Q ⊃ T .
@@ -138,6 +139,7 @@ impl OpTag {
     }
 
     /// Returns a user-friendly description of the set.
+    #[must_use]
     pub const fn description(&self) -> &str {
         match self {
             OpTag::Any => "Any",
@@ -172,12 +174,14 @@ impl OpTag {
 
     /// Returns whether the set is empty.
     #[inline]
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         matches!(self, &OpTag::None)
     }
 
     /// Constant equality check.
     #[inline]
+    #[must_use]
     pub const fn eq(self, other: OpTag) -> bool {
         self as u32 == other as u32
     }

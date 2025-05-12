@@ -213,15 +213,15 @@ fn print_tuple_parts<'a>(printer: &mut Printer<'a>, parts: &'a [SeqPart]) {
 }
 
 fn print_symbol_name<'a>(printer: &mut Printer<'a>, name: &'a SymbolName) {
-    printer.text(name.0.as_str())
+    printer.text(name.0.as_str());
 }
 
 fn print_var_name<'a>(printer: &mut Printer<'a>, name: &'a VarName) {
-    printer.text(format!("{name}"))
+    printer.text(format!("{name}"));
 }
 
 fn print_link_name<'a>(printer: &mut Printer<'a>, name: &'a LinkName) {
-    printer.text(format!("{name}"))
+    printer.text(format!("{name}"));
 }
 
 fn print_port_lists<'a>(
@@ -258,7 +258,7 @@ fn print_package<'a>(printer: &mut Printer<'a>, package: &'a Package) {
     printer.text("0");
     printer.parens_exit();
 
-    for module in package.modules.iter() {
+    for module in &package.modules {
         printer.parens_enter();
         printer.text("mod");
         printer.parens_exit();
@@ -268,11 +268,11 @@ fn print_package<'a>(printer: &mut Printer<'a>, package: &'a Package) {
 }
 
 fn print_module<'a>(printer: &mut Printer<'a>, module: &'a Module) {
-    for meta in module.root.meta.iter() {
+    for meta in &module.root.meta {
         print_meta_item(printer, meta);
     }
 
-    for child in module.root.children.iter() {
+    for child in &module.root.children {
         print_node(printer, child);
     }
 }
@@ -329,11 +329,11 @@ fn print_node<'a>(printer: &mut Printer<'a>, node: &'a Node) {
         print_signature(printer, signature);
     }
 
-    for meta in node.meta.iter() {
+    for meta in &node.meta {
         print_meta_item(printer, meta);
     }
 
-    for region in node.regions.iter() {
+    for region in &node.regions {
         print_region(printer, region);
     }
 
@@ -357,11 +357,11 @@ fn print_region<'a>(printer: &mut Printer<'a>, region: &'a Region) {
         print_signature(printer, signature);
     }
 
-    for meta in region.meta.iter() {
+    for meta in &region.meta {
         print_meta_item(printer, meta);
     }
 
-    for child in region.children.iter() {
+    for child in &region.children {
         print_node(printer, child);
     }
 
@@ -371,11 +371,11 @@ fn print_region<'a>(printer: &mut Printer<'a>, region: &'a Region) {
 fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
     print_symbol_name(printer, &symbol.name);
 
-    for param in symbol.params.iter() {
+    for param in &symbol.params {
         print_param(printer, param);
     }
 
-    for constraint in symbol.constraints.iter() {
+    for constraint in &symbol.constraints {
         print_constraint(printer, constraint);
     }
 

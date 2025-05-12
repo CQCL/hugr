@@ -27,8 +27,8 @@ impl<V: AbstractValue, N: Clone> ValueRow<V, N> {
         Self(vec![v])
     }
 
-    /// The first value in this ValueRow must be a sum;
-    /// returns a new ValueRow given by unpacking the elements of the specified variant of said first value,
+    /// The first value in this `ValueRow` must be a sum;
+    /// returns a new `ValueRow` given by unpacking the elements of the specified variant of said first value,
     /// then appending the rest of the values in this row.
     pub fn unpack_first(
         &self,

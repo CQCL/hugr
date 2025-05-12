@@ -1,4 +1,4 @@
-//! Provides the implementation for a collection of [CustomConst] callbacks.
+//! Provides the implementation for a collection of [`CustomConst`] callbacks.
 use std::{any::TypeId, collections::HashMap};
 
 use hugr_core::{HugrView, Node, ops::constant::CustomConst};
@@ -8,14 +8,14 @@ use anyhow::{Result, anyhow, bail, ensure};
 
 use crate::emit::EmitFuncContext;
 
-/// A helper trait for describing the callback used for emitting [CustomConst]s,
+/// A helper trait for describing the callback used for emitting [`CustomConst`]s,
 /// and for hanging documentation. We have the appropriate `Fn` as a supertrait,
 /// and there is a blanket impl for that `Fn`. We do not intend users to impl
 /// this trait.
 ///
-/// `LoadConstantFn` callbacks for `CC`, which must impl [CustomConst], should
-/// materialise an appropriate [BasicValueEnum]. The type of this value must
-/// match the result of [EmitFuncContext::llvm_type] on [CustomConst::get_type].
+/// `LoadConstantFn` callbacks for `CC`, which must impl [`CustomConst`], should
+/// materialise an appropriate [`BasicValueEnum`]. The type of this value must
+/// match the result of [`EmitFuncContext::llvm_type`] on [`CustomConst::get_type`].
 ///
 /// Callbacks may hold references with lifetimes older than `'a`.
 pub trait LoadConstantFn<'a, H: ?Sized, CC: CustomConst + ?Sized>:
@@ -32,8 +32,8 @@ impl<
 {
 }
 
-/// A collection of [LoadConstantFn] callbacks registered for various impls of [CustomConst].
-/// The callbacks are keyed by the [TypeId] of those impls.
+/// A collection of [`LoadConstantFn`] callbacks registered for various impls of [`CustomConst`].
+/// The callbacks are keyed by the [`TypeId`] of those impls.
 #[derive(Default)]
 pub struct LoadConstantsMap<'a, H>(
     HashMap<TypeId, Box<dyn LoadConstantFn<'a, H, dyn CustomConst>>>,

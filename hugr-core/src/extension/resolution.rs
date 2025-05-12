@@ -190,7 +190,7 @@ pub enum ExtensionCollectionError<N: HugrNode = Node> {
     /// An operation requires an extension that is not in the given registry.
     #[display(
         "{op}{} contains custom types for which have lost the reference to their defining extensions. Dropped extensions: {}",
-        if let Some(node) = node { format!(" ({node})") } else { "".to_string() },
+        if let Some(node) = node { format!(" ({node})") } else { String::new() },
         missing_extensions.join(", ")
     )]
     DroppedOpExtensions {

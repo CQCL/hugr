@@ -76,7 +76,7 @@ pub type Direction = portgraph::Direction;
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-/// A DataFlow wire, defined by a Value-kind output port of a node
+/// A `DataFlow` wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
 pub struct Wire<N = Node>(N, OutgoingPort);
 
@@ -91,14 +91,15 @@ impl Node {
 impl Port {
     /// Creates a new port.
     #[inline]
+    #[must_use]
     pub fn new(direction: Direction, port: usize) -> Self {
         Self {
             offset: portgraph::PortOffset::new(direction, port),
         }
     }
 
-    /// Converts to an [IncomingPort] if this port is one; else fails with
-    /// [HugrError::InvalidPortDirection]
+    /// Converts to an [`IncomingPort`] if this port is one; else fails with
+    /// [`HugrError::InvalidPortDirection`]
     #[inline]
     pub fn as_incoming(&self) -> Result<IncomingPort, HugrError> {
         self.as_directed()
@@ -106,8 +107,8 @@ impl Port {
             .ok_or(HugrError::InvalidPortDirection(self.direction()))
     }
 
-    /// Converts to an [OutgoingPort] if this port is one; else fails with
-    /// [HugrError::InvalidPortDirection]
+    /// Converts to an [`OutgoingPort`] if this port is one; else fails with
+    /// [`HugrError::InvalidPortDirection`]
     #[inline]
     pub fn as_outgoing(&self) -> Result<OutgoingPort, HugrError> {
         self.as_directed()
@@ -115,8 +116,9 @@ impl Port {
             .ok_or(HugrError::InvalidPortDirection(self.direction()))
     }
 
-    /// Converts to either an [IncomingPort] or an [OutgoingPort], as appropriate.
+    /// Converts to either an [`IncomingPort`] or an [`OutgoingPort`], as appropriate.
     #[inline]
+    #[must_use]
     pub fn as_directed(&self) -> Either<IncomingPort, OutgoingPort> {
         match self.direction() {
             Direction::Incoming => Left(IncomingPort {
@@ -130,6 +132,7 @@ impl Port {
 
     /// Returns the direction of the port.
     #[inline]
+    #[must_use]
     pub fn direction(self) -> Direction {
         self.offset.direction()
     }
@@ -252,11 +255,13 @@ pub enum CircuitUnit<N = Node> {
 
 impl CircuitUnit {
     /// Check if this is a wire.
+    #[must_use]
     pub fn is_wire(&self) -> bool {
         matches!(self, CircuitUnit::Wire(_))
     }
 
     /// Check if this is a linear unit.
+    #[must_use]
     pub fn is_linear(&self) -> bool {
         matches!(self, CircuitUnit::Linear(_))
     }

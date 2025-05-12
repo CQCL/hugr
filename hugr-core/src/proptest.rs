@@ -8,27 +8,27 @@ use smol_str::SmolStr;
 use crate::Hugr;
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
-/// The types [Type], [TypeEnum], [SumType], [FunctionType], [TypeArg],
-/// [TypeParam], as well as several others, form a mutually recursive hierarchy.
+/// The types [Type], [`TypeEnum`], [`SumType`], [`FunctionType`], [`TypeArg`],
+/// [`TypeParam`], as well as several others, form a mutually recursive hierarchy.
 ///
-/// The proptest [proptest::strategy::Strategy::prop_recursive] is inadequate to
+/// The proptest [`proptest::strategy::Strategy::prop_recursive`] is inadequate to
 /// generate values for these types.  Instead, the Arbitrary instances take a
 /// `RecursionDepth` as their (or part of their)
-/// [proptest::arbitrary::Arbitrary::Parameters]. We then use that parameter to
+/// [`proptest::arbitrary::Arbitrary::Parameters`]. We then use that parameter to
 /// generate children of that value. Usually we forward it unchanged, but in
 /// crucial locations(grep for `descend`) we instead forward the `descend` of
 /// it.
 ///
 /// Consider the tree of values generated. Each node is labelled with a
-/// [RecursionDepth].
+/// [`RecursionDepth`].
 ///
 /// Consider a path between two different nodes of the same kind(e.g. two
-/// [Type]s, or two [FunctionType]s).  The path must be non-increasing in
-/// [RecursionDepth] because each child's [RecursionDepth] is derived from it's
+/// [Type]s, or two [`FunctionType`]s).  The path must be non-increasing in
+/// [`RecursionDepth`] because each child's [`RecursionDepth`] is derived from it's
 /// parents.
 ///
-/// We must maintain the invariant that the [RecursionDepth] of the start of the
-/// path is strictly greater than the [RecursionDepth] of the end of the path.
+/// We must maintain the invariant that the [`RecursionDepth`] of the start of the
+/// path is strictly greater than the [`RecursionDepth`] of the end of the path.
 ///
 /// With this invariant in place we are guaranteed to generate a finite tree
 /// because there are only finitely many different types a node can take.
@@ -41,16 +41,19 @@ pub struct RecursionDepth(usize);
 impl RecursionDepth {
     const DEFAULT_RECURSION_DEPTH: usize = 4;
     /// Decrement the recursion depth counter.
+    #[must_use]
     pub fn descend(&self) -> Self {
         if self.leaf() { *self } else { Self(self.0 - 1) }
     }
 
     /// Returns `true` if the recursion depth counter is zero.
+    #[must_use]
     pub fn leaf(&self) -> bool {
         self.0 == 0
     }
 
-    /// Create a new [RecursionDepth] with the default recursion depth.
+    /// Create a new [`RecursionDepth`] with the default recursion depth.
+    #[must_use]
     pub fn new() -> Self {
         Self(Self::DEFAULT_RECURSION_DEPTH)
     }
@@ -141,7 +144,7 @@ pub fn any_nonempty_string() -> SBoxedStrategy<String> {
     ANY_NONEMPTY_STRING.to_owned()
 }
 
-/// A strategy for generating an arbitrary nonempty [SmolStr].
+/// A strategy for generating an arbitrary nonempty [`SmolStr`].
 pub fn any_nonempty_smolstr() -> SBoxedStrategy<SmolStr> {
     ANY_NONEMPTY_STRING.to_owned().prop_map_into().sboxed()
 }
@@ -156,12 +159,12 @@ pub fn any_string() -> SBoxedStrategy<String> {
     ANY_STRING.to_owned()
 }
 
-/// A strategy for generating an arbitrary [SmolStr].
+/// A strategy for generating an arbitrary [`SmolStr`].
 pub fn any_smolstr() -> SBoxedStrategy<SmolStr> {
     ANY_STRING.clone().prop_map_into().sboxed()
 }
 
-/// A strategy for generating an arbitrary [serde_json::Value].
+/// A strategy for generating an arbitrary [`serde_json::Value`].
 pub fn any_serde_json_value() -> impl Strategy<Value = serde_json::Value> {
     ANY_SERDE_JSON_VALUE_LEAF
         .clone()

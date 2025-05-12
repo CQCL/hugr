@@ -51,7 +51,7 @@ pub enum ImportError {
     Signature(#[from] SignatureError),
     /// A required extension is missing.
     #[error("Importing the hugr requires extension {missing_ext}, which was not found in the registry. The available extensions are: [{}]",
-            available.iter().map(|ext| ext.to_string()).collect::<Vec<_>>().join(", "))]
+            available.iter().map(std::string::ToString::to_string).collect::<Vec<_>>().join(", "))]
     Extension {
         /// The missing extension.
         missing_ext: ExtensionId,
@@ -295,12 +295,12 @@ impl<'a> Context<'a> {
                     unreachable!();
                 }
                 (_, [output]) => {
-                    for (node, port) in inputs.iter() {
+                    for (node, port) in &inputs {
                         self.hugr.connect(output.0, output.1, *node, *port);
                     }
                 }
                 ([input], _) => {
-                    for (node, port) in outputs.iter() {
+                    for (node, port) in &outputs {
                         self.hugr.connect(*node, *port, input.0, input.1);
                     }
                 }

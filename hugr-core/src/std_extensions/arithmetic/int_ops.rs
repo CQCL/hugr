@@ -108,7 +108,7 @@ impl MakeOpDef for IntOpDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -224,7 +224,7 @@ impl MakeOpDef for IntOpDef {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
@@ -287,9 +287,9 @@ pub struct ConcreteIntOp {
     pub def: IntOpDef,
     /// The width parameters of the int op. These are interpreted differently,
     /// depending on `def`. The types of inputs and outputs of the op will have
-    /// [int_type]s of these widths.
+    /// [`int_type`]s of these widths.
     ///
-    /// [int_type]: crate::std_extensions::arithmetic::int_types::int_type
+    /// [`int_type`]: crate::std_extensions::arithmetic::int_types::int_type
     pub log_widths: Vec<u8>,
 }
 
@@ -304,13 +304,16 @@ impl MakeExtensionOp for ConcreteIntOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        self.log_widths.iter().map(|&n| (n as u64).into()).collect()
+        self.log_widths
+            .iter()
+            .map(|&n| u64::from(n).into())
+            .collect()
     }
 }
 
 impl MakeRegisteredOp for ConcreteIntOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -319,24 +322,27 @@ impl MakeRegisteredOp for ConcreteIntOp {
 }
 
 impl IntOpDef {
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires no
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires no
     /// integer widths set.
+    #[must_use]
     pub fn without_log_width(self) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
             log_widths: vec![],
         }
     }
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires one
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires one
     /// integer width set.
+    #[must_use]
     pub fn with_log_width(self, log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
             log_widths: vec![log_width],
         }
     }
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires two
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires two
     /// integer widths set.
+    #[must_use]
     pub fn with_two_log_widths(self, first_log_width: u8, second_log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
@@ -434,9 +440,9 @@ mod test {
     #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
     #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
     #[should_panic(expected = "too large to be converted to signed")]
-    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u32::MAX as u64], &[], 5)]
+    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u64::from(u32::MAX)], &[], 5)]
     #[should_panic(expected = "Cannot convert negative integer")]
-    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[(0u32.wrapping_sub(42)) as u64], &[], 5)]
+    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[u64::from(0u32.wrapping_sub(42))], &[], 5)]
     fn int_fold(
         #[case] op: ConcreteIntOp,
         #[case] inputs: &[u64],

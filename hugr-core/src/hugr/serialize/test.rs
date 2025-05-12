@@ -298,7 +298,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![bool_t(); 2];
     let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp))?;
     let mut params: [_; 2] = dfg.input_wires_arr();
-    for p in params.iter_mut() {
+    for p in &mut params {
         *p = dfg
             .add_dataflow_op(Noop(bool_t()), [*p])
             .unwrap()
@@ -487,7 +487,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     [TypeParam::new_list(TypeBound::Any)],
     Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
-    check_testing_roundtrip(poly_func_type)
+    check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
@@ -501,7 +501,7 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
-    check_testing_roundtrip(poly_func_type)
+    check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
@@ -569,27 +569,27 @@ mod proptest {
     proptest! {
         #[test]
         fn prop_roundtrip_type(t:  Type) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_poly_func_type(t: PolyFuncTypeRV) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_value(t: Value) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_optype(op: NodeSer ) {
-            check_testing_roundtrip(op)
+            check_testing_roundtrip(op);
         }
 
         #[test]
         fn prop_roundtrip_opdef(opdef: SimpleOpDef) {
-            check_testing_roundtrip(opdef)
+            check_testing_roundtrip(opdef);
         }
     }
 }

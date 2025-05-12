@@ -119,6 +119,7 @@ pub struct OtherArgs {
 
 impl OtherArgs {
     /// Test whether a `level` message should be output.
+    #[must_use]
     pub fn verbosity(&self, level: Level) -> bool {
         self.verbose.log_level_filter() >= level
     }

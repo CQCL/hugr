@@ -31,7 +31,7 @@ pub trait HugrMut: HugrMutInternals {
     /// node, i.e. a node that can have children in the hierarchy.
     ///
     /// To get a borrowed view of the HUGR with a different entrypoint, use
-    /// [HugrView::with_entrypoint] or [HugrMut::with_entrypoint_mut] instead.
+    /// [`HugrView::with_entrypoint`] or [`HugrMut::with_entrypoint_mut`] instead.
     ///
     /// # Panics
     ///
@@ -43,7 +43,7 @@ pub trait HugrMut: HugrMutInternals {
     /// Changes to the returned HUGR affect the original one, and overwriting
     /// the entrypoint sets it both in the wrapper and the wrapped HUGR.
     ///
-    /// For a non-mut view, use [HugrView::with_entrypoint] instead.
+    /// For a non-mut view, use [`HugrView::with_entrypoint`] instead.
     ///
     /// # Panics
     ///
@@ -110,7 +110,7 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Remove a node from the graph and return the node weight.
     /// Note that if the node has children, they are not removed; this leaves
-    /// the Hugr in an invalid state. See [Self::remove_subtree].
+    /// the Hugr in an invalid state. See [`Self::remove_subtree`].
     ///
     /// # Panics
     ///
@@ -125,14 +125,14 @@ pub trait HugrMut: HugrMutInternals {
     fn remove_subtree(&mut self, node: Self::Node);
 
     /// Copies the strict descendants of `root` to under the `new_parent`, optionally applying a
-    /// [Substitution] to the [OpType]s of the copied nodes.
+    /// [Substitution] to the [`OpType`]s of the copied nodes.
     ///
     /// That is, the immediate children of root, are copied to make children of `new_parent`.
     ///
     /// Note this may invalidate the Hugr in two ways:
     /// * Adding children of `root` may make the children-list of `new_parent` invalid e.g.
     ///   leading to multiple [Input](OpType::Input), [Output](OpType::Output) or
-    ///   [ExitBlock](OpType::ExitBlock) nodes or Input/Output in the wrong positions
+    ///   [`ExitBlock`](OpType::ExitBlock) nodes or Input/Output in the wrong positions
     /// * Nonlocal edges incoming to the subtree of `root` will be copied to target the subtree under `new_parent`
     ///   which may be invalid if `new_parent` is not a child of `root`s parent (for `Ext` edges - or
     ///   correspondingly for `Dom` edges)
@@ -248,14 +248,14 @@ pub trait HugrMut: HugrMutInternals {
 }
 
 /// Records the result of inserting a Hugr or view
-/// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view].
+/// via [`HugrMut::insert_hugr`] or [`HugrMut::insert_from_view`].
 ///
 /// Contains a map from the nodes in the source HUGR to the nodes in the
 /// target HUGR, using their respective `Node` types.
 pub struct InsertionResult<SourceN = Node, TargetN = Node> {
     /// The node, after insertion, that was the entrypoint of the inserted Hugr.
     ///
-    /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::entrypoint].
+    /// That is, the value in [`InsertionResult::node_map`] under the key that was the [`HugrView::entrypoint`].
     pub inserted_entrypoint: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
@@ -411,7 +411,7 @@ impl HugrMut for Hugr {
         // Update the optypes and metadata, taking them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             let node_pg = node.into_portgraph();
             let new_node_pg = new_node.into_portgraph();
             let optype = other.op_types.take(node_pg);
@@ -442,7 +442,7 @@ impl HugrMut for Hugr {
         // Update the optypes and metadata, copying them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             let nodetype = other.get_optype(node);
             self.op_types
                 .set(new_node.into_portgraph(), nodetype.clone());
@@ -464,11 +464,11 @@ impl HugrMut for Hugr {
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
     ) -> HashMap<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, other, subgraph.nodes().iter().cloned(), |_| {
+        let node_map = insert_hugr_internal(self, other, subgraph.nodes().iter().copied(), |_| {
             Some(root)
         });
         // Update the optypes and metadata, copying them from the other graph.
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             let nodetype = other.get_optype(node);
             self.op_types
                 .set(new_node.into_portgraph(), nodetype.clone());
@@ -506,7 +506,7 @@ impl HugrMut for Hugr {
         }
 
         // Copy the optypes, metadata, and hierarchy
-        for (&node, &new_node) in node_map.iter() {
+        for (&node, &new_node) in &node_map {
             for ch in self.children(node).collect::<Vec<_>>() {
                 self.set_parent(*node_map.get(&ch).unwrap(), new_node);
             }
@@ -574,14 +574,13 @@ fn insert_hugr_internal<H: HugrView>(
 
         hugr.set_num_ports(new, other.num_inputs(old), other.num_outputs(old));
 
-        let new_parent = match reroot(&old) {
-            Some(new_parent) => new_parent,
-            None => {
-                let old_parent = other.get_parent(old).unwrap();
-                *node_map
-                    .get(&old_parent)
-                    .expect("Child node came before parent in `other_nodes` iterator")
-            }
+        let new_parent = if let Some(new_parent) = reroot(&old) {
+            new_parent
+        } else {
+            let old_parent = other.get_parent(old).unwrap();
+            *node_map
+                .get(&old_parent)
+                .expect("Child node came before parent in `other_nodes` iterator")
         };
         hugr.set_parent(new, new_parent);
 

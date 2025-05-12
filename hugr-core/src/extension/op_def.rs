@@ -18,7 +18,7 @@ use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
 
-/// Trait necessary for binary computations of OpDef signature
+/// Trait necessary for binary computations of `OpDef` signature
 pub trait CustomSignatureFunc: Send + Sync {
     /// Compute signature of node given
     /// values for the type parameters,
@@ -59,7 +59,7 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
     }
 }
 
-/// Trait for validating type arguments to a PolyFuncTypeRV beyond conformation to
+/// Trait for validating type arguments to a `PolyFuncTypeRV` beyond conformation to
 /// declared type parameter (which should have been checked beforehand).
 pub trait ValidateTypeArgs: Send + Sync {
     /// Validate the type arguments of node given
@@ -72,7 +72,7 @@ pub trait ValidateTypeArgs: Send + Sync {
     ) -> Result<(), SignatureError>;
 }
 
-/// Trait for validating type arguments to a PolyFuncTypeRV beyond conformation to
+/// Trait for validating type arguments to a `PolyFuncTypeRV` beyond conformation to
 /// declared type parameter (which should have been checked beforehand), given just the arguments.
 pub trait ValidateJustArgs: Send + Sync {
     /// Validate the type arguments of node given
@@ -98,9 +98,9 @@ impl<T: ValidateJustArgs> ValidateTypeArgs for T {
 /// useful for third-party Extensions or as a fallback for tools that do not support
 /// the operation natively.
 ///
-/// This trait allows the Hugr to be varied according to the operation's [TypeArg]s;
+/// This trait allows the Hugr to be varied according to the operation's [`TypeArg`]s;
 /// if this is not necessary then a single Hugr can be provided instead via
-/// [LowerFunc::FixedHugr].
+/// [`LowerFunc::FixedHugr`].
 pub trait CustomLowerFunc: Send + Sync {
     /// Return a Hugr that implements the node using only the specified available extensions;
     /// may fail.
@@ -114,7 +114,7 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
-/// Encode a signature as [PolyFuncTypeRV] but with additional validation of type
+/// Encode a signature as [`PolyFuncTypeRV`] but with additional validation of type
 /// arguments via a custom binary. The binary cannot be serialized so will be
 /// lost over a serialization round-trip.
 pub struct CustomValidator {
@@ -136,17 +136,17 @@ impl CustomValidator {
         }
     }
 
-    /// Return a mutable reference to the PolyFuncType.
+    /// Return a mutable reference to the `PolyFuncType`.
     pub(super) fn poly_func_mut(&mut self) -> &mut PolyFuncTypeRV {
         &mut self.poly_func
     }
 }
 
-/// The ways in which an OpDef may compute the Signature of each operation node.
+/// The ways in which an `OpDef` may compute the Signature of each operation node.
 pub enum SignatureFunc {
     /// An explicit polymorphic function type.
     PolyFuncType(PolyFuncTypeRV),
-    /// A polymorphic function type (like [Self::PolyFuncType] but also with a custom binary for validating type arguments.
+    /// A polymorphic function type (like [`Self::PolyFuncType`] but also with a custom binary for validating type arguments.
     CustomValidator(CustomValidator),
     /// Serialized declaration specified a custom validate binary but it was not provided.
     MissingValidateFunc(PolyFuncTypeRV),
@@ -212,11 +212,11 @@ impl SignatureFunc {
         }
     }
 
-    /// Compute the concrete signature ([FuncValueType]).
+    /// Compute the concrete signature ([`FuncValueType`]).
     ///
     /// # Panics
     ///
-    /// Panics if `self` is a [SignatureFunc::CustomFunc] and there are not enough type
+    /// Panics if `self` is a [`SignatureFunc::CustomFunc`] and there are not enough type
     /// arguments provided to match the number of static parameters.
     ///
     /// # Errors
@@ -301,15 +301,15 @@ impl Debug for LowerFunc {
 
 /// Serializable definition for dynamically loaded operations.
 ///
-/// TODO: Define a way to construct new OpDef's from a serialized definition.
+/// TODO: Define a way to construct new `OpDef`'s from a serialized definition.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
-    /// The unique Extension owning this OpDef (of which this OpDef is a member)
+    /// The unique Extension owning this `OpDef` (of which this `OpDef` is a member)
     extension: ExtensionId,
     /// A weak reference to the extension defining this operation.
     #[serde(skip)]
     extension_ref: Weak<Extension>,
-    /// Unique identifier of the operation. Used to look up OpDefs in the registry
+    /// Unique identifier of the operation. Used to look up `OpDefs` in the registry
     /// when deserializing nodes (which store only the name).
     name: OpName,
     /// Human readable description of the operation.
@@ -333,7 +333,7 @@ pub struct OpDef {
 impl OpDef {
     /// Check provided type arguments are valid against their extensions,
     /// against parameters, and that no type variables are used as static arguments
-    /// (to [compute_signature][CustomSignatureFunc::compute_signature])
+    /// (to [`compute_signature`][CustomSignatureFunc::compute_signature])
     pub fn validate_args(
         &self,
         args: &[TypeArg],
@@ -362,18 +362,19 @@ impl OpDef {
     }
 
     /// Computes the signature of a node, i.e. an instantiation of this
-    /// OpDef with statically-provided [TypeArg]s.
+    /// `OpDef` with statically-provided [`TypeArg`]s.
     pub fn compute_signature(&self, args: &[TypeArg]) -> Result<Signature, SignatureError> {
         self.signature_func.compute_signature(self, args)
     }
 
-    /// Fallibly returns a Hugr that may replace an instance of this OpDef
+    /// Fallibly returns a Hugr that may replace an instance of this `OpDef`
     /// given a set of available extensions that may be used in the Hugr.
+    #[must_use]
     pub fn try_lower(&self, args: &[TypeArg], available_extensions: &ExtensionSet) -> Option<Hugr> {
         // TODO test this
         self.lower_funcs
             .iter()
-            .flat_map(|f| match f {
+            .filter_map(|f| match f {
                 LowerFunc::FixedHugr { extensions, hugr } => {
                     if available_extensions.is_superset(extensions) {
                         Some(hugr.clone())
@@ -389,16 +390,19 @@ impl OpDef {
     }
 
     /// Returns a reference to the name of this [`OpDef`].
+    #[must_use]
     pub fn name(&self) -> &OpName {
         &self.name
     }
 
     /// Returns a reference to the extension id of this [`OpDef`].
+    #[must_use]
     pub fn extension_id(&self) -> &ExtensionId {
         &self.extension
     }
 
     /// Returns a weak reference to the extension defining this operation.
+    #[must_use]
     pub fn extension(&self) -> Weak<Extension> {
         self.extension_ref.clone()
     }
@@ -409,6 +413,7 @@ impl OpDef {
     }
 
     /// Returns a reference to the description of this [`OpDef`].
+    #[must_use]
     pub fn description(&self) -> &str {
         self.description.as_ref()
     }
@@ -430,12 +435,12 @@ impl OpDef {
         Ok(())
     }
 
-    /// Add a lowering function to the [OpDef]
+    /// Add a lowering function to the [`OpDef`]
     pub fn add_lower_func(&mut self, lower: LowerFunc) {
         self.lower_funcs.push(lower);
     }
 
-    /// Insert miscellaneous data `v` to the [OpDef], keyed by `k`.
+    /// Insert miscellaneous data `v` to the [`OpDef`], keyed by `k`.
     pub fn add_misc(
         &mut self,
         k: impl ToString,
@@ -444,7 +449,7 @@ impl OpDef {
         self.misc.insert(k.to_string(), v)
     }
 
-    /// Iterate over all miscellaneous data in the [OpDef].
+    /// Iterate over all miscellaneous data in the [`OpDef`].
     #[allow(unused)] // Unused when no features are enabled
     pub(crate) fn iter_misc(&self) -> impl ExactSizeIterator<Item = (&str, &serde_json::Value)> {
         self.misc.iter().map(|(k, v)| (k.as_str(), v))
@@ -453,11 +458,12 @@ impl OpDef {
     /// Set the constant folding function for this Op, which can evaluate it
     /// given constant inputs.
     pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
-        self.constant_folder = Some(Box::new(fold))
+        self.constant_folder = Some(Box::new(fold));
     }
 
     /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
     /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s.
+    #[must_use]
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],
@@ -467,6 +473,7 @@ impl OpDef {
     }
 
     /// Returns a reference to the signature function of this [`OpDef`].
+    #[must_use]
     pub fn signature_func(&self) -> &SignatureFunc {
         &self.signature_func
     }
@@ -560,6 +567,7 @@ pub(super) mod test {
 
     impl SimpleOpDef {
         /// Create a new dummy opdef.
+        #[must_use]
         pub fn new(op_def: OpDef) -> Self {
             assert!(op_def.constant_folder.is_none());
             assert!(matches!(
@@ -704,7 +712,7 @@ pub(super) mod test {
                     .map(|_| Type::new_var_use(0, TypeBound::Any))
                     .collect();
                 Ok(PolyFuncTypeRV::new(
-                    vec![TP.to_owned()],
+                    vec![TP.clone()],
                     Signature::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
                 ))
             }
@@ -716,7 +724,7 @@ pub(super) mod test {
         }
         let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
             let def: &mut crate::extension::OpDef =
-                ext.add_op("MyOp".into(), "".to_string(), SigFun(), extension_ref)?;
+                ext.add_op("MyOp".into(), String::new(), SigFun(), extension_ref)?;
 
             // Base case, no type variables:
             let args = [TypeArg::BoundedNat { n: 3 }, usize_t().into()];
@@ -782,7 +790,7 @@ pub(super) mod test {
         let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
             let def = ext.add_op(
                 "SimpleOp".into(),
-                "".into(),
+                String::new(),
                 PolyFuncTypeRV::new(
                     vec![TypeBound::Any.into()],
                     Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),

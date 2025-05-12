@@ -22,7 +22,7 @@ fn bench_construction(c: &mut Criterion) {
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     group.bench_function("construction", |b| {
-        b.iter(|| black_box(make_complex_type()))
+        b.iter(|| black_box(make_complex_type()));
     });
 
     group.finish();

@@ -13,9 +13,9 @@ use itertools::Itertools;
 use super::{NodeTemplate, ParametricType, handlers::linearize_value_array};
 
 /// Trait for things that know how to wire up linear outports to other than one
-/// target.  Used to restore Hugr validity when a [ReplaceTypes](super::ReplaceTypes)
+/// target.  Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
 /// results in types of such outports changing from [Copyable] to linear (i.e.
-/// [hugr_core::types::TypeBound::Any]).
+/// [`hugr_core::types::TypeBound::Any`]).
 ///
 /// Note that this is not really effective before [monomorphization]: if a
 /// function polymorphic over a [Copyable] becomes called with a
@@ -32,13 +32,13 @@ pub trait Linearizer {
     ///
     /// The default implementation
     /// * if `targets.len() == 1`, wires `src` to the unique target
-    /// * otherwise, makes a single call to [Self::copy_discard_op], inserts that op,
+    /// * otherwise, makes a single call to [`Self::copy_discard_op`], inserts that op,
     ///   and wires its outputs 1:1 to each target
     ///
     /// # Errors
     ///
-    /// Most variants of [LinearizeError] can be raised, specifically including
-    /// [LinearizeError::CopyableType] if the type is [Copyable], in which case the Hugr
+    /// Most variants of [`LinearizeError`] can be raised, specifically including
+    /// [`LinearizeError::CopyableType`] if the type is [Copyable], in which case the Hugr
     /// will be unchanged.
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
@@ -88,7 +88,7 @@ pub trait Linearizer {
         Ok(())
     }
 
-    /// Gets an [NodeTemplate] for copying or discarding a value of type `typ`, i.e.
+    /// Gets an [`NodeTemplate`] for copying or discarding a value of type `typ`, i.e.
     /// a recipe for a node with one input of that type and the specified number of
     /// outports.
     ///
@@ -103,7 +103,7 @@ pub trait Linearizer {
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
-/// such as [TypeEnum::Sum]s.
+/// such as [`TypeEnum::Sum`]s.
 #[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -156,7 +156,7 @@ pub enum LinearizeError {
         tgt: Node,
         tgt_parent: Node,
     },
-    /// SignatureError's can happen when converting nested types e.g. Sums
+    /// `SignatureError`'s can happen when converting nested types e.g. Sums
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// We cannot linearize (insert copy and discard functions) for
@@ -168,14 +168,15 @@ pub enum LinearizeError {
     #[error("Type {_0} is copyable")]
     CopyableType(Type),
     /// Error may be returned by a callback for e.g. a container because it could
-    /// not generate a [NodeTemplate] because of a problem with an element
+    /// not generate a [`NodeTemplate`] because of a problem with an element
     #[error("Could not generate NodeTemplate for contained type {0} because {1}")]
     NestedTemplateError(Type, BuildError),
 }
 
 impl DelegatingLinearizer {
-    /// Makes a new instance. Unlike [Self::default], this does not understand
+    /// Makes a new instance. Unlike [`Self::default`], this does not understand
     /// any extension types, even those in the prelude.
+    #[must_use]
     pub fn new_empty() -> Self {
         Self {
             copy_discard: Default::default(),
@@ -184,18 +185,18 @@ impl DelegatingLinearizer {
     }
 
     /// Configures this instance that the specified monomorphic type can be copied and/or
-    /// discarded via the provided [NodeTemplate]s - directly or as part of a compound type
-    /// e.g. [TypeEnum::Sum].
+    /// discarded via the provided [`NodeTemplate`]s - directly or as part of a compound type
+    /// e.g. [`TypeEnum::Sum`].
     /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///
     /// # Errors
     ///
-    /// * [LinearizeError::CopyableType] If `typ` is
+    /// * [`LinearizeError::CopyableType`] If `typ` is
     ///   [Copyable](hugr_core::types::TypeBound::Copyable)
-    /// * [LinearizeError::WrongSignature] if `copy` or `discard` do not have the expected
-    ///   inputs or outputs (for [NodeTemplate::SingleOp] and [NodeTemplate::CompoundOp]
-    ///   only: the signature for a [NodeTemplate::Call] cannot be checked until it is used
+    /// * [`LinearizeError::WrongSignature`] if `copy` or `discard` do not have the expected
+    ///   inputs or outputs (for [`NodeTemplate::SingleOp`] and [`NodeTemplate::CompoundOp`]
+    ///   only: the signature for a [`NodeTemplate::Call`] cannot be checked until it is used
     ///   in a Hugr).
     pub fn register_simple(
         &mut self,
@@ -213,18 +214,18 @@ impl DelegatingLinearizer {
         Ok(())
     }
 
-    /// Configures this instance that instances of the specified [TypeDef] (perhaps
+    /// Configures this instance that instances of the specified [`TypeDef`] (perhaps
     /// polymorphic) can be copied and/or discarded by using the provided callback
-    /// to generate a [NodeTemplate] for an appropriate copy/discard operation.
+    /// to generate a [`NodeTemplate`] for an appropriate copy/discard operation.
     ///
     /// The callback is given
-    /// * the type arguments (as appropriate for the [TypeDef], so perhaps empty)
+    /// * the type arguments (as appropriate for the [`TypeDef`], so perhaps empty)
     /// * the desired number of outports (this will never be 1)
-    /// * A [CallbackHandler] that the callback can use it to generate
+    /// * A [`CallbackHandler`] that the callback can use it to generate
     ///   `copy`/`discard` ops for other types (e.g. the elements of a collection),
-    ///   as part of an [NodeTemplate::CompoundOp].
+    ///   as part of an [`NodeTemplate::CompoundOp`].
     ///
-    /// Note that [Self::register_simple] takes precedence when the `src` types overlap.
+    /// Note that [`Self::register_simple`] takes precedence when the `src` types overlap.
     pub fn register_callback(
         &mut self,
         src: &TypeDef,
@@ -260,7 +261,7 @@ impl Linearizer for DelegatingLinearizer {
     ) -> Result<NodeTemplate, LinearizeError> {
         if typ.copyable() {
             return Err(LinearizeError::CopyableType(typ.clone()));
-        };
+        }
         assert!(num_outports != 1);
 
         match typ.as_type_enum() {
@@ -290,7 +291,7 @@ impl Linearizer for DelegatingLinearizer {
                         };
                         for (src, elems) in inp_copies.into_iter().zip_eq(elems_for_copy.iter_mut())
                         {
-                            elems.push(src)
+                            elems.push(src);
                         }
                     }
                     let t = Tag::new(tag, variants.clone());
@@ -310,26 +311,30 @@ impl Linearizer for DelegatingLinearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => match self.copy_discard.get(cty) {
-                Some((copy, discard)) => Ok(if num_outports == 0 {
-                    discard.clone()
+            TypeEnum::Extension(cty) => {
+                if let Some((copy, discard)) = self.copy_discard.get(cty) {
+                    Ok(if num_outports == 0 {
+                        discard.clone()
+                    } else {
+                        let mut dfb = DFGBuilder::new(inout_sig(
+                            typ.clone(),
+                            vec![typ.clone(); num_outports],
+                        ))
+                        .unwrap();
+                        let [mut src] = dfb.input_wires_arr();
+                        let mut outputs = vec![];
+                        for _ in 0..num_outports - 1 {
+                            let [out0, out1] =
+                                copy.clone().add(&mut dfb, [src]).unwrap().outputs_arr();
+                            outputs.push(out0);
+                            src = out1;
+                        }
+                        outputs.push(src);
+                        NodeTemplate::CompoundOp(Box::new(
+                            dfb.finish_hugr_with_outputs(outputs).unwrap(),
+                        ))
+                    })
                 } else {
-                    let mut dfb =
-                        DFGBuilder::new(inout_sig(typ.clone(), vec![typ.clone(); num_outports]))
-                            .unwrap();
-                    let [mut src] = dfb.input_wires_arr();
-                    let mut outputs = vec![];
-                    for _ in 0..num_outports - 1 {
-                        let [out0, out1] = copy.clone().add(&mut dfb, [src]).unwrap().outputs_arr();
-                        outputs.push(out0);
-                        src = out1;
-                    }
-                    outputs.push(src);
-                    NodeTemplate::CompoundOp(Box::new(
-                        dfb.finish_hugr_with_outputs(outputs).unwrap(),
-                    ))
-                }),
-                None => {
                     let copy_discard_fn = self
                         .copy_discard_parametric
                         .get(&cty.into())
@@ -338,7 +343,7 @@ impl Linearizer for DelegatingLinearizer {
                     check_sig(&tmpl, typ, num_outports)?;
                     Ok(tmpl)
                 }
-            },
+            }
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(typ.clone())),
         }
@@ -769,7 +774,7 @@ mod test {
         assert_eq!(
             copy_sig.output,
             TypeRow::from(
-                [value_array_type(5, lin_t.clone()), INT_TYPES[6].to_owned()]
+                [value_array_type(5, lin_t.clone()), INT_TYPES[6].clone()]
                     .into_iter()
                     .chain(vec![
                         value_array_type(5, option_type(lin_t.clone()).into());

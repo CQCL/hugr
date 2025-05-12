@@ -19,9 +19,9 @@ use super::call_graph::{CallGraph, CallGraphNode};
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-/// Errors produced by [RemoveDeadFuncsPass].
+/// Errors produced by [`RemoveDeadFuncsPass`].
 pub enum RemoveDeadFuncsError<N = Node> {
-    /// The specified entry point is not a FuncDefn node or is not a child of the root.
+    /// The specified entry point is not a `FuncDefn` node or is not a child of the root.
     #[error(
         "Entrypoint for RemoveDeadFuncsPass {node} was not a function definition in the root module"
     )]
@@ -45,7 +45,7 @@ fn reachable_funcs<'a, H: HugrView>(
             if !h.get_optype(n).is_func_defn() || h.get_parent(n) != Some(h.entrypoint()) {
                 return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
             }
-            d.stack.push(cg.node_index(n).unwrap())
+            d.stack.push(cg.node_index(n).unwrap());
         }
         d
     } else {
@@ -68,11 +68,11 @@ pub struct RemoveDeadFuncsPass {
 }
 
 impl RemoveDeadFuncsPass {
-    /// Adds new entry points - these must be [FuncDefn] nodes
-    /// that are children of the [Module] at the root of the Hugr.
+    /// Adds new entry points - these must be [`FuncDefn`] nodes
+    /// that are children of the [`Module`] at the root of the Hugr.
     ///
-    /// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
-    /// [Module]: hugr_core::ops::OpType::Module
+    /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
+    /// [`Module`]: hugr_core::ops::OpType::Module
     pub fn with_module_entry_points(
         mut self,
         entry_points: impl IntoIterator<Item = Node>,
@@ -89,7 +89,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
         let reachable = reachable_funcs(
             &CallGraph::new(hugr),
             hugr,
-            self.entry_points.iter().cloned(),
+            self.entry_points.iter().copied(),
         )?
         .collect::<HashSet<_>>();
         let unreachable = hugr
@@ -105,25 +105,25 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     }
 }
 
-/// Deletes from the Hugr any functions that are not used by either [Call] or
-/// [LoadFunction] nodes in reachable parts.
+/// Deletes from the Hugr any functions that are not used by either [`Call`] or
+/// [`LoadFunction`] nodes in reachable parts.
 ///
-/// For [Module]-rooted Hugrs, `entry_points` may provide a list of entry points,
+/// For [`Module`]-rooted Hugrs, `entry_points` may provide a list of entry points,
 /// which must be children of the root. Note that if `entry_points` is empty, this will
 /// result in all functions in the module being removed.
 ///
-/// For non-[Module]-rooted Hugrs, `entry_points` must be empty; the root node is used.
+/// For non-[`Module`]-rooted Hugrs, `entry_points` must be empty; the root node is used.
 ///
 /// # Errors
-/// * If there are any `entry_points` but the root of the hugr is not a [Module]
+/// * If there are any `entry_points` but the root of the hugr is not a [`Module`]
 /// * If any node in `entry_points` is
-///     * not a [FuncDefn], or
+///     * not a [`FuncDefn`], or
 ///     * not a child of the root
 ///
-/// [Call]: hugr_core::ops::OpType::Call
-/// [FuncDefn]: hugr_core::ops::OpType::FuncDefn
-/// [LoadFunction]: hugr_core::ops::OpType::LoadFunction
-/// [Module]: hugr_core::ops::OpType::Module
+/// [`Call`]: hugr_core::ops::OpType::Call
+/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
+/// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
+/// [`Module`]: hugr_core::ops::OpType::Module
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,

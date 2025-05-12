@@ -51,7 +51,7 @@ fn emit_logic_op<'c, H: HugrView<Node = Node>>(
     args.outputs.finish(context.builder(), vec![res])
 }
 
-/// Populates a [CodegenExtsBuilder] with all extensions needed to lower logic
+/// Populates a [`CodegenExtsBuilder`] with all extensions needed to lower logic
 /// ops.
 pub fn add_logic_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
@@ -64,8 +64,9 @@ pub fn add_logic_extensions<'a, H: HugrView<Node = Node> + 'a>(
 }
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Populates a [CodegenExtsBuilder] with all extensions needed to lower
+    /// Populates a [`CodegenExtsBuilder`] with all extensions needed to lower
     /// logic ops.
+    #[must_use]
     pub fn add_logic_extensions(self) -> Self {
         add_logic_extensions(self)
     }

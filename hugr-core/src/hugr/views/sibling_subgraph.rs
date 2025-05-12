@@ -311,21 +311,25 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// An iterator over the nodes in the subgraph.
+    #[must_use]
     pub fn nodes(&self) -> &[N] {
         &self.nodes
     }
 
     /// The number of nodes in the subgraph.
+    #[must_use]
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
 
     /// Returns the computed [`IncomingPorts`] of the subgraph.
+    #[must_use]
     pub fn incoming_ports(&self) -> &IncomingPorts<N> {
         &self.inputs
     }
 
     /// Returns the computed [`OutgoingPorts`] of the subgraph.
+    #[must_use]
     pub fn outgoing_ports(&self) -> &OutgoingPorts<N> {
         &self.outputs
     }
@@ -396,7 +400,9 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         {
             return Err(InvalidReplacement::InvalidSignature {
                 expected: self.signature(hugr),
-                actual: dfg_optype.dataflow_signature().map(|s| s.into_owned()),
+                actual: dfg_optype
+                    .dataflow_signature()
+                    .map(std::borrow::Cow::into_owned),
             });
         }
 
@@ -451,7 +457,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Create a new Hugr containing only the subgraph.
     ///
-    /// The new Hugr will contain a [FuncDefn][crate::ops::FuncDefn] root
+    /// The new Hugr will contain a [`FuncDefn`][crate::ops::FuncDefn] root
     /// with the same signature as the subgraph and the specified `name`
     pub fn extract_subgraph(
         &self,
@@ -634,7 +640,7 @@ impl<Base: HugrView> ConvexChecker for TopoConvexChecker<'_, Base> {
         // trivially convex.
         if nodes.peek().is_none() || nodes.peek().is_none() {
             return true;
-        };
+        }
         self.get_checker().is_convex(nodes, inputs, outputs)
     }
 }
@@ -707,14 +713,14 @@ fn validate_subgraph<H: HugrView>(
     // Check that the boundary ports are all in the subgraph.
     if let Some(&(n, p)) = boundary_ports.iter().find(|(n, _)| !node_set.contains(n)) {
         Err(InvalidSubgraphBoundary::PortNodeNotInSet(n, p))?;
-    };
+    }
     // Check that every inside port has at least one linked port outside.
     if let Some(&(n, p)) = boundary_ports.iter().find(|&&(n, p)| {
         hugr.linked_ports(n, p)
             .all(|(n1, _)| node_set.contains(&n1))
     }) {
         Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(n, p))?;
-    };
+    }
 
     // Check that every incoming port of a node in the subgraph whose source is not in the subgraph
     // belongs to inputs.
@@ -744,7 +750,7 @@ fn validate_subgraph<H: HugrView>(
     }
 
     // Check no incoming partition is empty
-    if inputs.iter().any(|p| p.is_empty()) {
+    if inputs.iter().any(std::vec::Vec::is_empty) {
         return Err(InvalidSubgraphBoundary::EmptyPartition.into());
     }
 
@@ -757,7 +763,7 @@ fn validate_subgraph<H: HugrView>(
         require_copy && !edge_t.copyable()
     }) {
         Err(InvalidSubgraphBoundary::MismatchedTypes(i))?;
-    };
+    }
 
     Ok(())
 }
@@ -821,7 +827,7 @@ fn has_other_edge<H: HugrView>(hugr: &H, node: H::Node, dir: Direction) -> bool 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum InvalidReplacement {
-    /// No DataflowParent root in replacement graph.
+    /// No `DataflowParent` root in replacement graph.
     #[error("The root of the replacement {node} is a {}, but only OpType::DFGs are supported.", op.name())]
     InvalidDataflowGraph {
         /// The node ID of the root node.
@@ -840,7 +846,7 @@ pub enum InvalidReplacement {
         /// The actual signature.
         actual: Option<Signature>,
     },
-    /// SiblingSubgraph is not convex.
+    /// `SiblingSubgraph` is not convex.
     #[error("SiblingSubgraph is not convex.")]
     NonConvexSubgraph,
 }
@@ -1091,7 +1097,7 @@ mod tests {
                 .nodes()
                 .len(),
             4
-        )
+        );
     }
 
     #[test]
@@ -1160,8 +1166,8 @@ mod tests {
         );
     }
 
-    /// A subgraphs mixed with multiports caused a NonConvex error.
-    /// https://github.com/CQCL/hugr/issues/1294
+    /// A subgraphs mixed with multiports caused a `NonConvex` error.
+    /// <https://github.com/CQCL/hugr/issues/1294>
     #[test]
     fn convex_multiports() {
         let (hugr, func_root) = build_multiport_hugr().unwrap();

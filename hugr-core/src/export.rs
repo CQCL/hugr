@@ -539,7 +539,7 @@ impl<'a> Context<'a> {
 
         let meta = {
             let description = Some(opdef.description()).filter(|d| !d.is_empty());
-            let meta_len = opdef.iter_misc().len() + description.is_some() as usize;
+            let meta_len = opdef.iter_misc().len() + usize::from(description.is_some());
             let mut meta = BumpVec::with_capacity_in(meta_len, self.bump);
 
             if let Some(description) = description {
@@ -576,7 +576,7 @@ impl<'a> Context<'a> {
 
         let outputs = {
             let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
-            for sum_row in block.sum_rows.iter() {
+            for sum_row in &block.sum_rows {
                 let variant = self.export_type_row_with_tail(sum_row, Some(tail));
                 let control = self.make_term_apply(model::CORE_CTRL, &[variant]);
                 outputs.push(table::SeqPart::Item(control));
@@ -707,18 +707,15 @@ impl<'a> Context<'a> {
         let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 1, self.bump);
 
         for child in children {
-            match self.hugr.get_optype(child) {
-                OpType::ExitBlock(_) => {
-                    targets = self.make_ports(child, Direction::Incoming, 1);
+            if let OpType::ExitBlock(_) = self.hugr.get_optype(child) {
+                targets = self.make_ports(child, Direction::Incoming, 1);
+            } else {
+                if let Some(child_id) = self.export_node_shallow(child) {
+                    region_children.push(child_id);
                 }
-                _ => {
-                    if let Some(child_id) = self.export_node_shallow(child) {
-                        region_children.push(child_id);
-                    }
 
-                    if source.is_none() {
-                        source = Some(self.links.use_link(child, IncomingPort::from(0)));
-                    }
+                if source.is_none() {
+                    source = Some(self.links.use_link(child, IncomingPort::from(0)));
                 }
             }
         }
@@ -798,7 +795,7 @@ impl<'a> Context<'a> {
             let name = self.bump.alloc_str(&i.to_string());
             let r#type = self.export_type_param(param, Some((scope, i as _)));
             let param = table::Param { name, r#type };
-            params.push(param)
+            params.push(param);
         }
 
         let constraints = self.bump.alloc_slice_copy(&self.local_constraints);
@@ -911,7 +908,8 @@ impl<'a> Context<'a> {
         row: &TypeRowBase<RV>,
         tail: Option<table::TermId>,
     ) -> table::TermId {
-        let mut parts = BumpVec::with_capacity_in(row.len() + tail.is_some() as usize, self.bump);
+        let mut parts =
+            BumpVec::with_capacity_in(row.len() + usize::from(tail.is_some()), self.bump);
 
         for t in row.iter() {
             match t.as_type_enum() {
@@ -997,7 +995,8 @@ impl<'a> Context<'a> {
                 }
 
                 if let Some(v) = e.value().downcast_ref::<ConstInt>() {
-                    let bitwidth = self.make_term(model::Literal::Nat(v.log_width() as u64).into());
+                    let bitwidth =
+                        self.make_term(model::Literal::Nat(u64::from(v.log_width())).into());
                     let literal = self.make_term(model::Literal::Nat(v.value_u()).into());
 
                     let symbol = self.resolve_symbol(ConstInt::CTR_NAME);

@@ -163,7 +163,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         // TODO Maybe we should delegate these checks to the OpTypes themselves.
         if let OpType::Const(c) = op_type {
             c.validate()?;
-        };
+        }
 
         Ok(())
     }
@@ -374,7 +374,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         if self.hugr.children(parent).next().is_none() {
             // No children, nothing to do
             return Ok(());
-        };
+        }
 
         let (region, node_map) = self.hugr.region_portgraph(parent);
         let postorder = Topo::new(&region);
@@ -398,8 +398,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
     /// - Local edges, of any kind;
     /// - External edges, for static and value edges only: from a node to a sibling's descendant.
     ///   For Value edges, there must also be an order edge between the copy and the sibling.
-    /// - Dominator edges, for value edges only: from a node in a BasicBlock node to
-    ///   a descendant of a post-dominating sibling of the BasicBlock.
+    /// - Dominator edges, for value edges only: from a node in a `BasicBlock` node to
+    ///   a descendant of a post-dominating sibling of the `BasicBlock`.
     fn validate_edge(
         &mut self,
         from: H::Node,
@@ -426,7 +426,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 to_offset,
                 ty: edge_kind,
             });
-        };
+        }
 
         // To detect either external or dominator edges, we traverse the ancestors
         // of the target until we find either `from_parent` (in the external
@@ -484,14 +484,14 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 }
                 err_entered_func.map_or(Ok(()), Err)?;
                 // Check domination
-                let (dominator_tree, node_map) = match self.dominators.get(&ancestor_parent) {
-                    Some(tree) => tree,
-                    None => {
+                let (dominator_tree, node_map) =
+                    if let Some(tree) = self.dominators.get(&ancestor_parent) {
+                        tree
+                    } else {
                         let (tree, node_map) = self.compute_dominator(ancestor_parent);
                         self.dominators.insert(ancestor_parent, (tree, node_map));
                         self.dominators.get(&ancestor_parent).unwrap()
-                    }
-                };
+                    };
                 if !dominator_tree
                     .dominators(node_map.to_portgraph(ancestor))
                     .is_some_and(|mut ds| ds.any(|n| n == node_map.to_portgraph(from_parent)))
@@ -518,8 +518,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         })
     }
 
-    /// Validates that TypeArgs are valid wrt the [ExtensionRegistry] and that nodes
-    /// only refer to type variables declared by the closest enclosing FuncDefn.
+    /// Validates that `TypeArgs` are valid wrt the [`ExtensionRegistry`] and that nodes
+    /// only refer to type variables declared by the closest enclosing `FuncDefn`.
     fn validate_subtree(
         &mut self,
         node: H::Node,
@@ -715,7 +715,7 @@ pub enum ValidationError<N: HugrNode> {
         #[source]
         cause: SignatureError,
     },
-    /// Error in a [ExtensionOp] serialized as an [Opaque].
+    /// Error in a [`ExtensionOp`] serialized as an [Opaque].
     ///
     /// [ExtensionOp]: crate::ops::ExtensionOp
     /// [Opaque]: crate::ops::OpaqueOp
@@ -749,7 +749,7 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         to_offset: Port,
         ty: EdgeKind,
     },
-    /// Inter-Graph edges may not enter into FuncDefns unless they are static
+    /// Inter-Graph edges may not enter into `FuncDefns` unless they are static
     #[error(
         "Inter-graph Value edges cannot enter into FuncDefns. Inter-graph edge from {from} ({from_offset}) to {to} ({to_offset} enters FuncDefn {func}"
     )]

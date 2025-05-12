@@ -107,6 +107,7 @@ impl<'c> Emission<'c> {
 }
 
 impl SimpleHugrConfig {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ins: Default::default(),

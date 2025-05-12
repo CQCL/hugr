@@ -37,7 +37,7 @@ fn get_variant_typerow(sum_type: &HugrSumType, tag: u32) -> Result<TypeRow> {
         .and_then(|tr| Ok(TypeRow::try_from(tr.clone())?))
 }
 
-/// Returns an `undef` value for any [BasicType].
+/// Returns an `undef` value for any [`BasicType`].
 fn basic_type_undef<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
     let t = t.as_basic_type_enum();
     match t {
@@ -51,7 +51,7 @@ fn basic_type_undef<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
     }
 }
 
-/// Returns an `poison` value for any [BasicType].
+/// Returns an `poison` value for any [`BasicType`].
 fn basic_type_poison<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
     let t = t.as_basic_type_enum();
     match t {
@@ -66,50 +66,50 @@ fn basic_type_poison<'c>(t: impl BasicType<'c>) -> BasicValueEnum<'c> {
 }
 
 #[derive(Debug, Clone, derive_more::Display)]
-/// The opaque representation of a [HugrSumType].
+/// The opaque representation of a [`HugrSumType`].
 ///
 /// Provides an `impl`s of `BasicType`, allowing interoperation with other
 /// inkwell tools.
 ///
-/// To obtain an [LLVMSumType] corresponding to a [HugrSumType] use
-/// [LLVMSumType::try_new] or [LLVMSumType::try_from_hugr_type].
+/// To obtain an [`LLVMSumType`] corresponding to a [`HugrSumType`] use
+/// [`LLVMSumType::try_new`] or [`LLVMSumType::try_from_hugr_type`].
 ///
-/// Any such [LLVMSumType] has a fixed underlying LLVM type, which can be
-/// obtained by [BasicType::as_basic_type_enum] or [LLVMSumType::value_type].
+/// Any such [`LLVMSumType`] has a fixed underlying LLVM type, which can be
+/// obtained by [`BasicType::as_basic_type_enum`] or [`LLVMSumType::value_type`].
 /// Note this type is unspecified, and we go to some effort to ensure that it is
 /// minimal and efficient. Users should not expect this type to remain the same
 /// across versions.
 ///
 /// Unit types such as empty structs(`{}`) are elided from the LLVM type where
-/// possible. See [elidable_type] for the specification of which types are
+/// possible. See [`elidable_type`] for the specification of which types are
 /// elided.
 ///
-/// Each [LLVMSumType] has an associated [IntType] tag type, which can be
-/// obtained via [LLVMSumType::tag_type].
+/// Each [`LLVMSumType`] has an associated [`IntType`] tag type, which can be
+/// obtained via [`LLVMSumType::tag_type`].
 ///
-/// The value type [LLVMSumValue] represents values of this type. To obtain an
-/// [LLVMSumValue] use [LLVMSumType::build_tag] or [LLVMSumType::value].
+/// The value type [`LLVMSumValue`] represents values of this type. To obtain an
+/// [`LLVMSumValue`] use [`LLVMSumType::build_tag`] or [`LLVMSumType::value`].
 pub struct LLVMSumType<'c>(LLVMSumTypeEnum<'c>);
 
 impl<'c> LLVMSumType<'c> {
     delegate! {
         to self.0 {
             /// The underlying LLVM type.
-            pub fn value_type(&self) -> BasicTypeEnum<'c>;
+            #[must_use] pub fn value_type(&self) -> BasicTypeEnum<'c>;
             /// The type of the value that would be returned by [LLVMSumValue::build_get_tag].
-            pub fn tag_type(&self) -> IntType<'c>;
+            #[must_use] pub fn tag_type(&self) -> IntType<'c>;
             /// The number of variants in the represented [HugrSumType].
-            pub fn num_variants(&self) -> usize;
+            #[must_use] pub fn num_variants(&self) -> usize;
             /// The number of fields in the `tag`th variant of the represented [HugrSumType].
             /// Panics if `tag` is out of bounds.
-            pub fn num_fields_for_variant(&self, tag: usize) -> usize;
+            #[must_use] pub fn num_fields_for_variant(&self, tag: usize) -> usize;
             /// The LLVM types representing the fields in the `tag` variant of the represented [HugrSumType].
             /// Panics if `tag` is out of bounds.
-            pub fn fields_for_variant(&self, tag: usize) -> &[BasicTypeEnum<'c>];
+            #[must_use] pub fn fields_for_variant(&self, tag: usize) -> &[BasicTypeEnum<'c>];
         }
     }
 
-    /// Constructs a new [LLVMSumType] from a [HugrSumType], using `session` to
+    /// Constructs a new [`LLVMSumType`] from a [`HugrSumType`], using `session` to
     /// determine the types of the fields.
     ///
     /// Returns an error if the type of any field cannot be converted by
@@ -129,7 +129,7 @@ impl<'c> LLVMSumType<'c> {
         Self::try_new(session.iw_context(), variants)
     }
 
-    /// Constructs a new [LLVMSumType] from a `Vec` of variants.
+    /// Constructs a new [`LLVMSumType`] from a `Vec` of variants.
     /// Each variant is a `Vec` of LLVM types each corresponding to a field in the sum.
     ///
     /// Returns an error if `variant_types` is empty;
@@ -144,16 +144,18 @@ impl<'c> LLVMSumType<'c> {
     }
 
     /// Returns an constant `undef` value of the underlying LLVM type.
+    #[must_use]
     pub fn get_undef(&self) -> impl BasicValue<'c> + use<'c> {
         basic_type_undef(self.0.value_type())
     }
 
     /// Returns an constant `poison` value of the underlying LLVM type.
+    #[must_use]
     pub fn get_poison(&self) -> impl BasicValue<'c> + use<'c> {
         basic_type_poison(self.0.value_type())
     }
 
-    /// Emits instructions to construct an [LLVMSumValue] of this type. The
+    /// Emits instructions to construct an [`LLVMSumValue`] of this type. The
     /// value will represent the `tag`th variant.
     pub fn build_tag(
         &self,
@@ -164,7 +166,7 @@ impl<'c> LLVMSumType<'c> {
         self.value(self.0.build_tag(builder, tag, vs)?)
     }
 
-    /// Returns an [LLVMSumValue] of this type.
+    /// Returns an [`LLVMSumValue`] of this type.
     ///
     /// Returns an error if `value.get_type() != self.value_type()`.
     pub fn value(&self, value: impl BasicValue<'c>) -> Result<LLVMSumValue<'c>> {
@@ -172,14 +174,14 @@ impl<'c> LLVMSumType<'c> {
     }
 }
 
-/// The internal representation of a [HugrSumType].
+/// The internal representation of a [`HugrSumType`].
 ///
 /// This type is not public, so that it can be changed without breaking users.
 #[derive(Debug, Clone)]
 enum LLVMSumTypeEnum<'c> {
     /// A Sum type with no variants. It's representation is unspecified.
     ///
-    /// Values of this type can only be constructed by [get_poison].
+    /// Values of this type can only be constructed by [`get_poison`].
     Void { tag_type: IntType<'c> },
     /// A Sum type with a single variant and all-elidable fields.
     /// Represented by `{}`
@@ -217,7 +219,7 @@ enum LLVMSumTypeEnum<'c> {
         /// The LLVM types of the fields. One entry for each Hugr field in the single
         /// variant.
         field_types: Vec<BasicTypeEnum<'c>>,
-        /// The index into variant_types of the non-elidable field.
+        /// The index into `variant_types` of the non-elidable field.
         field_index: usize,
         /// The LLVM type of the tag. Always `i1` for now.
         /// We store it here so because otherwise we would need a &[Context] to
@@ -270,7 +272,7 @@ fn tag_width_for_num_variants(num_variants: usize) -> u32 {
 }
 
 impl<'c> LLVMSumTypeEnum<'c> {
-    /// Constructs a new [LLVMSumTypeEnum] from a `Vec` of variants.
+    /// Constructs a new [`LLVMSumTypeEnum`] from a `Vec` of variants.
     /// Each variant is a `Vec` of LLVM types each corresponding to a field in the sum.
     pub fn try_new(
         context: &'c Context,
@@ -435,7 +437,7 @@ impl<'c> LLVMSumTypeEnum<'c> {
         }
     }
 
-    /// The number of variants in the represented [HugrSumType].
+    /// The number of variants in the represented [`HugrSumType`].
     pub fn num_variants(&self) -> usize {
         match self {
             Self::Void { .. } => 0,
@@ -448,14 +450,14 @@ impl<'c> LLVMSumTypeEnum<'c> {
         }
     }
 
-    /// The number of fields in the `tag`th variant of the represented [HugrSumType].
+    /// The number of fields in the `tag`th variant of the represented [`HugrSumType`].
     /// Panics if `tag` is out of bounds.
     pub(self) fn num_fields_for_variant(&self, tag: usize) -> usize {
         self.fields_for_variant(tag).len()
     }
 
     /// The LLVM types representing the fields in the `tag` variant of the
-    /// represented [HugrSumType].  Panics if `tag` is out of bounds.
+    /// represented [`HugrSumType`].  Panics if `tag` is out of bounds.
     pub(self) fn fields_for_variant(&self, tag: usize) -> &[BasicTypeEnum<'c>] {
         assert!(tag < self.num_variants());
         match self {
@@ -492,7 +494,7 @@ unsafe impl<'c> AnyType<'c> for LLVMSumType<'c> {}
 
 unsafe impl<'c> BasicType<'c> for LLVMSumType<'c> {}
 
-/// A Value equivalent of [LLVMSumType]. Represents a [HugrSumType] Value on the
+/// A Value equivalent of [`LLVMSumType`]. Represents a [`HugrSumType`] Value on the
 /// wire, offering functions for inspecting and deconstructing such Values.
 #[derive(Debug)]
 pub struct LLVMSumValue<'c>(BasicValueEnum<'c>, LLVMSumType<'c>);
@@ -528,13 +530,14 @@ impl<'c> LLVMSumValue<'c> {
         Ok(Self(value, sum_type))
     }
 
+    #[must_use]
     pub fn get_type(&self) -> LLVMSumType<'c> {
         self.1.clone()
     }
 
     /// Emit instructions to read the tag of a value of type `LLVMSumType`.
     ///
-    /// The type of the value is that returned by [LLVMSumType::tag_type].
+    /// The type of the value is that returned by [`LLVMSumType::tag_type`].
     pub fn build_get_tag(&self, builder: &Builder<'c>) -> Result<IntValue<'c>> {
         let result = match self.get_type().0 {
             LLVMSumTypeEnum::Void { .. } => bail!("Cannot get tag of void sum"),
@@ -631,7 +634,10 @@ impl<'c> LLVMSumValue<'c> {
             }?;
         #[cfg(debug_assertions)]
         {
-            let result_types = results.iter().map(|x| x.get_type()).collect_vec();
+            let result_types = results
+                .iter()
+                .map(inkwell::values::BasicValueEnum::get_type)
+                .collect_vec();
             assert_eq!(&result_types, self.get_type().fields_for_variant(tag));
         }
         Ok(results)
@@ -671,9 +677,9 @@ impl<'c> LLVMSumValue<'c> {
     delegate! {
         to self.1 {
             /// Get the type of the value that would be returned by `build_get_tag`.
-            pub fn tag_type(&self) -> IntType<'c>;
+            #[must_use] pub fn tag_type(&self) -> IntType<'c>;
             /// The number of variants in the represented [HugrSumType].
-            pub fn num_variants(&self) -> usize;
+            #[must_use] pub fn num_variants(&self) -> usize;
         }
     }
 }
@@ -705,7 +711,9 @@ mod test {
 
     #[rstest]
     fn sum_types(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(|cem| cem.add_default_prelude_extensions());
+        llvm_ctx.add_extensions(
+            super::super::custom::CodegenExtsBuilder::add_default_prelude_extensions,
+        );
         let ts = llvm_ctx.get_typing_session();
         let iwc = ts.iw_context();
         let empty_struct = iwc.struct_type(&[], false).as_basic_type_enum();

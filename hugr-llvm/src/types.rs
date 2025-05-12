@@ -12,7 +12,7 @@ pub use crate::sum::LLVMSumType;
 use crate::utils::type_map::TypeMap;
 
 /// A type alias for a hugr function type. We use this to disambiguate from
-/// the LLVM [FunctionType].
+/// the LLVM [`FunctionType`].
 pub type HugrFuncType = hugr_core::types::Signature;
 
 /// A type alias for a hugr type. We use this to disambiguate from LLVM types.
@@ -22,7 +22,7 @@ pub type HugrType = Type;
 pub type HugrSumType = SumType;
 
 /// A type that holds [Rc] shared pointers to everything needed to convert from
-/// a hugr [HugrType] to an LLVM [Type](inkwell::types).
+/// a hugr [`HugrType`] to an LLVM [Type](inkwell::types).
 #[derive(Clone)]
 pub struct TypingSession<'c, 'a> {
     iw_context: &'c Context,
@@ -42,6 +42,7 @@ impl<'c, 'a> TypingSession<'c, 'a> {
     }
 
     /// Creates a new `TypingSession`.
+    #[must_use]
     pub fn new(iw_context: &'c Context, type_converter: Rc<TypeConverter<'a>>) -> Self {
         Self {
             iw_context,
@@ -50,6 +51,7 @@ impl<'c, 'a> TypingSession<'c, 'a> {
     }
 
     /// Returns a reference to the inner [Context].
+    #[must_use]
     pub fn iw_context(&self) -> &'c Context {
         self.iw_context
     }
@@ -91,6 +93,7 @@ impl<'a> TypeConverter<'a> {
         self.0.map_sum_type(&hugr_type, context)
     }
 
+    #[must_use]
     pub fn session<'c>(self: Rc<Self>, iw_context: &'c Context) -> TypingSession<'c, 'a> {
         TypingSession::new(iw_context, self)
     }
@@ -120,7 +123,7 @@ pub mod test {
             "func_type_to_llvm",
             llvm_ctx.get_typing_session().llvm_func_type(&ft).unwrap(),
             &ft.to_string()
-        )
+        );
     }
 
     #[rstest]
@@ -136,7 +139,7 @@ pub mod test {
                 .llvm_sum_type(st.clone())
                 .unwrap(),
             &st.to_string()
-        )
+        );
     }
 
     #[rstest]

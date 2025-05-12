@@ -1,4 +1,4 @@
-//! Total equality (and hence [AbstractValue] support for [Value]s
+//! Total equality (and hence [`AbstractValue`] support for [Value]s
 //! (by adding a source-Node and part unhashable constants)
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
 use std::convert::Infallible;
@@ -14,7 +14,7 @@ use itertools::Either;
 
 use crate::dataflow::{AbstractValue, AsConcrete, ConstLocation, LoadedFunction, Sum};
 
-/// A custom constant that has been successfully hashed via [TryHash](hugr_core::ops::constant::TryHash)
+/// A custom constant that has been successfully hashed via [`TryHash`](hugr_core::ops::constant::TryHash)
 #[derive(Clone, Debug)]
 pub struct HashedConst {
     hash: u64,
@@ -48,15 +48,15 @@ impl Hash for HashedConst {
 /// An [Eq]-able and [Hash]-able leaf (non-[Sum](Value::Sum)) Value
 #[derive(Clone, Debug)]
 pub enum ValueHandle<N = Node> {
-    /// A [Value::Extension] that has been hashed
+    /// A [`Value::Extension`] that has been hashed
     Hashable(HashedConst),
-    /// Either a [Value::Extension] that can't be hashed, or a [Value::Function].
+    /// Either a [`Value::Extension`] that can't be hashed, or a [`Value::Function`].
     Unhashable {
         /// The node (i.e. a [Const](hugr_core::ops::Const)) containing the constant
         node: N,
-        /// Indices within [Value::Sum]s containing the unhashable [Self::Unhashable::leaf]
+        /// Indices within [`Value::Sum`]s containing the unhashable [`Self::Unhashable::leaf`]
         fields: Vec<usize>,
-        /// The unhashable [Value::Extension] or [Value::Function]
+        /// The unhashable [`Value::Extension`] or [`Value::Function`]
         leaf: Either<Arc<OpaqueValue>, Arc<Hugr>>,
     },
 }
@@ -73,7 +73,7 @@ fn node_and_fields<N: HugrNode>(loc: &ConstLocation<N>) -> (N, Vec<usize>) {
 }
 
 impl<N: HugrNode> ValueHandle<N> {
-    /// Makes a new instance from an [OpaqueValue] given the node and (for a [Sum](Value::Sum))
+    /// Makes a new instance from an [`OpaqueValue`] given the node and (for a [Sum](Value::Sum))
     /// field indices within that (used only if the custom constant is not hashable).
     pub fn new_opaque<'a>(loc: impl Into<ConstLocation<'a, N>>, val: OpaqueValue) -> Self
     where
@@ -91,7 +91,7 @@ impl<N: HugrNode> ValueHandle<N> {
         )
     }
 
-    /// New instance for a [Value::Function] found within a node
+    /// New instance for a [`Value::Function`] found within a node
     pub fn new_const_hugr<'a>(loc: impl Into<ConstLocation<'a, N>>, val: Box<Hugr>) -> Self
     where
         N: 'a,

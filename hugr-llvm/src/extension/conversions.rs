@@ -32,6 +32,7 @@ use crate::{
 ///  - The most negative signed integer
 ///  - The most positive signed integer
 ///  - The largest unsigned integer
+#[must_use]
 pub fn int_type_bounds(width: u32) -> (i64, i64, u64) {
     assert!(width <= 64);
     (
@@ -260,6 +261,7 @@ impl CodegenExtension for ConversionExtension {
 }
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
+    #[must_use]
     pub fn add_conversion_extensions(self) -> Self {
         self.add_extension(ConversionExtension)
     }
@@ -303,7 +305,7 @@ mod test {
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = EXTENSION
-                    .instantiate_extension_op(name.as_ref(), [(int_width as u64).into()])
+                    .instantiate_extension_op(name.as_ref(), [u64::from(int_width).into()])
                     .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, [in1])
@@ -359,8 +361,8 @@ mod test {
     ) {
         let mut tys = [INT_TYPES[0].clone(), bool_t()];
         if !input_int {
-            tys.reverse()
-        };
+            tys.reverse();
+        }
         let [in_t, out_t] = tys;
         llvm_ctx.add_extensions(|builder| {
             builder

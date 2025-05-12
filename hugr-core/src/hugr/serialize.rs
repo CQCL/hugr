@@ -1,5 +1,5 @@
 //! Serialization definition for [`Hugr`]
-//! [`Hugr`]: crate::hugr::Hugr
+//! [`Hugr`]: `crate::hugr::Hugr`
 
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
@@ -86,9 +86,9 @@ struct NodeSer {
 /// Version 1 of the HUGR serialization format.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct SerHugrLatest {
-    /// For each node: (parent, node_operation)
+    /// For each node: (parent, `node_operation`)
     nodes: Vec<NodeSer>,
-    /// for each edge: (src, src_offset, tgt, tgt_offset)
+    /// for each edge: (src, `src_offset`, tgt, `tgt_offset`)
     edges: Vec<[(Node, Option<u16>); 2]>,
     /// for each node: (metadata)
     #[serde(default)]
@@ -282,19 +282,18 @@ impl TryFrom<SerHugrLatest> for Hugr {
             if !hugr.graph.contains_node(node.into_portgraph()) {
                 return Err(HUGRSerializationError::UnknownEdgeNode { node });
             }
-            let offset = match offset {
-                Some(offset) => offset as usize,
-                None => {
-                    let op_type = hugr.get_optype(node);
-                    op_type
-                        .other_port(dir)
-                        .ok_or(HUGRSerializationError::MissingPortOffset {
-                            node,
-                            dir,
-                            op_type: op_type.clone(),
-                        })?
-                        .index()
-                }
+            let offset = if let Some(offset) = offset {
+                offset as usize
+            } else {
+                let op_type = hugr.get_optype(node);
+                op_type
+                    .other_port(dir)
+                    .ok_or(HUGRSerializationError::MissingPortOffset {
+                        node,
+                        dir,
+                        op_type: op_type.clone(),
+                    })?
+                    .index()
             };
             Ok(offset)
         };

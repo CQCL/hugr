@@ -24,12 +24,12 @@ pub trait PatchVerification {
     /// The type of Error with which this Rewrite may fail
     type Error: std::error::Error;
 
-    /// The node type of the HugrView that this patch applies to.
+    /// The node type of the `HugrView` that this patch applies to.
     type Node: HugrNode;
 
     /// Checks whether the rewrite would succeed on the specified Hugr.
-    /// If this call succeeds, [Patch::apply] should also succeed on the same
-    /// `h` If this calls fails, [Patch::apply] would fail with the same
+    /// If this call succeeds, [`Patch::apply`] should also succeed on the same
+    /// `h` If this calls fails, [`Patch::apply`] would fail with the same
     /// error.
     fn verify(&self, h: &impl HugrView<Node = Self::Node>) -> Result<(), Self::Error>;
 
@@ -56,7 +56,7 @@ pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
     /// The type returned on successful application of the rewrite.
     type Outcome;
 
-    /// If `true`, [Patch::apply]'s of this rewrite guarantee that they do not
+    /// If `true`, [`Patch::apply`]'s of this rewrite guarantee that they do not
     /// mutate the Hugr when they return an Err. If `false`, there is no
     /// guarantee; the Hugr should be assumed invalid when Err is returned.
     const UNCHANGED_ON_FAILURE: bool;
@@ -64,13 +64,13 @@ pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
     /// Mutate the specified Hugr, or fail with an error.
     ///
     /// Returns [`Self::Outcome`] if successful. If
-    /// [Patch::UNCHANGED_ON_FAILURE] is true, then `h` must be unchanged if Err
-    /// is returned. See also [PatchVerification::verify]
+    /// [`Patch::UNCHANGED_ON_FAILURE`] is true, then `h` must be unchanged if Err
+    /// is returned. See also [`PatchVerification::verify`]
     ///
     /// # Panics
     ///
     /// May panic if-and-only-if `h` would have failed
-    /// [Hugr::validate][crate::Hugr::validate]; that is, implementations may
+    /// [`Hugr::validate`][crate::Hugr::validate]; that is, implementations may
     /// begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
     /// being preferred.
     fn apply(self, h: &mut H) -> Result<Self::Outcome, Self::Error>;
@@ -103,14 +103,14 @@ pub trait PatchHugrMut: PatchVerification {
 
     /// Mutate the specified Hugr, or fail with an error.
     ///
-    /// Returns [`Self::Outcome`] if successful. If [self.unchanged_on_failure]
+    /// Returns [`Self::Outcome`] if successful. If [`self.unchanged_on_failure`]
     /// is true, then `h` must be unchanged if Err is returned. See also
     /// [self.verify]
     ///
     /// # Panics
     ///
     /// May panic if-and-only-if `h` would have failed
-    /// [Hugr::validate][crate::Hugr::validate]; that is, implementations may
+    /// [`Hugr::validate`][crate::Hugr::validate]; that is, implementations may
     /// begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
     /// being preferred.
     fn apply_hugr_mut(

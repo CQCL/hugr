@@ -37,6 +37,7 @@ pub enum PtrOpDef {
 
 impl PtrOpDef {
     /// Create a new concrete pointer operation with the given value type.
+    #[must_use]
     pub fn with_type(self, ty: Type) -> PtrOp {
         PtrOp::new(self, ty)
     }
@@ -115,7 +116,7 @@ lazy_static! {
     pub static ref EXTENSION: Arc<Extension> = extension();
 }
 
-/// Integer type of a given bit width (specified by the TypeArg).  Depending on
+/// Integer type of a given bit width (specified by the `TypeArg`).  Depending on
 /// the operation, the semantic interpretation may be unsigned integer, signed
 /// integer or bit string.
 fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> CustomType {
@@ -129,7 +130,7 @@ fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> Cust
     )
 }
 
-/// Integer type of a given bit width (specified by the TypeArg).
+/// Integer type of a given bit width (specified by the `TypeArg`).
 pub fn ptr_type(ty: impl Into<Type>) -> Type {
     ptr_custom_type(ty, &Arc::<Extension>::downgrade(&EXTENSION)).into()
 }
@@ -166,7 +167,7 @@ impl MakeExtensionOp for PtrOp {
 
 impl MakeRegisteredOp for PtrOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -281,6 +282,6 @@ pub(crate) mod test {
 
             builder.finish_hugr_with_outputs([]).unwrap()
         };
-        assert_matches!(hugr.validate(), Ok(_));
+        assert_matches!(hugr.validate(), Ok(()));
     }
 }

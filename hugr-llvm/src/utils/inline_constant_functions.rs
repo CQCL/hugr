@@ -142,7 +142,7 @@ mod test {
 
         for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
-                assert!(!matches!(konst.value(), Value::Function { .. }))
+                assert!(!matches!(konst.value(), Value::Function { .. }));
             }
         }
     }
@@ -192,7 +192,7 @@ mod test {
 
         for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
-                assert!(!matches!(konst.value(), Value::Function { .. }))
+                assert!(!matches!(konst.value(), Value::Function { .. }));
             }
         }
     }

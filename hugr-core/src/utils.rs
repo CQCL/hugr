@@ -7,7 +7,7 @@ use itertools::Itertools;
 use crate::{Hugr, HugrView, IncomingPort, Node, ops::Value};
 
 /// Write a comma separated list of of some types.
-/// Like debug_list, but using the Display instance rather than Debug,
+/// Like `debug_list`, but using the Display instance rather than Debug,
 /// and not adding surrounding square brackets.
 pub fn display_list<T>(ts: impl IntoIterator<Item = T>, f: &mut fmt::Formatter) -> fmt::Result
 where
@@ -17,7 +17,7 @@ where
 }
 
 /// Write a separated list of of some types, using a custom separator.
-/// Like debug_list, but using the Display instance rather than Debug,
+/// Like `debug_list`, but using the Display instance rather than Debug,
 /// and not adding surrounding square brackets.
 pub fn display_list_with_separator<T>(
     ts: impl IntoIterator<Item = T>,
@@ -28,7 +28,7 @@ where
     T: Display,
 {
     let mut first = true;
-    for t in ts.into_iter() {
+    for t in ts {
         if !first {
             f.write_str(sep)?;
         }
@@ -100,7 +100,7 @@ pub fn try_collect_array<const N: usize, T>(
 /// }
 /// ```
 ///
-/// From https://github.com/serde-rs/serde/issues/818.
+/// From <https://github.com/serde-rs/serde/issues/818>.
 #[allow(dead_code)]
 pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     *t == Default::default()
@@ -257,6 +257,7 @@ fn sort_by_in_port(consts: &[(IncomingPort, Value)]) -> Vec<&(IncomingPort, Valu
 }
 
 /// Sort some input constants by port and just return the constants.
+#[must_use]
 pub fn sorted_consts(consts: &[(IncomingPort, Value)]) -> Vec<&Value> {
     sort_by_in_port(consts)
         .into_iter()
@@ -285,13 +286,13 @@ pub(crate) mod test {
 
     /// Check that a hugr just loads and returns a single expected constant.
     pub(crate) fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
-        assert_fully_folded_with(h, |v| v == expected_value)
+        assert_fully_folded_with(h, |v| v == expected_value);
     }
 
     /// Check that a hugr just loads and returns a single constant, and validate
     /// that constant using `check_value`.
     ///
-    /// [CustomConst::equals_const] is not required to be implemented. Use this
+    /// [`CustomConst::equals_const`] is not required to be implemented. Use this
     /// function for Values containing such a `CustomConst`.
     pub(crate) fn assert_fully_folded_with(h: &Hugr, check_value: impl Fn(&Value) -> bool) {
         let mut node_count = 0;

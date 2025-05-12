@@ -27,7 +27,7 @@ pub struct CircuitBuilder<'a, T: ?Sized> {
 #[non_exhaustive]
 pub enum CircuitBuildError {
     /// Invalid index for stored wires.
-    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(|o| o.name()).unwrap_or_default())]
+    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(NamedOp::name).unwrap_or_default())]
     InvalidWireIndex {
         /// The operation.
         op: Option<OpType>,
@@ -233,6 +233,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     #[inline]
     /// Finish building the circuit region and return the dangling wires
     /// that correspond to the initially provided wires.
+    #[must_use]
     pub fn finish(self) -> Vec<Wire> {
         self.wires.into_iter().flatten().collect()
     }
@@ -296,7 +297,7 @@ mod test {
         let my_ext = Extension::new_test_arc(my_ext_name.clone(), |ext, extension_ref| {
             ext.add_op(
                 "MyOp".into(),
-                "".to_string(),
+                String::new(),
                 Signature::new(vec![qb_t(), usize_t()], vec![qb_t()]),
                 extension_ref,
             )

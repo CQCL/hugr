@@ -59,14 +59,14 @@ lazy_static! {
             |ext, extension_ref| {
                 ext.add_op(
                     OpName::new_inline("H"),
-                    "".into(),
+                    String::new(),
                     Signature::new_endo(qb_t()),
                     extension_ref,
                 )
                 .unwrap();
                 ext.add_op(
                     OpName::new_inline("Rz"),
-                    "".into(),
+                    String::new(),
                     Signature::new(vec![qb_t(), float64_type()], vec![qb_t()]),
                     extension_ref,
                 )
@@ -74,7 +74,7 @@ lazy_static! {
 
                 ext.add_op(
                     OpName::new_inline("CX"),
-                    "".into(),
+                    String::new(),
                     Signature::new_endo(vec![qb_t(), qb_t()]),
                     extension_ref,
                 )

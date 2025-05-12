@@ -13,7 +13,7 @@ impl Namer {
 
     /// Create a new `Namer` that for each symbol:
     /// * prefixes `prefix`
-    /// * if post_fix_node is true, postfixes ".{node.index()}"
+    /// * if `post_fix_node` is true, postfixes ".{`node.index()`}"
     ///
     /// # Example
     ///
@@ -34,7 +34,7 @@ impl Namer {
         }
     }
 
-    /// Mangle the the name of a [hugr_core::ops::FuncDefn] or [hugr_core::ops::FuncDecl].
+    /// Mangle the the name of a [`hugr_core::ops::FuncDefn`] or [`hugr_core::ops::FuncDecl`].
     pub fn name_func(&self, name: impl AsRef<str>, node: Node) -> String {
         let prefix = &self.prefix;
         let name = name.as_ref();

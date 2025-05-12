@@ -26,7 +26,7 @@ use super::PRELUDE;
 use super::{ConstUsize, PRELUDE_ID};
 use crate::types::type_param::TypeParam;
 
-/// Name of the operation for loading generic BoundedNat parameters.
+/// Name of the operation for loading generic `BoundedNat` parameters.
 pub static LOAD_NAT_OP_ID: OpName = OpName::new_inline("load_nat");
 
 /// Definition of the load nat operation.
@@ -102,12 +102,14 @@ pub struct LoadNat {
 }
 
 impl LoadNat {
-    /// Creates a new [LoadNat] operation.
+    /// Creates a new [`LoadNat`] operation.
+    #[must_use]
     pub fn new(nat: TypeArg) -> Self {
         LoadNat { nat }
     }
 
     /// Returns the nat type argument that should be loaded.
+    #[must_use]
     pub fn get_nat(self) -> TypeArg {
         self.nat
     }
@@ -186,7 +188,7 @@ mod tests {
             let node_optype = result.get_optype(child);
             // The only node in the HUGR besides Input and Output should be LoadNat.
             if !node_optype.is_input() && !node_optype.is_output() {
-                assert_eq!(node_optype, &exp_optype)
+                assert_eq!(node_optype, &exp_optype);
             }
         }
     }
@@ -198,14 +200,13 @@ mod tests {
 
         let optype: OpType = op.into();
 
-        match optype {
-            OpType::ExtensionOp(ext_op) => {
-                let result = ext_op.constant_fold(&[]);
-                let exp_port: OutgoingPort = 0.into();
-                let exp_val: constant::Value = ConstUsize::new(5).into();
-                assert_eq!(result, Some(vec![(exp_port, exp_val)]))
-            }
-            _ => panic!(),
+        if let OpType::ExtensionOp(ext_op) = optype {
+            let result = ext_op.constant_fold(&[]);
+            let exp_port: OutgoingPort = 0.into();
+            let exp_val: constant::Value = ConstUsize::new(5).into();
+            assert_eq!(result, Some(vec![(exp_port, exp_val)]));
+        } else {
+            panic!()
         }
     }
 }

@@ -5,8 +5,8 @@
 //! by the encoded HUGR itself.
 //!
 //! Use [`read_envelope`] and [`write_envelope`] for reading and writing
-//! envelopes from/to readers and writers, or call [Package::load] and
-//! [Package::store] directly.
+//! envelopes from/to readers and writers, or call [`Package::load`] and
+//! [`Package::store`] directly.
 //!
 //! ## Payload formats
 //!
@@ -23,8 +23,8 @@
 //!
 //! | Field  | Size (bytes) | Description |
 //! |--------|--------------|-------------|
-//! | Magic  | 8            | [MAGIC_NUMBERS] constant identifying the envelope format. |
-//! | Format | 1            | [EnvelopeFormat] describing the payload format. |
+//! | Magic  | 8            | [`MAGIC_NUMBERS`] constant identifying the envelope format. |
+//! | Format | 1            | [`EnvelopeFormat`] describing the payload format. |
 //! | Flags  | 1            | Additional configuration flags. |
 //!
 //! Flags:
@@ -157,7 +157,7 @@ pub enum EnvelopeError {
     #[display("Payload format {format} is not supported.{}",
         match feature {
             Some(f) => format!(" This requires the '{f}' feature for `hugr`."),
-            None => "".to_string()
+            None => String::new()
         },
     )]
     #[from(ignore)]
@@ -349,7 +349,7 @@ fn write_impl<'h>(
         | EnvelopeFormat::ModelWithExtensions
         | EnvelopeFormat::ModelText
         | EnvelopeFormat::ModelTextWithExtensions => {
-            encode_model(writer, hugrs, extensions, config.format)?
+            encode_model(writer, hugrs, extensions, config.format)?;
         }
     }
     Ok(())

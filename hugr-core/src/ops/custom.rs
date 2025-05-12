@@ -22,10 +22,10 @@ use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
 use super::{NamedOp, OpName, OpNameRef};
 
-/// An operation defined by an [OpDef] from a loaded [Extension].
+/// An operation defined by an [`OpDef`] from a loaded [Extension].
 ///
-/// Extension ops are not serializable. They must be downgraded into an [OpaqueOp] instead.
-/// See [ExtensionOp::make_opaque].
+/// Extension ops are not serializable. They must be downgraded into an [`OpaqueOp`] instead.
+/// See [`ExtensionOp::make_opaque`].
 ///
 /// [Extension]: crate::Extension
 #[derive(Clone, Debug, serde::Serialize)]
@@ -42,7 +42,7 @@ pub struct ExtensionOp {
 }
 
 impl ExtensionOp {
-    /// Create a new ExtensionOp given the type arguments and specified input extensions
+    /// Create a new `ExtensionOp` given the type arguments and specified input extensions
     pub fn new(def: Arc<OpDef>, args: impl Into<Vec<TypeArg>>) -> Result<Self, SignatureError> {
         let args: Vec<TypeArg> = args.into();
         let signature = def.compute_signature(&args)?;
@@ -53,7 +53,7 @@ impl ExtensionOp {
         })
     }
 
-    /// If OpDef is missing binary computation, trust the cached signature.
+    /// If `OpDef` is missing binary computation, trust the cached signature.
     pub(crate) fn new_with_cached(
         def: Arc<OpDef>,
         args: impl IntoIterator<Item = TypeArg>,
@@ -78,22 +78,26 @@ impl ExtensionOp {
     }
 
     /// Return the argument values for this operation.
+    #[must_use]
     pub fn args(&self) -> &[TypeArg] {
         &self.args
     }
 
     /// Returns a reference to the [`OpDef`] of this [`ExtensionOp`].
+    #[must_use]
     pub fn def(&self) -> &OpDef {
         self.def.as_ref()
     }
 
     /// Gets an Arc to the [`OpDef`] of this instance, i.e. usable to create
     /// new instances.
+    #[must_use]
     pub fn def_arc(&self) -> &Arc<OpDef> {
         &self.def
     }
 
     /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
+    #[must_use]
     pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Value)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
     }
@@ -105,6 +109,7 @@ impl ExtensionOp {
     /// registry with the appropriate extension.
     ///
     /// For a non-cloning version of this operation, use [`OpaqueOp::from`].
+    #[must_use]
     pub fn make_opaque(&self) -> OpaqueOp {
         OpaqueOp {
             extension: self.def.extension_id().clone(),
@@ -128,22 +133,26 @@ impl ExtensionOp {
     /// Cast the operation to an specific extension op.
     ///
     /// Returns `None` if the operation is not of the requested type.
+    #[must_use]
     pub fn cast<T: MakeExtensionOp>(&self) -> Option<T> {
         T::from_extension_op(self).ok()
     }
 
     /// Returns the extension id of the operation.
+    #[must_use]
     pub fn extension_id(&self) -> &ExtensionId {
         self.def.extension_id()
     }
 
     /// Returns the unqualified id of the operation. e.g. 'iadd'
     ///
+    #[must_use]
     pub fn unqualified_id(&self) -> &OpNameRef {
         self.def.name()
     }
 
     /// Returns the qualified id of the operation. e.g. 'arithmetic.iadd'
+    #[must_use]
     pub fn qualified_id(&self) -> OpName {
         qualify_name(self.extension_id(), self.unqualified_id())
     }
@@ -217,10 +226,10 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
 ///
-/// [ExtensionOp]s are serialised as `OpaqueOp`s.
+/// [`ExtensionOp`]s are serialised as `OpaqueOp`s.
 ///
-/// The signature of a [ExtensionOp] always includes that op's extension. We do not
-/// require that the `signature` field of [OpaqueOp] contains `extension`,
+/// The signature of a [`ExtensionOp`] always includes that op's extension. We do not
+/// require that the `signature` field of [`OpaqueOp`] contains `extension`,
 /// instead we are careful to add it whenever we look at the `signature` of an
 /// `OpaqueOp`. This is a small efficiency in serialisation and allows us to
 /// be more liberal in deserialisation.
@@ -244,7 +253,7 @@ fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
 }
 
 impl OpaqueOp {
-    /// Creates a new OpaqueOp from all the fields we'd expect to serialize.
+    /// Creates a new `OpaqueOp` from all the fields we'd expect to serialize.
     pub fn new(
         extension: ExtensionId,
         name: impl Into<OpName>,
@@ -275,21 +284,25 @@ impl NamedOp for OpaqueOp {
 
 impl OpaqueOp {
     /// Unique name of the operation.
+    #[must_use]
     pub fn unqualified_id(&self) -> &OpName {
         &self.name
     }
 
     /// Unique name of the operation.
+    #[must_use]
     pub fn qualified_id(&self) -> OpName {
         qualify_name(self.extension(), self.unqualified_id())
     }
 
     /// Type arguments.
+    #[must_use]
     pub fn args(&self) -> &[TypeArg] {
         &self.args
     }
 
     /// Parent extension.
+    #[must_use]
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
@@ -325,7 +338,7 @@ impl DataflowOpTrait for OpaqueOp {
 #[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum OpaqueOpError<N: HugrNode> {
-    /// The Extension was found but did not contain the expected OpDef
+    /// The Extension was found but did not contain the expected `OpDef`
     #[error("Operation '{op}' in {node} not found in Extension {extension}. Available operations: {}",
             available_ops.iter().join(", ")
     )]
@@ -339,7 +352,7 @@ pub enum OpaqueOpError<N: HugrNode> {
         /// The available operations in the extension.
         available_ops: Vec<OpName>,
     },
-    /// Extension and OpDef found, but computed signature did not match stored
+    /// Extension and `OpDef` found, but computed signature did not match stored
     #[error(
         "Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}"
     )]
@@ -351,7 +364,7 @@ pub enum OpaqueOpError<N: HugrNode> {
         stored: Signature,
         computed: Signature,
     },
-    /// An error in computing the signature of the ExtensionOp
+    /// An error in computing the signature of the `ExtensionOp`
     #[error("Error in signature of operation '{name}' in {node}: {cause}")]
     #[allow(missing_docs)]
     SignatureError {
@@ -441,7 +454,7 @@ mod test {
         let ext = Extension::new_test_arc("ext".try_into().unwrap(), |ext, extension_ref| {
             ext.add_op(
                 val_name.into(),
-                "".to_string(),
+                String::new(),
                 SignatureFunc::MissingValidateFunc(FuncValueType::from(endo_sig.clone()).into()),
                 extension_ref,
             )
@@ -449,7 +462,7 @@ mod test {
 
             ext.add_op(
                 comp_name.into(),
-                "".to_string(),
+                String::new(),
                 SignatureFunc::MissingComputeFunc,
                 extension_ref,
             )
@@ -462,11 +475,11 @@ mod test {
         let opaque_val = OpaqueOp::new(
             ext_id.clone(),
             val_name,
-            "".into(),
+            String::new(),
             vec![],
             endo_sig.clone(),
         );
-        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
+        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, String::new(), vec![], endo_sig);
         let mut resolved_val = opaque_val.into();
         resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),

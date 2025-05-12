@@ -27,7 +27,7 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
-    /// Returns a new DFGBuilder with the given base and parent node.
+    /// Returns a new `DFGBuilder` with the given base and parent node.
     ///
     /// Sets up the input and output nodes of the region. If `parent` already has
     /// input and output nodes, use [`DFGBuilder::create`] instead.
@@ -57,7 +57,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         })
     }
 
-    /// Returns a new DFGBuilder with the given base and parent node.
+    /// Returns a new `DFGBuilder` with the given base and parent node.
     ///
     /// The parent node may be any `DataflowParent` node.
     ///
@@ -152,7 +152,7 @@ impl<B, T> DFGWrapper<B, T> {
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a FuncDefn rooted HUGR
+    /// Initialize a builder for a `FuncDefn` rooted HUGR
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
@@ -246,7 +246,7 @@ impl FunctionBuilder<Hugr> {
 
     /// Update the function builder's parent signature.
     ///
-    /// Internal function used in [add_input] and [add_output].
+    /// Internal function used in [`add_input`] and [`add_output`].
     ///
     /// Does not update the input and output nodes.
     ///

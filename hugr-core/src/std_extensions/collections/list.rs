@@ -48,28 +48,32 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 pub struct ListValue(Vec<Value>, Type);
 
 impl ListValue {
-    /// Create a new [CustomConst] for a list of values of type `typ`.
+    /// Create a new [`CustomConst`] for a list of values of type `typ`.
     /// That all values are of type `typ` is not checked here.
     pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
         Self(contents.into_iter().collect_vec(), typ)
     }
 
-    /// Create a new [CustomConst] for an empty list of values of type `typ`.
+    /// Create a new [`CustomConst`] for an empty list of values of type `typ`.
+    #[must_use]
     pub fn new_empty(typ: Type) -> Self {
         Self(vec![], typ)
     }
 
     /// Returns the type of the `[ListValue]` as a `[CustomType]`.`
+    #[must_use]
     pub fn custom_type(&self) -> CustomType {
         list_custom_type(self.1.clone())
     }
 
     /// Returns the type of values inside the `[ListValue]`.
+    #[must_use]
     pub fn get_element_type(&self) -> &Type {
         &self.1
     }
 
     /// Returns the values contained inside the `[ListValue]`.
+    #[must_use]
     pub fn get_contents(&self) -> &[Value] {
         &self.0
     }
@@ -166,6 +170,7 @@ impl ListOp {
     const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
 
     /// Instantiate a list operation with an `element_type`.
+    #[must_use]
     pub fn with_type(self, element_type: Type) -> ListOpInst {
         ListOpInst {
             elem_type: element_type,
@@ -175,7 +180,7 @@ impl ListOp {
 
     /// Compute the signature of the operation, given the list type definition.
     fn compute_signature(self, list_type_def: &TypeDef) -> SignatureFunc {
-        use ListOp::*;
+        use ListOp::{get, insert, length, pop, push, set};
         let e = Type::new_var_use(0, TypeBound::Any);
         let l = self.list_type(list_type_def, 0);
         match self {
@@ -233,15 +238,15 @@ impl MakeOpDef for ListOp {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
         Arc::downgrade(&EXTENSION)
     }
 
-    /// Add an operation implemented as an [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as an [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the list type def while computing the signature,
     // to avoid recursive loops initializing the extension.
@@ -277,7 +282,7 @@ impl MakeOpDef for ListOp {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        list_fold::set_fold(self, def)
+        list_fold::set_fold(self, def);
     }
 }
 
@@ -302,7 +307,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for ListOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -311,12 +316,14 @@ impl MakeRegisteredOp for ListOp {
 }
 
 /// Get the type of a list of `elem_type` as a `CustomType`.
+#[must_use]
 pub fn list_type_def() -> &'static TypeDef {
     // This must not be called while the extension is being built.
     EXTENSION.get_type(&LIST_TYPENAME).unwrap()
 }
 
 /// Get the type of a list of `elem_type` as a `CustomType`.
+#[must_use]
 pub fn list_custom_type(elem_type: Type) -> CustomType {
     list_type_def()
         .instantiate(vec![TypeArg::Type { ty: elem_type }])
@@ -324,13 +331,14 @@ pub fn list_custom_type(elem_type: Type) -> CustomType {
 }
 
 /// Get the `Type` of a list of `elem_type`.
+#[must_use]
 pub fn list_type(elem_type: Type) -> Type {
     list_custom_type(elem_type).into()
 }
 
 /// A list operation with a concrete element type.
 ///
-/// See [ListOp] for the parametric version.
+/// See [`ListOp`] for the parametric version.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListOpInst {
     op: ListOp,
@@ -369,6 +377,7 @@ impl MakeExtensionOp for ListOpInst {
 impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
     /// registry to validate the element type against.
+    #[must_use]
     pub fn to_extension_op(self) -> Option<ExtensionOp> {
         ExtensionOp::new(EXTENSION.get_op(&self.op_id())?.clone(), self.type_args()).ok()
     }

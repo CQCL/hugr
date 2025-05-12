@@ -22,7 +22,7 @@ fn main() {
             eprintln!("Unknown command");
             std::process::exit(1);
         }
-    };
+    }
 }
 
 /// Run the `validate` subcommand.

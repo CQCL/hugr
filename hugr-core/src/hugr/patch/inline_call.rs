@@ -1,4 +1,4 @@
-//! Rewrite to inline a Call to a FuncDefn by copying the body of the function
+//! Rewrite to inline a Call to a `FuncDefn` by copying the body of the function
 //! into a DFG which replaces the Call node.
 use derive_more::{Display, Error};
 
@@ -9,18 +9,18 @@ use crate::{Direction, HugrView, Node};
 
 use super::{HugrMut, PatchHugrMut, PatchVerification};
 
-/// Rewrite to inline a [Call](OpType::Call) to a known [FuncDefn](OpType::FuncDefn)
+/// Rewrite to inline a [Call](OpType::Call) to a known [`FuncDefn`](OpType::FuncDefn)
 pub struct InlineCall<N = Node>(N);
 
-/// Error in performing [InlineCall] rewrite.
+/// Error in performing [`InlineCall`] rewrite.
 #[derive(Clone, Debug, Display, Error, PartialEq)]
 #[non_exhaustive]
 pub enum InlineCallError<N = Node> {
     /// The specified Node was not a [Call](OpType::Call)
     #[display("Node to inline {_0} expected to be a Call but actually {_1}")]
     NotCallNode(N, OpType),
-    /// The node was a Call, but the target was not a [FuncDefn](OpType::FuncDefn)
-    /// - presumably a [FuncDecl](OpType::FuncDecl), if the Hugr is valid.
+    /// The node was a Call, but the target was not a [`FuncDefn`](OpType::FuncDefn)
+    /// - presumably a [`FuncDecl`](OpType::FuncDecl), if the Hugr is valid.
     #[display("Call targetted node {_0} which must be a FuncDefn but was {_1}")]
     CallTargetNotFuncDefn(N, OpType),
 }
@@ -103,7 +103,7 @@ impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
         Ok(())
     }
 
-    /// Failure only occurs if the node is not a Call, or the target not a FuncDefn.
+    /// Failure only occurs if the node is not a Call, or the target not a `FuncDefn`.
     /// (Any later failure means an invalid Hugr and `panic`.)
     const UNCHANGED_ON_FAILURE: bool = true;
 }
@@ -284,7 +284,7 @@ mod test {
                 }
                 .into()
             ))
-        )
+        );
     }
 
     #[test]

@@ -26,7 +26,7 @@ impl_op_name!(TailLoop);
 impl DataflowOpTrait for TailLoop {
     const TAG: OpTag = OpTag::TailLoop;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A tail-controlled loop"
     }
 
@@ -57,7 +57,7 @@ impl TailLoop {
     /// [tag]: crate::ops::constant::Sum::tag
     pub const BREAK_TAG: usize = 1;
 
-    /// Build the output TypeRow of the child graph of a TailLoop node.
+    /// Build the output `TypeRow` of the child graph of a `TailLoop` node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
         let sum_type = Type::new_sum([self.just_inputs.clone(), self.just_outputs.clone()]);
         let mut outputs = vec![sum_type];
@@ -65,7 +65,7 @@ impl TailLoop {
         outputs.into()
     }
 
-    /// Build the input TypeRow of the child graph of a TailLoop node.
+    /// Build the input `TypeRow` of the child graph of a `TailLoop` node.
     pub(crate) fn body_input_row(&self) -> TypeRow {
         self.just_inputs.extend(self.rest.iter())
     }
@@ -97,7 +97,7 @@ impl_op_name!(Conditional);
 impl DataflowOpTrait for Conditional {
     const TAG: OpTag = OpTag::Conditional;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "HUGR conditional operation"
     }
 
@@ -120,7 +120,7 @@ impl DataflowOpTrait for Conditional {
 }
 
 impl Conditional {
-    /// Build the input TypeRow of the nth child graph of a Conditional node.
+    /// Build the input `TypeRow` of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
         Some(self.sum_rows.get(case)?.extend(self.other_inputs.iter()))
     }
@@ -139,7 +139,7 @@ impl_op_name!(CFG);
 impl DataflowOpTrait for CFG {
     const TAG: OpTag = OpTag::Cfg;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A dataflow node defined by a child CFG"
     }
 
@@ -199,7 +199,7 @@ impl DataflowParent for DataflowBlock {
 }
 
 impl OpTrait for DataflowBlock {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A CFG basic block node"
     }
     /// Tag identifying the operation.
@@ -232,7 +232,7 @@ impl OpTrait for DataflowBlock {
 }
 
 impl OpTrait for ExitBlock {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A CFG exit block node"
     }
     /// Tag identifying the operation.
@@ -262,7 +262,7 @@ impl OpTrait for ExitBlock {
     }
 }
 
-/// Functionality shared by DataflowBlock and Exit CFG block types.
+/// Functionality shared by `DataflowBlock` and Exit CFG block types.
 pub trait BasicBlock {
     /// The input dataflow signature of the CFG block.
     fn dataflow_input(&self) -> &TypeRow;
@@ -276,6 +276,7 @@ impl BasicBlock for DataflowBlock {
 impl DataflowBlock {
     /// The correct inputs of any successors. Returns None if successor is not a
     /// valid index.
+    #[must_use]
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
         Some(
             self.sum_rows
@@ -312,7 +313,7 @@ impl DataflowParent for Case {
 }
 
 impl OpTrait for Case {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A case node inside a conditional"
     }
 
@@ -329,11 +330,13 @@ impl OpTrait for Case {
 
 impl Case {
     /// The input signature of the contained dataflow graph.
+    #[must_use]
     pub fn dataflow_input(&self) -> &TypeRow {
         &self.signature.input
     }
 
     /// The output signature of the contained dataflow graph.
+    #[must_use]
     pub fn dataflow_output(&self) -> &TypeRow {
         &self.signature.output
     }

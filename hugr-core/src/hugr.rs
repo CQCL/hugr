@@ -93,6 +93,7 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 /// Public API for HUGRs.
 impl Hugr {
     /// Create a new Hugr, with a single [`Module`] operation as the root node.
+    #[must_use]
     pub fn new() -> Self {
         make_module_hugr(Module::new().into(), 0, 0).unwrap()
     }
@@ -184,7 +185,7 @@ impl Hugr {
     ///
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::store` with a bytearray instead.
-    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {
@@ -361,7 +362,7 @@ pub struct ExtensionError {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
-    /// The node was not of the required [OpTag]
+    /// The node was not of the required [`OpTag`]
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },

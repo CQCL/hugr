@@ -21,7 +21,7 @@ pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<table::Pa
     read_from_reader(slice, bump)
 }
 
-/// Read a hugr package from an impl of [BufRead].
+/// Read a hugr package from an impl of [`BufRead`].
 pub fn read_from_reader(reader: impl BufRead, bump: &Bump) -> ReadResult<table::Package<'_>> {
     let reader =
         capnp::serialize_packed::read_message(reader, capnp::message::ReaderOptions::new())?;

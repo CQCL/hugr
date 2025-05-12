@@ -47,9 +47,9 @@ impl Default for LinearizeArrayPass {
             let mut ty = v.get_element_type().clone();
             let mut contents = v.get_contents().iter().cloned().collect_vec();
             ty.transform(replacer).unwrap();
-            contents.iter_mut().for_each(|v| {
+            for v in &mut contents {
                 replacer.change_value(v).unwrap();
-            });
+            }
             Ok(Some(ArrayValue::new(ty, contents).into()))
         });
         for op_def in ArrayOpDef::iter() {
@@ -65,12 +65,11 @@ impl Default for LinearizeArrayPass {
                     // that takes a function ptr to copy the element? For now, let's just
                     // error out and make sure we're not emitting `get`s for nested value
                     // arrays.
-                    if op_def == ArrayOpDef::get && !args[1].as_type().unwrap().copyable() {
-                        panic!(
-                            "Cannot linearise arrays in this Hugr: \
+                    assert!(
+                        op_def != ArrayOpDef::get || args[1].as_type().unwrap().copyable(),
+                        "Cannot linearise arrays in this Hugr: \
                             Contains a `get` operation on nested value arrays"
-                        );
-                    }
+                    );
                     Some(NodeTemplate::SingleOp(
                         op_def.instantiate(args).unwrap().into(),
                     ))
@@ -132,6 +131,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LinearizeArrayPass {
 
 impl LinearizeArrayPass {
     /// Returns a new [`LinearizeArrayPass`] that handles all standard extensions.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

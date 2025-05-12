@@ -163,9 +163,9 @@ fn parse_region(pair: Pair<Rule>) -> ParseResult<Region> {
         kind,
         sources,
         targets,
-        signature,
-        meta,
         children,
+        meta,
+        signature,
     })
 }
 

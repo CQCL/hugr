@@ -26,6 +26,7 @@ pub struct GenericArrayScanDef<AK: ArrayKind>(PhantomData<AK>);
 
 impl<AK: ArrayKind> GenericArrayScanDef<AK> {
     /// Creates a new array scan operation definition.
+    #[must_use]
     pub fn new() -> Self {
         GenericArrayScanDef(PhantomData)
     }
@@ -122,8 +123,8 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayScanDef<AK> {
             .into()
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.
@@ -157,6 +158,7 @@ pub struct GenericArrayScan<AK: ArrayKind> {
 
 impl<AK: ArrayKind> GenericArrayScan<AK> {
     /// Creates a new array scan op.
+    #[must_use]
     pub fn new(src_ty: Type, tgt_ty: Type, acc_tys: Vec<Type>, size: u64) -> Self {
         GenericArrayScan {
             src_ty,

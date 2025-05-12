@@ -102,7 +102,7 @@ pub(crate) fn resolve_op_extensions<'e>(
             stored: opaque.signature().into_owned(),
         }
         .into());
-    };
+    }
 
     // Replace the opaque operation with the resolved extension operation.
     *op = ext_op.into();

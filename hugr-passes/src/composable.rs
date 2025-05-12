@@ -7,7 +7,7 @@ use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
-/// e.g. by [ValidatingPass]
+/// e.g. by [`ValidatingPass`]
 pub trait ComposablePass<H: HugrMut>: Sized {
     type Error: Error;
     type Result; // Would like to default to () but currently unstable
@@ -21,7 +21,7 @@ pub trait ComposablePass<H: HugrMut>: Sized {
         ErrMapper::new(self, f)
     }
 
-    /// Returns a [ComposablePass] that does "`self` then `other`", so long as
+    /// Returns a [`ComposablePass`] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
     fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
@@ -107,7 +107,7 @@ impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> Composabl
 
 // ValidatingPass ------------------------------
 
-/// Error from a [ValidatingPass]
+/// Error from a [`ValidatingPass`]
 #[derive(thiserror::Error, Debug)]
 pub enum ValidatePassError<N, E>
 where
@@ -170,7 +170,7 @@ where
 }
 
 // IfThen ------------------------------
-/// [ComposablePass] that executes a first pass that returns a `bool`
+/// [`ComposablePass`] that executes a first pass that returns a `bool`
 /// result; and then, if-and-only-if that first result was true,
 /// executes a second pass
 pub struct IfThen<E, H, A, B>(A, B, PhantomData<(E, H)>);
@@ -182,7 +182,7 @@ impl<
     E: ErrorCombiner<A::Error, B::Error>,
 > IfThen<E, H, A, B>
 {
-    /// Make a new instance given the [ComposablePass] to run first
+    /// Make a new instance given the [`ComposablePass`] to run first
     /// and (maybe) second
     pub fn new(fst: A, opt_snd: B) -> Self {
         Self(fst, opt_snd, PhantomData)

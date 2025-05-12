@@ -1266,7 +1266,7 @@ pub(in crate::hugr::patch) mod test {
             .map(|((tgt, tgt_port), (r_n, r_p))| {
                 if *tgt == out {
                     unimplemented!()
-                };
+                }
                 let (src, src_port) = h.single_linked_output(*r_n, *r_p).unwrap();
                 NewEdgeSpec {
                     src,
@@ -1285,7 +1285,7 @@ pub(in crate::hugr::patch) mod test {
                 let (src, src_port) = replacement.single_linked_output(out, out_port).unwrap();
                 if src == in_ {
                     unimplemented!()
-                };
+                }
                 NewEdgeSpec {
                     src,
                     tgt,

@@ -42,6 +42,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
     GenericArrayConvertDef<AK, DIR, OtherAK>
 {
     /// Creates a new array conversion definition.
+    #[must_use]
     pub fn new() -> Self {
         GenericArrayConvertDef(PhantomData, PhantomData)
     }
@@ -127,8 +128,8 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeOpDef
         }
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.
@@ -163,6 +164,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
     GenericArrayConvert<AK, DIR, OtherAK>
 {
     /// Creates a new array conversion op.
+    #[must_use]
     pub fn new(elem_ty: Type, size: u64) -> Self {
         GenericArrayConvert {
             elem_ty,

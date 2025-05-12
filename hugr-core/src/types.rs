@@ -56,10 +56,10 @@ pub enum EdgeKind {
     Value(Type),
     /// A reference to a static constant value - must be a Copyable type
     Const(Type),
-    /// A reference to a function i.e. [FuncDecl] or [FuncDefn].
+    /// A reference to a function i.e. [`FuncDecl`] or [`FuncDefn`].
     ///
-    /// [FuncDecl]: crate::ops::FuncDecl
-    /// [FuncDefn]: crate::ops::FuncDefn
+    /// [`FuncDecl`]: crate::ops::FuncDecl
+    /// [`FuncDefn`]: crate::ops::FuncDefn
     Function(PolyFuncType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
@@ -67,12 +67,14 @@ pub enum EdgeKind {
 
 impl EdgeKind {
     /// Returns whether the type might contain linear data.
+    #[must_use]
     pub fn is_linear(&self) -> bool {
         matches!(self, EdgeKind::Value(t) if !t.copyable())
     }
 
-    /// Whether this EdgeKind represents a Static edge (in the spec)
+    /// Whether this `EdgeKind` represents a Static edge (in the spec)
     /// - i.e. the value is statically known
+    #[must_use]
     pub fn is_static(&self) -> bool {
         matches!(self, EdgeKind::Const(_) | EdgeKind::Function(_))
     }
@@ -134,8 +136,9 @@ pub enum TypeBound {
 }
 
 impl TypeBound {
-    /// Returns the smallest TypeTag containing both the receiver and argument.
+    /// Returns the smallest `TypeTag` containing both the receiver and argument.
     /// (This will be one of the receiver or the argument.)
+    #[must_use]
     pub fn union(self, other: Self) -> Self {
         if self.contains(other) {
             self
@@ -146,8 +149,9 @@ impl TypeBound {
     }
 
     /// Report if this bound contains another.
+    #[must_use]
     pub const fn contains(&self, other: TypeBound) -> bool {
-        use TypeBound::*;
+        use TypeBound::{Any, Copyable};
         matches!((self, other), (Any, _) | (_, Copyable))
     }
 }
@@ -169,7 +173,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 #[non_exhaustive]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
-/// of a UnitSum (sum over empty tuples), store only the size of the Sum.
+/// of a `UnitSum` (sum over empty tuples), store only the size of the Sum.
 pub enum SumType {
     /// Special case of a Sum over unit types.
     #[allow(missing_docs)]
@@ -209,14 +213,15 @@ impl SumType {
         let rows = variants.into_iter().map(Into::into).collect_vec();
 
         let len: usize = rows.len();
-        if len <= (u8::MAX as usize) && rows.iter().all(TypeRowRV::is_empty) {
+        if u8::try_from(len).is_ok() && rows.iter().all(TypeRowRV::is_empty) {
             Self::new_unary(len as u8)
         } else {
             Self::General { rows }
         }
     }
 
-    /// New UnitSum with empty Tuple variants.
+    /// New `UnitSum` with empty Tuple variants.
+    #[must_use]
     pub const fn new_unary(size: u8) -> Self {
         Self::Unit { size }
     }
@@ -232,6 +237,7 @@ impl SumType {
     }
 
     /// Report the tag'th variant, if it exists.
+    #[must_use]
     pub fn get_variant(&self, tag: usize) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if tag < (*size as usize) => Some(TypeRV::EMPTY_TYPEROW_REF),
@@ -241,6 +247,7 @@ impl SumType {
     }
 
     /// Returns the number of variants in the sum type.
+    #[must_use]
     pub fn num_variants(&self) -> usize {
         match self {
             SumType::Unit { size } => *size as usize,
@@ -249,6 +256,7 @@ impl SumType {
     }
 
     /// Returns variant row if there is only one variant.
+    #[must_use]
     pub fn as_tuple(&self) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if *size == 1 => Some(TypeRV::EMPTY_TYPEROW_REF),
@@ -258,6 +266,7 @@ impl SumType {
     }
 
     /// If the sum matches the convention of `Option[row]`, return the row.
+    #[must_use]
     pub fn as_option(&self) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if *size == 2 => Some(TypeRV::EMPTY_TYPEROW_REF),
@@ -267,6 +276,7 @@ impl SumType {
     }
 
     /// If a sum is an option of a single type, return the type.
+    #[must_use]
     pub fn as_unary_option(&self) -> Option<&TypeRV> {
         self.as_option()
             .and_then(|row| row.iter().exactly_one().ok())
@@ -321,7 +331,7 @@ pub enum TypeEnum<RV: MaybeRV> {
     // We cache the TypeBound here (checked in validation)
     #[display("#{_0}")]
     Variable(usize, TypeBound),
-    /// RowVariable. Of course, this requires that `RV` has instances, [NoRV] doesn't.
+    /// `RowVariable`. Of course, this requires that `RV` has instances, [`NoRV`] doesn't.
     #[display("RowVar({_0})")]
     RowVar(RV),
     /// Sum of types.
@@ -354,10 +364,10 @@ impl<RV: MaybeRV> TypeEnum<RV> {
     into = "serialize::SerSimpleType",
     try_from = "serialize::SerSimpleType"
 )]
-/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
+/// A HUGR type - the valid types of [`EdgeKind::Value`] and [`EdgeKind::Const`] edges.
 ///
 /// Such an edge is valid if the ports on either end agree on the [Type].
-/// Types have an optional [TypeBound] which places limits on the valid
+/// Types have an optional [`TypeBound`] which places limits on the valid
 /// operations on a type.
 ///
 /// Examples:
@@ -441,12 +451,14 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     /// Initialize a new custom type.
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
+    #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
         TypeBase(TypeEnum::Extension(opaque), bound)
     }
 
     /// Initialize a new alias.
+    #[must_use]
     pub fn new_alias(alias: AliasDecl) -> Self {
         Self::new(TypeEnum::Alias(alias))
     }
@@ -456,7 +468,8 @@ impl<RV: MaybeRV> TypeBase<RV> {
         Self(type_e, bound)
     }
 
-    /// New UnitSum with empty Tuple variants
+    /// New `UnitSum` with empty Tuple variants
+    #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
         Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Copyable)
@@ -464,31 +477,32 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     /// New use (occurrence) of the type variable with specified index.
     /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [TypeParam::Type]`(bound)`), which may be narrower
+    /// (i.e. as a [`TypeParam::Type`]`(bound)`), which may be narrower
     /// than required for the use.
+    #[must_use]
     pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
     }
 
-    /// Report the least upper [TypeBound]
+    /// Report the least upper [`TypeBound`]
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
         self.1
     }
 
-    /// Report the component TypeEnum.
+    /// Report the component `TypeEnum`.
     #[inline(always)]
     pub const fn as_type_enum(&self) -> &TypeEnum<RV> {
         &self.0
     }
 
-    /// Report a mutable reference to the component TypeEnum.
+    /// Report a mutable reference to the component `TypeEnum`.
     #[inline(always)]
     pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
         &mut self.0
     }
 
-    /// Returns the inner [SumType] if the type is a sum.
+    /// Returns the inner [`SumType`] if the type is a sum.
     pub fn as_sum(&self) -> Option<&SumType> {
         match &self.0 {
             TypeEnum::Sum(s) => Some(s),
@@ -496,7 +510,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
         }
     }
 
-    /// Returns the inner [CustomType] if the type is from an extension.
+    /// Returns the inner [`CustomType`] if the type is from an extension.
     pub fn as_extension(&self) -> Option<&CustomType> {
         match &self.0 {
             TypeEnum::Extension(ct) => Some(ct),
@@ -511,9 +525,9 @@ impl<RV: MaybeRV> TypeBase<RV> {
     }
 
     /// Checks all variables used in the type are in the provided list
-    /// of bound variables, rejecting any [RowVariable]s if `allow_row_vars` is False;
-    /// and that for each [CustomType] the corresponding
-    /// [TypeDef] is in the [ExtensionRegistry] and the type arguments
+    /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
+    /// and that for each [`CustomType`] the corresponding
+    /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
     /// [validate] and fit into the def's declared parameters.
     ///
     /// [RowVariable]: TypeEnum::RowVariable
@@ -540,9 +554,9 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// Applies a substitution to a type.
     /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
     /// Invariants may be confirmed by validation:
-    /// * If [Type::validate]`(false)` returns successfully, this method will return a Vec containing exactly one type
-    /// * If [Type::validate]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
-    ///   return a Vec containing any number of [Type]s. These may (or not) pass [Type::validate]
+    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
+    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
+    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
     fn substitute(&self, t: &Substitution) -> Vec<Self> {
         match &self.0 {
             TypeEnum::RowVar(rv) => rv.substitute(t),
@@ -602,6 +616,7 @@ impl Type {
 
 impl TypeRV {
     /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
+    #[must_use]
     pub fn is_row_var(&self) -> bool {
         matches!(self.0, TypeEnum::RowVar(_))
     }
@@ -613,6 +628,7 @@ impl TypeRV {
     ///
     /// [OpDef]: crate::extension::OpDef
     /// [FuncDefn]: crate::ops::FuncDefn
+    #[must_use]
     pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::RowVar(RowVariable(idx, bound)), bound)
     }
@@ -620,8 +636,8 @@ impl TypeRV {
 
 // ====== Conversions ======
 impl<RV: MaybeRV> TypeBase<RV> {
-    /// (Fallibly) converts a TypeBase (parameterized, so may or may not be able
-    /// to contain [RowVariable]s) into a [Type] that definitely does not.
+    /// (Fallibly) converts a `TypeBase` (parameterized, so may or may not be able
+    /// to contain [`RowVariable`]s) into a [Type] that definitely does not.
     pub fn try_into_type(self) -> Result<Type, RowVariable> {
         Ok(TypeBase(
             match self.0 {
@@ -646,7 +662,7 @@ impl TryFrom<TypeRV> for Type {
 
 impl<RV1: MaybeRV> TypeBase<RV1> {
     /// A swiss-army-knife for any safe conversion of the type argument `RV1`
-    /// to/from [NoRV]/RowVariable/rust-type-variable.
+    /// to/from [`NoRV`]/RowVariable/rust-type-variable.
     fn into_<RV2: MaybeRV>(self) -> TypeBase<RV2>
     where
         RV1: Into<RV2>,
@@ -674,16 +690,17 @@ impl From<Type> for TypeRV {
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
 #[derive(Clone, Debug, derive_more::Display)]
-#[display("[{}]", _0.iter().map(|ta| ta.to_string()).join(", "))]
+#[display("[{}]", _0.iter().map(std::string::ToString::to_string).join(", "))]
 pub struct Substitution<'a>(&'a [TypeArg]);
 
 impl<'a> Substitution<'a> {
     /// Create a new Substitution given the replacement values (indexed
-    /// as the variables they replace). `exts` must contain the [TypeDef]
+    /// as the variables they replace). `exts` must contain the [`TypeDef`]
     /// for every custom [Type] (to which the Substitution is applied)
     /// containing a type-variable.
     ///
-    /// [TypeDef]: crate::extension::TypeDef
+    /// [`TypeDef`]: crate::extension::TypeDef
+    #[must_use]
     pub fn new(items: &'a [TypeArg]) -> Self {
         Self(items)
     }
@@ -728,24 +745,24 @@ impl<'a> Substitution<'a> {
     }
 }
 
-/// A transformation that can be applied to a [Type] or [TypeArg].
+/// A transformation that can be applied to a [Type] or [`TypeArg`].
 /// More general in some ways than a Substitution: can fail with a
-/// [Self::Err],  may change [TypeBound::Copyable] to [TypeBound::Any],
+/// [`Self::Err`],  may change [`TypeBound::Copyable`] to [`TypeBound::Any`],
 /// and applies to arbitrary extension types rather than type variables.
 pub trait TypeTransformer {
-    /// Error returned when a [CustomType] cannot be transformed, or a type
-    /// containing it (e.g. if changing a [TypeArg::Type] from copyable to
+    /// Error returned when a [`CustomType`] cannot be transformed, or a type
+    /// containing it (e.g. if changing a [`TypeArg::Type`] from copyable to
     /// linear invalidates a parameterized type).
     type Err: std::error::Error + From<SignatureError>;
 
     /// Applies the transformation to an extension type.
     ///
-    /// Note that if the [CustomType] has type arguments, these will *not*
+    /// Note that if the [`CustomType`] has type arguments, these will *not*
     /// have been transformed first (this might not produce a valid type
-    /// due to changes in [TypeBound]).
+    /// due to changes in [`TypeBound`]).
     ///
     /// Returns a type to use instead, or None to indicate no change
-    ///   (in which case, the TypeArgs will be transformed instead.
+    ///   (in which case, the `TypeArgs` will be transformed instead.
     ///    To prevent transforming the arguments, return `t.clone().into()`.)
     fn apply_custom(&self, t: &CustomType) -> Result<Option<Type>, Self::Err>;
 
@@ -753,10 +770,10 @@ pub trait TypeTransformer {
     // By defaulting such trait methods to Ok(None), backwards compatibility will be preserved.
 }
 
-/// Trait for things that can be transformed by applying a [TypeTransformer].
+/// Trait for things that can be transformed by applying a [`TypeTransformer`].
 /// (A destructive / in-place mutation.)
 pub trait Transformable {
-    /// Applies a [TypeTransformer] to this instance.
+    /// Applies a [`TypeTransformer`] to this instance.
     ///
     /// Returns true if any part may have changed, or false for definitely no change.
     ///

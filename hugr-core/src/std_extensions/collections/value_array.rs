@@ -138,8 +138,9 @@ impl CustomConst for VArrayValue {
     }
 }
 
-/// Gets the [TypeDef] for value arrays. Note that instantiations are more easily
-/// created via [value_array_type] and [value_array_type_parametric]
+/// Gets the [`TypeDef`] for value arrays. Note that instantiations are more easily
+/// created via [`value_array_type`] and [`value_array_type_parametric`]
+#[must_use]
 pub fn value_array_type_def() -> &'static TypeDef {
     ValueArray::type_def()
 }
@@ -148,6 +149,7 @@ pub fn value_array_type_def() -> &'static TypeDef {
 ///
 /// This method is equivalent to [`value_array_type_parametric`], but uses concrete
 /// arguments types to ensure no errors are possible.
+#[must_use]
 pub fn value_array_type(size: u64, element_ty: Type) -> Type {
     ValueArray::ty(size, element_ty)
 }

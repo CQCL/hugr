@@ -49,7 +49,7 @@ pub(super) fn node_style(
     let mut entrypoint_style = PresentationStyle::default();
     entrypoint_style.stroke = Some("#832561".to_string());
     entrypoint_style.stroke_width = Some("3px".to_string());
-    let entrypoint = config.entrypoint.map(|n| n.into_portgraph());
+    let entrypoint = config.entrypoint.map(Node::into_portgraph);
 
     if config.node_indices {
         Box::new(move |n| {
@@ -95,10 +95,13 @@ pub(super) fn port_style(
             EdgeKind::Const(ty) | EdgeKind::Value(ty) => {
                 PortStyle::new(html_escape::encode_text(&format!("{ty}")))
             }
-            EdgeKind::StateOrder => match graph.port_links(port).count() > 0 {
-                true => PortStyle::text("", false),
-                false => PortStyle::Hidden,
-            },
+            EdgeKind::StateOrder => {
+                if graph.port_links(port).count() > 0 {
+                    PortStyle::text("", false)
+                } else {
+                    PortStyle::Hidden
+                }
+            }
             _ => PortStyle::text("", true),
         }
     })

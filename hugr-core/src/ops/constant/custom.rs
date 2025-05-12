@@ -102,7 +102,7 @@ pub trait CustomConst:
 /// "not hashable", or else to implement/derive [Hash].
 pub trait TryHash {
     /// Hashes the value, if possible; else return `false` without mutating the `Hasher`.
-    /// This relates with [CustomConst::equal_consts] just like [Hash] with [Eq]:
+    /// This relates with [`CustomConst::equal_consts`] just like [Hash] with [Eq]:
     /// * if `x.equal_consts(y)` ==> `x.try_hash(s)` behaves equivalently to `y.try_hash(s)`
     /// * if `x.hash(s)` behaves differently from `y.hash(s)` ==> `x.equal_consts(y) == false`
     ///
@@ -129,7 +129,7 @@ impl PartialEq for dyn CustomConst {
     }
 }
 
-/// Const equality for types that have PartialEq
+/// Const equality for types that have `PartialEq`
 pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
     constant: &T,
     other: &dyn CustomConst,
@@ -141,7 +141,7 @@ pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
     }
 }
 
-/// Serialize any CustomConst using the `impl Serialize for &dyn CustomConst`.
+/// Serialize any `CustomConst` using the `impl Serialize for &dyn CustomConst`.
 fn serialize_custom_const(cc: &dyn CustomConst) -> Result<serde_json::Value, serde_json::Error> {
     serde_json::to_value(cc)
 }
@@ -204,6 +204,7 @@ impl CustomSerialized {
     }
 
     /// Returns the inner value.
+    #[must_use]
     pub fn value(&self) -> &serde_json::Value {
         &self.value
     }
@@ -258,6 +259,7 @@ impl CustomSerialized {
     ///
     /// Note that if the inner value is a [Self] we do not recursively
     /// deserialize it.
+    #[must_use]
     pub fn into_custom_const_box(self) -> Box<dyn CustomConst> {
         // ideally we would not have to clone, but serde_json does not allow us
         // to recover the value from the error
@@ -339,6 +341,7 @@ pub(super) mod serde_extension_value {
 }
 
 /// Given a singleton list of constant operations, return the value.
+#[must_use]
 pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) -> Option<&T> {
     let [(_, c)] = consts else {
         return None;
@@ -347,6 +350,7 @@ pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) 
 }
 
 /// Given a list of two constant operations, return the values.
+#[must_use]
 pub fn get_pair_of_input_values<T: CustomConst>(
     consts: &[(IncomingPort, Value)],
 ) -> Option<(&T, &T)> {

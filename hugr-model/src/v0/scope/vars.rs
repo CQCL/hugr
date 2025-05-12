@@ -49,6 +49,7 @@ pub struct VarTable<'a> {
 
 impl<'a> VarTable<'a> {
     /// Create a new empty variable table.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -59,7 +60,7 @@ impl<'a> VarTable<'a> {
             node,
             var_count: 0,
             var_stack: self.vars.len(),
-        })
+        });
     }
 
     /// Exit a previously entered scope.
@@ -96,6 +97,7 @@ impl<'a> VarTable<'a> {
     /// # Panics
     ///
     /// Panics if there are no open scopes.
+    #[must_use]
     pub fn is_visible(&self, var: VarId) -> bool {
         let scope = self.scopes.last().unwrap();
         scope.node == var.0 && var.1 < scope.var_count

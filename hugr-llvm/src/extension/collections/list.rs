@@ -34,9 +34,9 @@ pub enum ListRtFunc {
 }
 
 impl ListRtFunc {
-    /// The signature of a given [ListRtFunc].
+    /// The signature of a given [`ListRtFunc`].
     ///
-    /// Requires a [ListCodegen] to determine the type of lists.
+    /// Requires a [`ListCodegen`] to determine the type of lists.
     pub fn signature<'c>(
         self,
         ts: TypingSession<'c, '_>,
@@ -80,9 +80,9 @@ impl ListRtFunc {
         }
     }
 
-    /// Returns the extern function corresponding to this [ListRtFunc].
+    /// Returns the extern function corresponding to this [`ListRtFunc`].
     ///
-    /// Requires a [ListCodegen] to determine the function signature.
+    /// Requires a [`ListCodegen`] to determine the function signature.
     pub fn get_extern<'c, H: HugrView<Node = Node>>(
         self,
         ctx: &EmitFuncContext<'c, '_, H>,
@@ -109,10 +109,10 @@ impl From<ListOp> for ListRtFunc {
     }
 }
 
-/// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::list]
-/// types, [hugr_core::ops::constant::CustomConst]s, and ops.
+/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::list`]
+/// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait ListCodegen: Clone {
-    /// Return the llvm type of [hugr_core::std_extensions::collections::list::LIST_TYPENAME].
+    /// Return the llvm type of [`hugr_core::std_extensions::collections::list::LIST_TYPENAME`].
     fn list_type<'c>(&self, session: TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
         session
             .iw_context()
@@ -121,7 +121,7 @@ pub trait ListCodegen: Clone {
             .into()
     }
 
-    /// Return the name of a given [ListRtFunc].
+    /// Return the name of a given [`ListRtFunc`].
     fn rt_func_name(&self, func: ListRtFunc) -> String {
         match func {
             ListRtFunc::New => "__rt__list__new",
@@ -136,7 +136,7 @@ pub trait ListCodegen: Clone {
     }
 }
 
-/// A trivial implementation of [ListCodegen] which passes all methods
+/// A trivial implementation of [`ListCodegen`] which passes all methods
 /// through to their default implementations.
 #[derive(Default, Clone)]
 pub struct DefaultListCodegen;
@@ -182,14 +182,15 @@ impl<CCG: ListCodegen> CodegenExtension for ListCodegenExtension<CCG> {
 }
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [ListCodegenExtension] to the given [CodegenExtsBuilder] using `ccg`
+    /// Add a [`ListCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
     /// as the implementation.
+    #[must_use]
     pub fn add_default_list_extensions(self) -> Self {
         self.add_list_extensions(DefaultListCodegen)
     }
 
-    /// Add a [ListCodegenExtension] to the given [CodegenExtsBuilder] using
-    /// [DefaultListCodegen] as the implementation.
+    /// Add a [`ListCodegenExtension`] to the given [`CodegenExtsBuilder`] using
+    /// [`DefaultListCodegen`] as the implementation.
     pub fn add_list_extensions(self, ccg: impl ListCodegen + 'a) -> Self {
         self.add_extension(ListCodegenExtension::from(ccg))
     }

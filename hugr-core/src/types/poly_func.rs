@@ -16,12 +16,12 @@ use super::Substitution;
 use super::type_param::{TypeArg, TypeParam, check_type_args};
 use super::{MaybeRV, NoRV, RowVariable, signature::FuncTypeBase};
 
-/// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
+/// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
 /// (Nodes/operations in the Hugr are not polymorphic.)
 ///
-/// [FuncDecl]: crate::ops::module::FuncDecl
-/// [FuncDefn]: crate::ops::module::FuncDefn
-/// [OpDef]: crate::extension::OpDef
+/// [`FuncDecl`]: crate::ops::module::FuncDecl
+/// [`FuncDefn`]: crate::ops::module::FuncDefn
+/// [`OpDef`]: crate::extension::OpDef
 #[derive(
     Clone, PartialEq, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
@@ -29,27 +29,27 @@ use super::{MaybeRV, NoRV, RowVariable, signature::FuncTypeBase};
 #[display("{}{body}", self.display_params())]
 pub struct PolyFuncTypeBase<RV: MaybeRV> {
     /// The declared type parameters, i.e., these must be instantiated with
-    /// the same number of [TypeArg]s before the function can be called. This
+    /// the same number of [`TypeArg`]s before the function can be called. This
     /// defines the indices used by variables inside the body.
     #[cfg_attr(test, proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)"))]
     params: Vec<TypeParam>,
-    /// Template for the function. May contain variables up to length of [Self::params]
+    /// Template for the function. May contain variables up to length of [`Self::params`]
     #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<RV>>(params)"))]
     body: FuncTypeBase<RV>,
 }
 
-/// The polymorphic type of a [Call]-able function ([FuncDecl] or [FuncDefn]).
+/// The polymorphic type of a [`Call`]-able function ([`FuncDecl`] or [`FuncDefn`]).
 /// Number of inputs and outputs fixed.
 ///
-/// [Call]: crate::ops::Call
-/// [FuncDefn]: crate::ops::FuncDefn
-/// [FuncDecl]: crate::ops::FuncDecl
+/// [`Call`]: crate::ops::Call
+/// [`FuncDefn`]: crate::ops::FuncDefn
+/// [`FuncDecl`]: crate::ops::FuncDecl
 pub type PolyFuncType = PolyFuncTypeBase<NoRV>;
 
-/// The polymorphic type of an [OpDef], whose number of input and outputs
-/// may vary according to how [RowVariable]s therein are instantiated.
+/// The polymorphic type of an [`OpDef`], whose number of input and outputs
+/// may vary according to how [`RowVariable`]s therein are instantiated.
 ///
-/// [OpDef]: crate::extension::OpDef
+/// [`OpDef`]: crate::extension::OpDef
 pub type PolyFuncTypeRV = PolyFuncTypeBase<RowVariable>;
 
 // deriving Default leads to an impl that only applies for RV: Default
@@ -81,7 +81,7 @@ impl From<PolyFuncType> for PolyFuncTypeRV {
 }
 
 impl<RV: MaybeRV> TryFrom<PolyFuncTypeBase<RV>> for FuncTypeBase<RV> {
-    /// If the PolyFuncTypeBase is not monomorphic, fail with its binders
+    /// If the `PolyFuncTypeBase` is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
 
     fn try_from(value: PolyFuncTypeBase<RV>) -> Result<Self, Self::Error> {
@@ -104,8 +104,8 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
         &self.body
     }
 
-    /// Create a new PolyFuncTypeBase given the kinds of the variables it declares
-    /// and the underlying [FuncTypeBase].
+    /// Create a new `PolyFuncTypeBase` given the kinds of the variables it declares
+    /// and the underlying [`FuncTypeBase`].
     pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<RV>>) -> Self {
         Self {
             params: params.into(),
@@ -113,12 +113,12 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
         }
     }
 
-    /// Instantiates an outer [PolyFuncTypeBase], i.e. with no free variables
-    /// (as ensured by [Self::validate]), into a monomorphic type.
+    /// Instantiates an outer [`PolyFuncTypeBase`], i.e. with no free variables
+    /// (as ensured by [`Self::validate`]), into a monomorphic type.
     ///
     /// # Errors
-    /// If there is not exactly one [TypeArg] for each binder ([Self::params]),
-    /// or an arg does not fit into its corresponding [TypeParam]
+    /// If there is not exactly one [`TypeArg`] for each binder ([`Self::params`]),
+    /// or an arg does not fit into its corresponding [`TypeParam`]
     pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<RV>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
@@ -319,7 +319,7 @@ pub(crate) mod test {
             ext.add_type(
                 TYPE_NAME,
                 vec![bound.clone()],
-                "".into(),
+                String::new(),
                 TypeDefBound::any(),
                 extension_ref,
             )

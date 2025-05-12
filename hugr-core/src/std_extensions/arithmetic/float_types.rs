@@ -20,7 +20,8 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 /// Identifier for the 64-bit IEEE 754-2019 floating-point type.
 pub const FLOAT_TYPE_ID: TypeName = TypeName::new_inline("float64");
 
-/// 64-bit IEEE 754-2019 floating-point type (as [CustomType])
+/// 64-bit IEEE 754-2019 floating-point type (as [`CustomType`])
+#[must_use]
 pub fn float64_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
     CustomType::new(
         FLOAT_TYPE_ID,
@@ -32,6 +33,7 @@ pub fn float64_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
 }
 
 /// 64-bit IEEE 754-2019 floating-point type (as [Type])
+#[must_use]
 pub fn float64_type() -> Type {
     float64_custom_type(&Arc::downgrade(&EXTENSION)).into()
 }
@@ -68,15 +70,15 @@ impl ConstF64 {
     pub(crate) const CTR_NAME: &'static str = "arithmetic.float.const_f64";
 
     /// Create a new [`ConstF64`]
+    #[must_use]
     pub fn new(value: f64) -> Self {
         // This function can't be `const` because `is_finite()` is not yet stable as a const function.
-        if !value.is_finite() {
-            panic!("ConstF64 must have a finite value.");
-        }
+        assert!(value.is_finite(), "ConstF64 must have a finite value.");
         Self { value }
     }
 
     /// Returns the value of the constant
+    #[must_use]
     pub fn value(&self) -> f64 {
         self.value
     }

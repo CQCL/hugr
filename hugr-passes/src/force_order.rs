@@ -1,4 +1,4 @@
-//! Provides [force_order], a tool for fixing the order of nodes in a Hugr.
+//! Provides [`force_order`], a tool for fixing the order of nodes in a Hugr.
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
 use hugr_core::hugr::internal::PortgraphNodeMap;
@@ -41,7 +41,7 @@ pub fn force_order<H: HugrMut<Node = Node>>(
     force_order_by_key(hugr, root, rank)
 }
 
-/// As [force_order], but allows a generic [Ord] choice for the result of the
+/// As [`force_order`], but allows a generic [Ord] choice for the result of the
 /// `rank` function.
 pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     hugr: &mut H,
@@ -105,7 +105,7 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     Ok(())
 }
 
-/// An adaption of [petgraph::visit::Topo]. We differ only in that we sort nodes
+/// An adaption of [`petgraph::visit::Topo`]. We differ only in that we sort nodes
 /// by the rank function before adding them to the internal work stack. This
 /// ensures we visit lower ranked nodes before higher ranked nodes whenever the
 /// topology of the graph allows.
@@ -334,7 +334,7 @@ mod test {
     }
 
     #[test]
-    /// test for https://github.com/CQCL/hugr/issues/2005
+    /// test for <https://github.com/CQCL/hugr/issues/2005>
     fn call_indirect_bug() {
         let fn_type = Signature::new(Type::UNIT, vec![Type::UNIT]);
         let mut hugr = {

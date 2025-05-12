@@ -119,7 +119,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let n0: &ConstInt = get_single_input_value(consts)?;
                     (logwidth0 >= logwidth1 && n0.log_width() == logwidth0).then_some(())?;
 
-                    let int_out_type = INT_TYPES[logwidth1 as usize].to_owned();
+                    let int_out_type = INT_TYPES[logwidth1 as usize].clone();
                     let sum_type = sum_with_error(int_out_type.clone());
 
                     let mk_out_const = |i, mb_v: Result<Value, _>| {
@@ -147,7 +147,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let n0: &ConstInt = get_single_input_value(consts)?;
                     (logwidth0 >= logwidth1 && n0.log_width() == logwidth0).then_some(())?;
 
-                    let int_out_type = INT_TYPES[logwidth1 as usize].to_owned();
+                    let int_out_type = INT_TYPES[logwidth1 as usize].clone();
                     let sum_type = sum_with_error(int_out_type.clone());
                     let mk_out_const = |i, mb_v: Result<Value, _>| {
                         mb_v.and_then(|v| Value::sum(i, [v], sum_type))
@@ -498,9 +498,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     };
                     let logwidth: u8 = get_log_width(arg).ok()?;
                     let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != logwidth {
-                        None
-                    } else {
+                    if n0.log_width() == logwidth {
                         Some(vec![(
                             0.into(),
                             Value::extension(
@@ -512,6 +510,8 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 .unwrap(),
                             ),
                         )])
+                    } else {
+                        None
                     }
                 },
             ),
@@ -583,7 +583,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let q_type = INT_TYPES[logwidth0 as usize].to_owned();
+                        let q_type = INT_TYPES[logwidth0 as usize].clone();
                         let r_type = q_type.clone();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
                         let err_value = || {
@@ -644,8 +644,8 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let q_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let r_type = INT_TYPES[logwidth0 as usize].to_owned();
+                        let q_type = INT_TYPES[logwidth0 as usize].clone();
+                        let r_type = INT_TYPES[logwidth0 as usize].clone();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
                         let err_value = || {
                             ConstError {
@@ -704,7 +704,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
+                        let int_out_type = INT_TYPES[logwidth0 as usize].clone();
                         let err_value = || {
                             ConstError {
                                 signal: 0,
@@ -756,7 +756,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
+                        let int_out_type = INT_TYPES[logwidth0 as usize].clone();
                         let err_value = || {
                             ConstError {
                                 signal: 0,
@@ -808,7 +808,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
+                        let int_out_type = INT_TYPES[logwidth0 as usize].clone();
                         let err_value = || {
                             ConstError {
                                 signal: 0,
@@ -862,7 +862,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
+                        let int_out_type = INT_TYPES[logwidth0 as usize].clone();
                         let err_value = || {
                             ConstError {
                                 signal: 0,
@@ -913,9 +913,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let logwidth: u8 = get_log_width(arg).ok()?;
                     let n0: &ConstInt = get_single_input_value(consts)?;
                     let n0val = n0.value_s();
-                    if n0.log_width() != logwidth {
-                        None
-                    } else {
+                    if n0.log_width() == logwidth {
                         Some(vec![(
                             0.into(),
                             Value::extension(
@@ -928,6 +926,8 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 .unwrap(),
                             ),
                         )])
+                    } else {
+                        None
                     }
                 },
             ),
@@ -1003,9 +1003,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     };
                     let logwidth: u8 = get_log_width(arg).ok()?;
                     let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != logwidth {
-                        None
-                    } else {
+                    if n0.log_width() == logwidth {
                         Some(vec![(
                             0.into(),
                             Value::extension(
@@ -1016,6 +1014,8 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 .unwrap(),
                             ),
                         )])
+                    } else {
+                        None
                     }
                 },
             ),
@@ -1135,16 +1135,15 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     };
                     let logwidth: u8 = get_log_width(arg).ok()?;
                     let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != logwidth {
-                        None
-                    } else {
-                        if n0.value_s() < 0 {
-                            panic!(
-                                "Cannot convert negative integer {} to unsigned.",
-                                n0.value_s()
-                            );
-                        }
+                    if n0.log_width() == logwidth {
+                        assert!(
+                            (n0.value_s() >= 0),
+                            "Cannot convert negative integer {} to unsigned.",
+                            n0.value_s()
+                        );
                         Some(vec![(0.into(), Value::extension(n0.clone()))])
+                    } else {
+                        None
                     }
                 },
             ),
@@ -1157,16 +1156,15 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     };
                     let logwidth: u8 = get_log_width(arg).ok()?;
                     let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != logwidth {
-                        None
-                    } else {
-                        if n0.value_s() < 0 {
-                            panic!(
-                                "Unsigned integer {} is too large to be converted to signed.",
-                                n0.value_u()
-                            );
-                        }
+                    if n0.log_width() == logwidth {
+                        assert!(
+                            (n0.value_s() >= 0),
+                            "Unsigned integer {} is too large to be converted to signed.",
+                            n0.value_u()
+                        );
                         Some(vec![(0.into(), Value::extension(n0.clone()))])
+                    } else {
+                        None
                     }
                 },
             ),

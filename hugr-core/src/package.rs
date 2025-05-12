@@ -50,7 +50,7 @@ impl Package {
     ///
     /// Ensures that the top-level extension list is a superset of the extensions used in the modules.
     pub fn validate(&self) -> Result<(), PackageValidationError> {
-        for hugr in self.modules.iter() {
+        for hugr in &self.modules {
             hugr.validate()?;
         }
         Ok(())
@@ -90,7 +90,7 @@ impl Package {
     ///
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::store` with a bytearray instead.
-    /// See [EnvelopeFormat::ascii_printable][crate::envelope::EnvelopeFormat::ascii_printable].
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {
