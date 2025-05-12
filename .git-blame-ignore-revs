@@ -1,3 +1,8 @@
+# Commits to ignore in blame output
+#
+# To configure git to use this file, run:
+# > git config blame.ignoreRevsFile .git-blame-ignore-revs
+
 # Bump to rust edition 2024, and a bunch of automated lint fixes
 # https://github.com/CQCL/hugr/pull/2195
 16903a65294aede245a4c8bb2a07a4692a619769
