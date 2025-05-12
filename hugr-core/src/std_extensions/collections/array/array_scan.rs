@@ -6,6 +6,7 @@ use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -13,7 +14,6 @@ use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDe
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
-use crate::Extension;
 
 use super::array_kind::ArrayKind;
 
@@ -212,8 +212,12 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::Sequence { elems: acc_tys }] =>
-            {
+            [
+                TypeArg::BoundedNat { n },
+                TypeArg::Type { ty: src_ty },
+                TypeArg::Type { ty: tgt_ty },
+                TypeArg::Sequence { elems: acc_tys },
+            ] => {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
                     .map(|acc_ty| match acc_ty {

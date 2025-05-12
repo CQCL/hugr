@@ -42,11 +42,7 @@ impl RecursionDepth {
     const DEFAULT_RECURSION_DEPTH: usize = 4;
     /// Decrement the recursion depth counter.
     pub fn descend(&self) -> Self {
-        if self.leaf() {
-            *self
-        } else {
-            Self(self.0 - 1)
-        }
+        if self.leaf() { *self } else { Self(self.0 - 1) }
     }
 
     /// Returns `true` if the recursion depth counter is zero.

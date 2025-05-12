@@ -5,14 +5,14 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use thiserror::Error;
 
+use crate::PortIndex;
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::controlflow::BasicBlock;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{DataflowBlock, OpType};
-use crate::PortIndex;
-use crate::{type_row, Node};
+use crate::{Node, type_row};
 
 use super::{PatchHugrMut, PatchVerification};
 

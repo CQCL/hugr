@@ -6,13 +6,13 @@ use std::sync::{Arc, Weak};
 use crate::ops::constant::ValueName;
 use crate::types::TypeName;
 use crate::{
+    Extension,
     extension::ExtensionId,
     ops::constant::CustomConst,
     types::{
-        type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomType, Type, TypeBound,
+        type_param::{TypeArg, TypeArgError, TypeParam},
     },
-    Extension,
 };
 use lazy_static::lazy_static;
 /// The extension identifier.

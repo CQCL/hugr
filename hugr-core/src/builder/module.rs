@@ -1,12 +1,12 @@
 use super::{
+    BuildError, Container,
     build_traits::HugrBuilder,
     dataflow::{DFGBuilder, FunctionBuilder},
-    BuildError, Container,
 };
 
+use crate::hugr::ValidationError;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
-use crate::hugr::ValidationError;
 use crate::ops;
 use crate::types::{PolyFuncType, Type, TypeBound};
 
@@ -164,7 +164,7 @@ mod test {
 
     use crate::extension::prelude::usize_t;
     use crate::{
-        builder::{test::n_identity, Dataflow, DataflowSubContainer},
+        builder::{Dataflow, DataflowSubContainer, test::n_identity},
         types::Signature,
     };
 

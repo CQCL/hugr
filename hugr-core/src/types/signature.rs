@@ -13,7 +13,7 @@ use super::{
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
-    collect_signature_exts, ExtensionCollectionError, WeakExtensionRegistry,
+    ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -310,7 +310,7 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTy
 mod test {
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::type_row;
-    use crate::types::{test::FnTransformer, CustomType, TypeEnum};
+    use crate::types::{CustomType, TypeEnum, test::FnTransformer};
 
     use super::*;
     #[test]

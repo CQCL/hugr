@@ -1,16 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
 use hugr_core::builder::{
-    inout_sig, BuildError, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr,
-    DataflowSubContainer, HugrBuilder,
+    BuildError, ConditionalBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    HugrBuilder, inout_sig,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::value_array::value_array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
-use hugr_core::{hugr::hugrmut::HugrMut, ops::Tag, HugrView, IncomingPort, Node, Wire};
+use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
-use super::{handlers::linearize_value_array, NodeTemplate, ParametricType};
+use super::{NodeTemplate, ParametricType, handlers::linearize_value_array};
 
 /// Trait for things that know how to wire up linear outports to other than one
 /// target.  Used to restore Hugr validity when a [ReplaceTypes](super::ReplaceTypes)
@@ -147,7 +147,9 @@ pub enum LinearizeError {
         num_outports: usize,
         sig: Option<Signature>,
     },
-    #[error("Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})")]
+    #[error(
+        "Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})"
+    )]
     NoLinearNonLocalEdges {
         src: Node,
         src_parent: Node,
@@ -226,8 +228,12 @@ impl DelegatingLinearizer {
     pub fn register_callback(
         &mut self,
         src: &TypeDef,
-        copy_discard_fn: impl Fn(&[TypeArg], usize, &CallbackHandler<'_>) -> Result<NodeTemplate, LinearizeError>
-            + 'static,
+        copy_discard_fn: impl Fn(
+            &[TypeArg],
+            usize,
+            &CallbackHandler<'_>,
+        ) -> Result<NodeTemplate, LinearizeError>
+        + 'static,
     ) {
         // We could look for `src`s TypeDefBound being explicit Copyable, otherwise
         // it depends on the arguments. Since there is no method to get the TypeDefBound
@@ -356,8 +362,8 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
@@ -369,14 +375,14 @@ mod test {
     use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::value_array::{
-        value_array_type, value_array_type_def, VArrayOpDef, VArrayRepeat, VArrayScan,
-        VArrayScanDef,
+        VArrayOpDef, VArrayRepeat, VArrayScan, VArrayScanDef, value_array_type,
+        value_array_type_def,
     };
     use hugr_core::types::type_param::TypeParam;
     use hugr_core::types::{
         FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeEnum, TypeRow,
     };
-    use hugr_core::{hugr::IdentList, type_row, Extension, Hugr, HugrView, Node};
+    use hugr_core::{Extension, Hugr, HugrView, Node, hugr::IdentList, type_row};
     use itertools::Itertools;
     use rstest::rstest;
 

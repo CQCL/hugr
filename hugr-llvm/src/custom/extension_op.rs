@@ -1,15 +1,15 @@
 use std::{collections::HashMap, rc::Rc};
 
 use hugr_core::{
+    HugrView, Node,
     extension::{
-        simple_op::{MakeExtensionOp, MakeOpDef},
         ExtensionId,
+        simple_op::{MakeExtensionOp, MakeOpDef},
     },
     ops::{ExtensionOp, OpName},
-    HugrView, Node,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use strum::IntoEnumIterator;
 
@@ -40,15 +40,15 @@ pub trait ExtensionOpFn<'a, H>:
 }
 
 impl<
-        'a,
-        H,
-        F: for<'c> Fn(
-                &mut EmitFuncContext<'c, 'a, H>,
-                EmitOpArgs<'c, '_, ExtensionOp, H>,
-            ) -> Result<()>
-            + ?Sized
-            + 'a,
-    > ExtensionOpFn<'a, H> for F
+    'a,
+    H,
+    F: for<'c> Fn(
+            &mut EmitFuncContext<'c, 'a, H>,
+            EmitOpArgs<'c, '_, ExtensionOp, H>,
+        ) -> Result<()>
+        + ?Sized
+        + 'a,
+> ExtensionOpFn<'a, H> for F
 {
 }
 
@@ -75,11 +75,11 @@ impl<'a, H: HugrView<Node = Node>> ExtensionOpMap<'a, H> {
     pub fn simple_extension_op<Op: MakeOpDef + IntoEnumIterator>(
         &mut self,
         handler: impl 'a
-            + for<'c> Fn(
-                &mut EmitFuncContext<'c, 'a, H>,
-                EmitOpArgs<'c, '_, ExtensionOp, H>,
-                Op,
-            ) -> Result<()>,
+        + for<'c> Fn(
+            &mut EmitFuncContext<'c, 'a, H>,
+            EmitOpArgs<'c, '_, ExtensionOp, H>,
+            Op,
+        ) -> Result<()>,
     ) {
         let handler = Rc::new(handler);
         for op in Op::iter() {

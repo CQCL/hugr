@@ -1,6 +1,6 @@
 use std::cmp::min;
-use std::collections::btree_map::Entry;
 use std::collections::HashMap;
+use std::collections::btree_map::Entry;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Weak};
 
@@ -11,11 +11,11 @@ use super::{
     SignatureError,
 };
 
+use crate::Hugr;
 use crate::envelope::serde_with::AsStringEnvelope;
 use crate::ops::{OpName, OpNameRef};
-use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
-use crate::Hugr;
 mod serialize_signature_func;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -353,7 +353,7 @@ impl OpDef {
             }
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
             SignatureFunc::MissingValidateFunc(_) => {
-                return Err(SignatureError::MissingValidateFunc)
+                return Err(SignatureError::MissingValidateFunc);
             }
         };
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
@@ -539,16 +539,16 @@ pub(super) mod test {
     use itertools::Itertools;
 
     use super::SignatureFromArgs;
-    use crate::builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
+    use crate::extension::SignatureError;
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::usize_t;
-    use crate::extension::SignatureError;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::ops::OpName;
     use crate::std_extensions::collections::list;
     use crate::types::type_param::{TypeArgError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
-    use crate::{const_extension_ids, Extension};
+    use crate::{Extension, const_extension_ids};
 
     const_extension_ids! {
         const EXT_ID: ExtensionId = "MyExt";
@@ -566,10 +566,12 @@ pub(super) mod test {
                 op_def.signature_func,
                 SignatureFunc::PolyFuncType(_)
             ));
-            assert!(op_def
-                .lower_funcs
-                .iter()
-                .all(|lf| matches!(lf, LowerFunc::FixedHugr { .. })));
+            assert!(
+                op_def
+                    .lower_funcs
+                    .iter()
+                    .all(|lf| matches!(lf, LowerFunc::FixedHugr { .. }))
+            );
             Self(op_def)
         }
     }
@@ -816,7 +818,7 @@ pub(super) mod test {
 
         use crate::{
             builder::test::simple_dfg_hugr,
-            extension::{op_def::LowerFunc, ExtensionId, ExtensionSet, OpDef, SignatureFunc},
+            extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc, op_def::LowerFunc},
             types::PolyFuncTypeRV,
         };
 

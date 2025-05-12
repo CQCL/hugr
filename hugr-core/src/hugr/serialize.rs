@@ -115,7 +115,9 @@ pub enum HUGRSerializationError {
     #[error("Failed to build edge when deserializing: {0}.")]
     LinkError(#[from] LinkError),
     /// Edges without port offsets cannot be present in operations without non-dataflow ports.
-    #[error("Cannot connect an {dir:?} edge without port offset to node {node} with operation type {op_type}.")]
+    #[error(
+        "Cannot connect an {dir:?} edge without port offset to node {node} with operation type {op_type}."
+    )]
     MissingPortOffset {
         /// The node that has the port without offset.
         node: Node,

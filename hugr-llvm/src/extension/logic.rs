@@ -1,19 +1,19 @@
 use hugr_core::{
+    HugrView, Node,
     extension::simple_op::MakeExtensionOp,
     ops::{ExtensionOp, Value},
     std_extensions::logic::{self, LogicOp},
     types::SumType,
-    HugrView, Node,
 };
 use inkwell::IntPredicate;
 
 use crate::{
     custom::CodegenExtsBuilder,
-    emit::{emit_value, func::EmitFuncContext, EmitOpArgs},
+    emit::{EmitOpArgs, emit_value, func::EmitFuncContext},
     sum::LLVMSumValue,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 fn emit_logic_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
@@ -74,10 +74,10 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{Dataflow, DataflowSubContainer},
-        extension::{prelude::bool_t, ExtensionRegistry},
-        std_extensions::logic::{self, LogicOp},
         Hugr,
+        builder::{Dataflow, DataflowSubContainer},
+        extension::{ExtensionRegistry, prelude::bool_t},
+        std_extensions::logic::{self, LogicOp},
     };
     use rstest::rstest;
 
@@ -85,7 +85,7 @@ mod test {
         check_emission,
         emit::test::SimpleHugrConfig,
         extension::logic::add_logic_extensions,
-        test::{llvm_ctx, TestContext},
+        test::{TestContext, llvm_ctx},
     };
 
     fn test_logic_op(op: LogicOp, arity: usize) -> Hugr {

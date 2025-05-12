@@ -9,7 +9,7 @@ pub mod int_types;
 #[cfg(test)]
 mod test {
     use crate::{
-        std_extensions::arithmetic::int_types::{int_type, INT_TYPES},
+        std_extensions::arithmetic::int_types::{INT_TYPES, int_type},
         types::type_param::TypeArg,
     };
 

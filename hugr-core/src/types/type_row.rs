@@ -8,8 +8,8 @@ use std::{
 };
 
 use super::{
-    type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase,
-    TypeTransformer,
+    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeTransformer,
+    type_param::TypeParam,
 };
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;

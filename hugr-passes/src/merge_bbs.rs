@@ -10,7 +10,7 @@ use itertools::Itertools;
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
+use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, Output};
 use hugr_core::{Hugr, HugrView, Node};
 
 /// Merge any basic blocks that are direct children of the specified CFG
@@ -164,12 +164,12 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
-    use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize};
+    use hugr_core::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder, endo_sig, inout_sig};
+    use hugr_core::extension::prelude::{ConstUsize, qb_t, usize_t};
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::{LoadConstant, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
+    use hugr_core::{Extension, Hugr, HugrView, Wire, const_extension_ids, type_row};
 
     use super::merge_basic_blocks;
 

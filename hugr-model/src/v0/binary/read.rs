@@ -1,8 +1,8 @@
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
 use crate::v0 as model;
 use crate::v0::table;
-use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use std::io::BufRead;
 
 /// An error encounted while deserialising a model.

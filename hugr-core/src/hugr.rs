@@ -28,12 +28,12 @@ pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::{
-    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
+    resolve_op_types_extensions,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
-pub use crate::ops::{OpType, DEFAULT_OPTYPE};
+pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::package::Package;
 use crate::{Direction, Node};
 
@@ -346,7 +346,9 @@ impl Hugr {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
+#[error(
+    "Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}"
+)]
 /// An error in the extension deltas.
 pub struct ExtensionError {
     parent: Node,

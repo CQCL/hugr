@@ -9,8 +9,8 @@ use portgraph::{LinkMut, LinkView, MultiPortGraph, PortMut, PortOffset, PortView
 use crate::extension::ExtensionRegistry;
 use crate::{Direction, Hugr, Node};
 
-use super::views::{panic_invalid_node, panic_invalid_non_entrypoint};
 use super::HugrView;
+use super::views::{panic_invalid_node, panic_invalid_non_entrypoint};
 use super::{NodeMetadataMap, OpType};
 use crate::ops::handle::NodeHandle;
 
@@ -377,12 +377,12 @@ impl HugrMutInternals for Hugr {
 #[cfg(test)]
 mod test {
     use crate::{
+        Direction, HugrView as _,
         builder::{Container, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::Noop,
         hugr::internal::HugrMutInternals as _,
         ops::handle::NodeHandle,
         types::{Signature, Type},
-        Direction, HugrView as _,
     };
 
     #[test]

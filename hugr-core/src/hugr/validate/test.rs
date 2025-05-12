@@ -7,25 +7,25 @@ use cool_asserts::assert_matches;
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
+    BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, inout_sig,
 };
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t};
-use crate::extension::{Extension, ExtensionRegistry, TypeDefBound, PRELUDE};
-use crate::hugr::internal::HugrMutInternals;
+use crate::extension::{Extension, ExtensionRegistry, PRELUDE, TypeDefBound};
 use crate::hugr::HugrMut;
+use crate::hugr::internal::HugrMutInternals;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, OpType, Value};
-use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::LogicOp;
+use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
-use crate::{const_extension_ids, test_file, type_row, Direction, Hugr, IncomingPort, Node};
+use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file, type_row};
 
 /// Creates a hugr with a single function definition that copies a bit `copies` times.
 ///

@@ -20,8 +20,8 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 pub use custom::{
-    downcast_equal_consts, get_pair_of_input_values, get_single_input_value, CustomConst,
-    CustomSerialized, TryHash,
+    CustomConst, CustomSerialized, TryHash, downcast_equal_consts, get_pair_of_input_values,
+    get_single_input_value,
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -341,7 +341,7 @@ pub enum ConstTypeError {
     SumType(#[from] SumTypeError),
     /// Function constant missing a function type.
     #[error(
-        "A function constant cannot be defined using a Hugr with root of type {hugr_root_type}. Must be a monomorphic function.",
+        "A function constant cannot be defined using a Hugr with root of type {hugr_root_type}. Must be a monomorphic function."
     )]
     NotMonomorphicFunction {
         /// The root node type of the Hugr that (claims to) define the function constant.
@@ -580,22 +580,22 @@ pub(crate) mod test {
     use super::Value;
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::extension::PRELUDE;
     use crate::extension::prelude::{bool_t, usize_custom_t};
     use crate::extension::resolution::{
-        resolve_custom_type_extensions, resolve_typearg_extensions, ExtensionResolutionError,
-        WeakExtensionRegistry,
+        ExtensionResolutionError, WeakExtensionRegistry, resolve_custom_type_extensions,
+        resolve_typearg_extensions,
     };
-    use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
-    use crate::std_extensions::collections::array::{array_type, ArrayValue};
-    use crate::std_extensions::collections::value_array::{value_array_type, VArrayValue};
+    use crate::std_extensions::collections::array::{ArrayValue, array_type};
+    use crate::std_extensions::collections::value_array::{VArrayValue, value_array_type};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
-            prelude::{usize_t, ConstUsize},
             ExtensionId,
+            prelude::{ConstUsize, usize_t},
         },
-        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
+        std_extensions::arithmetic::float_types::{ConstF64, float64_type},
         type_row,
         types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
@@ -910,7 +910,7 @@ pub(crate) mod test {
     mod proptest {
         use super::super::{OpaqueValue, Sum};
         use crate::{
-            ops::{constant::CustomSerialized, Value},
+            ops::{Value, constant::CustomSerialized},
             std_extensions::arithmetic::int_types::ConstInt,
             std_extensions::collections::list::ListValue,
             types::{SumType, Type},

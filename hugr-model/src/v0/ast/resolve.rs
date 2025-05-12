@@ -1,4 +1,4 @@
-use bumpalo::{collections::Vec as BumpVec, Bump};
+use bumpalo::{Bump, collections::Vec as BumpVec};
 use fxhash::FxHashMap;
 use itertools::zip_eq;
 use thiserror::Error;
@@ -6,11 +6,11 @@ use thiserror::Error;
 use super::{
     LinkName, Module, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName,
 };
+use crate::v0::{RegionKind, ScopeClosure, table};
 use crate::v0::{
     scope::{LinkTable, SymbolTable, VarTable},
     table::{LinkIndex, NodeId, RegionId, TermId, VarId},
 };
-use crate::v0::{table, RegionKind, ScopeClosure};
 
 pub struct Context<'a> {
     module: table::Module<'a>,

@@ -4,11 +4,11 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 use crate::extension::resolution::{
-    resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    resolve_value_extensions,
 };
-use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
 use crate::ops::Value;
+use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomCheckFailure, CustomType, Type};
 
@@ -97,7 +97,7 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
                 return Err(CustomCheckFailure::Message(format!(
                     "Invalid array type arguments: {:?}",
                     typ.args()
-                )))
+                )));
             }
         };
 
@@ -138,7 +138,7 @@ impl<AK: ArrayKind> TryHash for GenericArrayValue<AK> {
 mod test {
     use rstest::rstest;
 
-    use crate::extension::prelude::{usize_t, ConstUsize};
+    use crate::extension::prelude::{ConstUsize, usize_t};
     use crate::std_extensions::arithmetic::float_types::ConstF64;
 
     use crate::std_extensions::collections::array::Array;

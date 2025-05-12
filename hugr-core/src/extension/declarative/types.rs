@@ -9,10 +9,10 @@
 
 use std::sync::Weak;
 
+use crate::Extension;
 use crate::extension::{TypeDef, TypeDefBound};
 use crate::types::type_param::TypeParam;
 use crate::types::{TypeBound, TypeName};
-use crate::Extension;
 
 use serde::{Deserialize, Serialize};
 

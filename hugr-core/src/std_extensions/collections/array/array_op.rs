@@ -5,6 +5,7 @@ use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Extension;
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
@@ -17,7 +18,6 @@ use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
 use crate::utils::Never;
-use crate::Extension;
 
 use super::array_kind::ArrayKind;
 
@@ -329,7 +329,7 @@ mod tests {
     use crate::std_extensions::collections::array::Array;
     use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
         extension::prelude::{bool_t, qb_t},
         ops::{OpTrait, OpType},
     };
@@ -463,11 +463,13 @@ mod tests {
                 sig.io(),
                 (
                     &vec![AK::ty(size, element_ty.clone())].into(),
-                    &vec![option_type(vec![
-                        element_ty.clone(),
-                        AK::ty(size - 1, element_ty.clone())
-                    ])
-                    .into()]
+                    &vec![
+                        option_type(vec![
+                            element_ty.clone(),
+                            AK::ty(size - 1, element_ty.clone())
+                        ])
+                        .into()
+                    ]
                     .into()
                 )
             );

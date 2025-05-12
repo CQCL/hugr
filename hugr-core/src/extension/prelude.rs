@@ -8,13 +8,13 @@ use lazy_static::lazy_static;
 
 use crate::extension::const_fold::fold_out_row;
 use crate::extension::simple_op::{
-    try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+    MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name,
 };
 use crate::extension::{
     ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDefBound,
 };
-use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::OpName;
+use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::{NamedOp, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
@@ -22,12 +22,12 @@ use crate::types::{
     TypeName, TypeRV, TypeRow, TypeRowRV,
 };
 use crate::utils::sorted_consts;
-use crate::{type_row, Extension};
+use crate::{Extension, type_row};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
-use super::resolution::{resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry};
 use super::ExtensionRegistry;
+use super::resolution::{ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions};
 
 mod unwrap_builder;
 
@@ -995,11 +995,11 @@ impl MakeRegisteredOp for Barrier {
 #[cfg(test)]
 mod test {
     use crate::builder::inout_sig;
-    use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+    use crate::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
     use crate::{
-        builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
-        utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
+        utils::test_quantum_extension::cx_gate,
     };
 
     use super::*;
@@ -1194,8 +1194,10 @@ mod test {
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", string_type(), false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, true)));
 
-        assert!(ConstExternalSymbol::new("", Type::UNIT, true)
-            .validate()
-            .is_err())
+        assert!(
+            ConstExternalSymbol::new("", Type::UNIT, true)
+                .validate()
+                .is_err()
+        )
     }
 }

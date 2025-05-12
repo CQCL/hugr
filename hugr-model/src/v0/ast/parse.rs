@@ -16,11 +16,11 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use base64::prelude::BASE64_STANDARD;
 use base64::Engine as _;
+use base64::prelude::BASE64_STANDARD;
 use ordered_float::OrderedFloat;
-use pest::iterators::{Pair, Pairs};
 use pest::Parser as _;
+use pest::iterators::{Pair, Pairs};
 use pest_parser::{HugrParser, Rule};
 use smol_str::SmolStr;
 use thiserror::Error;
@@ -266,11 +266,10 @@ fn parse_meta_item(pair: Pair<Rule>) -> ParseResult<Term> {
 }
 
 fn parse_optional_signature(pairs: &mut Pairs<Rule>) -> ParseResult<Option<Term>> {
-    match take_rule(pairs, Rule::signature).next() { Some(pair) => {
-        Ok(Some(parse_signature(pair)?))
-    } _ => {
-        Ok(None)
-    }}
+    match take_rule(pairs, Rule::signature).next() {
+        Some(pair) => Ok(Some(parse_signature(pair)?)),
+        _ => Ok(None),
+    }
 }
 
 fn parse_signature(pair: Pair<Rule>) -> ParseResult<Term> {

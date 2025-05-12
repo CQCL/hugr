@@ -1,17 +1,17 @@
 //! Callbacks for use with [ReplaceTypes::replace_consts_parametrized]
 //! and [DelegatingLinearizer::register_callback](super::DelegatingLinearizer::register_callback)
 
-use hugr_core::builder::{endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr};
-use hugr_core::extension::prelude::{option_type, UnwrapBuilder};
+use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig};
+use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
 use hugr_core::ops::constant::CustomConst;
-use hugr_core::ops::{constant::OpaqueValue, Value};
 use hugr_core::ops::{OpTrait, OpType, Tag};
+use hugr_core::ops::{Value, constant::OpaqueValue};
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use hugr_core::std_extensions::collections::array::{
-    array_type, Array, ArrayClone, ArrayDiscard, ArrayKind, ArrayOpBuilder, GenericArrayOpDef,
-    GenericArrayRepeat, GenericArrayScan, GenericArrayValue,
+    Array, ArrayClone, ArrayDiscard, ArrayKind, ArrayOpBuilder, GenericArrayOpDef,
+    GenericArrayRepeat, GenericArrayScan, GenericArrayValue, array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
 use hugr_core::std_extensions::collections::value_array::ValueArray;

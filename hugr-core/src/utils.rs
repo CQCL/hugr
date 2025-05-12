@@ -4,7 +4,7 @@ use std::fmt::{self, Debug, Display};
 
 use itertools::Itertools;
 
-use crate::{ops::Value, Hugr, HugrView, IncomingPort, Node};
+use crate::{Hugr, HugrView, IncomingPort, Node, ops::Value};
 
 /// Write a comma separated list of of some types.
 /// Like debug_list, but using the Display instance rather than Debug,
@@ -127,15 +127,15 @@ pub(crate) mod test_quantum_extension {
     use crate::std_extensions::logic;
     use crate::types::FuncValueType;
     use crate::{
+        Extension,
         extension::{
-            prelude::{bool_t, qb_t},
             ExtensionId, ExtensionRegistry, PRELUDE,
+            prelude::{bool_t, qb_t},
         },
         ops::ExtensionOp,
         std_extensions::arithmetic::float_types,
         type_row,
         types::{PolyFuncTypeRV, Signature},
-        Extension,
     };
 
     use lazy_static::lazy_static;
@@ -279,8 +279,8 @@ pub(crate) mod test {
     #[allow(unused_imports)]
     use crate::HugrView;
     use crate::{
-        ops::{OpType, Value},
         Hugr,
+        ops::{OpType, Value},
     };
 
     /// Check that a hugr just loads and returns a single expected constant.

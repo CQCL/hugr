@@ -87,8 +87,8 @@
 //! ```
 use thiserror::Error;
 
-use crate::extension::simple_op::OpLoadError;
 use crate::extension::SignatureError;
+use crate::extension::simple_op::OpLoadError;
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
@@ -153,7 +153,9 @@ pub enum BuildError {
     EntryBuiltError(Node),
     /// We don't allow creating `BasicBlockBuilder<Hugr>`s when the sum-rows
     /// are not homogeneous. Use a CFGBuilder and create a valid graph instead.
-    #[error("Cannot initialize hugr for a BasicBlockBuilder with complex sum-rows. Use a CFGBuilder instead.")]
+    #[error(
+        "Cannot initialize hugr for a BasicBlockBuilder with complex sum-rows. Use a CFGBuilder instead."
+    )]
     BasicBlockTooComplex,
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node} does not have type {op_desc} as expected.")]
@@ -222,7 +224,9 @@ pub enum BuilderWiringError {
         src_offset: Port,
     },
     /// The ancestors of an inter-graph edge are not related.
-    #[error("Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NoRelationIntergraph {
         src: Node,
@@ -231,7 +235,9 @@ pub enum BuilderWiringError {
         dst_offset: Port,
     },
     /// Inter-Graph edges can only carry copyable data.
-    #[error("Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NonCopyableIntergraph {
         src: Node,
@@ -246,12 +252,12 @@ pub enum BuilderWiringError {
 pub(crate) mod test {
     use rstest::fixture;
 
+    use crate::Hugr;
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::hugr::{views::HugrView, HugrMut};
+    use crate::hugr::{HugrMut, views::HugrView};
     use crate::ops;
     use crate::package::Package;
     use crate::types::{PolyFuncType, Signature};
-    use crate::Hugr;
 
     use super::handle::BuildHandle;
     use super::{

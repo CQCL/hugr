@@ -4,11 +4,11 @@ use std::io::Write;
 use clap::Parser;
 use clap_verbosity_flag::log::Level;
 use clio::Output;
-use hugr::package::PackageValidationError;
 use hugr::HugrView;
+use hugr::package::PackageValidationError;
 
-use crate::hugr_io::HugrInputArgs;
 use crate::OtherArgs;
+use crate::hugr_io::HugrInputArgs;
 
 /// Dump the standard extensions.
 #[derive(Parser, Debug)]

@@ -1,38 +1,38 @@
-use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
+use std::collections::hash_map::RandomState;
 
-use hugr_core::ops::handle::NodeHandle;
 use hugr_core::ops::Const;
+use hugr_core::ops::handle::NodeHandle;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
 
 use hugr_core::builder::{
-    endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    HugrBuilder, ModuleBuilder, SubContainer,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    ModuleBuilder, SubContainer, endo_sig, inout_sig,
 };
 use hugr_core::extension::prelude::{
-    bool_t, const_ok, error_type, string_type, sum_with_error, ConstError, ConstString, MakeTuple,
-    UnpackTuple,
+    ConstError, ConstString, MakeTuple, UnpackTuple, bool_t, const_ok, error_type, string_type,
+    sum_with_error,
 };
 
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::ops::{constant::CustomConst, OpTag, OpTrait, OpType, Value};
+use hugr_core::ops::{OpTag, OpTrait, OpType, Value, constant::CustomConst};
 use hugr_core::std_extensions::arithmetic::{
     conversions::ConvertOpDef,
     float_ops::FloatOps,
-    float_types::{float64_type, ConstF64},
+    float_types::{ConstF64, float64_type},
     int_ops::IntOpDef,
     int_types::{ConstInt, INT_TYPES},
 };
 use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
-use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
-use crate::dataflow::{partial_from_const, DFContext, PartialValue};
 use crate::ComposablePass as _;
+use crate::dataflow::{DFContext, PartialValue, partial_from_const};
 
-use super::{constant_fold_pass, ConstFoldContext, ConstantFoldPass, ValueHandle};
+use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, constant_fold_pass};
 
 #[rstest]
 #[case(ConstInt::new_u(4, 2).unwrap(), true)]

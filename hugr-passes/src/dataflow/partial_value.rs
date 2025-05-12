@@ -1,8 +1,8 @@
-use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
-use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
+use ascent::lattice::BoundedLattice;
 use hugr_core::Node;
-use itertools::{zip_eq, Itertools};
+use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
+use itertools::{Itertools, zip_eq};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -394,7 +394,7 @@ impl<V: AbstractValue, N: Clone> PartialValue<V, N> {
     pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V, N>>> {
         let vals = match self {
             PartialValue::Bottom | PartialValue::Value(_) | PartialValue::LoadedFunction(_) => {
-                return None
+                return None;
             }
             PartialValue::PartialSum(ps) => ps.variant_values(tag)?,
             PartialValue::Top => vec![PartialValue::Top; len],
@@ -524,9 +524,9 @@ impl<V: PartialEq, N: PartialEq + PartialOrd> PartialOrd for PartialValue<V, N> 
 mod test {
     use std::sync::Arc;
 
-    use ascent::{lattice::BoundedLattice, Lattice};
+    use ascent::{Lattice, lattice::BoundedLattice};
     use hugr_core::NodeIndex;
-    use itertools::{zip_eq, Itertools as _};
+    use itertools::{Itertools as _, zip_eq};
     use prop::sample::subsequence;
     use proptest::prelude::*;
 

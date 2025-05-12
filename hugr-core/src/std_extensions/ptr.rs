@@ -4,22 +4,22 @@ use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Wire;
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::TypeDefBound;
 use crate::ops::OpName;
 use crate::types::{CustomType, PolyFuncType, Signature, Type, TypeBound, TypeName};
-use crate::Wire;
 use crate::{
+    Extension,
     extension::{
+        ExtensionId, OpDef, SignatureError, SignatureFunc,
         simple_op::{
             HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
         },
-        ExtensionId, OpDef, SignatureError, SignatureFunc,
     },
     ops::custom::ExtensionOp,
     type_row,
     types::type_param::{TypeArg, TypeParam},
-    Extension,
 };
 use lazy_static::lazy_static;
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -222,10 +222,10 @@ impl HasDef for PtrOp {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use crate::HugrView;
     use crate::builder::DFGBuilder;
     use crate::extension::prelude::bool_t;
     use crate::ops::ExtensionOp;
-    use crate::HugrView;
     use crate::{
         builder::{Dataflow, DataflowHugr},
         std_extensions::arithmetic::int_types::INT_TYPES,

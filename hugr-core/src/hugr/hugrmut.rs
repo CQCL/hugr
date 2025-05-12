@@ -16,7 +16,7 @@ use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use super::internal::HugrMutInternals;
 use super::views::{
-    panic_invalid_node, panic_invalid_non_entrypoint, panic_invalid_port, Rerooted,
+    Rerooted, panic_invalid_node, panic_invalid_non_entrypoint, panic_invalid_port,
 };
 
 /// Functions for low-level building of a HUGR.
@@ -613,8 +613,8 @@ fn insert_hugr_internal<H: HugrView>(
 mod test {
     use crate::extension::PRELUDE;
     use crate::{
-        extension::prelude::{usize_t, Noop},
-        ops::{self, dataflow::IOTrait, FuncDefn, Input, Output},
+        extension::prelude::{Noop, usize_t},
+        ops::{self, FuncDefn, Input, Output, dataflow::IOTrait},
         types::Signature,
     };
 

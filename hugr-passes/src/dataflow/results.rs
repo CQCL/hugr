@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use hugr_core::{HugrView, PortIndex, Wire};
 
 use super::{
-    datalog::InWire, partial_value::ExtractValueError, AbstractValue, AsConcrete, PartialValue,
+    AbstractValue, AsConcrete, PartialValue, datalog::InWire, partial_value::ExtractValueError,
 };
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.

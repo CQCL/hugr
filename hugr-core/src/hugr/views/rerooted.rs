@@ -1,11 +1,11 @@
 //! A HUGR wrapper with a modified entrypoint node, returned by
 //! [`HugrView::with_entrypoint`] and [`HugrMut::with_entrypoint_mut`].
 
-use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::HugrMut;
+use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 
 use super::render::RenderConfig;
-use super::{panic_invalid_node, HugrView};
+use super::{HugrView, panic_invalid_node};
 
 /// A HUGR wrapper with a modified entrypoint node.
 ///
@@ -152,12 +152,12 @@ impl<H: HugrMut> HugrMut for Rerooted<H> {
 mod test {
     use crate::builder::test::simple_cfg_hugr;
     use crate::builder::{Dataflow, FunctionBuilder, HugrBuilder, SubContainer};
+    use crate::hugr::HugrMut;
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::views::ExtractionResult;
-    use crate::hugr::HugrMut;
     use crate::ops::handle::NodeHandle;
     use crate::ops::{DataflowBlock, OpType};
-    use crate::{type_row, types::Signature, HugrView};
+    use crate::{HugrView, type_row, types::Signature};
 
     #[test]
     fn rerooted() {

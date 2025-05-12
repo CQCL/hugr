@@ -10,23 +10,23 @@ use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::envelope::EnvelopeConfig;
-use crate::extension::prelude::{bool_t, usize_custom_t, usize_t, ConstUsize};
+use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
 use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
 use crate::extension::{
-    ExtensionId, ExtensionRegistry, ExtensionSet, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
+    ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound,
 };
-use crate::ops::constant::test::CustomTestValue;
 use crate::ops::constant::CustomConst;
+use crate::ops::constant::test::CustomTestValue;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
-use crate::std_extensions::arithmetic::float_types::{self, float64_type, ConstF64};
+use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
 use crate::std_extensions::std_reg;
 use crate::types::type_param::TypeParam;
 use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
-use crate::{type_row, Extension, Hugr, HugrView};
+use crate::{Extension, Hugr, HugrView, type_row};
 
 #[rstest]
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]

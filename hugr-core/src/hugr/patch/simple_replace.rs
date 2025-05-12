@@ -535,20 +535,20 @@ pub(in crate::hugr::patch) mod test {
 
     use crate::builder::test::n_identity;
     use crate::builder::{
-        endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
-        DataflowSubContainer, HugrBuilder, ModuleBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::{Outcome, OutputBoundaryMap};
     use crate::hugr::patch::{PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
-    use crate::ops::dataflow::DataflowOpTrait;
-    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
-    use crate::std_extensions::logic::test::and_op;
+    use crate::ops::dataflow::DataflowOpTrait;
+    use crate::ops::handle::NodeHandle;
     use crate::std_extensions::logic::LogicOp;
+    use crate::std_extensions::logic::test::and_op;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
@@ -774,9 +774,10 @@ pub(in crate::hugr::patch) mod test {
             r.map_host_output((h_outp_node, h_port_2)).unwrap(),
             ReplacementPort::from((r.get_replacement_io().unwrap()[1], n_port_2))
         );
-        assert!(r
-            .map_host_output((h_outp_node, OutgoingPort::from(0)))
-            .is_none());
+        assert!(
+            r.map_host_output((h_outp_node, OutgoingPort::from(0)))
+                .is_none()
+        );
 
         // Check invalidation set
         assert_eq!(

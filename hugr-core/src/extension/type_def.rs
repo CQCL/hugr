@@ -4,9 +4,9 @@ use std::sync::Weak;
 use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError};
 
-use crate::types::{least_upper_bound, CustomType, TypeName};
+use crate::types::{CustomType, TypeName, least_upper_bound};
 
-use crate::types::type_param::{check_type_args, TypeArg};
+use crate::types::type_param::{TypeArg, check_type_args};
 
 use crate::types::type_param::TypeParam;
 
@@ -230,8 +230,8 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::{qb_t, usize_t};
     use crate::extension::SignatureError;
+    use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{Signature, Type, TypeBound};

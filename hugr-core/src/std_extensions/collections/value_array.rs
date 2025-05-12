@@ -19,9 +19,9 @@ use crate::{Extension, Wire};
 
 use super::array::op_builder::GenericArrayOpBuilder;
 use super::array::{
-    Array, ArrayKind, GenericArrayConvert, GenericArrayConvertDef, GenericArrayOp,
+    Array, ArrayKind, FROM, GenericArrayConvert, GenericArrayConvertDef, GenericArrayOp,
     GenericArrayOpDef, GenericArrayRepeat, GenericArrayRepeatDef, GenericArrayScan,
-    GenericArrayScanDef, GenericArrayValue, FROM, INTO,
+    GenericArrayScanDef, GenericArrayValue, INTO,
 };
 
 /// Reported unique name of the value array type.

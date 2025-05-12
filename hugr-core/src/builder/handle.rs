@@ -1,6 +1,6 @@
 //! Handles to nodes in HUGR used during the building phase.
-use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle};
 use crate::ops::OpTag;
+use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle};
 use crate::utils::collect_array;
 use crate::{Node, OutgoingPort, Wire};
 

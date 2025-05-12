@@ -1,7 +1,7 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::{hugr::hugrmut::HugrMut, ops::OpType, HugrView};
+use hugr_core::{HugrView, hugr::hugrmut::HugrMut, ops::OpType};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
@@ -174,12 +174,12 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use hugr_core::extension::prelude::{usize_t, ConstUsize};
-    use hugr_core::ops::{handle::NodeHandle, OpTag, OpTrait};
-    use hugr_core::types::Signature;
     use hugr_core::Hugr;
-    use hugr_core::{ops::Value, type_row, HugrView};
+    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
+    use hugr_core::extension::prelude::{ConstUsize, usize_t};
+    use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
+    use hugr_core::types::Signature;
+    use hugr_core::{HugrView, ops::Value, type_row};
     use itertools::Itertools;
 
     use crate::ComposablePass;

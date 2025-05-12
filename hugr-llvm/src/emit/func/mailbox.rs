@@ -1,13 +1,13 @@
 use std::{borrow::Cow, rc::Rc};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use delegate::delegate;
 use inkwell::{
     builder::Builder,
     types::{BasicType, BasicTypeEnum},
     values::{BasicValue, BasicValueEnum, PointerValue},
 };
-use itertools::{zip_eq, Itertools as _};
+use itertools::{Itertools as _, zip_eq};
 
 #[derive(Eq, PartialEq, Clone)]
 pub struct ValueMailBox<'c> {

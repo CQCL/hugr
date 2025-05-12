@@ -147,8 +147,8 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{
-        endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        SubContainer,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
+        endo_sig, inout_sig,
     };
     use crate::extension::prelude::qb_t;
     use crate::hugr::HugrMut;
@@ -159,7 +159,7 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension;
-    use crate::{type_row, Direction, HugrView, Port};
+    use crate::{Direction, HugrView, Port, type_row};
     use crate::{Hugr, Wire};
 
     use super::InlineDFG;
@@ -262,7 +262,7 @@ mod test {
         let mut h = h.finish_hugr_with_outputs(cx.outputs())?;
         assert_eq!(find_dfgs(&h), vec![h.entrypoint(), swap.node()]);
         assert_eq!(h.entry_descendants().count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
-                                                      // No permutation outside the swap DFG:
+        // No permutation outside the swap DFG:
         assert_eq!(
             h.node_connections(p_h.node(), swap.node())
                 .collect::<Vec<_>>(),

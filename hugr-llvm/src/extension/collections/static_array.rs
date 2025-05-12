@@ -1,32 +1,32 @@
 use std::hash::Hasher as _;
 
 use hugr_core::{
+    HugrView, Node,
     extension::{
         prelude::{option_type, usize_t},
         simple_op::HasConcrete as _,
     },
-    ops::{constant::TryHash, ExtensionOp},
+    ops::{ExtensionOp, constant::TryHash},
     std_extensions::collections::static_array::{
         self, StaticArrayOp, StaticArrayOpDef, StaticArrayValue,
     },
-    HugrView, Node,
 };
 use inkwell::{
+    AddressSpace, IntPredicate,
     builder::Builder,
     context::Context,
     types::{BasicType, BasicTypeEnum, StructType},
     values::{ArrayValue, BasicValue, BasicValueEnum, IntValue, PointerValue},
-    AddressSpace, IntPredicate,
 };
 use itertools::Itertools as _;
 
 use crate::{
-    emit::{emit_value, EmitFuncContext, EmitOpArgs},
-    types::{HugrType, TypingSession},
     CodegenExtension, CodegenExtsBuilder,
+    emit::{EmitFuncContext, EmitOpArgs, emit_value},
+    types::{HugrType, TypingSession},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, derive_more::From)]
 /// A [CodegenExtension] that lowers the
@@ -394,14 +394,14 @@ mod test {
     use super::*;
     use float_types::float64_type;
     use hugr_core::extension::prelude::ConstUsize;
-    use hugr_core::ops::constant::CustomConst;
     use hugr_core::ops::OpType;
     use hugr_core::ops::Value;
+    use hugr_core::ops::constant::CustomConst;
     use hugr_core::std_extensions::arithmetic::float_types::{self, ConstF64};
     use rstest::rstest;
 
     use hugr_core::extension::simple_op::MakeRegisteredOp;
-    use hugr_core::extension::{prelude::bool_t, ExtensionRegistry};
+    use hugr_core::extension::{ExtensionRegistry, prelude::bool_t};
     use hugr_core::{builder::SubContainer as _, type_row};
     use static_array::StaticArrayOpBuilder as _;
 
@@ -409,7 +409,7 @@ mod test {
     use crate::test::single_op_hugr;
     use crate::{
         emit::test::SimpleHugrConfig,
-        test::{exec_ctx, llvm_ctx, TestContext},
+        test::{TestContext, exec_ctx, llvm_ctx},
     };
     use hugr_core::builder::{Dataflow as _, DataflowSubContainer as _};
 
@@ -476,7 +476,7 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(ExtensionRegistry::new(vec![
-                static_array::EXTENSION.to_owned()
+                static_array::EXTENSION.to_owned(),
             ]))
             .finish(|mut builder| {
                 let arr = builder.add_load_value(
@@ -527,7 +527,7 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(ExtensionRegistry::new(vec![
-                static_array::EXTENSION.to_owned()
+                static_array::EXTENSION.to_owned(),
             ]))
             .finish(|mut builder| {
                 let arr = builder
@@ -552,7 +552,7 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(ExtensionRegistry::new(vec![
-                static_array::EXTENSION.to_owned()
+                static_array::EXTENSION.to_owned(),
             ]))
             .finish(|mut builder| {
                 let inner_arrs: Vec<Value> = (0..10)

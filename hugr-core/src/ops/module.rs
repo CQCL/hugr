@@ -12,9 +12,9 @@ use {
 use crate::types::{EdgeKind, PolyFuncType, Signature};
 use crate::types::{Type, TypeBound};
 
-use super::dataflow::DataflowParent;
 use super::StaticTag;
-use super::{impl_op_name, OpTag, OpTrait};
+use super::dataflow::DataflowParent;
+use super::{OpTag, OpTrait, impl_op_name};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]

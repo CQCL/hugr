@@ -2,21 +2,21 @@
 
 use std::sync::{Arc, Weak};
 
-use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
+use super::int_types::{LOG_WIDTH_TYPE_PARAM, get_log_width, int_tv};
 use crate::extension::prelude::{bool_t, sum_with_error};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
 use crate::extension::{CustomValidator, OpDef, SignatureFunc, ValidateJustArgs};
-use crate::ops::custom::ExtensionOp;
 use crate::ops::OpName;
+use crate::ops::custom::ExtensionOp;
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
 use crate::{
-    extension::{ExtensionId, SignatureError},
-    types::{type_param::TypeArg, Type},
     Extension,
+    extension::{ExtensionId, SignatureError},
+    types::{Type, type_param::TypeArg},
 };
 
 use lazy_static::lazy_static;
@@ -416,10 +416,12 @@ mod test {
             &Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
         );
 
-        assert!(IntOpDef::inarrow_u
-            .with_two_log_widths(1, 2)
-            .to_extension_op()
-            .is_none());
+        assert!(
+            IntOpDef::inarrow_u
+                .with_two_log_widths(1, 2)
+                .to_extension_op()
+                .is_none()
+        );
     }
 
     #[rstest]

@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use crate::std_extensions::collections::array::op_builder::GenericArrayOpBuilder;
 use crate::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{ExtensionId, SignatureError, TypeDef},
     ops::constant::ValueName,
     types::{CustomType, Type, TypeArg, TypeName},
-    Extension, Wire,
 };
 
 /// Trait capturing a concrete array implementation in an extension.

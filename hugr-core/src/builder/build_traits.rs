@@ -9,11 +9,11 @@ use crate::{Extension, IncomingPort, Node, OutgoingPort};
 use std::iter;
 use std::sync::Arc;
 
-use super::{
-    handle::{BuildHandle, Outputs},
-    CircuitBuilder,
-};
 use super::{BuilderWiringError, FunctionBuilder};
+use super::{
+    CircuitBuilder,
+    handle::{BuildHandle, Outputs},
+};
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
@@ -26,8 +26,8 @@ use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
 use itertools::Itertools;
 
 use super::{
-    cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder,
-    tail_loop::TailLoopBuilder, BuildError, Wire,
+    BuildError, Wire, cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder,
+    tail_loop::TailLoopBuilder,
 };
 
 use crate::Hugr;
@@ -407,7 +407,7 @@ pub trait Dataflow: Container {
                 return Err(BuildError::UnexpectedType {
                     node: func_node,
                     op_desc: "FuncDecl/FuncDefn",
-                })
+                });
             }
         };
 
@@ -623,7 +623,7 @@ pub trait Dataflow: Container {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),
                     op_desc: "FuncDecl/FuncDefn",
-                })
+                });
             }
         };
         let op: OpType = ops::Call::try_new(type_scheme, type_args)?.into();

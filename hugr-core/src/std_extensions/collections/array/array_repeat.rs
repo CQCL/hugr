@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -11,7 +12,6 @@ use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDe
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
-use crate::Extension;
 
 use super::array_kind::ArrayKind;
 

@@ -12,8 +12,8 @@ use thiserror::Error;
 
 use super::row_var::MaybeRV;
 use super::{
-    check_typevar_decl, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound,
-    TypeTransformer,
+    NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound, TypeTransformer,
+    check_typevar_decl,
 };
 use crate::extension::SignatureError;
 
@@ -318,7 +318,7 @@ impl TypeArg {
                 let elems = match are_types.next() {
                     Some(true) => {
                         assert!(are_types.all(|b| b)); // If one is a Type, so must the rest be
-                                                       // So, anything that doesn't produce a Type, was a row variable => multiple Types
+                        // So, anything that doesn't produce a Type, was a row variable => multiple Types
                         elems
                             .iter()
                             .flat_map(|ta| match ta.substitute(t) {
@@ -453,7 +453,9 @@ pub enum TypeArgError {
     WrongNumberArgs(usize, usize),
 
     /// Wrong number of type arguments in tuple (actual vs expected).
-    #[error("Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters")]
+    #[error(
+        "Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters"
+    )]
     WrongNumberTuple(usize, usize),
     /// Opaque value type check error.
     #[error("Opaque type argument does not fit declared parameter type: {0}")]
@@ -467,9 +469,9 @@ pub enum TypeArgError {
 mod test {
     use itertools::Itertools;
 
-    use super::{check_type_arg, Substitution, TypeArg, TypeParam};
+    use super::{Substitution, TypeArg, TypeParam, check_type_arg};
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::types::{type_param::TypeArgError, TypeBound, TypeRV};
+    use crate::types::{TypeBound, TypeRV, type_param::TypeArgError};
 
     #[test]
     fn type_arg_fits_param() {

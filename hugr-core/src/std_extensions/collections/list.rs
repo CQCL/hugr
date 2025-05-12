@@ -14,26 +14,26 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::resolution::{
-    resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    resolve_value_extensions,
 };
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc};
-use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
+use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
 use crate::ops::{OpName, Value};
 use crate::types::{TypeName, TypeRowRV};
 use crate::{
+    Extension,
     extension::{
-        simple_op::{MakeExtensionOp, OpLoadError},
         ExtensionId, SignatureError, TypeDef, TypeDefBound,
+        simple_op::{MakeExtensionOp, OpLoadError},
     },
     ops::constant::CustomConst,
     ops::custom::ExtensionOp,
     types::{
-        type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeBound,
+        type_param::{TypeArg, TypeParam},
     },
-    Extension,
 };
 
 /// Reported unique name of the list type.
@@ -378,14 +378,14 @@ impl ListOpInst {
 mod test {
     use rstest::rstest;
 
+    use crate::PortIndex;
     use crate::extension::prelude::{
         const_fail_tuple, const_none, const_ok_tuple, const_some_tuple,
     };
     use crate::ops::OpTrait;
-    use crate::PortIndex;
     use crate::{
-        extension::prelude::{qb_t, usize_t, ConstUsize},
-        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
+        extension::prelude::{ConstUsize, qb_t, usize_t},
+        std_extensions::arithmetic::float_types::{ConstF64, float64_type},
         types::TypeRow,
     };
 
@@ -408,9 +408,11 @@ mod test {
             .instantiate([TypeArg::Type { ty: usize_t() }])
             .unwrap();
 
-        assert!(list_def
-            .instantiate([TypeArg::BoundedNat { n: 3 }])
-            .is_err());
+        assert!(
+            list_def
+                .instantiate([TypeArg::BoundedNat { n: 3 }])
+                .is_err()
+        );
 
         list_def.check_custom(&list_type).unwrap();
         let list_value = ListValue(vec![ConstUsize::new(3).into()], usize_t());

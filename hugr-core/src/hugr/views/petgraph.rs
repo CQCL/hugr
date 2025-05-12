@@ -220,9 +220,9 @@ mod test {
         EdgeCount, GetAdjacencyMatrix, IntoNodeReferences, NodeCount, NodeIndexable, NodeRef,
     };
 
+    use crate::HugrView;
     use crate::hugr::views::tests::sample_hugr;
     use crate::ops::handle::NodeHandle;
-    use crate::HugrView;
 
     use super::PetgraphWrapper;
 

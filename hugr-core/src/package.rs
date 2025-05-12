@@ -3,7 +3,7 @@
 use derive_more::{Display, Error, From};
 use std::io;
 
-use crate::envelope::{read_envelope, write_envelope, EnvelopeConfig, EnvelopeError};
+use crate::envelope::{EnvelopeConfig, EnvelopeError, read_envelope, write_envelope};
 use crate::extension::ExtensionRegistry;
 use crate::hugr::{HugrView, ValidationError};
 use crate::std_extensions::STD_REG;

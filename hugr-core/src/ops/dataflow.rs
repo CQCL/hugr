@@ -2,12 +2,12 @@
 
 use std::borrow::Cow;
 
-use super::{impl_op_name, OpTag, OpTrait};
+use super::{OpTag, OpTrait, impl_op_name};
 
 use crate::extension::SignatureError;
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
-use crate::{type_row, IncomingPort};
+use crate::{IncomingPort, type_row};
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;

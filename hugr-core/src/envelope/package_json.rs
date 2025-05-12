@@ -3,8 +3,8 @@ use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use std::io;
 
-use crate::extension::resolution::ExtensionResolutionError;
 use crate::extension::ExtensionRegistry;
+use crate::extension::resolution::ExtensionResolutionError;
 use crate::hugr::ExtensionError;
 use crate::package::Package;
 use crate::{Extension, Hugr};

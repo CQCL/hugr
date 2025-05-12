@@ -3,7 +3,7 @@
 use derive_more::{Display, Error};
 
 use crate::core::HugrNode;
-use crate::ops::{DataflowParent, OpType, DFG};
+use crate::ops::{DFG, DataflowParent, OpType};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
 

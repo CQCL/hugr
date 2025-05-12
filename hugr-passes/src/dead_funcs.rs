@@ -4,15 +4,15 @@
 use std::collections::HashSet;
 
 use hugr_core::{
+    HugrView, Node,
     hugr::hugrmut::HugrMut,
     ops::{OpTag, OpTrait},
-    HugrView, Node,
 };
 use petgraph::visit::{Dfs, Walker};
 
 use crate::{
-    composable::{validate_if_test, ValidatePassError},
     ComposablePass,
+    composable::{ValidatePassError, validate_if_test},
 };
 
 use super::call_graph::{CallGraph, CallGraphNode};
@@ -144,7 +144,7 @@ mod test {
     use hugr_core::builder::{
         Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::{extension::prelude::usize_t, types::Signature, HugrView};
+    use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
 
     use super::remove_dead_funcs;
 

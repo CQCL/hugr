@@ -16,7 +16,7 @@ use std::collections::HashMap;
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use rerooted::Rerooted;
-pub use root_checked::{check_tag, RootCheckable, RootChecked};
+pub use root_checked::{RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
 use itertools::Itertools;

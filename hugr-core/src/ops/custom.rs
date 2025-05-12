@@ -15,8 +15,8 @@ use {
 use crate::core::HugrNode;
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
-use crate::types::{type_param::TypeArg, Signature};
-use crate::{ops, IncomingPort};
+use crate::types::{Signature, type_param::TypeArg};
+use crate::{IncomingPort, ops};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -340,7 +340,9 @@ pub enum OpaqueOpError<N: HugrNode> {
         available_ops: Vec<OpName>,
     },
     /// Extension and OpDef found, but computed signature did not match stored
-    #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
+    #[error(
+        "Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}"
+    )]
     #[allow(missing_docs)]
     SignatureMismatch {
         node: N,
@@ -371,19 +373,19 @@ mod test {
 
     use ops::OpType;
 
-    use crate::extension::resolution::resolve_op_extensions;
-    use crate::extension::ExtensionRegistry;
-    use crate::std_extensions::arithmetic::conversions::{self};
-    use crate::std_extensions::STD_REG;
     use crate::Node;
+    use crate::extension::ExtensionRegistry;
+    use crate::extension::resolution::resolve_op_extensions;
+    use crate::std_extensions::STD_REG;
+    use crate::std_extensions::arithmetic::conversions::{self};
     use crate::{
+        Extension,
         extension::{
-            prelude::{bool_t, qb_t, usize_t},
             SignatureFunc,
+            prelude::{bool_t, qb_t, usize_t},
         },
         std_extensions::arithmetic::int_types::INT_TYPES,
         types::FuncValueType,
-        Extension,
     };
 
     use super::*;

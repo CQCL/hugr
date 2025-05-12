@@ -8,9 +8,9 @@ use std::rc::Rc;
 
 use self::extension_op::{ExtensionOpFn, ExtensionOpMap};
 use hugr_core::{
-    extension::{simple_op::MakeOpDef, ExtensionId},
-    ops::{constant::CustomConst, ExtensionOp, OpName},
     HugrView, Node,
+    extension::{ExtensionId, simple_op::MakeOpDef},
+    ops::{ExtensionOp, OpName, constant::CustomConst},
 };
 
 use strum::IntoEnumIterator;
@@ -21,7 +21,7 @@ use self::types::LLVMCustomTypeFn;
 use anyhow::Result;
 
 use crate::{
-    emit::{func::EmitFuncContext, EmitOpArgs},
+    emit::{EmitOpArgs, func::EmitFuncContext},
     types::TypeConverter,
 };
 
@@ -110,11 +110,11 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     pub fn simple_extension_op<Op: MakeOpDef + IntoEnumIterator>(
         mut self,
         handler: impl 'a
-            + for<'c> Fn(
-                &mut EmitFuncContext<'c, 'a, H>,
-                EmitOpArgs<'c, '_, ExtensionOp, H>,
-                Op,
-            ) -> Result<()>,
+        + for<'c> Fn(
+            &mut EmitFuncContext<'c, 'a, H>,
+            EmitOpArgs<'c, '_, ExtensionOp, H>,
+            Op,
+        ) -> Result<()>,
     ) -> Self {
         self.extension_op_handlers
             .simple_extension_op::<Op>(handler);
@@ -156,8 +156,8 @@ pub struct CodegenExtsMap<'a, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        extension::prelude::{string_type, ConstString, PRELUDE_ID, PRINT_OP_ID, STRING_TYPE_NAME},
         Hugr,
+        extension::prelude::{ConstString, PRELUDE_ID, PRINT_OP_ID, STRING_TYPE_NAME, string_type},
     };
     use inkwell::{
         context::Context,
@@ -166,7 +166,7 @@ mod test {
     };
     use itertools::Itertools as _;
 
-    use crate::{emit::libc::emit_libc_printf, CodegenExtsBuilder};
+    use crate::{CodegenExtsBuilder, emit::libc::emit_libc_printf};
 
     #[test]
     fn types_with_lifetimes() {

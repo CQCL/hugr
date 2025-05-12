@@ -1,21 +1,21 @@
-use anyhow::{anyhow, bail, ensure, Ok, Result};
+use anyhow::{Ok, Result, anyhow, bail, ensure};
+use hugr_core::Node;
 use hugr_core::extension::prelude::generic::LoadNat;
 use hugr_core::extension::prelude::{
-    self, error_type, generic, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple,
-    TupleOpDef, UnpackTuple,
+    self, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple, TupleOpDef,
+    UnpackTuple, error_type, generic,
 };
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
 use hugr_core::ops::ExtensionOp;
 use hugr_core::types::TypeArg;
-use hugr_core::Node;
 use hugr_core::{
-    extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst, types::SumType,
-    HugrView,
+    HugrView, extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst,
+    types::SumType,
 };
 use inkwell::{
+    AddressSpace,
     types::{BasicType, IntType, PointerType},
     values::{BasicValue as _, BasicValueEnum, StructValue},
-    AddressSpace,
 };
 use itertools::Itertools;
 
@@ -182,7 +182,10 @@ pub trait PreludeCodegen: Clone {
             .ptr_type(AddressSpace::default())
             .as_basic_type_enum();
         let str_type = ctx.llvm_type(&str.get_type())?.as_basic_type_enum();
-        ensure!(str_type == default_str_type, "The default implementation of PreludeCodegen::string_type was overridden, but the default implementation of emit_const_string was not. String type is: {str_type}");
+        ensure!(
+            str_type == default_str_type,
+            "The default implementation of PreludeCodegen::string_type was overridden, but the default implementation of emit_const_string was not. String type is: {str_type}"
+        );
         let s = ctx.builder().build_global_string_ptr(str.value(), "")?;
         Ok(s.as_basic_value_enum())
     }
@@ -402,17 +405,17 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
-    use hugr_core::extension::prelude::{Noop, EXIT_OP_ID};
     use hugr_core::extension::PRELUDE;
+    use hugr_core::extension::prelude::{EXIT_OP_ID, Noop};
     use hugr_core::types::{Type, TypeArg};
-    use hugr_core::{type_row, Hugr};
-    use prelude::{bool_t, qb_t, usize_t, PANIC_OP_ID, PRINT_OP_ID};
+    use hugr_core::{Hugr, type_row};
+    use prelude::{PANIC_OP_ID, PRINT_OP_ID, bool_t, qb_t, usize_t};
     use rstest::{fixture, rstest};
 
     use crate::check_emission;
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::test::{exec_ctx, llvm_ctx, TestContext};
+    use crate::test::{TestContext, exec_ctx, llvm_ctx};
     use crate::types::HugrType;
 
     use super::*;

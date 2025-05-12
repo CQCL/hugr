@@ -5,9 +5,9 @@ use std::sync::Weak;
 use strum::IntoEnumIterator;
 
 use crate::ops::{ExtensionOp, OpName, OpNameRef};
-use crate::{ops::OpType, types::TypeArg, Extension};
+use crate::{Extension, ops::OpType, types::TypeArg};
 
-use super::{op_def::SignatureFunc, ExtensionBuildError, ExtensionId, OpDef, SignatureError};
+use super::{ExtensionBuildError, ExtensionId, OpDef, SignatureError, op_def::SignatureFunc};
 use delegate::delegate;
 use thiserror::Error;
 

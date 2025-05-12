@@ -9,10 +9,10 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use itertools::Itertools;
+use portgraph::LinkView;
 use portgraph::algorithms::ConvexChecker;
 use portgraph::boundary::Boundary;
-use portgraph::LinkView;
-use portgraph::{view::Subgraph, Direction, PortView};
+use portgraph::{Direction, PortView, view::Subgraph};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
@@ -854,7 +854,7 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
     NotConvex,
     /// Not all nodes have the same parent.
     #[error(
-        "Not a sibling subgraph. {first_node} has parent {first_parent}, but {other_node} has parent {other_parent}.",
+        "Not a sibling subgraph. {first_node} has parent {first_parent}, but {other_node} has parent {other_parent}."
     )]
     NoSharedParent {
         /// The first node.
@@ -891,7 +891,9 @@ pub enum InvalidSubgraphBoundary<N: HugrNode = Node> {
     #[error("(node {0}, port {1}) is in the boundary, but node {0} is not in the set.")]
     PortNodeNotInSet(N, Port),
     /// A boundary port has no connections outside the subgraph.
-    #[error("(node {0}, port {1}) is in the boundary, but the port is not connected to a node outside the subgraph.")]
+    #[error(
+        "(node {0}, port {1}) is in the boundary, but the port is not connected to a node outside the subgraph."
+    )]
     DisconnectedBoundaryPort(N, Port),
     /// There's a non-unique input-boundary port.
     #[error("A port in the input boundary is used multiple times.")]
@@ -1122,10 +1124,11 @@ mod tests {
         // All graph but one edge
         assert_matches!(
             SiblingSubgraph::try_new(
-                vec![hugr
-                    .linked_ports(inp, first_cx_edge)
-                    .map(|(n, p)| (n, p.as_incoming().unwrap()))
-                    .collect()],
+                vec![
+                    hugr.linked_ports(inp, first_cx_edge)
+                        .map(|(n, p)| (n, p.as_incoming().unwrap()))
+                        .collect()
+                ],
                 vec![(inp, first_cx_edge)],
                 &func,
             ),

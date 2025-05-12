@@ -44,7 +44,7 @@ mod header;
 mod package_json;
 pub mod serde_with;
 
-pub use header::{EnvelopeConfig, EnvelopeFormat, ZstdConfig, MAGIC_NUMBERS};
+pub use header::{EnvelopeConfig, EnvelopeFormat, MAGIC_NUMBERS, ZstdConfig};
 pub use package_json::PackageEncodingError;
 
 use crate::Hugr;
@@ -58,7 +58,7 @@ use std::str::FromStr;
 use itertools::Itertools as _;
 
 use crate::import::ImportError;
-use crate::{import::import_package, Extension};
+use crate::{Extension, import::import_package};
 
 /// Read a HUGR envelope from a reader.
 ///
@@ -407,11 +407,11 @@ pub(crate) mod test {
     use std::borrow::Cow;
     use std::io::BufReader;
 
+    use crate::HugrView;
     use crate::builder::test::{multi_module_package, simple_package};
     use crate::extension::PRELUDE_REGISTRY;
     use crate::hugr::test::check_hugr_equality;
     use crate::std_extensions::STD_REG;
-    use crate::HugrView;
 
     /// Returns an `ExtensionRegistry` with the extensions from both
     /// sets. Avoids cloning if the first one already contains all

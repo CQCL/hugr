@@ -1,9 +1,9 @@
 use hugr_core::{
+    Wire,
     builder::{BuildError, Dataflow},
     extension::simple_op::HasConcrete as _,
     std_extensions::arithmetic::int_ops::IntOpDef,
     types::TypeArg,
-    Wire,
 };
 
 pub trait IntOpBuilder: Dataflow {

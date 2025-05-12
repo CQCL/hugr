@@ -18,9 +18,9 @@ use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::handle::{DataflowOpID, FuncID};
 use hugr_core::ops::{
-    AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock, ExitBlock, ExtensionOp,
-    FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop,
-    Value, CFG, DFG,
+    AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG, DataflowBlock, ExitBlock,
+    ExtensionOp, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output,
+    Tag, TailLoop, Value,
 };
 use hugr_core::types::{
     ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
@@ -165,7 +165,7 @@ fn call<H: HugrView<Node = Node>>(
             return Err(BuildError::UnexpectedType {
                 node: func,
                 op_desc: "func defn/decl",
-            })
+            });
         }
     };
     Ok(Call::try_new(func_sig, type_args)?)
@@ -381,7 +381,7 @@ impl ReplaceTypes {
         &mut self,
         src_ty: &TypeDef,
         const_fn: impl Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>
-            + 'static,
+        + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
     }
@@ -448,31 +448,37 @@ impl ReplaceTypes {
             OpType::Const(Const { value, .. }) => self.change_value(value),
             OpType::ExtensionOp(ext_op) => Ok(
                 // Copy/discard insertion done by caller
-                match self.op_map.get(&OpHashWrapper::from(&*ext_op)) { Some(replacement) => {
-                    replacement
-                        .replace(hugr, n)
-                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
-                    true
-                } _ => {
-                    let def = ext_op.def_arc();
-                    let mut args = ext_op.args().to_vec();
-                    let ch = args.transform(self)?;
-                    match self
-                        .param_ops
-                        .get(&def.as_ref().into())
-                        .and_then(|rep_fn| rep_fn(&args))
-                    { Some(replacement) => {
+                match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
+                    Some(replacement) => {
                         replacement
                             .replace(hugr, n)
                             .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
                         true
-                    } _ => {
-                        if ch {
-                            *ext_op = ExtensionOp::new(def.clone(), args)?;
+                    }
+                    _ => {
+                        let def = ext_op.def_arc();
+                        let mut args = ext_op.args().to_vec();
+                        let ch = args.transform(self)?;
+                        match self
+                            .param_ops
+                            .get(&def.as_ref().into())
+                            .and_then(|rep_fn| rep_fn(&args))
+                        {
+                            Some(replacement) => {
+                                replacement
+                                    .replace(hugr, n)
+                                    .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
+                                true
+                            }
+                            _ => {
+                                if ch {
+                                    *ext_op = ExtensionOp::new(def.clone(), args)?;
+                                }
+                                ch
+                            }
                         }
-                        ch
-                    }}
-                }},
+                    }
+                },
             ),
 
             OpType::OpaqueOp(_) => panic!("OpaqueOp should not be in a Hugr"),
@@ -596,13 +602,13 @@ mod test {
 
     use crate::replace_types::handlers::generic_array_const;
     use hugr_core::builder::{
-        inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder, inout_sig,
     };
     use hugr_core::extension::prelude::{
-        bool_t, option_type, qb_t, usize_t, ConstUsize, UnwrapBuilder,
+        ConstUsize, UnwrapBuilder, bool_t, option_type, qb_t, usize_t,
     };
-    use hugr_core::extension::{simple_op::MakeExtensionOp, TypeDefBound, Version};
+    use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::{IdentList, ValidationError};
     use hugr_core::ops::constant::CustomConst;
@@ -612,20 +618,20 @@ mod test {
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use hugr_core::std_extensions::collections::array::{Array, ArrayKind, GenericArrayValue};
     use hugr_core::std_extensions::collections::list::{
-        list_type, list_type_def, ListOp, ListValue,
+        ListOp, ListValue, list_type, list_type_def,
     };
     use hugr_core::std_extensions::collections::value_array::{
-        value_array_type, VArrayOp, VArrayOpDef, VArrayValue, ValueArray,
+        VArrayOp, VArrayOpDef, VArrayValue, ValueArray, value_array_type,
     };
 
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
-    use hugr_core::{type_row, Extension, HugrView};
+    use hugr_core::{Extension, HugrView, type_row};
     use itertools::Itertools;
     use rstest::rstest;
 
     use crate::ComposablePass;
 
-    use super::{handlers::list_const, NodeTemplate, ReplaceTypes};
+    use super::{NodeTemplate, ReplaceTypes, handlers::list_const};
 
     const PACKED_VEC: &str = "PackedVec";
     const READ: &str = "read";

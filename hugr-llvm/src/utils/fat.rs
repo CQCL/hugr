@@ -6,10 +6,10 @@ use std::{cmp::Ordering, fmt, hash::Hash, marker::PhantomData, ops::Deref};
 
 use hugr_core::hugr::views::Rerooted;
 use hugr_core::{
-    core::HugrNode,
-    ops::{DataflowBlock, ExitBlock, Input, OpType, Output, CFG},
-    types::Type,
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
+    core::HugrNode,
+    ops::{CFG, DataflowBlock, ExitBlock, Input, OpType, Output},
+    types::Type,
 };
 use itertools::Itertools as _;
 
@@ -141,18 +141,24 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn out_value_types(&self) -> impl Iterator<Item = (OutgoingPort, Type)> + 'hugr + use<'hugr, OT, H> {
+    pub fn out_value_types(
+        &self,
+    ) -> impl Iterator<Item = (OutgoingPort, Type)> + 'hugr + use<'hugr, OT, H> {
         self.hugr.out_value_types(self.node)
     }
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn in_value_types(&self) -> impl Iterator<Item = (IncomingPort, Type)> + 'hugr + use<'hugr, OT, H> {
+    pub fn in_value_types(
+        &self,
+    ) -> impl Iterator<Item = (IncomingPort, Type)> + 'hugr + use<'hugr, OT, H> {
         self.hugr.in_value_types(self.node)
     }
 
     /// Return iterator over the direct children of node.
-    pub fn children(&self) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr + use<'hugr, OT, H> {
+    pub fn children(
+        &self,
+    ) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr + use<'hugr, OT, H> {
         self.hugr
             .children(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))

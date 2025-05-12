@@ -8,9 +8,9 @@ use hugr::builder::{
 };
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};
 use hugr::ops::OpName;
-use hugr::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Signature;
-use hugr::{type_row, CircuitUnit, Extension, Hugr, Node};
+use hugr::{CircuitUnit, Extension, Hugr, Node, type_row};
 use lazy_static::lazy_static;
 
 pub fn simple_dfg_hugr() -> Hugr {

@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
-use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
+use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
@@ -12,8 +12,8 @@ use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
 use super::{
-    partial_from_const, row_contains_bottom, AbstractValue, AnalysisResults, DFContext,
-    LoadedFunction, PartialValue,
+    AbstractValue, AnalysisResults, DFContext, LoadedFunction, PartialValue, partial_from_const,
+    row_contains_bottom,
 };
 
 type PV<V, N> = PartialValue<V, N>;

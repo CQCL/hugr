@@ -2,8 +2,8 @@ use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeBase, TypeBound, T
 
 use super::custom::CustomType;
 
-use crate::extension::prelude::{qb_t, usize_t};
 use crate::extension::SignatureError;
+use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]

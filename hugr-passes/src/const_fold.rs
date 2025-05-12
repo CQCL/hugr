@@ -7,21 +7,21 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
+    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
     hugr::hugrmut::HugrMut,
     ops::{
-        constant::OpaqueValue, Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value,
+        Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value, constant::OpaqueValue,
     },
     types::EdgeKind,
-    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
 };
 use value_handle::ValueHandle;
 
 use crate::dataflow::{
-    partial_from_const, ConstLoader, ConstLocation, DFContext, Machine, PartialValue,
-    TailLoopTermination,
+    ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
+    partial_from_const,
 };
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
-use crate::{composable::validate_if_test, ComposablePass};
+use crate::{ComposablePass, composable::validate_if_test};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.

@@ -4,10 +4,10 @@ use std::collections::VecDeque;
 
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
-use hugr_core::hugr::views::SiblingSubgraph;
 use hugr_core::hugr::SimpleReplacementError;
+use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::views::SiblingSubgraph;
+use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, SimpleReplacement};
@@ -266,11 +266,11 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use hugr_core::extension::prelude::{bool_t, qb_t, UnpackTuple};
+    use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
 
+    use hugr_core::Hugr;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::types::Signature;
-    use hugr_core::Hugr;
     use rstest::{fixture, rstest};
 
     /// A simple pack operation with unused output.

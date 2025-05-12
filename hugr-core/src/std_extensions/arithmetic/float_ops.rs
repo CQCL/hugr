@@ -6,14 +6,14 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use super::float_types::float64_type;
 use crate::{
+    Extension,
     extension::{
+        ExtensionId, OpDef, SignatureFunc,
         prelude::{bool_t, string_type},
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
-        ExtensionId, OpDef, SignatureFunc,
     },
     ops::OpName,
     types::Signature,
-    Extension,
 };
 use lazy_static::lazy_static;
 mod const_fold;

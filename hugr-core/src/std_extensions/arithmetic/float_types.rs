@@ -5,10 +5,10 @@ use std::sync::{Arc, Weak};
 use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
 use crate::{
+    Extension,
     extension::ExtensionId,
     ops::constant::CustomConst,
     types::{CustomType, Type, TypeBound},
-    Extension,
 };
 use lazy_static::lazy_static;
 

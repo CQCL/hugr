@@ -1,6 +1,7 @@
 //! Provides [LinearizeArrayPass] which turns 'value_array`s into regular linear `array`s.
 
 use hugr_core::{
+    Node,
     extension::{
         prelude::Noop,
         simple_op::{HasConcrete, MakeOpDef as _, MakeRegisteredOp},
@@ -8,22 +9,21 @@ use hugr_core::{
     hugr::hugrmut::HugrMut,
     std_extensions::collections::{
         array::{
-            array_type_def, array_type_parametric, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
-            ArrayScanDef, ArrayValue, ARRAY_REPEAT_OP_ID, ARRAY_SCAN_OP_ID,
+            ARRAY_REPEAT_OP_ID, ARRAY_SCAN_OP_ID, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
+            ArrayScanDef, ArrayValue, array_type_def, array_type_parametric,
         },
         value_array::{self, VArrayFromArrayDef, VArrayToArrayDef, VArrayValue, ValueArray},
     },
     types::Transformable,
-    Node,
 };
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
 use crate::{
-    replace_types::{
-        handlers::copy_discard_array, DelegatingLinearizer, NodeTemplate, ReplaceTypesError,
-    },
     ComposablePass, ReplaceTypes,
+    replace_types::{
+        DelegatingLinearizer, NodeTemplate, ReplaceTypesError, handlers::copy_discard_array,
+    },
 };
 
 /// A HUGR -> HUGR pass that turns 'value_array`s into regular linear `array`s.
@@ -150,29 +150,29 @@ mod test {
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{Const, OpType};
     use hugr_core::std_extensions::collections::array::{
-        self, array_type, ArrayValue, Direction, FROM, INTO,
+        self, ArrayValue, Direction, FROM, INTO, array_type,
     };
     use hugr_core::std_extensions::collections::value_array::{
         VArrayFromArray, VArrayRepeat, VArrayScan, VArrayToArray, VArrayValue,
     };
     use hugr_core::types::Transformable;
     use hugr_core::{
+        HugrView,
         builder::{Container, DFGBuilder, Dataflow, HugrBuilder},
         extension::prelude::{qb_t, usize_t},
         std_extensions::collections::{
             array::{
-                op_builder::{build_all_array_ops, build_all_value_array_ops},
                 ArrayRepeat, ArrayScan,
+                op_builder::{build_all_array_ops, build_all_value_array_ops},
             },
             value_array::{self, value_array_type},
         },
         types::{Signature, Type},
-        HugrView,
     };
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::{composable::ValidatingPass, ComposablePass};
+    use crate::{ComposablePass, composable::ValidatingPass};
 
     use super::LinearizeArrayPass;
 

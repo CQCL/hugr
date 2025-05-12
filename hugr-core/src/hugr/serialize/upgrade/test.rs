@@ -1,7 +1,7 @@
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::bool_t,
-    hugr::serialize::test::{check_hugr_deserialize, HugrSer},
+    hugr::serialize::test::{HugrSer, check_hugr_deserialize},
     std_extensions::logic::LogicOp,
     types::Signature,
 };

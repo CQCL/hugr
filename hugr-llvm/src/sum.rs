@@ -4,7 +4,7 @@ use std::{iter, slice};
 
 use crate::types::{HugrSumType, TypingSession};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{Result, anyhow, bail, ensure};
 use delegate::delegate;
 use hugr_core::types::TypeRow;
 use inkwell::{
@@ -13,7 +13,7 @@ use inkwell::{
     types::{AnyType, AsTypeRef, BasicType, BasicTypeEnum, IntType, StructType},
     values::{AnyValue, AsValueRef, BasicValue, BasicValueEnum, IntValue, StructValue},
 };
-use itertools::{izip, Itertools as _};
+use itertools::{Itertools as _, izip};
 
 /// An elidable type is one that holds no information, for example `{}`, the
 /// empty struct.
@@ -682,10 +682,10 @@ impl<'c> LLVMSumValue<'c> {
 mod test {
     use hugr_core::extension::prelude::{bool_t, usize_t};
     use insta::assert_snapshot;
-    use rstest::{rstest, Context};
+    use rstest::{Context, rstest};
 
     use crate::{
-        test::{llvm_ctx, TestContext},
+        test::{TestContext, llvm_ctx},
         types::HugrType,
     };
 

@@ -11,7 +11,7 @@ use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDe
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound};
-use crate::{type_row, Extension};
+use crate::{Extension, type_row};
 
 use super::array_kind::ArrayKind;
 

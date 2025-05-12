@@ -11,7 +11,7 @@ pub mod tag;
 pub mod validate;
 use crate::core::HugrNode;
 use crate::extension::resolution::{
-    collect_op_extension, collect_op_types_extensions, ExtensionCollectionError,
+    ExtensionCollectionError, collect_op_extension, collect_op_types_extensions,
 };
 use std::borrow::Cow;
 
@@ -27,11 +27,11 @@ use paste::paste;
 use enum_dispatch::enum_dispatch;
 
 pub use constant::{Const, Value};
-pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
+pub use controlflow::{BasicBlock, CFG, Case, Conditional, DataflowBlock, ExitBlock, TailLoop};
 pub use custom::{ExtensionOp, OpaqueOp};
 pub use dataflow::{
-    Call, CallIndirect, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction, Output,
-    DFG,
+    Call, CallIndirect, DFG, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction,
+    Output,
 };
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 use smol_str::SmolStr;

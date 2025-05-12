@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use super::dataflow::DataflowOpTrait;
-use super::{impl_op_name, OpTag};
+use super::{OpTag, impl_op_name};
 use crate::types::{EdgeKind, Signature, Type, TypeRow};
 
 /// An operation that creates a tagged sum value from one of its variants.

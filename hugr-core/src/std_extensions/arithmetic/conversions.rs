@@ -4,6 +4,7 @@ use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Extension;
 use crate::extension::prelude::sum_with_error;
 use crate::extension::prelude::{bool_t, string_type, usize_t};
 use crate::extension::simple_op::{HasConcrete, HasDef};
@@ -13,7 +14,6 @@ use crate::ops::{ExtensionOp, OpName};
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::types::{TypeArg, TypeRV};
-use crate::Extension;
 
 use super::float_types::float64_type;
 use super::int_types::{get_log_width, int_tv};
@@ -207,10 +207,10 @@ impl HasDef for ConvertOpType {
 mod test {
     use rstest::rstest;
 
+    use crate::IncomingPort;
     use crate::extension::prelude::ConstUsize;
     use crate::ops::Value;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
-    use crate::IncomingPort;
 
     use super::*;
 

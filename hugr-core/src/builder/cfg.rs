@@ -1,16 +1,16 @@
 use super::{
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
-    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
+use crate::ops::{self, DataflowBlock, DataflowParent, ExitBlock, OpType, handle::NodeHandle};
 use crate::types::Signature;
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
-use crate::{hugr::HugrMut, type_row, Hugr};
+use crate::{Hugr, hugr::HugrMut, type_row};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph.
@@ -411,8 +411,8 @@ pub(crate) mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::hugr::validate::InterGraphEdgeError;
     use crate::hugr::ValidationError;
+    use crate::hugr::validate::InterGraphEdgeError;
     use crate::type_row;
     use cool_asserts::assert_matches;
 

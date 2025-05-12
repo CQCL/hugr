@@ -3,18 +3,18 @@ use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::{
-    hugr::{hugrmut::HugrMut, HugrError},
+    HugrView as _, Node,
+    hugr::{HugrError, hugrmut::HugrMut},
     ops::{OpTag, OpTrait},
     types::EdgeKind,
-    HugrView as _, Node,
 };
 use itertools::Itertools as _;
 use petgraph::{
+    Direction::Incoming,
     visit::{
         GraphBase, GraphRef, IntoNeighbors as _, IntoNeighborsDirected, IntoNodeIdentifiers,
         NodeFiltered, VisitMap, Visitable, Walker,
     },
-    Direction::Incoming,
 };
 
 /// Insert order edges into a Hugr according to a rank function.
@@ -207,15 +207,15 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use hugr_core::builder::{endo_sig, BuildHandle, Dataflow, DataflowHugr};
+    use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr, endo_sig};
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::{self, Value};
     use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, Type};
-    use hugr_core::{builder::DFGBuilder, hugr::Hugr};
     use hugr_core::{HugrView, Wire};
+    use hugr_core::{builder::DFGBuilder, hugr::Hugr};
 
     use petgraph::visit::Topo;
 
