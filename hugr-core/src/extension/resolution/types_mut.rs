@@ -24,7 +24,7 @@ pub fn resolve_op_types_extensions(
     node: Option<Node>,
     op: &mut OpType,
     extensions: &WeakExtensionRegistry,
-) -> Result<impl Iterator<Item = Weak<Extension>>, ExtensionResolutionError> {
+) -> Result<impl Iterator<Item = Weak<Extension>> + use<>, ExtensionResolutionError> {
     let mut used = WeakExtensionRegistry::default();
     let used_extensions = &mut used;
     match op {

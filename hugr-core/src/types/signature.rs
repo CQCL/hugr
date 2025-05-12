@@ -242,20 +242,20 @@ impl Signature {
 
     /// Returns the `Port`s in the signature for a given direction.
     #[inline]
-    pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
+    pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> + use<> {
         (0..self.port_count(dir)).map(move |i| Port::new(dir, i))
     }
 
     /// Returns the incoming `Port`s in the signature.
     #[inline]
-    pub fn input_ports(&self) -> impl Iterator<Item = IncomingPort> {
+    pub fn input_ports(&self) -> impl Iterator<Item = IncomingPort> + use<> {
         self.ports(Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
     }
 
     /// Returns the outgoing `Port`s in the signature.
     #[inline]
-    pub fn output_ports(&self) -> impl Iterator<Item = OutgoingPort> {
+    pub fn output_ports(&self) -> impl Iterator<Item = OutgoingPort> + use<> {
         self.ports(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
     }

@@ -144,12 +144,12 @@ impl<'c> LLVMSumType<'c> {
     }
 
     /// Returns an constant `undef` value of the underlying LLVM type.
-    pub fn get_undef(&self) -> impl BasicValue<'c> {
+    pub fn get_undef(&self) -> impl BasicValue<'c> + use<'c> {
         basic_type_undef(self.0.value_type())
     }
 
     /// Returns an constant `poison` value of the underlying LLVM type.
-    pub fn get_poison(&self) -> impl BasicValue<'c> {
+    pub fn get_poison(&self) -> impl BasicValue<'c> + use<'c> {
         basic_type_poison(self.0.value_type())
     }
 

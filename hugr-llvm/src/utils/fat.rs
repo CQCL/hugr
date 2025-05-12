@@ -141,18 +141,18 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn out_value_types(&self) -> impl Iterator<Item = (OutgoingPort, Type)> + 'hugr {
+    pub fn out_value_types(&self) -> impl Iterator<Item = (OutgoingPort, Type)> + 'hugr + use<'hugr, OT, H> {
         self.hugr.out_value_types(self.node)
     }
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn in_value_types(&self) -> impl Iterator<Item = (IncomingPort, Type)> + 'hugr {
+    pub fn in_value_types(&self) -> impl Iterator<Item = (IncomingPort, Type)> + 'hugr + use<'hugr, OT, H> {
         self.hugr.in_value_types(self.node)
     }
 
     /// Return iterator over the direct children of node.
-    pub fn children(&self) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr {
+    pub fn children(&self) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr + use<'hugr, OT, H> {
         self.hugr
             .children(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))
@@ -175,14 +175,14 @@ impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H, H::Node> {
     }
 
     /// Iterator over output ports of node.
-    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + 'hugr {
+    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + 'hugr + use<'hugr, OT, H> {
         self.hugr.node_outputs(self.node)
     }
 
     /// Iterates over the output neighbours of the `node`.
     pub fn output_neighbours(
         &self,
-    ) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr {
+    ) -> impl Iterator<Item = FatNode<'hugr, OpType, H, H::Node>> + 'hugr + use<'hugr, OT, H> {
         self.hugr
             .output_neighbours(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))

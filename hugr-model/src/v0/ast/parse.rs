@@ -266,11 +266,11 @@ fn parse_meta_item(pair: Pair<Rule>) -> ParseResult<Term> {
 }
 
 fn parse_optional_signature(pairs: &mut Pairs<Rule>) -> ParseResult<Option<Term>> {
-    if let Some(pair) = take_rule(pairs, Rule::signature).next() {
+    match take_rule(pairs, Rule::signature).next() { Some(pair) => {
         Ok(Some(parse_signature(pair)?))
-    } else {
+    } _ => {
         Ok(None)
-    }
+    }}
 }
 
 fn parse_signature(pair: Pair<Rule>) -> ParseResult<Term> {

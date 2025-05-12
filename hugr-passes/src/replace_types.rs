@@ -448,31 +448,31 @@ impl ReplaceTypes {
             OpType::Const(Const { value, .. }) => self.change_value(value),
             OpType::ExtensionOp(ext_op) => Ok(
                 // Copy/discard insertion done by caller
-                if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
+                match self.op_map.get(&OpHashWrapper::from(&*ext_op)) { Some(replacement) => {
                     replacement
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
                     true
-                } else {
+                } _ => {
                     let def = ext_op.def_arc();
                     let mut args = ext_op.args().to_vec();
                     let ch = args.transform(self)?;
-                    if let Some(replacement) = self
+                    match self
                         .param_ops
                         .get(&def.as_ref().into())
                         .and_then(|rep_fn| rep_fn(&args))
-                    {
+                    { Some(replacement) => {
                         replacement
                             .replace(hugr, n)
                             .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
                         true
-                    } else {
+                    } _ => {
                         if ch {
                             *ext_op = ExtensionOp::new(def.clone(), args)?;
                         }
                         ch
-                    }
-                },
+                    }}
+                }},
             ),
 
             OpType::OpaqueOp(_) => panic!("OpaqueOp should not be in a Hugr"),

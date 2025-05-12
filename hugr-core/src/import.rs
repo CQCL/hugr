@@ -6,13 +6,14 @@
 use std::sync::Arc;
 
 use crate::{
+    Direction, Hugr, HugrView, Node, Port,
     extension::{ExtensionId, ExtensionRegistry, SignatureError},
     hugr::{HugrMut, NodeMetadata},
     ops::{
+        AliasDecl, AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG,
+        DataflowBlock, ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType,
+        OpaqueOp, Output, Tag, TailLoop, Value,
         constant::{CustomConst, CustomSerialized, OpaqueValue},
-        AliasDecl, AliasDefn, Call, CallIndirect, Case, Conditional, Const, DataflowBlock,
-        ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType, OpaqueOp, Output,
-        Tag, TailLoop, Value, CFG, DFG,
     },
     package::Package,
     std_extensions::{
@@ -20,11 +21,10 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::{
-        type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
-        PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
-        TypeEnum, TypeName, TypeRow,
+        CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
+        Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow, type_param::TypeParam,
+        type_row::TypeRowBase,
     },
-    Direction, Hugr, HugrView, Node, Port,
 };
 use fxhash::FxHashMap;
 use hugr_model::v0 as model;
@@ -59,7 +59,9 @@ pub enum ImportError {
         available: Vec<ExtensionId>,
     },
     /// An extension type is missing.
-    #[error("Importing the hugr requires extension {ext} to have a type named {name}, but it was not found.")]
+    #[error(
+        "Importing the hugr requires extension {ext} to have a type named {name}, but it was not found."
+    )]
     ExtensionType {
         /// The extension that is missing the type.
         ext: ExtensionId,

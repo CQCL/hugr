@@ -109,7 +109,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
         for child_node in self.node.children() {
             let (inputs, outputs) = (vec![], RowMailBox::new_empty().promise());
             match child_node.as_ref() {
-                OpType::DataflowBlock(ref dfb) => self.emit_dataflow_block(
+                OpType::DataflowBlock(dfb) => self.emit_dataflow_block(
                     context,
                     EmitOpArgs {
                         node: child_node.into_ot(dfb),
@@ -117,7 +117,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
                         outputs,
                     },
                 ),
-                OpType::ExitBlock(ref eb) => self.emit_exit_block(
+                OpType::ExitBlock(eb) => self.emit_exit_block(
                     context,
                     EmitOpArgs {
                         node: child_node.into_ot(eb),
@@ -130,7 +130,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
                 // technically not allowed, but there is no harm in allowing it.
                 OpType::Const(_) => Ok(()),
                 OpType::FuncDecl(_) => Ok(()),
-                OpType::FuncDefn(ref fd) => {
+                OpType::FuncDefn(fd) => {
                     context.push_todo_func(child_node.into_ot(fd));
                     Ok(())
                 }

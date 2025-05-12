@@ -34,7 +34,7 @@ impl<V: AbstractValue, N: Clone> ValueRow<V, N> {
         &self,
         variant: usize,
         len: usize,
-    ) -> Option<impl Iterator<Item = PartialValue<V, N>>> {
+    ) -> Option<impl Iterator<Item = PartialValue<V, N>> + use<V, N>> {
         let vals = self[0].variant_values(variant, len)?;
         Some(vals.into_iter().chain(self.0[1..].to_owned()))
     }
