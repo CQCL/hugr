@@ -348,39 +348,17 @@ pub(crate) mod test {
         }
     }
 
-    /// Serialize and deserialize a HUGR into a binary envelope, and check that the
-    /// result is the same as the original.
+    /// Serialize and deserialize a HUGR into an envelope with the given config,
+    /// and check that the result is the same as the original.
     ///
-    /// We do not compare the before and after `Hugr`s for
-    /// equality directly, because impls of `CustomConst` are not required to implement
-    /// equality checking.
-    ///
-    /// Returns the deserialized HUGR.
-    #[expect(unused)]
-    pub(crate) fn check_hugr_bin_roundtrip(hugr: &Hugr) -> Hugr {
-        let mut buffer = Vec::new();
-        hugr.store(&mut buffer, EnvelopeConfig::binary()).unwrap();
-
-        let extensions = join_extensions(&STD_REG, hugr.extensions());
-
-        let reader = BufReader::new(buffer.as_slice());
-        let extracted = Hugr::load(reader, Some(&extensions)).unwrap();
-
-        check_hugr_equality(&extracted, hugr);
-        extracted
-    }
-
-    /// Serialize and deserialize a HUGR into a text envelope, and check that the
-    /// result is the same as the original.
-    ///
-    /// We do not compare the before and after `Hugr`s for
-    /// equality directly, because impls of `CustomConst` are not required to implement
-    /// equality checking.
+    /// We do not compare the before and after `Hugr`s for equality directly,
+    /// because impls of `CustomConst` are not required to implement equality
+    /// checking.
     ///
     /// Returns the deserialized HUGR.
-    pub(crate) fn check_hugr_text_roundtrip(hugr: &Hugr) -> Hugr {
+    pub(crate) fn check_hugr_roundtrip(hugr: &Hugr, config: EnvelopeConfig) -> Hugr {
         let mut buffer = Vec::new();
-        hugr.store(&mut buffer, EnvelopeConfig::text()).unwrap();
+        hugr.store(&mut buffer, config).unwrap();
 
         let extensions = join_extensions(&STD_REG, hugr.extensions());
 
