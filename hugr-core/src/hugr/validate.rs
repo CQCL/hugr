@@ -709,13 +709,17 @@ pub enum ValidationError<N: HugrNode> {
     /// Multiple nodes were exported using the same name from a [Module](super::Module)
     #[error("FuncDefn is exported under same name {link_name} as earlier node {:?}", children[0])]
     DuplicateExternalNames {
-        /// The link_name of a [FuncDecl] or [FuncDefn](super::FuncDefn)
+        /// The link_name of a [`FuncDecl`](crate::ops::FuncDecl) or [`FuncDefn`]
         link_name: String,
         /// Two nodes node exported under that name
         children: [N; 2],
     },
-    /// A [FuncDecl], or `FuncDefn` with a [link_name](super::FuncDefn::link_name),
-    /// was neither root nor child of a [Module] root
+    /// A [`FuncDecl`], or [`FuncDefn`] with a [link_name],
+    /// was neither root nor child of a [`Module`] root
+    ///
+    /// [`FuncDecl`]: crate::ops::FuncDecl
+    /// [link_name]: FuncDefn::link_name
+    /// [`Module`]: crate::ops::Module
     #[error("Node {node} has a link_name but is neither root nor child of Module root")]
     LinkNameNotAtTopLevel {
         // The node exporting/importing the name

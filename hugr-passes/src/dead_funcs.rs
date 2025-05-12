@@ -91,8 +91,9 @@ impl RemoveDeadFuncsPass {
         self
     }
 
-    /// Sets whether the exported [FuncDefn](hugr_core::ops::FuncDefn) children of a
-    /// [Module](hugr_core::ops::Module) are included as entry points (yes by default)
+    /// When the [HugrView::entrypoint] is a [Module](hugr_core::ops::Module),
+    /// sets whether the exported [FuncDefn](hugr_core::ops::FuncDefn) children are
+    /// included as entry points for reachability analysis. (Yes by default.)
     pub fn include_module_exports(mut self, include: bool) -> Self {
         self.include_exports = include;
         self
@@ -136,9 +137,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// Deletes from the Hugr any functions that are not used by either [`Call`] or
 /// [`LoadFunction`] nodes in reachable parts.
 ///
-/// For [`Module`]-rooted Hugrs, all top-level functions with [FuncDefn::link_name] set,
+/// For [`Module`]-rooted Hugrs, all top-level functions with [link_name] set,
 /// will be used as entry points.
 ///
+/// [`Call`]: hugr_core::ops::OpType::Call
+/// [link_name]: hugr_core::ops::FuncDefn::link_name
+/// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
+/// [`Module`]: hugr_core::ops::OpType::Module
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {

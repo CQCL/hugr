@@ -152,7 +152,7 @@ impl<B, T> DFGWrapper<B, T> {
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a [FuncDefn]-rooted HUGR; the function will be private.
+    /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR; the function will be private.
     /// (See also [Self::new_pub], [Self::new_link_name].)
     ///
     /// # Errors
