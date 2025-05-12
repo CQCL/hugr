@@ -1202,6 +1202,7 @@ dependencies = [
  "clio",
  "derive_more",
  "hugr",
+ "human-panic",
  "predicates",
  "rstest",
  "serde_json",
@@ -1316,6 +1317,22 @@ dependencies = [
  "hugr-model",
  "paste",
  "pyo3",
+]
+
+[[package]]
+name = "human-panic"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80b84a66a325082740043a6c28bbea400c129eac0d3a27673a1de971e44bf1f7"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "backtrace",
+ "os_info",
+ "serde",
+ "serde_derive",
+ "toml",
+ "uuid",
 ]
 
 [[package]]
@@ -1959,6 +1976,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2c1f9f56e534ac6a9b8a4600bdf0f530fb393b5f393e7b4d03489c3cf0c3f01"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "os_info"
+version = "3.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41fc863e2ca13dc2d5c34fb22ea4a588248ac14db929616ba65c45f21744b1e9"
+dependencies = [
+ "log",
+ "serde",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2678,6 +2706,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_spanned"
+version = "0.6.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87607cb1398ed59d48732e575a4c28a7a8ebf2454b964fe3f224f2afc07909e1"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3008,10 +3045,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_edit",
+]
+
+[[package]]
 name = "toml_datetime"
 version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3da5db5a963e24bc68be8b17b6fa82814bb22ee8660f192bb182771d498f09a3"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "toml_edit"
@@ -3020,9 +3072,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "310068873db2c5b3e7659d2cc35d21855dbafa50d1ce336397c666e3cb08137e"
 dependencies = [
  "indexmap 2.9.0",
+ "serde",
+ "serde_spanned",
  "toml_datetime",
+ "toml_write",
  "winnow",
 ]
+
+[[package]]
+name = "toml_write"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
 
 [[package]]
 name = "tower"
@@ -3200,6 +3261,9 @@ name = "uuid"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "458f7a779bf54acc9f347480ac654f68407d3aab21269a6e3c9f922acd9e2da9"
+dependencies = [
+ "getrandom 0.3.2",
+]
 
 [[package]]
 name = "uuid-simd"
