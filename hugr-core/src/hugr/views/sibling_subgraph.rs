@@ -178,13 +178,12 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         inputs: IncomingPorts<N>,
         outputs: OutgoingPorts<N>,
         hugr: &H,
-        checker: &impl ConvexChecker,
+        checker: &TopoConvexChecker<H>,
     ) -> Result<Self, InvalidSubgraph<N>> {
-        let parent = pick_parent(hugr, &inputs, &outputs)?;
-        let (region, node_map) = hugr.region_portgraph(parent);
+        let (region, node_map) = checker.region_portgraph();
 
         // Ordering of the edges here is preserved and becomes ordering of the signature.
-        let boundary = make_boundary::<H>(&region, &node_map, &inputs, &outputs);
+        let boundary = make_boundary::<H>(&region, node_map, &inputs, &outputs);
         let subpg = Subgraph::new_subgraph(region, boundary);
         let nodes = subpg
             .nodes_iter()
@@ -242,10 +241,10 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ///
     /// Refer to [`SiblingSubgraph::try_from_nodes`] for the full
     /// documentation.
-    pub fn try_from_nodes_with_checker<'c, 'h: 'c>(
+    pub fn try_from_nodes_with_checker<H: HugrView<Node = N>>(
         nodes: impl Into<Vec<N>>,
-        hugr: &'h impl HugrView<Node = N>,
-        checker: &impl ConvexChecker,
+        hugr: &H,
+        checker: &TopoConvexChecker<H>,
     ) -> Result<Self, InvalidSubgraph<N>> {
         let nodes = nodes.into();
 
@@ -634,6 +633,12 @@ impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
         portgraph::view::FlatRegion<'g, Base::RegionPortgraph<'g>>,
     > {
         &self.init_checker().0
+    }
+
+    /// Return the portgraph and node map on which convexity queries are performed.
+    fn region_portgraph(&self) -> (CheckerRegion<'g, Base>, &Base::RegionPortgraphNodes) {
+        let (checker, node_map) = self.init_checker();
+        (checker.graph(), node_map)
     }
 
     /// Returns the node map from the region to the base HUGR.
