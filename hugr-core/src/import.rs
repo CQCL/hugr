@@ -874,13 +874,12 @@ impl<'a> Context<'a> {
             self.region_scope = region;
         }
 
-        let [region_source, region_targets] = self.get_func_type(
+        let [_, region_targets] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
 
-        let region_source_types = self.import_closed_list(region_source)?;
         let region_target_types = self.import_closed_list(region_targets)?;
 
         // Identify the entry node of the control flow region by looking for
@@ -899,8 +898,10 @@ impl<'a> Context<'a> {
                 }
             }
 
-            // TODO: Handle the case where the entry link is a target of the region.
-
+            // TODO: We should allow for the case in which control flows
+            // directly from the source to the target of the region. This is
+            // currently not allowed in hugr core directly, but may be simulated
+            // by constructing an empty entry block.
             return Err(table::ModelError::InvalidRegions(node_id).into());
         };
 
