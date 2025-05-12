@@ -240,7 +240,7 @@ fn test_successive_replacements(test_state_space: (CommitStateSpace, [CommitId; 
     let persistent_final_hugr = persistent_hugr.to_hugr();
 
     // Check we have the expected number of patches (original + 2 replacements)
-    assert_eq!(persistent_hugr.commit_ids().count(), 3);
+    assert_eq!(persistent_hugr.all_commit_ids().count(), 3);
 
     assert_eq!(hugr.validate(), Ok(()));
     assert_eq!(persistent_final_hugr.validate(), Ok(()));
@@ -330,7 +330,7 @@ fn test_disjoint_replacements(test_state_space: (CommitStateSpace, [CommitId; 4]
     assert_eq!(persistent_final_hugr.validate(), Ok(()));
 
     // We should have 3 patches (base + 2 replacements)
-    assert_eq!(persistent_hugr.commit_ids().count(), 3);
+    assert_eq!(persistent_hugr.all_commit_ids().count(), 3);
 
     // TODO: use node-invariant equivalence check, e.g. hash-based comparison
     assert_eq!(

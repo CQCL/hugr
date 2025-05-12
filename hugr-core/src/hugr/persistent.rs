@@ -63,15 +63,16 @@
 
 mod resolver;
 mod state_space;
+mod trait_impls;
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeSet, HashMap, VecDeque},
     mem, vec,
 };
 
 use delegate::delegate;
 use derive_more::derive::From;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use relrc::RelRc;
 use state_space::{CommitData, CommitId};
 pub use state_space::{CommitStateSpace, InvalidCommit, PatchNode};
@@ -80,7 +81,7 @@ pub use resolver::PointerEqResolver;
 
 use crate::{
     hugr::patch::{simple_replace, Patch, PatchVerification},
-    Hugr, HugrView, Node, SimpleReplacement,
+    Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
 };
 
 /// A replacement operation that can be applied to a [`PersistentHugr`].
@@ -139,24 +140,74 @@ impl Commit {
         &self.0
     }
 
-    fn replacement(&self) -> Option<&PersistentReplacement> {
+    /// Get the set of nodes inserted by the patch in `self`.
+    pub fn inserted_nodes(&self) -> impl Iterator<Item = Node> + '_ {
+        match self.0.value() {
+            CommitData::Base(base) => Either::Left(base.nodes()),
+            CommitData::Replacement(repl) => {
+                // Skip the entrypoint and the IO nodes
+                Either::Right(repl.replacement().entry_descendants().skip(3))
+            }
+        }
+        .into_iter()
+    }
+
+    fn all_parents(&self) -> impl Iterator<Item = &Commit> + '_ {
+        self.0.all_parents().map_into()
+    }
+
+    /// Get the patch that `self` represents.
+    pub fn replacement(&self) -> Option<&PersistentReplacement> {
         match self.0.value() {
             CommitData::Base(_) => None,
             CommitData::Replacement(replacement) => Some(replacement),
         }
     }
 
-    /// Get the set of nodes invalidated by applying `self`.
-    fn invalidation_set(&self) -> impl Iterator<Item = PatchNode> + '_ {
+    /// Get the set of nodes invalidated by the patch in `self`.
+    pub fn invalidation_set(&self) -> impl Iterator<Item = PatchNode> + '_ {
         self.replacement()
             .into_iter()
             .flat_map(|r| r.invalidation_set())
     }
 
+    /// Get the set of nodes deleted by applying `self`.
+    pub fn deleted_nodes(&self) -> impl Iterator<Item = PatchNode> + '_ {
+        self.replacement()
+            .into_iter()
+            .flat_map(|r| r.subgraph().nodes())
+            .copied()
+    }
+
     delegate! {
         to self.0 {
             fn value(&self) -> &CommitData;
+            fn as_ptr(&self) -> *const relrc::node::InnerData<CommitData, ()>;
         }
+    }
+
+    /// Get all ancestors of `self` in reverse topological order, up until and
+    /// including the first commit for which `continue_fn` returns false.
+    fn get_ancestors_while<'a>(
+        &'a self,
+        continue_fn: impl Fn(&'a Commit) -> bool,
+    ) -> Vec<&'a Commit> {
+        let mut next_ancestor = 0;
+        let mut ancestors = vec![self];
+        let mut seen = BTreeSet::from_iter([self.as_ptr()]);
+        while next_ancestor < ancestors.len() {
+            let commit = &ancestors[next_ancestor];
+            next_ancestor += 1;
+            if !continue_fn(commit) {
+                continue;
+            }
+            for parent in commit.all_parents() {
+                if seen.insert(parent.as_ptr()) {
+                    ancestors.push(parent);
+                }
+            }
+        }
+        ancestors
     }
 }
 
@@ -205,6 +256,11 @@ impl<'a> From<&'a RelRc<CommitData, ()>> for &'a Commit {
 /// acyclic graph that we call the "commit history". A commit history is in
 /// effect a subgraph of a commit state space, with the additional invariant
 /// that all commits within the history are compatible.
+///
+/// ## Supported graph types
+///
+/// Currently, only patches that apply to subgraphs within dataflow regions
+/// are supported.
 #[derive(Clone, Debug)]
 pub struct PersistentHugr {
     /// The state space of all commits.
@@ -259,7 +315,9 @@ impl PersistentHugr {
 
     /// Add a replacement to `self`, with error handling.
     ///
-    /// Return the ID of the commit if it was added successfully. This may
+    /// All parent commits must already be in `self`.
+    ///
+    /// Return the ID of) the commit if it was added successfully. This may
     /// return the following errors:
     /// - a [`InvalidCommit::IncompatibleHistory`] error if the replacement is
     ///   incompatible with another commit already in `self`, or
@@ -288,15 +346,56 @@ impl PersistentHugr {
         self.state_space.try_add_replacement(replacement)
     }
 
-    /// Convert this `PersistentHugr` to a materialized HUGR by applying all
+    /// Add a commit to `self` and all its ancestors.
+    ///
+    /// The commit and all its ancestors must be compatible with all existing
+    /// commits in `self`. If this is not satisfied, an
+    /// [`InvalidCommit::IncompatibleHistory`] error is returned. In this case,
+    /// as many compatible commits as possible are added to `self`.
+    pub fn try_add_commit(&mut self, commit: Commit) -> Result<CommitId, InvalidCommit> {
+        let new_commits = commit.get_ancestors_while(|c| !self.contains(c));
+        let mut commit_id = None;
+        for &commit in new_commits.iter().rev() {
+            commit_id = Some(self.state_space.try_add_commit(commit.clone())?);
+            let commit_id = commit_id.unwrap();
+
+            // Check that the new commit is compatible with all its (current and
+            // future) children
+            let curr_children = self
+                .state_space
+                .children(commit_id)
+                .map(|id| self.get_commit(id));
+            let new_children = new_commits
+                .iter()
+                .copied()
+                .filter(|c| c.all_parents().any(|p| p.as_ptr() == commit.as_ptr()));
+            if let Some(node) = find_conflicting_node(
+                commit_id,
+                curr_children.chain(new_children).unique_by(|c| c.as_ptr()),
+            ) {
+                return Err(InvalidCommit::IncompatibleHistory(commit_id, node));
+            }
+        }
+        Ok(commit_id.expect("new_commits cannot be empty"))
+    }
+
+    /// Convert this `PersistentHugr` to a materialized Hugr by applying all
     /// commits in `self`.
     ///
     /// This operation may be expensive and should be avoided in
     /// performance-critical paths. For read-only views into the data, rely
     /// instead on the [`crate::HugrView`] implementation when possible.
     pub fn to_hugr(&self) -> Hugr {
+        self.apply_all().0
+    }
+
+    /// Apply all commits in `self` to the base HUGR.
+    ///
+    /// Also returns a map from the nodes of the base HUGR to the nodes of the
+    /// materialized HUGR.
+    pub fn apply_all(&self) -> (Hugr, HashMap<PatchNode, Node>) {
         let mut hugr = self.state_space.base_hugr().clone();
-        let mut node_map = BTreeMap::from_iter(
+        let mut node_map = HashMap::from_iter(
             hugr.nodes()
                 .map(|n| (PatchNode(self.state_space.base(), n), n)),
         );
@@ -304,18 +403,35 @@ impl PersistentHugr {
             let Some(repl) = self.state_space.get_commit(commit_id).replacement() else {
                 continue;
             };
+
             let repl = repl.map_host_nodes(|n| node_map[&n]);
 
             let simple_replace::Outcome {
                 node_map: new_node_map,
-                ..
+                removed_nodes,
             } = repl.apply(&mut hugr).expect("invalid replacement");
+
+            debug_assert!(
+                hugr.validate().is_ok(),
+                "malformed patch in persistent hugr:\n{}",
+                hugr.mermaid_string()
+            );
+
             for (old_node, new_node) in new_node_map {
                 let old_patch_node = PatchNode(commit_id, old_node);
                 node_map.insert(old_patch_node, new_node);
             }
+            for remove_node in removed_nodes.into_keys() {
+                let &remove_patch_node = node_map
+                    .iter()
+                    .find_map(|(patch_node, &hugr_node)| {
+                        (hugr_node == remove_node).then_some(patch_node)
+                    })
+                    .expect("node not found in node_map");
+                node_map.remove(&remove_patch_node);
+            }
         }
-        hugr
+        (hugr, node_map)
     }
 
     /// Get a reference to the underlying state space of `self`.
@@ -328,17 +444,170 @@ impl PersistentHugr {
         self.state_space
     }
 
+    /// The unique outgoing port in `self` that `port` is attached to.
+    fn get_single_outgoing_port(
+        &self,
+        node: PatchNode,
+        port: impl Into<Port>,
+    ) -> (PatchNode, OutgoingPort) {
+        let port = port.into();
+
+        assert!(self.is_value_port(node, port), "not a dataflow wire");
+
+        use itertools::Either::{Left, Right};
+        let (mut node, mut port) = match port.as_directed() {
+            Left(incoming) => (node, incoming),
+            Right(outgoing) => {
+                // pick any incoming port, the result is the same by uniqueness
+                // of the outgoing port
+                let commit_id = node.0;
+                let (node, port) = self
+                    .commit_hugr(commit_id)
+                    .linked_inputs(node.1, outgoing)
+                    .next()
+                    .expect("invalid dfg graph");
+                (PatchNode(commit_id, node), port)
+            }
+        };
+
+        loop {
+            let commit_id = node.0;
+            let hugr = self.commit_hugr(commit_id);
+            let (outgoing_node, outgoing_port) = hugr
+                .single_linked_output(node.1, port)
+                .expect("invalid HUGR");
+
+            let is_input = {
+                if let Some(repl) = self.replacement(commit_id) {
+                    repl.get_replacement_io().expect("invalid replacement")[0] == outgoing_node
+                } else {
+                    false
+                }
+            };
+            let is_deleted = || self.deleted_nodes(commit_id).contains(&outgoing_node);
+            if is_input || is_deleted() {
+                if let Some((child_node, child_port)) = self.child_output_port(node, port) {
+                    node = child_node;
+                    port = child_port;
+                } else {
+                    debug_assert!(is_input, "found deleted node but no replacement for it");
+                    (node, port) = self
+                        .parent_input_port(node, port)
+                        .expect("found input replacement port with no equivalent port in parents");
+                }
+            } else {
+                // outgoing_node is a valid node in the current hugr!
+                let outgoing_node = PatchNode(commit_id, outgoing_node);
+                return (outgoing_node, outgoing_port);
+            }
+        }
+    }
+
+    /// All incoming ports that the given outgoing port is attached to.
+    fn get_all_incoming_ports(
+        &self,
+        node: PatchNode,
+        port: OutgoingPort,
+    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> {
+        let mut valid_incoming_ports = BTreeSet::new();
+        let mut visited = BTreeSet::new();
+        let mut queue = {
+            let start_hugr = self.commit_hugr(node.0);
+            let to_patch_node = |(n, p)| (PatchNode(node.0, n), p);
+            VecDeque::from_iter(start_hugr.linked_inputs(node.1, port).map(to_patch_node))
+        };
+
+        // A simple BFS to find all equivalent incoming ports.
+        while let Some((node, port)) = queue.pop_front() {
+            if !visited.insert((node, port)) {
+                continue;
+            }
+            let commit_id = node.0;
+            let is_output = {
+                if let Some(repl) = self.replacement(commit_id) {
+                    repl.get_replacement_io().expect("invalid replacement")[1] == node.1
+                } else {
+                    false
+                }
+            };
+            let is_deleted = || self.deleted_nodes(commit_id).contains(&node.1);
+            if !is_output && !is_deleted() {
+                valid_incoming_ports.insert((node, port));
+            }
+            queue.extend(self.children_input_ports(node, port));
+            queue.extend(self.parents_output_ports(node, port));
+        }
+
+        valid_incoming_ports.into_iter()
+    }
+
     delegate! {
         to self.state_space {
             /// Check if `commit` is in the PersistentHugr.
             pub fn contains(&self, commit: &Commit) -> bool;
+            /// Check if `commit_id` is in the PersistentHugr.
+            pub fn contains_id(&self, commit_id: CommitId) -> bool;
             /// Get the base commit ID.
             pub fn base(&self) -> CommitId;
             /// Get the base [`Hugr`].
             pub fn base_hugr(&self) -> &Hugr;
             /// Get the base commit.
             pub fn base_commit(&self) -> &Commit;
+            /// Get the commit with ID `commit_id`.
+            pub fn get_commit(&self, commit_id: CommitId) -> &Commit;
+            /// Get an iterator over all nodes inserted by `commit_id`.
+            ///
+            /// All nodes will be PatchNodes with commit ID `commit_id`.
+            pub fn inserted_nodes(&self, commit_id: CommitId) -> impl Iterator<Item = PatchNode> + '_;
+            /// Get the input boundary ports that are equivalent to `(node, port)` in
+            /// the children of the commit of `node`.
+            fn children_input_ports(
+                &self,
+                node: PatchNode,
+                port: IncomingPort,
+            ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_;
+            /// Get the input boundary port in a parent of the commit of `node`
+            /// that is equivalent to `(node, port)`.
+            fn parent_input_port(
+                &self,
+                patch_node: PatchNode,
+                port: IncomingPort,
+            ) -> Option<(PatchNode, IncomingPort)>;
+            /// Get the output boundary ports that are equivalent to `(node, port)` in
+            /// the parents of the commit of `node`.
+            pub(super) fn parents_output_ports(
+                &self,
+                node: PatchNode,
+                port: IncomingPort,
+            ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_;
+            /// Get the replacement for `commit_id`.
+            fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>>;
+            /// Get the Hugr inserted by `commit_id`.
+            ///
+            /// This is either the replacement Hugr of a [`CommitData::Replacement`] or
+            /// the base Hugr of a [`CommitData::Base`].
+            pub(super) fn commit_hugr(&self, commit_id: CommitId) -> &Hugr;
+            /// Get an iterator over all commit IDs in the persistent HUGR.
+            pub fn all_commit_ids(&self) -> impl Iterator<Item = CommitId> + Clone + '_;
         }
+    }
+
+    /// Get the output boundary ports that are equivalent to `(node, port)` in
+    /// the children of the commit of `node`.
+    ///
+    /// By compatibility of all commits in `self`, there can be at most one
+    /// child replacement that defines at most one port equivalent to `(node,
+    /// port)`.
+    fn child_output_port(
+        &self,
+        node: PatchNode,
+        port: IncomingPort,
+    ) -> Option<(PatchNode, IncomingPort)> {
+        self.as_state_space()
+            .children_output_ports(node, port)
+            .at_most_one()
+            .ok()
+            .expect("at most one definition of output port in children replacements")
     }
 
     /// Get all commits in `self` in topological order.
@@ -347,23 +616,51 @@ impl PersistentHugr {
             .expect("history is a DAG")
     }
 
-    /// Iterator over the commit IDs in the history.
+    /// Get the set of nodes of `commit_id` that are invalidated by the patches
+    /// in the children commits of `commit_id`.
     ///
-    /// The commits are not guaranteed to be in any particular order.
-    fn commit_ids(&self) -> impl Iterator<Item = CommitId> + '_ {
-        self.state_space.all_commit_ids()
-    }
-
-    /// Get the set of nodes of `commit_id` that are invalidated by applying
-    /// children commits of `commit_id`.
-    fn invalidation_set(&self, commit_id: CommitId) -> impl Iterator<Item = Node> + '_ {
-        let children = self
-            .state_space
-            .children(commit_id)
-            .filter(|child_id| self.commit_ids().contains(child_id));
+    /// The invalidation set must include all nodes that are deleted by the
+    /// children commits (as returned by [`Self::deleted_nodes`]), but may
+    /// also include further nodes to enforce stricter exclusivity constraints
+    /// between patches.
+    pub fn invalidation_set(&self, commit_id: CommitId) -> impl Iterator<Item = Node> + '_ {
+        let children = self.state_space.children(commit_id);
         children
             .flat_map(move |child_id| self.state_space.invalidation_set(child_id, commit_id))
             .unique()
+    }
+
+    /// Get the set of nodes of `commit_id` that are deleted by applying
+    /// the children commits of `commit_id`.
+    ///
+    /// This is a subset of [`Self::invalidation_set`]. Whilst the latter is
+    /// used to establish exclusivity constraints between patches, this method
+    /// is used when we are computing the set of nodes currently present in
+    /// `self`.
+    pub fn deleted_nodes(&self, commit_id: CommitId) -> impl Iterator<Item = Node> + '_ {
+        let children = self.state_space.children(commit_id);
+        children
+            .flat_map(move |child_id| {
+                let child = self.get_commit(child_id);
+                child
+                    .deleted_nodes()
+                    .filter_map(move |PatchNode(id, node)| (commit_id == id).then_some(node))
+            })
+            .unique()
+    }
+
+    /// Check if a patch node is in the PersistentHugr, that is, it belongs to
+    /// a commit in the state space and is not deleted by any child commit.
+    pub fn contains_node(&self, PatchNode(commit_id, node): PatchNode) -> bool {
+        self.contains_id(commit_id) && !self.deleted_nodes(commit_id).contains(&node)
+    }
+
+    fn is_value_port(&self, PatchNode(commit_id, node): PatchNode, port: impl Into<Port>) -> bool {
+        self.commit_hugr(commit_id)
+            .get_optype(node)
+            .port_kind(port)
+            .expect("invalid port")
+            .is_value()
     }
 }
 
@@ -379,6 +676,29 @@ impl IntoIterator for PersistentHugr {
             .collect_vec()
             .into_iter()
     }
+}
+
+/// Find a node in `commit` that is invalidated by more than one child commit
+/// among `children`.
+fn find_conflicting_node<'a>(
+    commit_id: CommitId,
+    mut children: impl Iterator<Item = &'a Commit>,
+) -> Option<Node> {
+    let mut all_invalidated = BTreeSet::new();
+
+    children.find_map(|child| {
+        let mut new_invalidated =
+            child
+                .invalidation_set()
+                .filter_map(|PatchNode(del_commit_id, node)| {
+                    if del_commit_id == commit_id {
+                        Some(node)
+                    } else {
+                        None
+                    }
+                });
+        new_invalidated.find(|&n| !all_invalidated.insert(n))
+    })
 }
 
 #[cfg(test)]

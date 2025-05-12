@@ -7,7 +7,7 @@ use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port};
+use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Port};
 
 use derive_more::derive::From;
 use itertools::{Either, Itertools};
@@ -89,6 +89,22 @@ impl<N: HugrNode> OutputBoundaryMap<N> {
                 map.iter()
                     .map(|(&(node, out_port), &v)| ((node, out_port.into()), v)),
             ),
+        }
+        .into_iter()
+    }
+
+    /// The keys of the map.
+    ///
+    /// These will be either outgoing or incoming ports, depending on the
+    /// variant of `self`.
+    pub fn keys(&self) -> impl Iterator<Item = (N, Port)> + '_ {
+        match self {
+            OutputBoundaryMap::ByIncoming(map) => {
+                Either::Left(map.keys().map(|&(node, port)| (node, port.into())))
+            }
+            OutputBoundaryMap::ByOutgoing(map) => {
+                Either::Right(map.keys().map(|&(node, port)| (node, port.into())))
+            }
         }
         .into_iter()
     }
@@ -308,6 +324,14 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         )
     }
 
+    /// Get the direction of the ports in the outgoing boundary.
+    pub fn outgoing_boundary_type(&self) -> Direction {
+        match &self.nu_out {
+            OutputBoundaryMap::ByIncoming(_) => Direction::Incoming,
+            OutputBoundaryMap::ByOutgoing(_) => Direction::Outgoing,
+        }
+    }
+
     /// Get all edges that the replacement would add between ports in `host`.
     ///
     /// These correspond to direct edges between the input and output nodes
@@ -362,6 +386,44 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         self.nu_out
             .get(node, port.into())
             .map(|rep_out_port| ReplacementPort(rep_output, rep_out_port))
+    }
+
+    /// Get the incoming ports connected to the input node of `self.replacement`
+    /// that corresponds to the given host input port.
+    ///
+    /// This is the inverse of [`Self::map_replacement_input`]. Beware that it
+    /// is slightly inefficient as it iterates over all host input ports to find
+    /// matching `replacement` ports.
+    ///
+    /// This panics if self.replacement is not a DFG.
+    pub fn map_host_input(
+        &self,
+        port: impl Into<HostPort<HostNode, IncomingPort>>,
+    ) -> impl Iterator<Item = ReplacementPort<IncomingPort>> + '_ {
+        let host_port = port.into();
+        let all_repl_node_port = self.nu_inp.keys().copied();
+        all_repl_node_port
+            .map_into()
+            .filter(move |&repl_port| self.map_replacement_input(repl_port) == Some(host_port))
+    }
+
+    /// Get the incoming ports in `subgraph` that corresponds to the given
+    /// replacement output port.
+    ///
+    /// This is the inverse of [`Self::map_host_output`]. Beware that it is
+    /// slightly inefficient as it iterates over all replacement output ports
+    /// to find matching `subgraph` ports.
+    ///
+    /// This panics if self.replacement is not a DFG.
+    pub fn map_replacement_output(
+        &self,
+        port: impl Into<ReplacementPort<IncomingPort>>,
+    ) -> impl Iterator<Item = HostPort<HostNode, Port>> + '_ {
+        let repl_port = port.into();
+        let all_host_node_port = self.nu_out.keys();
+        all_host_node_port
+            .map_into()
+            .filter(move |&host_port| self.map_host_output(host_port) == Some(repl_port))
     }
 
     /// Get the incoming port in `subgraph` that corresponds to the given

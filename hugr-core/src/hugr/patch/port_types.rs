@@ -19,7 +19,7 @@ pub enum BoundaryPort<HostNode, P> {
 }
 
 /// A port in the host graph.
-#[derive(Debug, Clone, Copy, From)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From)]
 pub struct HostPort<N, P>(pub N, pub P);
 
 /// A port in the replacement graph.
