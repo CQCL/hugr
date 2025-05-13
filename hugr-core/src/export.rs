@@ -145,6 +145,9 @@ impl<'a> Context<'a> {
         all_children.extend(self.decl_operations.values().copied());
         all_children.extend(children);
 
+        let mut meta = Vec::new();
+        self.export_node_json_metadata(self.hugr.module_root(), &mut meta);
+
         let (links, ports) = self.links.exit();
         self.symbols.exit();
 
@@ -153,7 +156,7 @@ impl<'a> Context<'a> {
             sources: &[],
             targets: &[],
             children: all_children.into_bump_slice(),
-            meta: &[], // TODO: Export metadata
+            meta: self.bump.alloc_slice_copy(&meta),
             signature: None,
             scope: Some(table::RegionScope { links, ports }),
         };
