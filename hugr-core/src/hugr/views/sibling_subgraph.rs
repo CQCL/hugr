@@ -5,7 +5,7 @@
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
 
 use std::cell::OnceCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::mem;
 
 use itertools::Itertools;
@@ -393,66 +393,21 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .get_io(rep_root)
             .expect("DFG root in the replacement does not have input and output nodes.");
 
-        let current_signature = self.signature(hugr);
-        let new_signature = dfg_optype.dataflow_signature();
-        if new_signature.as_ref().map(|s| &s.input) != Some(&current_signature.input)
-            || new_signature.as_ref().map(|s| &s.output) != Some(&current_signature.output)
-        {
-            return Err(InvalidReplacement::InvalidSignature {
-                expected: self.signature(hugr),
-                actual: dfg_optype
-                    .dataflow_signature()
-                    .map(std::borrow::Cow::into_owned),
-            });
-        }
-
         // TODO: handle state order edges. For now panic if any are present.
         // See https://github.com/CQCL/hugr/discussions/432
-        let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
-        let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
-        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) = rep_inputs.partition(|&(n, p)| {
-            replacement
-                .signature(n)
-                .is_some_and(|s| s.port_type(p).is_some())
-        });
-        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) = rep_outputs.partition(|&(n, p)| {
-            replacement
-                .signature(n)
-                .is_some_and(|s| s.port_type(p).is_some())
-        });
-
-        if iter_io(&vec![out_order_ports], &in_order_ports)
-            .any(|(n, p)| is_order_edge(&replacement, n, p))
-        {
+        let state_order_at_input = replacement
+            .get_optype(rep_input)
+            .other_output_port()
+            .is_some_and(|p| replacement.is_linked(rep_input, p));
+        let state_order_at_output = replacement
+            .get_optype(rep_output)
+            .other_input_port()
+            .is_some_and(|p| replacement.is_linked(rep_output, p));
+        if state_order_at_input || state_order_at_output {
             unimplemented!("Found state order edges in replacement graph");
         }
 
-        let nu_inp = rep_inputs
-            .into_iter()
-            .zip_eq(&self.inputs)
-            .flat_map(|((rep_source_n, rep_source_p), self_targets)| {
-                replacement
-                    .linked_inputs(rep_source_n, rep_source_p)
-                    .flat_map(move |rep_target| {
-                        self_targets
-                            .iter()
-                            .map(move |&self_target| (rep_target, self_target))
-                    })
-            })
-            .collect();
-        let nu_out: HashMap<_, _> = self
-            .outputs
-            .iter()
-            .zip_eq(rep_outputs)
-            .map(|(&self_target, (_, rep_target_p))| (self_target, rep_target_p))
-            .collect();
-
-        Ok(SimpleReplacement::new(
-            self.clone(),
-            replacement,
-            nu_inp,
-            nu_out,
-        ))
+        SimpleReplacement::try_new(self.clone(), hugr, replacement)
     }
 
     /// Create a new Hugr containing only the subgraph.
@@ -749,9 +704,29 @@ fn validate_subgraph<H: HugrView>(
         return Err(InvalidSubgraphBoundary::NonUniqueInput.into());
     }
 
-    // Check no incoming partition is empty
-    if inputs.iter().any(std::vec::Vec::is_empty) {
-        return Err(InvalidSubgraphBoundary::EmptyPartition.into());
+    // Check
+    //  - no incoming partition is empty
+    //  - all inputs within a partition are linked to the same outgoing port
+    for inp in inputs {
+        let &(in_node, in_port) = inp.first().ok_or(InvalidSubgraphBoundary::EmptyPartition)?;
+        let exp_output_node_port = hugr
+            .single_linked_output(in_node, in_port)
+            .expect("valid dfg wire");
+        if let Some(output_node_port) = inp
+            .iter()
+            .map(|&(in_node, in_port)| {
+                hugr.single_linked_output(in_node, in_port)
+                    .expect("valid dfg wire")
+            })
+            .find(|&p| p != exp_output_node_port)
+        {
+            return Err(InvalidSubgraphBoundary::MismatchedOutputPort(
+                (in_node, in_port),
+                exp_output_node_port,
+                output_node_port,
+            )
+            .into());
+        }
     }
 
     // Check edge types are equal within partition and copyable if partition size > 1
@@ -907,6 +882,10 @@ pub enum InvalidSubgraphBoundary<N: HugrNode = Node> {
     /// There's an empty partition in the input boundary.
     #[error("A partition in the input boundary is empty.")]
     EmptyPartition,
+    /// A partition in the input boundary has ports linked to different output
+    /// ports.
+    #[error("expected port {0:?} to be linked to {1:?}, but is linked to {2:?}.")]
+    MismatchedOutputPort((N, IncomingPort), (N, OutgoingPort), (N, OutgoingPort)),
     /// Different types in a partition of the input boundary.
     #[error("The partition {0} in the input boundary has ports with different types.")]
     MismatchedTypes(usize),
