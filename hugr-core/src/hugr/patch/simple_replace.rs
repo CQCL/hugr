@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::views::SiblingSubgraph;
 pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
+use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, PortIndex};
@@ -38,18 +38,6 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             subgraph,
             replacement,
         }
-    }
-
-    /// Create a new [`SimpleReplacement`] specification.
-    #[inline]
-    #[deprecated(note = "Use `try_new` instead")]
-    pub fn new<AnyInMap, AnyOutMap>(
-        subgraph: SiblingSubgraph<HostNode>,
-        replacement: Hugr,
-        _nu_inp: AnyInMap,
-        _nu_out: AnyOutMap,
-    ) -> Self {
-        Self::new_unchecked(subgraph, replacement)
     }
 
     /// Create a new [`SimpleReplacement`] specification.
@@ -513,19 +501,19 @@ pub(in crate::hugr::patch) mod test {
 
     use crate::builder::test::n_identity;
     use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
+        endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;
     use crate::hugr::patch::{HostPort, PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
+    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
-    use crate::ops::handle::NodeHandle;
-    use crate::std_extensions::logic::LogicOp;
     use crate::std_extensions::logic::test::and_op;
+    use crate::std_extensions::logic::LogicOp;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::{IncomingPort, Node};
