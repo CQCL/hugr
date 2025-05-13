@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
-pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
 use crate::hugr::views::SiblingSubgraph;
+pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::EdgeKind;
@@ -518,24 +518,24 @@ pub(in crate::hugr::patch) mod test {
 
     use std::collections::{HashMap, HashSet};
 
+    use crate::Node;
     use crate::builder::test::n_identity;
     use crate::builder::{
-        endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
-        DataflowSubContainer, HugrBuilder, ModuleBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;
     use crate::hugr::patch::{HostPort, PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
-    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
-    use crate::std_extensions::logic::test::and_op;
+    use crate::ops::handle::NodeHandle;
     use crate::std_extensions::logic::LogicOp;
+    use crate::std_extensions::logic::test::and_op;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
-    use crate::Node;
 
     use super::SimpleReplacement;
 

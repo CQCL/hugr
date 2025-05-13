@@ -10,14 +10,14 @@ mod port_types;
 pub mod replace;
 pub mod simple_replace;
 
-use crate::HugrView;
 use crate::core::HugrNode;
+use crate::HugrView;
 use itertools::Itertools;
 pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
-use super::HugrMut;
 use super::views::ExtractionResult;
+use super::HugrMut;
 
 /// Verify that a patch application would succeed.
 pub trait PatchVerification {
