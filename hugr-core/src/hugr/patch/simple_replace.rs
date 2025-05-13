@@ -4,10 +4,11 @@ use std::collections::HashMap;
 
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::views::SiblingSubgraph;
 pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
+use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
+use crate::types::EdgeKind;
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, PortIndex};
 
 use itertools::Itertools;
@@ -51,9 +52,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         replacement: Hugr,
     ) -> Result<Self, InvalidReplacement> {
         let subgraph_sig = subgraph.signature(host);
-        let repl_sig = replacement
-            .inner_function_type()
-            .expect("replacement is a DFG");
+        let repl_sig =
+            replacement
+                .inner_function_type()
+                .ok_or(InvalidReplacement::InvalidDataflowGraph {
+                    node: replacement.entrypoint(),
+                    op: replacement.get_optype(replacement.entrypoint()).to_owned(),
+                })?;
         if subgraph_sig != repl_sig {
             return Err(InvalidReplacement::InvalidSignature {
                 expected: subgraph_sig,
@@ -107,10 +112,10 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     }
 
     /// Get the input and output nodes of the replacement hugr.
-    pub fn get_replacement_io(&self) -> Result<[Node; 2], SimpleReplacementError> {
+    pub fn get_replacement_io(&self) -> [Node; 2] {
         self.replacement
             .get_io(self.replacement.entrypoint())
-            .ok_or(SimpleReplacementError::InvalidParentNode())
+            .expect("replacement is a DFG")
     }
 
     /// Get all edges that the replacement would add from outgoing ports in
@@ -144,7 +149,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             });
 
         // The incoming ports at the input boundary of `replacement`
-        let [repl_inp, _] = self.get_replacement_io().expect("replacement is a DFG");
+        let [repl_inp, _] = self.get_replacement_io();
         let repl_incoming_ports = self
             .replacement
             .node_outputs(repl_inp)
@@ -202,7 +207,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
                 });
 
         // The outgoing ports at the output boundary of `replacement`
-        let [_, repl_out] = self.get_replacement_io().expect("replacement is a DFG");
+        let [_, repl_out] = self.get_replacement_io();
         let repl_outgoing_ports = self
             .replacement
             .node_inputs(repl_out)
@@ -257,7 +262,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             HostPort<HostNode, IncomingPort>,
         ),
     > + 'a {
-        let [repl_in, repl_out] = self.get_replacement_io().expect("replacement is a DFG");
+        let [repl_in, repl_out] = self.get_replacement_io();
 
         let empty_wires = self
             .replacement
@@ -322,7 +327,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             .iter()
             .position(|&node_port| node_port == (node, port))?;
         let incoming_port: IncomingPort = pos.into();
-        let [_, rep_output] = self.get_replacement_io().expect("replacement is a DFG");
+        let [_, rep_output] = self.get_replacement_io();
         Some(ReplacementPort(rep_output, incoming_port))
     }
 
@@ -337,7 +342,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         port: impl Into<ReplacementPort<OutgoingPort>>,
     ) -> impl Iterator<Item = HostPort<HostNode, IncomingPort>> + '_ {
         let ReplacementPort(node, port) = port.into();
-        let [repl_input, _] = self.get_replacement_io().expect("replacement is a DFG");
+        let [repl_input, _] = self.get_replacement_io();
 
         let ports = if node == repl_input {
             self.subgraph.incoming_ports().get(port.index())
@@ -500,7 +505,10 @@ fn is_value_port<N: HugrNode>(
     node: N,
     port: impl Into<Port>,
 ) -> bool {
-    hugr.get_optype(node).port_kind(port).unwrap().is_value()
+    hugr.get_optype(node)
+        .port_kind(port)
+        .as_ref()
+        .is_some_and(EdgeKind::is_value)
 }
 
 #[cfg(test)]
@@ -512,22 +520,22 @@ pub(in crate::hugr::patch) mod test {
 
     use crate::builder::test::n_identity;
     use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
+        endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;
     use crate::hugr::patch::{HostPort, PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
+    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
-    use crate::ops::handle::NodeHandle;
-    use crate::std_extensions::logic::LogicOp;
     use crate::std_extensions::logic::test::and_op;
+    use crate::std_extensions::logic::LogicOp;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
-    use crate::{IncomingPort, Node};
+    use crate::Node;
 
     use super::SimpleReplacement;
 
@@ -717,38 +725,21 @@ pub(in crate::hugr::patch) mod test {
             .entry_descendants()
             .find(|node: &Node| *n.get_optype(*node) == cx_gate().into())
             .unwrap();
-        let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
         // 3.2. Locate the ports we need to specify as "glue" in n
-        let n_port_0 = n.node_inputs(n_node_h0).next().unwrap();
-        let n_port_1 = n.node_inputs(n_node_h1).next().unwrap();
-        let (n_cx_out_0, n_cx_out_1) = n.node_outputs(n_node_cx).take(2).collect_tuple().unwrap();
+        let (n_cx_out_0, _n_cx_out_1) = n.node_outputs(n_node_cx).take(2).collect_tuple().unwrap();
         let n_port_2 = n.linked_inputs(n_node_cx, n_cx_out_0).next().unwrap().1;
-        let n_port_3 = n.linked_inputs(n_node_cx, n_cx_out_1).next().unwrap().1;
         // 3.3. Locate the ports we need to specify as "glue" in h
-        let (h_port_0, h_port_1) = h.node_inputs(h_node_cx).take(2).collect_tuple().unwrap();
         let h_h0_out = h.node_outputs(h_node_h0).next().unwrap();
-        let h_h1_out = h.node_outputs(h_node_h1).next().unwrap();
-        let (h_outp_node, h_port_2) = h.linked_inputs(h_node_h0, h_h0_out).next().unwrap();
-        let h_port_3 = h.linked_inputs(h_node_h1, h_h1_out).next().unwrap().1;
-        // 3.4. Construct the maps
-        let mut nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)> = HashMap::new();
-        let mut nu_out: HashMap<(Node, IncomingPort), IncomingPort> = HashMap::new();
-        nu_inp.insert((n_node_h0, n_port_0), (h_node_cx, h_port_0));
-        nu_inp.insert((n_node_h1, n_port_1), (h_node_cx, h_port_1));
-        nu_out.insert((h_outp_node, h_port_2), n_port_2);
-        nu_out.insert((h_outp_node, h_port_3), n_port_3);
         // 4. Define the replacement
         let r = SimpleReplacement {
             subgraph: SiblingSubgraph::try_from_nodes(s, &h).unwrap(),
             replacement: n,
-            // nu_inp,
-            // nu_out: nu_out.into(),
         };
 
         // Check output boundary
         assert_eq!(
             r.map_host_output((h_node_h0, h_h0_out)).unwrap(),
-            ReplacementPort::from((r.get_replacement_io().unwrap()[1], n_port_2))
+            ReplacementPort::from((r.get_replacement_io()[1], n_port_2))
         );
 
         // Check invalidation set
@@ -800,31 +791,10 @@ pub(in crate::hugr::patch) mod test {
         // 3.1. Locate the Output and its predecessor H in n
         let n_node_output = n.get_io(n.entrypoint()).unwrap()[1];
         let (_n_node_input, n_node_h) = n.input_neighbours(n_node_output).collect_tuple().unwrap();
-        // 3.2. Locate the ports we need to specify as "glue" in n
-        let (n_port_0, n_port_1) = n
-            .node_inputs(n_node_output)
-            .take(2)
-            .collect_tuple()
-            .unwrap();
-        let n_port_2 = n.node_inputs(n_node_h).next().unwrap();
-        // 3.3. Locate the ports we need to specify as "glue" in h
-        let (h_port_0, h_port_1) = h.node_inputs(h_node_cx).take(2).collect_tuple().unwrap();
-        let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
-        let h_port_2 = h.node_inputs(h_node_h0).next().unwrap();
-        let h_port_3 = h.node_inputs(h_node_h1).next().unwrap();
-        // 3.4. Construct the maps
-        let mut nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)> = HashMap::new();
-        let mut nu_out: HashMap<(Node, IncomingPort), IncomingPort> = HashMap::new();
-        nu_inp.insert((n_node_output, n_port_0), (h_node_cx, h_port_0));
-        nu_inp.insert((n_node_h, n_port_2), (h_node_cx, h_port_1));
-        nu_out.insert((h_node_h0, h_port_2), n_port_0);
-        nu_out.insert((h_node_h1, h_port_3), n_port_1);
         // 4. Define the replacement
         let r = SimpleReplacement {
             subgraph: SiblingSubgraph::try_from_nodes(s, &h).unwrap(),
             replacement: n,
-            // nu_inp,
-            // nu_out: nu_out.into(),
         };
         let Outcome {
             node_map,
@@ -865,33 +835,6 @@ pub(in crate::hugr::patch) mod test {
             .entry_descendants()
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect_vec();
-        // let inputs = h
-        //     .node_outputs(input)
-        //     .filter(|&p| {
-        //         h.get_optype(input)
-        //             .as_input()
-        //             .unwrap()
-        //             .signature()
-        //             .port_type(p)
-        //             .is_some()
-        //     })
-        //     .map(|p| {
-        //         let link = h.linked_inputs(input, p).next().unwrap();
-        //         (link, link)
-        //     })
-        //     .collect();
-        // let outputs: HashMap<_, _> = h
-        //     .node_inputs(output)
-        //     .filter(|&p| {
-        //         h.get_optype(output)
-        //             .as_output()
-        //             .unwrap()
-        //             .signature()
-        //             .port_type(p)
-        //             .is_some()
-        //     })
-        //     .map(|p| ((output, p), p))
-        //     .collect();
         h.apply_patch(
             SimpleReplacement::try_new(
                 SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
@@ -968,8 +911,6 @@ pub(in crate::hugr::patch) mod test {
         let rewrite = SimpleReplacement {
             subgraph,
             replacement,
-            // nu_inp,
-            // nu_out: nu_out.into(),
         };
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
@@ -1001,8 +942,6 @@ pub(in crate::hugr::patch) mod test {
         let rewrite = SimpleReplacement {
             subgraph,
             replacement,
-            // nu_inp,
-            // nu_out: nu_out.into(),
         };
         rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
 
@@ -1044,7 +983,7 @@ pub(in crate::hugr::patch) mod test {
     fn to_replace(h: &impl HugrView<Node = Node>, s: SimpleReplacement) -> Replacement {
         use crate::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec};
 
-        let [in_, out] = s.get_replacement_io().unwrap();
+        let [in_, out] = s.get_replacement_io();
         let mu_inp = s
             .incoming_boundary(h)
             .map(
