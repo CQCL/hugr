@@ -166,6 +166,21 @@ impl Hugr {
     }
 }
 
+/// Deerialize the HUGR using a serde decoder.
+///
+/// This API is unstable API and will be removed in the future.
+#[deprecated(
+    since = "0.20.0",
+    note = "This API is unstable and will be removed in the future.
+            Use `Hugr::load` or the `AsStringEnvelope` adaptor instead."
+)]
+pub fn serde_deserialize_hugr<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Hugr::serde_deserialize(deserializer)
+}
+
 impl TryFrom<&Hugr> for SerHugrLatest {
     type Error = HUGRSerializationError;
 
