@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
-pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
 use crate::hugr::views::SiblingSubgraph;
+pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, PortIndex};
@@ -31,7 +31,8 @@ pub struct SimpleReplacement<HostNode = Node> {
 }
 
 impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
-    /// Create a new [`SimpleReplacement`] specification.
+    /// Create a new [`SimpleReplacement`] specification without checking that
+    /// the replacement has the same signature as the subgraph.
     #[inline]
     pub fn new_unchecked(subgraph: SiblingSubgraph<HostNode>, replacement: Hugr) -> Self {
         Self {
@@ -115,11 +116,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Get all edges that the replacement would add from outgoing ports in
     /// `host` to incoming ports in `self.replacement`.
     ///
-    /// The incoming ports returned are always connected to outputs of
-    /// the [`OpTag::Input`] node of `self.replacement`.
-    ///
     /// For each pair in the returned vector, the first element is a port in
-    /// `host` and the second is a port in `self.replacement`.
+    /// `host` and the second is a port in `self.replacement`:
+    ///  - The outgoing host ports are always linked to the input boundary of
+    ///    `subgraph`, i.e. the ports returned by
+    ///    [`SiblingSubgraph::incoming_ports`],
+    ///  - The incoming replacement ports are always linked to output ports of
+    ///    the [`OpTag::Input`] node of `self.replacement`.
     pub fn incoming_boundary<'a>(
         &'a self,
         host: &'a impl HugrView<Node = HostNode>,
@@ -171,11 +174,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Get all edges that the replacement would add from outgoing ports in
     /// `self.replacement` to incoming ports in `host`.
     ///
-    /// The outgoing ports returned are always connected to inputs of
-    /// the [`OpTag::Output`] node of `self.replacement`.
-    ///
     /// For each pair in the returned vector, the first element is a port in
-    /// `self.replacement` and the second is a port in `host`.
+    /// `self.replacement` and the second is a port in `host`:
+    ///  - The outgoing replacement ports are always linked to inputs of the
+    ///    [`OpTag::Output`] node of `self.replacement`,
+    ///  - The incoming host ports are always linked to the output boundary of
+    ///    `subgraph`, i.e. the ports returned by
+    ///    [`SiblingSubgraph::outgoing_ports`],
     ///
     /// This panics if self.replacement is not a DFG.
     pub fn outgoing_boundary<'a>(
@@ -234,7 +239,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// These correspond to direct edges between the input and output nodes
     /// in the replacement graph.
     ///
-    /// For each pair in the returned vector, the both ports are in `host`.
+    /// For each pair in the returned vector, both ports are in `host`:
+    ///  - The outgoing host ports are linked to the input boundary of
+    ///    `subgraph`, i.e. the ports returned by
+    ///    [`SiblingSubgraph::incoming_ports`],
+    ///  - The incoming host ports are linked to the output boundary of
+    ///    `subgraph`, i.e. the ports returned by
+    ///    [`SiblingSubgraph::outgoing_ports`].
     ///
     /// This panics if self.replacement is not a DFG.
     pub fn host_to_host_boundary<'a>(
@@ -297,6 +308,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// that corresponds to the given outgoing port on the subgraph output
     /// boundary.
     ///
+    /// The host `port` should be a port in `self.subgraph().outgoing_ports()`.
+    ///
     /// This panics if self.replacement is not a DFG.
     pub fn map_host_output(
         &self,
@@ -315,6 +328,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
 
     /// Get the incoming ports in the input boundary of `subgraph` that
     /// correspond to the given output port at the input node of `replacement`
+    ///
+    /// Return ports in `self.subgraph().incoming_ports()`.
     ///
     /// This panics if self.replacement is not a DFG.
     pub fn map_replacement_input(
@@ -407,8 +422,6 @@ impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
         // 1. Get the boundary edges
         let boundary_edges = self.all_boundary_edges(h).collect_vec();
 
-        dbg!(&boundary_edges);
-
         let Self {
             replacement,
             subgraph,
@@ -442,8 +455,6 @@ impl<N: HugrNode> PatchHugrMut for SimpleReplacement<N> {
         // remove the replacement entrypoint from h and node_map
         h.remove_node(new_entrypoint);
         node_map.remove(&repl_entrypoint);
-
-        dbg!(&node_map);
 
         // 3. Insert all boundary edges.
         for (src, tgt) in boundary_edges {
@@ -501,19 +512,19 @@ pub(in crate::hugr::patch) mod test {
 
     use crate::builder::test::n_identity;
     use crate::builder::{
-        endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
-        DataflowSubContainer, HugrBuilder, ModuleBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;
     use crate::hugr::patch::{HostPort, PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
-    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
-    use crate::std_extensions::logic::test::and_op;
+    use crate::ops::handle::NodeHandle;
     use crate::std_extensions::logic::LogicOp;
+    use crate::std_extensions::logic::test::and_op;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::{IncomingPort, Node};
