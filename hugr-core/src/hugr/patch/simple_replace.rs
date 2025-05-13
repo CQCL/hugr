@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use crate::core::HugrNode;
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::views::SiblingSubgraph;
+pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, PortIndex};
@@ -41,21 +42,39 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
 
     /// Create a new [`SimpleReplacement`] specification.
     #[inline]
-    pub fn new(
+    #[deprecated(note = "Use `try_new` instead")]
+    pub fn new<AnyInMap, AnyOutMap>(
+        subgraph: SiblingSubgraph<HostNode>,
+        replacement: Hugr,
+        _nu_inp: AnyInMap,
+        _nu_out: AnyOutMap,
+    ) -> Self {
+        Self::new_unchecked(subgraph, replacement)
+    }
+
+    /// Create a new [`SimpleReplacement`] specification.
+    ///
+    /// Return a [`InvalidReplacement::InvalidSignature`] error if `subgraph`
+    /// and `replacement` have different signatures.
+    pub fn try_new(
         subgraph: SiblingSubgraph<HostNode>,
         host: &impl HugrView<Node = HostNode>,
         replacement: Hugr,
-    ) -> Self {
-        assert_eq!(
-            subgraph.signature(host),
-            replacement
-                .inner_function_type()
-                .expect("replacement is a DFG")
-        );
-        Self {
+    ) -> Result<Self, InvalidReplacement> {
+        let subgraph_sig = subgraph.signature(host);
+        let repl_sig = replacement
+            .inner_function_type()
+            .expect("replacement is a DFG");
+        if subgraph_sig != repl_sig {
+            return Err(InvalidReplacement::InvalidSignature {
+                expected: subgraph_sig,
+                actual: Some(repl_sig.into_owned()),
+            });
+        }
+        Ok(Self {
             subgraph,
             replacement,
-        }
+        })
     }
 
     /// The replacement hugr.
@@ -494,19 +513,19 @@ pub(in crate::hugr::patch) mod test {
 
     use crate::builder::test::n_identity;
     use crate::builder::{
-        endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
-        DataflowSubContainer, HugrBuilder, ModuleBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;
     use crate::hugr::patch::{HostPort, PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
-    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
-    use crate::std_extensions::logic::test::and_op;
+    use crate::ops::handle::NodeHandle;
     use crate::std_extensions::logic::LogicOp;
+    use crate::std_extensions::logic::test::and_op;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::{IncomingPort, Node};
@@ -874,13 +893,14 @@ pub(in crate::hugr::patch) mod test {
         //     })
         //     .map(|p| ((output, p), p))
         //     .collect();
-        h.apply_patch(SimpleReplacement::new(
-            SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
-            &h,
-            replacement,
-            // inputs,
-            // outputs,
-        ))
+        h.apply_patch(
+            SimpleReplacement::try_new(
+                SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
+                &h,
+                replacement,
+            )
+            .unwrap(),
+        )
         .unwrap();
 
         // They should be the same, up to node indices
@@ -912,14 +932,15 @@ pub(in crate::hugr::patch) mod test {
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect_vec();
 
-        let r = SimpleReplacement::new(
-            SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
-            &h,
-            repl,
-            // inputs,
-            // outputs,
-        );
-        h.apply_patch(r).unwrap();
+        h.apply_patch(
+            SimpleReplacement::try_new(
+                SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
+                &h,
+                repl,
+            )
+            .unwrap(),
+        )
+        .unwrap();
 
         // Nothing changed
         assert_eq!(h.num_nodes(), orig.num_nodes());
@@ -1010,7 +1031,7 @@ pub(in crate::hugr::patch) mod test {
             .unwrap();
         let subgraph = SiblingSubgraph::try_from_nodes(vec![h_node], &h).unwrap();
 
-        let rewrite = SimpleReplacement::new(subgraph, &h, replacement);
+        let rewrite = SimpleReplacement::try_new(subgraph, &h, replacement).unwrap();
 
         assert_eq!(h.entry_descendants().count(), 4);
 

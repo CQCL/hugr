@@ -9,10 +9,10 @@ use std::collections::HashSet;
 use std::mem;
 
 use itertools::Itertools;
+use portgraph::LinkView;
 use portgraph::algorithms::ConvexChecker;
 use portgraph::boundary::Boundary;
-use portgraph::LinkView;
-use portgraph::{view::Subgraph, Direction, PortView};
+use portgraph::{Direction, PortView, view::Subgraph};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
@@ -394,19 +394,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .get_io(rep_root)
             .expect("DFG root in the replacement does not have input and output nodes.");
 
-        let current_signature = self.signature(hugr);
-        let new_signature = dfg_optype.dataflow_signature();
-        if new_signature.as_ref().map(|s| &s.input) != Some(&current_signature.input)
-            || new_signature.as_ref().map(|s| &s.output) != Some(&current_signature.output)
-        {
-            return Err(InvalidReplacement::InvalidSignature {
-                expected: self.signature(hugr),
-                actual: dfg_optype
-                    .dataflow_signature()
-                    .map(std::borrow::Cow::into_owned),
-            });
-        }
-
         // TODO: handle state order edges. For now panic if any are present.
         // See https://github.com/CQCL/hugr/discussions/432
         let state_order_at_input = replacement
@@ -421,13 +408,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             unimplemented!("Found state order edges in replacement graph");
         }
 
-        Ok(SimpleReplacement::new(
-            self.clone(),
-            hugr,
-            replacement,
-            // nu_inp,
-            // nu_out,
-        ))
+        SimpleReplacement::try_new(self.clone(), hugr, replacement)
     }
 
     /// Create a new Hugr containing only the subgraph.
@@ -1133,10 +1114,11 @@ mod tests {
         // All graph but one edge
         assert_matches!(
             SiblingSubgraph::try_new(
-                vec![hugr
-                    .linked_ports(inp, first_cx_edge)
-                    .map(|(n, p)| (n, p.as_incoming().unwrap()))
-                    .collect()],
+                vec![
+                    hugr.linked_ports(inp, first_cx_edge)
+                        .map(|(n, p)| (n, p.as_incoming().unwrap()))
+                        .collect()
+                ],
                 vec![(inp, first_cx_edge)],
                 &func,
             ),
