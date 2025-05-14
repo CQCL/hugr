@@ -2,6 +2,21 @@
 
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-v0.15.4...hugr-v0.20.0) - 2025-05-14
 
+This release contains a big list of changes reworking multiple core definitions of HUGR.
+Some of this changes include:
+
+- 🧹 Cleanup of the internal hugr traits, making it possible to create virtual
+  Hugrs that are not backed by a portgraph or use different node index types.
+- 🚪 The functional root of a Hugr is now called the *entrypoint*. This node may
+  exist somewhere inside the region hierarchy, so we can now model edges that
+  connect beyond the descendants of the entrypoint.
+- 🌲 The hugr region hierarchy is now always rooted by a `Module` operation.
+- ✂ Made `SimpleReplacement` even simpler and easy to use.
+- 🔧 The `Rewrite` trait has been split into `VerifyPatch` and `Patch` parts.
+- ✉️ Hugr and package serialization is now done entirely using Envelopes. We
+  provide some backward-compatibility layers that will be removed in the future.
+- 🦀 The Minimum Supported Rust Version (MSRV) has been updated to `1.85`.
+
 ### Bug Fixes
 
 - [**breaking**] Don't expose `HugrMutInternals` ([#2071](https://github.com/CQCL/hugr/pull/2071))
