@@ -77,8 +77,8 @@ impl FuncDefn {
     }
 
     /// Sets the name of the function (as per [Self::func_name])
-    pub fn set_func_name(&mut self, name: String) {
-        self.name = name
+    pub fn func_name_mut(&mut self) -> &mut String {
+        &mut self.name
     }
 }
 

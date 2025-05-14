@@ -144,7 +144,7 @@ fn instantiate(
         let mut to_scan = Vec::from_iter(h.children(poly_func));
         while let Some(n) = to_scan.pop() {
             if let OpType::FuncDefn(fd) = h.optype_mut(n) {
-                fd.set_func_name(mangle_inner_func(&outer_name, fd.func_name()));
+                *fd.func_name_mut() = mangle_inner_func(&outer_name, fd.func_name());
                 h.move_after_sibling(n, poly_func);
             } else {
                 to_scan.extend(h.children(n));
