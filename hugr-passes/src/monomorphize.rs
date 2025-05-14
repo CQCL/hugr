@@ -554,9 +554,13 @@ mod test {
         }
     }
 
-    fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
+    fn list_funcs(h: &Hugr) -> HashMap<&str, (Node, &FuncDefn)> {
         h.entry_descendants()
-            .filter_map(|n| h.get_optype(n).as_func_defn().map(|fd| (&fd.name, (n, fd))))
+            .filter_map(|n| {
+                h.get_optype(n)
+                    .as_func_defn()
+                    .map(|fd| (fd.name.as_str(), (n, fd)))
+            })
             .collect::<HashMap<_, _>>()
     }
 
@@ -603,12 +607,12 @@ mod test {
         let mono_hugr = hugr;
 
         let mut funcs = list_funcs(&mono_hugr);
-        let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
+        let (m, _) = funcs.remove(&"id2").unwrap();
         assert_eq!(m, mono.handle().node());
         assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.entrypoint()));
         // ALAN: TODO: update wrt. mangling policy for name/link_name
         for _ in [usize_t(), ity()] {
-            let (n, _) = funcs.get(&"id".to_string()).unwrap();
+            let (n, _) = funcs.get(&"id").unwrap();
             assert_eq!(mono_hugr.get_parent(*n), Some(m)); // Not lifted to top
         }
         Ok(())
