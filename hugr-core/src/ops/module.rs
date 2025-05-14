@@ -68,12 +68,12 @@ impl FuncDefn {
         }
     }
 
-    /// The name of the function (not, the name of the Op)
+    /// The name of the function (not the name of the Op)
     pub fn func_name(&self) -> &String {
         &self.name
     }
 
-    /// Sets the name of the function (as per [Self::func_name])
+    /// Mutable access to the name of the function (as per [Self::func_name])
     pub fn func_name_mut(&mut self) -> &mut String {
         &mut self.name
     }
@@ -134,9 +134,14 @@ impl FuncDecl {
         }
     }
 
-    /// The name of the function (not, the name of the Op)
+    /// The name of the function (not the name of the Op)
     pub fn func_name(&self) -> &String {
         &self.name
+    }
+
+    /// Mutable access to the name of the function (as per [Self::func_name])
+    pub fn func_name_mut(&mut self) -> &mut String {
+        &mut self.name
     }
 
     /// Gets the signature of the function

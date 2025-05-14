@@ -66,6 +66,8 @@ impl NodeTemplate {
     ///    * has a [`signature`] which the type-args of the [`Self::Call`] do not match
     ///
     /// [`signature`]: hugr_core::types::PolyFuncType
+    /// [`FuncDecl`]: hugr_core::ops::FuncDecl
+    /// [`FuncDefn`]: hugr_core::ops::FuncDefn
     pub fn add_hugr(
         self,
         hugr: &mut impl HugrMut<Node = Node>,
