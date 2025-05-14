@@ -96,10 +96,7 @@ pub trait Container {
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn {
-            name: name.into(),
-            signature,
-        });
+        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
 
         // Add the extensions used by the function types.
         self.use_extensions(
