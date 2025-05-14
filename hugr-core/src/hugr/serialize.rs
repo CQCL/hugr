@@ -174,6 +174,7 @@ impl Hugr {
     note = "This API is unstable and will be removed in the future.
             Use `Hugr::load` or the `AsStringEnvelope` adaptor instead."
 )]
+#[doc(hidden)]
 pub fn serde_deserialize_hugr<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
 where
     D: Deserializer<'de>,
