@@ -73,7 +73,7 @@ impl FuncDefn {
         &self.name
     }
 
-    /// Mutable access to the name of the function (as per [Self::func_name])
+    /// Allows mutating the name of the function (as per [Self::func_name])
     pub fn func_name_mut(&mut self) -> &mut String {
         &mut self.name
     }
@@ -139,7 +139,7 @@ impl FuncDecl {
         &self.name
     }
 
-    /// Mutable access to the name of the function (as per [Self::func_name])
+    /// Allows mutating the name of the function (as per [Self::func_name])
     pub fn func_name_mut(&mut self) -> &mut String {
         &mut self.name
     }
