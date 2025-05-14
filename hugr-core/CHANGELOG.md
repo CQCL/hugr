@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.20.0-rc.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.4...hugr-core-v0.20.0-rc.0) - 2025-05-09
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.4...hugr-core-v0.20.0) - 2025-05-14
 
 ### Bug Fixes
 
@@ -8,6 +8,10 @@
 - `as_unary_option` indexing bug ([#2163](https://github.com/CQCL/hugr/pull/2163))
 - Skip phantom data for array value serialisation ([#2166](https://github.com/CQCL/hugr/pull/2166))
 - Remove deleted nodes from node_map in `SimpleReplacement` ([#2176](https://github.com/CQCL/hugr/pull/2176))
+- [**breaking**] Use unique region_portgraph in convexity check ([#2192](https://github.com/CQCL/hugr/pull/2192))
+- Panic when an extension name is too long. ([#2198](https://github.com/CQCL/hugr/pull/2198))
+- Respect type bounds on local variables when importing. ([#2206](https://github.com/CQCL/hugr/pull/2206))
+- Import and export JSON metadata on module roots. ([#2207](https://github.com/CQCL/hugr/pull/2207))
 
 ### New Features
 
@@ -33,6 +37,16 @@
 - Only allow region containers as entrypoints ([#2173](https://github.com/CQCL/hugr/pull/2173))
 - Export and import entrypoints via metadata in `hugr-model`. ([#2172](https://github.com/CQCL/hugr/pull/2172))
 - [**breaking**] Only expose envelope serialization of hugrs and packages ([#2167](https://github.com/CQCL/hugr/pull/2167))
+- Packages do not include the hugr extensions by default ([#2187](https://github.com/CQCL/hugr/pull/2187))
+- Define text-model envelope formats ([#2188](https://github.com/CQCL/hugr/pull/2188))
+- [**breaking**] Remove description on opaque ops. ([#2197](https://github.com/CQCL/hugr/pull/2197))
+- Import CFG regions without adding an entry block. ([#2200](https://github.com/CQCL/hugr/pull/2200))
+- [**breaking**] Remove boundary map in SimpleReplacement ([#2208](https://github.com/CQCL/hugr/pull/2208))
+- Export macro for hugr serde wrappers with custom extensions ([#2209](https://github.com/CQCL/hugr/pull/2209))
+- Allow any dataflow parent as SiblingSubgraph replacement ([#2210](https://github.com/CQCL/hugr/pull/2210))
+- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
+- Add SiblingSubgraph::set_outgoing_ports ([#2217](https://github.com/CQCL/hugr/pull/2217))
+- Symbol applications can leave out prefixes of wildcards. ([#2201](https://github.com/CQCL/hugr/pull/2201))
 
 ### Refactor
 
@@ -52,6 +66,7 @@
 ### Testing
 
 - Disable IO-dependent tests when running miri ([#2123](https://github.com/CQCL/hugr/pull/2123))
+- Check envelope roundtrips rather than json in `HugrView::verify` ([#2186](https://github.com/CQCL/hugr/pull/2186))
 
 ## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.2...hugr-core-v0.15.3) - 2025-04-02
 
