@@ -115,9 +115,24 @@ impl OpTrait for FuncDefn {
 pub struct FuncDecl {
     /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
-    pub name: String,
+    name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
+}
+
+impl FuncDecl {
+    /// Create a new instance with the given name and signature
+    pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self {
+            name: name.into(),
+            signature: signature.into(),
+        }
+    }
+
+    /// The name of the function (not, the name of the Op)
+    pub fn func_name(&self) -> &String {
+        &self.name
+    }
 }
 
 impl_op_name!(FuncDecl);

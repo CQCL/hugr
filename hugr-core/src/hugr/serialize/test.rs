@@ -507,7 +507,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[rstest]
 #[case(ops::Module::new())]
 #[case(ops::FuncDefn::new("polyfunc1", polyfunctype1()))]
-#[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
+#[case(ops::FuncDecl::new("polyfunc2", polyfunctype1()))]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
 #[case(ops::Const::new(Value::false_val()))]
