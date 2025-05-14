@@ -75,7 +75,7 @@ Some of these changes include:
 
 ### Testing
 
-- check envelope roundtrips rather than json in `HugrView::verify` ([#2186](https://github.com/CQCL/hugr/pull/2186))
+- Check envelope roundtrips rather than json in `HugrView::verify` ([#2186](https://github.com/CQCL/hugr/pull/2186))
 
 ## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-v0.15.3...hugr-v0.15.4) - 2025-05-07
 
