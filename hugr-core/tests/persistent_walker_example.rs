@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 
+use hugr::types::EdgeKind;
 use itertools::Itertools;
 
 use hugr_core::{
@@ -14,11 +15,11 @@ use hugr_core::{
     },
 };
 
-/// The maximum comimt depth that we will consider in this example
+/// The maximum commit depth that we will consider in this example
 const MAX_COMMITS: usize = 2;
 
-// We define a HUGR extension within this file, with CZ and H gates. Normally, you
-// would use an existing extension (e.g. as provided by tket2).
+// We define a HUGR extension within this file, with CZ and H gates. Normally,
+// you would use an existing extension (e.g. as provided by tket2).
 use walker_example_extension::{cz_gate, h_gate};
 mod walker_example_extension {
     use std::sync::Arc;
@@ -130,6 +131,35 @@ fn two_cz_3qb_hugr() -> Hugr {
     builder.finish_hugr_with_outputs(vec![q0, q1, q2]).unwrap()
 }
 
+/// Traverse all commits in state space, enqueueing all outgoing wires of
+/// CZ nodes
+fn enqueue_all(
+    queue: &mut VecDeque<(PinnedWire, Walker<'static>)>,
+    state_space: &CommitStateSpace,
+) {
+    for id in state_space.all_commit_ids() {
+        let cz_nodes = state_space
+            .inserted_nodes(id)
+            .filter(|&n| state_space.get_optype(n) == &cz_gate().into());
+        for node in cz_nodes {
+            let walker: Walker<'static> = Walker::from_pinned_node(node, state_space.clone());
+            if walker.as_hugr_view().all_commit_ids().count() > MAX_COMMITS {
+                continue;
+            }
+            for outport in state_space.node_outputs(node) {
+                if !matches!(
+                    state_space.get_optype(node).port_kind(outport),
+                    Some(EdgeKind::Value(_))
+                ) {
+                    continue;
+                }
+                let wire = walker.get_wire(node, outport);
+                queue.push_back((wire, walker.clone()));
+            }
+        }
+    }
+}
+
 fn build_state_space() -> CommitStateSpace {
     let base_hugr = dfg_hugr();
     let mut state_space = CommitStateSpace::with_base(base_hugr);
@@ -137,68 +167,31 @@ fn build_state_space() -> CommitStateSpace {
     let mut wire_queue = VecDeque::new();
     let mut added_patches = BTreeSet::new();
 
-    // Traverse all commits in state space, enqueueing all outgoing wires of
-    // CZ nodes
-    let enqueue_all = |queue: &mut VecDeque<_>, state_space: &CommitStateSpace| {
-        for id in state_space.all_commit_ids() {
-            let cz_nodes = state_space
-                .inserted_nodes(id)
-                .filter(|&n| state_space.get_optype(n) == &cz_gate().into());
-            for node in cz_nodes {
-                let mut walker: Walker<'static> = Walker::new(state_space.clone());
-                walker
-                    .try_pin_node(node)
-                    .expect("pinning a single node should never fail");
-                if walker.as_hugr().all_commit_ids().count() > MAX_COMMITS {
-                    continue;
-                }
-                for outport in state_space.node_outputs(node) {
-                    if !state_space
-                        .get_optype(node)
-                        .port_kind(outport)
-                        .unwrap()
-                        .is_value()
-                    {
-                        continue;
-                    }
-                    let wire = walker.get_wire(node, outport);
-                    queue.push_back((wire, walker.clone()));
-                }
-            }
-        }
-    };
-
     enqueue_all(&mut wire_queue, &state_space);
 
     while let Some((wire, walker)) = wire_queue.pop_front() {
         if !wire.is_complete(None) {
             // expand the wire in all possible ways
             let (pinned_node, pinned_port) = wire
-                .all_ports()
+                .all_pinned_ports()
                 .next()
                 .expect("at least one port was already pinned");
             assert!(
-                !walker
-                    .as_hugr()
-                    .deleted_nodes(pinned_node.0)
-                    .contains(&pinned_node.1),
+                walker.as_hugr_view().contains_node(pinned_node),
                 "pinned node is deleted"
             );
-            for walker in walker.expand(&wire, None) {
+            for subwalker in walker.expand(&wire, None) {
                 assert!(
-                    !walker
-                        .as_hugr()
-                        .deleted_nodes(pinned_node.0)
-                        .contains(&pinned_node.1),
+                    subwalker.as_hugr_view().contains_node(pinned_node),
                     "pinned node is deleted"
                 );
-                wire_queue.push_back((walker.get_wire(pinned_node, pinned_port), walker));
+                wire_queue.push_back((subwalker.get_wire(pinned_node, pinned_port), subwalker));
             }
         } else {
             // we have a complete wire, so we can commute the CZ gates (or
             // cancel them out)
 
-            let patch_nodes: BTreeSet<_> = wire.all_ports().map(|(n, _)| n).collect();
+            let patch_nodes: BTreeSet<_> = wire.all_pinned_ports().map(|(n, _)| n).collect();
             // check that the patch applies to more than one commit (or the base),
             // otherwise we have infinite commutations back and forth
             let patch_owners: BTreeSet<_> = patch_nodes.iter().map(|n| n.0).collect();
@@ -211,7 +204,7 @@ fn build_state_space() -> CommitStateSpace {
                 continue;
             }
 
-            let Ok(repl) = create_replacement(wire, &walker) else {
+            let Some(repl) = create_replacement(wire, &walker) else {
                 continue;
             };
 
@@ -238,14 +231,14 @@ fn build_state_space() -> CommitStateSpace {
     state_space
 }
 
-fn create_replacement(wire: PinnedWire, walker: &Walker) -> Result<PersistentReplacement, ()> {
-    let hugr = walker.clone().into_hugr();
+fn create_replacement(wire: PinnedWire, walker: &Walker) -> Option<PersistentReplacement> {
+    let hugr = walker.clone().into_persistent_hugr();
     let (out_node, _) = wire
-        .outgoing_port()
+        .pinned_outport()
         .expect("outgoing port was already pinned (and is unique)");
 
     let (in_node, _) = wire
-        .incoming_ports()
+        .pinned_inports()
         .exactly_one()
         .ok()
         .expect("all our wires have exactly one incoming port");
@@ -255,7 +248,7 @@ fn create_replacement(wire: PinnedWire, walker: &Walker) -> Result<PersistentRep
     {
         // one of the nodes we have matched is (presumably) an input or output gate
         // => skip
-        return Err(());
+        return None;
     }
 
     // figure out whether the two CZ gates act on the same qubits (iff the
@@ -265,7 +258,7 @@ fn create_replacement(wire: PinnedWire, walker: &Walker) -> Result<PersistentRep
 
     // The subgraph that we will replace
     let subgraph_nodes = [out_node, in_node];
-    let subgraph = SiblingSubgraph::try_from_nodes(subgraph_nodes, &hugr).map_err(|_| ())?;
+    let subgraph = SiblingSubgraph::try_from_nodes(subgraph_nodes, &hugr).ok()?;
 
     let (repl_hugr, nu_inp, nu_out) = match n_shared_qubits {
         2 => {
@@ -335,8 +328,7 @@ fn create_replacement(wire: PinnedWire, walker: &Walker) -> Result<PersistentRep
         _ => unreachable!(),
     };
 
-    let repl = SimpleReplacement::new(subgraph, repl_hugr, nu_inp, nu_out);
-    Ok(repl)
+    SimpleReplacement::new(subgraph, repl_hugr, nu_inp, nu_out).into()
 }
 
 #[test]

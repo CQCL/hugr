@@ -282,6 +282,14 @@ impl PersistentHugr {
         Self { state_space }
     }
 
+    /// Create a [`PersistentHugr`] from a single commit and its ancestors.
+    // This always defines a valid `PersistentHugr` as the ancestors of a commit
+    // are guaranteed to be compatible with each other.
+    pub fn from_commit(commit: Commit) -> Self {
+        let state_space = CommitStateSpace::try_from_commits([commit]).expect("commit is valid");
+        Self { state_space }
+    }
+
     /// Create a [`PersistentHugr`] from a list of commits.
     ///
     /// `Self` will correspond to the HUGR obtained by applying the patches of
