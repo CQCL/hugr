@@ -69,18 +69,19 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let ops::FuncDecl { signature, name } = self
-            .hugr()
-            .get_optype(f_node)
-            .as_func_decl()
-            .ok_or(BuildError::UnexpectedType {
-                node: f_node,
-                op_desc: "crate::ops::OpType::FuncDecl",
-            })?
-            .clone();
-        let body = signature.body().clone();
+        let decl =
+            self.hugr()
+                .get_optype(f_node)
+                .as_func_decl()
+                .ok_or(BuildError::UnexpectedType {
+                    node: f_node,
+                    op_desc: "crate::ops::OpType::FuncDecl",
+                })?;
+        let name = decl.func_name().clone();
+        let sig = decl.signature().clone();
+        let body = sig.body().clone();
         self.hugr_mut()
-            .replace_op(f_node, ops::FuncDefn { name, signature });
+            .replace_op(f_node, ops::FuncDefn::new(name, sig));
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
@@ -99,10 +100,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     ) -> Result<FuncID<false>, BuildError> {
         let body = signature.body().clone();
         // TODO add param names to metadata
-        let declare_n = self.add_child_node(ops::FuncDecl {
-            signature,
-            name: name.into(),
-        });
+        let declare_n = self.add_child_node(ops::FuncDecl::new(name, signature));
 
         // Add the extensions used by the function types.
         self.use_extensions(

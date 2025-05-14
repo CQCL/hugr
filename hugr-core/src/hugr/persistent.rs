@@ -79,8 +79,8 @@ pub use state_space::{CommitStateSpace, InvalidCommit, PatchNode};
 pub use resolver::PointerEqResolver;
 
 use crate::{
-    hugr::patch::{simple_replace, Patch, PatchVerification},
     Hugr, HugrView, Node, SimpleReplacement,
+    hugr::patch::{Patch, PatchVerification, simple_replace},
 };
 
 /// A replacement operation that can be applied to a [`PersistentHugr`].

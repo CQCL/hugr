@@ -31,11 +31,8 @@ use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file,
 ///
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
-    let def_op: OpType = ops::FuncDefn {
-        name: "main".into(),
-        signature: Signature::new(vec![bool_t()], vec![bool_t(); copies]).into(),
-    }
-    .into();
+    let def_op: OpType =
+        ops::FuncDefn::new("main", Signature::new(bool_t(), vec![bool_t(); copies])).into();
 
     let mut b = Hugr::default();
     let root = b.entrypoint();
@@ -129,13 +126,7 @@ fn children_restrictions() {
 
     // Add a definition without children
     let def_sig = Signature::new(vec![bool_t()], vec![bool_t(), bool_t()]);
-    let new_def = b.add_node_with_parent(
-        root,
-        ops::FuncDefn {
-            signature: def_sig.into(),
-            name: "main".into(),
-        },
-    );
+    let new_def = b.add_node_with_parent(root, ops::FuncDefn::new("main", def_sig));
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
@@ -314,10 +305,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 
     let def = b.add_node_with_parent(
         b.entrypoint(),
-        ops::FuncDefn {
-            name: "main".into(),
-            signature: Signature::new(row.clone(), row.clone()).into(),
-        },
+        ops::FuncDefn::new("main", Signature::new_endo(row.clone())),
     );
 
     let input = b.add_node_with_parent(def, ops::Input::new(row.clone()));

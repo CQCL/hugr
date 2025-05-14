@@ -3,15 +3,15 @@ use std::collections::{BTreeMap, HashMap};
 use rstest::*;
 
 use crate::{
-    builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+    IncomingPort, Node, OutgoingPort, SimpleReplacement,
+    builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
     extension::prelude::bool_t,
-    hugr::{patch::Patch, persistent::PatchNode, views::SiblingSubgraph, Hugr, HugrView},
+    hugr::{Hugr, HugrView, patch::Patch, persistent::PatchNode, views::SiblingSubgraph},
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
-    IncomingPort, Node, OutgoingPort, SimpleReplacement,
 };
 
-use super::{state_space::CommitId, CommitStateSpace};
+use super::{CommitStateSpace, state_space::CommitId};
 
 /// Creates a simple test Hugr with a DFG that contains a small boolean circuit
 ///
@@ -48,7 +48,7 @@ fn simple_hugr() -> (Hugr, [Node; 3]) {
 }
 
 /// Creates a replacement that replaces a node with a sequence of two NOT gates
-fn create_double_not_replacement(hugr: &Hugr, node_to_replace: Node) -> SimpleReplacement<Node> {
+fn create_double_not_replacement(hugr: &Hugr, node_to_replace: Node) -> SimpleReplacement {
     // Create a simple hugr with two NOT gates in sequence
     let mut dfg_builder = DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t()])).unwrap();
     let [input_wire] = dfg_builder.input_wires_arr();
@@ -84,12 +84,12 @@ fn create_double_not_replacement(hugr: &Hugr, node_to_replace: Node) -> SimpleRe
     let subgraph = SiblingSubgraph::try_from_nodes(vec![node_to_replace], hugr).unwrap();
 
     // Create the replacement
-    SimpleReplacement::new(subgraph, replacement_hugr, nu_inp, nu_out)
+    SimpleReplacement::try_new(subgraph, hugr, replacement_hugr).unwrap()
 }
 
 /// Creates a replacement that replaces the unique AND gate in `hugr` and its
 /// predecessor NOT gate on 1st input with an XOR gate
-fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement<Node> {
+fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
     // Create second replacement that replaces the second NOT gate from the first
     // replacement
     // Find the AND gate in the hugr
@@ -136,7 +136,7 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement<Node> {
     // Create subgraph with both the AND gate and NOT0 node
     let subgraph = SiblingSubgraph::try_from_nodes(vec![not_node, and_gate], &hugr).unwrap();
 
-    SimpleReplacement::new(subgraph, replacement_hugr, nu_inp, nu_out)
+    SimpleReplacement::try_new(subgraph, hugr, replacement_hugr).unwrap()
 }
 
 #[fixture]

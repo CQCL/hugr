@@ -145,6 +145,9 @@ impl<'a> Context<'a> {
         all_children.extend(self.decl_operations.values().copied());
         all_children.extend(children);
 
+        let mut meta = Vec::new();
+        self.export_node_json_metadata(self.hugr.module_root(), &mut meta);
+
         let (links, ports) = self.links.exit();
         self.symbols.exit();
 
@@ -153,7 +156,7 @@ impl<'a> Context<'a> {
             sources: &[],
             targets: &[],
             children: all_children.into_bump_slice(),
-            meta: &[], // TODO: Export metadata
+            meta: self.bump.alloc_slice_copy(&meta),
             signature: None,
             scope: Some(table::RegionScope { links, ports }),
         };
@@ -176,10 +179,19 @@ impl<'a> Context<'a> {
     }
 
     pub fn make_term(&mut self, term: table::Term<'a>) -> table::TermId {
-        // Wildcard terms do not all represent the same term, so we should not deduplicate them.
+        // There is a canonical id for wildcard terms.
         if term == table::Term::Wildcard {
-            return self.module.insert_term(term);
+            return table::TermId::default();
         }
+
+        // We can omit a prefix of wildcard terms for symbol applications.
+        let term = match term {
+            table::Term::Apply(symbol, args) => {
+                let prefix = args.iter().take_while(|arg| !arg.is_valid()).count();
+                table::Term::Apply(symbol, &args[prefix..])
+            }
+            term => term,
+        };
 
         *self
             .term_map
@@ -223,8 +235,8 @@ impl<'a> Context<'a> {
     /// one of those operations.
     fn get_func_name(&self, func_node: Node) -> Option<&'a str> {
         match self.hugr.get_optype(func_node) {
-            OpType::FuncDecl(func_decl) => Some(&func_decl.name),
-            OpType::FuncDefn(func_defn) => Some(&func_defn.name),
+            OpType::FuncDecl(func_decl) => Some(func_decl.func_name()),
+            OpType::FuncDefn(func_defn) => Some(func_defn.func_name()),
             _ => None,
         }
     }
@@ -257,8 +269,8 @@ impl<'a> Context<'a> {
 
         // We record the name of the symbol defined by the node, if any.
         let symbol = match optype {
-            OpType::FuncDefn(func_defn) => Some(func_defn.name.as_str()),
-            OpType::FuncDecl(func_decl) => Some(func_decl.name.as_str()),
+            OpType::FuncDefn(func_defn) => Some(func_defn.func_name().as_str()),
+            OpType::FuncDecl(func_decl) => Some(func_decl.func_name().as_str()),
             OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
             OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),
             _ => None,
@@ -328,7 +340,7 @@ impl<'a> Context<'a> {
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, &func.signature);
+                let symbol = this.export_poly_func_type(name, func.signature());
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
@@ -339,7 +351,7 @@ impl<'a> Context<'a> {
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, &func.signature);
+                let symbol = this.export_poly_func_type(name, func.signature());
                 table::Operation::DeclareFunc(symbol)
             }),
 

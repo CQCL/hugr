@@ -40,8 +40,8 @@ pub(super) fn node_style(
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
     fn node_name(h: &Hugr, n: NodeIndex) -> String {
         match h.get_optype(n.into()) {
-            OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.name),
-            OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.name),
+            OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
+            OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.func_name()),
             op => op.name().to_string(),
         }
     }

@@ -363,6 +363,10 @@ impl<'a> Context<'a> {
             self.import_node(*node, self.hugr.entrypoint())?;
         }
 
+        for meta_item in region_data.meta {
+            self.import_node_metadata(self.hugr.module_root(), *meta_item)?;
+        }
+
         Ok(())
     }
 
@@ -408,10 +412,7 @@ impl<'a> Context<'a> {
 
             table::Operation::DefineFunc(symbol) => {
                 self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-                    let optype = OpType::FuncDefn(FuncDefn {
-                        name: symbol.name.to_string(),
-                        signature,
-                    });
+                    let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, signature));
 
                     let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -427,10 +428,7 @@ impl<'a> Context<'a> {
 
             table::Operation::DeclareFunc(symbol) => {
                 self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-                    let optype = OpType::FuncDecl(FuncDecl {
-                        name: symbol.name.to_string(),
-                        signature,
-                    });
+                    let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, signature));
 
                     let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -568,13 +566,7 @@ impl<'a> Context<'a> {
                 // to declare operations as a node, in which case the description will be attached
                 // to that node as metadata.
 
-                let optype = OpType::OpaqueOp(OpaqueOp::new(
-                    extension,
-                    name,
-                    String::default(),
-                    args,
-                    signature,
-                ));
+                let optype = OpType::OpaqueOp(OpaqueOp::new(extension, name, args, signature));
 
                 let node = self.make_node(node_id, optype, parent)?;
 
@@ -874,86 +866,46 @@ impl<'a> Context<'a> {
             self.region_scope = region;
         }
 
-        let [region_source, region_targets] = self.get_func_type(
+        let [_, region_targets] = self.get_func_type(
             region_data
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
 
-        let region_source_types = self.import_closed_list(region_source)?;
         let region_target_types = self.import_closed_list(region_targets)?;
 
-        // Create the entry node for the control flow region.
-        // Since the core hugr does not have explicit entry blocks yet, we create a dataflow block
-        // that simply forwards its inputs to its outputs.
-        {
-            let types = {
-                let [ctrl_type] = region_source_types.as_slice() else {
-                    return Err(table::ModelError::TypeError(region_source).into());
-                };
-
-                let [types] = self.expect_symbol(*ctrl_type, model::CORE_CTRL)?;
-                self.import_type_row(types)?
+        // Identify the entry node of the control flow region by looking for
+        // a block whose input is linked to the sole source port of the CFG region.
+        let entry_node = 'find_entry: {
+            let [entry_link] = region_data.sources else {
+                return Err(table::ModelError::InvalidRegions(node_id).into());
             };
 
-            let entry = self.hugr.add_node_with_parent(
-                node,
-                OpType::DataflowBlock(DataflowBlock {
-                    inputs: types.clone(),
-                    other_outputs: TypeRow::default(),
-                    sum_rows: vec![types.clone()],
-                }),
-            );
+            for child in region_data.children {
+                let child_data = self.get_node(*child)?;
+                let is_entry = child_data.inputs.iter().any(|link| link == entry_link);
 
-            self.record_links(entry, Direction::Outgoing, region_data.sources);
-
-            let node_input = self.hugr.add_node_with_parent(
-                entry,
-                OpType::Input(Input {
-                    types: types.clone(),
-                }),
-            );
-
-            let node_output = self.hugr.add_node_with_parent(
-                entry,
-                OpType::Output(Output {
-                    types: vec![Type::new_sum([types.clone()])].into(),
-                }),
-            );
-
-            let node_tag = self.hugr.add_node_with_parent(
-                entry,
-                OpType::Tag(Tag {
-                    tag: 0,
-                    variants: vec![types],
-                }),
-            );
-
-            // Connect the input node to the tag node
-            let input_outputs = self.hugr.node_outputs(node_input);
-            let tag_inputs = self.hugr.node_inputs(node_tag);
-            let mut connections =
-                Vec::with_capacity(input_outputs.size_hint().0 + tag_inputs.size_hint().0);
-
-            for (a, b) in input_outputs.zip(tag_inputs) {
-                connections.push((node_input, a, node_tag, b));
+                if is_entry {
+                    break 'find_entry *child;
+                }
             }
 
-            // Connect the tag node to the output node
-            let tag_outputs = self.hugr.node_outputs(node_tag);
-            let output_inputs = self.hugr.node_inputs(node_output);
+            // TODO: We should allow for the case in which control flows
+            // directly from the source to the target of the region. This is
+            // currently not allowed in hugr core directly, but may be simulated
+            // by constructing an empty entry block.
+            return Err(table::ModelError::InvalidRegions(node_id).into());
+        };
 
-            for (a, b) in tag_outputs.zip(output_inputs) {
-                connections.push((node_tag, a, node_output, b));
-            }
-
-            for (src, src_port, dst, dst_port) in connections {
-                self.hugr.connect(src, src_port, dst, dst_port);
-            }
-        }
+        // The entry node in core control flow regions is identified by being
+        // the first child node of the CFG node. We therefore import the entry
+        // node first and follow it up by every other node.
+        self.import_node(entry_node, node)?;
 
         for child in region_data.children {
-            self.import_node(*child, node)?;
+            if *child != entry_node {
+                self.import_node(*child, node)?;
+            }
         }
 
         // Create the exit node for the control flow region.
@@ -1312,8 +1264,12 @@ impl<'a> Context<'a> {
                 )))
             }
 
-            table::Term::Var(table::VarId(_, index)) => {
-                Ok(TypeBase::new_var_use(*index as _, TypeBound::Copyable))
+            table::Term::Var(var @ table::VarId(_, index)) => {
+                let local_var = self
+                    .local_vars
+                    .get(var)
+                    .ok_or(table::ModelError::InvalidVar(*var))?;
+                Ok(TypeBase::new_var_use(*index as _, local_var.bound))
             }
 
             // The following terms are not runtime types, but the core `Type` only contains runtime types.
@@ -1632,7 +1588,21 @@ impl<'a> Context<'a> {
             return Ok(None);
         }
 
-        Ok((*args).try_into().ok())
+        // We allow the match even if the symbol is applied to fewer arguments
+        // than parameters. In that case, the arguments are padded with wildcards
+        // at the beginning.
+        if args.len() > N {
+            return Ok(None);
+        }
+
+        let result = std::array::from_fn(|i| {
+            (i + args.len())
+                .checked_sub(N)
+                .map(|i| args[i])
+                .unwrap_or_default()
+        });
+
+        Ok(Some(result))
     }
 
     fn expect_symbol<const N: usize>(

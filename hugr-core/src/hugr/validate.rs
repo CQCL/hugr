@@ -16,7 +16,7 @@ use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{
     ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, OpValidityFlags,
 };
-use crate::ops::{FuncDefn, NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::EdgeKind;
 use crate::types::type_param::TypeParam;
 use crate::{Direction, Port};
@@ -580,8 +580,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
         // For FuncDefn's, only the type variables declared by the FuncDefn can be referred to by nodes
         // inside the function. (The same would be true for FuncDecl's, but they have no child nodes.)
-        let var_decls = if let OpType::FuncDefn(FuncDefn { signature, .. }) = op_type {
-            signature.params()
+        let var_decls = if let OpType::FuncDefn(fd) = op_type {
+            fd.signature().params()
         } else {
             var_decls
         };
