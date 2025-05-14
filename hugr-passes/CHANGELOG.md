@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.20.0-rc.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.0-rc.0...hugr-passes-v0.20.0-rc.1) - 2025-05-14
+
+### New Features
+
+- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
+
 ## [0.20.0-rc.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.4...hugr-passes-v0.20.0-rc.0) - 2025-05-09
 
 ### New Features
