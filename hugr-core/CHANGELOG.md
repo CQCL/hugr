@@ -66,7 +66,7 @@
 ### Testing
 
 - Disable IO-dependent tests when running miri ([#2123](https://github.com/CQCL/hugr/pull/2123))
-- check envelope roundtrips rather than json in `HugrView::verify` ([#2186](https://github.com/CQCL/hugr/pull/2186))
+- Check envelope roundtrips rather than json in `HugrView::verify` ([#2186](https://github.com/CQCL/hugr/pull/2186))
 
 ## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.2...hugr-core-v0.15.3) - 2025-04-02
 
