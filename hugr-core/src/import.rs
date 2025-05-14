@@ -363,6 +363,10 @@ impl<'a> Context<'a> {
             self.import_node(*node, self.hugr.entrypoint())?;
         }
 
+        for meta_item in region_data.meta {
+            self.import_node_metadata(self.hugr.module_root(), *meta_item)?;
+        }
+
         Ok(())
     }
 
