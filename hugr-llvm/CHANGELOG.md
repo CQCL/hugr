@@ -5,14 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.20.0-rc.1](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.0-rc.0...hugr-llvm-v0.20.0-rc.1) - 2025-05-14
-
-### New Features
-
-- Restore old array lowering ([#2194](https://github.com/CQCL/hugr/pull/2194))
-- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
-
-## [0.20.0-rc.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.4...hugr-llvm-v0.20.0-rc.0) - 2025-05-09
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.4...hugr-llvm-v0.20.0) - 2025-05-14
 
 ### Bug Fixes
 
@@ -31,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add LLVM emission for prelude.noop ([#2160](https://github.com/CQCL/hugr/pull/2160))
 - [**breaking**] Add Hugr entrypoints ([#2147](https://github.com/CQCL/hugr/pull/2147))
 - [**breaking**] Return a node mapping in HugrInternals::region_portgraph ([#2164](https://github.com/CQCL/hugr/pull/2164))
+- Restore old array lowering ([#2194](https://github.com/CQCL/hugr/pull/2194))
+- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
 
 ## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.3...hugr-llvm-v0.15.4) - 2025-05-07
 

@@ -1,13 +1,7 @@
 # Changelog
 
 
-## [0.20.0-rc.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.0-rc.0...hugr-passes-v0.20.0-rc.1) - 2025-05-14
-
-### New Features
-
-- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
-
-## [0.20.0-rc.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.4...hugr-passes-v0.20.0-rc.0) - 2025-05-09
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.4...hugr-passes-v0.20.0) - 2025-05-14
 
 ### New Features
 
@@ -28,6 +22,7 @@
 - [**breaking**] Return a node mapping in HugrInternals::region_portgraph ([#2164](https://github.com/CQCL/hugr/pull/2164))
 - [**breaking**] Validate any HugrView, make errors generic ([#2155](https://github.com/CQCL/hugr/pull/2155))
 - [**breaking**] Explicit hugr type param to ComposablePass ([#2179](https://github.com/CQCL/hugr/pull/2179))
+- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
 
 ### Refactor
 

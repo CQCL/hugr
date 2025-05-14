@@ -1,20 +1,15 @@
 # Changelog
 
-## [0.20.0-rc.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.0-rc.0...hugr-model-v0.20.0-rc.1) - 2025-05-14
-
-### New Features
-
-- Define text-model envelope formats ([#2188](https://github.com/CQCL/hugr/pull/2188))
-- Import CFG regions without adding an entry block. ([#2200](https://github.com/CQCL/hugr/pull/2200))
-- Symbol applications can leave out prefixes of wildcards. ([#2201](https://github.com/CQCL/hugr/pull/2201))
-
-## [0.20.0-rc.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.19.1...hugr-model-v0.20.0-rc.0) - 2025-05-09
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.19.0...hugr-model-v0.20.0) - 2025-05-14
 
 ### New Features
 
 - [**breaking**] Mark all Error enums as non_exhaustive ([#2056](https://github.com/CQCL/hugr/pull/2056))
 - [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
 - Export and import entrypoints via metadata in `hugr-model`. ([#2172](https://github.com/CQCL/hugr/pull/2172))
+- Define text-model envelope formats ([#2188](https://github.com/CQCL/hugr/pull/2188))
+- Import CFG regions without adding an entry block. ([#2200](https://github.com/CQCL/hugr/pull/2200))
+- Symbol applications can leave out prefixes of wildcards. ([#2201](https://github.com/CQCL/hugr/pull/2201))
 
 ## [0.19.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.18.1...hugr-model-v0.19.0) - 2025-05-07
 
