@@ -1037,7 +1037,7 @@ class FuncDefn(DfParentOp):
     the function.
     """
 
-    #: function name
+    #: function name - internal only
     f_name: str
     #: input types of the function
     inputs: tys.TypeRow
@@ -1045,6 +1045,8 @@ class FuncDefn(DfParentOp):
     params: list[tys.TypeParam] = field(default_factory=list)
     _outputs: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=1, repr=False)
+    #: name for linking
+    link_name: str | None = None
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -1071,6 +1073,7 @@ class FuncDefn(DfParentOp):
             parent=parent.idx,
             name=self.f_name,
             signature=self.signature._to_serial(),
+            link_name=self.link_name,
         )
 
     def inner_signature(self) -> tys.FunctionType:

@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.11'",
@@ -10,9 +9,7 @@ resolution-markers = [
 members = [
     "hugr",
 ]
-
-[manifest.dependency-groups]
-dev = [
+requirements = [
     { name = "maturin", specifier = ">=1.7.0,<2" },
     { name = "mypy", specifier = ">=1.9.0,<2" },
     { name = "pre-commit", specifier = ">=3.6.2,<4" },
@@ -310,7 +307,6 @@ requires-dist = [
     { name = "sphinx-book-theme", marker = "extra == 'docs'", specifier = ">=1.1.2" },
     { name = "typing-extensions", specifier = "~=4.12" },
 ]
-provides-extras = ["docs", "pytket"]
 
 [[package]]
 name = "identify"
