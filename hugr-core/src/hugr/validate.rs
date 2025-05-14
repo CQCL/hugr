@@ -1,6 +1,7 @@
 //! HUGR invariant checks.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::iter;
 
 use itertools::Itertools;
@@ -308,6 +309,39 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     });
                 }
             }
+
+            // Linking info
+            let mut node_and_imp_sig = HashMap::new();
+            for c in all_children.clone() {
+                let (link_name, imp_sig) = match self.hugr.get_optype(c) {
+                    OpType::FuncDecl(fd) => (&fd.name, Some(&fd.signature)),
+                    OpType::FuncDefn(fd) => match fd.link_name.as_ref() {
+                        Some(ln) => (ln, None),
+                        None => continue,
+                    },
+                    _ => continue,
+                };
+                if node != self.hugr.module_root() {
+                    return Err(ValidationError::LinkNameNotAtTopLevel { node: c });
+                }
+                match node_and_imp_sig.entry(link_name) {
+                    Entry::Vacant(ve) => {
+                        ve.insert((c, imp_sig));
+                    }
+                    Entry::Occupied(oe) => {
+                        // Two nodes. Iff both import the same sig then we're OK
+                        let (prev_c, prev_imp_sig) = oe.get();
+                        if prev_imp_sig != &imp_sig || prev_imp_sig.is_none() {
+                            // Either they are different (import<->export, or import signature), or both are exports
+                            return Err(ValidationError::DuplicateExternalNames {
+                                link_name: link_name.clone(),
+                                children: [*prev_c, c],
+                            });
+                        };
+                    }
+                }
+            }
+
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c, self.hugr.get_optype(c)));
             if let Err(source) = op_type.validate_op_children(children_optypes) {
@@ -671,6 +705,25 @@ pub enum ValidationError<N: HugrNode> {
         parent: N,
         parent_optype: OpType,
         source: ChildrenValidationError<N>,
+    },
+    /// Multiple nodes were exported using the same name from a [Module](super::Module)
+    #[error("FuncDefn is exported under same name {link_name} as earlier node {:?}", children[0])]
+    DuplicateExternalNames {
+        /// The link_name of a [`FuncDecl`](crate::ops::FuncDecl) or [`FuncDefn`]
+        link_name: String,
+        /// Two nodes node exported under that name
+        children: [N; 2],
+    },
+    /// A [`FuncDecl`], or [`FuncDefn`] with a [link_name],
+    /// was neither root nor child of a [`Module`] root
+    ///
+    /// [`FuncDecl`]: crate::ops::FuncDecl
+    /// [link_name]: FuncDefn::link_name
+    /// [`Module`]: crate::ops::Module
+    #[error("Node {node} has a link_name but is neither root nor child of Module root")]
+    LinkNameNotAtTopLevel {
+        // The node exporting/importing the name
+        node: N,
     },
     /// The children graph has invalid edges.
     #[error(

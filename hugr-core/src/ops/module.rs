@@ -53,12 +53,42 @@ impl OpTrait for Module {
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
+#[non_exhaustive]
 pub struct FuncDefn {
     /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Is the function public? (Can it be linked against and called externally?)
+    pub link_name: Option<String>,
+}
+
+impl FuncDefn {
+    /// Create a new instance with the specified visibility
+    pub fn new(
+        name: impl ToString,
+        signature: impl Into<PolyFuncType>,
+        link_name: impl Into<Option<String>>,
+    ) -> Self {
+        Self {
+            name: name.to_string(),
+            signature: signature.into(),
+            link_name: link_name.into(),
+        }
+    }
+
+    /// Create a new instance with [Self::link_name] set to the same as `name`
+    pub fn new_public(name: impl ToString, signature: impl Into<PolyFuncType>) -> Self {
+        let name = name.to_string();
+        Self::new(name.clone(), signature, Some(name))
+    }
+
+    /// Create a new function that is not for external calls or linkage
+    pub fn new_private(name: impl ToString, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new(name, signature, None)
+    }
 }
 
 impl_op_name!(FuncDefn);

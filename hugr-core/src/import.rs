@@ -412,10 +412,12 @@ impl<'a> Context<'a> {
 
             table::Operation::DefineFunc(symbol) => {
                 self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-                    let optype = OpType::FuncDefn(FuncDefn {
-                        name: symbol.name.to_string(),
+                    let optype = FuncDefn::new_private(
+                        // ALAN TODO make this public if appropriate??
+                        symbol.name.to_string(),
                         signature,
-                    });
+                    )
+                    .into();
 
                     let node = ctx.make_node(node_id, optype, parent)?;
 

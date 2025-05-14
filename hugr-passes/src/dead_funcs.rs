@@ -61,10 +61,20 @@ fn reachable_funcs<'a, H: HugrView>(
     }))
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 /// A configuration for the Dead Function Removal pass.
 pub struct RemoveDeadFuncsPass {
     entry_points: Vec<Node>,
+    include_exports: bool,
+}
+
+impl Default for RemoveDeadFuncsPass {
+    fn default() -> Self {
+        Self {
+            entry_points: Default::default(),
+            include_exports: true,
+        }
+    }
 }
 
 impl RemoveDeadFuncsPass {
@@ -80,16 +90,35 @@ impl RemoveDeadFuncsPass {
         self.entry_points.extend(entry_points);
         self
     }
+
+    /// When the [HugrView::entrypoint] is a [Module](hugr_core::ops::Module),
+    /// sets whether the exported [FuncDefn](hugr_core::ops::FuncDefn) children are
+    /// included as entry points for reachability analysis. (Yes by default.)
+    pub fn include_module_exports(mut self, include: bool) -> Self {
+        self.include_exports = include;
+        self
+    }
 }
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Error = RemoveDeadFuncsError;
     type Result = ();
     fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
+        let exports = if hugr.entrypoint() == hugr.module_root() && self.include_exports {
+            hugr.children(hugr.module_root())
+                .filter(|ch| {
+                    hugr.get_optype(*ch)
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.link_name.is_some())
+                })
+                .collect()
+        } else {
+            vec![]
+        };
         let reachable = reachable_funcs(
             &CallGraph::new(hugr),
             hugr,
-            self.entry_points.iter().copied(),
+            self.entry_points.iter().copied().chain(exports),
         )?
         .collect::<HashSet<_>>();
         let unreachable = hugr
@@ -108,30 +137,17 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// Deletes from the Hugr any functions that are not used by either [`Call`] or
 /// [`LoadFunction`] nodes in reachable parts.
 ///
-/// For [`Module`]-rooted Hugrs, `entry_points` may provide a list of entry points,
-/// which must be children of the root. Note that if `entry_points` is empty, this will
-/// result in all functions in the module being removed.
-///
-/// For non-[`Module`]-rooted Hugrs, `entry_points` must be empty; the root node is used.
-///
-/// # Errors
-/// * If there are any `entry_points` but the root of the hugr is not a [`Module`]
-/// * If any node in `entry_points` is
-///     * not a [`FuncDefn`], or
-///     * not a child of the root
+/// For [`Module`]-rooted Hugrs, all top-level functions with [link_name] set,
+/// will be used as entry points.
 ///
 /// [`Call`]: hugr_core::ops::OpType::Call
-/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
+/// [link_name]: hugr_core::ops::FuncDefn::link_name
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,
-    entry_points: impl IntoIterator<Item = Node>,
 ) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
-    validate_if_test(
-        RemoveDeadFuncsPass::default().with_module_entry_points(entry_points),
-        h,
-    )
+    validate_if_test(RemoveDeadFuncsPass::default(), h)
 }
 
 #[cfg(test)]
@@ -146,16 +162,20 @@ mod test {
     };
     use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
 
-    use super::remove_dead_funcs;
+    use super::RemoveDeadFuncsPass;
+    use crate::ComposablePass;
 
     #[rstest]
-    #[case([], vec![])] // No entry_points removes everything!
-    #[case(["main"], vec!["from_main", "main"])]
-    #[case(["from_main"], vec!["from_main"])]
-    #[case(["other1"], vec!["other1", "other2"])]
-    #[case(["other2"], vec!["other2"])]
-    #[case(["other1", "other2"], vec!["other1", "other2"])]
+    #[case(false, [], vec![])] // No entry_points removes everything!
+    #[case(false, ["main"], vec!["from_main", "main"])]
+    #[case(false, ["from_main"], vec!["from_main"])]
+    #[case(false, ["other1"], vec!["other1", "other2"])]
+    #[case(false, ["other2"], vec!["other2"])]
+    #[case(false, ["other1", "other2"], vec!["other1", "other2"])]
+    #[case(true, [], vec!["from_main", "main", "other2"])]
+    #[case(true, ["other1"], vec!["from_main", "main", "other1", "other2"])]
     fn remove_dead_funcs_entry_points(
+        #[case] include_exports: bool,
         #[case] entry_points: impl IntoIterator<Item = &'static str>,
         #[case] retained_funcs: Vec<&'static str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -163,12 +183,13 @@ mod test {
         let o2 = hb.define_function("other2", Signature::new_endo(usize_t()))?;
         let o2inp = o2.input_wires();
         let o2 = o2.finish_with_outputs(o2inp)?;
-        let mut o1 = hb.define_function("other1", Signature::new_endo(usize_t()))?;
+        let mut o1 =
+            hb.define_function_link_name("other1", Signature::new_endo(usize_t()), None)?;
 
         let o1c = o1.call(o2.handle(), &[], o1.input_wires())?;
         o1.finish_with_outputs(o1c.outputs())?;
 
-        let fm = hb.define_function("from_main", Signature::new_endo(usize_t()))?;
+        let fm = hb.define_function_link_name("from_main", Signature::new_endo(usize_t()), None)?;
         let f_inp = fm.input_wires();
         let fm = fm.finish_with_outputs(f_inp)?;
         let mut m = hb.define_function("main", Signature::new_endo(usize_t()))?;
@@ -186,14 +207,16 @@ mod test {
             })
             .collect::<HashMap<_, _>>();
 
-        remove_dead_funcs(
-            &mut hugr,
-            entry_points
-                .into_iter()
-                .map(|name| *avail_funcs.get(name).unwrap())
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
+        RemoveDeadFuncsPass::default()
+            .include_module_exports(include_exports)
+            .with_module_entry_points(
+                entry_points
+                    .into_iter()
+                    .map(|name| *avail_funcs.get(name).unwrap())
+                    .collect::<Vec<_>>(),
+            )
+            .run(&mut hugr)
+            .unwrap();
 
         let remaining_funcs = hugr
             .nodes()

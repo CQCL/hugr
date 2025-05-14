@@ -83,7 +83,8 @@ pub trait Container {
     }
 
     /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
-    /// body graph.
+    /// body graph. The function has an appropriate [ops::FuncDefn::link_name] for the parent
+    /// (`None` for most containers / with the default impl.)
     ///
     /// # Errors
     ///
@@ -94,22 +95,7 @@ pub trait Container {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn {
-            name: name.into(),
-            signature,
-        });
-
-        // Add the extensions used by the function types.
-        self.use_extensions(
-            body.used_extensions().unwrap_or_else(|e| {
-                panic!("Build-time signatures should have valid extensions. {e}")
-            }),
-        );
-
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
-        Ok(FunctionBuilder::from_dfg_builder(db))
+        define_function_link_name(self, name, signature, None)
     }
 
     /// Insert a HUGR as a child of the container.
@@ -155,6 +141,26 @@ pub trait Container {
     {
         self.hugr_mut().use_extensions(registry);
     }
+}
+
+pub(super) fn define_function_link_name<C: Container + ?Sized>(
+    ctr: &mut C,
+    name: impl Into<String>,
+    signature: impl Into<PolyFuncType>,
+    link_name: impl Into<Option<String>>,
+) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+    let signature = signature.into();
+    let body = signature.body().clone();
+    let f_node = ctr.add_child_node(ops::FuncDefn::new(name.into(), signature, link_name));
+
+    // Add the extensions used by the function types.
+    ctr.use_extensions(
+        body.used_extensions()
+            .unwrap_or_else(|e| panic!("Build-time signatures should have valid extensions. {e}")),
+    );
+
+    let db = DFGBuilder::create_with_io(ctr.hugr_mut(), f_node, body)?;
+    Ok(FunctionBuilder::from_dfg_builder(db))
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
