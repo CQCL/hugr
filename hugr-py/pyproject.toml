@@ -32,7 +32,7 @@ dependencies = [
     "pydantic-extra-types>=2.9.0",
     "semver>=3.0.2",
     "typing-extensions~=4.12",
-    "pyzstd~=0.16.2",
+    "pyzstd>=0.16.2,<0.18.0",
 ]
 
 [project.optional-dependencies]
