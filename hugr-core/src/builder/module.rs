@@ -78,7 +78,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
                     op_desc: "crate::ops::OpType::FuncDecl",
                 })?;
         let name = decl.func_name().clone();
-        let sig = decl.signature.clone();
+        let sig = decl.signature().clone();
         let body = sig.body().clone();
         self.hugr_mut()
             .replace_op(f_node, ops::FuncDefn::new(name, sig));

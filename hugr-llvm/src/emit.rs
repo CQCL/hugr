@@ -147,7 +147,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     where
         H: HugrView<Node = Node>,
     {
-        self.get_hugr_func_impl(node.func_name(), node.node(), &node.signature)
+        self.get_hugr_func_impl(node.func_name(), node.node(), node.signature())
     }
 
     /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDecl`].
@@ -160,7 +160,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     where
         H: HugrView<Node = Node>,
     {
-        self.get_hugr_func_impl(node.func_name(), node.node(), &node.signature)
+        self.get_hugr_func_impl(node.func_name(), node.node(), node.signature())
     }
 
     /// Adds or get the [`FunctionValue`] in the [Module] with the given symbol
@@ -333,7 +333,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         }
         let func = self.module_context.get_func_defn(node)?;
         let mut func_ctx = EmitFuncContext::new(self.module_context, func)?;
-        let ret_rmb = func_ctx.new_row_mail_box(node.signature.body().output.iter(), "ret")?;
+        let ret_rmb = func_ctx.new_row_mail_box(node.signature().body().output.iter(), "ret")?;
         ops::emit_dataflow_parent(
             &mut func_ctx,
             EmitOpArgs {

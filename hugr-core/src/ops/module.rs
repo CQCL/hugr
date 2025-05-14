@@ -54,11 +54,9 @@ impl OpTrait for Module {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDefn {
-    /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
-    /// Signature of the function
-    pub signature: PolyFuncType,
+    signature: PolyFuncType,
 }
 
 impl FuncDefn {
@@ -78,6 +76,16 @@ impl FuncDefn {
     /// Sets the name of the function (as per [Self::func_name])
     pub fn func_name_mut(&mut self) -> &mut String {
         &mut self.name
+    }
+
+    /// Gets the signature of the function
+    pub fn signature(&self) -> &PolyFuncType {
+        &self.signature
+    }
+
+    /// Allows mutating the signature of the function
+    pub fn signature_mut(&mut self) -> &mut PolyFuncType {
+        &mut self.signature
     }
 }
 
@@ -112,11 +120,9 @@ impl OpTrait for FuncDefn {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDecl {
-    /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
-    /// Signature of the function
-    pub signature: PolyFuncType,
+    signature: PolyFuncType,
 }
 
 impl FuncDecl {
@@ -131,6 +137,16 @@ impl FuncDecl {
     /// The name of the function (not, the name of the Op)
     pub fn func_name(&self) -> &String {
         &self.name
+    }
+
+    /// Gets the signature of the function
+    pub fn signature(&self) -> &PolyFuncType {
+        &self.signature
+    }
+
+    /// Allows mutating the signature of the function
+    pub fn signature_mut(&mut self) -> &mut PolyFuncType {
+        &mut self.signature
     }
 }
 

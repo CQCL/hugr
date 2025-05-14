@@ -39,7 +39,7 @@ pub fn monomorphize(
 }
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
-    !fd.signature.params().is_empty()
+    !fd.signature().params().is_empty()
 }
 
 fn is_polymorphic_funcdefn(t: &OpType) -> bool {
@@ -116,7 +116,7 @@ fn mono_scan(
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache);
         let fn_out = {
             let func = h.get_optype(new_tgt).as_func_defn().unwrap();
-            debug_assert_eq!(func.signature, mono_sig.into());
+            debug_assert_eq!(func.signature(), &mono_sig.into());
             h.get_optype(new_tgt).static_output_port().unwrap()
         };
         h.disconnect(ch, fn_inp); // No-op if copying+substituting

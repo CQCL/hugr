@@ -398,8 +398,8 @@ pub trait Dataflow: Container {
         let func_node = fid.node();
         let func_op = self.hugr().get_optype(func_node);
         let func_sig = match func_op {
-            OpType::FuncDefn(ops::FuncDefn { signature, .. })
-            | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
+            OpType::FuncDefn(fd) => fd.signature().clone(),
+            OpType::FuncDecl(fd) => fd.signature().clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: func_node,
@@ -614,8 +614,8 @@ pub trait Dataflow: Container {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
         let type_scheme = match def_op {
-            OpType::FuncDefn(ops::FuncDefn { signature, .. })
-            | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
+            OpType::FuncDefn(fd) => fd.signature().clone(),
+            OpType::FuncDecl(fd) => fd.signature().clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),

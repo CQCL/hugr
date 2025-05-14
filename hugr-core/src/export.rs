@@ -328,7 +328,7 @@ impl<'a> Context<'a> {
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, &func.signature);
+                let symbol = this.export_poly_func_type(name, func.signature());
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
@@ -339,7 +339,7 @@ impl<'a> Context<'a> {
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, &func.signature);
+                let symbol = this.export_poly_func_type(name, func.signature());
                 table::Operation::DeclareFunc(symbol)
             }),
 

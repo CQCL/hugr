@@ -184,7 +184,7 @@ impl FunctionBuilder<Hugr> {
         });
 
         // Update the inner input node
-        let types = new_optype.signature.body().input.clone();
+        let types = new_optype.signature().body().input.clone();
         self.hugr_mut().replace_op(inp_node, Input { types });
         let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
         let new_port = new_port.next().unwrap();
@@ -219,7 +219,7 @@ impl FunctionBuilder<Hugr> {
         });
 
         // Update the inner input node
-        let types = new_optype.signature.body().output.clone();
+        let types = new_optype.signature().body().output.clone();
         self.hugr_mut().replace_op(out_node, Output { types });
         let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
         let new_port = new_port.next().unwrap();
@@ -254,7 +254,7 @@ impl FunctionBuilder<Hugr> {
         let ops::OpType::FuncDefn(fd) = self.hugr_mut().optype_mut(parent) else {
             panic!("FunctionBuilder node must be a FuncDefn")
         };
-        fd.signature = f(fd.inner_signature().into_owned()).into();
+        *fd.signature_mut() = f(fd.inner_signature().into_owned()).into();
         &*fd
     }
 }

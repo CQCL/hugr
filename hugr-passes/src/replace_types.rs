@@ -159,8 +159,8 @@ fn call<H: HugrView<Node = Node>>(
     type_args: Vec<TypeArg>,
 ) -> Result<Call, BuildError> {
     let func_sig = match h.get_optype(func) {
-        OpType::FuncDecl(fd) => fd.signature.clone(),
-        OpType::FuncDefn(fd) => fd.signature.clone(),
+        OpType::FuncDecl(fd) => fd.signature().clone(),
+        OpType::FuncDefn(fd) => fd.signature().clone(),
         _ => {
             return Err(BuildError::UnexpectedType {
                 node: func,
@@ -393,8 +393,8 @@ impl ReplaceTypes {
         n: Node,
     ) -> Result<bool, ReplaceTypesError> {
         match hugr.optype_mut(n) {
-            OpType::FuncDefn(FuncDefn { signature, .. })
-            | OpType::FuncDecl(FuncDecl { signature, .. }) => signature.body_mut().transform(self),
+            OpType::FuncDefn(fd) => fd.signature_mut().body_mut().transform(self),
+            OpType::FuncDecl(fd) => fd.signature_mut().body_mut().transform(self),
             OpType::LoadConstant(LoadConstant { datatype: ty })
             | OpType::AliasDefn(AliasDefn { definition: ty, .. }) => ty.transform(self),
 
