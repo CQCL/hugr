@@ -5,6 +5,7 @@ pub mod hugrmut;
 pub(crate) mod ident;
 pub mod internal;
 pub mod patch;
+pub mod persistent;
 pub mod serialize;
 pub mod validate;
 pub mod views;
