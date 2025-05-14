@@ -3,7 +3,7 @@
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-v0.15.4...hugr-v0.20.0) - 2025-05-14
 
 This release contains a big list of changes reworking multiple core definitions of HUGR.
-Some of this changes include:
+Some of these changes include:
 
 - 🧹 Cleanup of the internal hugr traits, making it possible to create virtual
   Hugrs that are not backed by a portgraph or use different node index types.
