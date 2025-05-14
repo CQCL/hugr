@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.20.0-rc.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.0-rc.0...hugr-cli-v0.20.0-rc.1) - 2025-05-14
+
+### New Features
+
+- Packages do not include the hugr extensions by default ([#2187](https://github.com/CQCL/hugr/pull/2187))
+
 ## [0.20.0-rc.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.15.4...hugr-cli-v0.20.0-rc.0) - 2025-05-09
 
 ### New Features

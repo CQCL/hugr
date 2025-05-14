@@ -21,7 +21,7 @@ bench = false
 
 [dependencies]
 bumpalo = { workspace = true, features = ["collections"] }
-hugr-model = { version = "0.20.0-rc.0", path = "../hugr-model", features = [
+hugr-model = { version = "0.20.0-rc.1", path = "../hugr-model", features = [
     "pyo3",
 ] }
 paste.workspace = true

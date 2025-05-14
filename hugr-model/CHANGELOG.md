@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.0-rc.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.0-rc.0...hugr-model-v0.20.0-rc.1) - 2025-05-14
+
+### New Features
+
+- Define text-model envelope formats ([#2188](https://github.com/CQCL/hugr/pull/2188))
+- Import CFG regions without adding an entry block. ([#2200](https://github.com/CQCL/hugr/pull/2200))
+- Symbol applications can leave out prefixes of wildcards. ([#2201](https://github.com/CQCL/hugr/pull/2201))
+
 ## [0.20.0-rc.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.19.1...hugr-model-v0.20.0-rc.0) - 2025-05-09
 
 ### New Features
