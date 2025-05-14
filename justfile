@@ -10,7 +10,7 @@ setup:
 
 # Run the pre-commit checks.
 check:
-    uv run pre-commit run --all-files
+    HUGR_TEST_SCHEMA=1 uv run pre-commit run --all-files
 
 # Run all the tests.
 test: test-rust test-python
@@ -20,7 +20,7 @@ test-rust *TEST_ARGS:
     @# built into a binary build (without using `maturin`)
     @#
     @# This feature list should be kept in sync with the `hugr-py/pyproject.toml`
-    cargo test \
+    HUGR_TEST_SCHEMA=1 cargo test \
         --workspace \
         --exclude 'hugr-py' \
         --features 'hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd' {{TEST_ARGS}}
