@@ -35,10 +35,20 @@ pub fn resolve_op_types_extensions(
             resolve_signature_exts(node, ext.signature_mut(), extensions, used_extensions)?;
         }
         OpType::FuncDefn(f) => {
-            resolve_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?;
+            resolve_signature_exts(
+                node,
+                f.signature_mut().body_mut(),
+                extensions,
+                used_extensions,
+            )?;
         }
         OpType::FuncDecl(f) => {
-            resolve_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?;
+            resolve_signature_exts(
+                node,
+                f.signature_mut().body_mut(),
+                extensions,
+                used_extensions,
+            )?;
         }
         OpType::Const(c) => resolve_value_exts(node, &mut c.value, extensions, used_extensions)?,
         OpType::Input(inp) => {

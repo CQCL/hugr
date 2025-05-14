@@ -54,11 +54,39 @@ impl OpTrait for Module {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDefn {
-    /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
-    pub name: String,
-    /// Signature of the function
-    pub signature: PolyFuncType,
+    name: String,
+    signature: PolyFuncType,
+}
+
+impl FuncDefn {
+    /// Create a new instance with the given name and signature
+    pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self {
+            name: name.into(),
+            signature: signature.into(),
+        }
+    }
+
+    /// The name of the function (not the name of the Op)
+    pub fn func_name(&self) -> &String {
+        &self.name
+    }
+
+    /// Allows mutating the name of the function (as per [Self::func_name])
+    pub fn func_name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    /// Gets the signature of the function
+    pub fn signature(&self) -> &PolyFuncType {
+        &self.signature
+    }
+
+    /// Allows mutating the signature of the function
+    pub fn signature_mut(&mut self) -> &mut PolyFuncType {
+        &mut self.signature
+    }
 }
 
 impl_op_name!(FuncDefn);
@@ -92,11 +120,39 @@ impl OpTrait for FuncDefn {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDecl {
-    /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
-    pub name: String,
-    /// Signature of the function
-    pub signature: PolyFuncType,
+    name: String,
+    signature: PolyFuncType,
+}
+
+impl FuncDecl {
+    /// Create a new instance with the given name and signature
+    pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self {
+            name: name.into(),
+            signature: signature.into(),
+        }
+    }
+
+    /// The name of the function (not the name of the Op)
+    pub fn func_name(&self) -> &String {
+        &self.name
+    }
+
+    /// Allows mutating the name of the function (as per [Self::func_name])
+    pub fn func_name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    /// Gets the signature of the function
+    pub fn signature(&self) -> &PolyFuncType {
+        &self.signature
+    }
+
+    /// Allows mutating the signature of the function
+    pub fn signature_mut(&mut self) -> &mut PolyFuncType {
+        &mut self.signature
+    }
 }
 
 impl_op_name!(FuncDecl);

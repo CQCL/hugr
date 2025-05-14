@@ -39,7 +39,7 @@ pub fn monomorphize(
 }
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
-    !fd.signature.params().is_empty()
+    !fd.signature().params().is_empty()
 }
 
 fn is_polymorphic_funcdefn(t: &OpType) -> bool {
@@ -116,7 +116,7 @@ fn mono_scan(
         let new_tgt = instantiate(h, tgt, type_args.clone(), mono_sig.clone(), cache);
         let fn_out = {
             let func = h.get_optype(new_tgt).as_func_defn().unwrap();
-            debug_assert_eq!(func.signature, mono_sig.into());
+            debug_assert_eq!(func.signature(), &mono_sig.into());
             h.get_optype(new_tgt).static_output_port().unwrap()
         };
         h.disconnect(ch, fn_inp); // No-op if copying+substituting
@@ -135,15 +135,16 @@ fn instantiate(
 ) -> Node {
     let for_func = cache.entry(poly_func).or_insert_with(|| {
         // First time we've instantiated poly_func. Lift any nested FuncDefn's out to the same level.
-        let outer_name = h.get_optype(poly_func).as_func_defn().unwrap().name.clone();
+        let outer_name = h
+            .get_optype(poly_func)
+            .as_func_defn()
+            .unwrap()
+            .func_name()
+            .clone();
         let mut to_scan = Vec::from_iter(h.children(poly_func));
         while let Some(n) = to_scan.pop() {
-            if let OpType::FuncDefn(fd) = h.get_optype(n) {
-                let fd = FuncDefn {
-                    name: mangle_inner_func(&outer_name, &fd.name),
-                    signature: fd.signature.clone(),
-                };
-                h.replace_op(n, fd);
+            if let OpType::FuncDefn(fd) = h.optype_mut(n) {
+                *fd.func_name_mut() = mangle_inner_func(&outer_name, fd.func_name());
                 h.move_after_sibling(n, poly_func);
             } else {
                 to_scan.extend(h.children(n));
@@ -158,16 +159,10 @@ fn instantiate(
     };
 
     let name = mangle_name(
-        &h.get_optype(poly_func).as_func_defn().unwrap().name,
+        h.get_optype(poly_func).as_func_defn().unwrap().func_name(),
         &type_args,
     );
-    let mono_tgt = h.add_node_after(
-        poly_func,
-        FuncDefn {
-            name,
-            signature: mono_sig.into(),
-        },
-    );
+    let mono_tgt = h.add_node_after(poly_func, FuncDefn::new(name, mono_sig));
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
     // Now make the instantiation
@@ -547,16 +542,20 @@ mod test {
         );
         for (n, fd) in funcs.into_values() {
             if n == mono_hugr.entrypoint() {
-                assert_eq!(fd.name, "mainish");
+                assert_eq!(fd.func_name(), "mainish");
             } else {
-                assert_ne!(fd.name, "mainish");
+                assert_ne!(fd.func_name(), "mainish");
             }
         }
     }
 
     fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
         h.entry_descendants()
-            .filter_map(|n| h.get_optype(n).as_func_defn().map(|fd| (&fd.name, (n, fd))))
+            .filter_map(|n| {
+                h.get_optype(n)
+                    .as_func_defn()
+                    .map(|fd| (fd.func_name(), (n, fd)))
+            })
             .collect::<HashMap<_, _>>()
     }
 

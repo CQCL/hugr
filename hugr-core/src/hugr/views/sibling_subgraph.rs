@@ -1190,7 +1190,7 @@ mod tests {
         let func =
             SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func_graph).unwrap();
         let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
-        assert_eq!(func_defn.signature, func.signature(&func_graph).into());
+        assert_eq!(func_defn.signature(), &func.signature(&func_graph).into());
     }
 
     #[test]
