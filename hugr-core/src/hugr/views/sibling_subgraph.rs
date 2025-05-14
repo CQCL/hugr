@@ -363,7 +363,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Construct a [`SimpleReplacement`] to replace `self` with `replacement`.
     ///
-    /// `replacement` must be a hugr with DFG root and its signature must
+    /// `replacement` must be a hugr with dataflow graph and its signature must
     /// match the signature of the subgraph.
     ///
     /// May return one of the following five errors
@@ -383,7 +383,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ) -> Result<SimpleReplacement<N>, InvalidReplacement> {
         let rep_root = replacement.entrypoint();
         let dfg_optype = replacement.get_optype(rep_root);
-        if !OpTag::Dfg.is_superset(dfg_optype.tag()) {
+        if !OpTag::DataflowParent.is_superset(dfg_optype.tag()) {
             return Err(InvalidReplacement::InvalidDataflowGraph {
                 node: rep_root,
                 op: dfg_optype.clone(),
@@ -803,7 +803,7 @@ fn has_other_edge<H: HugrView>(hugr: &H, node: H::Node, dir: Direction) -> bool 
 #[non_exhaustive]
 pub enum InvalidReplacement {
     /// No `DataflowParent` root in replacement graph.
-    #[error("The root of the replacement {node} is a {}, but only OpType::DFGs are supported.", op.name())]
+    #[error("The root of the replacement {node} is a {}, but only dataflow parents are supported.", op.name())]
     InvalidDataflowGraph {
         /// The node ID of the root node.
         node: Node,
