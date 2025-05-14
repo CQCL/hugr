@@ -19,8 +19,7 @@ use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::handle::{DataflowOpID, FuncID};
 use hugr_core::ops::{
     AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG, DataflowBlock, ExitBlock,
-    ExtensionOp, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output,
-    Tag, TailLoop, Value,
+    ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
 };
 use hugr_core::types::{
     ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,

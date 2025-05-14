@@ -16,7 +16,7 @@ use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{
     ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, OpValidityFlags,
 };
-use crate::ops::{FuncDefn, NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::EdgeKind;
 use crate::types::type_param::TypeParam;
 use crate::{Direction, Port};
