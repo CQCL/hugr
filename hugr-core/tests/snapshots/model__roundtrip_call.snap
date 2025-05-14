@@ -48,7 +48,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
       (core.fn
         []
         [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])]))
-    ((core.load_const _ example.caller) [] [%0]
+    ((core.load_const example.caller) [] [%0]
       (signature
         (core.fn
           []

@@ -97,10 +97,16 @@ impl<'a> Module<'a> {
     }
 
     /// Return the term data for a given term id.
+    ///
+    /// Returns [`Term::Wildcard`] when the term id is invalid.
     #[inline]
     #[must_use]
     pub fn get_term(&self, term_id: TermId) -> Option<&Term<'a>> {
-        self.terms.get(term_id.index())
+        if term_id.is_valid() {
+            self.terms.get(term_id.index())
+        } else {
+            Some(&Term::Wildcard)
+        }
     }
 
     /// Return a mutable reference to the term data for a given term id.
@@ -405,6 +411,12 @@ macro_rules! define_index {
                 Self(index as u32)
             }
 
+            /// Returns whether the index is valid.
+            #[inline]
+            #[must_use] pub fn is_valid(self) -> bool {
+                self.0 < u32::MAX
+            }
+
             /// Returns the index as a `usize` to conveniently use it as a slice index.
             #[inline]
             #[must_use] pub fn index(self) -> usize {
@@ -423,30 +435,36 @@ macro_rules! define_index {
                 unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const Self, slice.len()) }
             }
         }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self(u32::MAX)
+            }
+        }
     };
 }
 
 define_index! {
     /// Id of a node in a hugr graph.
-    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct NodeId(pub u32);
 }
 
 define_index! {
     /// Index of a link in a hugr graph.
-    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct LinkIndex(pub u32);
 }
 
 define_index! {
     /// Id of a region in a hugr graph.
-    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct RegionId(pub u32);
 }
 
 define_index! {
     /// Id of a term in a hugr graph.
-    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct TermId(pub u32);
 }
 

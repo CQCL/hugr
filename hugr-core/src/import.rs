@@ -1588,7 +1588,21 @@ impl<'a> Context<'a> {
             return Ok(None);
         }
 
-        Ok((*args).try_into().ok())
+        // We allow the match even if the symbol is applied to fewer arguments
+        // than parameters. In that case, the arguments are padded with wildcards
+        // at the beginning.
+        if args.len() > N {
+            return Ok(None);
+        }
+
+        let result = std::array::from_fn(|i| {
+            (i + args.len())
+                .checked_sub(N)
+                .map(|i| args[i])
+                .unwrap_or_default()
+        });
+
+        Ok(Some(result))
     }
 
     fn expect_symbol<const N: usize>(
