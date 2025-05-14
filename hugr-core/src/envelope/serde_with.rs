@@ -1,27 +1,22 @@
 //! Derivation to serialize and deserialize Hugrs and Packages as envelopes in a
 //! serde compatible way.
 //!
+//! This module provides a default wrapper, [`AsStringEnvelope`], that decodes
+//! hugrs and packages using the [`STD_REG`] extension registry.
+//!
+//! When a different extension registry is needed, use the
+//! [`impl_serde_as_string_envelope!`] macro to create a custom wrapper.
+//!
 //! These are meant to be used with `serde_with`'s `#[serde_as]` decorator, see
 //! <https://docs.rs/serde_with/latest/serde_with>.
 
-use serde::Deserializer;
-use serde::{Serializer, de};
-use serde_with::SerializeAs;
-
-use crate::Hugr;
-use crate::package::Package;
-
-use super::EnvelopeConfig;
+use crate::std_extensions::STD_REG;
 
 /// De/Serialize a package or hugr by encoding it into a textual Envelope and
 /// storing it as a string.
 ///
 /// Note that only PRELUDE extensions are used to decode the package's content.
 /// Additional extensions should be included in the serialized envelope.
-///
-// TODO: Support parametrizing the extensions somehow? Not sure if possible.
-// The current impl will use the PRELUDE extensions, plus any one encoded in the
-// package definition.
 ///
 /// # Examples
 ///
@@ -51,90 +46,154 @@ use super::EnvelopeConfig;
 /// compatibility layer is meant to be removed in 0.21.0.
 pub struct AsStringEnvelope;
 
-impl<'de> serde_with::DeserializeAs<'de, Package> for AsStringEnvelope {
-    fn deserialize_as<D>(deserializer: D) -> Result<Package, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct Helper;
-        impl de::Visitor<'_> for Helper {
-            type Value = Package;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a string-encoded envelope")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+/// Implements [`serde_with::DeserializeAs`] and [`serde_with::SerializeAs`] for
+/// the helper to deserialize `Hugr` and `Package` types, using the given
+/// extension registry.
+///
+/// This macro is used to implement the default [`AsStringEnvelope`] wrapper.
+///
+/// # Parameters
+///
+/// - `$adaptor`: The name of the adaptor type to implement.
+/// - `$extension_reg`: A reference to the extension registry to use for deserialization.
+///
+/// # Examples
+///
+/// ```rust
+/// # use serde::{Deserialize, Serialize};
+/// # use serde_json::json;
+/// # use serde_with::{serde_as};
+/// # use hugr_core::Hugr;
+/// # use hugr_core::package::Package;
+/// # use hugr_core::envelope::serde_with::AsStringEnvelope;
+/// # use hugr_core::envelope::serde_with::impl_serde_as_string_envelope;
+/// # use hugr_core::extension::ExtensionRegistry;
+/// #
+/// struct CustomAsEnvelope;
+///
+/// impl_serde_as_string_envelope!(CustomAsEnvelope, &hugr_core::extension::EMPTY_REG);
+///
+/// #[serde_as]
+/// #[derive(Deserialize, Serialize)]
+/// struct A {
+///     #[serde_as(as = "CustomAsEnvelope")]
+///     package: Package,
+/// }
+/// ```
+///
+#[macro_export]
+macro_rules! impl_serde_as_string_envelope {
+    ($adaptor:ident, $extension_reg:expr) => {
+        impl<'de> serde_with::DeserializeAs<'de, $crate::package::Package> for $adaptor {
+            fn deserialize_as<D>(deserializer: D) -> Result<$crate::package::Package, D::Error>
             where
-                E: de::Error,
+                D: serde::Deserializer<'de>,
             {
-                Package::load_str(value, None).map_err(de::Error::custom)
+                struct Helper;
+                impl serde::de::Visitor<'_> for Helper {
+                    type Value = $crate::package::Package;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        formatter.write_str("a string-encoded envelope")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
+                        $crate::package::Package::load_str(value, Some(extensions))
+                            .map_err(serde::de::Error::custom)
+                    }
+                }
+
+                deserializer.deserialize_str(Helper)
             }
         }
 
-        deserializer.deserialize_str(Helper)
-    }
-}
-
-impl<'de> serde_with::DeserializeAs<'de, Hugr> for AsStringEnvelope {
-    fn deserialize_as<D>(deserializer: D) -> Result<Hugr, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct Helper;
-        impl<'vis> de::Visitor<'vis> for Helper {
-            type Value = Hugr;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a string-encoded envelope")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        impl<'de> serde_with::DeserializeAs<'de, $crate::Hugr> for $adaptor {
+            fn deserialize_as<D>(deserializer: D) -> Result<$crate::Hugr, D::Error>
             where
-                E: de::Error,
+                D: serde::Deserializer<'de>,
             {
-                Hugr::load_str(value, None).map_err(de::Error::custom)
-            }
+                struct Helper;
+                impl<'vis> serde::de::Visitor<'vis> for Helper {
+                    type Value = $crate::Hugr;
 
-            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-            where
-                A: de::MapAccess<'vis>,
-            {
-                // Backwards compatibility: If the encoded value is not a
-                // string, we may have a legacy HUGR serde structure instead. In that
-                // case, we can add an envelope header and try again.
-                //
-                // TODO: Remove this fallback in 0.21.0
-                let deserializer = serde::de::value::MapAccessDeserializer::new(map);
-                Hugr::serde_deserialize(deserializer).map_err(de::Error::custom)
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        formatter.write_str("a string-encoded envelope")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
+                        $crate::Hugr::load_str(value, Some(extensions))
+                            .map_err(serde::de::Error::custom)
+                    }
+
+                    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+                    where
+                        A: serde::de::MapAccess<'vis>,
+                    {
+                        // Backwards compatibility: If the encoded value is not a
+                        // string, we may have a legacy HUGR serde structure instead. In that
+                        // case, we can add an envelope header and try again.
+                        //
+                        // TODO: Remove this fallback in 0.21.0
+                        let deserializer = serde::de::value::MapAccessDeserializer::new(map);
+                        #[allow(deprecated)]
+                        let mut hugr =
+                            $crate::hugr::serialize::serde_deserialize_hugr(deserializer)
+                                .map_err(serde::de::Error::custom)?;
+
+                        let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
+                        hugr.resolve_extension_defs(extensions)
+                            .map_err(serde::de::Error::custom)?;
+                        Ok(hugr)
+                    }
+                }
+
+                // TODO: Go back to `deserialize_str` once the fallback is removed.
+                deserializer.deserialize_any(Helper)
             }
         }
 
-        // TODO: Go back to `deserialize_str` once the fallback is removed.
-        deserializer.deserialize_any(Helper)
-    }
-}
+        impl serde_with::SerializeAs<$crate::package::Package> for $adaptor {
+            fn serialize_as<S>(
+                source: &$crate::package::Package,
+                serializer: S,
+            ) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let str = source
+                    .store_str($crate::envelope::EnvelopeConfig::text())
+                    .map_err(serde::ser::Error::custom)?;
+                serializer.collect_str(&str)
+            }
+        }
 
-impl SerializeAs<Package> for AsStringEnvelope {
-    fn serialize_as<S>(source: &Package, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let str = source
-            .store_str(EnvelopeConfig::text())
-            .map_err(serde::ser::Error::custom)?;
-        serializer.collect_str(&str)
-    }
+        impl serde_with::SerializeAs<$crate::Hugr> for $adaptor {
+            fn serialize_as<S>(source: &$crate::Hugr, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let str = source
+                    .store_str($crate::envelope::EnvelopeConfig::text())
+                    .map_err(serde::ser::Error::custom)?;
+                serializer.collect_str(&str)
+            }
+        }
+    };
 }
+pub use impl_serde_as_string_envelope;
 
-impl SerializeAs<Hugr> for AsStringEnvelope {
-    fn serialize_as<S>(source: &Hugr, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let str = source
-            .store_str(EnvelopeConfig::text())
-            .map_err(serde::ser::Error::custom)?;
-        serializer.collect_str(&str)
-    }
-}
+impl_serde_as_string_envelope!(AsStringEnvelope, &STD_REG);
