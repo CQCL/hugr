@@ -53,7 +53,6 @@ impl OpTrait for Module {
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
-#[non_exhaustive]
 pub struct FuncDefn {
     /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
