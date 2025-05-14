@@ -446,6 +446,32 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
         extracted
     }
+
+    /// Change the output boundary of the subgraph.
+    ///
+    /// All ports of the new boundary must be contained in the old boundary,
+    /// i.e. the only changes that are allowed are copying, discarding and
+    /// shuffling existing ports in the output boundary.
+    ///
+    /// Return whether the new boundary was successfully set.
+    ///
+    /// If the new boundary is invalid (contains ports not in the old boundary,
+    /// `self` is left unchanged.
+    pub fn set_outgoing_ports(
+        &mut self,
+        host: &impl HugrView<Node = N>,
+        ports: OutgoingPorts<N>,
+    ) -> bool {
+        let old_boundary: HashSet<_> = iter_outgoing(&self.outputs).collect();
+        if !iter_outgoing(&ports).all(|(n, p)| old_boundary.contains(&(n, p)))
+            || !has_unique_linear_ports(host, &ports)
+        {
+            false
+        } else {
+            self.outputs = ports;
+            true
+        }
+    }
 }
 
 /// Returns an iterator over the input ports.
@@ -891,6 +917,20 @@ pub enum InvalidSubgraphBoundary<N: HugrNode = Node> {
     MismatchedTypes(usize),
 }
 
+/// Returns true if all linear ports in the set are unique.
+fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>) -> bool {
+    let linear_ports: Vec<_> = ports
+        .iter()
+        .filter(|&&(n, p)| {
+            host.get_optype(n)
+                .port_kind(p)
+                .is_some_and(|pk| pk.is_linear())
+        })
+        .collect();
+    let unique_ports: HashSet<_> = linear_ports.iter().collect();
+    linear_ports.len() == unique_ports.len()
+}
+
 #[cfg(test)]
 mod tests {
     use cool_asserts::assert_matches;
@@ -1278,5 +1318,55 @@ mod tests {
             subg.signature(&h).io(),
             Signature::new(vec![bool_t()], vec![]).io()
         );
+    }
+
+    #[test]
+    fn test_set_outgoing_ports() {
+        let (hugr, func_root) = build_3not_hugr().unwrap();
+        let [inp, out] = hugr.get_io(func_root).unwrap();
+        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
+        let not1_out = hugr.node_outputs(not1).next().unwrap();
+
+        // Create a subgraph with just the NOT gate
+        let mut subgraph = SiblingSubgraph::from_node(not1, &hugr);
+
+        // Initially should have one output
+        assert_eq!(subgraph.outgoing_ports().len(), 1);
+
+        // Try to set two outputs by copying the existing one
+        let new_outputs = vec![(not1, not1_out), (not1, not1_out)];
+        assert!(subgraph.set_outgoing_ports(&hugr, new_outputs));
+
+        // Should now have two outputs
+        assert_eq!(subgraph.outgoing_ports().len(), 2);
+
+        // Try to set an invalid output (from a different node)
+        let invalid_outputs = vec![(not1, not1_out), (out, 2.into())];
+        assert!(!subgraph.set_outgoing_ports(&hugr, invalid_outputs));
+
+        // Should still have two outputs from before
+        assert_eq!(subgraph.outgoing_ports().len(), 2);
+    }
+
+    #[test]
+    fn test_set_outgoing_ports_linear() {
+        let (hugr, func_root) = build_hugr().unwrap();
+        let [inp, _out] = hugr.get_io(func_root).unwrap();
+        let rz = hugr.output_neighbours(inp).nth(2).unwrap();
+        let rz_out = hugr.node_outputs(rz).next().unwrap();
+
+        // Create a subgraph with just the CX gate
+        let mut subgraph = SiblingSubgraph::from_node(rz, &hugr);
+
+        // Initially should have one output
+        assert_eq!(subgraph.outgoing_ports().len(), 1);
+
+        // Try to set two outputs by copying the existing one (should fail for linear
+        // ports)
+        let new_outputs = vec![(rz, rz_out), (rz, rz_out)];
+        assert!(!subgraph.set_outgoing_ports(&hugr, new_outputs));
+
+        // Should still have one output
+        assert_eq!(subgraph.outgoing_ports().len(), 1);
     }
 }
