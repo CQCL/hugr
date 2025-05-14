@@ -1266,8 +1266,12 @@ impl<'a> Context<'a> {
                 )))
             }
 
-            table::Term::Var(table::VarId(_, index)) => {
-                Ok(TypeBase::new_var_use(*index as _, TypeBound::Copyable))
+            table::Term::Var(var @ table::VarId(_, index)) => {
+                let local_var = self
+                    .local_vars
+                    .get(var)
+                    .ok_or(table::ModelError::InvalidVar(*var))?;
+                Ok(TypeBase::new_var_use(*index as _, local_var.bound))
             }
 
             // The following terms are not runtime types, but the core `Type` only contains runtime types.
