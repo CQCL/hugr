@@ -453,24 +453,29 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// i.e. the only changes that are allowed are copying, discarding and
     /// shuffling existing ports in the output boundary.
     ///
-    /// Return whether the new boundary was successfully set.
-    ///
-    /// If the new boundary is invalid (contains ports not in the old boundary,
-    /// `self` is left unchanged.
+    /// Returns an error if the new boundary is invalid (contains ports not in the old boundary
+    /// or has non-unique linear ports). In this case, `self` is left unchanged.
     pub fn set_outgoing_ports(
         &mut self,
-        host: &impl HugrView<Node = N>,
         ports: OutgoingPorts<N>,
-    ) -> bool {
+        host: &impl HugrView<Node = N>,
+    ) -> Result<(), InvalidOutputPorts<N>> {
         let old_boundary: HashSet<_> = iter_outgoing(&self.outputs).collect();
-        if !iter_outgoing(&ports).all(|(n, p)| old_boundary.contains(&(n, p)))
-            || !has_unique_linear_ports(host, &ports)
+
+        // Check for unknown ports
+        if let Some((node, port)) =
+            iter_outgoing(&ports).find(|(n, p)| !old_boundary.contains(&(*n, *p)))
         {
-            false
-        } else {
-            self.outputs = ports;
-            true
+            return Err(InvalidOutputPorts::UnknownOutput { port, node });
         }
+
+        // Check for non-unique linear ports
+        if !has_unique_linear_ports(host, &ports) {
+            return Err(InvalidOutputPorts::NonUniqueLinear);
+        }
+
+        self.outputs = ports;
+        Ok(())
     }
 }
 
@@ -917,6 +922,23 @@ pub enum InvalidSubgraphBoundary<N: HugrNode = Node> {
     MismatchedTypes(usize),
 }
 
+/// Error returned when trying to set an invalid output boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("Invalid output ports: {0:?}")]
+pub enum InvalidOutputPorts<N: HugrNode = Node> {
+    /// Some ports weren't in the original output boundary.
+    #[error("{port} in {node} was not part of the original boundary.")]
+    UnknownOutput {
+        /// The unknown port.
+        port: OutgoingPort,
+        /// The port's node
+        node: N,
+    },
+    /// Linear ports must appear exactly once.
+    #[error("Linear ports must appear exactly once.")]
+    NonUniqueLinear,
+}
+
 /// Returns true if all linear ports in the set are unique.
 fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>) -> bool {
     let linear_ports: Vec<_> = ports
@@ -1335,14 +1357,17 @@ mod tests {
 
         // Try to set two outputs by copying the existing one
         let new_outputs = vec![(not1, not1_out), (not1, not1_out)];
-        assert!(subgraph.set_outgoing_ports(&hugr, new_outputs));
+        assert!(subgraph.set_outgoing_ports(new_outputs, &hugr).is_ok());
 
         // Should now have two outputs
         assert_eq!(subgraph.outgoing_ports().len(), 2);
 
         // Try to set an invalid output (from a different node)
         let invalid_outputs = vec![(not1, not1_out), (out, 2.into())];
-        assert!(!subgraph.set_outgoing_ports(&hugr, invalid_outputs));
+        assert!(matches!(
+            subgraph.set_outgoing_ports(invalid_outputs, &hugr),
+            Err(InvalidOutputPorts::UnknownOutput { .. })
+        ));
 
         // Should still have two outputs from before
         assert_eq!(subgraph.outgoing_ports().len(), 2);
@@ -1364,7 +1389,10 @@ mod tests {
         // Try to set two outputs by copying the existing one (should fail for linear
         // ports)
         let new_outputs = vec![(rz, rz_out), (rz, rz_out)];
-        assert!(!subgraph.set_outgoing_ports(&hugr, new_outputs));
+        assert!(matches!(
+            subgraph.set_outgoing_ports(new_outputs, &hugr),
+            Err(InvalidOutputPorts::NonUniqueLinear)
+        ));
 
         // Should still have one output
         assert_eq!(subgraph.outgoing_ports().len(), 1);
