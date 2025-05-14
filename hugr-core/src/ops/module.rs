@@ -57,7 +57,7 @@ impl OpTrait for Module {
 pub struct FuncDefn {
     /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
-    pub name: String,
+    name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
 }
@@ -69,6 +69,16 @@ impl FuncDefn {
             name: name.into(),
             signature: signature.into(),
         }
+    }
+
+    /// The name of the function (not, the name of the Op)
+    pub fn func_name(&self) -> &String {
+        &self.name
+    }
+
+    /// Sets the name of the function (as per [Self::func_name])
+    pub fn set_func_name(&mut self, name: String) {
+        self.name = name
     }
 }
 

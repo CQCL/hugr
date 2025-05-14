@@ -147,7 +147,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     where
         H: HugrView<Node = Node>,
     {
-        self.get_hugr_func_impl(&node.name, node.node(), &node.signature)
+        self.get_hugr_func_impl(node.func_name(), node.node(), &node.signature)
     }
 
     /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDecl`].

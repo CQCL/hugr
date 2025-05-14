@@ -224,7 +224,7 @@ impl<'a> Context<'a> {
     fn get_func_name(&self, func_node: Node) -> Option<&'a str> {
         match self.hugr.get_optype(func_node) {
             OpType::FuncDecl(func_decl) => Some(&func_decl.name),
-            OpType::FuncDefn(func_defn) => Some(&func_defn.name),
+            OpType::FuncDefn(func_defn) => Some(func_defn.func_name()),
             _ => None,
         }
     }
@@ -257,7 +257,7 @@ impl<'a> Context<'a> {
 
         // We record the name of the symbol defined by the node, if any.
         let symbol = match optype {
-            OpType::FuncDefn(func_defn) => Some(func_defn.name.as_str()),
+            OpType::FuncDefn(func_defn) => Some(func_defn.func_name().as_str()),
             OpType::FuncDecl(func_decl) => Some(func_decl.name.as_str()),
             OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
             OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),

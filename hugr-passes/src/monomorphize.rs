@@ -135,11 +135,16 @@ fn instantiate(
 ) -> Node {
     let for_func = cache.entry(poly_func).or_insert_with(|| {
         // First time we've instantiated poly_func. Lift any nested FuncDefn's out to the same level.
-        let outer_name = h.get_optype(poly_func).as_func_defn().unwrap().name.clone();
+        let outer_name = h
+            .get_optype(poly_func)
+            .as_func_defn()
+            .unwrap()
+            .func_name()
+            .clone();
         let mut to_scan = Vec::from_iter(h.children(poly_func));
         while let Some(n) = to_scan.pop() {
             if let OpType::FuncDefn(fd) = h.optype_mut(n) {
-                fd.name = mangle_inner_func(&outer_name, &fd.name);
+                fd.set_func_name(mangle_inner_func(&outer_name, fd.func_name()));
                 h.move_after_sibling(n, poly_func);
             } else {
                 to_scan.extend(h.children(n));
@@ -154,7 +159,7 @@ fn instantiate(
     };
 
     let name = mangle_name(
-        &h.get_optype(poly_func).as_func_defn().unwrap().name,
+        h.get_optype(poly_func).as_func_defn().unwrap().func_name(),
         &type_args,
     );
     let mono_tgt = h.add_node_after(poly_func, FuncDefn::new(name, mono_sig));
@@ -537,16 +542,20 @@ mod test {
         );
         for (n, fd) in funcs.into_values() {
             if n == mono_hugr.entrypoint() {
-                assert_eq!(fd.name, "mainish");
+                assert_eq!(fd.func_name(), "mainish");
             } else {
-                assert_ne!(fd.name, "mainish");
+                assert_ne!(fd.func_name(), "mainish");
             }
         }
     }
 
     fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
         h.entry_descendants()
-            .filter_map(|n| h.get_optype(n).as_func_defn().map(|fd| (&fd.name, (n, fd))))
+            .filter_map(|n| {
+                h.get_optype(n)
+                    .as_func_defn()
+                    .map(|fd| (fd.func_name(), (n, fd)))
+            })
             .collect::<HashMap<_, _>>()
     }
 

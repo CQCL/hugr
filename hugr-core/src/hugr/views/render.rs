@@ -41,7 +41,7 @@ pub(super) fn node_style(
     fn node_name(h: &Hugr, n: NodeIndex) -> String {
         match h.get_optype(n.into()) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.name),
-            OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.name),
+            OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.func_name()),
             op => op.name().to_string(),
         }
     }
