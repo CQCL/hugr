@@ -175,6 +175,63 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
     serde_json::from_value(val).unwrap()
 }
 
+#[test]
+fn funcdefn_extra_field() {
+    let val = serde_json::Value::from(
+        r#"{
+        "op_def":null,
+        "optype":{
+            "extra_field":"not_in_schema",
+            "name":"polyfunc1",
+            "op":"FuncDefn",
+            "parent":0,
+            "signature":{
+                "body":{
+                    "input":[],
+                    "output":[]
+                },
+                "params":[
+                    {"bound":null,"tp":"BoundedNat"}
+                ]
+            }
+        },
+        "poly_func_type":null,
+        "sum_type":null,
+        "typ":null,
+        "value":null,
+        "version":"live"
+    }"#,
+    );
+    NamedSchema::check_schemas(&val, get_testing_schemas(true));
+}
+
+#[test]
+fn funcdefn_missing_name() {
+    let val = serde_json::Value::from(
+        r#"{
+        "op_def":null,
+        "optype":{
+            "op":"FuncDefn",
+            "parent":0,
+            "signature":{
+                "body":{
+                    "input":[],
+                    "output":[]
+                },
+                "params":[
+                    {"bound":null,"tp":"BoundedNat"}
+                ]
+            }
+        },
+        "poly_func_type":null,
+        "sum_type":null,
+        "typ":null,
+        "value":null,
+        "version":"live"
+    }"#,
+    );
+    NamedSchema::check_schemas(&val, get_testing_schemas(true));
+}
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
 ///
 /// If `check_schema` is true, checks the serialized json against the in-tree schema.
