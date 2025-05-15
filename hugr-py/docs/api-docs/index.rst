@@ -11,6 +11,13 @@ This is the API documentation for the HUGR Python package.
 
    hugr
 
+.. toctree::
+
+   Github <https://github.com/CQCL/hugr>
+   HUGR Specification <https://github.com/CQCL/hugr/blob/main/specification/hugr.md>
+   pypi <https://pypi.org/project/hugr/>
+
+
 
 Indices and tables
 ~~~~~~~~~~~~~~~~~~
