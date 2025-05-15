@@ -8,10 +8,9 @@ use crate::hugr::views::SiblingSubgraph;
 pub use crate::hugr::views::sibling_subgraph::InvalidReplacement;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::types::EdgeKind;
-use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, PortIndex};
+use crate::{Hugr, IncomingPort, Node, OutgoingPort, PortIndex};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use thiserror::Error;
 
@@ -118,6 +117,174 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             .expect("replacement is a DFG")
     }
 
+    /// Traverse output boundary edge from `host` to `replacement`.
+    ///
+    /// Given an incoming port in `host` linked to an output boundary port of
+    /// `subgraph`, return the port it will be linked to after application
+    /// of `self`.
+    ///
+    /// The returned port will be in `replacement`, unless the wire in the
+    /// replacement is empty, in which case it will another `host` port.
+    pub fn linked_replacement_output(
+        &self,
+        port: impl Into<HostPort<HostNode, IncomingPort>>,
+        host: &impl HugrView<Node = HostNode>,
+    ) -> BoundaryPort<HostNode, OutgoingPort> {
+        let HostPort(node, port) = port.into();
+        let pos = self
+            .subgraph
+            .outgoing_ports()
+            .iter()
+            .position(move |&(n, p)| host.linked_inputs(n, p).contains(&(node, port)))
+            .expect("valid incoming output port");
+
+        self.linked_replacement_output_by_position(pos, host)
+    }
+
+    /// The outgoing port linked to the i-th output boundary edge of `subgraph`.
+    ///
+    /// This port will be in `replacement` if the i-th output wire is not
+    /// connected to the input, and in `host` otherwise.
+    fn linked_replacement_output_by_position(
+        &self,
+        pos: usize,
+        host: &impl HugrView<Node = HostNode>,
+    ) -> BoundaryPort<HostNode, OutgoingPort> {
+        debug_assert!(pos < self.subgraph().signature(host).output_count());
+
+        // The outgoing ports at the output boundary of `replacement`
+        let [repl_inp, repl_out] = self.get_replacement_io();
+        let (out_node, out_port) = self
+            .replacement
+            .single_linked_output(repl_out, pos)
+            .expect("valid dfg wire");
+
+        if out_node != repl_inp {
+            BoundaryPort::Replacement(out_node, out_port)
+        } else {
+            let (in_node, in_port) = *self.subgraph.incoming_ports()[out_port.index()]
+                .first()
+                .expect("non-empty boundary partition");
+            let (out_node, out_port) = host
+                .single_linked_output(in_node, in_port)
+                .expect("valid dfg wire");
+            BoundaryPort::Host(out_node, out_port)
+        }
+    }
+
+    /// Traverse output boundary edge from `replacement` to `host`.
+    ///
+    /// `port` must be an outgoing port linked to the output node of
+    /// `replacement`.
+    ///
+    /// This is the inverse of [`Self::linked_replacement_output`], in the case
+    /// where the latter returns a [`BoundaryPort::Replacement`] port.
+    pub fn linked_host_outputs(
+        &self,
+        port: impl Into<ReplacementPort<OutgoingPort>>,
+        host: &impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<Item = HostPort<HostNode, IncomingPort>> {
+        let ReplacementPort(node, port) = port.into();
+        let [_, repl_out] = self.get_replacement_io();
+        let mut positions = self
+            .replacement
+            .linked_inputs(node, port)
+            .filter_map(move |(n, p)| (n == repl_out).then_some(p.index()))
+            .peekable();
+
+        assert!(positions.peek().is_some(), "not a boundary port");
+
+        positions
+            .map(|pos| self.subgraph.outgoing_ports()[pos])
+            .flat_map(|(out_node, out_port)| {
+                let in_nodes_ports = host.linked_inputs(out_node, out_port);
+                in_nodes_ports.map(|(n, p)| HostPort(n, p))
+            })
+    }
+
+    /// Traverse input boundary edge from `host` to `replacement`.
+    ///
+    /// Given an outgoing port in `host` linked to an input boundary port of
+    /// `subgraph`, return the ports it will be linked to after application
+    /// of `self`.
+    ///
+    /// The returned ports will be in `replacement`, unless the wires in the
+    /// replacement are empty, in which case they are other `host` ports.
+    pub fn linked_replacement_inputs<'a>(
+        &'a self,
+        port: impl Into<HostPort<HostNode, OutgoingPort>>,
+        host: &'a impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<Item = BoundaryPort<HostNode, IncomingPort>> + 'a {
+        let HostPort(node, port) = port.into();
+        let positions = self
+            .subgraph
+            .incoming_ports()
+            .iter()
+            .positions(move |ports| {
+                let (n, p) = *ports.first().expect("non-empty boundary partition");
+                host.single_linked_output(n, p).expect("valid dfg wire") == (node, port)
+            });
+
+        positions.flat_map(|pos| self.linked_replacement_inputs_by_position(pos, host))
+    }
+
+    /// The incoming ports linked to the i-th input boundary edge of `subgraph`.
+    ///
+    /// The ports will be in `replacement` for all endpoints of the i-th input
+    /// wire that are not the output node of `replacement` and be in `host`
+    /// otherwise.
+    fn linked_replacement_inputs_by_position(
+        &self,
+        pos: usize,
+        host: &impl HugrView<Node = HostNode>,
+    ) -> impl Iterator<Item = BoundaryPort<HostNode, IncomingPort>> {
+        debug_assert!(pos < self.subgraph().signature(host).input_count());
+
+        let [repl_inp, repl_out] = self.get_replacement_io();
+        self.replacement
+            .linked_inputs(repl_inp, pos)
+            .flat_map(move |(in_node, in_port)| {
+                if in_node != repl_out {
+                    Either::Left(std::iter::once(BoundaryPort::Replacement(in_node, in_port)))
+                } else {
+                    let (out_node, out_port) = self.subgraph.outgoing_ports()[in_port.index()];
+                    let in_nodes_ports = host.linked_inputs(out_node, out_port);
+                    Either::Right(in_nodes_ports.map(|(n, p)| BoundaryPort::Host(n, p)))
+                }
+            })
+    }
+
+    /// Traverse output boundary edge from `replacement` to `host`.
+    ///
+    /// `port` must be an outgoing port linked to the output node of
+    /// `replacement`.
+    ///
+    /// This is the inverse of [`Self::linked_replacement_output`], in the case
+    /// where the latter returns a [`BoundaryPort::Replacement`] port.
+    pub fn linked_host_input(
+        &self,
+        port: impl Into<ReplacementPort<IncomingPort>>,
+        host: &impl HugrView<Node = HostNode>,
+    ) -> HostPort<HostNode, OutgoingPort> {
+        let ReplacementPort(node, port) = port.into();
+        let (out_node, out_port) = self
+            .replacement
+            .single_linked_output(node, port)
+            .expect("valid dfg wire");
+
+        let [repl_in, _] = self.get_replacement_io();
+        assert!(out_node == repl_in, "not a boundary port");
+
+        let (in_node, in_port) = *self.subgraph.incoming_ports()[out_port.index()]
+            .first()
+            .expect("non-empty input partition");
+
+        let (host_node, host_port) = host
+            .single_linked_output(in_node, in_port)
+            .expect("valid dfg wire");
+        HostPort(host_node, host_port)
+    }
+
     /// Get all edges that the replacement would add from outgoing ports in
     /// `host` to incoming ports in `self.replacement`.
     ///
@@ -148,32 +315,18 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
                     .expect("valid dfg wire")
             });
 
-        // The incoming ports at the input boundary of `replacement`
-        let [repl_inp, _] = self.get_replacement_io();
-        let repl_incoming_ports = self
-            .replacement
-            .node_outputs(repl_inp)
-            .filter(move |&port| is_value_port(&self.replacement, repl_inp, port))
-            .map(move |repl_out_port| {
-                self.replacement
-                    .linked_inputs(repl_inp, repl_out_port)
-                    .filter(|&(node, _)| self.replacement.get_optype(node).tag() != OpTag::Output)
-            });
-
-        // Zip the two iterators and add edges from each outgoing port to all
-        // corresponding incoming ports.
-        subgraph_outgoing_ports.zip(repl_incoming_ports).flat_map(
-            |((subgraph_out_node, subgraph_out_port), repl_all_incoming)| {
-                // add edge from outgoing port in subgraph to incoming port in
-                // replacement
-                repl_all_incoming.map(move |(repl_inp_node, repl_inp_port)| {
-                    (
-                        HostPort(subgraph_out_node, subgraph_out_port),
-                        ReplacementPort(repl_inp_node, repl_inp_port),
-                    )
-                })
-            },
-        )
+        subgraph_outgoing_ports
+            .enumerate()
+            .flat_map(|(pos, subg_np)| {
+                self.linked_replacement_inputs_by_position(pos, host)
+                    .filter_map(move |np| Some((np.as_replacement()?, subg_np)))
+            })
+            .map(|((repl_node, repl_port), (subgraph_node, subgraph_port))| {
+                (
+                    HostPort(subgraph_node, subgraph_port),
+                    ReplacementPort(repl_node, repl_port),
+                )
+            })
     }
 
     /// Get all edges that the replacement would add from outgoing ports in
@@ -198,45 +351,27 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         ),
     > + 'a {
         // The incoming ports at the output boundary of `subgraph`
-        let subgraph_incoming_ports =
-            self.subgraph
-                .outgoing_ports()
-                .iter()
-                .map(|&(subgraph_out_node, subgraph_out_port)| {
-                    host.linked_inputs(subgraph_out_node, subgraph_out_port)
-                });
-
-        // The outgoing ports at the output boundary of `replacement`
-        let [_, repl_out] = self.get_replacement_io();
-        let repl_outgoing_ports = self
-            .replacement
-            .node_inputs(repl_out)
-            .filter(move |&port| is_value_port(&self.replacement, repl_out, port))
-            .map(move |repl_in_port| {
-                self.replacement
-                    .single_linked_output(repl_out, repl_in_port)
-                    .expect("valid dfg wire")
-            });
-
-        repl_outgoing_ports.zip(subgraph_incoming_ports).flat_map(
-            |((repl_out_node, repl_out_port), subgraph_all_incoming)| {
-                if self.replacement.get_optype(repl_out_node).tag() != OpTag::Input {
-                    Some(
-                        subgraph_all_incoming.map(move |(subgraph_in_node, subgraph_in_port)| {
-                            (
-                                // the new output node will be updated after insertion
-                                ReplacementPort(repl_out_node, repl_out_port),
-                                HostPort(subgraph_in_node, subgraph_in_port),
-                            )
-                        }),
-                    )
-                    .into_iter()
-                    .flatten()
-                } else {
-                    None.into_iter().flatten()
-                }
+        let subgraph_incoming_ports = self.subgraph.outgoing_ports().iter().map(
+            move |&(subgraph_out_node, subgraph_out_port)| {
+                host.linked_inputs(subgraph_out_node, subgraph_out_port)
             },
-        )
+        );
+
+        subgraph_incoming_ports
+            .enumerate()
+            .filter_map(|(pos, subg_all)| {
+                let np = self
+                    .linked_replacement_output_by_position(pos, host)
+                    .as_replacement()?;
+                Some((np, subg_all))
+            })
+            .flat_map(|(repl_np, subg_all)| subg_all.map(move |subg_np| (repl_np, subg_np)))
+            .map(|((repl_node, repl_port), (subgraph_node, subgraph_port))| {
+                (
+                    ReplacementPort(repl_node, repl_port),
+                    HostPort(subgraph_node, subgraph_port),
+                )
+            })
     }
 
     /// Get all edges that the replacement would add between ports in `host`.
@@ -262,51 +397,31 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             HostPort<HostNode, IncomingPort>,
         ),
     > + 'a {
-        let [repl_in, repl_out] = self.get_replacement_io();
-
-        let empty_wires = self
-            .replacement
-            .node_inputs(repl_out)
-            .filter(move |&port| is_value_port(&self.replacement, repl_out, port))
-            .filter_map(move |repl_in_port| {
-                let (repl_out_node, repl_out_port) = self
-                    .replacement
-                    .single_linked_output(repl_out, repl_in_port)
-                    .expect("valid dfg wire");
-                (repl_out_node == repl_in).then_some((repl_out_port, repl_in_port))
-            });
-
-        // The outgoing ports at the input boundary of `subgraph`
-        let subgraph_input_boundary = self
-            .subgraph
-            .incoming_ports()
-            .iter()
-            .map(|node_ports| {
-                let (node, port) = *node_ports.first().expect("non-empty boundary partition");
-                host.single_linked_output(node, port)
-                    .expect("valid dfg wire")
-            })
-            .collect_vec();
         // The incoming ports at the output boundary of `subgraph`
-        let subgraph_output_boundary = self
-            .subgraph
-            .outgoing_ports()
-            .iter()
-            .map(|&(node, port)| host.linked_inputs(node, port).collect_vec())
-            .collect_vec();
+        let subgraph_incoming_ports = self.subgraph.outgoing_ports().iter().map(
+            move |&(subgraph_out_node, subgraph_out_port)| {
+                host.linked_inputs(subgraph_out_node, subgraph_out_port)
+            },
+        );
 
-        empty_wires.flat_map(move |(repl_out_port, repl_in_port)| {
-            let (host_out_node, host_out_port) = subgraph_input_boundary[repl_out_port.index()];
-            subgraph_output_boundary[repl_in_port.index()]
-                .clone()
-                .into_iter()
-                .map(move |(host_in_node, host_in_port)| {
+        subgraph_incoming_ports
+            .enumerate()
+            .filter_map(|(pos, subg_all)| {
+                Some((
+                    self.linked_replacement_output_by_position(pos, host)
+                        .as_host()?,
+                    subg_all,
+                ))
+            })
+            .flat_map(|(host_np, subg_all)| subg_all.map(move |subg_np| (host_np, subg_np)))
+            .map(
+                |((host_out_node, host_out_port), (host_in_node, host_in_port))| {
                     (
                         HostPort(host_out_node, host_out_port),
                         HostPort(host_in_node, host_in_port),
                     )
-                })
-        })
+                },
+            )
     }
 
     /// Get the incoming port at the output node of `self.replacement`
@@ -523,25 +638,13 @@ pub enum SimpleReplacementError {
     InliningFailed(#[from] InlineDFGError),
 }
 
-fn is_value_port<N: HugrNode>(
-    hugr: &impl HugrView<Node = N>,
-    node: N,
-    port: impl Into<Port>,
-) -> bool {
-    hugr.get_optype(node)
-        .port_kind(port)
-        .as_ref()
-        .is_some_and(EdgeKind::is_value)
-}
-
 #[cfg(test)]
 pub(in crate::hugr::patch) mod test {
     use itertools::Itertools;
     use rstest::{fixture, rstest};
 
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeSet, HashMap, HashSet};
 
-    use crate::Node;
     use crate::builder::test::n_identity;
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -549,7 +652,10 @@ pub(in crate::hugr::patch) mod test {
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;
-    use crate::hugr::patch::{HostPort, PatchVerification, ReplacementPort};
+    use crate::hugr::patch::{BoundaryPort, HostPort, PatchVerification, ReplacementPort};
+    use crate::hugr::views::sibling_subgraph::tests::{
+        build_3not_hugr, build_hugr_classical, build_multiport_hugr,
+    };
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
     use crate::ops::OpTag;
@@ -559,6 +665,7 @@ pub(in crate::hugr::patch) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
+    use crate::{IncomingPort, Node, OutgoingPort};
 
     use super::SimpleReplacement;
 
@@ -1000,6 +1107,162 @@ pub(in crate::hugr::patch) mod test {
         h.validate().unwrap_or_else(|e| panic!("{e}"));
 
         assert_eq!(h.entry_descendants().count(), 6);
+    }
+
+    /// A dfg hugr with 1 input -> copy -> 2x NOT -> 2x copy -> 4 outputs
+    #[fixture]
+    fn copy_not_not_copy_hugr() -> Hugr {
+        let mut b = DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t(); 4])).unwrap();
+        let [w] = b.input_wires_arr();
+        let not1 = b.add_dataflow_op(LogicOp::Not, [w]).unwrap();
+        let not2 = b.add_dataflow_op(LogicOp::Not, [w]).unwrap();
+
+        let [out1] = not1.outputs_arr();
+        let [out2] = not2.outputs_arr();
+
+        b.finish_hugr_with_outputs([out1, out2, out1, out2])
+            .unwrap()
+    }
+
+    #[rstest]
+    fn test_boundary_traversal_empty_replacement(copy_not_not_copy_hugr: Hugr) {
+        let hugr = copy_not_not_copy_hugr;
+        let [inp, out] = hugr.get_io(hugr.entrypoint()).unwrap();
+        let [not1, not2] = hugr.output_neighbours(inp).collect_array().unwrap();
+        let subg_incoming = vec![
+            vec![(not1, IncomingPort::from(0))],
+            vec![(not2, IncomingPort::from(0))],
+        ];
+        let subg_outgoing = [not1, not2].map(|n| (n, OutgoingPort::from(0))).to_vec();
+
+        let subgraph = SiblingSubgraph::try_new(subg_incoming, subg_outgoing, &hugr).unwrap();
+
+        // Create an empty replacement (just copies)
+        let repl = {
+            let b = DFGBuilder::new(Signature::new_endo(vec![bool_t(); 2])).unwrap();
+            let [w1, w2] = b.input_wires_arr();
+            let repl_hugr = b.finish_hugr_with_outputs([w1, w2]).unwrap();
+            SimpleReplacement::try_new(subgraph, &hugr, repl_hugr).unwrap()
+        };
+
+        // Test linked_replacement_inputs with empty replacement
+        let replacement_inputs: Vec<_> = repl
+            .linked_replacement_inputs((inp, OutgoingPort::from(0)), &hugr)
+            .collect();
+
+        assert_eq!(
+            BTreeSet::from_iter(replacement_inputs),
+            (0..4)
+                .map(|i| BoundaryPort::Host(out, IncomingPort::from(i)))
+                .collect()
+        );
+
+        // Test linked_replacement_output with empty replacement
+        let replacement_output = (0..4)
+            .map(|i| repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr))
+            .collect_vec();
+
+        assert_eq!(
+            replacement_output,
+            vec![BoundaryPort::Host(inp, OutgoingPort::from(0)); 4]
+        );
+    }
+
+    #[rstest]
+    fn test_boundary_traversal_copy_empty_replacement(copy_not_not_copy_hugr: Hugr) {
+        let hugr = copy_not_not_copy_hugr;
+        let [inp, out] = hugr.get_io(hugr.entrypoint()).unwrap();
+        let [not1, not2] = hugr.output_neighbours(inp).collect_array().unwrap();
+        let subg_incoming = vec![vec![
+            (not1, IncomingPort::from(0)),
+            (not2, IncomingPort::from(0)),
+        ]];
+        let subg_outgoing = [not1, not2].map(|n| (n, OutgoingPort::from(0))).to_vec();
+
+        let subgraph = SiblingSubgraph::try_new(subg_incoming, subg_outgoing, &hugr).unwrap();
+
+        // Create an empty replacement (just copies)
+        let repl = {
+            let b = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t(); 2])).unwrap();
+            let [w] = b.input_wires_arr();
+            let repl_hugr = b.finish_hugr_with_outputs([w, w]).unwrap();
+            SimpleReplacement::try_new(subgraph, &hugr, repl_hugr).unwrap()
+        };
+
+        let replacement_inputs: Vec<_> = repl
+            .linked_replacement_inputs((inp, OutgoingPort::from(0)), &hugr)
+            .collect();
+
+        assert_eq!(
+            BTreeSet::from_iter(replacement_inputs),
+            (0..4)
+                .map(|i| BoundaryPort::Host(out, IncomingPort::from(i)))
+                .collect()
+        );
+
+        let replacement_output = (0..4)
+            .map(|i| repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr))
+            .collect_vec();
+
+        assert_eq!(
+            replacement_output,
+            vec![BoundaryPort::Host(inp, OutgoingPort::from(0)); 4]
+        );
+    }
+
+    #[rstest]
+    fn test_boundary_traversal_non_empty_replacement(copy_not_not_copy_hugr: Hugr) {
+        let hugr = copy_not_not_copy_hugr;
+        let [inp, out] = hugr.get_io(hugr.entrypoint()).unwrap();
+        let [not1, not2] = hugr.output_neighbours(inp).collect_array().unwrap();
+        let subg_incoming = vec![
+            vec![(not1, IncomingPort::from(0))],
+            vec![(not2, IncomingPort::from(0))],
+        ];
+        let subg_outgoing = [not1, not2].map(|n| (n, OutgoingPort::from(0))).to_vec();
+
+        let subgraph = SiblingSubgraph::try_new(subg_incoming, subg_outgoing, &hugr).unwrap();
+
+        // Create a replacement with a single NOT gate
+        let (repl, or_node) = {
+            let mut b = DFGBuilder::new(Signature::new_endo(vec![bool_t(); 2])).unwrap();
+            let [w1, w2] = b.input_wires_arr();
+            let or_handle = b.add_dataflow_op(LogicOp::Or, [w1, w2]).unwrap();
+            let [out] = or_handle.outputs_arr();
+            let repl_hugr = b.finish_hugr_with_outputs([out, out]).unwrap();
+            (
+                SimpleReplacement::try_new(subgraph, &hugr, repl_hugr).unwrap(),
+                or_handle.node(),
+            )
+        };
+
+        let replacement_inputs: Vec<_> = repl
+            .linked_replacement_inputs((inp, OutgoingPort::from(0)), &hugr)
+            .collect();
+
+        assert_eq!(
+            BTreeSet::from_iter(replacement_inputs),
+            (0..2)
+                .map(|i| BoundaryPort::Replacement(or_node, IncomingPort::from(i)))
+                .collect()
+        );
+        assert_eq!(
+            repl.linked_host_input((or_node, IncomingPort::from(0)), &hugr),
+            (inp, OutgoingPort::from(0)).into()
+        );
+
+        let replacement_output = (0..4)
+            .map(|i| repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr))
+            .collect_vec();
+
+        assert_eq!(
+            replacement_output,
+            vec![BoundaryPort::Replacement(or_node, OutgoingPort::from(0)); 4]
+        );
+        assert_eq!(
+            BTreeSet::from_iter(repl.linked_host_outputs((or_node, OutgoingPort::from(0)), &hugr)),
+            BTreeSet::from_iter((0..4).map(|i| HostPort(out, IncomingPort::from(i))))
+        );
     }
 
     use crate::hugr::patch::replace::Replacement;
