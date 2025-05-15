@@ -13,7 +13,7 @@ use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
 
-/// Collects every extension used te define the types in an operation.
+/// Collects every extension used to define the types in an operation.
 ///
 /// Custom types store a [`Weak`] reference to their extension, which can be
 /// invalidated if the original `Arc<Extension>` is dropped. This normally
@@ -164,7 +164,7 @@ fn collect_type_row_exts<RV: MaybeRV>(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-pub(super) fn collect_type_exts<RV: MaybeRV>(
+pub(crate) fn collect_type_exts<RV: MaybeRV>(
     typ: &TypeBase<RV>,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,

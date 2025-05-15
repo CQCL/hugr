@@ -23,7 +23,7 @@ mod weak_registry;
 pub use weak_registry::WeakExtensionRegistry;
 
 pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
-pub(crate) use types::{collect_op_types_extensions, collect_signature_exts};
+pub(crate) use types::{collect_op_types_extensions, collect_signature_exts, collect_type_exts};
 pub(crate) use types_mut::resolve_op_types_extensions;
 use types_mut::{
     resolve_custom_type_exts, resolve_type_exts, resolve_typearg_exts, resolve_value_exts,
@@ -184,6 +184,7 @@ impl<N: HugrNode> ExtensionResolutionError<N> {
 }
 
 /// Errors that can occur when collecting extension requirements.
+// TODO: [Deprecated] Remove `From` implementation from here
 #[derive(Debug, Display, Clone, Error, From, PartialEq)]
 #[non_exhaustive]
 pub enum ExtensionCollectionError<N: HugrNode = Node> {
@@ -212,6 +213,18 @@ pub enum ExtensionCollectionError<N: HugrNode = Node> {
         /// The missing extensions.
         missing_extensions: Vec<ExtensionId>,
     },
+    /// A signature requires an extension that is not in the given registry.
+    #[display(
+        "Type {typ} contains custom types for which have lost the reference to their defining extensions. Dropped extensions: {}",
+        missing_extensions.join(", ")
+    )]
+    #[from(ignore)]
+    DroppedTypeExtensions {
+        /// The type that is missing extensions.
+        typ: String,
+        /// The missing extensions.
+        missing_extensions: Vec<ExtensionId>,
+    },
 }
 
 impl<N: HugrNode> ExtensionCollectionError<N> {
@@ -235,6 +248,17 @@ impl<N: HugrNode> ExtensionCollectionError<N> {
     ) -> Self {
         Self::DroppedSignatureExtensions {
             signature: format!("{signature}"),
+            missing_extensions: missing_extension.into_iter().collect(),
+        }
+    }
+
+    /// Create a new error when signature extensions have been dropped.
+    pub fn dropped_type<RV: MaybeRV>(
+        typ: &TypeBase<RV>,
+        missing_extension: impl IntoIterator<Item = ExtensionId>,
+    ) -> Self {
+        Self::DroppedTypeExtensions {
+            typ: format!("{typ}"),
             missing_extensions: missing_extension.into_iter().collect(),
         }
     }
