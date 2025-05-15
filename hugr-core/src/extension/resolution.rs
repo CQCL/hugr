@@ -215,7 +215,7 @@ pub enum ExtensionCollectionError<N: HugrNode = Node> {
     },
     /// A signature requires an extension that is not in the given registry.
     #[display(
-        "Type {typ} contains custom types for which have lost the reference to their defining extensions. Dropped extensions: {}",
+        "Type {typ} contains custom types which have lost the reference to their defining extensions. Dropped extensions: {}",
         missing_extensions.join(", ")
     )]
     #[from(ignore)]
