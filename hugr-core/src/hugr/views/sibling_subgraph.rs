@@ -282,6 +282,10 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// Create a subgraph containing a single node.
     ///
     /// The subgraph signature will be given by signature of the node.
+    ///
+    /// # Panics
+    ///
+    /// If the node has incoming or outgoing state order edges.
     pub fn from_node(node: N, hugr: &impl HugrView<Node = N>) -> Self {
         let nodes = vec![node];
         let inputs = hugr
