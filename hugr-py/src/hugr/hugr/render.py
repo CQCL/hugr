@@ -259,7 +259,7 @@ class DotRenderer:
                     self._viz_node(child, hugr, sub)
                 html_label = self._format_html_label(**label_config)
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
-                sub.attr(label="", margin="10", color=self.config.palette.edge)
+                sub.attr(label="", margin="10", color=label_config["border_colour"])
         else:
             html_label = self._format_html_label(**label_config)
             graph.node(f"{node.idx}", label=f"<{html_label}>", shape="plain")
