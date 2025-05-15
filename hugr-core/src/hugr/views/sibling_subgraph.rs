@@ -303,6 +303,18 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             })
             .collect_vec();
 
+        let state_order_at_input = hugr
+            .get_optype(node)
+            .other_output_port()
+            .is_some_and(|p| hugr.is_linked(node, p));
+        let state_order_at_output = hugr
+            .get_optype(node)
+            .other_input_port()
+            .is_some_and(|p| hugr.is_linked(node, p));
+        if state_order_at_input || state_order_at_output {
+            unimplemented!("Order edges in {node:?} not supported");
+        }
+
         Self {
             nodes,
             inputs,
