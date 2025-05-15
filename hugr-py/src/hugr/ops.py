@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Protocol,
+    TypeGuard,
+    TypeVar,
+    runtime_checkable,
+)
 
 from typing_extensions import Self
 
@@ -144,7 +152,7 @@ class DataflowOp(Op, Protocol):
         return Command(self, list(args))
 
 
-def is_dataflow_op_instance(op: Any) -> bool:
+def is_dataflow_op(op: Any) -> TypeGuard[DataflowOp]:
     """Returns `true` if the object is an instance of :class:`DataflowOp`.
 
     This is functionally equivalent to matching on `DataflowOp()` directly, but
@@ -697,7 +705,7 @@ class DfParentOp(Op, Protocol):
     def _inputs(self) -> tys.TypeRow: ...
 
 
-def is_df_parent_op_instance(op: Any) -> bool:
+def is_df_parent_op(op: Any) -> TypeGuard[DfParentOp]:
     """Returns `true` if the object is an instance of :class:`DfParentOp`.
 
     This is functionally equivalent to matching on `DfParentOp()` directly, but

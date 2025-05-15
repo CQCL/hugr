@@ -30,6 +30,10 @@ if TYPE_CHECKING:
 OpVar = TypeVar("OpVar", bound=ops.Op)
 
 
+class DataflowError(Exception):
+    """Error building a :class:`DfBase` dataflow graph."""
+
+
 @dataclass()
 class DefinitionBuilder(Generic[OpVar]):
     """Base class for builders that can define functions, constants, and aliases.
@@ -170,8 +174,16 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> dfg = Dfg._new_existing(hugr)
             >>> dfg.parent_node
             Node(4)
+
+        Raises:
+            :class:`DataflowError` if the `root` operation is not a dataflow
+            parent.
         """
         root = root or hugr.entrypoint
+
+        if not ops.is_df_parent_op(hugr[root].op):
+            msg = f"{hugr[root].op} is not a dataflow parent"
+            raise DataflowError(msg)
 
         new = cls.__new__(cls)
         new.hugr = hugr

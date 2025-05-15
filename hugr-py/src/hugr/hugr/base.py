@@ -108,8 +108,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     #
     # Most traversals and rewrite operations start from this node.
     #
-    # This node may be of any optype, and is a descendant of the module
-    # definition at the HUGR root (or the root itself).
+    # This node may be of any optype that's the parent to a region, and is a
+    # descendant of the module definition at the HUGR root (or the root itself).
     entrypoint: Node
     # List of nodes, with None for deleted nodes.
     _nodes: list[NodeData | None]
@@ -129,59 +129,63 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         self.module_root = self._add_node(Module(), None, 0)
         self.entrypoint = self.module_root
 
+        unsupported_op_msg = (
+            f"Creating new HUGRs with entrypoint {entrypoint_op} is not supported"
+        )
+
         # Depending on the entrypoint op, we may need to
         # wrap nest it inside the root module.
         match entrypoint_op:
             case None | Module():
                 pass
-            # Ops that can be defined directly in the root module.
-            case (
-                ops.FuncDefn()
-                | ops.FuncDecl()
-                | ops.Const()
-                | ops.AliasDecl()
-                | ops.AliasDefn()
-            ):
+            case ops.FuncDefn():
                 self.entrypoint = self.add_node(entrypoint_op, self.module_root)
-            # Exclude these two from the `DataflowOp` case below.
-            case ops.Input() | ops.Output():
-                msg = f"Cannot create a new HUGR with entrypoint {entrypoint_op}"
-                raise ValueError(msg)
-            case _ if ops.is_dataflow_op(entrypoint_op):
+            case _:
                 from hugr.build import Function
+
+                # Some operations are unsupported, as they require additional context to
+                # be valid (e.g. cfg blocks, case statements, etc.).
+                if not ops.is_dataflow_op(entrypoint_op):
+                    raise ValueError(unsupported_op_msg)
+                # Explicit type required to keep mypy happy
+                df_op: ops.DataflowOp = entrypoint_op
+
+                # Only region containers are allowed to be entrypoints
+                match df_op:
+                    case CFG():
+                        pass
+                    case Conditional():
+                        pass
+                    case _ if ops.is_df_parent_op(df_op):
+                        pass
+                    case _:
+                        raise ValueError(unsupported_op_msg)
 
                 inputs, outputs = None, None
                 try:
-                    sig = entrypoint_op.outer_signature()
+                    sig = df_op.outer_signature()
                     inputs = sig.input
                     outputs = sig.output
                 except IncompleteOp:
-                    match entrypoint_op:
+                    match df_op:
                         case CFG():
-                            inputs = entrypoint_op.inputs
-                        case Conditional():
-                            inputs = entrypoint_op._inputs()
+                            inputs = df_op.inputs
                         case _:
-                            inputs = entrypoint_op._inputs()
+                            inputs = df_op._inputs()
 
                 parent_op = FuncDefn("main", inputs, [])
                 func = Function.new_nested(parent_op, self, self.module_root)
 
                 if outputs is not None:
-                    func.add_op(entrypoint_op, *func.inputs())
+                    self.entrypoint = func.add_op(df_op, *func.inputs())
                     func.set_outputs(*self.entrypoint.outputs())
                 else:
                     # Connecting the entrypoint to the function's output is delayed
                     # until `set_outputs` is called.
                     # See `hugr._connect_df_entrypoint_outputs`.
-                    self.entrypoint = self.add_node(entrypoint_op, func)
+                    self.entrypoint = self.add_node(df_op, func)
                     func._wire_up(self.entrypoint, func.inputs())
-                    entrypoint_op._entrypoint_requires_wiring = True
-            # Some operations are unsupported, as they require additional context to
-            # be valid (e.g. cfg blocks, case statements, etc.).
-            case _:
-                msg = f"Cannot create a new HUGR with entrypoint {entrypoint_op}"
-                raise ValueError(msg)
+                    df_op._entrypoint_requires_wiring = True
 
     def __getitem__(self, key: ToNode) -> NodeData:
         key = key.to_node()
