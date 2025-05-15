@@ -282,6 +282,10 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// Create a subgraph containing a single node.
     ///
     /// The subgraph signature will be given by signature of the node.
+    ///
+    /// # Panics
+    ///
+    /// If the node has incoming or outgoing state order edges.
     pub fn from_node(node: N, hugr: &impl HugrView<Node = N>) -> Self {
         let nodes = vec![node];
         let inputs = hugr
@@ -302,6 +306,18 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 .then_some((node, p))
             })
             .collect_vec();
+
+        let state_order_at_input = hugr
+            .get_optype(node)
+            .other_output_port()
+            .is_some_and(|p| hugr.is_linked(node, p));
+        let state_order_at_output = hugr
+            .get_optype(node)
+            .other_input_port()
+            .is_some_and(|p| hugr.is_linked(node, p));
+        if state_order_at_input || state_order_at_output {
+            unimplemented!("Order edges in {node:?} not supported");
+        }
 
         Self {
             nodes,
