@@ -183,7 +183,9 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
         let mut links = self.hugr.linked_ports(node, port).peekable();
         // Linear dataflow values must be used, and control must have somewhere to flow.
-        let outgoing_is_linear = port_kind.is_linear() || port_kind == EdgeKind::ControlFlow;
+        let outgoing_is_unique = port_kind.is_linear() || port_kind == EdgeKind::ControlFlow;
+        // All dataflow wires must have a unique source.
+        let incoming_is_unique = port_kind.is_value() || port_kind.is_const();
         let must_be_connected = match dir {
             // Incoming ports must be connected, except for state order ports, branch case nodes,
             // and CFG nodes.
@@ -192,7 +194,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     && port_kind != EdgeKind::ControlFlow
                     && op_type.tag() != OpTag::Case
             }
-            Direction::Outgoing => outgoing_is_linear,
+            Direction::Outgoing => outgoing_is_unique,
         };
         if must_be_connected && links.peek().is_none() {
             return Err(ValidationError::UnconnectedPort {
@@ -204,6 +206,13 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
         // Avoid double checking connected port types.
         if dir == Direction::Incoming {
+            if incoming_is_unique && links.nth(1).is_some() {
+                return Err(ValidationError::TooManyConnections {
+                    node,
+                    port,
+                    port_kind,
+                });
+            }
             return Ok(());
         }
 
@@ -217,7 +226,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         let mut link_cnt = 0;
         for (other_node, other_offset) in links {
             link_cnt += 1;
-            if outgoing_is_linear && link_cnt > 1 {
+            if outgoing_is_unique && link_cnt > 1 {
                 return Err(ValidationError::TooManyConnections {
                     node,
                     port,
