@@ -147,24 +147,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             case ops.Input() | ops.Output():
                 msg = f"Cannot create a new HUGR with entrypoint {entrypoint_op}"
                 raise ValueError(msg)
-            # Dataflow operations
-            #
-            # NOTE: This is functionally equivalent to matching on `DataflowOp()`
-            # directly, but calling `isinstance(_, DataflowOp)` errors out in
-            # `python <=3.11` due to how runtime_checkable Protocols were implemented.
-            # See <https://github.com/python/cpython/issues/102433>
-            case (
-                ops.Custom()
-                | ops.Tag()
-                | ops.DFG()
-                | ops.CFG()
-                | ops.LoadConst()
-                | ops.Conditional()
-                | ops.TailLoop()
-                | ops.CallIndirect()
-                | ops.LoadFunc()
-                | ops.AsExtOp()
-            ):
+            case _ if ops.is_dataflow_op(entrypoint_op):
                 from hugr.build import Function
 
                 inputs, outputs = None, None
@@ -178,22 +161,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                             inputs = entrypoint_op.inputs
                         case Conditional():
                             inputs = entrypoint_op._inputs()
-                        # See NOTE above about `isinstance(_, DataflowOp)`.
-                        case (
-                            ops.Custom()
-                            | ops.Tag()
-                            | ops.DFG()
-                            | ops.CFG()
-                            | ops.LoadConst()
-                            | ops.Conditional()
-                            | ops.TailLoop()
-                            | ops.CallIndirect()
-                            | ops.LoadFunc()
-                            | ops.AsExtOp()
-                        ):
-                            inputs = entrypoint_op._inputs()
                         case _:
-                            raise
+                            inputs = entrypoint_op._inputs()
 
                 parent_op = FuncDefn("main", inputs, [])
                 func = Function.new_nested(parent_op, self, self.module_root)

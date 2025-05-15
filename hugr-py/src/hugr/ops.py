@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, runtime_checkable
 
 from typing_extensions import Self
 
@@ -142,6 +142,31 @@ class DataflowOp(Op, Protocol):
         dataflow graph.
         """
         return Command(self, list(args))
+
+
+def is_dataflow_op_instance(op: Any) -> bool:
+    """Returns `true` if the object is an instance of :class:`DataflowOp`.
+
+    This is functionally equivalent to matching on `DataflowOp()` directly, but
+    calling `isinstance(_, DataflowOp)` errors out in `python <=3.11` due to how
+    runtime_checkable Protocols were implemented. See <https://github.com/python/cpython/issues/102433>
+    """
+    match op:
+        case (
+            Custom()
+            | Tag()
+            | DFG()
+            | CFG()
+            | LoadConst()
+            | Conditional()
+            | TailLoop()
+            | CallIndirect()
+            | LoadFunc()
+            | AsExtOp()
+        ):
+            return True
+        case _:
+            return False
 
 
 @runtime_checkable
@@ -670,6 +695,21 @@ class DfParentOp(Op, Protocol):
     def _set_out_types(self, types: tys.TypeRow) -> None: ...
 
     def _inputs(self) -> tys.TypeRow: ...
+
+
+def is_df_parent_op_instance(op: Any) -> bool:
+    """Returns `true` if the object is an instance of :class:`DfParentOp`.
+
+    This is functionally equivalent to matching on `DfParentOp()` directly, but
+    calling `isinstance(_, DfParentOp)` errors out in `python <=3.11` due to how
+    runtime_checkable Protocols were implemented.
+    See <https://github.com/python/cpython/issues/102433>
+    """
+    match op:
+        case DFG() | DataflowBlock() | Case() | TailLoop() | FuncDefn():
+            return True
+        case _:
+            return False
 
 
 @dataclass
