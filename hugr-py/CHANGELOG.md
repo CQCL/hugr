@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.0...hugr-py-v0.12.1) (2025-05-16)
+
+
+### Documentation
+
+* update hugr-py docs appearance, add HUGR logo ([#2222](https://github.com/CQCL/hugr/issues/2222)) ([fefa599](https://github.com/CQCL/hugr/commit/fefa599f12a0ddb3335b01abad87bb80ecf2ed36))
+
 ## [0.12.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.5...hugr-py-v0.12.0) (2025-05-16)
 
 
