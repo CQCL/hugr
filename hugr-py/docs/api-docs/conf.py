@@ -1,9 +1,9 @@
 # Configuration file for the Sphinx documentation builder.  # noqa: INP001
 # See https://www.sphinx-doc.org/en/master/usage/configuration.html
-
+import hugr
 
 project = "HUGR Python"
-copyright = "2024, Quantinuum"
+copyright = "2025, Quantinuum"
 author = "Quantinuum"
 
 extensions = [
@@ -15,23 +15,18 @@ extensions = [
     "sphinx.ext.intersphinx",
 ]
 
-html_theme = "sphinx_book_theme"
+html_theme = "furo"
 
-html_title = "HUGR python package API documentation."
+
+html_title = f"HUGR-py v{hugr.__version__} API documentation."
 
 html_theme_options = {
-    "repository_url": "https://github.com/CQCL/hugr",
-    "use_repository_button": True,
-    "navigation_with_keys": True,
-    "logo": {
-        "image_light": "_static/Quantinuum_logo_black.png",
-        "image_dark": "_static/Quantinuum_logo_white.png",
-    },
-    "show_navbar_depth": 2,
+    "sidebar_hide_name": False,
 }
 
 html_static_path = ["../_static"]
-html_css_files = ["custom.css"]
+
+html_logo = "../_static/hugr_logo_no_bg.svg"
 
 autosummary_generate = True
 
