@@ -14,6 +14,7 @@ pub mod core;
 pub mod envelope;
 pub mod export;
 pub mod extension;
+pub mod hierarchy;
 pub mod hugr;
 pub mod import;
 pub mod macros;
