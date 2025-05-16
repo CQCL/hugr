@@ -1,5 +1,5 @@
-//! Çontains [HierarchyTester], a tool for examining the hierarchy
-//! about ancestry and descendancy.
+//! Çontains [HierarchyTester], a tool for efficiently querying the hierarchy
+//! (constant-time in size and depth of Hugr)
 
 use std::collections::{HashMap, hash_map::Entry};
 
@@ -7,16 +7,20 @@ use itertools::Itertools;
 
 use crate::HugrView;
 
+type NodeData = (usize, usize, Option<H::Node>); // start, end, enclosing func
+
 /// Caches enough information on the hierarchy of an immutably-held Hugr
-/// to allow efficient querying of [Self::is_ancestor_of] and [Self::which_child_contains]
+/// to allow efficient querying of [Self::is_ancestor_of] and [Self::nearest_enclosing_funcdefn].
+/// Also supports [Self::which_child_contains] (less efficiently).
 #[derive(Clone, Debug)]
 pub struct HierarchyTester<'a, H: HugrView> {
     /// This both allows us to access the Hugr, but also guarantees the Hugr isn't
     /// changing beneath our back to invalidate the results.
     hugr: &'a H,
-    /// The entry and exit indices (inclusive) of every node in the Hugr
-    /// beneath the entrypoint. (Note: every entry number is different.)
-    entry_exit: HashMap<H::Node, (usize, usize)>,
+    /// The entry and exit indices (inclusive), of every node in the Hugr
+    /// beneath the entrypoint, and the nearest strictly-enclosing FuncDefn.
+    /// (Note: every entry number is different.)
+    entry_exit: HashMap<H::Node, NodeData>,
 }
 
 impl<'a, H: HugrView> HierarchyTester<'a, H> {
@@ -24,17 +28,25 @@ impl<'a, H: HugrView> HierarchyTester<'a, H> {
     /// specified Hugr's entrypoint
     pub fn new(hugr: &'a H) -> Self {
         let mut entry_exit = HashMap::new();
-        fn traverse<H: HugrView>(hugr: &H, n: H::Node, ee: &mut HashMap<H::Node, (usize, usize)>) {
-            let old = ee.insert(n, (ee.len(), usize::MAX)); // second is placeholder for now
+        fn traverse<H: HugrView>(
+            hugr: &H,
+            n: H::Node,
+            mut fd: Option<H::Node>,
+            ee: &mut HashMap<H::Node, NodeData>,
+        ) {
+            let old = ee.insert(n, (ee.len(), usize::MAX, fd)); // second is placeholder for now
             debug_assert!(old.is_none());
+            if hugr.get_optype(n).is_func_defn() {
+                fd = Some(n)
+            }
             for ch in hugr.children(n) {
-                traverse(hugr, ch, ee)
+                traverse(hugr, ch, fd, ee)
             }
             let end_idx = ee.len() - 1;
             let Entry::Occupied(oe) = ee.entry(n) else {
                 panic!()
             };
-            let (_, end) = oe.into_mut();
+            let (_, end, _) = oe.into_mut();
             *end = end_idx;
             debug_assert!(
                 // Could do this on every which_child_contains?!
@@ -43,13 +55,16 @@ impl<'a, H: HugrView> HierarchyTester<'a, H> {
                     .all(|(a, b)| ee.get(&a).unwrap().1 == ee.get(&b).unwrap().0 - 1)
             );
         }
-        traverse(hugr, hugr.entrypoint(), &mut entry_exit);
+        traverse(hugr, hugr.entrypoint(), None, &mut entry_exit);
         Self { hugr, entry_exit }
     }
 
     /// Returns true if `anc` is an ancestor of `desc`, including `anc == desc`.
     /// (See also [Self::is_strict_ancestor_of].)
-    /// Constant time regardless of size/depth of Hugr.
+    ///
+    /// # Panics
+    ///
+    /// if `n` is not an entry-descendant in the Hugr
     pub fn is_ancestor_of(&self, anc: H::Node, desc: H::Node) -> bool {
         let anc = self.entry_exit.get(&anc).unwrap();
         let desc = self.entry_exit.get(&desc).unwrap();
@@ -59,10 +74,23 @@ impl<'a, H: HugrView> HierarchyTester<'a, H> {
     /// Returns true if `anc` is an ancestor of `desc`, excluding `anc == desc`.
     /// (See also [Self::is_ancestor_of].)
     /// Constant time regardless of size/depth of Hugr.
+    ///
+    /// # Panics
+    ///
+    /// if `n` is not an entry-descendant in the Hugr
     pub fn is_strict_ancestor_of(&self, anc: H::Node, desc: H::Node) -> bool {
         let anc = self.entry_exit.get(&anc).unwrap();
         let desc = self.entry_exit.get(&desc).unwrap();
         anc.0 < desc.0 && desc.1 <= anc.1
+    }
+
+    /// Returns the nearest strictly-enclosing [FuncDefn](crate::ops::FuncDefn) of a node
+    ///
+    /// # Panics
+    ///
+    /// if `n` is not an entry-descendant in the Hugr
+    pub fn nearest_enclosing_funcdefn(&self, n: H::Node) -> Option<H::Node> {
+        self.entry_exit.get(&n).unwrap().2
     }
 
     /// Returns the child of `parent` which is an ancestor of `desc` - unique if there is one.
