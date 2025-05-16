@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.12.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.5...hugr-py-v0.12.0) (2025-05-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* Hugrs now define an `entrypoint` in addition to a module root.
+* `std.collections.array` is now a linear type, even if the contained elements are copyable. Use the new `std.collections.value_array` for an array with the previous copyable semantics.
+* `std.collections.array.get` now also returns the passed array as an extra output.
+* `ArrayOpBuilder` was moved from `hugr_core::std_extensions::collections::array::op_builder` to `hugr_core::std_extensions::collections::array`.
+* Functions that manipulate runtime extension sets have been removed from the Rust and Python code. Extension set parameters were removed from operations.
+* `values` field in `Extension` and `ExtensionValue` struct/class removed in rust and python. Use 0-input ops that return constant values.
+
+### Features
+
+* Entrypoints in `hugr-py` ([#2148](https://github.com/CQCL/hugr/issues/2148)) ([ef8ea5e](https://github.com/CQCL/hugr/commit/ef8ea5e0ac6f4ea8a3e4ba8f6d1a36e53227546e))
+* **hugr-py:** Add `to/from_bytes/str` to Hugr, using envelopes ([#2228](https://github.com/CQCL/hugr/issues/2228)) ([9985143](https://github.com/CQCL/hugr/commit/9985143bfb1d751911e519dd55890d179868524f))
+* Improved array lowering ([#2109](https://github.com/CQCL/hugr/issues/2109)) ([1bc91c1](https://github.com/CQCL/hugr/commit/1bc91c197519f4a81f5fff1bf9df5905a1d1559e))
+* Remove description on opaque ops. ([#2197](https://github.com/CQCL/hugr/issues/2197)) ([f6163bf](https://github.com/CQCL/hugr/commit/f6163bf09f208047bfa8fcf4069f2991f0434101))
+* remove ExtensionValue ([#2093](https://github.com/CQCL/hugr/issues/2093)) ([70881b7](https://github.com/CQCL/hugr/commit/70881b7c5a55613f0304f41ee7cae8236a8bd668))
+* Removed runtime extension sets. ([#2145](https://github.com/CQCL/hugr/issues/2145)) ([cd7ef68](https://github.com/CQCL/hugr/commit/cd7ef68120b5b903b12ac2fcbbf5fae812e3e70f))
+
 ## [0.11.5](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.4...hugr-py-v0.11.5) (2025-04-16)
 
 
