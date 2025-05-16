@@ -40,15 +40,21 @@ from typing import TYPE_CHECKING, ClassVar
 import pyzstd
 
 if TYPE_CHECKING:
+    from hugr.hugr.base import Hugr
     from hugr.package import Package
 
 # This is a hard-coded magic number that identifies the start of a HUGR envelope.
 MAGIC_NUMBERS = b"HUGRiHJv"
 
 
-def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
-    """Encode a HUGR package into an envelope, using the given configuration."""
+def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
+    """Encode a HUGR or Package into an envelope, using the given configuration."""
+    from hugr.package import Package
+
     envelope = bytearray(config._make_header().to_bytes())
+
+    if not isinstance(package, Package):
+        package = Package(modules=[package], extensions=[])
 
     # Currently only uncompressed JSON is supported.
     payload: bytes
@@ -77,8 +83,8 @@ def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
     return bytes(envelope)
 
 
-def make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
-    """Encode a HUGR package into an envelope, using the given configuration."""
+def make_envelope_str(package: Package | Hugr, config: EnvelopeConfig) -> str:
+    """Encode a HUGR or Package into an envelope, using the given configuration."""
     if not config.format.ascii_printable():
         msg = "Only ascii-printable envelope formats can be encoded into a string."
         raise ValueError(msg)
@@ -104,9 +110,41 @@ def read_envelope(envelope: bytes) -> Package:
             raise ValueError(msg)
 
 
+def read_envelope_hugr(envelope: bytes) -> Hugr:
+    """Decode a HUGR from an envelope.
+
+    Raises:
+        ValueError: If the envelope does not contain a single module.
+    """
+    pkg = read_envelope(envelope)
+    if len(pkg.modules) != 1:
+        msg = (
+            "Expected a single module in the envelope, but got "
+            + f"{len(pkg.modules)} modules."
+        )
+        raise ValueError(msg)
+    return pkg.modules[0]
+
+
 def read_envelope_str(envelope: str) -> Package:
     """Decode a HUGR package from an envelope."""
     return read_envelope(envelope.encode("utf-8"))
+
+
+def read_envelope_hugr_str(envelope: str) -> Hugr:
+    """Decode a HUGR from an envelope.
+
+    Raises:
+        ValueError: If the envelope does not contain a single module.
+    """
+    pkg = read_envelope_str(envelope)
+    if len(pkg.modules) != 1:
+        msg = (
+            "Expected a single module in the envelope, but got "
+            + f"{len(pkg.modules)} modules."
+        )
+        raise ValueError(msg)
+    return pkg.modules[0]
 
 
 class EnvelopeFormat(Enum):
