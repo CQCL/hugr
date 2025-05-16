@@ -422,6 +422,17 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         to: H::Node,
         to_offset: Port,
     ) -> Result<(), InterGraphEdgeError<H::Node>> {
+        fn containing_child<H: HugrView>(hugr: &H, parent: H::Node, desc: H::Node) -> H::Node {
+            let mut n = desc;
+            loop {
+                let p = hugr.get_parent(n).unwrap();
+                if p == parent {
+                    return n;
+                }
+                n = p;
+            }
+        }
+
         let from_parent = self
             .hugr
             .get_parent(from)
@@ -468,7 +479,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     from_offset,
                     to,
                     to_offset,
-                    to_ancestor: ht.which_child_contains(from_parent, to).unwrap(),
+                    to_ancestor: containing_child(self.hugr, from_parent, to),
                 })?;
             }
         } else if let Some(fpp) =
@@ -490,7 +501,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 .dominators
                 .entry(fpp)
                 .or_insert_with(|| Self::compute_dominator(self.hugr, fpp));
-            let ancestor = ht.which_child_contains(fpp, to).unwrap();
+            let ancestor = containing_child(self.hugr, fpp, to);
             if !dominator_tree
                 .dominators(node_map.to_portgraph(ancestor))
                 .is_some_and(|mut ds| ds.any(|n| n == node_map.to_portgraph(from_parent)))

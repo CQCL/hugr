@@ -13,13 +13,11 @@ type NodeData<N> = (usize, usize, Option<N>);
 
 /// Caches enough information on the hierarchy of an immutably-held Hugr
 /// to allow efficient querying of [Self::is_ancestor_of] and [Self::nearest_enclosing_funcdefn].
-/// Also supports [Self::which_child_contains] (less efficiently).
 #[derive(Clone, Debug)]
 pub struct HierarchyTester<'a, H: HugrView> {
-    /// This both allows us to access the Hugr, but also guarantees the Hugr isn't
-    /// changing beneath our back to invalidate the results.
+    #[allow(unused)] // Just make sure the Hugr isn't changing behind our back
     hugr: &'a H,
-    entry_exit: HashMap<H::Node, NodeData<H::Node>> // for every node beneath entrypoint
+    entry_exit: HashMap<H::Node, NodeData<H::Node>>, // for every node beneath entrypoint
 }
 
 impl<'a, H: HugrView> HierarchyTester<'a, H> {
@@ -90,19 +88,6 @@ impl<'a, H: HugrView> HierarchyTester<'a, H> {
     /// if `n` is not an entry-descendant in the Hugr
     pub fn nearest_enclosing_funcdefn(&self, n: H::Node) -> Option<H::Node> {
         self.entry_exit.get(&n).unwrap().2
-    }
-
-    /// Returns the child of `parent` which is an ancestor of `desc` - unique if there is one.
-    /// Time O(n) in number of children of `parent` regardless of size/depth of Hugr.
-    pub fn which_child_contains(&self, parent: H::Node, desc: H::Node) -> Option<H::Node> {
-        // If we cached child *Vecs* then we could do a binary search, but since we don't,
-        // even just getting the children into a Vec is linear, so we might as well...
-        for c in self.hugr.children(parent) {
-            if self.is_ancestor_of(c, desc) {
-                return Some(c);
-            }
-        }
-        None
     }
 }
 
