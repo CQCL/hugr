@@ -26,7 +26,7 @@ html_theme_options = {
 
 html_static_path = ["../_static"]
 
-html_logo = "../_static/hugr_logo.svg"
+html_logo = "../_static/hugr_logo_no_bg.svg"
 
 autosummary_generate = True
 
