@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.20.0...hugr-core-v0.20.1) - 2025-05-16
+
+### Bug Fixes
+
+- check well-definedness of DFG wires in validate ([#2221](https://github.com/CQCL/hugr/pull/2221))
+- Check for order edges in SiblingSubgraph::from_node ([#2223](https://github.com/CQCL/hugr/pull/2223))
+
+### New Features
+
+- Add PersistentHugr ([#2080](https://github.com/CQCL/hugr/pull/2080))
+- Add `Type::used_extensions` ([#2224](https://github.com/CQCL/hugr/pull/2224))
+
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.4...hugr-core-v0.20.0) - 2025-05-14
 
 ### Bug Fixes
