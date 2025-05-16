@@ -447,67 +447,64 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             .get_or_insert_with(|| HierarchyTester::new(self.hugr));
         let from_parent_parent = self.hugr.get_parent(from_parent);
 
-        'found_ancestor: {
-            if ht.is_strict_ancestor_of(from_parent, to) {
-                // External edge.
-                if is_static {
-                    return Ok(());
-                }
-                //Check for Order edge: some Order-successor should contain the target
-                assert_eq!(
-                    from_optype.other_port_kind(Direction::Outgoing),
-                    Some(EdgeKind::StateOrder)
-                );
-
-                if !self
-                    .hugr
-                    .linked_inputs(from, from_optype.other_output_port().unwrap())
-                    .any(|(sibling, _)| ht.is_strict_ancestor_of(sibling, to))
-                {
-                    return Err(InterGraphEdgeError::MissingOrderEdge {
-                        from,
-                        from_offset,
-                        to,
-                        to_offset,
-                        to_ancestor: ht.which_child_contains(from_parent, to).unwrap(),
-                    })?;
-                }
-                break 'found_ancestor;
-            } else if let Some(fpp) = from_parent_parent {
-                if !is_static && ht.is_strict_ancestor_of(fpp, to) {
-                    // Dominator edge
-                    let from_grandparent_op = self.hugr.get_optype(fpp);
-                    if from_grandparent_op.tag() != OpTag::Cfg {
-                        return Err(InterGraphEdgeError::NonCFGAncestor {
-                            from,
-                            from_offset,
-                            to,
-                            to_offset,
-                            ancestor_parent_op: from_grandparent_op.clone(),
-                        });
-                    }
-                    // Check domination
-                    let (dominator_tree, node_map) = self
-                        .dominators
-                        .entry(fpp)
-                        .or_insert_with(|| Self::compute_dominator(self.hugr, fpp));
-                    let ancestor = ht.which_child_contains(fpp, to).unwrap();
-                    if !dominator_tree
-                        .dominators(node_map.to_portgraph(ancestor))
-                        .is_some_and(|mut ds| ds.any(|n| n == node_map.to_portgraph(from_parent)))
-                    {
-                        return Err(InterGraphEdgeError::NonDominatedAncestor {
-                            from,
-                            from_offset,
-                            to,
-                            to_offset,
-                            from_parent,
-                            ancestor,
-                        });
-                    }
-                    break 'found_ancestor;
-                } //else, NoRelation
+        if ht.is_strict_ancestor_of(from_parent, to) {
+            // External edge.
+            if is_static {
+                return Ok(());
             }
+            //Check for Order edge: some Order-successor should contain the target
+            assert_eq!(
+                from_optype.other_port_kind(Direction::Outgoing),
+                Some(EdgeKind::StateOrder)
+            );
+
+            if !self
+                .hugr
+                .linked_inputs(from, from_optype.other_output_port().unwrap())
+                .any(|(sibling, _)| ht.is_strict_ancestor_of(sibling, to))
+            {
+                return Err(InterGraphEdgeError::MissingOrderEdge {
+                    from,
+                    from_offset,
+                    to,
+                    to_offset,
+                    to_ancestor: ht.which_child_contains(from_parent, to).unwrap(),
+                })?;
+            }
+        } else if let Some(fpp) =
+            from_parent_parent.filter(|fpp| !is_static && ht.is_strict_ancestor_of(*fpp, to))
+        {
+            // Dominator edge
+            let from_grandparent_op = self.hugr.get_optype(fpp);
+            if from_grandparent_op.tag() != OpTag::Cfg {
+                return Err(InterGraphEdgeError::NonCFGAncestor {
+                    from,
+                    from_offset,
+                    to,
+                    to_offset,
+                    ancestor_parent_op: from_grandparent_op.clone(),
+                });
+            }
+            // Check domination
+            let (dominator_tree, node_map) = self
+                .dominators
+                .entry(fpp)
+                .or_insert_with(|| Self::compute_dominator(self.hugr, fpp));
+            let ancestor = ht.which_child_contains(fpp, to).unwrap();
+            if !dominator_tree
+                .dominators(node_map.to_portgraph(ancestor))
+                .is_some_and(|mut ds| ds.any(|n| n == node_map.to_portgraph(from_parent)))
+            {
+                return Err(InterGraphEdgeError::NonDominatedAncestor {
+                    from,
+                    from_offset,
+                    to,
+                    to_offset,
+                    from_parent,
+                    ancestor,
+                });
+            }
+        } else {
             return Err(InterGraphEdgeError::NoRelation {
                 from,
                 from_offset,
