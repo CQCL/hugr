@@ -14,7 +14,6 @@ def build_basic_cfg(cfg: Cfg) -> None:
 def test_basic_cfg() -> None:
     cfg = Cfg(tys.Bool)
     build_basic_cfg(cfg)
-    cfg.hugr.store_dot("hugr.dot")
     validate(cfg.hugr)
 
 

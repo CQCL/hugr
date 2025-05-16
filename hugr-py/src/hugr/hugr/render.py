@@ -244,6 +244,7 @@ class DotRenderer:
             "inputs_row": inputs_row,
             "outputs_row": outputs_row,
             "border_colour": self.config.palette.background,
+            "border_width": "1",
         }
         if hugr.children(node):
             # Some overrides when rendering a container node
@@ -252,6 +253,7 @@ class DotRenderer:
         if node == hugr.entrypoint:
             label_config["node_label"] = "<b>[" + label_config["node_label"] + "]</b>"
             label_config["border_colour"] = self.config.palette.entrypoint_edge
+            label_config["border_width"] = "2"
 
         if hugr.children(node):
             with graph.subgraph(name=f"cluster{node.idx}") as sub:
@@ -259,7 +261,12 @@ class DotRenderer:
                     self._viz_node(child, hugr, sub)
                 html_label = self._format_html_label(**label_config)
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
-                sub.attr(label="", margin="10", color=label_config["border_colour"])
+                sub.attr(
+                    label="",
+                    margin="10",
+                    color=label_config["border_colour"],
+                    penwidth=label_config["border_width"],
+                )
         else:
             html_label = self._format_html_label(**label_config)
             graph.node(f"{node.idx}", label=f"<{html_label}>", shape="plain")

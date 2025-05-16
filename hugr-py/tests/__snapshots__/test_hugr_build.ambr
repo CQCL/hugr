@@ -142,7 +142,7 @@
       </TABLE>
       > shape=plain]
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -176,7 +176,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -193,7 +193,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -210,7 +210,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -428,10 +428,10 @@
       
       </TABLE>
       > shape=plain]
-  					color="#1CADE4" label="" margin=10
+  					color="#1CADE4" label="" margin=10 penwidth=1
   				}
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -465,7 +465,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -482,7 +482,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -499,7 +499,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	2:"out.1" -> 4:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -742,10 +742,10 @@
       
       </TABLE>
       > shape=plain]
-  					color="#1CADE4" label="" margin=10
+  					color="#1CADE4" label="" margin=10 penwidth=1
   				}
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -779,7 +779,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -796,7 +796,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -813,7 +813,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -1053,10 +1053,10 @@
       
       </TABLE>
       > shape=plain]
-  					color="#1CADE4" label="" margin=10
+  					color="#1CADE4" label="" margin=10 penwidth=1
   				}
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -1090,7 +1090,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1107,7 +1107,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1124,7 +1124,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	8:"out.0" -> 10:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -1279,7 +1279,7 @@
       </TABLE>
       > shape=plain]
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -1313,7 +1313,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1330,7 +1330,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1347,7 +1347,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -1500,7 +1500,7 @@
       </TABLE>
       > shape=plain]
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -1534,7 +1534,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1551,7 +1551,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1568,7 +1568,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label="int<5>" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	2:"out.1" -> 4:"in.1" [label="int<5>" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -1690,7 +1690,7 @@
       </TABLE>
       > shape=plain]
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -1724,7 +1724,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1741,7 +1741,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -1758,7 +1758,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	5:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -1885,10 +1885,10 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
       <TR>
@@ -1902,7 +1902,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#F4A261" label="" margin=10
+  		color="#F4A261" label="" margin=10 penwidth=2
   	}
   	1:"out.0" -> 4:"in.1" [label="" arrowhead=none arrowsize=1.0 color="#77CEEF" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	2:"out.0" -> 4:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -2019,7 +2019,7 @@
       </TABLE>
       > shape=plain]
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -2053,7 +2053,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -2070,7 +2070,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -2087,7 +2087,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	2:"out.1" -> 4:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
@@ -2277,7 +2277,7 @@
       </TABLE>
       > shape=plain]
   				4 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+      <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
           BGCOLOR="#1CADE4" COLOR="#F4A261">
       
           <TR>
@@ -2311,7 +2311,7 @@
       
       </TABLE>
       > shape=plain]
-  				color="#F4A261" label="" margin=10
+  				color="#F4A261" label="" margin=10 penwidth=2
   			}
   			1 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -2328,7 +2328,7 @@
       
       </TABLE>
       > shape=plain]
-  			color="#1CADE4" label="" margin=10
+  			color="#1CADE4" label="" margin=10 penwidth=1
   		}
   		0 [label=<
       <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
@@ -2345,7 +2345,7 @@
       
       </TABLE>
       > shape=plain]
-  		color="#1CADE4" label="" margin=10
+  		color="#1CADE4" label="" margin=10 penwidth=1
   	}
   	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   	2:"out.1" -> 4:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
