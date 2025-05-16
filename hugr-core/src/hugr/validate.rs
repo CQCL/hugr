@@ -86,21 +86,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         Ok(())
     }
 
-    /// Compute the dominator tree for a CFG region, identified by its container
-    /// node.
-    ///
-    /// The results of this computation should be cached in `self.dominators`.
-    /// We don't do it here to avoid mutable borrows.
-    fn compute_dominator(
-        h: &H,
-        parent: H::Node,
-    ) -> (Dominators<portgraph::NodeIndex>, H::RegionPortgraphNodes) {
-        let (region, node_map) = h.region_portgraph(parent);
-        let entry_node = h.children(parent).next().unwrap();
-        let doms = dominators::simple_fast(&region, node_map.to_portgraph(entry_node));
-        (doms, node_map)
-    }
-
     /// Check the constraints on a single node.
     ///
     /// This includes:
@@ -497,10 +482,12 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 });
             }
             // Check domination
-            let (dominator_tree, node_map) = self
-                .dominators
-                .entry(fpp)
-                .or_insert_with(|| Self::compute_dominator(self.hugr, fpp));
+            let (dominator_tree, node_map) = self.dominators.entry(fpp).or_insert_with(|| {
+                let (region, node_map) = self.hugr.region_portgraph(fpp);
+                let entry_node = self.hugr.children(fpp).next().unwrap();
+                let doms = dominators::simple_fast(&region, node_map.to_portgraph(entry_node));
+                (doms, node_map)
+            });
             let ancestor = containing_child(self.hugr, fpp, to);
             if !dominator_tree
                 .dominators(node_map.to_portgraph(ancestor))
