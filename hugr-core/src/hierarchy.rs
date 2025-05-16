@@ -7,7 +7,9 @@ use itertools::Itertools;
 
 use crate::HugrView;
 
-type NodeData = (usize, usize, Option<H::Node>); // start, end, enclosing func
+/// The entry and exit indices (inclusive, note every entry number is different);
+/// and the nearest strictly-enclosing FuncDefn.
+type NodeData<N> = (usize, usize, Option<N>);
 
 /// Caches enough information on the hierarchy of an immutably-held Hugr
 /// to allow efficient querying of [Self::is_ancestor_of] and [Self::nearest_enclosing_funcdefn].
@@ -17,10 +19,7 @@ pub struct HierarchyTester<'a, H: HugrView> {
     /// This both allows us to access the Hugr, but also guarantees the Hugr isn't
     /// changing beneath our back to invalidate the results.
     hugr: &'a H,
-    /// The entry and exit indices (inclusive), of every node in the Hugr
-    /// beneath the entrypoint, and the nearest strictly-enclosing FuncDefn.
-    /// (Note: every entry number is different.)
-    entry_exit: HashMap<H::Node, NodeData>,
+    entry_exit: HashMap<H::Node, NodeData<H::Node>> // for every node beneath entrypoint
 }
 
 impl<'a, H: HugrView> HierarchyTester<'a, H> {
@@ -32,7 +31,7 @@ impl<'a, H: HugrView> HierarchyTester<'a, H> {
             hugr: &H,
             n: H::Node,
             mut fd: Option<H::Node>,
-            ee: &mut HashMap<H::Node, NodeData>,
+            ee: &mut HashMap<H::Node, NodeData<H::Node>>,
         ) {
             let old = ee.insert(n, (ee.len(), usize::MAX, fd)); // second is placeholder for now
             debug_assert!(old.is_none());
