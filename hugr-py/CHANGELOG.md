@@ -6,9 +6,10 @@
 ### ⚠ BREAKING CHANGES
 
 * Hugrs now define an `entrypoint` in addition to a module root.
-* 
-* `ArrayOpBuilder` was moved from
-* Functions that manipulate runtime extension sets have been removed from the Rust and Python code. Extension set parameters were removed from operations.   Closes https://github.com/CQCL/hugr/issues/1906
+* `std.collections.array` is now a linear type, even if the contained elements are copyable. Use the new `std.collections.value_array` for an array with the previous copyable semantics.
+* `std.collections.array.get` now also returns the passed array as an extra output.
+* `ArrayOpBuilder` was moved from `hugr_core::std_extensions::collections::array::op_builder` to `hugr_core::std_extensions::collections::array`.
+* Functions that manipulate runtime extension sets have been removed from the Rust and Python code. Extension set parameters were removed from operations.
 * `values` field in `Extension` and `ExtensionValue` struct/class removed in rust and python. Use 0-input ops that return constant values.
 
 ### Features
