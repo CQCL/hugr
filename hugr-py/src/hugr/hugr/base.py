@@ -152,9 +152,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
                 # Only region containers are allowed to be entrypoints
                 match df_op:
-                    case CFG():
-                        pass
-                    case Conditional():
+                    case CFG() | Conditional():
                         pass
                     case _ if ops.is_df_parent_op(df_op):
                         pass
