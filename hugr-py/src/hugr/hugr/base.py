@@ -15,10 +15,19 @@ from typing import (
     overload,
 )
 
+from typing_extensions import deprecated
+
 import hugr.model as model
 import hugr.ops as ops
 from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
+from hugr.envelope import (
+    EnvelopeConfig,
+    make_envelope,
+    make_envelope_str,
+    read_envelope_hugr,
+    read_envelope_hugr_str,
+)
 from hugr.exceptions import ParentBeforeChild
 from hugr.ops import (
     CFG,
@@ -892,6 +901,59 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         return hugr
 
+    @staticmethod
+    def from_bytes(envelope: bytes) -> Hugr:
+        """Deserialize a byte string to a Hugr object.
+
+        Some envelope formats can be read from a string. See :meth:`from_str`.
+
+        Args:
+            envelope: The byte string representing a Hugr envelope.
+
+        Returns:
+            The deserialized Hugr object.
+
+        Raises:
+            ValueError: If the envelope does not contain exactly one module.
+        """
+        return read_envelope_hugr(envelope)
+
+    @staticmethod
+    def from_str(envelope: str) -> Hugr:
+        """Deserialize a string to a Hugr object.
+
+        Not all envelope formats can be read from a string.
+        See :meth:`from_bytes` for a more general method.
+
+        Args:
+            envelope: The string representing a Hugr envelope.
+
+        Returns:
+            The deserialized Hugr object.
+
+        Raises:
+            ValueError: If the envelope does not contain exactly one module.
+        """
+        return read_envelope_hugr_str(envelope)
+
+    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+        """Serialize the HUGR into an envelope byte string.
+
+        Some envelope formats can be encoded into a string. See :meth:`to_str`.
+        """
+        config = config or EnvelopeConfig.BINARY
+        return make_envelope(self, config)
+
+    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+        """Serialize the package to a HUGR envelope string.
+
+        Not all envelope formats can be encoded into a string.
+        See :meth:`to_bytes` for a more general method.
+        """
+        config = config or EnvelopeConfig.TEXT
+        return make_envelope_str(self, config)
+
+    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:
         """Serialize the HUGR to a JSON string.
 
@@ -909,6 +971,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return model.Module(region)
 
     @classmethod
+    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def load_json(cls, json_str: str) -> Hugr:
         """Deserialize a JSON string into a HUGR.
 

@@ -23,7 +23,7 @@ def test_children():
     h = mod.hugr
     assert len(h.children()) == 1
 
-    h2 = Hugr.load_json(h.to_json())
+    h2 = Hugr.from_str(h.to_str())
 
     assert len(h2.children()) == 1
 
@@ -44,7 +44,7 @@ def test_entrypoint():
     assert h[func].parent == h.module_root
 
     # Do a roundtrip, and test all again
-    h2 = Hugr.load_json(h.to_json())
+    h2 = Hugr.from_str(h.to_str())
 
     dfg = h2.entrypoint
     assert h2[dfg].op == ops.DFG(inputs=[tys.Bool], _outputs=[tys.Bool])
