@@ -71,27 +71,6 @@ impl<N: HugrNode> Default for BBNeedsSourcesMap<N> {
     }
 }
 
-struct NeedsSourcesMapIter<'a, N>(
-    <&'a BTreeMap<N, BTreeMap<Wire<N>, Type>> as IntoIterator>::IntoIter,
-);
-
-impl<'a, N> Iterator for NeedsSourcesMapIter<'a, N> {
-    type Item = (&'a N, &'a BTreeMap<Wire<N>, Type>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
-    }
-}
-
-impl<'a, N: HugrNode> IntoIterator for &'a BBNeedsSourcesMap<N> {
-    type Item = <Self::IntoIter as Iterator>::Item;
-    type IntoIter = NeedsSourcesMapIter<'a, N>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        NeedsSourcesMapIter(self.0.iter())
-    }
-}
-
 impl<N: HugrNode> BBNeedsSourcesMap<N> {
     fn insert(&mut self, node: N, source: Wire<N>, ty: Type) -> bool {
         self.0.entry(node).or_default().insert(source, ty).is_none()
@@ -645,7 +624,7 @@ fn thread_sources<N: HugrNode>(
     Vec<ControlWorkItem<N>>,
 ) {
     let mut state = ThreadState::new(bb_needs_sources_map);
-    for (&bb, sources) in bb_needs_sources_map {
+    for (&bb, sources) in bb_needs_sources_map.0.iter() {
         let sources = sources.iter().map(|(&w, ty)| (w, ty.clone())).collect_vec();
         match hugr.get_optype(bb).clone() {
             OpType::DFG(_) => state.do_dfg(hugr, bb, sources),
