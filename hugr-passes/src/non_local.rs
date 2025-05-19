@@ -155,6 +155,181 @@ fn build_needs_sources_map<N: HugrNode>(
 }
 
 // Transformation: adding extra ports, and wiring them up ===============================
+impl<N: HugrNode> BBNeedsSourcesMap<N> {
+    fn thread_node(
+        &self,
+        hugr: &mut impl HugrMut<Node = N>,
+        node: N,
+        locals: &HashMap<Wire<N>, Wire<N>>,
+    ) {
+        if self.get(node).next().is_none() {
+            // No edges incoming into this subtree, but there could still be nonlocal edges internal to it
+            for ch in hugr.children(node).collect::<Vec<_>>() {
+                self.thread_node(hugr, ch, &HashMap::new())
+            }
+            return;
+        }
+
+        let sources: Vec<(Wire<N>, Type)> = self.get(node).map(|(w, t)| (*w, t.clone())).collect();
+        let src_wires: Vec<Wire<N>> = sources.iter().map(|(w, _)| *w).collect();
+
+        // `match` must deal with everything inside the node, and update the signature (per OpType)
+        let start_new_port_index = match hugr.optype_mut(node) {
+            OpType::DFG(dfg) => {
+                let ins = dfg.signature.input.to_mut();
+                let start_new_port_index = ins.len();
+                ins.extend(sources.iter().map(|(_, t)| t.clone()));
+
+                self.thread_dataflow_parent(hugr, node, start_new_port_index, sources);
+                start_new_port_index
+            }
+            OpType::Conditional(cond) => {
+                let start_new_port_index = cond.signature().input.len();
+                cond.other_inputs
+                    .to_mut()
+                    .extend(sources.iter().map(|x| x.1.clone()));
+
+                self.thread_conditional(hugr, node, sources);
+                start_new_port_index
+            }
+            OpType::TailLoop(tail_op) => {
+                vec_prepend(
+                    tail_op.just_inputs.to_mut(),
+                    sources.iter().map(|(_, t)| t.clone()),
+                );
+                self.thread_tailloop(hugr, node, sources);
+                0
+            }
+            OpType::CFG(cfg) => {
+                vec_prepend(
+                    cfg.signature.input.to_mut(),
+                    sources.iter().map(|(_, t)| t.clone()),
+                );
+                assert_eq!(
+                    self.get(node).collect::<Vec<_>>(),
+                    self.get(hugr.children(node).next().unwrap())
+                        .collect::<Vec<_>>()
+                ); // Entry node
+                for bb in hugr.children(node).collect::<Vec<_>>() {
+                    self.thread_bb(hugr, bb);
+                }
+                0
+            }
+            _ => panic!(
+                "All containers handled except Module/FuncDefn or root Case/DFB, which should not have incoming nonlocal edges"
+            ),
+        };
+
+        let new_dfg_ports = hugr.insert_ports(
+            node,
+            Direction::Incoming,
+            start_new_port_index,
+            src_wires.len(),
+        );
+        let local_srcs = src_wires.into_iter().map(|w| *locals.get(&w).unwrap_or(&w));
+        for (w, tgt_port) in local_srcs.zip_eq(new_dfg_ports) {
+            assert_eq!(hugr.get_parent(w.node()), hugr.get_parent(node));
+            hugr.connect(w.node(), w.source(), node, tgt_port)
+        }
+    }
+
+    fn thread_dataflow_parent(
+        &self,
+        hugr: &mut impl HugrMut<Node = N>,
+        node: N,
+        start_new_port_index: usize,
+        srcs: Vec<(Wire<N>, Type)>,
+    ) -> HashMap<Wire<N>, Wire<N>> {
+        let nlocals = if srcs.is_empty() {
+            HashMap::new()
+        } else {
+            let (srcs, tys): (Vec<_>, Vec<Type>) = srcs.into_iter().unzip();
+            let [inp, _] = hugr.get_io(node).unwrap();
+            let OpType::Input(in_op) = hugr.optype_mut(inp) else {
+                panic!("Expected Input node")
+            };
+            vec_insert(in_op.types.to_mut(), tys, start_new_port_index);
+            let new_outports =
+                hugr.insert_ports(inp, Direction::Outgoing, start_new_port_index, srcs.len());
+
+            srcs.into_iter()
+                .zip_eq(new_outports)
+                .map(|(w, p)| (w, Wire::new(inp, p)))
+                .collect()
+        };
+        for ch in hugr.children(node).collect::<Vec<_>>() {
+            self.thread_node(hugr, ch, &nlocals);
+        }
+        nlocals
+    }
+
+    fn thread_conditional(
+        &self,
+        hugr: &mut impl HugrMut<Node = N>,
+        node: N,
+        srcs: Vec<(Wire<N>, Type)>,
+    ) {
+        for case in hugr.children(node).collect::<Vec<_>>() {
+            let OpType::Case(case_op) = hugr.optype_mut(case) else {
+                continue;
+            };
+            let ins = case_op.signature.input.to_mut();
+            let start_case_port_index = ins.len();
+            ins.extend(srcs.iter().map(|(_, t)| t.clone()));
+            self.thread_dataflow_parent(hugr, case, start_case_port_index, srcs.clone());
+        }
+    }
+
+    fn thread_tailloop(
+        &self,
+        hugr: &mut impl HugrMut<Node = N>,
+        node: N,
+        srcs: Vec<(Wire<N>, Type)>,
+    ) {
+        let [_, o] = hugr.get_io(node).unwrap();
+        let new_sum_row_prefixes = {
+            let mut v = vec![vec![]; 2];
+            v[TailLoop::CONTINUE_TAG].extend(srcs.iter().map(|(w, _)| w));
+            v
+        };
+        ControlWorkItem {
+            output_node: o,
+            variant_source_prefixes: new_sum_row_prefixes,
+        }
+        .go(&mut hugr, psm);
+        self.thread_dataflow_parent(hugr, node, 0, srcs);
+    }
+
+    fn thread_bb(&self, hugr: &mut impl HugrMut<Node = N>, node: N) {
+        let locals = self.thread_dataflow_parent(
+            hugr,
+            node,
+            0,
+            self.get(node).map(|(w, t)| (*w, t.clone())).collect(),
+        );
+        let [_, output_node] = hugr.get_io(node).unwrap();
+        let variant_source_prefixes = hugr
+            .output_neighbours(node)
+            .map(|succ| {
+                // The wires required for each successor block, should be available in the predecessor
+                self.get(succ)
+                    .map(|(w, _)| {
+                        if hugr.get_parent(w.node()) == Some(node) {
+                            *w
+                        } else {
+                            *locals.get(w).unwrap()
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        ControlWorkItem {
+            output_node,
+            variant_source_prefixes,
+        }
+        .go(&mut hugr, psm)
+    }
+}
 
 #[derive(derive_more::Error, derive_more::From, derive_more::Display, Debug, PartialEq)]
 #[non_exhaustive]
