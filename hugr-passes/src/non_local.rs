@@ -53,10 +53,8 @@ use hugr_core::{
 pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, IncomingPort)> + '_ {
     hugr.entry_descendants().flat_map(move |node| {
         hugr.in_value_types(node).filter_map(move |(in_p, _)| {
-            let parent = hugr.get_parent(node);
-            hugr.linked_outputs(node, in_p)
-                .any(|(neighbour_node, _)| parent != hugr.get_parent(neighbour_node))
-                .then_some((node, in_p))
+            let (src, _) = hugr.single_linked_output(node, in_p)?;
+            (hugr.get_parent(node) != hugr.get_parent(src)).then_some((node, in_p))
         })
     })
 }
