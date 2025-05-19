@@ -178,33 +178,25 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             OpType::DFG(dfg) => {
                 let ins = dfg.signature.input.to_mut();
                 let start_new_port_index = ins.len();
-                ins.extend(sources.iter().map(|(_, t)| t.clone()));
+                ins.extend(just_types(&sources));
 
                 self.thread_dataflow_parent(hugr, node, start_new_port_index, sources);
                 start_new_port_index
             }
             OpType::Conditional(cond) => {
                 let start_new_port_index = cond.signature().input.len();
-                cond.other_inputs
-                    .to_mut()
-                    .extend(sources.iter().map(|x| x.1.clone()));
+                cond.other_inputs.to_mut().extend(just_types(&sources));
 
                 self.thread_conditional(hugr, node, sources);
                 start_new_port_index
             }
             OpType::TailLoop(tail_op) => {
-                vec_prepend(
-                    tail_op.just_inputs.to_mut(),
-                    sources.iter().map(|(_, t)| t.clone()),
-                );
+                vec_prepend(tail_op.just_inputs.to_mut(), just_types(&sources));
                 self.thread_tailloop(hugr, node, sources);
                 0
             }
             OpType::CFG(cfg) => {
-                vec_prepend(
-                    cfg.signature.input.to_mut(),
-                    sources.iter().map(|(_, t)| t.clone()),
-                );
+                vec_prepend(cfg.signature.input.to_mut(), just_types(&sources));
                 assert_eq!(
                     self.get(node).collect::<Vec<_>>(),
                     self.get(hugr.children(node).next().unwrap())
@@ -286,7 +278,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             };
             let ins = case_op.signature.input.to_mut();
             let start_case_port_index = ins.len();
-            ins.extend(srcs.iter().map(|(_, t)| t.clone()));
+            ins.extend(just_types(&srcs));
             self.thread_dataflow_parent(hugr, case, start_case_port_index, srcs.clone());
         }
     }
@@ -315,16 +307,9 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         let OpType::DataflowBlock(this_dfb) = hugr.optype_mut(node) else {
             panic!("Expected dataflow block")
         };
-        vec_prepend(
-            this_dfb.inputs.to_mut(),
-            self.get(node).map(|(_, t)| t.clone()),
-        );
-        let locals = self.thread_dataflow_parent(
-            hugr,
-            node,
-            0,
-            self.get(node).map(|(w, t)| (*w, t.clone())).collect(),
-        );
+        let my_inputs: Vec<_> = self.get(node).map(|(w, t)| (*w, t.clone())).collect();
+        vec_prepend(this_dfb.inputs.to_mut(), just_types(&my_inputs));
+        let locals = self.thread_dataflow_parent(hugr, node, 0, my_inputs);
         let variant_source_prefixes: Vec<Vec<(Wire<N>, Type)>> = hugr
             .output_neighbours(node)
             .map(|succ| {
@@ -350,10 +335,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             .iter()
             .zip_eq(this_dfb.sum_rows.iter_mut())
         {
-            vec_prepend(
-                sum_row.to_mut(),
-                source_prefix.iter().map(|(_, t)| t.clone()),
-            );
+            vec_prepend(sum_row.to_mut(), just_types(source_prefix));
         }
         let [_, output_node] = hugr.get_io(node).unwrap();
         ControlWorkItem {
@@ -362,6 +344,10 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         }
         .go(hugr)
     }
+}
+
+fn just_types<'a, X: 'a>(v: impl IntoIterator<Item = &'a (X, Type)>) -> impl Iterator<Item = Type> {
+    v.into_iter().map(|(_, t)| t.clone())
 }
 
 #[derive(derive_more::Error, derive_more::From, derive_more::Display, Debug, PartialEq)]
@@ -440,10 +426,7 @@ impl<N: HugrNode> ControlWorkItem<N> {
             let new_control_type = Type::new_sum(new_sum_rows.clone());
             let mut cond = ConditionalBuilder::new(
                 old_sum_rows.clone(),
-                needed_sources
-                    .values()
-                    .map(|(_, t)| t.clone())
-                    .collect_vec(),
+                just_types(needed_sources.values()).collect_vec(),
                 new_control_type.clone(),
             )
             .unwrap();
