@@ -300,7 +300,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         let [_, o] = hugr.get_io(node).unwrap();
         let new_sum_row_prefixes = {
             let mut v = vec![vec![]; 2];
-            v[TailLoop::CONTINUE_TAG].extend(srcs.iter().map(|(w, _)| w));
+            v[TailLoop::CONTINUE_TAG] = srcs.clone();
             v
         };
         ControlWorkItem {
@@ -323,12 +323,15 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             .map(|succ| {
                 // The wires required for each successor block, should be available in the predecessor
                 self.get(succ)
-                    .map(|(w, _)| {
-                        if hugr.get_parent(w.node()) == Some(node) {
-                            *w
-                        } else {
-                            *locals.get(w).unwrap()
-                        }
+                    .map(|(w, ty)| {
+                        (
+                            if hugr.get_parent(w.node()) == Some(node) {
+                                *w
+                            } else {
+                                *locals.get(w).unwrap()
+                            },
+                            ty.clone(),
+                        )
                     })
                     .collect()
             })
@@ -371,8 +374,8 @@ struct WorkItem<N: HugrNode> {
 
 #[derive(Clone, Debug)]
 struct ControlWorkItem<N: HugrNode> {
-    output_node: N,                             // Output node of CFG / TailLoop
-    variant_source_prefixes: Vec<Vec<Wire<N>>>, // prefixes to each element of Sum type
+    output_node: N,                                     // Output node of CFG / TailLoop
+    variant_source_prefixes: Vec<Vec<(Wire<N>, Type)>>, // prefixes to each element of Sum type
 }
 
 impl<N: HugrNode> ControlWorkItem<N> {
@@ -393,15 +396,11 @@ impl<N: HugrNode> ControlWorkItem<N> {
                 panic!("impossible")
             };
 
-            let mut type_for_source = |source: &Wire<N>| {
-                let t = hugr.signature(source.node())
-                            .unwrap()
-                            .out_port_type(source.source())
-                            .unwrap()
-                            .clone();
-                let replaced = needed_sources.insert(*source, (*source, t.clone()));
-                debug_assert!(!replaced.is_some_and(|x| x != (*source, t.clone())));
-                t
+            let mut type_for_source = |source: &(Wire<N>, Type)| {
+                let (w, t) = source;
+                let replaced = needed_sources.insert(*w, (*w, t.clone()));
+                debug_assert!(!replaced.is_some_and(|x| x != (*w, t.clone())));
+                t.clone()
             };
             let old_sum_rows: Vec<TypeRow> = sum_type
                 .variants()
@@ -434,7 +433,7 @@ impl<N: HugrNode> ControlWorkItem<N> {
                 let case_inputs = case.input_wires().collect_vec();
                 let mut args = new_sources
                     .into_iter()
-                    .map(|s| {
+                    .map(|(s, _ty)| {
                         case_inputs[old_sum_rows[i].len()
                             + needed_sources
                                 .iter()
