@@ -106,81 +106,36 @@ impl<H: HugrView> BBNeedsSourcesMapBuilder<H> {
 
     fn insert(&mut self, mut parent: H::Node, source: Wire<H::Node>, ty: Type) {
         let source_parent = self.hugr.get_parent(source.node()).unwrap();
-        loop {
-            if source_parent == parent {
-                break;
-            }
+        while source_parent != parent {
             if !self.needs_sources.insert(parent, source, ty.clone()) {
                 break;
             }
-            let Some(parent_of_parent) = self.hugr.get_parent(parent) else {
-                break;
-            };
-            parent = parent_of_parent
+            if self.hugr.get_optype(parent).is_conditional() {
+                // One of these we must have just done on the previous iteration
+                for case in self.hugr.children(parent) {
+                    // Full recursion unnecessary as we've just added parent:
+                    self.needs_sources.insert(case, source, ty.clone());
+                }
+            }
+            // this will panic if source_parent is not an ancestor of target
+            let parent_parent = self.hugr.get_parent(parent).unwrap();
+            if self.hugr.get_optype(parent).is_dataflow_block() {
+                assert!(self.hugr.get_optype(parent_parent).is_cfg());
+                for pred in self.hugr.input_neighbours(parent).collect::<Vec<_>>() {
+                    self.insert(pred, source, ty.clone());
+                }
+                if Some(parent) != self.hugr.children(parent_parent).next() {
+                    // Recursive calls on predecessors will have traced back to entry block
+                    // (or source_parent itself if a dominating Basic Block)
+                    break;
+                }
+                // We've just added to entry node - so must add to CFG as well
+            }
+            parent = parent_parent;
         }
     }
 
-    fn finish(mut self) -> BBNeedsSourcesMap<H::Node> {
-        {
-            // Conditionals. Any `Case` needing an input, means the parent Conditional needs it too.
-            let conds = self
-                .needs_sources
-                .keys()
-                .copied()
-                .filter(|&n| self.hugr.get_optype(n).is_conditional())
-                .collect_vec();
-            for n in conds {
-                let n_needs = self
-                    .needs_sources
-                    .get(n)
-                    .map(|(&w, ty)| (w, ty.clone()))
-                    .collect_vec();
-                for case in self
-                    .hugr
-                    .children(n)
-                    .filter(|&child| self.hugr.get_optype(child).is_case())
-                {
-                    for (w, ty) in n_needs.iter() {
-                        self.needs_sources.insert(case, *w, ty.clone());
-                    }
-                }
-            }
-        }
-        {
-            let cfgs = self
-                .needs_sources
-                .keys()
-                .copied()
-                .filter(|&n| self.hugr.get_optype(n).is_cfg())
-                .collect_vec();
-            for n in cfgs {
-                let dfbs = self
-                    .hugr
-                    .children(n)
-                    .filter(|&child| self.hugr.get_optype(child).is_dataflow_block())
-                    .collect_vec();
-                loop {
-                    let mut any_change = false;
-                    for &dfb in dfbs.iter() {
-                        for succ_n in self.hugr.output_neighbours(dfb) {
-                            for (w, ty) in self
-                                .needs_sources
-                                .get(succ_n)
-                                .map(|(w, ty)| (*w, ty.clone()))
-                                .collect_vec()
-                            {
-                                // Do we need something like:
-                                //  if w.node() == dfb: continue
-                                any_change |= self.needs_sources.insert(dfb, w, ty.clone());
-                            }
-                        }
-                    }
-                    if !any_change {
-                        break;
-                    }
-                }
-            }
-        }
+    fn finish(self) -> BBNeedsSourcesMap<H::Node> {
         self.needs_sources
     }
 }
@@ -317,7 +272,7 @@ impl<N: HugrNode> ParentSourceMap<N> {
 
 #[derive(Clone, Debug)]
 struct ControlWorkItem<N: HugrNode> {
-    output_node: N, // Output node of CFG / TailLoop
+    output_node: N,                             // Output node of CFG / TailLoop
     variant_source_prefixes: Vec<Vec<Wire<N>>>, // prefixes to each element of Sum type
 }
 
@@ -756,16 +711,16 @@ mod test {
 
     #[test]
     fn vec_insert0() {
-        let mut v = vec![5,7,9];
-        vec_insert(&mut v, [1,2], 0);
-        assert_eq!(v, [1,2,5,7,9]);
+        let mut v = vec![5, 7, 9];
+        vec_insert(&mut v, [1, 2], 0);
+        assert_eq!(v, [1, 2, 5, 7, 9]);
     }
 
     #[test]
     fn vec_insert1() {
-        let mut v = vec![5,7,9];
-        vec_insert(&mut v, [1,2], 1);
-        assert_eq!(v, [5,1,2,7,9]);
+        let mut v = vec![5, 7, 9];
+        vec_insert(&mut v, [1, 2], 1);
+        assert_eq!(v, [5, 1, 2, 7, 9]);
     }
 
     #[test]
