@@ -61,6 +61,169 @@ pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, I
     })
 }
 
+// Analysis: determining all extra ports that must be added =============================
+#[derive(Debug, Clone)]
+// Map from (parent of target node) to source Wire to Type.
+// `BB` is any (dataflow?) container, not necessarily a Basic Block or in a CFG
+struct BBNeedsSourcesMap<N: HugrNode>(BTreeMap<N, BTreeMap<Wire<N>, Type>>);
+
+impl<N: HugrNode> Default for BBNeedsSourcesMap<N> {
+    fn default() -> Self {
+        Self(BTreeMap::default())
+    }
+}
+
+struct NeedsSourcesMapIter<'a, N>(
+    <&'a BTreeMap<N, BTreeMap<Wire<N>, Type>> as IntoIterator>::IntoIter,
+);
+
+impl<'a, N> Iterator for NeedsSourcesMapIter<'a, N> {
+    type Item = (&'a N, &'a BTreeMap<Wire<N>, Type>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a, N: HugrNode> IntoIterator for &'a BBNeedsSourcesMap<N> {
+    type Item = <Self::IntoIter as Iterator>::Item;
+    type IntoIter = NeedsSourcesMapIter<'a, N>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        NeedsSourcesMapIter(self.0.iter())
+    }
+}
+
+impl<N: HugrNode> BBNeedsSourcesMap<N> {
+    fn insert(&mut self, node: N, source: Wire<N>, ty: Type) -> bool {
+        self.0.entry(node).or_default().insert(source, ty).is_none()
+    }
+
+    fn get(&self, node: N) -> impl Iterator<Item = (&Wire<N>, &Type)> + '_ {
+        match self.0.get(&node) {
+            Some(x) => Either::Left(x.iter()),
+            None => Either::Right(iter::empty()),
+        }
+    }
+
+    delegate! {
+        to self.0 {
+            fn keys(&self) -> impl Iterator<Item=&N>;
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BBNeedsSourcesMapBuilder<H: HugrView> {
+    hugr: H,
+    needs_sources: BBNeedsSourcesMap<H::Node>,
+}
+
+impl<H: HugrView> BBNeedsSourcesMapBuilder<H> {
+    fn new(hugr: H) -> Self {
+        Self {
+            hugr,
+            needs_sources: Default::default(),
+        }
+    }
+
+    fn insert(&mut self, mut parent: H::Node, source: Wire<H::Node>, ty: Type) {
+        let source_parent = self.hugr.get_parent(source.node()).unwrap();
+        loop {
+            if source_parent == parent {
+                break;
+            }
+            if !self.needs_sources.insert(parent, source, ty.clone()) {
+                break;
+            }
+            let Some(parent_of_parent) = self.hugr.get_parent(parent) else {
+                break;
+            };
+            parent = parent_of_parent
+        }
+    }
+
+    fn finish(mut self) -> BBNeedsSourcesMap<H::Node> {
+        {
+            // Conditionals. Any `Case` needing an input, means the parent Conditional needs it too.
+            let conds = self
+                .needs_sources
+                .keys()
+                .copied()
+                .filter(|&n| self.hugr.get_optype(n).is_conditional())
+                .collect_vec();
+            for n in conds {
+                let n_needs = self
+                    .needs_sources
+                    .get(n)
+                    .map(|(&w, ty)| (w, ty.clone()))
+                    .collect_vec();
+                for case in self
+                    .hugr
+                    .children(n)
+                    .filter(|&child| self.hugr.get_optype(child).is_case())
+                {
+                    for (w, ty) in n_needs.iter() {
+                        self.needs_sources.insert(case, *w, ty.clone());
+                    }
+                }
+            }
+        }
+        {
+            let cfgs = self
+                .needs_sources
+                .keys()
+                .copied()
+                .filter(|&n| self.hugr.get_optype(n).is_cfg())
+                .collect_vec();
+            for n in cfgs {
+                let dfbs = self
+                    .hugr
+                    .children(n)
+                    .filter(|&child| self.hugr.get_optype(child).is_dataflow_block())
+                    .collect_vec();
+                loop {
+                    let mut any_change = false;
+                    for &dfb in dfbs.iter() {
+                        for succ_n in self.hugr.output_neighbours(dfb) {
+                            for (w, ty) in self
+                                .needs_sources
+                                .get(succ_n)
+                                .map(|(w, ty)| (*w, ty.clone()))
+                                .collect_vec()
+                            {
+                                // Do we need something like:
+                                //  if w.node() == dfb: continue
+                                any_change |= self.needs_sources.insert(dfb, w, ty.clone());
+                            }
+                        }
+                    }
+                    if !any_change {
+                        break;
+                    }
+                }
+            }
+        }
+        self.needs_sources
+    }
+}
+
+// Identify all required extra inputs (for both Dom and Ext edges)
+fn build_needs_sources_map<N: HugrNode>(
+    hugr: impl HugrView<Node = N>,
+    nonlocal_edges: &HashMap<N, WorkItem<N>>,
+) -> BBNeedsSourcesMap<N> {
+    let mut bnsm = BBNeedsSourcesMapBuilder::new(&hugr);
+    for workitem in nonlocal_edges.values() {
+        let parent = hugr.get_parent(workitem.target.0).unwrap();
+        debug_assert!(hugr.get_parent(parent).is_some());
+        bnsm.insert(parent, workitem.source, workitem.ty.clone());
+    }
+    bnsm.finish()
+}
+
+// Transformation: adding extra ports, and wiring them up ===============================
+
 #[derive(derive_more::Error, derive_more::From, derive_more::Display, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum NonLocalEdgesError<N> {
@@ -177,8 +340,8 @@ impl<N: HugrNode> ParentSourceMap<N> {
 
 #[derive(Clone, Debug)]
 struct ControlWorkItem<N: HugrNode> {
-    output_node: N,
-    variant_source_prefixes: Vec<Vec<Wire<N>>>,
+    output_node: N, // Output node of CFG / TailLoop
+    variant_source_prefixes: Vec<Vec<Wire<N>>>, // prefixes to each element of Sum type
 }
 
 impl<N: HugrNode> ControlWorkItem<N> {
@@ -512,160 +675,6 @@ fn mk_workitems<N: HugrNode>(
     })
 }
 
-#[derive(Debug, Clone)]
-struct BBNeedsSourcesMap<N: HugrNode>(BTreeMap<N, BTreeMap<Wire<N>, Type>>);
-
-impl<N: HugrNode> Default for BBNeedsSourcesMap<N> {
-    fn default() -> Self {
-        Self(BTreeMap::default())
-    }
-}
-
-struct NeedsSourcesMapIter<'a, N>(
-    <&'a BTreeMap<N, BTreeMap<Wire<N>, Type>> as IntoIterator>::IntoIter,
-);
-
-impl<'a, N> Iterator for NeedsSourcesMapIter<'a, N> {
-    type Item = (&'a N, &'a BTreeMap<Wire<N>, Type>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
-    }
-}
-
-impl<'a, N: HugrNode> IntoIterator for &'a BBNeedsSourcesMap<N> {
-    type Item = <Self::IntoIter as Iterator>::Item;
-    type IntoIter = NeedsSourcesMapIter<'a, N>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        NeedsSourcesMapIter(self.0.iter())
-    }
-}
-
-impl<N: HugrNode> BBNeedsSourcesMap<N> {
-    fn insert(&mut self, node: N, source: Wire<N>, ty: Type) -> bool {
-        self.0.entry(node).or_default().insert(source, ty).is_none()
-    }
-
-    fn get(&self, node: N) -> impl Iterator<Item = (&Wire<N>, &Type)> + '_ {
-        match self.0.get(&node) {
-            Some(x) => Either::Left(x.iter()),
-            None => Either::Right(iter::empty()),
-        }
-    }
-
-    delegate! {
-        to self.0 {
-            fn keys(&self) -> impl Iterator<Item=&N>;
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct BBNeedsSourcesMapBuilder<H: HugrView> {
-    hugr: H,
-    needs_sources: BBNeedsSourcesMap<H::Node>,
-}
-
-impl<H: HugrView> BBNeedsSourcesMapBuilder<H> {
-    fn new(hugr: H) -> Self {
-        Self {
-            hugr,
-            needs_sources: Default::default(),
-        }
-    }
-
-    fn insert(&mut self, mut parent: H::Node, source: Wire<H::Node>, ty: Type) {
-        let source_parent = self.hugr.get_parent(source.node()).unwrap();
-        loop {
-            if source_parent == parent {
-                break;
-            }
-            if !self.needs_sources.insert(parent, source, ty.clone()) {
-                break;
-            }
-            let Some(parent_of_parent) = self.hugr.get_parent(parent) else {
-                break;
-            };
-            parent = parent_of_parent
-        }
-    }
-
-    fn finish(mut self) -> BBNeedsSourcesMap<H::Node> {
-        {
-            let conds = self
-                .needs_sources
-                .keys()
-                .copied()
-                .filter(|&n| self.hugr.get_optype(n).is_conditional())
-                .collect_vec();
-            for n in conds {
-                let n_needs = self
-                    .needs_sources
-                    .get(n)
-                    .map(|(&w, ty)| (w, ty.clone()))
-                    .collect_vec();
-                for case in self
-                    .hugr
-                    .children(n)
-                    .filter(|&child| self.hugr.get_optype(child).is_case())
-                {
-                    for (w, ty) in n_needs.iter() {
-                        self.needs_sources.insert(case, *w, ty.clone());
-                    }
-                }
-            }
-        }
-        {
-            let cfgs = self
-                .needs_sources
-                .keys()
-                .copied()
-                .filter(|&n| self.hugr.get_optype(n).is_cfg())
-                .collect_vec();
-            for n in cfgs {
-                let dfbs = self
-                    .hugr
-                    .children(n)
-                    .filter(|&child| self.hugr.get_optype(child).is_dataflow_block())
-                    .collect_vec();
-                loop {
-                    let mut any_change = false;
-                    for &dfb in dfbs.iter() {
-                        for succ_n in self.hugr.output_neighbours(dfb) {
-                            for (w, ty) in self
-                                .needs_sources
-                                .get(succ_n)
-                                .map(|(w, ty)| (*w, ty.clone()))
-                                .collect_vec()
-                            {
-                                any_change |= self.needs_sources.insert(dfb, w, ty.clone());
-                            }
-                        }
-                    }
-                    if !any_change {
-                        break;
-                    }
-                }
-            }
-        }
-        self.needs_sources
-    }
-}
-
-fn build_needs_sources_map<N: HugrNode>(
-    hugr: impl HugrView<Node = N>,
-    nonlocal_edges: &HashMap<N, WorkItem<N>>,
-) -> BBNeedsSourcesMap<N> {
-    let mut bnsm = BBNeedsSourcesMapBuilder::new(&hugr);
-    for workitem in nonlocal_edges.values() {
-        let parent = hugr.get_parent(workitem.target.0).unwrap();
-        debug_assert!(hugr.get_parent(parent).is_some());
-        bnsm.insert(parent, workitem.source, workitem.ty.clone());
-    }
-    bnsm.finish()
-}
-
 pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), NonLocalEdgesError<H::Node>> {
     // First we collect all the non-local edges in the graph. We associate them to a WorkItem, which tracks:
     //  * the source of the non-local edge
@@ -767,6 +776,20 @@ mod test {
     };
 
     use super::*;
+
+    #[test]
+    fn vec_insert0() {
+        let mut v = vec![5,7,9];
+        vec_insert(&mut v, [1,2], 0);
+        assert_eq!(v, [1,2,5,7,9]);
+    }
+
+    #[test]
+    fn vec_insert1() {
+        let mut v = vec![5,7,9];
+        vec_insert(&mut v, [1,2], 1);
+        assert_eq!(v, [5,1,2,7,9]);
+    }
 
     #[test]
     fn ensures_no_nonlocal_edges() {
