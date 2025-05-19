@@ -317,6 +317,8 @@ class Extension(Value):
     typ: tys.Type
     #: Value payload.
     val: Any
+
+    #: Extension set. Deprecated, no longer used. Will be removed in hugr v0.13.
     extensions: tys.ExtensionSet = field(default_factory=tys.ExtensionSet)
 
     def type_(self) -> tys.Type:
@@ -326,7 +328,6 @@ class Extension(Value):
         return sops.CustomValue(
             typ=self.typ._to_serial_root(),
             value=sops.CustomConst(c=self.name, v=self.val),
-            extensions=self.extensions,
         )
 
     def to_model(self) -> model.Term:

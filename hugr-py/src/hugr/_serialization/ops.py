@@ -16,7 +16,6 @@ from . import tys as stys
 from .tys import (
     ConfiguredBaseModel,
     ExtensionId,
-    ExtensionSet,
     FunctionType,
     PolyFuncType,
     SumType,
@@ -109,7 +108,6 @@ class CustomValue(BaseValue):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
     v: Literal["Extension"] = Field(default="Extension", title="ValueTag")
-    extensions: ExtensionSet
     typ: Type
     value: CustomConst
 
@@ -118,7 +116,6 @@ class CustomValue(BaseValue):
             name=self.value.c,
             typ=self.typ.deserialize(),
             val=self.value.v,
-            extensions=self.extensions,
         )
 
 

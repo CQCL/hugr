@@ -338,13 +338,6 @@
                     "title": "ValueTag",
                     "type": "string"
                 },
-                "extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extensions",
-                    "type": "array"
-                },
                 "typ": {
                     "$ref": "#/$defs/Type"
                 },
@@ -353,7 +346,6 @@
                 }
             },
             "required": [
-                "extensions",
                 "typ",
                 "value"
             ],
