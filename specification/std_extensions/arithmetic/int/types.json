@@ -1,7 +1,6 @@
 {
   "version": "0.1.0",
   "name": "arithmetic.int.types",
-  "runtime_reqs": [],
   "types": {
     "int": {
       "extension": "arithmetic.int.types",
@@ -19,6 +18,5 @@
       }
     }
   },
-  "values": {},
   "operations": {}
 }

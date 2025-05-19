@@ -1,0 +1,109 @@
+WHITESPACE         = _{ " " | "\t" | "\r" | "\n" }
+COMMENT            = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
+identifier         = @{ identifier_initial ~ identifier_rest* }
+identifier_initial = @{ ASCII_ALPHA | "_" | "-" }
+identifier_rest    = @{ ASCII_ALPHANUMERIC | "_" | "-" }
+symbol_name        = @{ !(reserved ~ !(identifier_rest | ".")) ~ (identifier ~ ("." ~ identifier)*) }
+link_name          = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
+
+literal = { literal_string | literal_float | literal_nat | literal_bytes }
+
+reserved = @{
+    "mod"
+  | "hugr"
+  | "bytes"
+  | "tuple"
+  | "list"
+  | "meta"
+  | "signature"
+  | "dfg"
+  | "cfg"
+  | "block"
+  | "define-func"
+  | "declare-func"
+  | "declare-operation"
+  | "declare-ctr"
+  | "declare-alias"
+  | "tail-loop"
+  | "cond"
+  | "import"
+  | "..."
+}
+
+literal_string         = ${ "\"" ~ (literal_string_raw | literal_string_escape | literal_string_unicode)* ~ "\"" }
+literal_string_raw     = @{ (!("\\" | "\"") ~ ANY)+ }
+literal_string_escape  = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
+literal_string_unicode = @{ "\\u" ~ "{" ~ ASCII_HEX_DIGIT+ ~ "}" }
+
+literal_nat   = @{ (ASCII_DIGIT)+ }
+literal_bytes =  { "(" ~ "bytes" ~ base64_string ~ ")" }
+literal_float = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ ("e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
+
+base64_string = { "\"" ~ (ASCII_ALPHANUMERIC | "+" | "/")* ~ "="* ~ "\"" }
+
+package = { "(" ~ "hugr" ~ "0" ~ ")" ~ module* ~ EOI }
+module  = { "(" ~ "mod" ~ ")" ~ meta* ~ node* }
+
+meta = { "(" ~ "meta" ~ term ~ ")" }
+
+port_list  =  { "[" ~ link_name* ~ "]" }
+port_lists = _{ port_list ~ port_list }
+
+node = {
+    node_dfg
+  | node_cfg
+  | node_block
+  | node_define_func
+  | node_declare_func
+  | node_define_alias
+  | node_declare_alias
+  | node_declare_ctr
+  | node_declare_operation
+  | node_tail_loop
+  | node_cond
+  | node_import
+  | node_custom
+}
+
+node_dfg               = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_cfg               = { "(" ~ "cfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_block             = { "(" ~ "block" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_define_func       = { "(" ~ "define-func" ~ symbol ~ meta* ~ region* ~ ")" }
+node_declare_func      = { "(" ~ "declare-func" ~ symbol ~ meta* ~ ")" }
+node_define_alias      = { "(" ~ "define-alias" ~ symbol ~ term ~ meta* ~ ")" }
+node_declare_alias     = { "(" ~ "declare-alias" ~ symbol ~ meta* ~ ")" }
+node_declare_ctr       = { "(" ~ "declare-ctr" ~ symbol ~ meta* ~ ")" }
+node_declare_operation = { "(" ~ "declare-operation" ~ symbol ~ meta* ~ ")" }
+node_tail_loop         = { "(" ~ "tail-loop" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_import            = { "(" ~ "import" ~ symbol_name ~ meta* ~ ")" }
+node_custom            = { "(" ~ term ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+
+symbol = { symbol_name ~ param* ~ where_clause* ~ term }
+
+signature    = { "(" ~ "signature" ~ term ~ ")" }
+param        = { "(" ~ "param" ~ term_var ~ term ~ ")" }
+where_clause = { "(" ~ "where" ~ term ~ ")" }
+
+region      = { "(" ~ region_kind ~ port_lists? ~ signature? ~ meta* ~ node* ~ ")" }
+region_kind = { "dfg" | "cfg" | "mod" }
+
+term = {
+    term_wildcard
+  | term_var
+  | term_list
+  | literal
+  | term_tuple
+  | term_const_func
+  | term_apply
+}
+
+term_wildcard   = @{ "_" ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
+term_var        =  { "?" ~ identifier }
+term_apply      =  { symbol_name | ("(" ~ symbol_name ~ term* ~ ")") }
+term_list       =  { "[" ~ part* ~ "]" }
+term_tuple      =  { "(" ~ "tuple" ~ part* ~ ")" }
+term_const_func =  { "(" ~ "fn" ~ term ~ ")" }
+
+part         = { spliced_term | term }
+spliced_term = { term ~ "..." }

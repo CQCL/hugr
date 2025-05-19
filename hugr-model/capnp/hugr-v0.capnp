@@ -18,6 +18,10 @@ using LinkId = UInt32;
 # The index of a `Link`.
 using LinkIndex = UInt32;
 
+struct Package {
+    modules @0 :List(Module);
+}
+
 struct Module {
     root @0 :RegionId;
     nodes @1 :List(Node);
@@ -29,21 +33,23 @@ struct Node {
     operation @0 :Operation;
     inputs @1 :List(LinkIndex);
     outputs @2 :List(LinkIndex);
-    params @3 :List(TermId);
-    regions @4 :List(RegionId);
-    meta @5 :List(TermId);
-    signature @6 :OptionalTermId;
+    regions @3 :List(RegionId);
+    meta @4 :List(TermId);
+    signature @5 :OptionalTermId;
 }
 
 struct Operation {
     union {
-        custom @0 :NodeId;
+        custom @0 :TermId;
         dfg @1 :Void;
         cfg @2 :Void;
         block @3 :Void;
         funcDefn @4 :Symbol;
         funcDecl @5 :Symbol;
-        aliasDefn @6 :Symbol;
+        aliasDefn :group {
+            symbol @6 :Symbol;
+            value @14 :TermId;
+        }
         aliasDecl @7 :Symbol;
         invalid @8 :Void;
         tailLoop @9 :Void;
@@ -92,32 +98,17 @@ struct Term {
             node @2 :NodeId;
             index @3 :UInt16;
         }
-        list @4 :List(ListPart);
+        list @4 :List(SeqPart);
         string @5 :Text;
         nat @6 :UInt64;
-        extSet @7 :List(ExtSetPart);
-        bytes @8 :Data;
-        float @9 :Float64;
-        constFunc @10 :RegionId;
-        wildcard @11 :Void;
-        tuple @12 :List(TuplePart);
+        bytes @7 :Data;
+        float @8 :Float64;
+        func @9 :RegionId;
+        wildcard @10 :Void;
+        tuple @11 :List(SeqPart);
     }
 
-    struct ListPart {
-        union {
-            item @0 :TermId;
-            splice @1 :TermId;
-        }
-    }
-
-    struct ExtSetPart {
-        union {
-            extension @0 :Text;
-            splice @1 :TermId;
-        }
-    }
-
-    struct TuplePart {
+    struct SeqPart {
         union {
             item @0 :TermId;
             splice @1 :TermId;

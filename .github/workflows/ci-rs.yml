@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     branches:
-      - '*'
+      - "**"
   merge_group:
     types: [checks_requested]
   workflow_dispatch: {}
@@ -19,12 +19,10 @@ env:
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
-  HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
   # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
   LLVM_VERSION: "14.0"
   LLVM_FEATURE_NAME: "14-0"
-
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -43,25 +41,25 @@ jobs:
       model: ${{ steps.filter.outputs.model == 'true' || steps.override.outputs.out == 'true' }}
       llvm: ${{ steps.filter.outputs.llvm == 'true' || steps.override.outputs.out == 'true' }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Override label
-      id: override
-      run: |
-        echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
-        if [ "$OVERRIDE_LABEL" == "true" ]; then
-          echo "Overriding due to label 'run-ci-checks'"
-          echo "out=true" >> $GITHUB_OUTPUT
-        elif [ "$DEFAULT_BRANCH" == "true" ]; then
-          echo "Overriding due to running on the default branch"
-          echo "out=true" >> $GITHUB_OUTPUT
-        fi
-      env:
-        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
-        DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: .github/change-filters.yml
+      - uses: actions/checkout@v4
+      - name: Override label
+        id: override
+        run: |
+          echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
+          if [ "$OVERRIDE_LABEL" == "true" ]; then
+            echo "Overriding due to label 'run-ci-checks'"
+            echo "out=true" >> $GITHUB_OUTPUT
+          elif [ "$DEFAULT_BRANCH" == "true" ]; then
+            echo "Overriding due to running on the default branch"
+            echo "out=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
+          DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: .github/change-filters.yml
 
   check:
     needs: changes
@@ -69,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -88,23 +86,33 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
-    name: Build benchmarks 🏋️
+    name: Continuous benchmarking 🏋️
     needs: changes
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      - name: Build benchmarks with no features
-        run: cargo bench --verbose --no-run  --no-default-features
-      - name: Build benchmarks with all features
-        run: cargo bench --verbose --no-run  --all-features
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-codspeed
+        run: cargo binstall cargo-codspeed --force
+      - name: Override criterion with the CodSpeed harness
+        run: cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
+      - name: Build benchmarks
+        run: cargo codspeed build --profile bench --features declarative,llvm,llvm-test
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v3
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: "cargo codspeed run"
 
   # Run tests on Rust stable
   tests-stable-no-features:
@@ -114,7 +122,7 @@ jobs:
     name: tests (Rust stable, no features)
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -140,7 +148,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -180,11 +188,12 @@ jobs:
       matrix:
         # Stable is covered by `tests-stable-no-features` and `tests-stable-all-features`
         # Nightly is covered by `tests-nightly-coverage`
-        rust: ["1.75", beta]
+        # MSRV is covered by `tests-msrv`
+        rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -203,6 +212,63 @@ jobs:
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose  --all-features
+      - name: Build hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+      - name: Tests hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+
+  # Run tests on the minimum supported rust version, with minimal dependency versions
+  tests-msrv:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    runs-on: ubuntu-latest
+    name: tests (Rust MSRV, min dependencies)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Install MSRV toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.85"
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # Nightly must be installed for `cargo-minimal-versions` to work
+          toolchain: "nightly"
+      - name: Configure default rust toolchain
+        run: rustup override set ${{steps.toolchain.outputs.name}}
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-minimal-versions
+        run: |
+          cargo binstall cargo-hack --force
+          cargo binstall cargo-minimal-versions --force
+      - name: Pin transitive dependencies not compatible with our MSRV
+        # Add new dependencies as needed if the check fails due to
+        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.85.0"
+        run: |
+          # rm Cargo.lock
+          # cargo add -p hugr half@2.4.1
+      - name: Build with no features
+        run: cargo minimal-versions --direct test --verbose  --no-default-features --no-run
+      - name: Tests with no features
+        run: cargo minimal-versions --direct test --verbose  --no-default-features
+      - name: Build with all features
+        run: cargo minimal-versions --direct test --verbose  --all-features --no-run
+      - name: Tests with all features
+        run: cargo minimal-versions --direct test --verbose  --all-features
+      - name: Build hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+      - name: Tests hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -238,7 +304,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install CapnProto
@@ -270,11 +336,12 @@ jobs:
     name: tests (Rust nightly, coverage)
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
-          toolchain: "nightly"
+          # TODO: Pinned due to <https://github.com/CQCL/hugr/issues/2227>
+          toolchain: "nightly-2025-05-14"
           components: llvm-tools-preview
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
@@ -314,16 +381,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fail if required checks failed
-        # This condition should simply be `if: failure() || cancelled()`,
-        # but there seems to be a bug in the github workflow runner.
-        #
-        # See https://github.com/orgs/community/discussions/80788
-        if: |
-          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
-          needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
-          needs.tests-stable-no-features.result == 'failure' || needs.tests-stable-no-features.result == 'cancelled' ||
-          needs.tests-stable-all-features.result == 'failure' || needs.tests-stable-all-features.result == 'cancelled' ||
-          needs.std-extensions.result == 'failure' || needs.std-extensions.result == 'cancelled'
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "Required checks failed"
           echo "Please check the logs for more information"

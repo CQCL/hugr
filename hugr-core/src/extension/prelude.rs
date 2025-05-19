@@ -1,5 +1,6 @@
 //! Prelude extension - available in all contexts, defining common types,
 //! operations and constants.
+use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
@@ -7,13 +8,13 @@ use lazy_static::lazy_static;
 
 use crate::extension::const_fold::fold_out_row;
 use crate::extension::simple_op::{
-    try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+    MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name,
 };
 use crate::extension::{
-    ConstFold, ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDefBound,
+    ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDefBound,
 };
-use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::OpName;
+use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::{NamedOp, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
@@ -21,12 +22,12 @@ use crate::types::{
     TypeName, TypeRV, TypeRow, TypeRowRV,
 };
 use crate::utils::sorted_consts;
-use crate::{type_row, Extension};
+use crate::{Extension, type_row};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
-use super::resolution::{resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry};
 use super::ExtensionRegistry;
+use super::resolution::{ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions};
 
 mod unwrap_builder;
 
@@ -38,7 +39,7 @@ pub mod generic;
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
 lazy_static! {
     /// Prelude extension, containing common types and operations.
     pub static ref PRELUDE: Arc<Extension> = {
@@ -102,17 +103,31 @@ lazy_static! {
                     PolyFuncTypeRV::new(
                         [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
                         FuncValueType::new(
-                            vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                            vec![TypeRV::new_extension(error_type.clone()), TypeRV::new_row_var_use(0, TypeBound::Any)],
                             vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
                         ),
                     ),
                     extension_ref,
                 )
                 .unwrap();
+            prelude
+            .add_op(
+                EXIT_OP_ID,
+                "Exit with input error".to_string(),
+                PolyFuncTypeRV::new(
+                    [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                    FuncValueType::new(
+                        vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                        vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                    ),
+                ),
+                extension_ref,
+            )
+            .unwrap();
 
             TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
             NoopDef.add_to_extension(prelude, extension_ref).unwrap();
-            LiftDef.add_to_extension(prelude, extension_ref).unwrap();
+            BarrierDef.add_to_extension(prelude, extension_ref).unwrap();
             generic::LoadNatDef.add_to_extension(prelude, extension_ref).unwrap();
         })
     };
@@ -142,14 +157,17 @@ pub(crate) fn qb_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
 }
 
 /// Qubit type.
+#[must_use]
 pub fn qb_t() -> Type {
     qb_custom_t(&Arc::downgrade(&PRELUDE)).into()
 }
 /// Unsigned size type.
+#[must_use]
 pub fn usize_t() -> Type {
     usize_custom_t(&Arc::downgrade(&PRELUDE)).into()
 }
 /// Boolean type - Sum of two units.
+#[must_use]
 pub fn bool_t() -> Type {
     Type::new_unit_sum(2)
 }
@@ -157,13 +175,30 @@ pub fn bool_t() -> Type {
 /// Name of the prelude panic operation.
 ///
 /// This operation can have any input and any output wires; it is instantiated
-/// with two [TypeArg::Sequence]s representing these. The first input to the
+/// with two [`TypeArg::Sequence`]s representing these. The first input to the
 /// operation is always an error type; the remaining inputs correspond to the
 /// first sequence of types in its instantiation; the outputs correspond to the
 /// second sequence of types in its instantiation. Note that the inputs and
 /// outputs only exist so that structural constraints such as linearity can be
 /// satisfied.
+///
+/// Panic immediately halts a multi-shot program. It is intended to be used in
+/// cases where an unrecoverable error is detected.
 pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
+
+/// Name of the prelude exit operation.
+///
+/// This operation can have any input and any output wires; it is instantiated
+/// with two [`TypeArg::Sequence`]s representing these. The first input to the
+/// operation is always an error type; the remaining inputs correspond to the
+/// first sequence of types in its instantiation; the outputs correspond to the
+/// second sequence of types in its instantiation. Note that the inputs and
+/// outputs only exist so that structural constraints such as linearity can be
+/// satisfied.
+///
+/// Exit immediately halts a single shot's execution. It is intended to be used
+/// when the user wants to exit the program early.
+pub const EXIT_OP_ID: OpName = OpName::new_inline("exit");
 
 /// Name of the string type.
 pub const STRING_TYPE_NAME: TypeName = TypeName::new_inline("string");
@@ -183,6 +218,7 @@ fn string_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
 }
 
 /// String type.
+#[must_use]
 pub fn string_type() -> Type {
     string_custom_type(&Arc::downgrade(&PRELUDE)).into()
 }
@@ -193,11 +229,13 @@ pub struct ConstString(String);
 
 impl ConstString {
     /// Creates a new [`ConstString`].
+    #[must_use]
     pub fn new(value: String) -> Self {
         Self(value)
     }
 
     /// Returns the value of the constant.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.0
     }
@@ -211,10 +249,6 @@ impl CustomConst for ConstString {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
     }
 
     fn get_type(&self) -> Type {
@@ -240,6 +274,7 @@ fn error_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
 }
 
 /// Unspecified opaque error type.
+#[must_use]
 pub fn error_type() -> Type {
     error_custom_type(&Arc::downgrade(&PRELUDE)).into()
 }
@@ -269,23 +304,24 @@ pub fn either_type(ty_left: impl Into<TypeRowRV>, ty_right: impl Into<TypeRowRV>
 
 /// A constant optional value with a given value.
 ///
-/// See [option_type].
+/// See [`option_type`].
+#[must_use]
 pub fn const_some(value: Value) -> Value {
     const_some_tuple([value])
 }
 
 /// A constant optional value with a row of values.
 ///
-/// For single values, use [const_some].
+/// For single values, use [`const_some`].
 ///
-/// See [option_type].
+/// See [`option_type`].
 pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
     const_right_tuple(TypeRow::new(), values)
 }
 
 /// A constant optional value with no value.
 ///
-/// See [option_type].
+/// See [`option_type`].
 pub fn const_none(ty: impl Into<TypeRowRV>) -> Value {
     const_left_tuple([], ty)
 }
@@ -294,7 +330,7 @@ pub fn const_none(ty: impl Into<TypeRowRV>) -> Value {
 ///
 /// In fallible computations, this represents a failure.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_left(value: Value, ty_right: impl Into<TypeRowRV>) -> Value {
     const_left_tuple([value], ty_right)
 }
@@ -303,7 +339,7 @@ pub fn const_left(value: Value, ty_right: impl Into<TypeRowRV>) -> Value {
 ///
 /// In fallible computations, this represents a failure.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_left_tuple(
     values: impl IntoIterator<Item = Value>,
     ty_right: impl Into<TypeRowRV>,
@@ -322,7 +358,7 @@ pub fn const_left_tuple(
 ///
 /// In fallible computations, this represents a successful result.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_right(ty_left: impl Into<TypeRowRV>, value: Value) -> Value {
     const_right_tuple(ty_left, [value])
 }
@@ -331,7 +367,7 @@ pub fn const_right(ty_left: impl Into<TypeRowRV>, value: Value) -> Value {
 ///
 /// In fallible computations, this represents a successful result.
 ///
-/// See [either_type].
+/// See [`either_type`].
 pub fn const_right_tuple(
     ty_left: impl Into<TypeRowRV>,
     values: impl IntoIterator<Item = Value>,
@@ -348,14 +384,14 @@ pub fn const_right_tuple(
 
 /// A constant Either value with a success variant.
 ///
-/// Alias for [const_right].
+/// Alias for [`const_right`].
 pub fn const_ok(value: Value, ty_fail: impl Into<TypeRowRV>) -> Value {
     const_right(ty_fail, value)
 }
 
 /// A constant Either with a row of success values.
 ///
-/// Alias for [const_right_tuple].
+/// Alias for [`const_right_tuple`].
 pub fn const_ok_tuple(
     values: impl IntoIterator<Item = Value>,
     ty_fail: impl Into<TypeRowRV>,
@@ -365,14 +401,14 @@ pub fn const_ok_tuple(
 
 /// A constant Either value with a failure variant.
 ///
-/// Alias for [const_left].
+/// Alias for [`const_left`].
 pub fn const_fail(value: Value, ty_ok: impl Into<TypeRowRV>) -> Value {
     const_left(value, ty_ok)
 }
 
 /// A constant Either with a row of failure values.
 ///
-/// Alias for [const_left_tuple].
+/// Alias for [`const_left_tuple`].
 pub fn const_fail_tuple(
     values: impl IntoIterator<Item = Value>,
     ty_ok: impl Into<TypeRowRV>,
@@ -386,11 +422,13 @@ pub struct ConstUsize(u64);
 
 impl ConstUsize {
     /// Creates a new [`ConstUsize`].
+    #[must_use]
     pub fn new(value: u64) -> Self {
         Self(value)
     }
 
     /// Returns the value of the constant.
+    #[must_use]
     pub fn value(&self) -> u64 {
         self.0
     }
@@ -406,23 +444,24 @@ impl CustomConst for ConstUsize {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
-
     fn get_type(&self) -> Type {
         usize_t()
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-/// Structure for holding constant usize values.
+/// Structure for holding constant [error types].
+///
+/// [error types]: crate::extension::prelude::error_type
 pub struct ConstError {
     /// Integer tag/signal for the error.
     pub signal: u32,
     /// Error message.
     pub message: String,
 }
+
+/// Default error signal.
+pub const DEFAULT_ERROR_SIGNAL: u32 = 1;
 
 impl ConstError {
     /// Define a new error value.
@@ -433,10 +472,16 @@ impl ConstError {
         }
     }
 
+    /// Define a new error value with the [default signal].
+    ///
+    /// [default signal]: DEFAULT_ERROR_SIGNAL
+    pub fn new_default_signal(message: impl ToString) -> Self {
+        Self::new(DEFAULT_ERROR_SIGNAL, message)
+    }
     /// Returns an "either" value with a failure variant.
     ///
     /// args:
-    ///     ty_ok: The type of the success variant.
+    ///     `ty_ok`: The type of the success variant.
     pub fn as_either(self, ty_ok: impl Into<TypeRowRV>) -> Value {
         const_fail(self.into(), ty_ok)
     }
@@ -452,11 +497,22 @@ impl CustomConst for ConstError {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
     fn get_type(&self) -> Type {
         error_type()
+    }
+}
+
+impl FromStr for ConstError {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::new_default_signal(s))
+    }
+}
+
+impl From<String> for ConstError {
+    fn from(s: String) -> Self {
+        Self::new_default_signal(s)
     }
 }
 
@@ -472,7 +528,7 @@ pub struct ConstExternalSymbol {
 }
 
 impl ConstExternalSymbol {
-    /// Construct a new [ConstExternalSymbol].
+    /// Construct a new [`ConstExternalSymbol`].
     pub fn new(symbol: impl Into<String>, typ: impl Into<Type>, constant: bool) -> Self {
         Self {
             symbol: symbol.into(),
@@ -498,9 +554,6 @@ impl CustomConst for ConstExternalSymbol {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(PRELUDE_ID)
-    }
     fn get_type(&self) -> Type {
         self.typ.clone()
     }
@@ -552,7 +605,12 @@ impl ConstFold for TupleOpDef {
         }
     }
 }
+
 impl MakeOpDef for TupleOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let rv = TypeRV::new_row_var_use(0, TypeBound::Any);
         let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
@@ -582,7 +640,7 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -600,26 +658,25 @@ impl MakeOpDef for TupleOpDef {
 pub struct MakeTuple(pub TypeRow);
 
 impl MakeTuple {
-    /// Create a new MakeTuple operation.
+    /// Create a new `MakeTuple` operation.
+    #[must_use]
     pub fn new(tys: TypeRow) -> Self {
         Self(tys)
     }
 }
 
-impl NamedOp for MakeTuple {
-    fn name(&self) -> OpName {
-        TupleOpDef::MakeTuple.name()
-    }
-}
-
 impl MakeExtensionOp for MakeTuple {
+    fn op_id(&self) -> OpName {
+        TupleOpDef::MakeTuple.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::MakeTuple {
-            return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
         let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
@@ -647,7 +704,7 @@ impl MakeExtensionOp for MakeTuple {
 
 impl MakeRegisteredOp for MakeTuple {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -662,26 +719,25 @@ impl MakeRegisteredOp for MakeTuple {
 pub struct UnpackTuple(pub TypeRow);
 
 impl UnpackTuple {
-    /// Create a new UnpackTuple operation.
+    /// Create a new `UnpackTuple` operation.
+    #[must_use]
     pub fn new(tys: TypeRow) -> Self {
         Self(tys)
     }
 }
 
-impl NamedOp for UnpackTuple {
-    fn name(&self) -> OpName {
-        TupleOpDef::UnpackTuple.name()
-    }
-}
-
 impl MakeExtensionOp for UnpackTuple {
+    fn op_id(&self) -> OpName {
+        TupleOpDef::UnpackTuple.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::UnpackTuple {
-            return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
         let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
@@ -709,7 +765,7 @@ impl MakeExtensionOp for UnpackTuple {
 
 impl MakeRegisteredOp for UnpackTuple {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -717,28 +773,30 @@ impl MakeRegisteredOp for UnpackTuple {
     }
 }
 
+/// Name of the no-op operation.
+pub const NOOP_OP_ID: OpName = OpName::new_inline("Noop");
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 /// A no-op operation definition.
 pub struct NoopDef;
-
-impl NamedOp for NoopDef {
-    fn name(&self) -> OpName {
-        "Noop".into()
-    }
-}
 
 impl std::str::FromStr for NoopDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == NoopDef.name() {
+        if s == NoopDef.op_id() {
             Ok(Self)
         } else {
             Err(())
         }
     }
 }
+
 impl MakeOpDef for NoopDef {
+    fn opdef_id(&self) -> OpName {
+        NOOP_OP_ID
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let tv = Type::new_var_use(0, TypeBound::Any);
         PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(tv)).into()
@@ -753,7 +811,7 @@ impl MakeOpDef for NoopDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -783,6 +841,7 @@ pub struct Noop(pub Type);
 
 impl Noop {
     /// Create a new Noop operation.
+    #[must_use]
     pub fn new(ty: Type) -> Self {
         Self(ty)
     }
@@ -793,13 +852,12 @@ impl Default for Noop {
         Self(Type::UNIT)
     }
 }
-impl NamedOp for Noop {
-    fn name(&self) -> OpName {
-        NoopDef.name()
-    }
-}
 
 impl MakeExtensionOp for Noop {
+    fn op_id(&self) -> OpName {
+        NoopDef.op_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -818,7 +876,7 @@ impl MakeExtensionOp for Noop {
 
 impl MakeRegisteredOp for Noop {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -827,20 +885,17 @@ impl MakeRegisteredOp for Noop {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-/// A lift operation definition.
-pub struct LiftDef;
+/// A barrier operation definition.
+pub struct BarrierDef;
 
-impl NamedOp for LiftDef {
-    fn name(&self) -> OpName {
-        "Lift".into()
-    }
-}
+/// Name of the barrier operation.
+pub const BARRIER_OP_ID: OpName = OpName::new_inline("Barrier");
 
-impl std::str::FromStr for LiftDef {
+impl std::str::FromStr for BarrierDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == LiftDef.name() {
+        if s == BarrierDef.op_id() {
             Ok(Self)
         } else {
             Err(())
@@ -848,18 +903,21 @@ impl std::str::FromStr for LiftDef {
     }
 }
 
-impl MakeOpDef for LiftDef {
+impl MakeOpDef for BarrierDef {
+    fn opdef_id(&self) -> OpName {
+        BARRIER_OP_ID
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
-            vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
-            FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))
-                .with_extension_delta(ExtensionSet::type_var(0)),
+            vec![TypeParam::new_list(TypeBound::Any)],
+            FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any)),
         )
         .into()
     }
 
     fn description(&self) -> String {
-        "Add extension requirements to a row of values".to_string()
+        "Add a barrier to a row of values".to_string()
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
@@ -867,7 +925,7 @@ impl MakeOpDef for LiftDef {
     }
 
     fn extension(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -875,42 +933,43 @@ impl MakeOpDef for LiftDef {
     }
 }
 
-/// A node which adds a extension req to the types of the wires it is passed
-/// It has no effect on the values passed along the edge
+/// A barrier across a row of values. This operation has no effect on the values,
+/// except to enforce some ordering between operations before and after the barrier.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 #[non_exhaustive]
-pub struct Lift {
+pub struct Barrier {
     /// The types of the edges
     pub type_row: TypeRow,
-    /// The extensions which we're adding to the inputs
-    pub new_extensions: ExtensionSet,
 }
 
-impl Lift {
-    /// Create a new Lift operation with the extensions to add.
-    pub fn new(type_row: TypeRow, set: impl Into<ExtensionSet>) -> Self {
+impl Barrier {
+    /// Create a new Barrier operation over the specified row.
+    pub fn new(type_row: impl Into<TypeRow>) -> Self {
         Self {
-            type_row,
-            new_extensions: set.into(),
+            type_row: type_row.into(),
         }
     }
 }
 
-impl NamedOp for Lift {
+impl NamedOp for Barrier {
     fn name(&self) -> OpName {
-        LiftDef.name()
+        BarrierDef.op_id()
     }
 }
 
-impl MakeExtensionOp for Lift {
+impl MakeExtensionOp for Barrier {
+    fn op_id(&self) -> OpName {
+        BarrierDef.op_id()
+    }
+
     fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
-        let _def = LiftDef::from_def(ext_op.def())?;
+        let _def = BarrierDef::from_def(ext_op.def())?;
 
-        let [TypeArg::Extensions { es }, TypeArg::Sequence { elems }] = ext_op.args() else {
+        let [TypeArg::Sequence { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
@@ -922,29 +981,23 @@ impl MakeExtensionOp for Lift {
             .collect();
         Ok(Self {
             type_row: tys?.into(),
-            new_extensions: es.clone(),
         })
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![
-            TypeArg::Extensions {
-                es: self.new_extensions.clone(),
-            },
-            TypeArg::Sequence {
-                elems: self
-                    .type_row
-                    .iter()
-                    .map(|t| TypeArg::Type { ty: t.clone() })
-                    .collect(),
-            },
-        ]
+        vec![TypeArg::Sequence {
+            elems: self
+                .type_row
+                .iter()
+                .map(|t| TypeArg::Type { ty: t.clone() })
+                .collect(),
+        }]
     }
 }
 
-impl MakeRegisteredOp for Lift {
+impl MakeRegisteredOp for Barrier {
     fn extension_id(&self) -> ExtensionId {
-        PRELUDE_ID.to_owned()
+        PRELUDE_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -955,11 +1008,11 @@ impl MakeRegisteredOp for Lift {
 #[cfg(test)]
 mod test {
     use crate::builder::inout_sig;
-    use crate::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+    use crate::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
     use crate::{
-        builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
-        utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
+        utils::test_quantum_extension::cx_gate,
     };
 
     use super::*;
@@ -1015,17 +1068,14 @@ mod test {
 
     #[test]
     fn test_lift() {
-        const XA: ExtensionId = ExtensionId::new_unchecked("xa");
-        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(XA));
+        let op = Barrier::new(type_row![Type::UNIT]);
         let optype: OpType = op.clone().into();
         assert_eq!(
             optype.dataflow_signature().unwrap().as_ref(),
             &Signature::new_endo(type_row![Type::UNIT])
-                .with_extension_delta(XA)
-                .with_prelude()
         );
 
-        let new_op = Lift::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        let new_op = Barrier::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
         assert_eq!(new_op, op);
     }
 
@@ -1075,10 +1125,6 @@ mod test {
 
         assert!(error_val.validate().is_ok());
 
-        assert_eq!(
-            error_val.extension_reqs(),
-            ExtensionSet::singleton(PRELUDE_ID)
-        );
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
 
@@ -1088,7 +1134,7 @@ mod test {
 
         const TYPE_ARG_NONE: TypeArg = TypeArg::Sequence { elems: vec![] };
         let op = PRELUDE
-            .instantiate_extension_op(&PANIC_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
+            .instantiate_extension_op(&EXIT_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
@@ -1135,10 +1181,6 @@ mod test {
         let string_const: ConstString = ConstString::new("Lorem ipsum".into());
         assert_eq!(string_const.name(), "ConstString(\"Lorem ipsum\")");
         assert!(string_const.validate().is_ok());
-        assert_eq!(
-            string_const.extension_reqs(),
-            ExtensionSet::singleton(PRELUDE_ID)
-        );
         assert!(string_const.equal_consts(&ConstString::new("Lorem ipsum".into())));
         assert!(!string_const.equal_consts(&ConstString::new("Lorem ispum".into())));
     }
@@ -1160,17 +1202,15 @@ mod test {
         assert_eq!(subject.get_type(), Type::UNIT);
         assert_eq!(subject.name(), "@foo");
         assert!(subject.validate().is_ok());
-        assert_eq!(
-            subject.extension_reqs(),
-            ExtensionSet::singleton(PRELUDE_ID)
-        );
         assert!(subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("bar", Type::UNIT, false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", string_type(), false)));
         assert!(!subject.equal_consts(&ConstExternalSymbol::new("foo", Type::UNIT, true)));
 
-        assert!(ConstExternalSymbol::new("", Type::UNIT, true)
-            .validate()
-            .is_err())
+        assert!(
+            ConstExternalSymbol::new("", Type::UNIT, true)
+                .validate()
+                .is_err()
+        );
     }
 }

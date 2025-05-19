@@ -1,5 +1,7 @@
 (hugr 0)
 
+(mod)
+
 (declare-operation core.call-indirect
                    (param ?inputs (core.list core.type))
                    (param ?outputs (core.list core.type))
@@ -11,11 +13,9 @@
                    (param ?inputs-1 (core.list core.type))
                    (param ?outputs-0 (core.list core.type))
                    (param ?outputs-1 (core.list core.type))
-                   (param ?exts core.ext-set)
                    (core.fn
-                    [(core.fn ?inputs-0 ?outputs-0 ?exts)
-                     (core.fn ?inputs-1 ?outputs-1 ?exts)
+                    [(core.fn ?inputs-0 ?outputs-0)
+                     (core.fn ?inputs-1 ?outputs-1)
                      ?inputs-0 ...
                      ?inputs-1 ...]
-                    [?outputs-0 ... ?outputs-1 ...]
-                    ?exts))
+                    [?outputs-0 ... ?outputs-1 ...]))

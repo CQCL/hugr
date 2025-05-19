@@ -1,16 +1,17 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
+use hugr_core::Node;
+use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
-    constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
-    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, CFG,
+    CFG, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
+    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, constant::Sum,
 };
 use hugr_core::{
-    hugr::views::SiblingGraph,
-    types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
+    types::{SumType, Type, TypeEnum},
 };
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, CallableValue};
-use itertools::{zip_eq, Itertools};
+use itertools::{Itertools, zip_eq};
 use petgraph::visit::Walker;
 
 use crate::{
@@ -19,9 +20,8 @@ use crate::{
 };
 
 use super::{
-    deaggregate_call_result,
+    EmitOpArgs, deaggregate_call_result,
     func::{EmitFuncContext, RowPromise},
-    EmitOpArgs,
 };
 
 mod cfg;
@@ -32,7 +32,7 @@ struct DataflowParentEmitter<'c, 'hugr, OT, H> {
     outputs: Option<RowPromise<'c>>,
 }
 
-impl<'c, 'hugr, OT: OpTrait, H: HugrView> DataflowParentEmitter<'c, 'hugr, OT, H>
+impl<'c, 'hugr, OT: OpTrait, H: HugrView<Node = Node>> DataflowParentEmitter<'c, 'hugr, OT, H>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
@@ -61,8 +61,8 @@ where
         use petgraph::visit::Topo;
         let node = self.node;
         if !OpTag::DataflowParent.is_superset(node.tag()) {
-            Err(anyhow!("Not a dataflow parent"))?
-        };
+            Err(anyhow!("Not a dataflow parent"))?;
+        }
 
         let (i, o): (FatNode<Input, H>, FatNode<Output, H>) = node
             .get_io()
@@ -70,34 +70,33 @@ where
         debug_assert!(i.out_value_types().count() == self.inputs.as_ref().unwrap().len());
         debug_assert!(o.in_value_types().count() == self.outputs.as_ref().unwrap().len());
 
-        let region: SiblingGraph = node.try_new_hierarchy_view().unwrap();
-        Topo::new(&region.as_petgraph())
-            .iter(&region.as_petgraph())
-            .filter(|x| (*x != node.node()))
-            .map(|x| node.hugr().fat_optype(x))
-            .try_for_each(|node| {
-                let inputs_rmb = context.node_ins_rmb(node)?;
-                let inputs = inputs_rmb.read(context.builder(), [])?;
-                let outputs = context.node_outs_rmb(node)?.promise();
-                match node.as_ref() {
-                    OpType::Input(_) => {
-                        let i = self.take_input()?;
-                        outputs.finish(context.builder(), i)
-                    }
-                    OpType::Output(_) => {
-                        let o = self.take_output()?;
-                        o.finish(context.builder(), inputs)
-                    }
-                    _ => emit_optype(
-                        context,
-                        EmitOpArgs {
-                            node,
-                            inputs,
-                            outputs,
-                        },
-                    ),
+        let (region_graph, node_map) = node.hugr().region_portgraph(node.node());
+        let topo = Topo::new(&region_graph);
+        for n in topo.iter(&region_graph) {
+            let node = node.hugr().fat_optype(node_map.from_portgraph(n));
+            let inputs_rmb = context.node_ins_rmb(node)?;
+            let inputs = inputs_rmb.read(context.builder(), [])?;
+            let outputs = context.node_outs_rmb(node)?.promise();
+            match node.as_ref() {
+                OpType::Input(_) => {
+                    let i = self.take_input()?;
+                    outputs.finish(context.builder(), i)?;
                 }
-            })
+                OpType::Output(_) => {
+                    let o = self.take_output()?;
+                    o.finish(context.builder(), inputs)?;
+                }
+                _ => emit_optype(
+                    context,
+                    EmitOpArgs {
+                        node,
+                        inputs,
+                        outputs,
+                    },
+                )?,
+            }
+        }
+        Ok(())
     }
 }
 
@@ -113,7 +112,7 @@ fn get_exactly_one_sum_type(ts: impl IntoIterator<Item = Type>) -> Result<SumTyp
     Ok(sum_type)
 }
 
-pub fn emit_value<'c, H: HugrView>(
+pub fn emit_value<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     v: &Value,
 ) -> Result<BasicValueEnum<'c>> {
@@ -139,7 +138,7 @@ pub fn emit_value<'c, H: HugrView>(
     }
 }
 
-pub(crate) fn emit_dataflow_parent<'c, 'hugr, OT: OpTrait, H: HugrView>(
+pub(crate) fn emit_dataflow_parent<'c, 'hugr, OT: OpTrait, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, 'hugr, OT, H>,
 ) -> Result<()>
@@ -149,7 +148,7 @@ where
     DataflowParentEmitter::new(args).emit_children(context)
 }
 
-fn emit_tag<'c, H: HugrView>(
+fn emit_tag<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, Tag, H>,
 ) -> Result<()> {
@@ -163,7 +162,7 @@ fn emit_tag<'c, H: HugrView>(
     )
 }
 
-fn emit_conditional<'c, H: HugrView>(
+fn emit_conditional<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     EmitOpArgs {
         node,
@@ -220,7 +219,7 @@ fn emit_conditional<'c, H: HugrView>(
     Ok(())
 }
 
-fn emit_load_constant<'c, H: HugrView>(
+fn emit_load_constant<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, LoadConstant, H>,
 ) -> Result<()> {
@@ -235,7 +234,7 @@ fn emit_load_constant<'c, H: HugrView>(
     args.outputs.finish(context.builder(), [r])
 }
 
-fn emit_call<'c, H: HugrView>(
+fn emit_call<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, Call, H>,
 ) -> Result<()> {
@@ -258,7 +257,7 @@ fn emit_call<'c, H: HugrView>(
     args.outputs.finish(builder, call_results)
 }
 
-fn emit_call_indirect<'c, H: HugrView>(
+fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, CallIndirect, H>,
 ) -> Result<()> {
@@ -275,7 +274,7 @@ fn emit_call_indirect<'c, H: HugrView>(
     args.outputs.finish(builder, call_results)
 }
 
-fn emit_load_function<'c, H: HugrView>(
+fn emit_load_function<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, LoadFunction, H>,
 ) -> Result<()> {
@@ -298,14 +297,14 @@ fn emit_load_function<'c, H: HugrView>(
     )
 }
 
-fn emit_cfg<'c, H: HugrView>(
+fn emit_cfg<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, CFG, H>,
 ) -> Result<()> {
     cfg::CfgEmitter::new(context, args)?.emit_children(context)
 }
 
-fn emit_tail_loop<'c, H: HugrView>(
+fn emit_tail_loop<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, TailLoop, H>,
 ) -> Result<()> {
@@ -358,27 +357,27 @@ fn emit_tail_loop<'c, H: HugrView>(
     Ok(())
 }
 
-fn emit_optype<'c, H: HugrView>(
+fn emit_optype<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, OpType, H>,
 ) -> Result<()> {
     let node = args.node();
     match node.as_ref() {
-        OpType::Tag(ref tag) => emit_tag(context, args.into_ot(tag)),
+        OpType::Tag(tag) => emit_tag(context, args.into_ot(tag)),
         OpType::DFG(_) => emit_dataflow_parent(context, args),
 
-        OpType::ExtensionOp(ref co) => context.emit_extension_op(args.into_ot(co)),
-        OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
-        OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
-        OpType::CallIndirect(ref cl) => emit_call_indirect(context, args.into_ot(cl)),
-        OpType::LoadFunction(ref lf) => emit_load_function(context, args.into_ot(lf)),
-        OpType::Conditional(ref co) => emit_conditional(context, args.into_ot(co)),
-        OpType::CFG(ref cfg) => emit_cfg(context, args.into_ot(cfg)),
+        OpType::ExtensionOp(co) => context.emit_extension_op(args.into_ot(co)),
+        OpType::LoadConstant(lc) => emit_load_constant(context, args.into_ot(lc)),
+        OpType::Call(cl) => emit_call(context, args.into_ot(cl)),
+        OpType::CallIndirect(cl) => emit_call_indirect(context, args.into_ot(cl)),
+        OpType::LoadFunction(lf) => emit_load_function(context, args.into_ot(lf)),
+        OpType::Conditional(co) => emit_conditional(context, args.into_ot(co)),
+        OpType::CFG(cfg) => emit_cfg(context, args.into_ot(cfg)),
         // Const is allowed, but requires no work here. FuncDecl is technically
         // not allowed, but there is no harm in allowing it.
         OpType::Const(_) => Ok(()),
         OpType::FuncDecl(_) => Ok(()),
-        OpType::FuncDefn(ref fd) => {
+        OpType::FuncDefn(fd) => {
             context.push_todo_func(node.into_ot(fd));
             Ok(())
         }
@@ -401,7 +400,7 @@ pub(crate) fn emit_custom_unary_op<'c, 'hugr, H, F>(
     go: F,
 ) -> Result<()>
 where
-    H: HugrView,
+    H: HugrView<Node = Node>,
     F: FnOnce(
         &mut EmitFuncContext<'c, '_, H>,
         BasicValueEnum<'c>,
@@ -442,7 +441,7 @@ pub(crate) fn emit_custom_binary_op<'c, 'hugr, H, F>(
     go: F,
 ) -> Result<()>
 where
-    H: HugrView,
+    H: HugrView<Node = Node>,
     F: FnOnce(
         &mut EmitFuncContext<'c, '_, H>,
         (BasicValueEnum<'c>, BasicValueEnum<'c>),

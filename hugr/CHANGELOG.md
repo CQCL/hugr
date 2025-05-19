@@ -1,5 +1,172 @@
 # Changelog
 
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-v0.15.4...hugr-v0.20.0) - 2025-05-14
+
+This release contains a big list of changes reworking multiple core definitions of HUGR.
+Some of these changes include:
+
+- 🧹 Cleanup of the internal hugr traits, making it possible to create virtual
+  Hugrs that are not backed by a portgraph or use different node index types.
+- 🚪 The functional root of a Hugr is now called the *entrypoint*. This node may
+  exist somewhere inside the region hierarchy, so we can now model edges that
+  connect beyond the descendants of the entrypoint.
+- 🌲 The hugr region hierarchy is now always rooted by a `Module` operation.
+- ✂ Made `SimpleReplacement` even simpler and easy to use.
+- 🔧 The `Rewrite` trait has been split into `VerifyPatch` and `Patch` parts.
+- ✉️ Hugr and package serialization is now done entirely using Envelopes. We
+  provide some backward-compatibility layers that will be removed in the future.
+- 🦀 The Minimum Supported Rust Version (MSRV) has been updated to `1.85`.
+
+### Bug Fixes
+
+- [**breaking**] Don't expose `HugrMutInternals` ([#2071](https://github.com/CQCL/hugr/pull/2071))
+- `as_unary_option` indexing bug ([#2163](https://github.com/CQCL/hugr/pull/2163))
+- Skip phantom data for array value serialisation ([#2166](https://github.com/CQCL/hugr/pull/2166))
+- Remove deleted nodes from node_map in `SimpleReplacement` ([#2176](https://github.com/CQCL/hugr/pull/2176))
+- [**breaking**] Use unique region_portgraph in convexity check ([#2192](https://github.com/CQCL/hugr/pull/2192))
+- Panic when an extension name is too long. ([#2198](https://github.com/CQCL/hugr/pull/2198))
+- Respect type bounds on local variables when importing. ([#2206](https://github.com/CQCL/hugr/pull/2206))
+- Import and export JSON metadata on module roots. ([#2207](https://github.com/CQCL/hugr/pull/2207))
+
+### New Features
+
+- [**breaking**] Handle CallIndirect in Dataflow Analysis ([#2059](https://github.com/CQCL/hugr/pull/2059))
+- [**breaking**] ComposablePass trait allowing sequencing and validation ([#1895](https://github.com/CQCL/hugr/pull/1895))
+- [**breaking**] ReplaceTypes: allow lowering ops into a Call to a function already in the Hugr ([#2094](https://github.com/CQCL/hugr/pull/2094))
+- export mangle name function ([#2152](https://github.com/CQCL/hugr/pull/2152))
+- [**breaking**] Explicit hugr type param to ComposablePass ([#2179](https://github.com/CQCL/hugr/pull/2179))
+- [**breaking**] Allow generic Nodes in HugrMut insert operations ([#2075](https://github.com/CQCL/hugr/pull/2075))
+- [**breaking**] Mark all Error enums as non_exhaustive ([#2056](https://github.com/CQCL/hugr/pull/2056))
+- Make NodeHandle generic ([#2092](https://github.com/CQCL/hugr/pull/2092))
+- [**breaking**] remove ExtensionValue ([#2093](https://github.com/CQCL/hugr/pull/2093))
+- [**breaking**] Hugrmut on generic nodes ([#2111](https://github.com/CQCL/hugr/pull/2111))
+- [**breaking**] Cleanup core trait definitions ([#2126](https://github.com/CQCL/hugr/pull/2126))
+- [**breaking**] Accept outgoing ports in SimpleReplacement nu_out ([#2151](https://github.com/CQCL/hugr/pull/2151))
+- [**breaking**] Improved array lowering ([#2109](https://github.com/CQCL/hugr/pull/2109))
+- [**breaking**] Make `NamedOp` private. Add `MakeExtensionOp::name` and `MakeOpDef::opdef_name` ([#2138](https://github.com/CQCL/hugr/pull/2138))
+- InsertCut patch for inserting HUGR across edges. ([#2153](https://github.com/CQCL/hugr/pull/2153))
+- [**breaking**] Add Hugr entrypoints ([#2147](https://github.com/CQCL/hugr/pull/2147))
+- [**breaking**] Return a node mapping in HugrInternals::region_portgraph ([#2164](https://github.com/CQCL/hugr/pull/2164))
+- [**breaking**] Validate any HugrView, make errors generic ([#2155](https://github.com/CQCL/hugr/pull/2155))
+- Reimplement `insert_hugr` using only `HugrView` ([#2174](https://github.com/CQCL/hugr/pull/2174))
+- Only allow region containers as entrypoints ([#2173](https://github.com/CQCL/hugr/pull/2173))
+- Export and import entrypoints via metadata in `hugr-model`. ([#2172](https://github.com/CQCL/hugr/pull/2172))
+- [**breaking**] Removed model_unstable feature flag ([#2120](https://github.com/CQCL/hugr/pull/2120))
+- [**breaking**] Remove `RootTagged` from the hugr view trait hierarchy ([#2122](https://github.com/CQCL/hugr/pull/2122))
+- [**breaking**] Split Rewrite trait into VerifyPatch and ApplyPatch ([#2070](https://github.com/CQCL/hugr/pull/2070))
+- [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
+- [**breaking**] Removed runtime extension sets. ([#2145](https://github.com/CQCL/hugr/pull/2145))
+- [**breaking**] Only expose envelope serialization of hugrs and packages ([#2167](https://github.com/CQCL/hugr/pull/2167))
+- Packages do not include the hugr extensions by default ([#2187](https://github.com/CQCL/hugr/pull/2187))
+- Define text-model envelope formats ([#2188](https://github.com/CQCL/hugr/pull/2188))
+- [**breaking**] Remove description on opaque ops. ([#2197](https://github.com/CQCL/hugr/pull/2197))
+- Import CFG regions without adding an entry block. ([#2200](https://github.com/CQCL/hugr/pull/2200))
+- [**breaking**] Remove boundary map in SimpleReplacement ([#2208](https://github.com/CQCL/hugr/pull/2208))
+- Export macro for hugr serde wrappers with custom extensions ([#2209](https://github.com/CQCL/hugr/pull/2209))
+- Allow any dataflow parent as SiblingSubgraph replacement ([#2210](https://github.com/CQCL/hugr/pull/2210))
+- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
+- Add SiblingSubgraph::set_outgoing_ports ([#2217](https://github.com/CQCL/hugr/pull/2217))
+- Symbol applications can leave out prefixes of wildcards. ([#2201](https://github.com/CQCL/hugr/pull/2201))
+
+### Refactor
+
+- do not use .portgraph in mermaid/graphviz ([#2177](https://github.com/CQCL/hugr/pull/2177))
+- [**breaking**] Removed global portgraph-related methods from `HugrInternals` ([#2180](https://github.com/CQCL/hugr/pull/2180))
+
+### Testing
+
+- Check envelope roundtrips rather than json in `HugrView::verify` ([#2186](https://github.com/CQCL/hugr/pull/2186))
+
+## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-v0.15.3...hugr-v0.15.4) - 2025-05-07
+
+### New Features
+
+- Export the portgraph hierarchy in HugrInternals ([#2057](https://github.com/CQCL/hugr/pull/2057))
+- Implement Debug for generic Wire<N>s ([#2068](https://github.com/CQCL/hugr/pull/2068))
+- Add ExtensionOp helpers ([#2072](https://github.com/CQCL/hugr/pull/2072))
+- ReplaceTypes: handlers for array constants + linearization ([#2023](https://github.com/CQCL/hugr/pull/2023))
+- move `ArrayOpBuilder` to hugr-core ([#2115](https://github.com/CQCL/hugr/pull/2115))
+
+### Testing
+
+- Disable IO-dependent tests when running miri ([#2123](https://github.com/CQCL/hugr/pull/2123))
+
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-v0.15.2...hugr-v0.15.3) - 2025-04-02
+
+### Documentation
+
+- Provide docs for array ops, fix bad doc for HugrView::poly_func_type ([#2021](https://github.com/CQCL/hugr/pull/2021))
+
+### New Features
+
+- MakeTuple->UnpackTuple elision pass ([#2012](https://github.com/CQCL/hugr/pull/2012))
+- Extend LowerTypes pass to linearize by inserting copy/discard ([#2018](https://github.com/CQCL/hugr/pull/2018))
+- Expand SimpleReplacement API ([#1920](https://github.com/CQCL/hugr/pull/1920))
+- Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/pull/1959))
+- ReplaceTypes pass allows replacing extension types and ops ([#1989](https://github.com/CQCL/hugr/pull/1989))
+- Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/pull/2031))
+- Represent order edges in `hugr-model` as metadata. ([#2027](https://github.com/CQCL/hugr/pull/2027))
+- add `build_expect_sum` to allow specific error messages ([#2032](https://github.com/CQCL/hugr/pull/2032))
+- Packages in `hugr-model` and envelope support. ([#2026](https://github.com/CQCL/hugr/pull/2026))
+
+## [0.15.2](https://github.com/CQCL/hugr/compare/hugr-v0.15.1...hugr-v0.15.2) - 2025-03-21
+
+### Bug Fixes
+
+- Don't enable envelope compression by default (yet) ([#2014](https://github.com/CQCL/hugr/pull/2014))
+- Inconsistent behaviour in `SiblingSubgraph::from_nodes` ([#2011](https://github.com/CQCL/hugr/pull/2011))
+
+## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-v0.15.0...hugr-v0.15.1) - 2025-03-21
+
+### Bug Fixes
+
+- correct `CallIndirect` tag from `FnCall` to `DataflowChild` ([#2006](https://github.com/CQCL/hugr/pull/2006))
+- StaticArrayValue serialisation ([#2009](https://github.com/CQCL/hugr/pull/2009))
+
+### New Features
+
+- traits for transforming Types/TypeArgs/etc. ([#1991](https://github.com/CQCL/hugr/pull/1991))
+- add exit operation to prelude ([#2008](https://github.com/CQCL/hugr/pull/2008))
+- Add llvm codegen for collections.static_array ([#2003](https://github.com/CQCL/hugr/pull/2003))
+- *(hugr-py)* Support envelope compression ([#1994](https://github.com/CQCL/hugr/pull/1994))
+
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-v0.14.4...hugr-v0.15.0) - 2025-03-14
+
+This release adds a new `Node` parameter to the `HugrView` trait, so it is now possible to have more complex structures behave like hugrs.
+
+We also added a new text/binary serialization format for hugrs that will let us keep interoperability between different versions.
+
+Finally, we added multiple new operations and improvements to the rewrites and passes.
+
+### New Features
+
+- Add separate DCE pass ([#1902](https://github.com/CQCL/hugr/pull/1902))
+- [**breaking**] Don't assume "main"-function in dataflow + constant folding ([#1896](https://github.com/CQCL/hugr/pull/1896))
+- [**breaking**] Add associated type Node to HugrView ([#1932](https://github.com/CQCL/hugr/pull/1932))
+- Rewrite for inlining a single Call ([#1934](https://github.com/CQCL/hugr/pull/1934))
+- [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))
+- `hugr-model` AST ([#1953](https://github.com/CQCL/hugr/pull/1953))
+- Add float <--> int bytecasting ops to conversions extension ([#1956](https://github.com/CQCL/hugr/pull/1956))
+- Add collections.static_array extension. ([#1964](https://github.com/CQCL/hugr/pull/1964))
+- [**breaking**] Generic HUGR serialization with envelopes ([#1958](https://github.com/CQCL/hugr/pull/1958))
+
+### Refactor
+
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` ([#1870](https://github.com/CQCL/hugr/pull/1870))
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-v0.14.3...hugr-v0.14.4) - 2025-02-24
+
+### Bug Fixes
+
+- delegate default impls in HugrView (#1921)
+
+### New Features
+
+- add xor to logic extension (#1911)
+- Add `Type::as_sum` and `SumType::variants`. (#1914)
+- Add `HugrMutInternals::insert_ports` (#1915)
+
 ## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-v0.14.2...hugr-v0.14.3) - 2025-02-05
 
 ### Bug Fixes

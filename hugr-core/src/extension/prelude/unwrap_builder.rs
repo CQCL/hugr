@@ -1,13 +1,13 @@
 use std::iter;
 
 use crate::{
+    Wire,
     builder::{BuildError, BuildHandle, Dataflow, DataflowSubContainer, SubContainer},
     extension::prelude::{ConstError, PANIC_OP_ID},
     ops::handle::DataflowOpID,
     types::{SumType, Type, TypeArg, TypeRow},
-    Wire,
 };
-use itertools::{zip_eq, Itertools as _};
+use itertools::{Itertools as _, zip_eq};
 
 use super::PRELUDE;
 
@@ -44,6 +44,31 @@ pub trait UnwrapBuilder: Dataflow {
         sum_type: SumType,
         input: Wire,
     ) -> Result<[Wire; N], BuildError> {
+        self.build_expect_sum(tag, sum_type, input, |i| {
+            format!("Expected variant {tag} but got variant {i}")
+        })
+    }
+
+    /// Build an unwrap operation for a sum type to extract the variant at the given tag
+    /// or panic with given message if the tag is not the expected value.
+    ///
+    /// `error` is a function that takes the actual tag and returns the error message
+    /// for cases where the tag is not the expected value.
+    ///
+    /// # Panics
+    ///
+    /// If `tag` is greater than the number of variants in the sum type.
+    ///
+    /// # Errors
+    ///
+    /// Errors in building the unwrapping conditional.
+    fn build_expect_sum<const N: usize, T: Into<ConstError>>(
+        &mut self,
+        tag: usize,
+        sum_type: SumType,
+        input: Wire,
+        mut error: impl FnMut(usize) -> T,
+    ) -> Result<[Wire; N], BuildError> {
         let variants: Vec<TypeRow> = (0..sum_type.num_variants())
             .map(|i| {
                 let tr_rv = sum_type.get_variant(i).unwrap().to_owned();
@@ -64,8 +89,7 @@ pub trait UnwrapBuilder: Dataflow {
             } else {
                 let output_row = output_row.iter().cloned();
                 let inputs = zip_eq(case.input_wires(), variant.iter().cloned());
-                let err =
-                    ConstError::new(1, format!("Expected variant {} but got variant {}", tag, i));
+                let err = error(i).into();
                 let outputs = case.add_panic(err, output_row, inputs)?.outputs();
                 case.finish_with_outputs(outputs)?;
             }
@@ -87,10 +111,8 @@ mod tests {
 
     #[test]
     fn test_build_unwrap() {
-        let mut builder = DFGBuilder::new(
-            Signature::new(Type::from(option_type(bool_t())), bool_t()).with_prelude(),
-        )
-        .unwrap();
+        let mut builder =
+            DFGBuilder::new(Signature::new(Type::from(option_type(bool_t())), bool_t())).unwrap();
 
         let [opt] = builder.input_wires_arr();
 

@@ -25,10 +25,11 @@
 //! # Example
 //!
 //! To build a HUGR for a simple quantum circuit and then serialize it to a buffer, we can define
-//! a simple quantum extension and then use the [[builder::DFGBuilder]] as follows:
+//! a simple quantum extension and then use the [[`builder::DFGBuilder`]] as follows:
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
 //! use hugr::extension::prelude::{bool_t, qb_t};
+//! use hugr::envelope::EnvelopeConfig;
 //! use hugr::hugr::Hugr;
 //! use hugr::type_row;
 //! use hugr::types::FuncValueType;
@@ -123,13 +124,15 @@
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().unwrap();
-//! let serialized = serde_json::to_string(&h).unwrap();
+//! let serialized = h.store_str(EnvelopeConfig::text()).unwrap();
 //! println!("{}", serialized);
 //! ```
 
 // These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
 // The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate.
-pub use hugr_core::{builder, core, extension, ops, package, std_extensions, types, utils};
+pub use hugr_core::{
+    builder, core, envelope, extension, ops, package, std_extensions, types, utils,
+};
 #[doc(inline)]
 pub use hugr_passes as algorithms;
 

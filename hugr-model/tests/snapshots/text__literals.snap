@@ -4,6 +4,8 @@ expression: "roundtrip(include_str!(\"fixtures/model-literals.edn\"))"
 ---
 (hugr 0)
 
+(mod)
+
 (define-alias mod.string core.str "\"\n\r\t\\👍")
 
 (define-alias mod.bytes core.bytes (bytes "SGVsbG8gd29ybGQg8J+Yig=="))

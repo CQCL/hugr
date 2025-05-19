@@ -1,25 +1,25 @@
-use ascent::{lattice::BoundedLattice, Lattice};
+use std::convert::Infallible;
 
-use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder};
-use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
-use hugr_core::ops::handle::DfgID;
-use hugr_core::ops::TailLoop;
-use hugr_core::types::TypeRow;
+use ascent::{Lattice, lattice::BoundedLattice};
+
+use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder, inout_sig};
+use hugr_core::ops::{CallIndirect, TailLoop};
+use hugr_core::types::{ConstTypeError, TypeRow};
+use hugr_core::{Hugr, Node, Wire};
 use hugr_core::{
-    builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
-    extension::{
-        prelude::{bool_t, UnpackTuple},
-        ExtensionSet,
-    },
-    ops::{handle::NodeHandle, DataflowOpTrait, Tag, Value},
+    HugrView,
+    builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer, endo_sig},
+    extension::prelude::{UnpackTuple, bool_t},
+    ops::{DataflowOpTrait, Tag, Value, handle::NodeHandle},
     type_row,
     types::{Signature, SumType, Type},
-    HugrView,
 };
-use hugr_core::{Hugr, Wire};
 use rstest::{fixture, rstest};
 
-use super::{AbstractValue, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination};
+use super::{
+    AbstractValue, AsConcrete, ConstLoader, DFContext, LoadedFunction, Machine, PartialValue, Sum,
+    TailLoopTermination,
+};
 
 // ------- Minimal implementation of DFContext and AbstractValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -29,13 +29,27 @@ impl AbstractValue for Void {}
 
 struct TestContext;
 
-impl ConstLoader<Void> for TestContext {}
+impl ConstLoader<Void> for TestContext {
+    type Node = Node;
+}
 impl DFContext<Void> for TestContext {}
 
 // This allows testing creation of tuple/sum Values (only)
-impl From<Void> for Value {
-    fn from(v: Void) -> Self {
+impl<N> AsConcrete<Void, N> for Value {
+    type ValErr = Infallible;
+
+    type SumErr = ConstTypeError;
+
+    fn from_value(v: Void) -> Result<Self, Infallible> {
         match v {}
+    }
+
+    fn from_sum(value: Sum<Self>) -> Result<Self, Self::SumErr> {
+        Self::sum(value.tag, value.values, value.st)
+    }
+
+    fn from_func(func: LoadedFunction<N>) -> Result<Self, crate::dataflow::LoadedFunction<N>> {
+        Err(func)
     }
 }
 
@@ -108,7 +122,7 @@ fn test_tail_loop_never_iterates() {
     assert_eq!(
         Some(TailLoopTermination::NeverContinues),
         results.tail_loop_terminates(tail_loop.node())
-    )
+    );
 }
 
 #[test]
@@ -146,7 +160,7 @@ fn test_tail_loop_always_iterates() {
         Some(TailLoopTermination::NeverBreaks),
         results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.entrypoint()), None);
 }
 
 #[test]
@@ -157,12 +171,7 @@ fn test_tail_loop_two_iters() {
     let false_w = builder.add_load_value(Value::false_val());
 
     let tlb = builder
-        .tail_loop_builder_exts(
-            [],
-            [(bool_t(), false_w), (bool_t(), true_w)],
-            type_row![],
-            ExtensionSet::new(),
-        )
+        .tail_loop_builder([], [(bool_t(), false_w), (bool_t(), true_w)], type_row![])
         .unwrap();
     assert_eq!(
         tlb.loop_signature().unwrap().signature().as_ref(),
@@ -184,7 +193,7 @@ fn test_tail_loop_two_iters() {
         Some(TailLoopTermination::BreaksAndContinues),
         results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.entrypoint()), None);
 }
 
 #[test]
@@ -247,7 +256,7 @@ fn test_tail_loop_containing_conditional() {
         Some(TailLoopTermination::BreaksAndContinues),
         results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.entrypoint()), None);
 }
 
 #[test]
@@ -293,9 +302,7 @@ fn test_conditional() {
 
     let cond_r1: Value = results.try_read_wire_concrete(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
-    assert!(results
-        .try_read_wire_concrete::<Value, _, _>(cond_o2)
-        .is_err());
+    assert!(results.try_read_wire_concrete::<Value>(cond_o2).is_err());
 
     assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
     assert_eq!(results.case_reachable(case2.node()), Some(true));
@@ -385,7 +392,7 @@ fn test_cfg(
     #[case] out1: PartialValue<Void>,
     xor_and_cfg: Hugr,
 ) {
-    let root = xor_and_cfg.root();
+    let root = xor_and_cfg.entrypoint();
     let results = Machine::new(&xor_and_cfg).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
 
     assert_eq!(results.read_out_wire(Wire::new(root, 0)).unwrap(), out0);
@@ -420,7 +427,11 @@ fn test_call(
 
     let results = Machine::new(&hugr).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
 
-    let [res0, res1] = [0, 1].map(|i| results.read_out_wire(Wire::new(hugr.root(), i)).unwrap());
+    let [res0, res1] = [0, 1].map(|i| {
+        results
+            .read_out_wire(Wire::new(hugr.entrypoint(), i))
+            .unwrap()
+    });
     // The two calls alias so both results will be the same:
     assert_eq!(res0, out);
     assert_eq!(res1, out);
@@ -448,17 +459,17 @@ fn test_region() {
         Some(pv_false())
     );
     assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 0)),
+        whole_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), 0)),
         Some(pv_true())
     );
     assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 1)),
+        whole_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), 1)),
         Some(pv_false())
     );
 
-    let subview = DescendantsGraph::<DfgID>::try_new(&hugr, nested.node()).unwrap();
     // Do not provide a value on the second input (constant false in the whole hugr, above)
-    let sub_hugr_results = Machine::new(subview).run(TestContext, [(0.into(), pv_true())]);
+    let sub_hugr_results =
+        Machine::new(hugr.with_entrypoint(nested.node())).run(TestContext, [(0.into(), pv_true())]);
     assert_eq!(
         sub_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
         Some(pv_true())
@@ -469,7 +480,7 @@ fn test_region() {
     );
     for w in [0, 1] {
         assert_eq!(
-            sub_hugr_results.read_out_wire(Wire::new(hugr.root(), w)),
+            sub_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), w)),
             None
         );
     }
@@ -498,11 +509,16 @@ fn test_module() {
     let [inp] = main.input_wires_arr();
     let cst_false = main.add_load_value(Value::false_val());
     let main_call = main.call(leaf_fn.handle(), &[], [inp, cst_false]).unwrap();
-    main.finish_with_outputs(main_call.outputs()).unwrap();
+    let main = main.finish_with_outputs(main_call.outputs()).unwrap();
     let hugr = modb.finish_hugr().unwrap();
     let [f2_inp, _] = hugr.get_io(f2.node()).unwrap();
 
-    let results_just_main = Machine::new(&hugr).run(TestContext, [(0.into(), pv_true())]);
+    let results_just_main = {
+        let mut mach = Machine::new(&hugr);
+        mach.prepopulate_inputs(main.node(), [(0.into(), pv_true())])
+            .unwrap();
+        mach.run(TestContext, [])
+    };
     assert_eq!(
         results_just_main.read_out_wire(Wire::new(f2_inp, 0)),
         Some(PartialValue::Bottom)
@@ -522,8 +538,11 @@ fn test_module() {
 
     let results_two_calls = {
         let mut m = Machine::new(&hugr);
-        m.prepopulate_df_inputs(f2.node(), [(0.into(), pv_true())]);
-        m.run(TestContext, [(0.into(), pv_false())])
+        m.prepopulate_inputs(f2.node(), [(0.into(), pv_true())])
+            .unwrap();
+        m.prepopulate_inputs(main.node(), [(0.into(), pv_false())])
+            .unwrap();
+        m.run(TestContext, [])
     };
 
     for call in [f2_call, main_call] {
@@ -536,4 +555,79 @@ fn test_module() {
             Some(pv_true_or_false())
         );
     }
+}
+
+#[rstest]
+#[case(pv_false(), pv_false())]
+#[case(pv_false(), pv_true())]
+#[case(pv_true(), pv_false())]
+#[case(pv_true(), pv_true())]
+fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
+    let b2b = || Signature::new_endo(bool_t());
+    let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
+
+    let [id1, id2] = ["id1", "[id2]"].map(|name| {
+        let fb = dfb.define_function(name, b2b()).unwrap();
+        let [inp] = fb.input_wires_arr();
+        fb.finish_with_outputs([inp]).unwrap()
+    });
+
+    let [inp_direct, which, inp_indirect] = dfb.input_wires_arr();
+    let [res1] = dfb
+        .call(id1.handle(), &[], [inp_direct])
+        .unwrap()
+        .outputs_arr();
+
+    // We'll unconditionally load both functions, to demonstrate that it's
+    // the CallIndirect that matters, not just which functions are loaded.
+    let lf1 = dfb.load_func(id1.handle(), &[]).unwrap();
+    let lf2 = dfb.load_func(id2.handle(), &[]).unwrap();
+    let bool_func = || Type::new_function(b2b());
+    let mut cond = dfb
+        .conditional_builder(
+            (vec![type_row![]; 2], which),
+            [(bool_func(), lf1), (bool_func(), lf2)],
+            bool_func().into(),
+        )
+        .unwrap();
+    let case_false = cond.case_builder(0).unwrap();
+    let [f0, _f1] = case_false.input_wires_arr();
+    case_false.finish_with_outputs([f0]).unwrap();
+    let case_true = cond.case_builder(1).unwrap();
+    let [_f0, f1] = case_true.input_wires_arr();
+    case_true.finish_with_outputs([f1]).unwrap();
+    let [tgt] = cond.finish_sub_container().unwrap().outputs_arr();
+    let [res2] = dfb
+        .add_dataflow_op(CallIndirect { signature: b2b() }, [tgt, inp_indirect])
+        .unwrap()
+        .outputs_arr();
+    let h = dfb.finish_hugr_with_outputs([res1, res2]).unwrap();
+
+    let run = |which| {
+        Machine::new(&h).run(
+            TestContext,
+            [
+                (0.into(), inp1.clone()),
+                (1.into(), which),
+                (2.into(), inp2.clone()),
+            ],
+        )
+    };
+    let (w1, w2) = (Wire::new(h.entrypoint(), 0), Wire::new(h.entrypoint(), 1));
+
+    // 1. Test with `which` unknown -> second output unknown
+    let results = run(PartialValue::Top);
+    assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+    assert_eq!(results.read_out_wire(w2), Some(PartialValue::Top));
+
+    // 2. Test with `which` selecting second function -> both passthrough
+    let results = run(pv_true());
+    assert_eq!(results.read_out_wire(w1), Some(inp1.clone()));
+    assert_eq!(results.read_out_wire(w2), Some(inp2.clone()));
+
+    //3. Test with `which` selecting first function -> alias
+    let results = run(pv_false());
+    let out = Some(inp1.join(inp2));
+    assert_eq!(results.read_out_wire(w1), out);
+    assert_eq!(results.read_out_wire(w2), out);
 }

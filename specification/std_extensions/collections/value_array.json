@@ -1,0 +1,737 @@
+{
+  "version": "0.1.0",
+  "name": "collections.value_array",
+  "types": {
+    "value_array": {
+      "extension": "collections.value_array",
+      "name": "value_array",
+      "params": [
+        {
+          "tp": "BoundedNat",
+          "bound": null
+        },
+        {
+          "tp": "Type",
+          "b": "A"
+        }
+      ],
+      "description": "Fixed-length value array",
+      "bound": {
+        "b": "FromParams",
+        "indices": [
+          1
+        ]
+      }
+    }
+  },
+  "operations": {
+    "discard_empty": {
+      "extension": "collections.value_array",
+      "name": "discard_empty",
+      "description": "Discard an empty array",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 0
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "from_array": {
+      "extension": "collections.value_array",
+      "name": "from_array",
+      "description": "Turns `array` into `value_array`",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "get": {
+      "extension": "collections.value_array",
+      "name": "get",
+      "description": "Get an element from an array",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                ]
+              ]
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "new_array": {
+      "extension": "collections.value_array",
+      "name": "new_array",
+      "description": "Create a new array from elements",
+      "signature": null,
+      "binary": true
+    },
+    "pop_left": {
+      "extension": "collections.value_array",
+      "name": "pop_left",
+      "description": "Pop an element from the left of an array",
+      "signature": null,
+      "binary": true
+    },
+    "pop_right": {
+      "extension": "collections.value_array",
+      "name": "pop_right",
+      "description": "Pop an element from the right of an array",
+      "signature": null,
+      "binary": true
+    },
+    "repeat": {
+      "extension": "collections.value_array",
+      "name": "repeat",
+      "description": "Creates a new array whose elements are initialised by calling the given function n times",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "G",
+              "input": [],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                }
+              ]
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "scan": {
+      "extension": "collections.value_array",
+      "name": "scan",
+      "description": "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "G",
+              "input": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 2,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ]
+            },
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 2,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "set": {
+      "extension": "collections.value_array",
+      "name": "set",
+      "description": "Set an element in an array",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            },
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  },
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ],
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  },
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "swap": {
+      "extension": "collections.value_array",
+      "name": "swap",
+      "description": "Swap two elements in an array",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.value_array",
+                    "id": "value_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "to_array": {
+      "extension": "collections.value_array",
+      "name": "to_array",
+      "description": "Turns `value_array` into `array`",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.value_array",
+              "id": "value_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

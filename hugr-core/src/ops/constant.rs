@@ -8,19 +8,20 @@ use std::hash::{Hash, Hasher};
 
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
-use crate::extension::ExtensionSet;
+use crate::envelope::serde_with::AsStringEnvelope;
 use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
 
 use delegate::delegate;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use smol_str::SmolStr;
 use thiserror::Error;
 
 pub use custom::{
-    downcast_equal_consts, get_pair_of_input_values, get_single_input_value, CustomConst,
-    CustomSerialized, TryHash,
+    CustomConst, CustomSerialized, TryHash, downcast_equal_consts, get_pair_of_input_values,
+    get_single_input_value,
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -37,11 +38,13 @@ pub struct Const {
 
 impl Const {
     /// Create a new [`Const`] operation.
+    #[must_use]
     pub fn new(value: Value) -> Self {
         Self { value }
     }
 
     /// The inner value of the [`Const`]
+    #[must_use]
     pub fn value(&self) -> &Value {
         &self.value
     }
@@ -49,10 +52,10 @@ impl Const {
     delegate! {
         to self.value {
             /// Returns the type of this constant.
-            pub fn get_type(&self) -> Type;
+            #[must_use] pub fn get_type(&self) -> Type;
             /// For a Const holding a CustomConst, extract the CustomConst by
             /// downcasting.
-            pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T>;
+            #[must_use] pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T>;
 
             /// Check the value.
             pub fn validate(&self) -> Result<(), ConstTypeError>;
@@ -77,12 +80,8 @@ impl StaticTag for Const {
 }
 
 impl OpTrait for Const {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Constant value"
-    }
-
-    fn extension_delta(&self) -> ExtensionSet {
-        self.value().extension_reqs()
     }
 
     fn tag(&self) -> OpTag {
@@ -136,6 +135,7 @@ pub struct Sum {
 
 impl Sum {
     /// If value is a sum with a single row variant, return the row.
+    #[must_use]
     pub fn as_tuple(&self) -> Option<&[Value]> {
         // For valid instances, the type row will not have any row variables.
         self.sum_type.as_tuple().map(|_| self.values.as_ref())
@@ -197,6 +197,7 @@ impl From<Sum> for SerialSum {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "v")]
 /// A value that can be stored as a static constant. Representing core types and
@@ -209,9 +210,9 @@ pub enum Value {
         e: OpaqueValue,
     },
     /// A higher-order function value.
-    // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
     Function {
         /// A Hugr defining the function.
+        #[serde_as(as = "Box<AsStringEnvelope>")]
         hugr: Box<Hugr>,
     },
     /// A Sum variant, with a tag indicating the index of the variant and its
@@ -251,7 +252,6 @@ pub enum Value {
 /// use serde_json::json;
 ///
 /// let expected_json = json!({
-///     "extensions": ["prelude"],
 ///     "typ": usize_t(),
 ///     "value": {'c': "ConstUsize", 'v': 1}
 /// });
@@ -259,9 +259,8 @@ pub enum Value {
 /// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 ///
-/// let ev = OpaqueValue::new(CustomSerialized::new(usize_t().clone(), serde_json::Value::Null, ExtensionSet::default()));
+/// let ev = OpaqueValue::new(CustomSerialized::new(usize_t().clone(), serde_json::Value::Null));
 /// let expected_json = json!({
-///     "extensions": [],
 ///     "typ": usize_t(),
 ///     "value": null
 /// });
@@ -282,6 +281,7 @@ impl OpaqueValue {
     }
 
     /// Returns a reference to the internal [`CustomConst`].
+    #[must_use]
     pub fn value(&self) -> &dyn CustomConst {
         self.v.as_ref()
     }
@@ -294,11 +294,9 @@ impl OpaqueValue {
     delegate! {
         to self.value() {
             /// Returns the type of the internal [`CustomConst`].
-            pub fn get_type(&self) -> Type;
+            #[must_use] pub fn get_type(&self) -> Type;
             /// An identifier of the internal [`CustomConst`].
-            pub fn name(&self) -> ValueName;
-            /// The extension(s) defining the internal [`CustomConst`].
-            pub fn extension_reqs(&self) -> ExtensionSet;
+            #[must_use] pub fn name(&self) -> ValueName;
         }
     }
 }
@@ -347,7 +345,7 @@ pub enum ConstTypeError {
     SumType(#[from] SumTypeError),
     /// Function constant missing a function type.
     #[error(
-        "A function constant cannot be defined using a Hugr with root of type {hugr_root_type}. Must be a monomorphic function.",
+        "A function constant cannot be defined using a Hugr with root of type {hugr_root_type}. Must be a monomorphic function."
     )]
     NotMonomorphicFunction {
         /// The root node type of the Hugr that (claims to) define the function constant.
@@ -364,7 +362,7 @@ pub enum ConstTypeError {
 /// Hugrs (even functions) inside Consts must be monomorphic
 fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
-        hugr_root_type: h.root_type().clone(),
+        hugr_root_type: h.entrypoint_optype().clone(),
     };
     if let Some(pf) = h.poly_func_type() {
         match pf.try_into() {
@@ -378,6 +376,7 @@ fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
 
 impl Value {
     /// Returns the type of this [`Value`].
+    #[must_use]
     pub fn get_type(&self) -> Type {
         match self {
             Self::Extension { e } => e.get_type(),
@@ -428,6 +427,7 @@ impl Value {
     }
 
     /// Returns a constant unit type (empty Tuple).
+    #[must_use]
     pub const fn unit() -> Self {
         Self::Sum(Sum {
             tag: 0,
@@ -442,16 +442,19 @@ impl Value {
     }
 
     /// Returns a constant Sum over units, with only one variant.
+    #[must_use]
     pub fn unary_unit_sum() -> Self {
         Self::unit_sum(0, 1).expect("0 < 1")
     }
 
     /// Returns a constant "true" value, i.e. the second variant of Sum((), ()).
+    #[must_use]
     pub fn true_val() -> Self {
         Self::unit_sum(1, 2).expect("1 < 2")
     }
 
     /// Returns a constant "false" value, i.e. the first variant of Sum((), ()).
+    #[must_use]
     pub fn false_val() -> Self {
         Self::unit_sum(0, 2).expect("0 < 2")
     }
@@ -460,7 +463,7 @@ impl Value {
     /// first being empty and the second being the values.
     pub fn some<V: Into<Value>>(values: impl IntoIterator<Item = V>) -> Self {
         let values: Vec<Value> = values.into_iter().map(Into::into).collect_vec();
-        let value_types: Vec<Type> = values.iter().map(|v| v.get_type()).collect_vec();
+        let value_types: Vec<Type> = values.iter().map(Value::get_type).collect_vec();
         let sum_type = SumType::new_option(value_types);
         Self::sum(1, values, sum_type).unwrap()
     }
@@ -474,6 +477,7 @@ impl Value {
     /// Returns a constant `bool` value.
     ///
     /// see [`Value::true_val`] and [`Value::false_val`].
+    #[must_use]
     pub fn from_bool(b: bool) -> Self {
         if b {
             Self::true_val()
@@ -482,14 +486,15 @@ impl Value {
         }
     }
 
-    /// Returns a [Value::Extension] holding `custom_const`.
+    /// Returns a [`Value::Extension`] holding `custom_const`.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
             e: OpaqueValue::new(custom_const),
         }
     }
 
-    /// For a [Value] holding a [CustomConst], extract the CustomConst by downcasting.
+    /// For a [Value] holding a [`CustomConst`], extract the `CustomConst` by downcasting.
+    #[must_use]
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
         if let Self::Extension { e } = self {
             e.v.downcast_ref()
@@ -505,7 +510,7 @@ impl Value {
                 let Ok(t) = mono_fn_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
-                format!("const:function:[{}]", t)
+                format!("const:function:[{t}]")
             }
             Self::Sum(Sum {
                 tag,
@@ -521,17 +526,6 @@ impl Value {
             }
         }
         .into()
-    }
-
-    /// The extensions required by a [`Value`]
-    pub fn extension_reqs(&self) -> ExtensionSet {
-        match self {
-            Self::Extension { e } => e.extension_reqs().clone(),
-            Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
-            Self::Sum(Sum { values, .. }) => {
-                ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
-            }
-        }
     }
 
     /// Check the value.
@@ -554,6 +548,7 @@ impl Value {
     }
 
     /// If value is a sum with a single row variant, return the row.
+    #[must_use]
     pub fn as_tuple(&self) -> Option<&[Value]> {
         if let Self::Sum(sum) = self {
             sum.as_tuple()
@@ -562,9 +557,9 @@ impl Value {
         }
     }
 
-    /// Hashes this value, if possible. [Value::Extension]s are hashable according
-    /// to their implementation of [TryHash]; [Value::Function]s never are;
-    /// [Value::Sum]s are if their contents are.
+    /// Hashes this value, if possible. [`Value::Extension`]s are hashable according
+    /// to their implementation of [`TryHash`]; [`Value::Function`]s never are;
+    /// [`Value::Sum`]s are if their contents are.
     pub fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
         match self {
             Value::Extension { e } => e.value().try_hash(&mut *st),
@@ -597,21 +592,22 @@ pub(crate) mod test {
     use super::Value;
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::extension::PRELUDE;
     use crate::extension::prelude::{bool_t, usize_custom_t};
     use crate::extension::resolution::{
-        resolve_custom_type_extensions, resolve_typearg_extensions, ExtensionResolutionError,
-        WeakExtensionRegistry,
+        ExtensionResolutionError, WeakExtensionRegistry, resolve_custom_type_extensions,
+        resolve_typearg_extensions,
     };
-    use crate::extension::PRELUDE;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
-    use crate::std_extensions::collections::array::{array_type, ArrayValue};
+    use crate::std_extensions::collections::array::{ArrayValue, array_type};
+    use crate::std_extensions::collections::value_array::{VArrayValue, value_array_type};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
-            prelude::{usize_t, ConstUsize},
             ExtensionId,
+            prelude::{ConstUsize, usize_t},
         },
-        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
+        std_extensions::arithmetic::float_types::{ConstF64, float64_type},
         type_row,
         types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
@@ -629,10 +625,6 @@ pub(crate) mod test {
     impl CustomConst for CustomTestValue {
         fn name(&self) -> ValueName {
             format!("CustomTestValue({:?})", self.0).into()
-        }
-
-        fn extension_reqs(&self) -> ExtensionSet {
-            ExtensionSet::singleton(self.0.extension().clone())
         }
 
         fn update_extensions(
@@ -747,7 +739,7 @@ pub(crate) mod test {
         let correct_type = Type::new_function(Signature::new_endo(vec![bool_t()]));
 
         assert_eq!(v.get_type(), correct_type);
-        assert!(v.name().starts_with("const:function:"))
+        assert!(v.name().starts_with("const:function:"));
     }
 
     #[fixture]
@@ -779,11 +771,24 @@ pub(crate) mod test {
     }
 
     #[fixture]
+    fn const_value_array_bool() -> Value {
+        VArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
+    }
+
+    #[fixture]
     fn const_array_options() -> Value {
         let some_true = Value::some([Value::true_val()]);
         let none = Value::none(vec![bool_t()]);
         let elem_ty = SumType::new_option(vec![bool_t()]);
         ArrayValue::new(elem_ty.into(), [some_true, none]).into()
+    }
+
+    #[fixture]
+    fn const_value_array_options() -> Value {
+        let some_true = Value::some([Value::true_val()]);
+        let none = Value::none(vec![bool_t()]);
+        let elem_ty = SumType::new_option(vec![bool_t()]);
+        VArrayValue::new(elem_ty.into(), [some_true, none]).into()
     }
 
     #[rstest]
@@ -793,9 +798,19 @@ pub(crate) mod test {
     #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
+        const_value_array_bool(),
+        value_array_type(2, bool_t()),
+        "const:custom:value_array"
+    )]
+    #[case(
         const_array_options(),
         array_type(2, SumType::new_option(vec![bool_t()]).into()),
         "const:custom:array"
+    )]
+    #[case(
+        const_value_array_options(),
+        value_array_type(2, SumType::new_option(vec![bool_t()]).into()),
+        "const:custom:value_array"
     )]
     fn const_type(
         #[case] const_value: Value,
@@ -816,7 +831,12 @@ pub(crate) mod test {
     #[case(const_serialized_usize(), const_usize())]
     #[case(const_tuple_serialized(), const_tuple())]
     #[case(const_array_bool(), const_array_bool())]
+    #[case(const_value_array_bool(), const_value_array_bool())]
     #[case(const_array_options(), const_array_options())]
+    #[case(const_value_array_options(), const_value_array_options())]
+    // Opaque constants don't get resolved into concrete types when running miri,
+    // as the `typetag` machinery is not available.
+    #[cfg_attr(miri, ignore)]
     fn const_serde_roundtrip(#[case] const_value: Value, #[case] expected_value: Value) {
         let serialized = serde_json::to_string(&const_value).unwrap();
         let deserialized: Value = serde_json::from_str(&serialized).unwrap();
@@ -846,8 +866,7 @@ pub(crate) mod test {
             // Dummy extension reference.
             &Weak::default(),
         );
-        let json_const: Value =
-            CustomSerialized::new(typ_int.clone(), 6.into(), ex_id.clone()).into();
+        let json_const: Value = CustomSerialized::new(typ_int.clone(), 6.into()).into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Copyable);
         assert_eq!(json_const.get_type(), classic_t);
@@ -903,7 +922,7 @@ pub(crate) mod test {
     mod proptest {
         use super::super::{OpaqueValue, Sum};
         use crate::{
-            ops::{constant::CustomSerialized, Value},
+            ops::{Value, constant::CustomSerialized},
             std_extensions::arithmetic::int_types::ConstInt,
             std_extensions::collections::list::ListValue,
             types::{SumType, Type},

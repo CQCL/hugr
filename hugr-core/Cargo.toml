@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.14.3"
+version = "0.20.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -17,46 +17,50 @@ categories = ["compilers"]
 workspace = true
 
 [features]
-extension_inference = []
 declarative = ["serde_yaml"]
-model_unstable = ["hugr-model"]
+zstd = ["dep:zstd"]
 
 [lib]
 bench = false
 
 [[test]]
 name = "model"
-required-features = ["model_unstable"]
 
 [dependencies]
-portgraph = { workspace = true, features = ["serde", "petgraph"] }
-thiserror = { workspace = true }
-regex = { workspace = true }
+hugr-model = { version = "0.20.0", path = "../hugr-model" }
+
 cgmath = { workspace = true, features = ["serde"] }
-num-rational = { workspace = true, features = ["serde"] }
+delegate = { workspace = true }
+derive_more = { workspace = true, features = [
+    "display",
+    "error",
+    "from",
+    "into",
+] }
 downcast-rs = { workspace = true }
+enum_dispatch = { workspace = true }
+fxhash.workspace = true
+html-escape = { workspace = true }
+indexmap.workspace = true
+itertools = { workspace = true }
+lazy_static = { workspace = true }
+paste = { workspace = true }
+petgraph = { workspace = true }
+portgraph = { workspace = true, features = ["serde", "petgraph"] }
+regex = { workspace = true }
 # Rc used here for Extension, but unfortunately we must turn the feature on globally
 serde = { workspace = true, features = ["derive", "rc"] }
-serde_yaml = { workspace = true, optional = true }
-typetag = { workspace = true }
-smol_str = { workspace = true, features = ["serde"] }
-derive_more = { workspace = true, features = ["display", "error", "from"] }
-itertools = { workspace = true }
-html-escape = { workspace = true }
-bitvec = { workspace = true, features = ["serde"] }
-enum_dispatch = { workspace = true }
-lazy_static = { workspace = true }
-petgraph = { workspace = true }
 serde_json = { workspace = true }
-delegate = { workspace = true }
-paste = { workspace = true }
-strum = { workspace = true }
-strum_macros = { workspace = true }
-semver = { version = "1.0.23", features = ["serde"] }
-hugr-model = { version = "0.17.1", path = "../hugr-model", optional = true }
-indexmap.workspace = true
-fxhash.workspace = true
-bumpalo = { workspace = true, features = ["collections"] }
+serde_with = { workspace = true }
+serde_yaml = { workspace = true, optional = true }
+smol_str = { workspace = true, features = ["serde"] }
+static_assertions = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+typetag = { workspace = true }
+semver = { workspace = true, features = ["serde"] }
+zstd = { workspace = true, optional = true }
+relrc = { workspace = true, features = ["petgraph"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
@@ -65,7 +69,6 @@ insta = { workspace = true, features = ["yaml"] }
 jsonschema = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-regex-syntax = { workspace = true }
 
 
 # Required for documentation examples

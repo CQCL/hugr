@@ -7,13 +7,16 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Type, TypeBase};
+use super::{
+    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeTransformer,
+    type_param::TypeParam,
+};
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
 use itertools::Itertools;
 
 /// List of types, used for function signatures.
-/// The `ROWVARS` parameter controls whether this may contain [RowVariable]s
+/// The `ROWVARS` parameter controls whether this may contain [`RowVariable`]s
 #[derive(Clone, Eq, Debug, Hash, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]
@@ -49,6 +52,7 @@ impl<RV: MaybeRV> Display for TypeRowBase<RV> {
 
 impl<RV: MaybeRV> TypeRowBase<RV> {
     /// Create a new empty row.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             types: Cow::Owned(Vec::new()),
@@ -61,6 +65,7 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
     }
 
     /// Returns a reference to the types in the row.
+    #[must_use]
     pub fn as_slice(&self) -> &[TypeBase<RV>] {
         &self.types
     }
@@ -84,10 +89,10 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
             pub fn to_mut(&mut self) -> &mut Vec<TypeBase<RV>>;
 
             /// Allow access (consumption) of the contained elements
-            pub fn into_owned(self) -> Vec<TypeBase<RV>>;
+            #[must_use] pub fn into_owned(self) -> Vec<TypeBase<RV>>;
 
             /// Returns `true` if the row contains no types.
-            pub fn is_empty(&self) -> bool ;
+            #[must_use] pub fn is_empty(&self) -> bool ;
         }
     }
 
@@ -96,15 +101,21 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
     }
 }
 
+impl<RV: MaybeRV> Transformable for TypeRowBase<RV> {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        self.to_mut().transform(tr)
+    }
+}
+
 impl TypeRow {
     delegate! {
         to self.types {
             /// Returns the number of types in the row.
-            pub fn len(&self) -> usize;
+            #[must_use] pub fn len(&self) -> usize;
 
             #[inline(always)]
             /// Returns the type at the specified index. Returns `None` if out of bounds.
-            pub fn get(&self, offset: usize) -> Option<&Type>;
+            #[must_use] pub fn get(&self, offset: usize) -> Option<&Type>;
         }
 
         to self.types.to_mut() {
@@ -123,7 +134,7 @@ impl TryFrom<TypeRowRV> for TypeRow {
             value
                 .into_owned()
                 .into_iter()
-                .map(|t| t.try_into())
+                .map(std::convert::TryInto::try_into)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|var| SignatureError::RowVarWhereTypeExpected { var })?,
         ))
@@ -214,7 +225,7 @@ mod test {
                     Just(TypeRowBase::new()).boxed()
                 } else {
                     vec(any_with::<TypeBase<RV>>(depth), 0..4)
-                        .prop_map(|ts| ts.to_vec().into())
+                        .prop_map(|ts| ts.clone().into())
                         .boxed()
                 }
             }

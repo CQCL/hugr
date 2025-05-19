@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from semver import Version
 
 import hugr._serialization.extension as ext_s
-from hugr import ops, tys, val
+from hugr import ops, tys
 from hugr.utils import ser_it
 
 __all__ = [
@@ -18,7 +18,6 @@ __all__ = [
     "FixedHugr",
     "OpDefSig",
     "OpDef",
-    "ExtensionValue",
     "Extension",
     "Version",
 ]
@@ -236,31 +235,7 @@ class OpDef(ExtensionObject):
             concrete_signature: Concrete function type of the operation, only required
             if the operation is polymorphic.
         """
-        # Add the extension where the operation is defined as a runtime requirement.
-        # We don't store this in the json definition as it is redundant information.
-        if concrete_signature is not None:
-            concrete_signature = concrete_signature.with_runtime_reqs(
-                [self.get_extension().name]
-            )
-
         return ops.ExtOp(self, concrete_signature, list(args or []))
-
-
-@dataclass
-class ExtensionValue(ExtensionObject):
-    """A value defined in an :class:`Extension`."""
-
-    #: The name of the value.
-    name: str
-    #: Value payload.
-    val: val.Value
-
-    def _to_serial(self) -> ext_s.ExtensionValue:
-        return ext_s.ExtensionValue(
-            extension=self.get_extension().name,
-            name=self.name,
-            typed_value=self.val._to_serial_root(),
-        )
 
 
 T = TypeVar("T", bound=ops.RegisteredOp)
@@ -274,12 +249,8 @@ class Extension:
     name: ExtensionId
     #: The version of the extension.
     version: Version
-    #: Extensions required by this extension at runtime, identified by name.
-    runtime_reqs: set[ExtensionId] = field(default_factory=set)
     #: Type definitions in the extension.
     types: dict[str, TypeDef] = field(default_factory=dict)
-    #: Values defined in the extension.
-    values: dict[str, ExtensionValue] = field(default_factory=dict)
     #: Operation definitions in the extension.
     operations: dict[str, OpDef] = field(default_factory=dict)
 
@@ -293,9 +264,7 @@ class Extension:
         return ext_s.Extension(
             name=self.name,
             version=self.version,  # type: ignore[arg-type]
-            runtime_reqs=self.runtime_reqs,
             types={k: v._to_serial() for k, v in self.types.items()},
-            values={k: v._to_serial() for k, v in self.values.items()},
             operations={k: v._to_serial() for k, v in self.operations.items()},
         )
 
@@ -324,12 +293,6 @@ class Extension:
         Returns:
             The added operation definition, now associated with the extension.
         """
-        if op_def.signature.poly_func is not None:
-            # Ensure the op def signature has the extension as a requirement
-            op_def.signature.poly_func = op_def.signature.poly_func.with_runtime_reqs(
-                [self.name]
-            )
-
         op_def._extension = self
         self.operations[op_def.name] = op_def
         return self.operations[op_def.name]
@@ -346,19 +309,6 @@ class Extension:
         type_def._extension = self
         self.types[type_def.name] = type_def
         return self.types[type_def.name]
-
-    def add_extension_value(self, extension_value: ExtensionValue) -> ExtensionValue:
-        """Add a value to the extension.
-
-        Args:
-            extension_value: The value to add.
-
-        Returns:
-            The added value, now associated with the extension.
-        """
-        extension_value._extension = self
-        self.values[extension_value.name] = extension_value
-        return self.values[extension_value.name]
 
     @dataclass
     class OperationNotFound(NotFound):
@@ -405,12 +355,6 @@ class Extension:
     @dataclass
     class ValueNotFound(NotFound):
         """Value not found in extension."""
-
-    def get_value(self, name: str) -> ExtensionValue:
-        try:
-            return self.values[name]
-        except KeyError as e:
-            raise self.ValueNotFound(name) from e
 
     T = TypeVar("T", bound=ops.RegisteredOp)
 

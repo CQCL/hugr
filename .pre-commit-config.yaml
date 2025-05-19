@@ -73,8 +73,13 @@ repos:
         pass_filenames: false
       - id: cargo-test
         name: cargo test
-        description: Run tests with `cargo test`.
-        entry: cargo test --all-features --workspace
+        description:
+          Run tests with `cargo test`.
+          # We cannot use --all-features as `hugr-model`s pyo3 feature cannot be
+          # built into a binary build (without using `maturin`)
+          #
+          # This feature list should be kept in sync with the `hugr-py/pyproject.toml`
+        entry: cargo test --workspace --exclude 'hugr-py' --features 'hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd'
         language: system
         files: \.rs$
         pass_filenames: false
@@ -95,10 +100,7 @@ repos:
       - id: py-test
         name: pytest
         description: Run python tests
-        # We need to rebuild `hugr-cli` without the `extension_inference` feature
-        # to avoid test errors.
-        # TODO: Remove this once the issue is fixed.
-        entry: sh -c "cargo build -p hugr-cli && uv run pytest"
+        entry: sh -c "uv run pytest"
         language: system
         files: \.py$
         pass_filenames: false

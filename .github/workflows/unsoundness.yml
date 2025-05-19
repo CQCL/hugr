@@ -41,14 +41,14 @@ jobs:
   create-issue:
     uses: CQCL/hugrverse-actions/.github/workflows/create-issue.yml@main
     needs: miri
-    if: always() && needs.miri.result == 'failure' && github.event_name == 'push'
+    if: always() && needs.miri.result == 'failure' && github.ref == 'refs/heads/main'
     secrets:
         GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
     with:
-        title: "💥 Unsoundness check failed on main"
+        title: "💥 Unsoundness check fail on main"
         body: |
             The unsoundness check for `CQCL/hugr` failed.
 
-            [https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}](Please investigate).
+            [Please investigate](https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}).
         unique-label: "unsoundness-checks"
         other-labels: "bug"

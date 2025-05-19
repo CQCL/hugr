@@ -1,21 +1,21 @@
 use hugr_core::{
+    HugrView, Node,
     extension::simple_op::MakeExtensionOp,
-    ops::{ExtensionOp, NamedOp, Value},
+    ops::{ExtensionOp, Value},
     std_extensions::logic::{self, LogicOp},
     types::SumType,
-    HugrView,
 };
 use inkwell::IntPredicate;
 
 use crate::{
     custom::CodegenExtsBuilder,
-    emit::{emit_value, func::EmitFuncContext, EmitOpArgs},
+    emit::{EmitOpArgs, emit_value, func::EmitFuncContext},
     sum::LLVMSumValue,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
-fn emit_logic_op<'c, H: HugrView>(
+fn emit_logic_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
 ) -> Result<()> {
@@ -51,21 +51,22 @@ fn emit_logic_op<'c, H: HugrView>(
     args.outputs.finish(context.builder(), vec![res])
 }
 
-/// Populates a [CodegenExtsBuilder] with all extensions needed to lower logic
+/// Populates a [`CodegenExtsBuilder`] with all extensions needed to lower logic
 /// ops.
-pub fn add_logic_extensions<'a, H: HugrView + 'a>(
+pub fn add_logic_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
 ) -> CodegenExtsBuilder<'a, H> {
-    cem.extension_op(logic::EXTENSION_ID, LogicOp::Eq.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::And.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::Or.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::Not.name(), emit_logic_op)
-        .extension_op(logic::EXTENSION_ID, LogicOp::Xor.name(), emit_logic_op) // Added Xor
+    cem.extension_op(logic::EXTENSION_ID, LogicOp::Eq.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::And.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Or.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Not.op_id(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Xor.op_id(), emit_logic_op) // Added Xor
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
-    /// Populates a [CodegenExtsBuilder] with all extensions needed to lower
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
+    /// Populates a [`CodegenExtsBuilder`] with all extensions needed to lower
     /// logic ops.
+    #[must_use]
     pub fn add_logic_extensions(self) -> Self {
         add_logic_extensions(self)
     }
@@ -74,10 +75,10 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{Dataflow, DataflowSubContainer},
-        extension::{prelude::bool_t, ExtensionRegistry},
-        std_extensions::logic::{self, LogicOp},
         Hugr,
+        builder::{Dataflow, DataflowSubContainer},
+        extension::{ExtensionRegistry, prelude::bool_t},
+        std_extensions::logic::{self, LogicOp},
     };
     use rstest::rstest;
 
@@ -85,7 +86,7 @@ mod test {
         check_emission,
         emit::test::SimpleHugrConfig,
         extension::logic::add_logic_extensions,
-        test::{llvm_ctx, TestContext},
+        test::{TestContext, llvm_ctx},
     };
 
     fn test_logic_op(op: LogicOp, arity: usize) -> Hugr {

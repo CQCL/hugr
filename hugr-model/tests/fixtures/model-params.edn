@@ -1,9 +1,11 @@
 (hugr 0)
 
+(mod)
+
 (define-func example.swap
   ; The types of the values to be swapped are passed as implicit parameters.
   (param ?a core.type)
   (param ?b core.type)
-  (core.fn [?a ?b] [?b ?a] (ext))
+  (core.fn [?a ?b] [?b ?a])
   (dfg [%a %b] [%b %a]
-       (signature (core.fn [?a ?b] [?b ?a] (ext)))))
+       (signature (core.fn [?a ?b] [?b ?a]))))

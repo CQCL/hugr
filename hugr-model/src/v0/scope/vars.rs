@@ -3,7 +3,7 @@ use indexmap::IndexSet;
 use std::hash::BuildHasherDefault;
 use thiserror::Error;
 
-use crate::v0::{NodeId, VarId};
+use crate::v0::table::{NodeId, VarId};
 
 type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 
@@ -19,7 +19,7 @@ type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 /// # Examples
 ///
 /// ```
-/// # pub use hugr_model::v0::{NodeId, VarId};
+/// # pub use hugr_model::v0::table::{NodeId, VarId};
 /// # pub use hugr_model::v0::scope::VarTable;
 /// let mut vars = VarTable::new();
 /// vars.enter(NodeId(0));
@@ -49,6 +49,7 @@ pub struct VarTable<'a> {
 
 impl<'a> VarTable<'a> {
     /// Create a new empty variable table.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -59,7 +60,7 @@ impl<'a> VarTable<'a> {
             node,
             var_count: 0,
             var_stack: self.vars.len(),
-        })
+        });
     }
 
     /// Exit a previously entered scope.
@@ -96,6 +97,7 @@ impl<'a> VarTable<'a> {
     /// # Panics
     ///
     /// Panics if there are no open scopes.
+    #[must_use]
     pub fn is_visible(&self, var: VarId) -> bool {
         let scope = self.scopes.last().unwrap();
         scope.node == var.0 && var.1 < scope.var_count

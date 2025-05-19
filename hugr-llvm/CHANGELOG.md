@@ -4,7 +4,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.4...hugr-llvm-v0.20.0) - 2025-05-14
+
+### Bug Fixes
+
+- Fix `inline_constant_functions` pass ([#2135](https://github.com/CQCL/hugr/pull/2135))
+
+### New Features
+
+- [**breaking**] Hugrmut on generic nodes ([#2111](https://github.com/CQCL/hugr/pull/2111))
+- [**breaking**] Remove `RootTagged` from the hugr view trait hierarchy ([#2122](https://github.com/CQCL/hugr/pull/2122))
+- [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
+- [**breaking**] Cleanup core trait definitions ([#2126](https://github.com/CQCL/hugr/pull/2126))
+- [**breaking**] Removed runtime extension sets. ([#2145](https://github.com/CQCL/hugr/pull/2145))
+- [**breaking**] Improved array lowering ([#2109](https://github.com/CQCL/hugr/pull/2109))
+- [**breaking**] Make `NamedOp` private. Add `MakeExtensionOp::name` and `MakeOpDef::opdef_name` ([#2138](https://github.com/CQCL/hugr/pull/2138))
+- Make `hugr_llvm::extension::collections::array::build_array_alloc` public ([#2165](https://github.com/CQCL/hugr/pull/2165))
+- Add LLVM emission for prelude.noop ([#2160](https://github.com/CQCL/hugr/pull/2160))
+- [**breaking**] Add Hugr entrypoints ([#2147](https://github.com/CQCL/hugr/pull/2147))
+- [**breaking**] Return a node mapping in HugrInternals::region_portgraph ([#2164](https://github.com/CQCL/hugr/pull/2164))
+- Restore old array lowering ([#2194](https://github.com/CQCL/hugr/pull/2194))
+- [**breaking**] Hide FuncDefn/cl fields, add accessors and ::new(...) ([#2213](https://github.com/CQCL/hugr/pull/2213))
+
+## [0.15.4](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.3...hugr-llvm-v0.15.4) - 2025-05-07
+
+### New Features
+
+- move `ArrayOpBuilder` to hugr-core ([#2115](https://github.com/CQCL/hugr/pull/2115))
+
+## [0.15.3](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.2...hugr-llvm-v0.15.3) - 2025-04-02
+
+### New Features
+
+- *(hugr-llvm)* Add llvm codegen for `arithmetic.float.fpow` ([#2042](https://github.com/CQCL/hugr/pull/2042))
+- *(hugr-llvm)* Emit divmod and mod operations ([#2025](https://github.com/CQCL/hugr/pull/2025))
+
+## [0.15.1](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.0...hugr-llvm-v0.15.1) - 2025-03-21
+
+### Bug Fixes
+
+- Remove return from val_or_panic ([#1999](https://github.com/CQCL/hugr/pull/1999))
+
+### New Features
+
+- add exit operation to prelude ([#2008](https://github.com/CQCL/hugr/pull/2008))
+- Add llvm codegen for collections.static_array ([#2003](https://github.com/CQCL/hugr/pull/2003))
+
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.4...hugr-llvm-v0.15.0) - 2025-03-14
+
+### Bug Fixes
+
+- Rename widen insta tests ([#1949](https://github.com/CQCL/hugr/pull/1949))
+
+### New Features
+
+- Emit `widen` ops from the int ops extension ([#1946](https://github.com/CQCL/hugr/pull/1946))
+- [**breaking**] replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/pull/1952))
+- *(hugr-llvm)* Emit narrow ops ([#1955](https://github.com/CQCL/hugr/pull/1955))
+- Add float <--> int bytecasting ops to conversions extension ([#1956](https://github.com/CQCL/hugr/pull/1956))
+- *(hugr-llvm)* Emit iu_to_s and is_to_u ([#1978](https://github.com/CQCL/hugr/pull/1978))
+
+### Refactor
+
+- [**breaking**] remove unused dependencies ([#1935](https://github.com/CQCL/hugr/pull/1935))
+
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.3...hugr-llvm-v0.14.4) - 2025-02-24
+
+### New Features
+
+- add xor to logic extension (#1911)
+- *(hugr-llvm)* Add extension points to `PreludeCodegen` for customising string lowering (#1918)
 
 ## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.14.1...hugr-llvm-v0.14.2) - 2025-01-20
 

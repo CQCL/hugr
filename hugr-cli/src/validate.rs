@@ -2,9 +2,11 @@
 
 use clap::Parser;
 use clap_verbosity_flag::log::Level;
-use hugr::{extension::ExtensionRegistry, Extension, Hugr};
+use hugr::package::PackageValidationError;
+use hugr::{Hugr, HugrView};
 
-use crate::{CliError, HugrArgs};
+use crate::hugr_io::HugrInputArgs;
+use crate::{CliError, OtherArgs};
 
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
@@ -13,9 +15,13 @@ use crate::{CliError, HugrArgs};
 #[group(id = "hugr")]
 #[non_exhaustive]
 pub struct ValArgs {
+    /// Hugr input.
     #[command(flatten)]
-    /// common arguments
-    pub hugr_args: HugrArgs,
+    pub input_args: HugrInputArgs,
+
+    /// Additional arguments
+    #[command(flatten)]
+    pub other_args: OtherArgs,
 }
 
 /// String to print when validation is successful.
@@ -24,51 +30,27 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
-        let result = self.hugr_args.validate()?;
+        let result = if self.input_args.hugr_json {
+            let hugr = self.input_args.get_hugr()?;
+            hugr.validate()
+                .map_err(PackageValidationError::Validation)?;
+            vec![hugr]
+        } else {
+            let package = self.input_args.get_package()?;
+            package.validate()?;
+            package.modules
+        };
+
         if self.verbosity(Level::Info) {
-            eprintln!("{}", VALID_PRINT);
+            eprintln!("{VALID_PRINT}");
         }
+
         Ok(result)
     }
 
     /// Test whether a `level` message should be output.
+    #[must_use]
     pub fn verbosity(&self, level: Level) -> bool {
-        self.hugr_args.verbosity(level)
-    }
-}
-
-impl HugrArgs {
-    /// Load the package and validate against an extension registry.
-    ///
-    /// Returns the validated modules and the extension registry the modules
-    /// were validated against.
-    pub fn validate(&mut self) -> Result<Vec<Hugr>, CliError> {
-        let reg = self.extensions()?;
-        let package = self.get_package_or_hugr(&reg)?;
-
-        package.validate()?;
-        Ok(package.into_hugrs())
-    }
-
-    /// Return a register with the selected extensions.
-    pub fn extensions(&self) -> Result<ExtensionRegistry, CliError> {
-        let mut reg = if self.no_std {
-            hugr::extension::PRELUDE_REGISTRY.to_owned()
-        } else {
-            hugr::std_extensions::STD_REG.to_owned()
-        };
-
-        for ext in &self.extensions {
-            let f = std::fs::File::open(ext)?;
-            let ext: Extension = serde_json::from_reader(f)?;
-            reg.register_updated(ext);
-        }
-
-        Ok(reg)
-    }
-
-    /// Test whether a `level` message should be output.
-    pub fn verbosity(&self, level: Level) -> bool {
-        self.verbose.log_level_filter() >= level
+        self.other_args.verbosity(level)
     }
 }

@@ -4,12 +4,12 @@
 use std::fmt::{self, Display};
 use std::sync::{Arc, Weak};
 
-use crate::extension::{ExtensionId, SignatureError, TypeDef};
 use crate::Extension;
+use crate::extension::{ExtensionId, SignatureError, TypeDef};
 
 use super::{
-    type_param::{TypeArg, TypeParam},
     Substitution, TypeBound,
+    type_param::{TypeArg, TypeParam},
 };
 use super::{Type, TypeName};
 
@@ -30,7 +30,7 @@ pub struct CustomType {
     ///
     /// [`TypeParam`]: super::type_param::TypeParam
     args: Vec<TypeArg>,
-    /// The [TypeBound] describing what can be done to instances of this type
+    /// The [`TypeBound`] describing what can be done to instances of this type
     bound: TypeBound,
 }
 
@@ -73,6 +73,7 @@ impl CustomType {
     }
 
     /// Returns the bound of this [`CustomType`].
+    #[must_use]
     pub const fn bound(&self) -> TypeBound {
         self.bound
     }
@@ -86,7 +87,10 @@ impl CustomType {
         def.check_custom(self)
     }
 
-    fn get_type_def<'a>(&self, ext: &'a Arc<Extension>) -> Result<&'a TypeDef, SignatureError> {
+    pub(super) fn get_type_def<'a>(
+        &self,
+        ext: &'a Arc<Extension>,
+    ) -> Result<&'a TypeDef, SignatureError> {
         ext.get_type(&self.id)
             .ok_or(SignatureError::ExtensionTypeNotFound {
                 exn: self.extension.clone(),
@@ -94,7 +98,7 @@ impl CustomType {
             })
     }
 
-    fn get_extension(&self) -> Result<Arc<Extension>, SignatureError> {
+    pub(super) fn get_extension(&self) -> Result<Arc<Extension>, SignatureError> {
         self.extension_ref
             .upgrade()
             .ok_or(SignatureError::MissingTypeExtension {
@@ -123,11 +127,13 @@ impl CustomType {
     }
 
     /// unique name of the type.
+    #[must_use]
     pub fn name(&self) -> &TypeName {
         &self.id
     }
 
     /// Type arguments.
+    #[must_use]
     pub fn args(&self) -> &[TypeArg] {
         &self.args
     }
@@ -138,11 +144,13 @@ impl CustomType {
     }
 
     /// Parent extension.
+    #[must_use]
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
 
     /// Returns a weak reference to the extension defining this type.
+    #[must_use]
     pub fn extension_ref(&self) -> Weak<Extension> {
         self.extension_ref.clone()
     }
@@ -178,8 +186,8 @@ mod test {
         use std::sync::Weak;
 
         use crate::extension::ExtensionId;
-        use crate::proptest::any_nonempty_string;
         use crate::proptest::RecursionDepth;
+        use crate::proptest::any_nonempty_string;
         use crate::types::type_param::TypeArg;
         use crate::types::{CustomType, TypeBound};
         use ::proptest::collection::vec;

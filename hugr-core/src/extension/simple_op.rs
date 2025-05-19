@@ -5,13 +5,9 @@ use std::sync::Weak;
 use strum::IntoEnumIterator;
 
 use crate::ops::{ExtensionOp, OpName, OpNameRef};
-use crate::{
-    ops::{NamedOp, OpType},
-    types::TypeArg,
-    Extension,
-};
+use crate::{Extension, ops::OpType, types::TypeArg};
 
-use super::{op_def::SignatureFunc, ExtensionBuildError, ExtensionId, OpDef, SignatureError};
+use super::{ExtensionBuildError, ExtensionId, OpDef, SignatureError, op_def::SignatureFunc};
 use delegate::delegate;
 use thiserror::Error;
 
@@ -29,23 +25,25 @@ pub enum OpLoadError {
     WrongExtension(ExtensionId, ExtensionId),
 }
 
-impl<T> NamedOp for T
-where
-    for<'a> &'a T: Into<&'static str>,
-{
-    fn name(&self) -> OpName {
-        let s = self.into();
-        s.into()
-    }
-}
-
 /// Traits implemented by types which can add themselves to [`Extension`]s as
 /// [`OpDef`]s or load themselves from an [`OpDef`].
 ///
-/// Particularly useful with C-style enums that implement [strum::IntoEnumIterator],
+/// Particularly useful with C-style enums that implement [`strum::IntoEnumIterator`],
 /// as then all definitions can be added to an extension at once.
-pub trait MakeOpDef: NamedOp {
-    /// Try to load one of the operations of this set from an [OpDef].
+///
+/// [`MakeExtensionOp`] has a blanket impl for types that impl [`MakeOpDef`].
+pub trait MakeOpDef {
+    /// The [`OpDef::name`] which will be used when `Self`  is added to an [Extension]
+    /// or when `Self` is loaded from an [`OpDef`].
+    ///
+    /// This identifer must be unique within the extension with which the
+    /// [`OpDef`] is registered. An [`ExtensionOp`] instantiating this [`OpDef`] will
+    /// report `self.opdef_id()` as its [`ExtensionOp::unqualified_id`].
+    ///
+    /// [`MakeExtensionOp::op_id`] must match this function.
+    fn opdef_id(&self) -> OpName;
+
+    /// Try to load one of the operations of this set from an [`OpDef`].
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized;
@@ -68,16 +66,16 @@ pub trait MakeOpDef: NamedOp {
         self.init_signature(&self.extension_ref())
     }
 
-    /// Description of the operation. By default, the same as `self.name()`.
+    /// Description of the operation. By default, the same as `self.opdef_id()`.
     fn description(&self) -> String {
-        self.name().to_string()
+        self.opdef_id().to_string()
     }
 
     /// Edit the opdef before finalising. By default does nothing.
     fn post_opdef(&self, _def: &mut OpDef) {}
 
-    /// Add an operation implemented as an [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as an [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     ///
     /// Requires a [`Weak`] reference to the extension defining the operation.
     /// This method is intended to be used inside the closure passed to [`Extension::new_arc`].
@@ -87,7 +85,7 @@ pub trait MakeOpDef: NamedOp {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), ExtensionBuildError> {
         let def = extension.add_op(
-            self.name(),
+            self.opdef_id(),
             self.description(),
             self.init_signature(extension_ref),
             extension_ref,
@@ -99,7 +97,7 @@ pub trait MakeOpDef: NamedOp {
     }
 
     /// Load all variants of an enum of op definitions in to an extension as op defs.
-    /// See [strum::IntoEnumIterator].
+    /// See [`strum::IntoEnumIterator`].
     ///
     /// Requires a [`Weak`] reference to the extension defining the operation.
     /// This method is intended to be used inside the closure passed to [`Extension::new_arc`].
@@ -116,7 +114,7 @@ pub trait MakeOpDef: NamedOp {
         Ok(())
     }
 
-    /// If the definition can be loaded from a string, load from an [ExtensionOp].
+    /// If the definition can be loaded from a string, load from an [`ExtensionOp`].
     fn from_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized + std::str::FromStr,
@@ -125,7 +123,7 @@ pub trait MakeOpDef: NamedOp {
     }
 }
 
-/// [MakeOpDef] with an associate concrete Op type which can be instantiated with type arguments.
+/// [`MakeOpDef`] with an associate concrete Op type which can be instantiated with type arguments.
 pub trait HasConcrete: MakeOpDef {
     /// Associated concrete type.
     type Concrete: MakeExtensionOp;
@@ -134,12 +132,12 @@ pub trait HasConcrete: MakeOpDef {
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError>;
 }
 
-/// [MakeExtensionOp] with an associated [HasConcrete].
+/// [`MakeExtensionOp`] with an associated [`HasConcrete`].
 pub trait HasDef: MakeExtensionOp {
-    /// Associated [HasConcrete] type.
+    /// Associated [`HasConcrete`] type.
     type Def: HasConcrete<Concrete = Self> + std::str::FromStr;
 
-    /// Load the operation from a [ExtensionOp].
+    /// Load the operation from a [`ExtensionOp`].
     fn from_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -150,13 +148,21 @@ pub trait HasDef: MakeExtensionOp {
 
 /// Traits implemented by types which can be loaded from [`ExtensionOp`]s,
 /// i.e. concrete instances of [`OpDef`]s, with defined type arguments.
-pub trait MakeExtensionOp: NamedOp {
-    /// Try to load one of the operations of this set from an [OpDef].
+pub trait MakeExtensionOp {
+    /// The [`OpDef::name`] of [`ExtensionOp`]s from which `Self` can be loaded.
+    ///
+    /// This identifer must be unique within the extension with which the
+    /// [`OpDef`] is registered. An [`ExtensionOp`] instantiating this [`OpDef`] will
+    /// report `self.opdef_id()` as its [`ExtensionOp::unqualified_id`].
+    fn op_id(&self) -> OpName;
+
+    /// Try to load one of the operations of this set from an [`OpDef`].
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized;
-    /// Try to instantiate a variant from an [OpType]. Default behaviour assumes
-    /// an [ExtensionOp] and loads from the name.
+    /// Try to instantiate a variant from an [`OpType`]. Default behaviour assumes
+    /// an [`ExtensionOp`] and loads from the name.
+    #[must_use]
     fn from_optype(op: &OpType) -> Option<Self>
     where
         Self: Sized,
@@ -169,7 +175,7 @@ pub trait MakeExtensionOp: NamedOp {
     fn type_args(&self) -> Vec<TypeArg>;
 
     /// Given the ID of the extension this operation is defined in, and a
-    /// registry containing that extension, return a [RegisteredOp].
+    /// registry containing that extension, return a [`RegisteredOp`].
     fn to_registered(
         self,
         extension_id: ExtensionId,
@@ -186,8 +192,12 @@ pub trait MakeExtensionOp: NamedOp {
     }
 }
 
-/// Blanket implementation for non-polymorphic operations - [OpDef]s with no type parameters.
+/// Blanket implementation for non-polymorphic operations - [`OpDef`]s with no type parameters.
 impl<T: MakeOpDef> MakeExtensionOp for T {
+    fn op_id(&self) -> OpName {
+        self.opdef_id()
+    }
+
     #[inline]
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
@@ -202,8 +212,8 @@ impl<T: MakeOpDef> MakeExtensionOp for T {
     }
 }
 
-/// Load an [MakeOpDef] from its name.
-/// See [strum_macros::EnumString].
+/// Load an [`MakeOpDef`] from its name.
+/// See [`strum::EnumString`].
 pub fn try_from_name<T>(name: &OpNameRef, def_extension: &ExtensionId) -> Result<T, OpLoadError>
 where
     T: std::str::FromStr + MakeOpDef,
@@ -220,15 +230,15 @@ where
     Ok(op)
 }
 
-/// Wrap an [MakeExtensionOp] with an extension registry to allow type computation.
-/// Generate from [MakeExtensionOp::to_registered]
+/// Wrap an [`MakeExtensionOp`] with an extension registry to allow type computation.
+/// Generate from [`MakeExtensionOp::to_registered`]
 #[derive(Clone, Debug)]
 pub struct RegisteredOp<T> {
     /// The name of the extension these ops belong to.
     pub extension_id: ExtensionId,
     /// A registry of all extensions, used for type computation.
     extension: Weak<Extension>,
-    /// The inner [MakeExtensionOp]
+    /// The inner [`MakeExtensionOp`]
     op: T,
 }
 
@@ -240,10 +250,10 @@ impl<T> RegisteredOp<T> {
 }
 
 impl<T: MakeExtensionOp> RegisteredOp<T> {
-    /// Generate an [OpType].
+    /// Generate an [`OpType`].
     pub fn to_extension_op(&self) -> Option<ExtensionOp> {
         ExtensionOp::new(
-            self.extension.upgrade()?.get_op(&self.name())?.clone(),
+            self.extension.upgrade()?.get_op(&self.op_id())?.clone(),
             self.type_args(),
         )
         .ok()
@@ -252,7 +262,7 @@ impl<T: MakeExtensionOp> RegisteredOp<T> {
     delegate! {
         to self.op {
             /// Name of the operation - derived from strum serialization.
-            pub fn name(&self) -> OpName;
+            pub fn op_id(&self) -> OpName;
             /// Any type args which define this operation. Default is no type arguments.
             pub fn type_args(&self) -> Vec<TypeArg>;
         }
@@ -268,7 +278,7 @@ pub trait MakeRegisteredOp: MakeExtensionOp {
     /// A reference to the [Extension] which defines this operation.
     fn extension_ref(&self) -> Weak<Extension>;
 
-    /// Convert this operation in to an [ExtensionOp]. Returns None if the type
+    /// Convert this operation in to an [`ExtensionOp`]. Returns None if the type
     /// cannot be computed.
     fn to_extension_op(self) -> Option<ExtensionOp>
     where
@@ -302,7 +312,7 @@ mod test {
 
     use super::*;
     use lazy_static::lazy_static;
-    use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+    use strum::{EnumIter, EnumString, IntoStaticStr};
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
     enum DummyEnum {
@@ -310,6 +320,10 @@ mod test {
     }
 
     impl MakeOpDef for DummyEnum {
+        fn opdef_id(&self) -> OpName {
+            <&'static str>::from(self).into()
+        }
+
         fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
             Signature::new_endo(type_row![]).into()
         }
@@ -323,7 +337,7 @@ mod test {
         }
 
         fn extension(&self) -> ExtensionId {
-            EXT_ID.to_owned()
+            EXT_ID.clone()
         }
     }
 
@@ -353,7 +367,7 @@ mod test {
     }
     impl MakeRegisteredOp for DummyEnum {
         fn extension_id(&self) -> ExtensionId {
-            EXT_ID.to_owned()
+            EXT_ID.clone()
         }
 
         fn extension_ref(&self) -> Weak<Extension> {
@@ -366,7 +380,7 @@ mod test {
         let o = DummyEnum::Dumb;
 
         assert_eq!(
-            DummyEnum::from_def(EXT.get_op(&o.name()).unwrap()).unwrap(),
+            DummyEnum::from_def(EXT.get_op(&o.opdef_id()).unwrap()).unwrap(),
             o
         );
 

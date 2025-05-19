@@ -4,34 +4,38 @@ pub mod hugrmut;
 
 pub(crate) mod ident;
 pub mod internal;
-pub mod rewrite;
+pub mod patch;
+pub mod persistent;
 pub mod serialize;
 pub mod validate;
 pub mod views;
 
 use std::collections::VecDeque;
-use std::io::Read;
+use std::io;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 pub use ident::{IdentList, InvalidIdentifier};
-pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
+use itertools::Itertools;
+pub use patch::{Patch, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
 use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
-pub use self::views::{HugrView, RootTagged};
+pub use self::views::HugrView;
 use crate::core::NodeIndex;
+use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::{
-    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
+    resolve_op_types_extensions,
 };
-use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
-use crate::ops::{OpTag, OpTrait};
-pub use crate::ops::{OpType, DEFAULT_OPTYPE};
+use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
+pub use crate::ops::{DEFAULT_OPTYPE, OpType};
+use crate::package::Package;
 use crate::{Direction, Node};
 
 /// The Hugr data structure.
@@ -43,8 +47,13 @@ pub struct Hugr {
     /// The node hierarchy.
     hierarchy: Hierarchy,
 
-    /// The single root node in the hierarchy.
-    root: portgraph::NodeIndex,
+    /// The single root node in the portgraph hierarchy.
+    ///
+    /// This node is always a module node, containing all the other nodes.
+    module_root: portgraph::NodeIndex,
+
+    /// The distinguished entrypoint node of the HUGR.
+    entrypoint: portgraph::NodeIndex,
 
     /// Operation types for each node.
     op_types: UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
@@ -58,7 +67,7 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(crate::ops::Module::new())
+        Self::new()
     }
 }
 
@@ -84,104 +93,110 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Create a new Hugr, with a single root node.
-    pub fn new(root_node: impl Into<OpType>) -> Self {
-        Self::with_capacity(root_node.into(), 0, 0)
+    /// Create a new Hugr, with a single [`Module`] operation as the root node.
+    #[must_use]
+    pub fn new() -> Self {
+        make_module_hugr(Module::new().into(), 0, 0).unwrap()
     }
 
-    /// Load a Hugr from a json reader.
+    /// Create a new Hugr, with a given entrypoint operation.
     ///
-    /// Validates the Hugr against the provided extension registry, ensuring all
-    /// operations are resolved.
+    /// If the optype is [`OpType::Module`], the HUGR module root will match the
+    /// entrypoint node. Otherwise, the entrypoint will be a descendent of the a
+    /// module initialized at the node hierarchy root. The specific HUGR created
+    /// depends on the operation type.
     ///
-    /// If the feature `extension_inference` is enabled, we will ensure every function
-    /// correctly specifies the extensions required by its contained ops.
-    pub fn load_json(
-        reader: impl Read,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Self, LoadHugrError> {
-        let mut hugr: Hugr = serde_json::from_reader(reader)?;
-
-        hugr.resolve_extension_defs(extension_registry)?;
-        hugr.validate_no_extensions()?;
-
-        if cfg!(feature = "extension_inference") {
-            hugr.infer_extensions(false)?;
-            hugr.validate_extensions()?;
-        }
-
-        Ok(hugr)
+    /// # Error
+    ///
+    /// Returns [`HugrError::UnsupportedEntrypoint`] if the entrypoint operation
+    /// requires additional context to be defined. This is the case for
+    /// [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
+    /// since they are context-specific definitions.
+    pub fn new_with_entrypoint(entrypoint_op: impl Into<OpType>) -> Result<Self, HugrError> {
+        Self::with_capacity(entrypoint_op, 0, 0)
     }
 
-    /// Infers an extension-delta for any non-function container node
-    /// whose current [extension_delta] contains [TO_BE_INFERRED]. The inferred delta
-    /// will be the smallest delta compatible with its children and that includes any
-    /// other [ExtensionId]s in the current delta.
+    /// Create a new Hugr, with a given entrypoint operation and preallocated capacity.
     ///
-    /// If `remove` is true, for such container nodes *without* [TO_BE_INFERRED],
-    /// ExtensionIds are removed from the delta if they are *not* used by any child node.
+    /// If the optype is [`OpType::Module`], the HUGR module root will match the
+    /// entrypoint node. Otherwise, the entrypoint will be a child of the a
+    /// module initialized at the node hierarchy root. The specific HUGR created
+    /// depends on the operation type.
     ///
-    /// The non-function container nodes are:
-    /// [Case], [CFG], [Conditional], [DataflowBlock], [DFG], [TailLoop]
+    /// # Error
     ///
-    /// [Case]: crate::ops::Case
-    /// [CFG]: crate::ops::CFG
-    /// [Conditional]: crate::ops::Conditional
-    /// [DataflowBlock]: crate::ops::DataflowBlock
-    /// [DFG]: crate::ops::DFG
-    /// [TailLoop]: crate::ops::TailLoop
-    /// [extension_delta]: crate::ops::OpType::extension_delta
-    /// [ExtensionId]: crate::extension::ExtensionId
-    pub fn infer_extensions(&mut self, remove: bool) -> Result<(), ExtensionError> {
-        fn delta_mut(optype: &mut OpType) -> Option<&mut ExtensionSet> {
-            match optype {
-                OpType::DFG(dfg) => Some(&mut dfg.signature.runtime_reqs),
-                OpType::DataflowBlock(dfb) => Some(&mut dfb.extension_delta),
-                OpType::TailLoop(tl) => Some(&mut tl.extension_delta),
-                OpType::CFG(cfg) => Some(&mut cfg.signature.runtime_reqs),
-                OpType::Conditional(c) => Some(&mut c.extension_delta),
-                OpType::Case(c) => Some(&mut c.signature.runtime_reqs),
-                //OpType::Lift(_) // Not ATM: only a single element, and we expect Lift to be removed
-                //OpType::FuncDefn(_) // Not at present due to the possibility of recursion
-                _ => None,
-            }
-        }
-        fn infer(h: &mut Hugr, node: Node, remove: bool) -> Result<ExtensionSet, ExtensionError> {
-            let mut child_sets = h
-                .children(node)
-                .collect::<Vec<_>>() // Avoid borrowing h over recursive call
-                .into_iter()
-                .map(|ch| Ok((ch, infer(h, ch, remove)?)))
-                .collect::<Result<Vec<_>, _>>()?;
+    /// Returns [`HugrError::UnsupportedEntrypoint`] if the entrypoint operation
+    /// requires additional context to be defined. This is the case for
+    /// [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
+    /// since they are context-specific definitions.
+    pub fn with_capacity(
+        entrypoint_op: impl Into<OpType>,
+        nodes: usize,
+        ports: usize,
+    ) -> Result<Self, HugrError> {
+        let entrypoint_op: OpType = entrypoint_op.into();
+        let op_name = entrypoint_op.name();
+        make_module_hugr(entrypoint_op, nodes, ports)
+            .ok_or(HugrError::UnsupportedEntrypoint { op: op_name })
+    }
 
-            let Some(es) = delta_mut(h.op_types.get_mut(node.pg_index())) else {
-                return Ok(h.get_optype(node).extension_delta());
-            };
-            if es.contains(&TO_BE_INFERRED) {
-                // Do not remove anything from current delta - any other elements are a lower bound
-                child_sets.push((node, es.clone())); // "child_sets" now misnamed but we discard fst
-            } else if remove {
-                child_sets.iter().try_for_each(|(ch, ch_exts)| {
-                    if !es.is_superset(ch_exts) {
-                        return Err(ExtensionError {
-                            parent: node,
-                            parent_extensions: es.clone(),
-                            child: *ch,
-                            child_extensions: ch_exts.clone(),
-                        });
-                    }
-                    Ok(())
-                })?;
-            } else {
-                return Ok(es.clone()); // Can't neither add nor remove, so nothing to do
-            }
-            let merged = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
-            *es = ExtensionSet::singleton(TO_BE_INFERRED).missing_from(&merged);
+    /// Reserves enough capacity to insert at least the given number of
+    /// additional nodes and links.
+    ///
+    /// This method does not take into account already allocated free space left
+    /// after node removals, and may overallocate capacity.
+    pub fn reserve(&mut self, nodes: usize, links: usize) {
+        let ports = links * 2;
+        self.graph.reserve(nodes, ports);
+    }
 
-            Ok(es.clone())
+    /// Read a Package from a HUGR envelope.
+    pub fn load(
+        reader: impl io::BufRead,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<Self, EnvelopeError> {
+        let pkg = Package::load(reader, extensions)?;
+        match pkg.modules.into_iter().exactly_one() {
+            Ok(hugr) => Ok(hugr),
+            Err(e) => Err(EnvelopeError::ExpectedSingleHugr { count: e.count() }),
         }
-        infer(self, self.root(), remove)?;
-        Ok(())
+    }
+
+    /// Read a Package from a HUGR envelope encoded in a string.
+    ///
+    /// Note that not all envelopes are valid strings. In the general case,
+    /// it is recommended to use `Package::load` with a bytearray instead.
+    pub fn load_str(
+        envelope: impl AsRef<str>,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<Self, EnvelopeError> {
+        Self::load(envelope.as_ref().as_bytes(), extensions)
+    }
+
+    /// Store the Package in a HUGR envelope.
+    pub fn store(
+        &self,
+        writer: impl io::Write,
+        config: EnvelopeConfig,
+    ) -> Result<(), EnvelopeError> {
+        envelope::write_envelope_impl(writer, [self], &self.extensions, config)
+    }
+
+    /// Store the Package in a HUGR envelope encoded in a string.
+    ///
+    /// Note that not all envelopes are valid strings. In the general case,
+    /// it is recommended to use `Package::store` with a bytearray instead.
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
+        if !config.format.ascii_printable() {
+            return Err(EnvelopeError::NonASCIIFormat {
+                format: config.format,
+            });
+        }
+
+        let mut buf = Vec::new();
+        self.store(&mut buf, config)?;
+        Ok(String::from_utf8(buf).expect("Envelope is valid utf8"))
     }
 
     /// Given a Hugr that has been deserialized, collect all extensions used to
@@ -195,19 +210,14 @@ impl Hugr {
     /// to define the HUGR nodes and wire types. This is computed from the union
     /// of all extension required across the HUGR.
     ///
-    /// This is distinct from _runtime_ extension requirements computed in
-    /// [`Hugr::infer_extensions`], which are computed more granularly in each
-    /// function signature by the `runtime_reqs` field and define the set
-    /// of capabilities required by the runtime to execute each function.
-    ///
     /// Updates the internal extension registry with the extensions used in the
     /// definition.
     ///
     /// # Parameters
     ///
     /// - `extensions`: The extension set considered when resolving opaque
-    ///     operations and types. The original Hugr's internal extension
-    ///     registry is ignored and replaced with the newly computed one.
+    ///   operations and types. The original Hugr's internal extension
+    ///   registry is ignored and replaced with the newly computed one.
     ///
     /// # Errors
     ///
@@ -260,31 +270,6 @@ impl Hugr {
 
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
-    /// Create a new Hugr, with a single root node and preallocated capacity.
-    pub(crate) fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
-        let mut graph = MultiPortGraph::with_capacity(nodes, ports);
-        let hierarchy = Hierarchy::new();
-        let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
-        let root = graph.add_node(root_node.input_count(), root_node.output_count());
-        let extensions = root_node.used_extensions();
-        op_types[root] = root_node;
-
-        Self {
-            graph,
-            hierarchy,
-            root,
-            op_types,
-            metadata: UnmanagedDenseMap::with_capacity(nodes),
-            extensions: extensions.unwrap_or_default(),
-        }
-    }
-
-    /// Set the root node of the hugr.
-    pub(crate) fn set_root(&mut self, root: Node) {
-        self.hierarchy.detach(self.root);
-        self.root = root.pg_index();
-    }
-
     /// Add a node to the graph.
     pub(crate) fn add_node(&mut self, nodetype: OpType) -> Node {
         let node = self
@@ -322,8 +307,9 @@ impl Hugr {
     /// preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
         // Generate the ordered list of nodes
-        let mut ordered = Vec::with_capacity(self.node_count());
-        let root = self.root();
+        let mut ordered = Vec::with_capacity(self.num_nodes());
+        let root = self.module_root();
+        let mut new_entrypoint = self.entrypoint;
         ordered.extend(self.as_mut().canonical_order(root));
 
         // Permute the nodes in the graph to match the order.
@@ -339,15 +325,20 @@ impl Hugr {
 
             let target: Node = portgraph::NodeIndex::new(position).into();
             if target != source {
-                let pg_target = target.pg_index();
-                let pg_source = source.pg_index();
+                let pg_target = target.into_portgraph();
+                let pg_source = source.into_portgraph();
                 self.graph.swap_nodes(pg_target, pg_source);
                 self.op_types.swap(pg_target, pg_source);
                 self.hierarchy.swap_nodes(pg_target, pg_source);
                 rekey(source, target);
+
+                if source.into_portgraph() == self.entrypoint {
+                    new_entrypoint = target.into_portgraph();
+                }
             }
         }
-        self.root = portgraph::NodeIndex::new(0);
+        self.module_root = portgraph::NodeIndex::new(0);
+        self.entrypoint = new_entrypoint;
 
         // Finish by compacting the copy nodes.
         // The operation nodes will be left in place.
@@ -357,7 +348,9 @@ impl Hugr {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
+#[error(
+    "Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}"
+)]
 /// An error in the extension deltas.
 pub struct ExtensionError {
     parent: Node,
@@ -367,54 +360,190 @@ pub struct ExtensionError {
 }
 
 /// Errors that can occur while manipulating a Hugr.
-///
-/// TODO: Better descriptions, not just re-exporting portgraph errors.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
-    /// The node was not of the required [OpTag]
-    /// (e.g. to conform to the [RootTagged::RootHandle] of a [HugrView])
+    /// The node was not of the required [`OpTag`]
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
     /// An invalid port was specified.
     #[error("Invalid port direction {0:?}.")]
     InvalidPortDirection(Direction),
+    /// Cannot initialize a HUGR with the given entrypoint operation type.
+    #[error("Cannot initialize a HUGR with entrypoint type {op}")]
+    UnsupportedEntrypoint {
+        /// The name of the unsupported operation.
+        op: OpName,
+    },
 }
 
-/// Errors that can occur while loading and validating a Hugr json.
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum LoadHugrError {
-    /// Error while loading the Hugr from JSON.
-    #[error("Error while loading the Hugr from JSON: {0}")]
-    Load(#[from] serde_json::Error),
-    /// Validation of the loaded Hugr failed.
-    #[error(transparent)]
-    Validation(#[from] ValidationError),
-    /// Error when resolving extension operations and types.
-    #[error(transparent)]
-    Extension(#[from] ExtensionResolutionError),
-    /// Error when inferring runtime extensions.
-    #[error(transparent)]
-    RuntimeInference(#[from] ExtensionError),
+/// Create a new Hugr, with a given root node and preallocated capacity.
+///
+/// The root operation must be region root, i.e., define a node that can be
+/// assigned as the parent of other nodes.
+///
+/// If the root optype is [`OpType::Module`], the HUGR module root will match
+/// the root node.
+///
+/// Otherwise, the root node will be a child of the a module created at the node
+/// hierarchy root. The specific HUGR created depends on the operation type, and
+/// whether it can be contained in a module, function definition, etc.
+///
+/// Some operation types are not allowed and will result in a panic. This is the
+/// case for [`OpType::Case`] and [`OpType::DataflowBlock`] since they are
+/// context-specific operation.
+fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr> {
+    let mut graph = MultiPortGraph::with_capacity(nodes, ports);
+    let hierarchy = Hierarchy::new();
+    let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
+    let extensions = root_op.used_extensions().unwrap_or_default();
+
+    // Filter out operations that are not region roots.
+    let tag = root_op.tag();
+    let container_tags = [
+        OpTag::ModuleRoot,
+        OpTag::DataflowParent,
+        OpTag::Cfg,
+        OpTag::Conditional,
+    ];
+    if !container_tags.iter().any(|t| t.is_superset(tag)) {
+        return None;
+    }
+
+    let module = graph.add_node(0, 0);
+    op_types[module] = OpType::Module(ops::Module::new());
+
+    let mut hugr = Hugr {
+        graph,
+        hierarchy,
+        module_root: module,
+        entrypoint: module,
+        op_types,
+        metadata: UnmanagedDenseMap::with_capacity(nodes),
+        extensions,
+    };
+    let module: Node = module.into();
+
+    // Now the behaviour depends on the root node type.
+    if root_op.is_module() {
+        // The hugr is already a module, nothing to do.
+    }
+    // If possible, put the op directly in the module.
+    else if OpTag::ModuleOp.is_superset(tag) {
+        let node = hugr.add_node_with_parent(module, root_op);
+        hugr.set_entrypoint(node);
+    }
+    // If it can exist inside a function definition, create a "main" function
+    // and put the op inside it.
+    else if OpTag::DataflowChild.is_superset(tag) && !root_op.is_input() && !root_op.is_output() {
+        let signature = root_op
+            .dataflow_signature()
+            .unwrap_or_else(|| panic!("Dataflow child {} without signature", root_op.name()))
+            .into_owned();
+        let dataflow_inputs = signature.input_count();
+        let dataflow_outputs = signature.output_count();
+
+        let func = hugr.add_node_with_parent(module, ops::FuncDefn::new("main", signature.clone()));
+        let inp = hugr.add_node_with_parent(
+            func,
+            ops::Input {
+                types: signature.input.clone(),
+            },
+        );
+        let out = hugr.add_node_with_parent(
+            func,
+            ops::Output {
+                types: signature.output.clone(),
+            },
+        );
+        let entrypoint = hugr.add_node_with_parent(func, root_op);
+
+        // Wire the inputs and outputs of the entrypoint node to the function's
+        // inputs and outputs.
+        for port in 0..dataflow_inputs {
+            hugr.connect(inp, port, entrypoint, port);
+        }
+        for port in 0..dataflow_outputs {
+            hugr.connect(entrypoint, port, out, port);
+        }
+
+        hugr.set_entrypoint(entrypoint);
+    }
+    // Other more exotic ops are unsupported, and will cause a panic.
+    else {
+        debug_assert!(matches!(
+            root_op,
+            OpType::Input(_)
+                | OpType::Output(_)
+                | OpType::DataflowBlock(_)
+                | OpType::ExitBlock(_)
+                | OpType::Case(_)
+        ));
+        return None;
+    }
+
+    Some(hugr)
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use std::{fs::File, io::BufReader};
 
-    use super::internal::HugrMutInternals;
-    #[cfg(feature = "extension_inference")]
-    use super::ValidationError;
-    use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
-    use crate::extension::prelude::Lift;
-    use crate::extension::prelude::PRELUDE_ID;
-    use crate::extension::{ExtensionId, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
-    use crate::types::{Signature, Type};
-    use crate::{const_extension_ids, ops, test_file, type_row};
+    use super::*;
+
+    use crate::envelope::{EnvelopeError, PackageEncodingError};
+    use crate::ops::OpaqueOp;
+    use crate::test_file;
     use cool_asserts::assert_matches;
-    use rstest::rstest;
+    use portgraph::LinkView;
+
+    /// Check that two HUGRs are equivalent, up to node renumbering.
+    pub(crate) fn check_hugr_equality(lhs: &Hugr, rhs: &Hugr) {
+        // Original HUGR, with canonicalized node indices
+        //
+        // The internal port indices may still be different.
+        let mut lhs = lhs.clone();
+        lhs.canonicalize_nodes(|_, _| {});
+        let mut rhs = rhs.clone();
+        rhs.canonicalize_nodes(|_, _| {});
+
+        assert_eq!(rhs.module_root(), lhs.module_root());
+        assert_eq!(rhs.entrypoint(), lhs.entrypoint());
+        assert_eq!(rhs.hierarchy, lhs.hierarchy);
+        assert_eq!(rhs.metadata, lhs.metadata);
+
+        // Extension operations may have been downgraded to opaque operations.
+        for node in rhs.nodes() {
+            let new_op = rhs.get_optype(node);
+            let old_op = lhs.get_optype(node);
+            if !new_op.is_const() {
+                match (new_op, old_op) {
+                    (OpType::ExtensionOp(ext), OpType::OpaqueOp(opaque))
+                    | (OpType::OpaqueOp(opaque), OpType::ExtensionOp(ext)) => {
+                        let ext_opaque: OpaqueOp = ext.clone().into();
+                        assert_eq!(ext_opaque, opaque.clone());
+                    }
+                    _ => assert_eq!(new_op, old_op),
+                }
+            }
+        }
+
+        // Check that the graphs are equivalent up to port renumbering.
+        let new_graph = &rhs.graph;
+        let old_graph = &lhs.graph;
+        assert_eq!(new_graph.node_count(), old_graph.node_count());
+        assert_eq!(new_graph.port_count(), old_graph.port_count());
+        assert_eq!(new_graph.link_count(), old_graph.link_count());
+        for n in old_graph.nodes_iter() {
+            assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
+            assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
+            assert_eq!(
+                new_graph.output_neighbours(n).collect_vec(),
+                old_graph.output_neighbours(n).collect_vec()
+            );
+        }
+    }
 
     #[test]
     fn impls_send_and_sync() {
@@ -431,27 +560,32 @@ mod test {
         use cool_asserts::assert_matches;
 
         let hugr = simple_dfg_hugr();
-        assert_matches!(hugr.get_io(hugr.root()), Some(_));
+        assert_matches!(hugr.get_io(hugr.entrypoint()), Some(_));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_0() {
         // https://github.com/CQCL/hugr/issues/1091 bad case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-0.json")).unwrap()),
-            &PRELUDE_REGISTRY,
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-0.hugr")).unwrap()),
+            None,
         );
-        assert_matches!(hugr, Err(_));
+        assert_matches!(
+            hugr,
+            Err(EnvelopeError::PackageEncoding {
+                source: PackageEncodingError::JsonEncoding(_)
+            })
+        );
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_1() {
         // https://github.com/CQCL/hugr/issues/1091 good case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-1.json")).unwrap()),
-            &PRELUDE_REGISTRY,
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-1.hugr")).unwrap()),
+            None,
         );
         assert_matches!(&hugr, Ok(_));
     }
@@ -460,181 +594,22 @@ mod test {
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_2() {
         // https://github.com/CQCL/hugr/issues/1185 bad case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-2.json")).unwrap()),
-            &PRELUDE_REGISTRY,
-        );
-        assert_matches!(hugr, Err(_));
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-2.hugr")).unwrap()),
+            None,
+        )
+        .unwrap();
+        assert_matches!(hugr.validate(), Err(_));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_3() {
         // https://github.com/CQCL/hugr/issues/1185 good case
-        let hugr = Hugr::load_json(
-            BufReader::new(File::open(test_file!("hugr-3.json")).unwrap()),
-            &PRELUDE_REGISTRY,
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-3.hugr")).unwrap()),
+            None,
         );
         assert_matches!(&hugr, Ok(_));
-    }
-
-    const_extension_ids! {
-        const XA: ExtensionId = "EXT_A";
-        const XB: ExtensionId = "EXT_B";
-    }
-
-    #[rstest]
-    #[case([], XA.into())]
-    #[case([XA], XA.into())]
-    #[case([XB], ExtensionSet::from_iter([XA, XB]))]
-
-    fn infer_single_delta(
-        #[case] parent: impl IntoIterator<Item = ExtensionId>,
-        #[values(true, false)] remove: bool, // makes no difference when inferring
-        #[case] result: ExtensionSet,
-    ) {
-        let parent = ExtensionSet::from_iter(parent).union(TO_BE_INFERRED.into());
-        let (mut h, _) = build_ext_dfg(parent);
-        h.infer_extensions(remove).unwrap();
-        assert_eq!(h, build_ext_dfg(result.union(PRELUDE_ID.into())).0);
-    }
-
-    #[test]
-    fn infer_removes_from_delta() {
-        let parent = ExtensionSet::from_iter([XA, XB, PRELUDE_ID]);
-        let mut h = build_ext_dfg(parent.clone()).0;
-        let backup = h.clone();
-        h.infer_extensions(false).unwrap();
-        assert_eq!(h, backup); // did nothing
-        h.infer_extensions(true).unwrap();
-        assert_eq!(
-            h,
-            build_ext_dfg(ExtensionSet::from_iter([XA, PRELUDE_ID])).0
-        );
-    }
-
-    #[test]
-    fn infer_bad_remove() {
-        let (mut h, mid) = build_ext_dfg(XB.into());
-        let backup = h.clone();
-        h.infer_extensions(false).unwrap();
-        assert_eq!(h, backup); // did nothing
-        let val_res = h.validate();
-        let expected_err = ExtensionError {
-            parent: h.root(),
-            parent_extensions: XB.into(),
-            child: mid,
-            child_extensions: ExtensionSet::from_iter([XA, PRELUDE_ID]),
-        };
-        #[cfg(feature = "extension_inference")]
-        assert_eq!(
-            val_res,
-            Err(ValidationError::ExtensionError(expected_err.clone()))
-        );
-        #[cfg(not(feature = "extension_inference"))]
-        assert!(val_res.is_ok());
-
-        let inf_res = h.infer_extensions(true);
-        assert_eq!(inf_res, Err(expected_err));
-    }
-
-    fn build_ext_dfg(parent: ExtensionSet) -> (Hugr, Node) {
-        let ty = Type::new_function(Signature::new_endo(type_row![]));
-        let mut h = Hugr::new(ops::DFG {
-            signature: Signature::new_endo(ty.clone()).with_extension_delta(parent.clone()),
-        });
-        let root = h.root();
-        let mid = add_inliftout(&mut h, root, ty);
-        (h, mid)
-    }
-
-    fn add_inliftout(h: &mut Hugr, p: Node, ty: Type) -> Node {
-        let inp = h.add_node_with_parent(
-            p,
-            ops::Input {
-                types: ty.clone().into(),
-            },
-        );
-        let out = h.add_node_with_parent(
-            p,
-            ops::Output {
-                types: ty.clone().into(),
-            },
-        );
-        let mid = h.add_node_with_parent(p, Lift::new(ty.into(), XA));
-        h.connect(inp, 0, mid, 0);
-        h.connect(mid, 0, out, 0);
-        mid
-    }
-
-    #[rstest]
-    // Base case success: delta inferred for parent equals grandparent.
-    #[case([XA], [TO_BE_INFERRED], true, [XA])]
-    // Success: delta inferred for parent is subset of grandparent
-    #[case([XA, XB], [TO_BE_INFERRED], true, [XA])]
-    // Base case failure: infers [XA] for parent but grandparent has disjoint set
-    #[case([XB], [TO_BE_INFERRED], false, [XA])]
-    // Failure: as previous, but extra "lower bound" on parent that has no effect
-    #[case([XB], [XA, TO_BE_INFERRED], false, [XA])]
-    // Failure: grandparent ok wrt. child but parent specifies extra lower-bound XB
-    #[case([XA], [XB, TO_BE_INFERRED], false, [XA, XB])]
-    // Success: grandparent includes extra XB required for parent's "lower bound"
-    #[case([XA, XB], [XB, TO_BE_INFERRED], true, [XA, XB])]
-    // Success: grandparent is also inferred so can include 'extra' XB from parent
-    #[case([TO_BE_INFERRED], [TO_BE_INFERRED, XB], true, [XA, XB])]
-    // No inference: extraneous XB in parent is removed so all become [XA].
-    #[case([XA], [XA, XB], true, [XA])]
-    fn infer_three_generations(
-        #[case] grandparent: impl IntoIterator<Item = ExtensionId>,
-        #[case] parent: impl IntoIterator<Item = ExtensionId>,
-        #[case] success: bool,
-        #[case] result: impl IntoIterator<Item = ExtensionId>,
-    ) {
-        let ty = Type::new_function(Signature::new_endo(type_row![]));
-        let grandparent = ExtensionSet::from_iter(grandparent).union(PRELUDE_ID.into());
-        let parent = ExtensionSet::from_iter(parent).union(PRELUDE_ID.into());
-        let result = ExtensionSet::from_iter(result).union(PRELUDE_ID.into());
-        let root_ty = ops::Conditional {
-            sum_rows: vec![type_row![]],
-            other_inputs: ty.clone().into(),
-            outputs: ty.clone().into(),
-            extension_delta: grandparent.clone(),
-        };
-        let mut h = Hugr::new(root_ty.clone());
-        let p = h.add_node_with_parent(
-            h.root(),
-            ops::Case {
-                signature: Signature::new_endo(ty.clone()).with_extension_delta(parent),
-            },
-        );
-        add_inliftout(&mut h, p, ty.clone());
-        assert!(h.validate_extensions().is_err());
-        let backup = h.clone();
-        let inf_res = h.infer_extensions(true);
-        if success {
-            assert!(inf_res.is_ok());
-            let expected_p = ops::Case {
-                signature: Signature::new_endo(ty).with_extension_delta(result.clone()),
-            };
-            let mut expected = backup;
-            expected.replace_op(p, expected_p).unwrap();
-            let expected_gp = ops::Conditional {
-                extension_delta: result,
-                ..root_ty
-            };
-            expected.replace_op(h.root(), expected_gp).unwrap();
-
-            assert_eq!(h, expected);
-        } else {
-            assert_eq!(
-                inf_res,
-                Err(ExtensionError {
-                    parent: h.root(),
-                    parent_extensions: grandparent,
-                    child: p,
-                    child_extensions: result
-                })
-            );
-        }
     }
 }

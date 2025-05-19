@@ -1,23 +1,20 @@
-//! Provides [force_order], a tool for fixing the order of nodes in a Hugr.
+//! Provides [`force_order`], a tool for fixing the order of nodes in a Hugr.
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
+use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::{
-    hugr::{
-        hugrmut::HugrMut,
-        views::{DescendantsGraph, HierarchyView, SiblingGraph},
-        HugrError,
-    },
-    ops::{NamedOp, OpTag, OpTrait},
-    types::EdgeKind,
     HugrView as _, Node,
+    hugr::{HugrError, hugrmut::HugrMut},
+    ops::{OpTag, OpTrait},
+    types::EdgeKind,
 };
 use itertools::Itertools as _;
 use petgraph::{
+    Direction::Incoming,
     visit::{
         GraphBase, GraphRef, IntoNeighbors as _, IntoNeighborsDirected, IntoNodeIdentifiers,
         NodeFiltered, VisitMap, Visitable, Walker,
     },
-    Direction::Incoming,
 };
 
 /// Insert order edges into a Hugr according to a rank function.
@@ -36,7 +33,7 @@ use petgraph::{
 /// there is no path from `n2` to `n1` (otherwise this would invalidate `hugr`).
 /// Nodes of equal rank will be ordered arbitrarily, although that arbitrary
 /// order is deterministic.
-pub fn force_order<H: HugrMut>(
+pub fn force_order<H: HugrMut<Node = Node>>(
     hugr: &mut H,
     root: Node,
     rank: impl Fn(&H, Node) -> i64,
@@ -44,41 +41,47 @@ pub fn force_order<H: HugrMut>(
     force_order_by_key(hugr, root, rank)
 }
 
-/// As [force_order], but allows a generic [Ord] choice for the result of the
+/// As [`force_order`], but allows a generic [Ord] choice for the result of the
 /// `rank` function.
-pub fn force_order_by_key<H: HugrMut, K: Ord>(
+pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
     hugr: &mut H,
     root: Node,
     rank: impl Fn(&H, Node) -> K,
 ) -> Result<(), HugrError> {
-    let dataflow_parents = DescendantsGraph::<Node>::try_new(hugr, root)?
-        .nodes()
+    let dataflow_parents = hugr
+        .descendants(root)
         .filter(|n| hugr.get_optype(*n).tag() <= OpTag::DataflowParent)
         .collect_vec();
     for dp in dataflow_parents {
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
-        let rank = |n| rank(hugr, n);
-        let sg = SiblingGraph::<Node>::try_new(hugr, dp)?;
-        let petgraph = NodeFiltered::from_fn(sg.as_petgraph(), |x| x != dp && x != i && x != o);
-        let ordered_nodes = ForceOrder::new(&petgraph, &rank)
-            .iter(&petgraph)
-            .filter(|&x| {
-                let expected_edge = Some(EdgeKind::StateOrder);
-                let optype = hugr.get_optype(x);
-                if optype.other_input() == expected_edge || optype.other_output() == expected_edge {
-                    assert_eq!(
-                        optype.other_input(),
-                        optype.other_output(),
-                        "Optype does not have both input and output order edge: {}",
-                        optype.name()
-                    );
-                    true
-                } else {
-                    false
-                }
-            })
-            .collect_vec();
+        let ordered_nodes = {
+            let (region, node_map) = hugr.region_portgraph(dp);
+            let rank = |n| rank(hugr, node_map.from_portgraph(n));
+            let i_pg = node_map.to_portgraph(i);
+            let o_pg = node_map.to_portgraph(o);
+            let petgraph = NodeFiltered::from_fn(&region, |x| x != i_pg && x != o_pg);
+            ForceOrder::<_, portgraph::NodeIndex, _, _>::new(&petgraph, &rank)
+                .iter(&petgraph)
+                .filter_map(|x| {
+                    let x = node_map.from_portgraph(x);
+                    let expected_edge = Some(EdgeKind::StateOrder);
+                    let optype = hugr.get_optype(x);
+                    if optype.other_input() == expected_edge
+                        || optype.other_output() == expected_edge
+                    {
+                        assert_eq!(
+                            optype.other_input(),
+                            optype.other_output(),
+                            "Optype does not have both input and output order edge: {optype}"
+                        );
+                        Some(x)
+                    } else {
+                        None
+                    }
+                })
+                .collect_vec()
+        };
 
         // we iterate over the topologically sorted nodes, prepending the input
         // node and suffixing the output node.
@@ -102,7 +105,7 @@ pub fn force_order_by_key<H: HugrMut, K: Ord>(
     Ok(())
 }
 
-/// An adaption of [petgraph::visit::Topo]. We differ only in that we sort nodes
+/// An adaption of [`petgraph::visit::Topo`]. We differ only in that we sort nodes
 /// by the rank function before adding them to the internal work stack. This
 /// ensures we visit lower ranked nodes before higher ranked nodes whenever the
 /// topology of the graph allows.
@@ -204,15 +207,15 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use hugr_core::builder::{endo_sig, BuildHandle, Dataflow, DataflowHugr};
+    use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr, endo_sig};
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
-    use hugr_core::ops::Value;
+    use hugr_core::ops::{self, Value};
     use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, Type};
-    use hugr_core::{builder::DFGBuilder, hugr::Hugr};
     use hugr_core::{HugrView, Wire};
+    use hugr_core::{builder::DFGBuilder, hugr::Hugr};
 
     use petgraph::visit::Topo;
 
@@ -269,13 +272,16 @@ mod test {
     type RankMap = HashMap<Node, i64>;
 
     fn force_order_test_impl(hugr: &mut Hugr, rank_map: RankMap) -> Vec<Node> {
-        force_order(hugr, hugr.root(), |_, n| *rank_map.get(&n).unwrap_or(&0)).unwrap();
+        force_order(hugr, hugr.entrypoint(), |_, n| {
+            *rank_map.get(&n).unwrap_or(&0)
+        })
+        .unwrap();
 
         let topo_sorted = Topo::new(&hugr.as_petgraph())
             .iter(&hugr.as_petgraph())
             .filter(|n| rank_map.contains_key(n))
             .collect_vec();
-        hugr.validate_no_extensions().unwrap();
+        hugr.validate().unwrap();
 
         topo_sorted
     }
@@ -323,7 +329,33 @@ mod test {
             let unit = builder.add_load_value(Value::unary_unit_sum());
             builder.finish_hugr_with_outputs([unit]).unwrap()
         };
-        let root = hugr.root();
+        let root = hugr.entrypoint();
+        force_order(&mut hugr, root, |_, _| 0).unwrap();
+    }
+
+    #[test]
+    /// test for <https://github.com/CQCL/hugr/issues/2005>
+    fn call_indirect_bug() {
+        let fn_type = Signature::new(Type::UNIT, vec![Type::UNIT]);
+        let mut hugr = {
+            let mut builder = DFGBuilder::new(Signature::new(
+                vec![Type::new_function(fn_type.clone()), Type::UNIT],
+                vec![Type::UNIT, Type::UNIT],
+            ))
+            .unwrap();
+            let out = builder
+                .add_dataflow_op(
+                    ops::CallIndirect { signature: fn_type },
+                    builder.input_wires(),
+                )
+                .unwrap()
+                .out_wire(0);
+            // requires another op to induce an order edge
+            let other_unit = builder.add_load_value(Value::unary_unit_sum());
+            builder.finish_hugr_with_outputs([out, other_unit]).unwrap()
+        };
+        let root = hugr.entrypoint();
+
         force_order(&mut hugr, root, |_, _| 0).unwrap();
     }
 }

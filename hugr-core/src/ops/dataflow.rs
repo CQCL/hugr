@@ -2,12 +2,12 @@
 
 use std::borrow::Cow;
 
-use super::{impl_op_name, OpTag, OpTrait};
+use super::{OpTag, OpTrait, impl_op_name};
 
-use crate::extension::{ExtensionSet, SignatureError};
+use crate::extension::SignatureError;
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
-use crate::{type_row, IncomingPort};
+use crate::{IncomingPort, type_row};
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
@@ -52,7 +52,7 @@ pub trait DataflowOpTrait: Sized {
         None
     }
 
-    /// Apply a type-level substitution to this OpType, i.e. replace
+    /// Apply a type-level substitution to this `OpType`, i.e. replace
     /// [type variables](TypeArg::new_var_use) with new types.
     fn substitute(&self, _subst: &Substitution) -> Self;
 }
@@ -103,7 +103,7 @@ impl IOTrait for Output {
 impl DataflowOpTrait for Input {
     const TAG: OpTag = OpTag::Input;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "The input node for this dataflow subgraph"
     }
 
@@ -125,7 +125,7 @@ impl DataflowOpTrait for Input {
 impl DataflowOpTrait for Output {
     const TAG: OpTag = OpTag::Output;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "The output node for this dataflow subgraph"
     }
 
@@ -151,15 +151,15 @@ impl<T: DataflowOpTrait + Clone> OpTrait for T {
     fn description(&self) -> &str {
         DataflowOpTrait::description(self)
     }
+
     fn tag(&self) -> OpTag {
         T::TAG
     }
+
     fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         Some(DataflowOpTrait::signature(self))
     }
-    fn extension_delta(&self) -> ExtensionSet {
-        DataflowOpTrait::signature(self).runtime_reqs.clone()
-    }
+
     fn other_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_input(self)
     }
@@ -200,7 +200,7 @@ impl_op_name!(Call);
 impl DataflowOpTrait for Call {
     const TAG: OpTag = OpTag::FnCall;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Call a function directly"
     }
 
@@ -250,11 +250,12 @@ impl Call {
 
     #[inline]
     /// Return the signature of the function called by this op.
+    #[must_use]
     pub fn called_function_type(&self) -> &PolyFuncType {
         &self.func_sig
     }
 
-    /// The IncomingPort which links to the function being called.
+    /// The `IncomingPort` which links to the function being called.
     ///
     /// This matches [`OpType::static_input_port`].
     ///
@@ -272,6 +273,7 @@ impl Call {
     ///
     /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
+    #[must_use]
     pub fn called_function_port(&self) -> IncomingPort {
         self.instantiation.input_count().into()
     }
@@ -300,9 +302,9 @@ pub struct CallIndirect {
 impl_op_name!(CallIndirect);
 
 impl DataflowOpTrait for CallIndirect {
-    const TAG: OpTag = OpTag::FnCall;
+    const TAG: OpTag = OpTag::DataflowChild;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Call a function indirectly"
     }
 
@@ -333,7 +335,7 @@ impl_op_name!(LoadConstant);
 impl DataflowOpTrait for LoadConstant {
     const TAG: OpTag = OpTag::LoadConst;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Load a static constant in to the local dataflow graph"
     }
 
@@ -355,11 +357,12 @@ impl DataflowOpTrait for LoadConstant {
 impl LoadConstant {
     #[inline]
     /// The type of the constant loaded by this op.
+    #[must_use]
     pub fn constant_type(&self) -> &Type {
         &self.datatype
     }
 
-    /// The IncomingPort which links to the loaded constant.
+    /// The `IncomingPort` which links to the loaded constant.
     ///
     /// This matches [`OpType::static_input_port`].
     ///
@@ -375,6 +378,7 @@ impl LoadConstant {
     ///
     /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
+    #[must_use]
     pub fn constant_port(&self) -> IncomingPort {
         0.into()
     }
@@ -395,7 +399,7 @@ impl_op_name!(LoadFunction);
 impl DataflowOpTrait for LoadFunction {
     const TAG: OpTag = OpTag::LoadFunc;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Load a static function in to the local dataflow graph"
     }
 
@@ -448,16 +452,18 @@ impl LoadFunction {
 
     #[inline]
     /// Return the type of the function loaded by this op.
+    #[must_use]
     pub fn function_type(&self) -> &PolyFuncType {
         &self.func_sig
     }
 
-    /// The IncomingPort which links to the loaded function.
+    /// The `IncomingPort` which links to the loaded function.
     ///
     /// This matches [`OpType::static_input_port`].
     ///
     /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
+    #[must_use]
     pub fn function_port(&self) -> IncomingPort {
         0.into()
     }
@@ -503,7 +509,7 @@ impl DataflowParent for DFG {
 impl DataflowOpTrait for DFG {
     const TAG: OpTag = OpTag::Dfg;
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A simply nested dataflow graph"
     }
 

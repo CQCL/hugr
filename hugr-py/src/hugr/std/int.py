@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import Self
 
+import hugr.model as model
 from hugr import ext, tys, val
 from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
 from hugr.std import _load_extension
@@ -71,6 +72,11 @@ class IntVal(val.ExtensionValue):
     def __str__(self) -> str:
         return f"{self.v}"
 
+    def to_model(self) -> model.Term:
+        return model.Apply(
+            "arithmetic.int.const", [model.Literal(self.width), model.Literal(self.v)]
+        )
+
 
 INT_OPS_EXTENSION = _load_extension("arithmetic.int")
 
@@ -87,7 +93,7 @@ class _DivModDef(RegisteredOp):
 
     def cached_signature(self) -> tys.FunctionType | None:
         row: list[tys.Type] = [int_t(self.width)] * 2
-        return tys.FunctionType.endo(row, runtime_reqs=[INT_OPS_EXTENSION.name])
+        return tys.FunctionType.endo(row)
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:

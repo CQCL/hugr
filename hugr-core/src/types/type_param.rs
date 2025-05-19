@@ -11,8 +11,10 @@ use std::num::NonZeroU64;
 use thiserror::Error;
 
 use super::row_var::MaybeRV;
-use super::{check_typevar_decl, NoRV, RowVariable, Substitution, Type, TypeBase, TypeBound};
-use crate::extension::ExtensionSet;
+use super::{
+    NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound, TypeTransformer,
+    check_typevar_decl,
+};
 use crate::extension::SignatureError;
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -40,32 +42,33 @@ impl UpperBound {
     }
 
     /// Returns the value of the upper bound.
+    #[must_use]
     pub fn value(&self) -> &Option<NonZeroU64> {
         &self.0
     }
 }
 
-/// A *kind* of [TypeArg]. Thus, a parameter declared by a [PolyFuncType] or [PolyFuncTypeRV],
+/// A *kind* of [`TypeArg`]. Thus, a parameter declared by a [`PolyFuncType`] or [`PolyFuncTypeRV`],
 /// specifying a value that must be provided statically in order to instantiate it.
 ///
-/// [PolyFuncType]: super::PolyFuncType
-/// [PolyFuncTypeRV]: super::PolyFuncTypeRV
+/// [`PolyFuncType`]: super::PolyFuncType
+/// [`PolyFuncTypeRV`]: super::PolyFuncTypeRV
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
 #[serde(tag = "tp")]
 pub enum TypeParam {
-    /// Argument is a [TypeArg::Type].
+    /// Argument is a [`TypeArg::Type`].
     #[display("Type{}", match b {
-        TypeBound::Any => "".to_string(),
+        TypeBound::Any => String::new(),
         _ => format!("[{b}]")
     })]
     Type {
         /// Bound for the type parameter.
         b: TypeBound,
     },
-    /// Argument is a [TypeArg::BoundedNat] that is less than the upper bound.
+    /// Argument is a [`TypeArg::BoundedNat`] that is less than the upper bound.
     #[display("{}", match bound.value() {
         Some(v) => format!("BoundedNat[{v}]"),
         None => "Nat".to_string()
@@ -74,29 +77,26 @@ pub enum TypeParam {
         /// Upper bound for the Nat parameter.
         bound: UpperBound,
     },
-    /// Argument is a [TypeArg::String].
+    /// Argument is a [`TypeArg::String`].
     String,
-    /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing
+    /// Argument is a [`TypeArg::Sequence`]. A list of indeterminate size containing
     /// parameters all of the (same) specified element type.
     #[display("List[{param}]")]
     List {
-        /// The [TypeParam] describing each element of the list.
+        /// The [`TypeParam`] describing each element of the list.
         param: Box<TypeParam>,
     },
-    /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
-    #[display("Tuple[{}]", params.iter().map(|t|t.to_string()).join(", "))]
+    /// Argument is a [`TypeArg::Sequence`]. A tuple of parameters.
+    #[display("Tuple[{}]", params.iter().map(std::string::ToString::to_string).join(", "))]
     Tuple {
-        /// The [TypeParam]s contained in the tuple.
+        /// The [`TypeParam`]s contained in the tuple.
         params: Vec<TypeParam>,
     },
-    /// Argument is a [TypeArg::Extensions]. A set of [ExtensionId]s.
-    ///
-    /// [ExtensionId]: crate::extension::ExtensionId
-    Extensions,
 }
 
 impl TypeParam {
     /// [`TypeParam::BoundedNat`] with the maximum bound (`u64::MAX` + 1)
+    #[must_use]
     pub const fn max_nat() -> Self {
         Self::BoundedNat {
             bound: UpperBound(None),
@@ -104,6 +104,7 @@ impl TypeParam {
     }
 
     /// [`TypeParam::BoundedNat`] with the stated upper bound (non-exclusive)
+    #[must_use]
     pub const fn bounded_nat(upper_bound: NonZeroU64) -> Self {
         Self::BoundedNat {
             bound: UpperBound(Some(upper_bound)),
@@ -128,7 +129,6 @@ impl TypeParam {
             (TypeParam::Tuple { params: es1 }, TypeParam::Tuple { params: es2 }) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
             }
-            (TypeParam::Extensions, TypeParam::Extensions) => true,
             _ => false,
         }
     }
@@ -153,46 +153,37 @@ impl From<UpperBound> for TypeParam {
 #[non_exhaustive]
 #[serde(tag = "tya")]
 pub enum TypeArg {
-    /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
+    /// Where the (Type/Op)Def declares that an argument is a [`TypeParam::Type`]
     #[display("{ty}")]
     Type {
         /// The concrete type for the parameter.
         ty: Type,
     },
-    /// Instance of [TypeParam::BoundedNat]. 64-bit unsigned integer.
+    /// Instance of [`TypeParam::BoundedNat`]. 64-bit unsigned integer.
     #[display("{n}")]
     BoundedNat {
         /// The integer value for the parameter.
         n: u64,
     },
-    ///Instance of [TypeParam::String]. UTF-8 encoded string argument.
+    ///Instance of [`TypeParam::String`]. UTF-8 encoded string argument.
     #[display("\"{arg}\"")]
     String {
         /// The string value for the parameter.
         arg: String,
     },
-    /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
+    /// Instance of [`TypeParam::List`] or [`TypeParam::Tuple`], defined by a
     /// sequence of elements.
     #[display("({})", {
         use itertools::Itertools as _;
-        elems.iter().map(|t|t.to_string()).join(",")
+        elems.iter().map(std::string::ToString::to_string).join(",")
     })]
     Sequence {
         /// List of element types
         elems: Vec<TypeArg>,
     },
-    /// Instance of [TypeParam::Extensions], providing the extension ids.
-    #[display("Exts({})", {
-        use itertools::Itertools as _;
-        es.iter().map(|t|t.to_string()).join(",")
-    })]
-    Extensions {
-        #[allow(missing_docs)]
-        es: ExtensionSet,
-    },
     /// Variable (used in type schemes or inside polymorphic functions),
-    /// but not a [TypeArg::Type] (not even a row variable i.e. [TypeParam::List] of type)
-    /// nor [TypeArg::Extensions] - see [TypeArg::new_var_use]
+    /// but not a [`TypeArg::Type`] (not even a row variable i.e. [`TypeParam::List`] of type)
+    /// - see [`TypeArg::new_var_use`]
     #[display("{v}")]
     Variable {
         #[allow(missing_docs)]
@@ -236,15 +227,8 @@ impl From<Vec<TypeArg>> for TypeArg {
     }
 }
 
-impl From<ExtensionSet> for TypeArg {
-    fn from(es: ExtensionSet) -> Self {
-        Self::Extensions { es }
-    }
-}
-
-/// Variable in a TypeArg, that is neither a [TypeArg::Extensions]
-/// nor a single [TypeArg::Type] (i.e. not a [Type::new_var_use]
-/// - it might be a [Type::new_row_var_use]).
+/// Variable in a `TypeArg`, that is not a single [`TypeArg::Type`] (i.e. not a [`Type::new_var_use`]
+/// - it might be a [`Type::new_row_var_use`]).
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
 )]
@@ -255,22 +239,19 @@ pub struct TypeArgVariable {
 }
 
 impl TypeArg {
-    /// [Type::UNIT] as a [TypeArg::Type]
+    /// [`Type::UNIT`] as a [`TypeArg::Type`]
     pub const UNIT: Self = Self::Type { ty: Type::UNIT };
 
-    /// Makes a TypeArg representing a use (occurrence) of the type variable
+    /// Makes a `TypeArg` representing a use (occurrence) of the type variable
     /// with the specified index.
     /// `decl` must be exactly that with which the variable was declared.
+    #[must_use]
     pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
         match decl {
             // Note a TypeParam::List of TypeParam::Type *cannot* be represented
             // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
             // not a RowVariable.
             TypeParam::Type { b } => Type::new_var_use(idx, b).into(),
-            // Prevent TypeArg::Variable(idx, TypeParam::Extensions)
-            TypeParam::Extensions => TypeArg::Extensions {
-                es: ExtensionSet::type_var(idx),
-            },
             _ => TypeArg::Variable {
                 v: TypeArgVariable {
                     idx,
@@ -280,7 +261,8 @@ impl TypeArg {
         }
     }
 
-    /// Returns an integer if the TypeArg is an instance of BoundedNat.
+    /// Returns an integer if the `TypeArg` is an instance of `BoundedNat`.
+    #[must_use]
     pub fn as_nat(&self) -> Option<u64> {
         match self {
             TypeArg::BoundedNat { n } => Some(*n),
@@ -288,7 +270,8 @@ impl TypeArg {
         }
     }
 
-    /// Returns a type if the TypeArg is an instance of Type.
+    /// Returns a type if the `TypeArg` is an instance of Type.
+    #[must_use]
     pub fn as_type(&self) -> Option<TypeBase<NoRV>> {
         match self {
             TypeArg::Type { ty } => Some(ty.clone()),
@@ -296,7 +279,8 @@ impl TypeArg {
         }
     }
 
-    /// Returns a string if the TypeArg is an instance of String.
+    /// Returns a string if the `TypeArg` is an instance of String.
+    #[must_use]
     pub fn as_string(&self) -> Option<String> {
         match self {
             TypeArg::String { arg } => Some(arg.clone()),
@@ -304,21 +288,19 @@ impl TypeArg {
         }
     }
 
-    /// Much as [Type::validate], also checks that the type of any [TypeArg::Opaque]
+    /// Much as [`Type::validate`], also checks that the type of any [`TypeArg::Opaque`]
     /// is valid and closed.
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
             TypeArg::Type { ty } => ty.validate(var_decls),
             TypeArg::BoundedNat { .. } | TypeArg::String { .. } => Ok(()),
             TypeArg::Sequence { elems } => elems.iter().try_for_each(|a| a.validate(var_decls)),
-            TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => {
                 assert!(
                     !matches!(cached_decl, TypeParam::Type { .. }),
-                    "Malformed TypeArg::Variable {} - should be inconstructible",
-                    cached_decl
+                    "Malformed TypeArg::Variable {cached_decl} - should be inconstructible"
                 );
 
                 check_typevar_decl(var_decls, *idx, cached_decl)
@@ -342,7 +324,7 @@ impl TypeArg {
                 let elems = match are_types.next() {
                     Some(true) => {
                         assert!(are_types.all(|b| b)); // If one is a Type, so must the rest be
-                                                       // So, anything that doesn't produce a Type, was a row variable => multiple Types
+                        // So, anything that doesn't produce a Type, was a row variable => multiple Types
                         elems
                             .iter()
                             .flat_map(|ta| match ta.substitute(t) {
@@ -359,9 +341,6 @@ impl TypeArg {
                 };
                 TypeArg::Sequence { elems }
             }
-            TypeArg::Extensions { es } => TypeArg::Extensions {
-                es: es.substitute(t),
-            },
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
@@ -369,14 +348,28 @@ impl TypeArg {
     }
 }
 
+impl Transformable for TypeArg {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match self {
+            TypeArg::Type { ty } => ty.transform(tr),
+            TypeArg::Sequence { elems } => elems.transform(tr),
+            TypeArg::BoundedNat { .. } | TypeArg::String { .. } | TypeArg::Variable { .. } => {
+                Ok(false)
+            }
+        }
+    }
+}
+
 impl TypeArgVariable {
     /// Return the index.
+    #[must_use]
     pub fn index(&self) -> usize {
         self.idx
     }
 
     /// Determines whether this represents a row variable; if so, returns
-    /// the [TypeBound] of the individual types it might stand for.
+    /// the [`TypeBound`] of the individual types it might stand for.
+    #[must_use]
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
         if let TypeParam::List { param } = &self.cached_decl {
             if let TypeParam::Type { b } = **param {
@@ -387,7 +380,7 @@ impl TypeArgVariable {
     }
 }
 
-/// Checks a [TypeArg] is as expected for a [TypeParam]
+/// Checks a [`TypeArg`] is as expected for a [`TypeParam`]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
         (
@@ -417,13 +410,13 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             })
         }
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
-            if items.len() != types.len() {
-                Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
-            } else {
+            if items.len() == types.len() {
                 items
                     .iter()
                     .zip(types.iter())
                     .try_for_each(|(arg, param)| check_type_arg(arg, param))
+            } else {
+                Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
             }
         }
         (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNat { bound })
@@ -433,7 +426,6 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         }
 
         (TypeArg::String { .. }, TypeParam::String) => Ok(()),
-        (TypeArg::Extensions { .. }, TypeParam::Extensions) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),
@@ -452,7 +444,7 @@ pub fn check_type_args(args: &[TypeArg], params: &[TypeParam]) -> Result<(), Typ
     Ok(())
 }
 
-/// Errors that can occur fitting a [TypeArg] into a [TypeParam]
+/// Errors that can occur fitting a [`TypeArg`] into a [`TypeParam`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum TypeArgError {
@@ -469,7 +461,9 @@ pub enum TypeArgError {
     WrongNumberArgs(usize, usize),
 
     /// Wrong number of type arguments in tuple (actual vs expected).
-    #[error("Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters")]
+    #[error(
+        "Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters"
+    )]
     WrongNumberTuple(usize, usize),
     /// Opaque value type check error.
     #[error("Opaque type argument does not fit declared parameter type: {0}")]
@@ -483,9 +477,9 @@ pub enum TypeArgError {
 mod test {
     use itertools::Itertools;
 
-    use super::{check_type_arg, Substitution, TypeArg, TypeParam};
+    use super::{Substitution, TypeArg, TypeParam, check_type_arg};
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::types::{type_param::TypeArgError, TypeBound, TypeRV};
+    use crate::types::{TypeBound, TypeRV, type_param::TypeArgError};
 
     #[test]
     fn type_arg_fits_param() {
@@ -643,7 +637,6 @@ mod test {
         use proptest::prelude::*;
 
         use super::super::{TypeArg, TypeArgVariable, TypeParam, UpperBound};
-        use crate::extension::ExtensionSet;
         use crate::proptest::RecursionDepth;
         use crate::types::{Type, TypeBound};
 
@@ -664,7 +657,6 @@ mod test {
                 use prop::collection::vec;
                 use prop::strategy::Union;
                 let mut strat = Union::new([
-                    Just(Self::Extensions).boxed(),
                     Just(Self::String).boxed(),
                     any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
                     any::<UpperBound>()
@@ -679,7 +671,7 @@ mod test {
                             .boxed())
                         .or(vec(any_with::<Self>(depth.descend()), 0..3)
                             .prop_map(|params| Self::Tuple { params })
-                            .boxed())
+                            .boxed());
                 }
 
                 strat.boxed()
@@ -695,9 +687,6 @@ mod test {
                 let mut strat = Union::new([
                     any::<u64>().prop_map(|n| Self::BoundedNat { n }).boxed(),
                     any::<String>().prop_map(|arg| Self::String { arg }).boxed(),
-                    any::<ExtensionSet>()
-                        .prop_map(|es| Self::Extensions { es })
-                        .boxed(),
                     any_with::<Type>(depth)
                         .prop_map(|ty| Self::Type { ty })
                         .boxed(),

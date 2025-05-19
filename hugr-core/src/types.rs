@@ -11,6 +11,9 @@ pub mod type_row;
 pub(crate) use row_var::MaybeRV;
 pub use row_var::{NoRV, RowVariable};
 
+use crate::extension::resolution::{
+    ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
+};
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
@@ -32,7 +35,7 @@ use itertools::{Either, Itertools as _};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-use crate::extension::SignatureError;
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::AliasDecl;
 
 use self::type_param::TypeParam;
@@ -56,10 +59,10 @@ pub enum EdgeKind {
     Value(Type),
     /// A reference to a static constant value - must be a Copyable type
     Const(Type),
-    /// A reference to a function i.e. [FuncDecl] or [FuncDefn].
+    /// A reference to a function i.e. [`FuncDecl`] or [`FuncDefn`].
     ///
-    /// [FuncDecl]: crate::ops::FuncDecl
-    /// [FuncDefn]: crate::ops::FuncDefn
+    /// [`FuncDecl`]: crate::ops::FuncDecl
+    /// [`FuncDefn`]: crate::ops::FuncDefn
     Function(PolyFuncType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
@@ -67,12 +70,14 @@ pub enum EdgeKind {
 
 impl EdgeKind {
     /// Returns whether the type might contain linear data.
+    #[must_use]
     pub fn is_linear(&self) -> bool {
         matches!(self, EdgeKind::Value(t) if !t.copyable())
     }
 
-    /// Whether this EdgeKind represents a Static edge (in the spec)
+    /// Whether this `EdgeKind` represents a Static edge (in the spec)
     /// - i.e. the value is statically known
+    #[must_use]
     pub fn is_static(&self) -> bool {
         matches!(self, EdgeKind::Const(_) | EdgeKind::Function(_))
     }
@@ -134,8 +139,9 @@ pub enum TypeBound {
 }
 
 impl TypeBound {
-    /// Returns the smallest TypeTag containing both the receiver and argument.
+    /// Returns the smallest `TypeTag` containing both the receiver and argument.
     /// (This will be one of the receiver or the argument.)
+    #[must_use]
     pub fn union(self, other: Self) -> Self {
         if self.contains(other) {
             self
@@ -146,8 +152,9 @@ impl TypeBound {
     }
 
     /// Report if this bound contains another.
+    #[must_use]
     pub const fn contains(&self, other: TypeBound) -> bool {
-        use TypeBound::*;
+        use TypeBound::{Any, Copyable};
         matches!((self, other), (Any, _) | (_, Copyable))
     }
 }
@@ -169,7 +176,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 #[non_exhaustive]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
-/// of a UnitSum (sum over empty tuples), store only the size of the Sum.
+/// of a `UnitSum` (sum over empty tuples), store only the size of the Sum.
 pub enum SumType {
     /// Special case of a Sum over unit types.
     #[allow(missing_docs)]
@@ -209,14 +216,15 @@ impl SumType {
         let rows = variants.into_iter().map(Into::into).collect_vec();
 
         let len: usize = rows.len();
-        if len <= (u8::MAX as usize) && rows.iter().all(TypeRowRV::is_empty) {
+        if u8::try_from(len).is_ok() && rows.iter().all(TypeRowRV::is_empty) {
             Self::new_unary(len as u8)
         } else {
             Self::General { rows }
         }
     }
 
-    /// New UnitSum with empty Tuple variants.
+    /// New `UnitSum` with empty Tuple variants.
+    #[must_use]
     pub const fn new_unary(size: u8) -> Self {
         Self::Unit { size }
     }
@@ -232,6 +240,7 @@ impl SumType {
     }
 
     /// Report the tag'th variant, if it exists.
+    #[must_use]
     pub fn get_variant(&self, tag: usize) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if tag < (*size as usize) => Some(TypeRV::EMPTY_TYPEROW_REF),
@@ -241,6 +250,7 @@ impl SumType {
     }
 
     /// Returns the number of variants in the sum type.
+    #[must_use]
     pub fn num_variants(&self) -> usize {
         match self {
             SumType::Unit { size } => *size as usize,
@@ -249,12 +259,30 @@ impl SumType {
     }
 
     /// Returns variant row if there is only one variant.
+    #[must_use]
     pub fn as_tuple(&self) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if *size == 1 => Some(TypeRV::EMPTY_TYPEROW_REF),
             SumType::General { rows } if rows.len() == 1 => Some(&rows[0]),
             _ => None,
         }
+    }
+
+    /// If the sum matches the convention of `Option[row]`, return the row.
+    #[must_use]
+    pub fn as_option(&self) -> Option<&TypeRowRV> {
+        match self {
+            SumType::Unit { size } if *size == 2 => Some(TypeRV::EMPTY_TYPEROW_REF),
+            SumType::General { rows } if rows.len() == 2 && rows[0].is_empty() => Some(&rows[1]),
+            _ => None,
+        }
+    }
+
+    /// If a sum is an option of a single type, return the type.
+    #[must_use]
+    pub fn as_unary_option(&self) -> Option<&TypeRV> {
+        self.as_option()
+            .and_then(|row| row.iter().exactly_one().ok())
     }
 
     /// Returns an iterator over the variants.
@@ -265,6 +293,15 @@ impl SumType {
                 *size as usize,
             )),
             SumType::General { rows } => Either::Right(rows.iter()),
+        }
+    }
+}
+
+impl Transformable for SumType {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match self {
+            SumType::Unit { .. } => Ok(false),
+            SumType::General { rows } => rows.transform(tr),
         }
     }
 }
@@ -297,7 +334,7 @@ pub enum TypeEnum<RV: MaybeRV> {
     // We cache the TypeBound here (checked in validation)
     #[display("#{_0}")]
     Variable(usize, TypeBound),
-    /// RowVariable. Of course, this requires that `RV` has instances, [NoRV] doesn't.
+    /// `RowVariable`. Of course, this requires that `RV` has instances, [`NoRV`] doesn't.
     #[display("RowVar({_0})")]
     RowVar(RV),
     /// Sum of types.
@@ -330,10 +367,10 @@ impl<RV: MaybeRV> TypeEnum<RV> {
     into = "serialize::SerSimpleType",
     try_from = "serialize::SerSimpleType"
 )]
-/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
+/// A HUGR type - the valid types of [`EdgeKind::Value`] and [`EdgeKind::Const`] edges.
 ///
 /// Such an edge is valid if the ports on either end agree on the [Type].
-/// Types have an optional [TypeBound] which places limits on the valid
+/// Types have an optional [`TypeBound`] which places limits on the valid
 /// operations on a type.
 ///
 /// Examples:
@@ -417,12 +454,14 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     /// Initialize a new custom type.
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
+    #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
         TypeBase(TypeEnum::Extension(opaque), bound)
     }
 
     /// Initialize a new alias.
+    #[must_use]
     pub fn new_alias(alias: AliasDecl) -> Self {
         Self::new(TypeEnum::Alias(alias))
     }
@@ -432,7 +471,8 @@ impl<RV: MaybeRV> TypeBase<RV> {
         Self(type_e, bound)
     }
 
-    /// New UnitSum with empty Tuple variants
+    /// New `UnitSum` with empty Tuple variants
+    #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
         Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Copyable)
@@ -440,34 +480,43 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     /// New use (occurrence) of the type variable with specified index.
     /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [TypeParam::Type]`(bound)`), which may be narrower
+    /// (i.e. as a [`TypeParam::Type`]`(bound)`), which may be narrower
     /// than required for the use.
+    #[must_use]
     pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
     }
 
-    /// Report the least upper [TypeBound]
+    /// Report the least upper [`TypeBound`]
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
         self.1
     }
 
-    /// Report the component TypeEnum.
+    /// Report the component `TypeEnum`.
     #[inline(always)]
     pub const fn as_type_enum(&self) -> &TypeEnum<RV> {
         &self.0
     }
 
-    /// Report a mutable reference to the component TypeEnum.
+    /// Report a mutable reference to the component `TypeEnum`.
     #[inline(always)]
     pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
         &mut self.0
     }
 
-    /// Returns the inner [SumType] if the type is a sum.
+    /// Returns the inner [`SumType`] if the type is a sum.
     pub fn as_sum(&self) -> Option<&SumType> {
         match &self.0 {
             TypeEnum::Sum(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Returns the inner [`CustomType`] if the type is from an extension.
+    pub fn as_extension(&self) -> Option<&CustomType> {
+        match &self.0 {
+            TypeEnum::Extension(ct) => Some(ct),
             _ => None,
         }
     }
@@ -479,9 +528,9 @@ impl<RV: MaybeRV> TypeBase<RV> {
     }
 
     /// Checks all variables used in the type are in the provided list
-    /// of bound variables, rejecting any [RowVariable]s if `allow_row_vars` is False;
-    /// and that for each [CustomType] the corresponding
-    /// [TypeDef] is in the [ExtensionRegistry] and the type arguments
+    /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
+    /// and that for each [`CustomType`] the corresponding
+    /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
     /// [validate] and fit into the def's declared parameters.
     ///
     /// [RowVariable]: TypeEnum::RowVariable
@@ -508,9 +557,9 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// Applies a substitution to a type.
     /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
     /// Invariants may be confirmed by validation:
-    /// * If [Type::validate]`(false)` returns successfully, this method will return a Vec containing exactly one type
-    /// * If [Type::validate]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
-    ///   return a Vec containing any number of [Type]s. These may (or not) pass [Type::validate]
+    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
+    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
+    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
     fn substitute(&self, t: &Substitution) -> Vec<Self> {
         match &self.0 {
             TypeEnum::RowVar(rv) => rv.substitute(t),
@@ -528,6 +577,53 @@ impl<RV: MaybeRV> TypeBase<RV> {
             }
         }
     }
+
+    /// Returns a registry with the concrete extensions used by this type.
+    ///
+    /// This includes the extensions of custom types that may be nested
+    /// inside other types.
+    pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
+        let mut used = WeakExtensionRegistry::default();
+        let mut missing = ExtensionSet::new();
+
+        collect_type_exts(self, &mut used, &mut missing);
+
+        if missing.is_empty() {
+            Ok(used.try_into().expect("all extensions are present"))
+        } else {
+            Err(ExtensionCollectionError::dropped_type(self, missing))
+        }
+    }
+}
+
+impl<RV: MaybeRV> Transformable for TypeBase<RV> {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match &mut self.0 {
+            TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
+            TypeEnum::Extension(custom_type) => {
+                if let Some(nt) = tr.apply_custom(custom_type)? {
+                    *self = nt.into_();
+                    Ok(true)
+                } else {
+                    let args_changed = custom_type.args_mut().transform(tr)?;
+                    if args_changed {
+                        *self = Self::new_extension(
+                            custom_type
+                                .get_type_def(&custom_type.get_extension()?)?
+                                .instantiate(custom_type.args())?,
+                        );
+                    }
+                    Ok(args_changed)
+                }
+            }
+            TypeEnum::Function(fty) => fty.transform(tr),
+            TypeEnum::Sum(sum_type) => {
+                let ch = sum_type.transform(tr)?;
+                self.1 = self.0.least_upper_bound();
+                Ok(ch)
+            }
+        }
+    }
 }
 
 impl Type {
@@ -540,6 +636,7 @@ impl Type {
 
 impl TypeRV {
     /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
+    #[must_use]
     pub fn is_row_var(&self) -> bool {
         matches!(self.0, TypeEnum::RowVar(_))
     }
@@ -551,6 +648,7 @@ impl TypeRV {
     ///
     /// [OpDef]: crate::extension::OpDef
     /// [FuncDefn]: crate::ops::FuncDefn
+    #[must_use]
     pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::RowVar(RowVariable(idx, bound)), bound)
     }
@@ -558,8 +656,8 @@ impl TypeRV {
 
 // ====== Conversions ======
 impl<RV: MaybeRV> TypeBase<RV> {
-    /// (Fallibly) converts a TypeBase (parameterized, so may or may not be able
-    /// to contain [RowVariable]s) into a [Type] that definitely does not.
+    /// (Fallibly) converts a `TypeBase` (parameterized, so may or may not be able
+    /// to contain [`RowVariable`]s) into a [Type] that definitely does not.
     pub fn try_into_type(self) -> Result<Type, RowVariable> {
         Ok(TypeBase(
             match self.0 {
@@ -584,7 +682,7 @@ impl TryFrom<TypeRV> for Type {
 
 impl<RV1: MaybeRV> TypeBase<RV1> {
     /// A swiss-army-knife for any safe conversion of the type argument `RV1`
-    /// to/from [NoRV]/RowVariable/rust-type-variable.
+    /// to/from [`NoRV`]/RowVariable/rust-type-variable.
     fn into_<RV2: MaybeRV>(self) -> TypeBase<RV2>
     where
         RV1: Into<RV2>,
@@ -612,16 +710,17 @@ impl From<Type> for TypeRV {
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
 #[derive(Clone, Debug, derive_more::Display)]
-#[display("[{}]", _0.iter().map(|ta| ta.to_string()).join(", "))]
+#[display("[{}]", _0.iter().map(std::string::ToString::to_string).join(", "))]
 pub struct Substitution<'a>(&'a [TypeArg]);
 
 impl<'a> Substitution<'a> {
     /// Create a new Substitution given the replacement values (indexed
-    /// as the variables they replace). `exts` must contain the [TypeDef]
+    /// as the variables they replace). `exts` must contain the [`TypeDef`]
     /// for every custom [Type] (to which the Substitution is applied)
     /// containing a type-variable.
     ///
-    /// [TypeDef]: crate::extension::TypeDef
+    /// [`TypeDef`]: crate::extension::TypeDef
+    #[must_use]
     pub fn new(items: &'a [TypeArg]) -> Self {
         Self(items)
     }
@@ -666,6 +765,53 @@ impl<'a> Substitution<'a> {
     }
 }
 
+/// A transformation that can be applied to a [Type] or [`TypeArg`].
+/// More general in some ways than a Substitution: can fail with a
+/// [`Self::Err`],  may change [`TypeBound::Copyable`] to [`TypeBound::Any`],
+/// and applies to arbitrary extension types rather than type variables.
+pub trait TypeTransformer {
+    /// Error returned when a [`CustomType`] cannot be transformed, or a type
+    /// containing it (e.g. if changing a [`TypeArg::Type`] from copyable to
+    /// linear invalidates a parameterized type).
+    type Err: std::error::Error + From<SignatureError>;
+
+    /// Applies the transformation to an extension type.
+    ///
+    /// Note that if the [`CustomType`] has type arguments, these will *not*
+    /// have been transformed first (this might not produce a valid type
+    /// due to changes in [`TypeBound`]).
+    ///
+    /// Returns a type to use instead, or None to indicate no change
+    ///   (in which case, the `TypeArgs` will be transformed instead.
+    ///    To prevent transforming the arguments, return `t.clone().into()`.)
+    fn apply_custom(&self, t: &CustomType) -> Result<Option<Type>, Self::Err>;
+
+    // Note: in future releases more methods may be added here to transform other types.
+    // By defaulting such trait methods to Ok(None), backwards compatibility will be preserved.
+}
+
+/// Trait for things that can be transformed by applying a [`TypeTransformer`].
+/// (A destructive / in-place mutation.)
+pub trait Transformable {
+    /// Applies a [`TypeTransformer`] to this instance.
+    ///
+    /// Returns true if any part may have changed, or false for definitely no change.
+    ///
+    /// If an Err occurs, `self` may be left in an inconsistent state (e.g. partially
+    /// transformed).
+    fn transform<T: TypeTransformer>(&mut self, t: &T) -> Result<bool, T::Err>;
+}
+
+impl<E: Transformable> Transformable for [E] {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        let mut any_change = false;
+        for item in self {
+            any_change |= item.transform(tr)?;
+        }
+        Ok(any_change)
+    }
+}
+
 pub(crate) fn check_typevar_decl(
     decls: &[TypeParam],
     idx: usize,
@@ -693,12 +839,15 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
-
     use std::sync::Weak;
 
     use super::*;
-    use crate::extension::prelude::usize_t;
-    use crate::type_row;
+    use crate::extension::TypeDefBound;
+    use crate::extension::prelude::{option_type, qb_t, usize_t};
+    use crate::std_extensions::collections::array::{array_type, array_type_parametric};
+    use crate::std_extensions::collections::list::list_type;
+    use crate::types::type_param::TypeArgError;
+    use crate::{Extension, hugr::IdentList, type_row};
 
     #[test]
     fn construct() {
@@ -739,6 +888,34 @@ pub(crate) mod test {
     }
 
     #[test]
+    fn as_option() {
+        let opt = option_type(usize_t());
+
+        assert_eq!(opt.as_unary_option().unwrap().clone(), usize_t());
+        assert_eq!(
+            Type::new_unit_sum(2).as_sum().unwrap().as_unary_option(),
+            None
+        );
+
+        assert_eq!(
+            Type::new_tuple(vec![usize_t()])
+                .as_sum()
+                .unwrap()
+                .as_option(),
+            None
+        );
+    }
+
+    #[test]
+    fn as_extension() {
+        assert_eq!(
+            Type::new_extension(usize_t().as_extension().unwrap().clone()),
+            usize_t()
+        );
+        assert_eq!(Type::new_unit_sum(0).as_extension(), None);
+    }
+
+    #[test]
     fn sum_variants() {
         {
             let variants: Vec<TypeRowRV> = vec![
@@ -754,6 +931,127 @@ pub(crate) mod test {
                 SumType::new_unary(3).variants().collect_vec()
             );
         }
+    }
+
+    pub(super) struct FnTransformer<T>(pub(super) T);
+    impl<T: Fn(&CustomType) -> Option<Type>> TypeTransformer for FnTransformer<T> {
+        type Err = SignatureError;
+
+        fn apply_custom(&self, t: &CustomType) -> Result<Option<Type>, Self::Err> {
+            Ok((self.0)(t))
+        }
+    }
+    #[test]
+    fn transform() {
+        const LIN: SmolStr = SmolStr::new_inline("MyLinear");
+        let e = Extension::new_test_arc(IdentList::new("TestExt").unwrap(), |e, w| {
+            e.add_type(LIN, vec![], String::new(), TypeDefBound::any(), w)
+                .unwrap();
+        });
+        let lin = e.get_type(&LIN).unwrap().instantiate([]).unwrap();
+
+        let lin_to_usize = FnTransformer(|ct: &CustomType| (*ct == lin).then_some(usize_t()));
+        let mut t = Type::new_extension(lin.clone());
+        assert_eq!(t.transform(&lin_to_usize), Ok(true));
+        assert_eq!(t, usize_t());
+
+        for coln in [
+            list_type,
+            |t| array_type(10, t),
+            |t| {
+                array_type_parametric(
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat(3.try_into().unwrap())),
+                    t,
+                )
+                .unwrap()
+            },
+        ] {
+            let mut t = coln(lin.clone().into());
+            assert_eq!(t.transform(&lin_to_usize), Ok(true));
+            let expected = coln(usize_t());
+            assert_eq!(t, expected);
+            assert_eq!(t.transform(&lin_to_usize), Ok(false));
+            assert_eq!(t, expected);
+        }
+    }
+
+    #[test]
+    fn transform_copyable_to_linear() {
+        const CPY: SmolStr = SmolStr::new_inline("MyCopyable");
+        const COLN: SmolStr = SmolStr::new_inline("ColnOfCopyableElems");
+        let e = Extension::new_test_arc(IdentList::new("TestExt").unwrap(), |e, w| {
+            e.add_type(CPY, vec![], String::new(), TypeDefBound::copyable(), w)
+                .unwrap();
+            e.add_type(
+                COLN,
+                vec![TypeParam::new_list(TypeBound::Copyable)],
+                String::new(),
+                TypeDefBound::copyable(),
+                w,
+            )
+            .unwrap();
+        });
+
+        let cpy = e.get_type(&CPY).unwrap().instantiate([]).unwrap();
+        let mk_opt = |t: Type| Type::new_sum([type_row![], TypeRow::from(t)]);
+
+        let cpy_to_qb = FnTransformer(|ct: &CustomType| (ct == &cpy).then_some(qb_t()));
+
+        let mut t = mk_opt(cpy.clone().into());
+        assert_eq!(t.transform(&cpy_to_qb), Ok(true));
+        assert_eq!(t, mk_opt(qb_t()));
+
+        let coln = e.get_type(&COLN).unwrap();
+        let c_of_cpy = coln
+            .instantiate([TypeArg::Sequence {
+                elems: vec![Type::from(cpy.clone()).into()],
+            }])
+            .unwrap();
+
+        let mut t = Type::new_extension(c_of_cpy.clone());
+        assert_eq!(
+            t.transform(&cpy_to_qb),
+            Err(SignatureError::from(TypeArgError::TypeMismatch {
+                param: TypeBound::Copyable.into(),
+                arg: qb_t().into()
+            }))
+        );
+
+        let mut t = Type::new_extension(
+            coln.instantiate([TypeArg::Sequence {
+                elems: vec![mk_opt(Type::from(cpy.clone())).into()],
+            }])
+            .unwrap(),
+        );
+        assert_eq!(
+            t.transform(&cpy_to_qb),
+            Err(SignatureError::from(TypeArgError::TypeMismatch {
+                param: TypeBound::Copyable.into(),
+                arg: mk_opt(qb_t()).into()
+            }))
+        );
+
+        // Finally, check handling Coln<Cpy> overrides handling of Cpy
+        let cpy_to_qb2 = FnTransformer(|ct: &CustomType| {
+            assert_ne!(ct, &cpy);
+            (ct == &c_of_cpy).then_some(usize_t())
+        });
+        let mut t = Type::new_extension(
+            coln.instantiate([TypeArg::Sequence {
+                elems: vec![Type::from(c_of_cpy.clone()).into(); 2],
+            }])
+            .unwrap(),
+        );
+        assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
+        assert_eq!(
+            t,
+            Type::new_extension(
+                coln.instantiate([TypeArg::Sequence {
+                    elems: vec![usize_t().into(); 2]
+                }])
+                .unwrap()
+            )
+        );
     }
 
     mod proptest {

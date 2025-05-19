@@ -24,7 +24,7 @@ pub fn resolve_op_types_extensions(
     node: Option<Node>,
     op: &mut OpType,
     extensions: &WeakExtensionRegistry,
-) -> Result<impl Iterator<Item = Weak<Extension>>, ExtensionResolutionError> {
+) -> Result<impl Iterator<Item = Weak<Extension>> + use<>, ExtensionResolutionError> {
     let mut used = WeakExtensionRegistry::default();
     let used_extensions = &mut used;
     match op {
@@ -32,20 +32,30 @@ pub fn resolve_op_types_extensions(
             for arg in ext.args_mut() {
                 resolve_typearg_exts(node, arg, extensions, used_extensions)?;
             }
-            resolve_signature_exts(node, ext.signature_mut(), extensions, used_extensions)?
+            resolve_signature_exts(node, ext.signature_mut(), extensions, used_extensions)?;
         }
         OpType::FuncDefn(f) => {
-            resolve_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?
+            resolve_signature_exts(
+                node,
+                f.signature_mut().body_mut(),
+                extensions,
+                used_extensions,
+            )?;
         }
         OpType::FuncDecl(f) => {
-            resolve_signature_exts(node, f.signature.body_mut(), extensions, used_extensions)?
+            resolve_signature_exts(
+                node,
+                f.signature_mut().body_mut(),
+                extensions,
+                used_extensions,
+            )?;
         }
         OpType::Const(c) => resolve_value_exts(node, &mut c.value, extensions, used_extensions)?,
         OpType::Input(inp) => {
-            resolve_type_row_exts(node, &mut inp.types, extensions, used_extensions)?
+            resolve_type_row_exts(node, &mut inp.types, extensions, used_extensions)?;
         }
         OpType::Output(out) => {
-            resolve_type_row_exts(node, &mut out.types, extensions, used_extensions)?
+            resolve_type_row_exts(node, &mut out.types, extensions, used_extensions)?;
         }
         OpType::Call(c) => {
             resolve_signature_exts(node, c.func_sig.body_mut(), extensions, used_extensions)?;
@@ -55,10 +65,10 @@ pub fn resolve_op_types_extensions(
             }
         }
         OpType::CallIndirect(c) => {
-            resolve_signature_exts(node, &mut c.signature, extensions, used_extensions)?
+            resolve_signature_exts(node, &mut c.signature, extensions, used_extensions)?;
         }
         OpType::LoadConstant(lc) => {
-            resolve_type_exts(node, &mut lc.datatype, extensions, used_extensions)?
+            resolve_type_exts(node, &mut lc.datatype, extensions, used_extensions)?;
         }
         OpType::LoadFunction(lf) => {
             resolve_signature_exts(node, lf.func_sig.body_mut(), extensions, used_extensions)?;
@@ -68,23 +78,23 @@ pub fn resolve_op_types_extensions(
             }
         }
         OpType::DFG(dfg) => {
-            resolve_signature_exts(node, &mut dfg.signature, extensions, used_extensions)?
+            resolve_signature_exts(node, &mut dfg.signature, extensions, used_extensions)?;
         }
         OpType::OpaqueOp(op) => {
             for arg in op.args_mut() {
                 resolve_typearg_exts(node, arg, extensions, used_extensions)?;
             }
-            resolve_signature_exts(node, op.signature_mut(), extensions, used_extensions)?
+            resolve_signature_exts(node, op.signature_mut(), extensions, used_extensions)?;
         }
         OpType::Tag(t) => {
-            for variant in t.variants.iter_mut() {
-                resolve_type_row_exts(node, variant, extensions, used_extensions)?
+            for variant in &mut t.variants {
+                resolve_type_row_exts(node, variant, extensions, used_extensions)?;
             }
         }
         OpType::DataflowBlock(db) => {
             resolve_type_row_exts(node, &mut db.inputs, extensions, used_extensions)?;
             resolve_type_row_exts(node, &mut db.other_outputs, extensions, used_extensions)?;
-            for row in db.sum_rows.iter_mut() {
+            for row in &mut db.sum_rows {
                 resolve_type_row_exts(node, row, extensions, used_extensions)?;
             }
         }
@@ -100,7 +110,7 @@ pub fn resolve_op_types_extensions(
             resolve_signature_exts(node, &mut cfg.signature, extensions, used_extensions)?;
         }
         OpType::Conditional(cond) => {
-            for row in cond.sum_rows.iter_mut() {
+            for row in &mut cond.sum_rows {
                 resolve_type_row_exts(node, row, extensions, used_extensions)?;
             }
             resolve_type_row_exts(node, &mut cond.other_inputs, extensions, used_extensions)?;
@@ -124,8 +134,6 @@ pub(super) fn resolve_signature_exts<RV: MaybeRV>(
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    // Note that we do not include the signature's `runtime_reqs` here, as those refer
-    // to _runtime_ requirements that may not be currently present.
     resolve_type_row_exts(node, &mut signature.input, extensions, used_extensions)?;
     resolve_type_row_exts(node, &mut signature.output, extensions, used_extensions)?;
     Ok(())

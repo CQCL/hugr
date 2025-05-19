@@ -1,12 +1,12 @@
 use super::{
+    BuildError, Container,
     build_traits::HugrBuilder,
     dataflow::{DFGBuilder, FunctionBuilder},
-    BuildError, Container,
 };
 
+use crate::hugr::ValidationError;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
-use crate::hugr::ValidationError;
 use crate::ops;
 use crate::types::{PolyFuncType, Type, TypeBound};
 
@@ -22,7 +22,7 @@ pub struct ModuleBuilder<T>(pub(super) T);
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().root()
+        self.0.as_ref().entrypoint()
     }
 
     #[inline]
@@ -50,10 +50,7 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.0.infer_extensions(false)?;
-        }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>> {
         self.0.validate()?;
         Ok(self.0)
     }
@@ -72,19 +69,19 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let ops::FuncDecl { signature, name } = self
-            .hugr()
-            .get_optype(f_node)
-            .as_func_decl()
-            .ok_or(BuildError::UnexpectedType {
-                node: f_node,
-                op_desc: "crate::ops::OpType::FuncDecl",
-            })?
-            .clone();
-        let body = signature.body().clone();
+        let decl =
+            self.hugr()
+                .get_optype(f_node)
+                .as_func_decl()
+                .ok_or(BuildError::UnexpectedType {
+                    node: f_node,
+                    op_desc: "crate::ops::OpType::FuncDecl",
+                })?;
+        let name = decl.func_name().clone();
+        let sig = decl.signature().clone();
+        let body = sig.body().clone();
         self.hugr_mut()
-            .replace_op(f_node, ops::FuncDefn { name, signature })
-            .expect("Replacing a FuncDecl node with a FuncDefn should always be valid");
+            .replace_op(f_node, ops::FuncDefn::new(name, sig));
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
@@ -103,10 +100,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     ) -> Result<FuncID<false>, BuildError> {
         let body = signature.body().clone();
         // TODO add param names to metadata
-        let declare_n = self.add_child_node(ops::FuncDecl {
-            signature,
-            name: name.into(),
-        });
+        let declare_n = self.add_child_node(ops::FuncDecl::new(name, signature));
 
         // Add the extensions used by the function types.
         self.use_extensions(
@@ -168,7 +162,7 @@ mod test {
 
     use crate::extension::prelude::usize_t;
     use crate::{
-        builder::{test::n_identity, Dataflow, DataflowSubContainer},
+        builder::{Dataflow, DataflowSubContainer, test::n_identity},
         types::Signature,
     };
 

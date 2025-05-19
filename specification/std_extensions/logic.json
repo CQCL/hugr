@@ -1,36 +1,7 @@
 {
   "version": "0.1.0",
   "name": "logic",
-  "runtime_reqs": [],
   "types": {},
-  "values": {
-    "FALSE": {
-      "extension": "logic",
-      "name": "FALSE",
-      "typed_value": {
-        "v": "Sum",
-        "tag": 0,
-        "vs": [],
-        "typ": {
-          "s": "Unit",
-          "size": 2
-        }
-      }
-    },
-    "TRUE": {
-      "extension": "logic",
-      "name": "TRUE",
-      "typed_value": {
-        "v": "Sum",
-        "tag": 1,
-        "vs": [],
-        "typ": {
-          "s": "Unit",
-          "size": 2
-        }
-      }
-    }
-  },
   "operations": {
     "And": {
       "extension": "logic",
@@ -57,8 +28,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -88,8 +58,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -114,8 +83,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -145,8 +113,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -176,8 +143,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

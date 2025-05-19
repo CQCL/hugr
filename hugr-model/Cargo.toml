@@ -1,6 +1,6 @@
 [package]
 name = "hugr-model"
-version = "0.17.1"
+version = "0.20.0"
 readme = "README.md"
 documentation = "https://docs.rs/hugr-model/"
 description = "Data model for Quantinuum's HUGR intermediate representation"
@@ -19,15 +19,20 @@ bench = false
 base64 = { workspace = true }
 bumpalo = { workspace = true, features = ["collections"] }
 capnp = { workspace = true }
-derive_more = { workspace = true, features = ["display"] }
+derive_more = { workspace = true, features = ["display", "error", "from"] }
 fxhash.workspace = true
 indexmap.workspace = true
+itertools.workspace = true
 ordered-float = { workspace = true }
 pest = { workspace = true }
 pest_derive = { workspace = true }
 pretty = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
+pyo3 = { workspace = true, optional = true, features = ["extension-module"] }
+
+[features]
+pyo3 = ["dep:pyo3"]
 
 [lints]
 workspace = true
@@ -35,3 +40,5 @@ workspace = true
 [dev-dependencies]
 insta = { workspace = true }
 pretty_assertions = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }

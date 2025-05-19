@@ -7,13 +7,13 @@
 //! updates the weak links to point to the correct extensions.
 
 use super::{ExtensionCollectionError, WeakExtensionRegistry};
+use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
-use crate::Node;
 
-/// Collects every extension used te define the types in an operation.
+/// Collects every extension used to define the types in an operation.
 ///
 /// Custom types store a [`Weak`] reference to their extension, which can be
 /// invalidated if the original `Arc<Extension>` is dropped. This normally
@@ -40,10 +40,14 @@ pub(crate) fn collect_op_types_extensions(
             for arg in ext.args() {
                 collect_typearg_exts(arg, &mut used, &mut missing);
             }
-            collect_signature_exts(&ext.signature(), &mut used, &mut missing)
+            collect_signature_exts(&ext.signature(), &mut used, &mut missing);
         }
-        OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
-        OpType::FuncDecl(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
+        OpType::FuncDefn(f) => {
+            collect_signature_exts(f.signature().body(), &mut used, &mut missing)
+        }
+        OpType::FuncDecl(f) => {
+            collect_signature_exts(f.signature().body(), &mut used, &mut missing)
+        }
         OpType::Const(c) => collect_value_exts(&c.value, &mut used, &mut missing),
         OpType::Input(inp) => collect_type_row_exts(&inp.types, &mut used, &mut missing),
         OpType::Output(out) => collect_type_row_exts(&out.types, &mut used, &mut missing),
@@ -68,17 +72,17 @@ pub(crate) fn collect_op_types_extensions(
             for arg in op.args() {
                 collect_typearg_exts(arg, &mut used, &mut missing);
             }
-            collect_signature_exts(&op.signature(), &mut used, &mut missing)
+            collect_signature_exts(&op.signature(), &mut used, &mut missing);
         }
         OpType::Tag(t) => {
-            for variant in t.variants.iter() {
-                collect_type_row_exts(variant, &mut used, &mut missing)
+            for variant in &t.variants {
+                collect_type_row_exts(variant, &mut used, &mut missing);
             }
         }
         OpType::DataflowBlock(db) => {
             collect_type_row_exts(&db.inputs, &mut used, &mut missing);
             collect_type_row_exts(&db.other_outputs, &mut used, &mut missing);
-            for row in db.sum_rows.iter() {
+            for row in &db.sum_rows {
                 collect_type_row_exts(row, &mut used, &mut missing);
             }
         }
@@ -94,7 +98,7 @@ pub(crate) fn collect_op_types_extensions(
             collect_signature_exts(&cfg.signature, &mut used, &mut missing);
         }
         OpType::Conditional(cond) => {
-            for row in cond.sum_rows.iter() {
+            for row in &cond.sum_rows {
                 collect_type_row_exts(row, &mut used, &mut missing);
             }
             collect_type_row_exts(&cond.other_inputs, &mut used, &mut missing);
@@ -105,16 +109,15 @@ pub(crate) fn collect_op_types_extensions(
         }
         // Ignore optypes that do not store a signature.
         OpType::Module(_) | OpType::AliasDecl(_) | OpType::AliasDefn(_) => {}
-    };
+    }
 
-    match missing.is_empty() {
-        true => {
-            // We know there are no missing extensions, so this should not fail.
-            Ok(used.try_into().expect("All extensions are valid"))
-        }
-        false => Err(ExtensionCollectionError::dropped_op_extension(
+    if missing.is_empty() {
+        // We know there are no missing extensions, so this should not fail.
+        Ok(used.try_into().expect("All extensions are valid"))
+    } else {
+        Err(ExtensionCollectionError::dropped_op_extension(
             node, op, missing,
-        )),
+        ))
     }
 }
 
@@ -131,8 +134,6 @@ pub(crate) fn collect_signature_exts<RV: MaybeRV>(
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
-    // Note that we do not include the signature's `runtime_reqs` here, as those refer
-    // to _runtime_ requirements that we do not be require to be defined.
     collect_type_row_exts(&signature.input, used_extensions, missing_extensions);
     collect_type_row_exts(&signature.output, used_extensions, missing_extensions);
 }
@@ -163,7 +164,7 @@ fn collect_type_row_exts<RV: MaybeRV>(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-pub(super) fn collect_type_exts<RV: MaybeRV>(
+pub(crate) fn collect_type_exts<RV: MaybeRV>(
     typ: &TypeBase<RV>,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
@@ -189,7 +190,7 @@ pub(super) fn collect_type_exts<RV: MaybeRV>(
             collect_type_row_exts(&f.output, used_extensions, missing_extensions);
         }
         TypeEnum::Sum(SumType::General { rows }) => {
-            for row in rows.iter() {
+            for row in rows {
                 collect_type_row_exts(row, used_extensions, missing_extensions);
             }
         }
@@ -217,7 +218,7 @@ pub(super) fn collect_typearg_exts(
     match arg {
         TypeArg::Type { ty } => collect_type_exts(ty, used_extensions, missing_extensions),
         TypeArg::Sequence { elems } => {
-            for elem in elems.iter() {
+            for elem in elems {
                 collect_typearg_exts(elem, used_extensions, missing_extensions);
             }
         }
@@ -250,7 +251,7 @@ fn collect_value_exts(
         }
         Value::Sum(s) => {
             if let SumType::General { rows } = &s.sum_type {
-                for row in rows.iter() {
+                for row in rows {
                     collect_type_row_exts(row, used_extensions, missing_extensions);
                 }
             }

@@ -1,30 +1,48 @@
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{Result, anyhow, bail, ensure};
 
 use hugr_core::{
+    HugrView, Node,
     extension::{
-        prelude::{bool_t, sum_with_error, ConstError},
+        prelude::{ConstError, bool_t, sum_with_error},
         simple_op::MakeExtensionOp,
     },
-    ops::{constant::Value, custom::ExtensionOp, DataflowOpTrait as _},
+    ops::{DataflowOpTrait as _, constant::Value, custom::ExtensionOp},
     std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
-    types::{TypeArg, TypeEnum, TypeRow},
-    HugrView,
+    types::{TypeEnum, TypeRow},
 };
 
-use inkwell::{types::IntType, values::BasicValue, FloatPredicate, IntPredicate};
+use inkwell::{FloatPredicate, IntPredicate, types::IntType, values::BasicValue};
 
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
     emit::{
+        EmitOpArgs,
         func::EmitFuncContext,
         ops::{emit_custom_unary_op, emit_value},
-        EmitOpArgs,
     },
+    extension::int::get_width_arg,
     sum::LLVMSumValue,
     types::HugrType,
 };
 
-fn build_trunc_op<'c, H: HugrView>(
+/// Returns the largest and smallest values that can be represented by an
+/// integer of the given `width`.
+///
+/// The elements of the tuple are:
+///  - The most negative signed integer
+///  - The most positive signed integer
+///  - The largest unsigned integer
+#[must_use]
+pub fn int_type_bounds(width: u32) -> (i64, i64, u64) {
+    assert!(width <= 64);
+    (
+        i64::MIN >> (64 - width),
+        i64::MAX >> (64 - width),
+        u64::MAX >> (64 - width),
+    )
+}
+
+fn build_trunc_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     signed: bool,
     log_width: u64,
@@ -46,18 +64,13 @@ fn build_trunc_op<'c, H: HugrView>(
 
     let sum_ty = context.llvm_sum_type(hugr_sum_ty)?;
 
-    let (width, int_min_value_s, int_max_value_s, int_max_value_u) = {
+    let (width, (int_min_value_s, int_max_value_s, int_max_value_u)) = {
         ensure!(
             log_width <= 6,
             "Expected log_width of output to be <= 6, found: {log_width}"
         );
         let width = 1 << log_width;
-        (
-            width,
-            i64::MIN >> (64 - width),
-            i64::MAX >> (64 - width),
-            u64::MAX >> (64 - width),
-        )
+        (width, int_type_bounds(width))
     };
 
     emit_custom_unary_op(context, args, |ctx, arg, _| {
@@ -114,10 +127,7 @@ fn build_trunc_op<'c, H: HugrView>(
 
         let err_msg = Value::extension(ConstError::new(
             2,
-            format!(
-                "Float value too big to convert to int of given width ({})",
-                width
-            ),
+            format!("Float value too big to convert to int of given width ({width})"),
         ));
 
         let err_val = emit_value(ctx, &err_msg)?;
@@ -134,7 +144,7 @@ fn build_trunc_op<'c, H: HugrView>(
     })
 }
 
-fn emit_conversion_op<'c, H: HugrView>(
+fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
     context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     conversion_op: ConvertOpDef,
@@ -142,28 +152,30 @@ fn emit_conversion_op<'c, H: HugrView>(
     match conversion_op {
         ConvertOpDef::trunc_u | ConvertOpDef::trunc_s => {
             let signed = conversion_op == ConvertOpDef::trunc_s;
-            let Some(TypeArg::BoundedNat { n: log_width }) = args.node().args().last().cloned()
-            else {
-                panic!("This op should have one type arg only: the log-width of the int we're truncating to.: {:?}", conversion_op.type_args())
-            };
-
+            let log_width = get_width_arg(&args, &conversion_op)?;
             build_trunc_op(context, signed, log_width, args)
         }
 
         ConvertOpDef::convert_u => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
             let out_ty = out_tys.last().unwrap();
-            Ok(vec![ctx
-                .builder()
-                .build_unsigned_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_unsigned_int_to_float(
+                        arg.into_int_value(),
+                        out_ty.into_float_type(),
+                        "",
+                    )?
+                    .as_basic_value_enum(),
+            ])
         }),
 
         ConvertOpDef::convert_s => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
             let out_ty = out_tys.last().unwrap();
-            Ok(vec![ctx
-                .builder()
-                .build_signed_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
-                .as_basic_value_enum()])
+            Ok(vec![
+                ctx.builder()
+                    .build_signed_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
+                    .as_basic_value_enum(),
+            ])
         }),
         // These ops convert between hugr's `USIZE` and u64. The former is
         // implementation-dependent and we define them to be the same.
@@ -214,6 +226,18 @@ fn emit_conversion_op<'c, H: HugrView>(
                 Ok(vec![res])
             })
         }
+        ConvertOpDef::bytecast_int64_to_float64 => {
+            emit_custom_unary_op(context, args, |ctx, arg, outs| {
+                let [out] = outs.try_into()?;
+                Ok(vec![ctx.builder().build_bit_cast(arg, out, "")?])
+            })
+        }
+        ConvertOpDef::bytecast_float64_to_int64 => {
+            emit_custom_unary_op(context, args, |ctx, arg, outs| {
+                let [out] = outs.try_into()?;
+                Ok(vec![ctx.builder().build_bit_cast(arg, out, "")?])
+            })
+        }
         _ => Err(anyhow!(
             "Conversion op not implemented: {:?}",
             args.node().as_ref()
@@ -225,7 +249,7 @@ fn emit_conversion_op<'c, H: HugrView>(
 pub struct ConversionExtension;
 
 impl CodegenExtension for ConversionExtension {
-    fn add_extension<'a, H: HugrView + 'a>(
+    fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H>
@@ -236,7 +260,8 @@ impl CodegenExtension for ConversionExtension {
     }
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
+    #[must_use]
     pub fn add_conversion_extensions(self) -> Self {
         self.add_extension(ConversionExtension)
     }
@@ -248,21 +273,22 @@ mod test {
     use super::*;
 
     use crate::check_emission;
-    use crate::emit::test::{SimpleHugrConfig, DFGW};
-    use crate::test::{exec_ctx, llvm_ctx, TestContext};
+    use crate::emit::test::{DFGW, SimpleHugrConfig};
+    use crate::test::{TestContext, exec_ctx, llvm_ctx};
     use hugr_core::builder::SubContainer;
-    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::STD_REG;
+    use hugr_core::std_extensions::arithmetic::float_types::ConstF64;
+    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::{
+        Hugr,
         builder::{Dataflow, DataflowSubContainer},
-        extension::prelude::{usize_t, ConstUsize, PRELUDE_REGISTRY},
+        extension::prelude::{ConstUsize, PRELUDE_REGISTRY, usize_t},
         std_extensions::arithmetic::{
             conversions::{ConvertOpDef, EXTENSION},
             float_types::float64_type,
             int_types::INT_TYPES,
         },
         types::Type,
-        Hugr,
     };
     use rstest::rstest;
 
@@ -279,7 +305,7 @@ mod test {
             .finish(|mut hugr_builder| {
                 let [in1] = hugr_builder.input_wires_arr();
                 let ext_op = EXTENSION
-                    .instantiate_extension_op(name.as_ref(), [(int_width as u64).into()])
+                    .instantiate_extension_op(name.as_ref(), [u64::from(int_width).into()])
                     .unwrap();
                 let outputs = hugr_builder
                     .add_dataflow_op(ext_op, [in1])
@@ -294,7 +320,7 @@ mod test {
     #[case("convert_s", 5)]
     fn test_convert(mut llvm_ctx: TestContext, #[case] op_name: &str, #[case] log_width: u8) -> () {
         llvm_ctx.add_extensions(|ceb| {
-            ceb.add_int_extensions()
+            ceb.add_default_int_extensions()
                 .add_float_extensions()
                 .add_conversion_extensions()
         });
@@ -314,7 +340,7 @@ mod test {
     ) -> () {
         llvm_ctx.add_extensions(|builder| {
             builder
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_float_extensions()
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
@@ -335,12 +361,12 @@ mod test {
     ) {
         let mut tys = [INT_TYPES[0].clone(), bool_t()];
         if !input_int {
-            tys.reverse()
-        };
+            tys.reverse();
+        }
         let [in_t, out_t] = tys;
         llvm_ctx.add_extensions(|builder| {
             builder
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_float_extensions()
                 .add_conversion_extensions()
         });
@@ -395,7 +421,7 @@ mod test {
             });
         exec_ctx.add_extensions(|builder| {
             builder
-                .add_int_extensions()
+                .add_default_int_extensions()
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
         });
@@ -465,7 +491,7 @@ mod test {
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
                 .add_float_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
     }
 
@@ -593,7 +619,7 @@ mod test {
             builder
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         assert_eq!(i * 5 + 1, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -615,8 +641,64 @@ mod test {
             builder
                 .add_conversion_extensions()
                 .add_default_prelude_extensions()
-                .add_int_extensions()
+                .add_default_int_extensions()
         });
         assert_eq!(i, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    #[case(42.0)]
+    #[case(f64::INFINITY)]
+    #[case(f64::NEG_INFINITY)]
+    #[case(f64::NAN)]
+    #[case(-0.0f64)]
+    #[case(0.0f64)]
+    fn bytecast_int64_to_float64(mut exec_ctx: TestContext, #[case] f: f64) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(float64_type())
+            .with_extensions(STD_REG.to_owned())
+            .finish(|mut builder| {
+                let i = builder.add_load_value(ConstInt::new_u(6, f.to_bits()).unwrap());
+                let i2f = EXTENSION
+                    .instantiate_extension_op("bytecast_int64_to_float64", [])
+                    .unwrap();
+                let [f] = builder.add_dataflow_op(i2f, [i]).unwrap().outputs_arr();
+                builder.finish_with_outputs([f]).unwrap()
+            });
+        exec_ctx.add_extensions(|builder| {
+            builder
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+                .add_default_int_extensions()
+                .add_float_extensions()
+        });
+        let hugr_f = exec_ctx.exec_hugr_f64(hugr, "main");
+        assert!((f.is_nan() && hugr_f.is_nan()) || f == hugr_f);
+    }
+
+    #[rstest]
+    #[case(42.0)]
+    #[case(-0.0f64)]
+    #[case(0.0f64)]
+    fn bytecast_float64_to_int64(mut exec_ctx: TestContext, #[case] f: f64) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(INT_TYPES[6].clone())
+            .with_extensions(STD_REG.to_owned())
+            .finish(|mut builder| {
+                let f = builder.add_load_value(ConstF64::new(f));
+                let f2i = EXTENSION
+                    .instantiate_extension_op("bytecast_float64_to_int64", [])
+                    .unwrap();
+                let [i] = builder.add_dataflow_op(f2i, [f]).unwrap().outputs_arr();
+                builder.finish_with_outputs([i]).unwrap()
+            });
+        exec_ctx.add_extensions(|builder| {
+            builder
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+                .add_default_int_extensions()
+                .add_float_extensions()
+        });
+        assert_eq!(f.to_bits(), exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 }

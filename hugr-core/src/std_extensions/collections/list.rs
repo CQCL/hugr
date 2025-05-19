@@ -10,30 +10,30 @@ use std::sync::{Arc, Weak};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::resolution::{
-    resolve_type_extensions, resolve_value_extensions, ExtensionResolutionError,
-    WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    resolve_value_extensions,
 };
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc};
-use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
+use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
 use crate::ops::{OpName, Value};
 use crate::types::{TypeName, TypeRowRV};
 use crate::{
+    Extension,
     extension::{
+        ExtensionId, SignatureError, TypeDef, TypeDefBound,
         simple_op::{MakeExtensionOp, OpLoadError},
-        ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound,
     },
     ops::constant::CustomConst,
-    ops::{custom::ExtensionOp, NamedOp},
+    ops::custom::ExtensionOp,
     types::{
-        type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeBound,
+        type_param::{TypeArg, TypeParam},
     },
-    Extension,
 };
 
 /// Reported unique name of the list type.
@@ -48,28 +48,32 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 pub struct ListValue(Vec<Value>, Type);
 
 impl ListValue {
-    /// Create a new [CustomConst] for a list of values of type `typ`.
+    /// Create a new [`CustomConst`] for a list of values of type `typ`.
     /// That all values are of type `typ` is not checked here.
     pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
         Self(contents.into_iter().collect_vec(), typ)
     }
 
-    /// Create a new [CustomConst] for an empty list of values of type `typ`.
+    /// Create a new [`CustomConst`] for an empty list of values of type `typ`.
+    #[must_use]
     pub fn new_empty(typ: Type) -> Self {
         Self(vec![], typ)
     }
 
     /// Returns the type of the `[ListValue]` as a `[CustomType]`.`
+    #[must_use]
     pub fn custom_type(&self) -> CustomType {
         list_custom_type(self.1.clone())
     }
 
     /// Returns the type of values inside the `[ListValue]`.
+    #[must_use]
     pub fn get_element_type(&self) -> &Type {
         &self.1
     }
 
     /// Returns the values contained inside the `[ListValue]`.
+    #[must_use]
     pub fn get_contents(&self) -> &[Value] {
         &self.0
     }
@@ -126,11 +130,6 @@ impl CustomConst for ListValue {
         crate::ops::constant::downcast_equal_consts(self, other)
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
-            .union(EXTENSION_ID.into())
-    }
-
     fn update_extensions(
         &mut self,
         extensions: &WeakExtensionRegistry,
@@ -171,6 +170,7 @@ impl ListOp {
     const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
 
     /// Instantiate a list operation with an `element_type`.
+    #[must_use]
     pub fn with_type(self, element_type: Type) -> ListOpInst {
         ListOpInst {
             elem_type: element_type,
@@ -180,7 +180,7 @@ impl ListOp {
 
     /// Compute the signature of the operation, given the list type definition.
     fn compute_signature(self, list_type_def: &TypeDef) -> SignatureFunc {
-        use ListOp::*;
+        use ListOp::{get, insert, length, pop, push, set};
         let e = Type::new_var_use(0, TypeBound::Any);
         let l = self.list_type(list_type_def, 0);
         match self {
@@ -229,20 +229,24 @@ impl ListOp {
 }
 
 impl MakeOpDef for ListOp {
+    fn opdef_id(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
         Arc::downgrade(&EXTENSION)
     }
 
-    /// Add an operation implemented as an [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as an [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the list type def while computing the signature,
     // to avoid recursive loops initializing the extension.
@@ -252,7 +256,7 @@ impl MakeOpDef for ListOp {
         extension_ref: &Weak<Extension>,
     ) -> Result<(), ExtensionBuildError> {
         let sig = self.compute_signature(extension.get_type(&LIST_TYPENAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -278,7 +282,7 @@ impl MakeOpDef for ListOp {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        list_fold::set_fold(self, def)
+        list_fold::set_fold(self, def);
     }
 }
 
@@ -303,7 +307,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for ListOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -312,12 +316,14 @@ impl MakeRegisteredOp for ListOp {
 }
 
 /// Get the type of a list of `elem_type` as a `CustomType`.
+#[must_use]
 pub fn list_type_def() -> &'static TypeDef {
     // This must not be called while the extension is being built.
     EXTENSION.get_type(&LIST_TYPENAME).unwrap()
 }
 
 /// Get the type of a list of `elem_type` as a `CustomType`.
+#[must_use]
 pub fn list_custom_type(elem_type: Type) -> CustomType {
     list_type_def()
         .instantiate(vec![TypeArg::Type { ty: elem_type }])
@@ -325,34 +331,32 @@ pub fn list_custom_type(elem_type: Type) -> CustomType {
 }
 
 /// Get the `Type` of a list of `elem_type`.
+#[must_use]
 pub fn list_type(elem_type: Type) -> Type {
     list_custom_type(elem_type).into()
 }
 
 /// A list operation with a concrete element type.
 ///
-/// See [ListOp] for the parametric version.
+/// See [`ListOp`] for the parametric version.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListOpInst {
     op: ListOp,
     elem_type: Type,
 }
 
-impl NamedOp for ListOpInst {
-    fn name(&self) -> OpName {
-        let name: &str = self.op.into();
-        name.into()
-    }
-}
-
 impl MakeExtensionOp for ListOpInst {
+    fn op_id(&self) -> OpName {
+        self.op.opdef_id()
+    }
+
     fn from_extension_op(
         ext_op: &ExtensionOp,
     ) -> Result<Self, crate::extension::simple_op::OpLoadError> {
         let [TypeArg::Type { ty }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
-        let name = ext_op.def().name();
+        let name = ext_op.unqualified_id();
         let Ok(op) = ListOp::from_str(name) else {
             return Err(OpLoadError::NotMember(name.to_string()));
         };
@@ -373,8 +377,9 @@ impl MakeExtensionOp for ListOpInst {
 impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
     /// registry to validate the element type against.
+    #[must_use]
     pub fn to_extension_op(self) -> Option<ExtensionOp> {
-        ExtensionOp::new(EXTENSION.get_op(&self.name())?.clone(), self.type_args()).ok()
+        ExtensionOp::new(EXTENSION.get_op(&self.op_id())?.clone(), self.type_args()).ok()
     }
 }
 
@@ -382,14 +387,14 @@ impl ListOpInst {
 mod test {
     use rstest::rstest;
 
+    use crate::PortIndex;
     use crate::extension::prelude::{
         const_fail_tuple, const_none, const_ok_tuple, const_some_tuple,
     };
     use crate::ops::OpTrait;
-    use crate::PortIndex;
     use crate::{
-        extension::prelude::{qb_t, usize_t, ConstUsize},
-        std_extensions::arithmetic::float_types::{float64_type, ConstF64},
+        extension::prelude::{ConstUsize, qb_t, usize_t},
+        std_extensions::arithmetic::float_types::{ConstF64, float64_type},
         types::TypeRow,
     };
 
@@ -412,9 +417,11 @@ mod test {
             .instantiate([TypeArg::Type { ty: usize_t() }])
             .unwrap();
 
-        assert!(list_def
-            .instantiate([TypeArg::BoundedNat { n: 3 }])
-            .is_err());
+        assert!(
+            list_def
+                .instantiate([TypeArg::BoundedNat { n: 3 }])
+                .is_err()
+        );
 
         list_def.check_custom(&list_type).unwrap();
         let list_value = ListValue(vec![ConstUsize::new(3).into()], usize_t());

@@ -2,19 +2,18 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Extension;
 use crate::extension::prelude::sum_with_error;
 use crate::extension::prelude::{bool_t, string_type, usize_t};
 use crate::extension::simple_op::{HasConcrete, HasDef};
 use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
-use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc};
-use crate::ops::OpName;
-use crate::ops::{custom::ExtensionOp, NamedOp};
+use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc};
+use crate::ops::{ExtensionOp, OpName};
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::types::{TypeArg, TypeRV};
-use crate::Extension;
 
 use super::float_types::float64_type;
 use super::int_types::{get_log_width, int_tv};
@@ -40,15 +39,21 @@ pub enum ConvertOpDef {
     itostring_s,
     itousize,
     ifromusize,
+    bytecast_int64_to_float64,
+    bytecast_float64_to_int64,
 }
 
 impl MakeOpDef for ConvertOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -69,6 +74,8 @@ impl MakeOpDef for ConvertOpDef {
             itostring_u | itostring_s => int_polytype(1, vec![int_tv(0)], vec![string_type()]),
             itousize => int_polytype(0, vec![int_type(6)], vec![usize_t()]),
             ifromusize => int_polytype(0, vec![usize_t()], vec![int_type(6)]),
+            bytecast_int64_to_float64 => int_polytype(0, vec![int_type(6)], vec![float64_type()]),
+            bytecast_float64_to_int64 => int_polytype(0, vec![float64_type()], vec![int_type(6)]),
         }
         .into()
     }
@@ -86,26 +93,34 @@ impl MakeOpDef for ConvertOpDef {
             itostring_u => "convert an unsigned integer to its string representation",
             itousize => "convert a 64b unsigned integer to its usize representation",
             ifromusize => "convert a usize to a 64b unsigned integer",
+            bytecast_int64_to_float64 => {
+                "reinterpret an int64 as a float64 based on its bytes, with the same endianness"
+            }
+            bytecast_float64_to_int64 => {
+                "reinterpret an float64 as an int based on its bytes, with the same endianness"
+            }
         }
         .to_string()
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
 impl ConvertOpDef {
-    /// Initialize a [ConvertOpType] from a [ConvertOpDef] which requires no
+    /// Initialize a [`ConvertOpType`] from a [`ConvertOpDef`] which requires no
     /// integer widths set.
+    #[must_use]
     pub fn without_log_width(self) -> ConvertOpType {
         ConvertOpType {
             def: self,
             log_width: None,
         }
     }
-    /// Initialize a [ConvertOpType] from a [ConvertOpDef] which requires one
+    /// Initialize a [`ConvertOpType`] from a [`ConvertOpDef`] which requires one
     /// integer width set.
+    #[must_use]
     pub fn with_log_width(self, log_width: u8) -> ConvertOpType {
         ConvertOpType {
             def: self,
@@ -120,36 +135,39 @@ pub struct ConvertOpType {
     def: ConvertOpDef,
     /// The integer width parameter of the conversion op, if any. This is interpreted
     /// differently, depending on `def`. The integer types in the inputs and
-    /// outputs of the op will have [int_type]s of this width.
+    /// outputs of the op will have [`int_type`]s of this width.
     log_width: Option<u8>,
 }
 
 impl ConvertOpType {
-    /// Returns the generic [ConvertOpDef] of this [ConvertOpType].
+    /// Returns the generic [`ConvertOpDef`] of this [`ConvertOpType`].
+    #[must_use]
     pub fn def(&self) -> &ConvertOpDef {
         &self.def
     }
 
-    /// Returns the integer width parameters of this [ConvertOpType], if any.
+    /// Returns the integer width parameters of this [`ConvertOpType`], if any.
+    #[must_use]
     pub fn log_widths(&self) -> &[u8] {
         self.log_width.as_slice()
     }
 }
 
-impl NamedOp for ConvertOpType {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
-
 impl MakeExtensionOp for ConvertOpType {
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = ConvertOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        self.log_width.iter().map(|&n| (n as u64).into()).collect()
+        self.log_width
+            .iter()
+            .map(|&n| u64::from(n).into())
+            .collect()
     }
 }
 
@@ -157,12 +175,6 @@ lazy_static! {
     /// Extension for conversions between integers and floats.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(
-                ExtensionSet::from_iter(vec![
-                    super::int_types::EXTENSION_ID,
-                    super::float_types::EXTENSION_ID,
-            ]));
-
             ConvertOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
@@ -170,7 +182,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for ConvertOpType {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -202,10 +214,10 @@ impl HasDef for ConvertOpType {
 mod test {
     use rstest::rstest;
 
+    use crate::IncomingPort;
     use crate::extension::prelude::ConstUsize;
     use crate::ops::Value;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
-    use crate::IncomingPort;
 
     use super::*;
 

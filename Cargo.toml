@@ -10,74 +10,92 @@ members = [
     "hugr-cli",
     "hugr-model",
     "hugr-llvm",
+    "hugr-py",
 ]
 default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
 [workspace.package]
-rust-version = "1.75"
-edition = "2021"
+rust-version = "1.85"
+edition = "2024"
 homepage = "https://github.com/CQCL/hugr"
 repository = "https://github.com/CQCL/hugr"
 license = "Apache-2.0"
 # authors
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ci_run)'] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    # Set by our CI
+    'cfg(ci_run)',
+    # Set by codecov
+    'cfg(coverage,coverage_nightly)',
+] }
 
 missing_docs = "warn"
+
 [workspace.lints.clippy]
 # Unstable check, may cause false positives.
 # https://github.com/rust-lang/rust-clippy/issues/5112
 debug_assert_with_mut_call = "warn"
 
+# TODO: Reduce the size of error types.
+result_large_err = "allow"
+large_enum_variant = "allow"
+
 [workspace.dependencies]
-portgraph = { version = "0.13.0" }
-insta = { version = "1.34.0" }
+insta = { version = "1.43.1" }
 bitvec = "1.0.1"
-capnp = "0.20.1"
+capnp = "0.20.6"
 cgmath = "0.18.0"
 cool_asserts = "2.0.3"
-criterion = "0.5.1"
-delegate = "0.13.0"
+delegate = "0.13.3"
 derive_more = "1.0.0"
 downcast-rs = "2.0.1"
 enum_dispatch = "0.3.11"
 html-escape = "0.2.13"
 itertools = "0.14.0"
-jsonschema = "0.28.1"
+jsonschema = "0.29.1"
 lazy_static = "1.4.0"
 num-rational = "0.4.1"
 paste = "1.0"
-petgraph = { version = "0.7.1", default-features = false }
 proptest = "1.4.0"
 proptest-derive = "0.5.0"
-regex = "1.9.5"
+regex = "1.10.6"
 regex-syntax = "0.8.3"
 rstest = "0.24.0"
-serde = "1.0"
-serde_json = "1.0.97"
-serde_yaml = "0.9.19"
+semver = "1.0.26"
+serde = "1.0.219"
+serde_json = "1.0.140"
+serde_with = "3.12.0"
+serde_yaml = "0.9.34"
 smol_str = "0.3.1"
-strum = "0.26.1"
-strum_macros = "0.26.1"
-thiserror = "2.0.6"
-typetag = "0.2.7"
-clap = { version = "4.5.4" }
+static_assertions = "1.1.0"
+strum = "0.27.0"
+thiserror = "2.0.12"
+typetag = "0.2.20"
+clap = { version = "4.5.38" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.1"
-assert_cmd = "2.0.14"
-assert_fs = "1.1.1"
+assert_cmd = "2.0.17"
+assert_fs = "1.1.3"
 predicates = "3.1.0"
-indexmap = "2.3.0"
+indexmap = "2.9.0"
 fxhash = "0.2.1"
-bumpalo = { version = "3.16.0" }
+bumpalo = "3.16.0"
 pathsearch = "0.2.0"
 base64 = "0.22.1"
-ordered-float = "4.6.0"
-pest = "2.7.12"
-pest_derive = "2.7.12"
-pretty = "0.12.3"
+ordered-float = "5.0.0"
+pest = "2.8.0"
+pest_derive = "2.8.0"
+pretty = "0.12.4"
 pretty_assertions = "1.4.1"
+zstd = "0.13.2"
+relrc = "0.4.1"
+
+# These public dependencies usually require breaking changes downstream, so we
+# try to be as permissive as possible.
+pyo3 = ">= 0.23.4, < 0.25"
+portgraph = { version = "0.14.1" }
+petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
 
 [profile.dev.package]
 insta.opt-level = 3

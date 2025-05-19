@@ -1,5 +1,5 @@
 //! Serialization definition for [`Hugr`]
-//! [`Hugr`]: crate::hugr::Hugr
+//! [`Hugr`]: `crate::hugr::Hugr`
 
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use self::upgrade::UpgradeError;
 
-use super::{HugrMut, HugrView, NodeMetadataMap};
+use super::{HugrError, HugrMut, HugrView, NodeMetadataMap};
 
 mod upgrade;
 
@@ -86,9 +86,9 @@ struct NodeSer {
 /// Version 1 of the HUGR serialization format.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct SerHugrLatest {
-    /// For each node: (parent, node_operation)
+    /// For each node: (parent, `node_operation`)
     nodes: Vec<NodeSer>,
-    /// for each edge: (src, src_offset, tgt, tgt_offset)
+    /// for each edge: (src, `src_offset`, tgt, `tgt_offset`)
     edges: Vec<[(Node, Option<u16>); 2]>,
     /// for each node: (metadata)
     #[serde(default)]
@@ -96,6 +96,12 @@ struct SerHugrLatest {
     /// A metadata field with the package identifier that encoded the HUGR.
     #[serde(default)]
     encoder: Option<String>,
+    /// The entrypoint of the HUGR.
+    ///
+    /// For backwards compatibility, if `None` the entrypoint is set to the root
+    /// of the node hierarchy.
+    #[serde(default)]
+    entrypoint: Option<Node>,
 }
 
 /// Errors that can occur while serializing a HUGR.
@@ -109,7 +115,9 @@ pub enum HUGRSerializationError {
     #[error("Failed to build edge when deserializing: {0}.")]
     LinkError(#[from] LinkError),
     /// Edges without port offsets cannot be present in operations without non-dataflow ports.
-    #[error("Cannot connect an {dir:?} edge without port offset to node {node} with operation type {op_type}.")]
+    #[error(
+        "Cannot connect an {dir:?} edge without port offset to node {node} with operation type {op_type}."
+    )]
     MissingPortOffset {
         /// The node that has the port without offset.
         node: Node,
@@ -127,10 +135,16 @@ pub enum HUGRSerializationError {
     /// First node in node list must be the HUGR root.
     #[error("The first node in the node list has parent {0}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),
+    /// Failed to deserialize the HUGR.
+    #[error(transparent)]
+    HugrError(#[from] HugrError),
 }
 
-impl Serialize for Hugr {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl Hugr {
+    /// Serializes the HUGR using a serde encoder.
+    ///
+    /// This is an internal API, used to generate the JSON variant of the HUGR envelope format.
+    pub(crate) fn serde_serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -138,10 +152,11 @@ impl Serialize for Hugr {
         let versioned = Versioned::new_latest(shg);
         versioned.serialize(serializer)
     }
-}
 
-impl<'de> Deserialize<'de> for Hugr {
-    fn deserialize<D>(deserializer: D) -> Result<Hugr, D::Error>
+    /// Deserializes the HUGR using a serde decoder.
+    ///
+    /// This is an internal API, used to read the JSON variant of the HUGR envelope format.
+    pub(crate) fn serde_deserialize<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -151,19 +166,35 @@ impl<'de> Deserialize<'de> for Hugr {
     }
 }
 
+/// Deerialize the HUGR using a serde decoder.
+///
+/// This API is unstable API and will be removed in the future.
+#[deprecated(
+    since = "0.20.0",
+    note = "This API is unstable and will be removed in the future.
+            Use `Hugr::load` or the `AsStringEnvelope` adaptor instead."
+)]
+#[doc(hidden)]
+pub fn serde_deserialize_hugr<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Hugr::serde_deserialize(deserializer)
+}
+
 impl TryFrom<&Hugr> for SerHugrLatest {
     type Error = HUGRSerializationError;
 
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
-        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
-        for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
+        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
+        for (order, node) in hugr.canonical_order(hugr.module_root()).enumerate() {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
-        let mut nodes = vec![None; hugr.node_count()];
-        let mut metadata = vec![None; hugr.node_count()];
+        let mut nodes = vec![None; hugr.num_nodes()];
+        let mut metadata = vec![None; hugr.num_nodes()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_optype(n);
@@ -172,7 +203,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
                 parent,
                 op: opt.clone(),
             });
-            metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
+            metadata[new_node].clone_from(hugr.metadata.get(n.into_portgraph()));
         }
         let nodes = nodes
             .into_iter()
@@ -209,6 +240,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             edges,
             metadata: Some(metadata),
             encoder,
+            entrypoint: Some(node_rekey[&hugr.entrypoint()]),
         })
     }
 }
@@ -221,6 +253,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
             edges,
             metadata,
             encoder: _,
+            entrypoint,
         }: SerHugrLatest,
     ) -> Result<Self, Self::Error> {
         // Root must be first node
@@ -235,42 +268,55 @@ impl TryFrom<SerHugrLatest> for Hugr {
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
+        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2)?;
+
+        // Since the new Hugr may add some nodes to contain the root (if the
+        // encoded file did not have a module at the root), we need a function
+        // to map the node indices.
+        let padding_nodes = hugr.entrypoint.index();
+        let hugr_node =
+            |node: Node| -> Node { portgraph::NodeIndex::new(node.index() + padding_nodes).into() };
 
         for node_ser in nodes {
-            hugr.add_node_with_parent(node_ser.parent, node_ser.op);
+            hugr.add_node_with_parent(hugr_node(node_ser.parent), node_ser.op);
+        }
+
+        if let Some(entrypoint) = entrypoint {
+            hugr.set_entrypoint(entrypoint);
         }
 
         if let Some(metadata) = metadata {
-            for (node, metadata) in metadata.into_iter().enumerate() {
+            for (node_idx, metadata) in metadata.into_iter().enumerate() {
                 if let Some(metadata) = metadata {
-                    let node = portgraph::NodeIndex::new(node);
-                    hugr.metadata[node] = Some(metadata);
+                    let node = hugr_node(portgraph::NodeIndex::new(node_idx).into());
+                    hugr.metadata[node.into_portgraph()] = Some(metadata);
                 }
             }
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
-            if !hugr.graph.contains_node(node.pg_index()) {
+            if !hugr.graph.contains_node(node.into_portgraph()) {
                 return Err(HUGRSerializationError::UnknownEdgeNode { node });
             }
-            let offset = match offset {
-                Some(offset) => offset as usize,
-                None => {
-                    let op_type = hugr.get_optype(node);
-                    op_type
-                        .other_port(dir)
-                        .ok_or(HUGRSerializationError::MissingPortOffset {
-                            node,
-                            dir,
-                            op_type: op_type.clone(),
-                        })?
-                        .index()
-                }
+            let offset = if let Some(offset) = offset {
+                offset as usize
+            } else {
+                let op_type = hugr.get_optype(node);
+                op_type
+                    .other_port(dir)
+                    .ok_or(HUGRSerializationError::MissingPortOffset {
+                        node,
+                        dir,
+                        op_type: op_type.clone(),
+                    })?
+                    .index()
             };
             Ok(offset)
         };
         for [(src, from_offset), (dst, to_offset)] in edges {
+            let src = hugr_node(src);
+            let dst = hugr_node(dst);
+
             let src_port = unwrap_offset(src, from_offset, Direction::Outgoing, &hugr)?;
             let dst_port = unwrap_offset(dst, to_offset, Direction::Incoming, &hugr)?;
 

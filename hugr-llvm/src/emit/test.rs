@@ -1,18 +1,13 @@
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr_core::builder::{
     BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use hugr_core::extension::prelude::PRELUDE_ID;
-use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
+use hugr_core::extension::ExtensionRegistry;
 use hugr_core::ops::handle::FuncID;
-use hugr_core::std_extensions::arithmetic::{
-    conversions, float_ops, float_types, int_ops, int_types,
-};
-use hugr_core::std_extensions::{collections, logic};
 use hugr_core::types::TypeRow;
-use hugr_core::{Hugr, HugrView};
+use hugr_core::{Hugr, HugrView, Node};
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::values::GenericValue;
@@ -35,7 +30,7 @@ pub struct Emission<'c> {
 
 impl<'c> Emission<'c> {
     /// Create an `Emission` from a HUGR.
-    pub fn emit_hugr<'a: 'c, H: HugrView>(
+    pub fn emit_hugr<'a: 'c, H: HugrView<Node = Node>>(
         hugr: FatNode<'c, hugr_core::ops::Module, H>,
         eh: EmitHugr<'c, 'a, H>,
     ) -> Result<Self> where {
@@ -112,6 +107,7 @@ impl<'c> Emission<'c> {
 }
 
 impl SimpleHugrConfig {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ins: Default::default(),
@@ -150,22 +146,7 @@ impl SimpleHugrConfig {
     ) -> Hugr {
         let mut mod_b = ModuleBuilder::new();
         let func_b = mod_b
-            .define_function(
-                "main",
-                HugrFuncType::new(self.ins, self.outs).with_extension_delta(
-                    ExtensionSet::from_iter([
-                        PRELUDE_ID,
-                        int_types::EXTENSION_ID,
-                        int_ops::EXTENSION_ID,
-                        float_types::EXTENSION_ID,
-                        float_ops::EXTENSION_ID,
-                        conversions::EXTENSION_ID,
-                        logic::EXTENSION_ID,
-                        collections::array::EXTENSION_ID,
-                        collections::list::EXTENSION_ID,
-                    ]),
-                ),
-            )
+            .define_function("main", HugrFuncType::new(self.ins, self.outs))
             .unwrap();
         make(func_b, &self.extensions);
 
@@ -254,21 +235,20 @@ macro_rules! check_emission {
 mod test_fns {
     use super::*;
     use crate::custom::CodegenExtsBuilder;
-    use crate::extension::int::add_int_extensions;
     use crate::types::{HugrFuncType, HugrSumType};
 
     use hugr_core::builder::DataflowSubContainer;
     use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
-    use hugr_core::extension::prelude::{bool_t, usize_t, ConstUsize};
     use hugr_core::extension::PRELUDE_REGISTRY;
+    use hugr_core::extension::prelude::{ConstUsize, bool_t, usize_t};
     use hugr_core::ops::constant::CustomConst;
 
     use hugr_core::ops::{CallIndirect, Tag, Value};
-    use hugr_core::std_extensions::arithmetic::int_ops::{self};
-    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::std_extensions::STD_REG;
+    use hugr_core::std_extensions::arithmetic::int_ops::{self};
+    use hugr_core::std_extensions::arithmetic::int_types::{self, ConstInt};
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{type_row, Hugr};
+    use hugr_core::{Hugr, type_row};
 
     use itertools::Itertools;
     use rstest::{fixture, rstest};
@@ -357,7 +337,8 @@ mod test_fns {
 
     #[rstest]
     fn emit_hugr_load_constant(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_int_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+
         let v = Value::tuple([
             Value::unit_sum(2, 4).unwrap(),
             ConstInt::new_s(4, -24).unwrap().into(),
@@ -416,7 +397,7 @@ mod test_fns {
 
     #[rstest]
     fn emit_hugr_custom_op(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_int_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         let v1 = ConstInt::new_s(4, -24).unwrap();
         let v2 = ConstInt::new_s(4, 24).unwrap();
 
@@ -670,7 +651,7 @@ mod test_fns {
                                 ([type_row![], type_row![]], eq_0),
                                 vec![(just_input.clone(), loop_int_w)],
                                 vec![
-                                    HugrSumType::new(vec![vec![just_input.clone()], vec![]]).into()
+                                    HugrSumType::new(vec![vec![just_input.clone()], vec![]]).into(),
                                 ]
                                 .into(),
                             )
@@ -714,7 +695,6 @@ mod test_fns {
                         .unwrap()
                 };
                 let [out_int] = tail_l.outputs_arr();
-                println!("{}", builder.hugr().mermaid_string());
                 builder
                     .finish_with_outputs([out_int])
                     .unwrap_or_else(|e| panic!("{e}"))
@@ -723,8 +703,7 @@ mod test_fns {
 
     #[rstest]
     fn tail_loop(mut llvm_ctx: TestContext, #[with(3, 7)] terminal_loop: Hugr) {
-        llvm_ctx.add_extensions(add_int_extensions);
-
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         check_emission!(terminal_loop, llvm_ctx);
     }
 
@@ -738,7 +717,7 @@ mod test_fns {
         #[case] input: u64,
         #[with(iters, input)] terminal_loop: Hugr,
     ) {
-        exec_ctx.add_extensions(add_int_extensions);
+        exec_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         assert_eq!(
             input << (iters + 1),
             exec_ctx.exec_hugr_u64(terminal_loop, "main")

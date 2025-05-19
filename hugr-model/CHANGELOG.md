@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.19.0...hugr-model-v0.20.0) - 2025-05-14
+
+### New Features
+
+- [**breaking**] Mark all Error enums as non_exhaustive ([#2056](https://github.com/CQCL/hugr/pull/2056))
+- [**breaking**] Bump MSRV to 1.85 ([#2136](https://github.com/CQCL/hugr/pull/2136))
+- Export and import entrypoints via metadata in `hugr-model`. ([#2172](https://github.com/CQCL/hugr/pull/2172))
+- Define text-model envelope formats ([#2188](https://github.com/CQCL/hugr/pull/2188))
+- Import CFG regions without adding an entry block. ([#2200](https://github.com/CQCL/hugr/pull/2200))
+- Symbol applications can leave out prefixes of wildcards. ([#2201](https://github.com/CQCL/hugr/pull/2201))
+
+## [0.19.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.18.1...hugr-model-v0.19.0) - 2025-05-07
+
+### New Features
+
+- Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/pull/1959))
+- Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/pull/2031))
+- Packages in `hugr-model` and envelope support. ([#2026](https://github.com/CQCL/hugr/pull/2026))
+- Represent order edges in `hugr-model` as metadata. ([#2027](https://github.com/CQCL/hugr/pull/2027))
+
+## [0.18.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.17.1...hugr-model-v0.18.0) - 2025-03-14
+
+### Bug Fixes
+
+- Hugr-model using undeclared derive_more features ([#1940](https://github.com/CQCL/hugr/pull/1940))
+
+### New Features
+
+- *(hugr-model)* [**breaking**] Add `read_from_reader` and `write_to_writer` for streaming reads and writes. ([#1871](https://github.com/CQCL/hugr/pull/1871))
+- `hugr-model` AST ([#1953](https://github.com/CQCL/hugr/pull/1953))
+
+### Refactor
+
+- *(hugr-model)* Reexport `bumpalo` from `hugr-model` ([#1870](https://github.com/CQCL/hugr/pull/1870))
+
 ## [0.17.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.17.0...hugr-model-v0.17.1) - 2025-02-05
 
 ### Bug Fixes

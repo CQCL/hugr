@@ -8,7 +8,6 @@ from pydantic_extra_types.semantic_version import SemanticVersion  # noqa: TCH00
 from hugr.hugr.base import Hugr
 from hugr.utils import deser_it
 
-from .ops import Value
 from .serial_hugr import SerialHugr, serialization_version
 from .tys import (
     ConfiguredBaseModel,
@@ -20,7 +19,6 @@ from .tys import (
 )
 
 if TYPE_CHECKING:
-    from .ops import Value
     from .serial_hugr import SerialHugr
 
 
@@ -62,20 +60,6 @@ class TypeDef(ConfiguredBaseModel):
         )
 
 
-class ExtensionValue(ConfiguredBaseModel):
-    extension: ExtensionId
-    name: str
-    typed_value: Value
-
-    def deserialize(self, extension: ext.Extension) -> ext.ExtensionValue:
-        return extension.add_extension_value(
-            ext.ExtensionValue(
-                name=self.name,
-                val=self.typed_value.deserialize(),
-            )
-        )
-
-
 # --------------------------------------
 # --------------- OpDef ----------------
 # --------------------------------------
@@ -102,9 +86,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
 
     def deserialize(self, extension: ext.Extension) -> ext.OpDef:
         signature = ext.OpDefSig(
-            self.signature.deserialize().with_runtime_reqs([extension.name])
-            if self.signature
-            else None,
+            self.signature.deserialize() if self.signature else None,
             self.binary,
         )
 
@@ -122,9 +104,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
 class Extension(ConfiguredBaseModel):
     version: SemanticVersion
     name: ExtensionId
-    runtime_reqs: set[ExtensionId]
     types: dict[str, TypeDef]
-    values: dict[str, ExtensionValue]
     operations: dict[str, OpDef]
 
     @classmethod
@@ -135,7 +115,6 @@ class Extension(ConfiguredBaseModel):
         e = ext.Extension(
             version=self.version,  # type: ignore[arg-type]
             name=self.name,
-            runtime_reqs=self.runtime_reqs,
         )
 
         for k, t in self.types.items():
@@ -145,10 +124,6 @@ class Extension(ConfiguredBaseModel):
         for k, o in self.operations.items():
             assert k == o.name, "Operation name must match key"
             e.add_op_def(o.deserialize(e))
-
-        for k, v in self.values.items():
-            assert k == v.name, "Value name must match key"
-            e.add_extension_value(v.deserialize(e))
 
         return e
 

@@ -1,25 +1,22 @@
 use hugr_core::{
-    hugr::{hugrmut::HugrMut, views::SiblingSubgraph, HugrError},
-    ops::OpType,
     Hugr, Node,
+    hugr::{hugrmut::HugrMut, views::SiblingSubgraph},
+    ops::OpType,
 };
 
+use itertools::Itertools;
 use thiserror::Error;
 
 /// Replace all operations in a HUGR according to a mapping.
 /// New operations must match the signature of the old operations.
 ///
 /// Returns a list of the replaced nodes and their old operations.
-///
-/// # Errors
-///
-/// Returns a [`HugrError`] if any replacement fails.
 pub fn replace_many_ops<S: Into<OpType>>(
-    hugr: &mut impl HugrMut,
+    hugr: &mut impl HugrMut<Node = Node>,
     mapping: impl Fn(&OpType) -> Option<S>,
-) -> Result<Vec<(Node, OpType)>, HugrError> {
+) -> Vec<(Node, OpType)> {
     let replacements = hugr
-        .nodes()
+        .entry_descendants()
         .filter_map(|node| {
             let new_op = mapping(hugr.get_optype(node))?;
             Some((node, new_op))
@@ -28,13 +25,17 @@ pub fn replace_many_ops<S: Into<OpType>>(
 
     replacements
         .into_iter()
-        .map(|(node, new_op)| hugr.replace_op(node, new_op).map(|old_op| (node, old_op)))
+        .map(|(node, new_op)| {
+            let old_op = hugr.replace_op(node, new_op);
+            (node, old_op)
+        })
         .collect()
 }
 
 /// Errors produced by the [`lower_ops`] function.
 #[derive(Debug, Error)]
 #[error(transparent)]
+#[non_exhaustive]
 pub enum LowerError {
     /// Invalid subgraph.
     #[error("Subgraph formed by node is invalid: {0}")]
@@ -53,11 +54,11 @@ pub enum LowerError {
 ///
 /// Returns a [`LowerError`] if the lowered HUGR is invalid or if any rewrite fails.
 pub fn lower_ops(
-    hugr: &mut impl HugrMut,
+    hugr: &mut impl HugrMut<Node = Node>,
     lowering: impl Fn(&OpType) -> Option<Hugr>,
 ) -> Result<Vec<(Node, OpType)>, LowerError> {
     let replacements = hugr
-        .nodes()
+        .entry_descendants()
         .filter_map(|node| {
             let hugr = lowering(hugr.get_optype(node))?;
             Some((node, hugr))
@@ -69,9 +70,11 @@ pub fn lower_ops(
         .map(|(node, replacement)| {
             let subcirc = SiblingSubgraph::from_node(node, hugr);
             let rw = subcirc.create_simple_replacement(hugr, replacement)?;
-            let mut repls = hugr.apply_rewrite(rw)?;
-            debug_assert_eq!(repls.len(), 1);
-            Ok(repls.remove(0))
+            let removed_nodes = hugr.apply_patch(rw)?.removed_nodes;
+            Ok(removed_nodes
+                .into_iter()
+                .exactly_one()
+                .expect("removed exactly one node"))
         })
         .collect()
 }
@@ -79,11 +82,11 @@ pub fn lower_ops(
 #[cfg(test)]
 mod test {
     use hugr_core::{
+        HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{bool_t, Noop},
+        extension::prelude::{Noop, bool_t},
         std_extensions::logic::LogicOp,
         types::Signature,
-        HugrView,
     };
 
     use super::*;
@@ -91,7 +94,7 @@ mod test {
 
     #[fixture]
     fn noop_hugr() -> Hugr {
-        let mut b = DFGBuilder::new(Signature::new_endo(bool_t()).with_prelude()).unwrap();
+        let mut b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
         let out = b
             .add_dataflow_op(Noop::new(bool_t()), [b.input_wires().next().unwrap()])
             .unwrap()
@@ -116,8 +119,7 @@ mod test {
             } else {
                 None
             }
-        })
-        .unwrap();
+        });
 
         assert_eq!(replaced.len(), 1);
         let (n, op) = replaced.remove(0);
@@ -139,6 +141,6 @@ mod test {
         });
 
         assert_eq!(lowered.unwrap().len(), 1);
-        assert_eq!(h.node_count(), 3); // DFG, input, output
+        assert_eq!(h.entry_descendants().count(), 3); // DFG, input, output
     }
 }

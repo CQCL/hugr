@@ -3,7 +3,7 @@ use std::hash::{BuildHasherDefault, Hash};
 use fxhash::FxHasher;
 use indexmap::IndexSet;
 
-use crate::v0::{LinkIndex, RegionId};
+use crate::v0::table::{LinkIndex, RegionId};
 
 type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 
@@ -23,7 +23,7 @@ type FxIndexSet<K> = IndexSet<K, BuildHasherDefault<FxHasher>>;
 /// # Examples
 ///
 /// ```
-/// # pub use hugr_model::v0::RegionId;
+/// # pub use hugr_model::v0::table::RegionId;
 /// # pub use hugr_model::v0::scope::LinkTable;
 /// let mut links = LinkTable::new();
 /// links.enter(RegionId(0));
@@ -52,6 +52,7 @@ where
     K: Copy + Eq + Hash,
 {
     /// Create a new empty link table.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             links: FxIndexSet::default(),

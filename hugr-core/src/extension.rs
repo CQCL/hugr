@@ -19,12 +19,11 @@ use derive_more::Display;
 use thiserror::Error;
 
 use crate::hugr::IdentList;
-use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::{self, OpName, OpNameRef};
-use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::ops::{OpName, OpNameRef};
 use crate::types::RowVariable;
-use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
+use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::{CustomType, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
 mod const_fold;
@@ -34,7 +33,7 @@ pub mod resolution;
 pub mod simple_op;
 mod type_def;
 
-pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
+pub use const_fold::{ConstFold, ConstFoldResult, Folder, fold_out_row};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,
@@ -79,13 +78,13 @@ impl ExtensionRegistry {
     /// Create a new empty extension registry.
     pub fn new(extensions: impl IntoIterator<Item = Arc<Extension>>) -> Self {
         let mut res = Self::default();
-        for ext in extensions.into_iter() {
+        for ext in extensions {
             res.register_updated(ext);
         }
         res
     }
 
-    /// Load an ExtensionRegistry serialized as json.
+    /// Load an `ExtensionRegistry` serialized as json.
     ///
     /// After deserialization, updates all the internal `Weak<Extension>`
     /// references to point to the newly created [`Arc`]s in the registry,
@@ -227,12 +226,12 @@ impl ExtensionRegistry {
         self.exts.remove(name)
     }
 
-    /// Constructs a new ExtensionRegistry from a list of [`Extension`]s while
+    /// Constructs a new `ExtensionRegistry` from a list of [`Extension`]s while
     /// giving you a [`WeakExtensionRegistry`] to the allocation. This allows
     /// you to add [`Weak`] self-references to the [`Extension`]s while
     /// constructing them, before wrapping them in [`Arc`]s.
     ///
-    /// This is similar to [`Arc::new_cyclic`], but for ExtensionRegistries.
+    /// This is similar to [`Arc::new_cyclic`], but for `ExtensionRegistries`.
     ///
     /// Calling [`Weak::upgrade`] on a weak reference in the
     /// [`WeakExtensionRegistry`] inside your closure will return an extension
@@ -344,7 +343,7 @@ impl Extend<Arc<Extension>> for ExtensionRegistry {
     }
 }
 
-/// Encode/decode ExtensionRegistry as a list of extensions.
+/// Encode/decode `ExtensionRegistry` as a list of extensions.
 ///
 /// Any `Weak<Extension>` references inside the registry will be left unresolved.
 /// Prefer using [`ExtensionRegistry::load_json`] when deserializing.
@@ -378,6 +377,7 @@ pub static EMPTY_REG: ExtensionRegistry = ExtensionRegistry {
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
@@ -385,19 +385,21 @@ pub enum SignatureError {
     /// Extension mismatch
     #[error("Definition extension ({0}) and instantiation extension ({1}) do not match.")]
     ExtensionMismatch(ExtensionId, ExtensionId),
-    /// When the type arguments of the node did not match the params declared by the OpDef
+    /// When the type arguments of the node did not match the params declared by the `OpDef`
     #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
     /// The weak [`Extension`] reference for a custom type has been dropped.
-    #[error("Type '{typ}' is defined in extension '{missing}', but the extension reference has been dropped.")]
+    #[error(
+        "Type '{typ}' is defined in extension '{missing}', but the extension reference has been dropped."
+    )]
     MissingTypeExtension { typ: TypeName, missing: ExtensionId },
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
-    /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
+    /// The bound recorded for a `CustomType` doesn't match what the `TypeDef` would compute
     #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
     WrongBound {
         actual: TypeBound,
@@ -426,10 +428,10 @@ pub enum SignatureError {
         cached: Signature,
         expected: Signature,
     },
-    /// The result of the type application stored in a [LoadFunction]
+    /// The result of the type application stored in a [`LoadFunction`]
     /// is not what we get by applying the type-args to the polymorphic function
     ///
-    /// [LoadFunction]: crate::ops::dataflow::LoadFunction
+    /// [`LoadFunction`]: crate::ops::dataflow::LoadFunction
     #[error(
         "Incorrect result of type application in LoadFunction - cached {cached} but expected {expected}"
     )]
@@ -466,8 +468,8 @@ trait CustomConcrete {
 impl CustomConcrete for OpaqueOp {
     type Identifier = OpName;
 
-    fn def_name(&self) -> &OpName {
-        self.op_name()
+    fn def_name(&self) -> &Self::Identifier {
+        self.unqualified_id()
     }
 
     fn type_args(&self) -> &[TypeArg] {
@@ -493,37 +495,6 @@ impl CustomConcrete for CustomType {
 
     fn parent_extension(&self) -> &ExtensionId {
         self.extension()
-    }
-}
-
-/// A constant value provided by a extension.
-/// Must be an instance of a type available to the extension.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ExtensionValue {
-    extension: ExtensionId,
-    name: ValueName,
-    typed_value: ops::Value,
-}
-
-impl ExtensionValue {
-    /// Returns a reference to the typed value of this [`ExtensionValue`].
-    pub fn typed_value(&self) -> &ops::Value {
-        &self.typed_value
-    }
-
-    /// Returns a mutable reference to the typed value of this [`ExtensionValue`].
-    pub(super) fn typed_value_mut(&mut self) -> &mut ops::Value {
-        &mut self.typed_value
-    }
-
-    /// Returns a reference to the name of this [`ExtensionValue`].
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    /// Returns a reference to the extension this [`ExtensionValue`] belongs to.
-    pub fn extension(&self) -> &ExtensionId {
-        &self.extension
     }
 }
 
@@ -578,12 +549,8 @@ pub struct Extension {
     pub version: Version,
     /// Unique identifier for the extension.
     pub name: ExtensionId,
-    /// Runtime dependencies this extension has on other extensions.
-    pub runtime_reqs: ExtensionSet,
     /// Types defined by this extension.
     types: BTreeMap<TypeName, TypeDef>,
-    /// Static values defined by this extension.
-    values: BTreeMap<ValueName, ExtensionValue>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
@@ -601,13 +568,12 @@ impl Extension {
     ///
     /// See [`Extension::new_arc`] for a more ergonomic way to create boxed
     /// extensions.
+    #[must_use]
     pub fn new(name: ExtensionId, version: Version) -> Self {
         Self {
             name,
             version,
-            runtime_reqs: Default::default(),
             types: Default::default(),
-            values: Default::default(),
             operations: Default::default(),
         }
     }
@@ -650,7 +616,7 @@ impl Extension {
         let ext = Arc::new_cyclic(|extension_ref| {
             let mut ext = Self::new(name, version);
             match init(&mut ext, extension_ref) {
-                Ok(_) => ext,
+                Ok(()) => ext,
                 Err(e) => {
                     error = Some(e);
                     ext
@@ -663,33 +629,26 @@ impl Extension {
         }
     }
 
-    /// Extend the runtime requirements of this extension with another set of extensions.
-    pub fn add_requirements(&mut self, runtime_reqs: impl Into<ExtensionSet>) {
-        let reqs = mem::take(&mut self.runtime_reqs);
-        self.runtime_reqs = reqs.union(runtime_reqs.into());
-    }
-
     /// Allows read-only access to the operations in this Extension
+    #[must_use]
     pub fn get_op(&self, name: &OpNameRef) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(name)
     }
 
     /// Allows read-only access to the types in this Extension
+    #[must_use]
     pub fn get_type(&self, type_name: &TypeNameRef) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
-    /// Allows read-only access to the values in this Extension
-    pub fn get_value(&self, value_name: &ValueNameRef) -> Option<&ExtensionValue> {
-        self.values.get(value_name)
-    }
-
     /// Returns the name of the extension.
+    #[must_use]
     pub fn name(&self) -> &ExtensionId {
         &self.name
     }
 
     /// Returns the version of the extension.
+    #[must_use]
     pub fn version(&self) -> &Version {
         &self.version
     }
@@ -702,25 +661,6 @@ impl Extension {
     /// Iterator over the types of this [`Extension`].
     pub fn types(&self) -> impl Iterator<Item = (&TypeName, &TypeDef)> {
         self.types.iter()
-    }
-
-    /// Add a named static value to the extension.
-    pub fn add_value(
-        &mut self,
-        name: impl Into<ValueName>,
-        typed_value: ops::Value,
-    ) -> Result<&mut ExtensionValue, ExtensionBuildError> {
-        let extension_value = ExtensionValue {
-            extension: self.name.clone(),
-            name: name.into(),
-            typed_value,
-        };
-        match self.values.entry(extension_value.name.clone()) {
-            btree_map::Entry::Occupied(_) => {
-                Err(ExtensionBuildError::ValueExists(extension_value.name))
-            }
-            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
-        }
     }
 
     /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
@@ -754,7 +694,9 @@ impl PartialEq for Extension {
 #[non_exhaustive]
 pub enum ExtensionRegistryError {
     /// Extension already defined.
-    #[error("The registry already contains an extension with id {0} and version {1}. New extension has version {2}.")]
+    #[error(
+        "The registry already contains an extension with id {0} and version {1}. New extension has version {2}."
+    )]
     AlreadyRegistered(ExtensionId, Version, Version),
     /// A registered extension has invalid signatures.
     #[error("The extension {0} contains an invalid signature, {1}.")]
@@ -783,9 +725,6 @@ pub enum ExtensionBuildError {
     /// Existing [`TypeDef`]
     #[error("Extension already has an type called {0}.")]
     TypeDefExists(TypeName),
-    /// Existing [`ExtensionValue`]
-    #[error("Extension already has an extension value called {0}.")]
-    ValueExists(ValueName),
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].
@@ -795,16 +734,9 @@ pub enum ExtensionBuildError {
 #[display("[{}]", _0.iter().join(", "))]
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
-/// A special ExtensionId which indicates that the delta of a non-Function
-/// container node should be computed by extension inference.
-///
-/// See [`infer_extensions`] which lists the container nodes to which this can be applied.
-///
-/// [`infer_extensions`]: crate::hugr::Hugr::infer_extensions
-pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked(".TO_BE_INFERRED");
-
 impl ExtensionSet {
     /// Creates a new empty extension set.
+    #[must_use]
     pub const fn new() -> Self {
         Self(BTreeSet::new())
     }
@@ -814,89 +746,64 @@ impl ExtensionSet {
         self.0.insert(extension.clone());
     }
 
-    /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
-    pub fn insert_type_var(&mut self, idx: usize) {
-        // Represent type vars as string representation of variable index.
-        // This is not a legal IdentList or ExtensionId so should not conflict.
-        self.0
-            .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));
-    }
-
     /// Returns `true` if the set contains the given extension.
+    #[must_use]
     pub fn contains(&self, extension: &ExtensionId) -> bool {
         self.0.contains(extension)
     }
 
     /// Returns `true` if the set is a subset of `other`.
+    #[must_use]
     pub fn is_subset(&self, other: &Self) -> bool {
         self.0.is_subset(&other.0)
     }
 
     /// Returns `true` if the set is a superset of `other`.
+    #[must_use]
     pub fn is_superset(&self, other: &Self) -> bool {
         self.0.is_superset(&other.0)
     }
 
     /// Create a extension set with a single element.
+    #[must_use]
     pub fn singleton(extension: ExtensionId) -> Self {
         let mut set = Self::new();
         set.insert(extension);
         set
     }
 
-    /// An ExtensionSet containing a single type variable
-    /// (which must have been declared as a [TypeParam::Extensions])
-    pub fn type_var(idx: usize) -> Self {
-        let mut set = Self::new();
-        set.insert_type_var(idx);
-        set
-    }
-
     /// Returns the union of two extension sets.
+    #[must_use]
     pub fn union(mut self, other: Self) -> Self {
         self.0.extend(other.0);
         self
     }
 
-    /// Returns the union of an arbitrary collection of [ExtensionSet]s
+    /// Returns the union of an arbitrary collection of [`ExtensionSet`]s
     pub fn union_over(sets: impl IntoIterator<Item = Self>) -> Self {
         // `union` clones the receiver, which we do not need to do here
         let mut res = ExtensionSet::new();
         for s in sets {
-            res.0.extend(s.0)
+            res.0.extend(s.0);
         }
         res
     }
 
     /// The things in other which are in not in self
+    #[must_use]
     pub fn missing_from(&self, other: &Self) -> Self {
         ExtensionSet::from_iter(other.0.difference(&self.0).cloned())
     }
 
-    /// Iterate over the contained ExtensionIds
+    /// Iterate over the contained `ExtensionIds`
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.iter()
     }
 
-    /// True if this set contains no [ExtensionId]s
+    /// True if this set contains no [`ExtensionId`]s
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
-    }
-
-    pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
-        self.iter()
-            .filter_map(as_typevar)
-            .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
-    }
-
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
-        Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
-            None => vec![e.clone()],
-            Some(i) => match t.apply_var(i, &TypeParam::Extensions) {
-                TypeArg::Extensions{es} => es.iter().cloned().collect::<Vec<_>>(),
-                _ => panic!("value for type var was not extension set - type scheme should be validated first"),
-            },
-        }))
     }
 }
 
@@ -921,16 +828,6 @@ impl<'a> IntoIterator for &'a ExtensionSet {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
-    }
-}
-
-fn as_typevar(e: &ExtensionId) -> Option<usize> {
-    // Type variables are represented as radix-10 numbers, which are illegal
-    // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
-    // we assume it must be a type variable, and fail fast if it isn't.
-    match e.chars().next() {
-        Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
-        _ => None,
     }
 }
 
@@ -1027,17 +924,9 @@ pub mod test {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
 
-            fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-                (
-                    hash_set(0..10usize, 0..3),
-                    hash_set(any::<ExtensionId>(), 0..3),
-                )
-                    .prop_map(|(vars, extensions)| {
-                        ExtensionSet::union_over(
-                            std::iter::once(extensions.into_iter().collect::<ExtensionSet>())
-                                .chain(vars.into_iter().map(ExtensionSet::type_var)),
-                        )
-                    })
+            fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+                hash_set(any::<ExtensionId>(), 0..3)
+                    .prop_map(|extensions| extensions.into_iter().collect::<ExtensionSet>())
                     .boxed()
             }
         }

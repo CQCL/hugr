@@ -4,32 +4,49 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cfg.
 ---
 (hugr 0)
 
-(define-func example.cfg
-  (param ?0 core.type)
-  (core.fn [?0] [?0] (ext))
-  (dfg
-    [%0] [%1]
-    (signature (core.fn [?0] [?0] (ext)))
+(mod)
+
+(import core.make_adt)
+
+(import core.ctrl)
+
+(import core.type)
+
+(import core.fn)
+
+(import core.adt)
+
+(define-func example.cfg_loop (param ?0 core.type) (core.fn [?0] [?0])
+  (dfg [%0] [%1]
+    (signature (core.fn [?0] [?0]))
     (cfg [%0] [%1]
-      (signature (core.fn [?0] [?0] (ext)))
-      (cfg
-        [%2] [%3]
-        (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])] (ext)))
-        (block [%2] [%6]
-          (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])] (ext)))
-          (dfg
-            [%4] [%5]
-            (signature (core.fn [?0] [(core.adt [[?0]])] (ext)))
-            ((core.make_adt _ _ 0) [%4] [%5]
-              (signature (core.fn [?0] [(core.adt [[?0]])] (ext))))))
-        (block [%6] [%3 %6]
+      (signature (core.fn [?0] [?0]))
+      (cfg [%2] [%3]
+        (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])]))
+        (block [%2] [%3 %2]
           (signature
-            (core.fn
-              [(core.ctrl [?0])]
-              [(core.ctrl [?0]) (core.ctrl [?0])]
-              (ext)))
-          (dfg
-            [%7] [%8]
-            (signature (core.fn [?0] [(core.adt [[?0] [?0]])] (ext)))
-            ((core.make_adt _ _ 0) [%7] [%8]
-              (signature (core.fn [?0] [(core.adt [[?0] [?0]])] (ext))))))))))
+            (core.fn [(core.ctrl [?0])] [(core.ctrl [?0]) (core.ctrl [?0])]))
+          (dfg [%4] [%5]
+            (signature (core.fn [?0] [(core.adt [[?0] [?0]])]))
+            ((core.make_adt 0) [%4] [%5]
+              (signature (core.fn [?0] [(core.adt [[?0] [?0]])])))))))))
+
+(define-func example.cfg_order (param ?0 core.type) (core.fn [?0] [?0])
+  (dfg [%0] [%1]
+    (signature (core.fn [?0] [?0]))
+    (cfg [%0] [%1]
+      (signature (core.fn [?0] [?0]))
+      (cfg [%2] [%3]
+        (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])]))
+        (block [%2] [%6]
+          (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])]))
+          (dfg [%4] [%5]
+            (signature (core.fn [?0] [(core.adt [[?0]])]))
+            ((core.make_adt 0) [%4] [%5]
+              (signature (core.fn [?0] [(core.adt [[?0]])])))))
+        (block [%6] [%3]
+          (signature (core.fn [(core.ctrl [?0])] [(core.ctrl [?0])]))
+          (dfg [%7] [%8]
+            (signature (core.fn [?0] [(core.adt [[?0]])]))
+            ((core.make_adt 0) [%7] [%8]
+              (signature (core.fn [?0] [(core.adt [[?0]])])))))))))

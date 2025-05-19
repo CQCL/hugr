@@ -1,6 +1,11 @@
 use std::rc::Rc;
 
-use hugr_core::Hugr;
+use hugr_core::{
+    Hugr,
+    builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+    ops::{OpTrait, OpType},
+    types::PolyFuncType,
+};
 use inkwell::{
     context::Context,
     types::{BasicType, BasicTypeEnum},
@@ -10,7 +15,7 @@ use rstest::fixture;
 
 use crate::{
     custom::{CodegenExtsBuilder, CodegenExtsMap},
-    emit::{test::Emission, EmitHugr, EmitModuleContext, Namer},
+    emit::{EmitHugr, EmitModuleContext, Namer, test::Emission},
     types::{TypeConverter, TypingSession},
     utils::fat::FatExt as _,
 };
@@ -25,12 +30,14 @@ pub struct InstaSettingsBuilder {
 }
 
 impl InstaSettingsBuilder {
+    #[must_use]
     pub fn new_llvm(id: Option<usize>) -> Self {
         let mut r = Self::new(id);
         r.llvm = Some(super::llvm_version().into());
         r
     }
 
+    #[must_use]
     pub fn new(id: Option<usize>) -> Self {
         Self {
             settings: insta::Settings::clone_current(),
@@ -44,6 +51,7 @@ impl InstaSettingsBuilder {
         &mut self.settings
     }
 
+    #[must_use]
     pub fn finish(mut self) -> Option<insta::internals::SettingsBindDropGuard> {
         let suffix = self
             .llvm
@@ -56,6 +64,7 @@ impl InstaSettingsBuilder {
     }
 }
 
+#[must_use]
 pub fn no_extensions(id: CodegenExtsMap<'_, THugrView>) -> CodegenExtsMap<'_, THugrView> {
     id
 }
@@ -66,10 +75,10 @@ pub trait MakeCodegenExtsMapFn:
 }
 
 impl<
-        F: Fn(CodegenExtsBuilder<'static, THugrView>) -> CodegenExtsBuilder<'static, THugrView>
-            + ?Sized
-            + 'static,
-    > MakeCodegenExtsMapFn for F
+    F: Fn(CodegenExtsBuilder<'static, THugrView>) -> CodegenExtsBuilder<'static, THugrView>
+        + ?Sized
+        + 'static,
+> MakeCodegenExtsMapFn for F
 {
 }
 
@@ -98,14 +107,17 @@ impl TestContext {
         }
     }
 
+    #[must_use]
     pub fn i32(&'_ self) -> BasicTypeEnum<'_> {
         self.context.i32_type().as_basic_type_enum()
     }
 
+    #[must_use]
     pub fn type_converter(&self) -> Rc<TypeConverter<'static>> {
         self.extensions().type_converter
     }
 
+    #[must_use]
     pub fn extensions(&self) -> CodegenExtsMap<'static, THugrView> {
         (self.mk_exts)(Default::default()).finish()
     }
@@ -116,17 +128,20 @@ impl TestContext {
             std::mem::swap(&mut self.mk_exts, &mut tmp);
             tmp
         };
-        self.mk_exts = Box::new(move |cem| f(old_mk_exts(cem)))
+        self.mk_exts = Box::new(move |cem| f(old_mk_exts(cem)));
     }
 
+    #[must_use]
     pub fn iw_context(&self) -> &Context {
         &self.context
     }
 
+    #[must_use]
     pub fn get_typing_session(&self) -> TypingSession<'_, 'static> {
         self.type_converter().session(&self.context)
     }
 
+    #[must_use]
     pub fn get_emit_hugr(&'_ self) -> EmitHugr<'_, 'static, THugrView> {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
@@ -138,6 +153,7 @@ impl TestContext {
         self.namer = namer;
     }
 
+    #[must_use]
     pub fn get_emit_module_context(&'_ self) -> EmitModuleContext<'_, 'static, THugrView> {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
@@ -208,4 +224,24 @@ impl Default for InstaSettingsBuilder {
     fn default() -> Self {
         Self::new_llvm(None)
     }
+}
+
+#[must_use]
+pub fn single_op_hugr(op: OpType) -> Hugr {
+    let Some(sig) = op.dataflow_signature() else {
+        panic!("not a dataflow op")
+    };
+    let sig = sig.into_owned();
+
+    let mut module_builder = ModuleBuilder::new();
+    {
+        let mut func_builder = module_builder
+            .define_function("main", PolyFuncType::from(sig))
+            .unwrap();
+        let op = func_builder
+            .add_dataflow_op(op, func_builder.input_wires())
+            .unwrap();
+        func_builder.finish_with_outputs(op.outputs()).unwrap()
+    };
+    module_builder.finish_hugr().unwrap()
 }

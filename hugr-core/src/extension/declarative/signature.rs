@@ -11,11 +11,11 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
+use crate::Extension;
 use crate::extension::prelude::PRELUDE_ID;
-use crate::extension::{ExtensionSet, SignatureFunc, TypeDef};
+use crate::extension::{SignatureFunc, TypeDef};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeRowRV};
-use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
 
@@ -26,10 +26,6 @@ pub(super) struct SignatureDeclaration {
     inputs: Vec<SignaturePortDeclaration>,
     /// The outputs of the operation.
     outputs: Vec<SignaturePortDeclaration>,
-    /// A set of extensions invoked while running this operation.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "crate::utils::is_default")]
-    extensions: ExtensionSet,
 }
 
 impl SignatureDeclaration {
@@ -53,7 +49,6 @@ impl SignatureDeclaration {
         let body = FuncValueType {
             input: make_type_row(&self.inputs)?,
             output: make_type_row(&self.outputs)?,
-            runtime_reqs: self.extensions.clone(),
         };
 
         let poly_func = PolyFuncTypeRV::new(op_params, body);
@@ -89,7 +84,7 @@ impl SignaturePortDeclaration {
                 return Err(ExtensionDeclarationError::UnsupportedPortRepetition {
                     ext: ext.name().clone(),
                     parametric_repetition: parametric_repetition.clone(),
-                })
+                });
             }
         };
 

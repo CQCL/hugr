@@ -1,5 +1,88 @@
 # Changelog
 
+## [0.11.5](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.4...hugr-py-v0.11.5) (2025-04-16)
+
+
+### Features
+
+* **hugr-py:** move in result classes from guppylang ([#2084](https://github.com/CQCL/hugr/issues/2084)) ([b6efb03](https://github.com/CQCL/hugr/commit/b6efb03bde407740ba546fff72435cc9d70a380b))
+* Packages in `hugr-model` and envelope support. ([#2026](https://github.com/CQCL/hugr/issues/2026)) ([a16389f](https://github.com/CQCL/hugr/commit/a16389fd6909e29ba1a7d93efea2fc75f810e6b8))
+* Represent order edges in `hugr-model` as metadata. ([#2027](https://github.com/CQCL/hugr/issues/2027)) ([09de9e3](https://github.com/CQCL/hugr/commit/09de9e32712c2659cf9ce0ef0254273e2cc916b1))
+
+## [0.11.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.3...hugr-py-v0.11.4) (2025-03-28)
+
+
+### Features
+
+* Python bindings for `hugr-model`. ([#1959](https://github.com/CQCL/hugr/issues/1959)) ([25df063](https://github.com/CQCL/hugr/commit/25df06380d9e14a4bde8f6353c70dc27ef58c3ef))
+* Remove extension sets from `hugr-model`. ([#2031](https://github.com/CQCL/hugr/issues/2031)) ([5dd1f96](https://github.com/CQCL/hugr/commit/5dd1f9659f0954e937e0a3a41886e953db58628b))
+
+## [0.11.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.2...hugr-py-v0.11.3) (2025-03-21)
+
+
+### Bug Fixes
+
+* Don't enable envelope compression by default (yet) ([#2014](https://github.com/CQCL/hugr/issues/2014)) ([c5423ed](https://github.com/CQCL/hugr/commit/c5423edf6a4650a6222df08b5c5fb13529b5ef9f))
+
+## [0.11.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.1...hugr-py-v0.11.2) (2025-03-21)
+
+
+### Features
+
+* add exit operation to prelude ([#2008](https://github.com/CQCL/hugr/issues/2008)) ([6bd7665](https://github.com/CQCL/hugr/commit/6bd76659d1f3f3b100cef46f0d5f7ceec79699a9))
+* Add llvm codegen for collections.static_array ([#2003](https://github.com/CQCL/hugr/issues/2003)) ([f3dd145](https://github.com/CQCL/hugr/commit/f3dd145963ce23152f29d2d46be7eaa9a78ef2c5))
+* **hugr-py:** Add `StaticArray` to standard extensions ([#1985](https://github.com/CQCL/hugr/issues/1985)) ([cf860f3](https://github.com/CQCL/hugr/commit/cf860f34b132a26411787f80668d621b7273f2c9)), closes [#1984](https://github.com/CQCL/hugr/issues/1984)
+* **hugr-py:** Support envelope compression ([#1994](https://github.com/CQCL/hugr/issues/1994)) ([434c563](https://github.com/CQCL/hugr/commit/434c563ae4134b34070c45dfd8d13865b613c49d))
+
+
+### Bug Fixes
+
+* StaticArrayValue serialisation ([#2009](https://github.com/CQCL/hugr/issues/2009)) ([3fe6bf8](https://github.com/CQCL/hugr/commit/3fe6bf82ad3ebed5689e3304e7df88f43b9128b1))
+
+
+### Reverts
+
+* Revert breaking change to StaticArrayValue ([33a2b49](https://github.com/CQCL/hugr/commit/33a2b49d2d343265415dab3c52631845b5cd53ce))
+
+## [0.11.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.0...hugr-py-v0.11.1) (2025-03-17)
+
+
+### Features
+
+* Add default envelope config to `Package.to_str`/`to_bytes` ([#1980](https://github.com/CQCL/hugr/issues/1980)) ([44deda1](https://github.com/CQCL/hugr/commit/44deda11e9c335f7ff705eaf1b8bcc01b6c2e202))
+
+
+### Bug Fixes
+
+* Cyclic import in hugr.envelope ([#1981](https://github.com/CQCL/hugr/issues/1981)) ([cff0dba](https://github.com/CQCL/hugr/commit/cff0dba67c241f6a817eb029f73e7c9634b2d441))
+
+## [0.11.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.3...hugr-py-v0.11.0) (2025-03-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* Lift op in prelude replaced with a Barrier that behaves similarly except does not add any extensions.
+
+### Features
+
+* Add collections.static_array extension. ([#1964](https://github.com/CQCL/hugr/issues/1964)) ([fdcd48a](https://github.com/CQCL/hugr/commit/fdcd48af26c10ec92b63287681fd201dff0f281c))
+* Add float &lt;--&gt; int bytecasting ops to conversions extension ([#1956](https://github.com/CQCL/hugr/issues/1956)) ([fa1bf86](https://github.com/CQCL/hugr/commit/fa1bf867289bbfce10316a7101ea123419d1893f))
+* Generic HUGR serialization with envelopes ([6710e5f](https://github.com/CQCL/hugr/commit/6710e5fe3939a71b38018fca547c4d9cc421cbac))
+* replace `Lift` with `Barrier` ([#1952](https://github.com/CQCL/hugr/issues/1952)) ([4e6b6d8](https://github.com/CQCL/hugr/commit/4e6b6d8df576f43bd5ced51b2eb4f1ed4d5c3b82))
+
+
+### Bug Fixes
+
+* **hugr-py:** output and delete node issues ([#1971](https://github.com/CQCL/hugr/issues/1971)) ([408517d](https://github.com/CQCL/hugr/commit/408517d620711c5573ea013e4d062499a62f55dd))
+
+## [0.10.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.2...hugr-py-v0.10.3) (2025-02-17)
+
+
+### Features
+
+* add xor to logic extension ([#1911](https://github.com/CQCL/hugr/issues/1911)) ([5e7c81e](https://github.com/CQCL/hugr/commit/5e7c81e2a6e939629feac8448f79ed30d986349a))
+* **hugr-llvm:** Emit ipow ([#1839](https://github.com/CQCL/hugr/issues/1839)) ([89e671a](https://github.com/CQCL/hugr/commit/89e671a27501363994322a71c2a0d83f59ebebe4))
+
 ## [0.10.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.10.1...hugr-py-v0.10.2) (2024-12-20)
 
 

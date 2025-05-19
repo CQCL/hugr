@@ -12,9 +12,9 @@ use {
 use crate::types::{EdgeKind, PolyFuncType, Signature};
 use crate::types::{Type, TypeBound};
 
-use super::dataflow::DataflowParent;
 use super::StaticTag;
-use super::{impl_op_name, OpTag, OpTrait};
+use super::dataflow::DataflowParent;
+use super::{OpTag, OpTrait, impl_op_name};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -26,6 +26,7 @@ pub struct Module {
 
 impl Module {
     /// Construct a new Module.
+    #[must_use]
     pub const fn new() -> Self {
         Self {}
     }
@@ -38,7 +39,7 @@ impl StaticTag for Module {
 }
 
 impl OpTrait for Module {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "The root of a module, parent of all other `OpType`s"
     }
 
@@ -53,11 +54,39 @@ impl OpTrait for Module {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDefn {
-    /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
-    pub name: String,
-    /// Signature of the function
-    pub signature: PolyFuncType,
+    name: String,
+    signature: PolyFuncType,
+}
+
+impl FuncDefn {
+    /// Create a new instance with the given name and signature
+    pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self {
+            name: name.into(),
+            signature: signature.into(),
+        }
+    }
+
+    /// The name of the function (not the name of the Op)
+    pub fn func_name(&self) -> &String {
+        &self.name
+    }
+
+    /// Allows mutating the name of the function (as per [Self::func_name])
+    pub fn func_name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    /// Gets the signature of the function
+    pub fn signature(&self) -> &PolyFuncType {
+        &self.signature
+    }
+
+    /// Allows mutating the signature of the function
+    pub fn signature_mut(&mut self) -> &mut PolyFuncType {
+        &mut self.signature
+    }
 }
 
 impl_op_name!(FuncDefn);
@@ -72,7 +101,7 @@ impl DataflowParent for FuncDefn {
 }
 
 impl OpTrait for FuncDefn {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A function definition"
     }
 
@@ -91,11 +120,39 @@ impl OpTrait for FuncDefn {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDecl {
-    /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
-    pub name: String,
-    /// Signature of the function
-    pub signature: PolyFuncType,
+    name: String,
+    signature: PolyFuncType,
+}
+
+impl FuncDecl {
+    /// Create a new instance with the given name and signature
+    pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self {
+            name: name.into(),
+            signature: signature.into(),
+        }
+    }
+
+    /// The name of the function (not the name of the Op)
+    pub fn func_name(&self) -> &String {
+        &self.name
+    }
+
+    /// Allows mutating the name of the function (as per [Self::func_name])
+    pub fn func_name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    /// Gets the signature of the function
+    pub fn signature(&self) -> &PolyFuncType {
+        &self.signature
+    }
+
+    /// Allows mutating the signature of the function
+    pub fn signature_mut(&mut self) -> &mut PolyFuncType {
+        &mut self.signature
+    }
 }
 
 impl_op_name!(FuncDecl);
@@ -104,7 +161,7 @@ impl StaticTag for FuncDecl {
 }
 
 impl OpTrait for FuncDecl {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "External function declaration, linked at runtime"
     }
 
@@ -134,7 +191,7 @@ impl StaticTag for AliasDefn {
     const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDefn {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A type alias definition"
     }
 
@@ -167,6 +224,7 @@ impl AliasDecl {
     }
 
     /// Returns a reference to the name of this [`AliasDecl`].
+    #[must_use]
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
@@ -177,7 +235,7 @@ impl StaticTag for AliasDecl {
     const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDecl {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "A type alias declaration"
     }
 

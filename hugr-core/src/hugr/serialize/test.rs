@@ -2,18 +2,20 @@
 
 use super::*;
 use crate::builder::{
-    endo_sig, inout_sig, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
-    DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    ModuleBuilder, endo_sig, inout_sig, test::closed_dfg_root_hugr,
 };
-use crate::extension::prelude::Noop;
-use crate::extension::prelude::{bool_t, qb_t, usize_t, PRELUDE_ID};
-use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::ExtensionRegistry;
-use crate::extension::{test::SimpleOpDef, ExtensionSet};
+use crate::extension::prelude::Noop;
+use crate::extension::prelude::{bool_t, qb_t, usize_t};
+use crate::extension::simple_op::MakeRegisteredOp;
+use crate::extension::test::SimpleOpDef;
 use crate::hugr::internal::HugrMutInternals;
+use crate::hugr::test::check_hugr_equality;
 use crate::hugr::validate::ValidationError;
+use crate::hugr::views::ExtractionResult;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
-use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
+use crate::ops::{self, DFG, Input, Module, Output, Value, dataflow::IOTrait};
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
@@ -22,14 +24,22 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
-use crate::{type_row, OutgoingPort};
+use crate::{OutgoingPort, type_row};
 
 use itertools::Itertools;
 use jsonschema::{Draft, Validator};
 use lazy_static::lazy_static;
-use portgraph::LinkView;
-use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, LinkMut, PortMut, UnmanagedDenseMap, multiportgraph::MultiPortGraph};
 use rstest::rstest;
+
+/// A serde-serializable hugr. Used for testing.
+#[derive(Debug, serde::Serialize)]
+#[serde(transparent)]
+pub(super) struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")] pub &'h Hugr);
+/// A serde-deserializable hugr. Used for testing.
+#[derive(Debug, serde::Deserialize)]
+#[serde(transparent)]
+pub(super) struct HugrDeser(#[serde(deserialize_with = "Hugr::serde_deserialize")] pub Hugr);
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
@@ -58,7 +68,7 @@ impl NamedSchema {
             // errors don't necessarily implement Debug
             eprintln!("Schema failed to validate: {}", self.name);
             for error in errors {
-                eprintln!("Validation error: {}", error);
+                eprintln!("Validation error: {error}");
                 eprintln!("Instance path: {}", error.instance_path);
             }
             panic!("Serialization test failed.");
@@ -144,7 +154,7 @@ impl From<Type> for SerTestingLatest {
 
 #[test]
 fn empty_hugr_serialize() {
-    check_hugr_roundtrip(&Hugr::default(), true);
+    check_hugr_json_roundtrip(&Hugr::default(), true);
 }
 
 fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
@@ -156,10 +166,10 @@ fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
 }
 
 /// Serialize and deserialize a value, validating against a schema.
-fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
-    g: &T,
+fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwned>(
+    g: &TSer,
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
-) -> T {
+) -> TDeser {
     let val = serde_json::to_value(g).unwrap();
     NamedSchema::check_schemas(&val, schemas);
     serde_json::from_value(val).unwrap()
@@ -174,63 +184,24 @@ fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
 /// equality checking.
 ///
 /// Returns the deserialized HUGR.
-pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
-    let new_hugr = ser_roundtrip_check_schema(hugr, get_schemas(check_schema));
+fn check_hugr_json_roundtrip(hugr: &impl HugrView, check_schema: bool) -> Hugr {
+    // Transform the whole view into a HUGR.
+    let (mut base, extract_map) = hugr.extract_hugr(hugr.module_root());
+    base.set_entrypoint(extract_map.extracted_node(hugr.entrypoint()));
 
-    check_hugr(hugr, &new_hugr);
-    new_hugr
+    let new_hugr: HugrDeser =
+        ser_roundtrip_check_schema(&HugrSer(&base), get_schemas(check_schema));
+
+    check_hugr_equality(&base, &new_hugr.0);
+    new_hugr.0
 }
 
 /// Deserialize a HUGR json, ensuring that it is valid against the schema.
 pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schema: bool) -> Hugr {
-    let new_hugr = ser_deserialize_check_schema(value, get_schemas(check_schema));
+    let new_hugr: HugrDeser = ser_deserialize_check_schema(value, get_schemas(check_schema));
 
-    check_hugr(hugr, &new_hugr);
-    new_hugr
-}
-
-/// Check that two HUGRs are equivalent, up to node renumbering.
-pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
-    // Original HUGR, with canonicalized node indices
-    //
-    // The internal port indices may still be different.
-    let mut h_canon = lhs.clone();
-    h_canon.canonicalize_nodes(|_, _| {});
-
-    assert_eq!(rhs.root, h_canon.root);
-    assert_eq!(rhs.hierarchy, h_canon.hierarchy);
-    assert_eq!(rhs.metadata, h_canon.metadata);
-
-    // Extension operations may have been downgraded to opaque operations.
-    for node in rhs.nodes() {
-        let new_op = rhs.get_optype(node);
-        let old_op = h_canon.get_optype(node);
-        if !new_op.is_const() {
-            match (new_op, old_op) {
-                (OpType::ExtensionOp(ext), OpType::OpaqueOp(opaque))
-                | (OpType::OpaqueOp(opaque), OpType::ExtensionOp(ext)) => {
-                    let ext_opaque: OpaqueOp = ext.clone().into();
-                    assert_eq!(ext_opaque, opaque.clone());
-                }
-                _ => assert_eq!(new_op, old_op),
-            }
-        }
-    }
-
-    // Check that the graphs are equivalent up to port renumbering.
-    let new_graph = &rhs.graph;
-    let old_graph = &h_canon.graph;
-    assert_eq!(new_graph.node_count(), old_graph.node_count());
-    assert_eq!(new_graph.port_count(), old_graph.port_count());
-    assert_eq!(new_graph.link_count(), old_graph.link_count());
-    for n in old_graph.nodes_iter() {
-        assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
-        assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
-        assert_eq!(
-            new_graph.output_neighbours(n).collect_vec(),
-            old_graph.output_neighbours(n).collect_vec()
-        );
-    }
+    check_hugr_equality(hugr, &new_hugr.0);
+    new_hugr.0
 }
 
 fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
@@ -258,7 +229,7 @@ fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
 fn simpleser() {
     let mut g = MultiPortGraph::new();
 
-    let root = g.add_node(0, 0);
+    let entrypoint = g.add_node(0, 0);
     let a = g.add_node(1, 1);
     let b = g.add_node(3, 2);
     let c = g.add_node(1, 1);
@@ -273,23 +244,24 @@ fn simpleser() {
     let mut h = Hierarchy::new();
     let mut op_types = UnmanagedDenseMap::new();
 
-    op_types[root] = gen_optype(&g, root);
+    op_types[entrypoint] = gen_optype(&g, entrypoint);
 
     for n in [a, b, c] {
-        h.push_child(n, root).unwrap();
+        h.push_child(n, entrypoint).unwrap();
         op_types[n] = gen_optype(&g, n);
     }
 
     let hugr = Hugr {
         graph: g,
         hierarchy: h,
-        root,
+        module_root: entrypoint,
+        entrypoint,
         op_types,
         metadata: Default::default(),
         extensions: ExtensionRegistry::default(),
     };
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
 }
 
 #[test]
@@ -300,7 +272,7 @@ fn weighted_hugr_ser() {
 
         let t_row = vec![Type::new_sum([vec![usize_t()], vec![qb_t()]])];
         let mut f_build = module_builder
-            .define_function("main", Signature::new(t_row.clone(), t_row).with_prelude())
+            .define_function("main", Signature::new(t_row.clone(), t_row))
             .unwrap();
 
         let outputs = f_build
@@ -318,15 +290,15 @@ fn weighted_hugr_ser() {
         module_builder.finish_hugr().unwrap()
     };
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
 }
 
 #[test]
 fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![bool_t(); 2];
-    let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp).with_prelude())?;
+    let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp))?;
     let mut params: [_; 2] = dfg.input_wires_arr();
-    for p in params.iter_mut() {
+    for p in &mut params {
         *p = dfg
             .add_dataflow_op(Noop(bool_t()), [*p])
             .unwrap()
@@ -334,7 +306,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     }
     let hugr = dfg.finish_hugr_with_outputs(params)?;
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
     Ok(())
 }
 
@@ -353,7 +325,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     let hugr = dfg.finish_hugr_with_outputs([wire])?;
 
-    check_hugr_roundtrip(&hugr, true);
+    check_hugr_json_roundtrip(&hugr, true);
     Ok(())
 }
 
@@ -390,19 +362,19 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn function_type() -> Result<(), Box<dyn std::error::Error>> {
-    let fn_ty = Type::new_function(Signature::new_endo(vec![bool_t()]).with_prelude());
-    let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]).with_prelude())?;
+    let fn_ty = Type::new_function(Signature::new_endo(vec![bool_t()]));
+    let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]))?;
     let op = bldr.add_dataflow_op(Noop(fn_ty), bldr.input_wires())?;
     let h = bldr.finish_hugr_with_outputs(op.outputs())?;
 
-    check_hugr_roundtrip(&h, true);
+    check_hugr_json_roundtrip(&h, true);
     Ok(())
 }
 
 #[test]
 fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     let mut hugr = closed_dfg_root_hugr(Signature::new(vec![qb_t()], vec![qb_t()]));
-    let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
+    let [old_in, out] = hugr.get_io(hugr.entrypoint()).unwrap();
     hugr.connect(old_in, 0, out, 0);
 
     // Now add a new input
@@ -413,7 +385,7 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     hugr.remove_node(old_in);
     hugr.validate()?;
 
-    let rhs: Hugr = check_hugr_roundtrip(&hugr, true);
+    let rhs: Hugr = check_hugr_json_roundtrip(&hugr, true);
     rhs.validate()?;
     Ok(())
 }
@@ -424,10 +396,13 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
     let hugr = builder.finish_hugr_with_outputs([w])?;
 
-    let ser = serde_json::to_vec(&hugr)?;
-    let deser = Hugr::load_json(ser.as_slice(), hugr.extensions())?;
+    let ser = serde_json::to_string(&HugrSer(&hugr))?;
+    let deser: HugrDeser = serde_json::from_str(&ser)?;
 
-    assert_eq!(hugr, deser);
+    let mut hugr_deser = deser.0;
+    hugr_deser.resolve_extension_defs(hugr.extensions())?;
+
+    assert_eq!(hugr, hugr_deser);
 
     Ok(())
 }
@@ -482,10 +457,8 @@ fn roundtrip_value(#[case] value: Value) {
 }
 
 fn polyfunctype1() -> PolyFuncType {
-    let mut extension_set = ExtensionSet::new();
-    extension_set.insert_type_var(1);
-    let function_type = Signature::new_endo(type_row![]).with_extension_delta(extension_set);
-    PolyFuncType::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
+    let function_type = Signature::new_endo(type_row![]);
+    PolyFuncType::new([TypeParam::max_nat()], function_type)
 }
 
 fn polyfunctype2() -> PolyFuncTypeRV {
@@ -514,7 +487,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     [TypeParam::new_list(TypeBound::Any)],
     Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
-    check_testing_roundtrip(poly_func_type)
+    check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
@@ -528,20 +501,20 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
-    check_testing_roundtrip(poly_func_type)
+    check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
 #[case(ops::Module::new())]
-#[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1()})]
-#[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
+#[case(ops::FuncDefn::new("polyfunc1", polyfunctype1()))]
+#[case(ops::FuncDecl::new("polyfunc2", polyfunctype1()))]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
 #[case(ops::Const::new(Value::false_val()))]
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
-#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(PRELUDE_ID)} ]).unwrap())]
+#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}]).unwrap())]
 #[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
@@ -596,27 +569,27 @@ mod proptest {
     proptest! {
         #[test]
         fn prop_roundtrip_type(t:  Type) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_poly_func_type(t: PolyFuncTypeRV) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_value(t: Value) {
-            check_testing_roundtrip(t)
+            check_testing_roundtrip(t);
         }
 
         #[test]
         fn prop_roundtrip_optype(op: NodeSer ) {
-            check_testing_roundtrip(op)
+            check_testing_roundtrip(op);
         }
 
         #[test]
         fn prop_roundtrip_opdef(opdef: SimpleOpDef) {
-            check_testing_roundtrip(opdef)
+            check_testing_roundtrip(opdef);
         }
     }
 }

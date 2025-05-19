@@ -1,7 +1,6 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "prelude",
-  "runtime_reqs": [],
   "types": {
     "error": {
       "extension": "prelude",
@@ -44,17 +43,13 @@
       }
     }
   },
-  "values": {},
   "operations": {
-    "Lift": {
+    "Barrier": {
       "extension": "prelude",
-      "name": "Lift",
-      "description": "Add extension requirements to a row of values",
+      "name": "Barrier",
+      "description": "Add a barrier to a row of values",
       "signature": {
         "params": [
-          {
-            "tp": "Extensions"
-          },
           {
             "tp": "List",
             "param": {
@@ -67,19 +62,16 @@
           "input": [
             {
               "t": "R",
-              "i": 1,
+              "i": 0,
               "b": "A"
             }
           ],
           "output": [
             {
               "t": "R",
-              "i": 1,
+              "i": 0,
               "b": "A"
             }
-          ],
-          "runtime_reqs": [
-            "0"
           ]
         }
       },
@@ -121,8 +113,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -152,8 +143,7 @@
               "i": 0,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -194,8 +184,54 @@
               "i": 0,
               "b": "A"
             }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "exit": {
+      "extension": "prelude",
+      "name": "exit",
+      "description": "Exit with input error",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "error",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
           ],
-          "runtime_reqs": []
+          "output": [
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ]
         }
       },
       "binary": false
@@ -217,8 +253,7 @@
             {
               "t": "I"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -265,8 +300,7 @@
               "i": 1,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -287,8 +321,7 @@
               "bound": "C"
             }
           ],
-          "output": [],
-          "runtime_reqs": []
+          "output": []
         }
       },
       "binary": false

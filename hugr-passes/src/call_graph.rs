@@ -2,52 +2,53 @@
 //! Data structure for call graphs of a Hugr
 use std::collections::HashMap;
 
-use hugr_core::{ops::OpType, HugrView, Node};
-use petgraph::{graph::NodeIndex, Graph};
+use hugr_core::{HugrView, Node, core::HugrNode, ops::OpType};
+use petgraph::Graph;
 
-/// Weight for an edge in a [CallGraph]
-pub enum CallGraphEdge {
+/// Weight for an edge in a [`CallGraph`]
+pub enum CallGraphEdge<N = Node> {
     /// Edge corresponds to a [Call](OpType::Call) node (specified) in the Hugr
-    Call(Node),
-    /// Edge corresponds to a [LoadFunction](OpType::LoadFunction) node (specified) in the Hugr
-    LoadFunction(Node),
+    Call(N),
+    /// Edge corresponds to a [`LoadFunction`](OpType::LoadFunction) node (specified) in the Hugr
+    LoadFunction(N),
 }
 
-/// Weight for a petgraph-node in a [CallGraph]
-pub enum CallGraphNode {
-    /// petgraph-node corresponds to a [FuncDecl](OpType::FuncDecl) node (specified) in the Hugr
-    FuncDecl(Node),
-    /// petgraph-node corresponds to a [FuncDefn](OpType::FuncDefn) node (specified) in the Hugr
-    FuncDefn(Node),
+/// Weight for a petgraph-node in a [`CallGraph`]
+pub enum CallGraphNode<N = Node> {
+    /// petgraph-node corresponds to a [`FuncDecl`](OpType::FuncDecl) node (specified) in the Hugr
+    FuncDecl(N),
+    /// petgraph-node corresponds to a [`FuncDefn`](OpType::FuncDefn) node (specified) in the Hugr
+    FuncDefn(N),
     /// petgraph-node corresponds to the root node of the hugr, that is not
-    /// a [FuncDefn](OpType::FuncDefn). Note that it will not be a [Module](OpType::Module)
+    /// a [`FuncDefn`](OpType::FuncDefn). Note that it will not be a [Module](OpType::Module)
     /// either, as such a node could not have outgoing edges, so is not represented in the petgraph.
     NonFuncRoot,
 }
 
-/// Details the [Call]s and [LoadFunction]s in a Hugr.
-/// Each node in the `CallGraph` corresponds to a [FuncDefn] in the Hugr; each edge corresponds
-/// to a [Call]/[LoadFunction] of the edge's target, contained in the edge's source.
+/// Details the [`Call`]s and [`LoadFunction`]s in a Hugr.
+/// Each node in the `CallGraph` corresponds to a [`FuncDefn`] in the Hugr; each edge corresponds
+/// to a [`Call`]/[`LoadFunction`] of the edge's target, contained in the edge's source.
 ///
-/// For Hugrs whose root is neither a [Module](OpType::Module) nor a [FuncDefn], the call graph
-/// will have an additional [CallGraphNode::NonFuncRoot] corresponding to the Hugr's root, with no incoming edges.
+/// For Hugrs whose root is neither a [Module](OpType::Module) nor a [`FuncDefn`], the call graph
+/// will have an additional [`CallGraphNode::NonFuncRoot`] corresponding to the Hugr's root, with no incoming edges.
 ///
-/// [Call]: OpType::Call
-/// [FuncDefn]: OpType::FuncDefn
-/// [LoadFunction]: OpType::LoadFunction
-pub struct CallGraph {
-    g: Graph<CallGraphNode, CallGraphEdge>,
-    node_to_g: HashMap<Node, NodeIndex<u32>>,
+/// [`Call`]: OpType::Call
+/// [`FuncDefn`]: OpType::FuncDefn
+/// [`LoadFunction`]: OpType::LoadFunction
+pub struct CallGraph<N = Node> {
+    g: Graph<CallGraphNode<N>, CallGraphEdge<N>>,
+    node_to_g: HashMap<N, petgraph::graph::NodeIndex<u32>>,
 }
 
-impl CallGraph {
-    /// Makes a new CallGraph for a specified (subview) of a Hugr.
+impl<N: HugrNode> CallGraph<N> {
+    /// Makes a new `CallGraph` for a specified (subview) of a Hugr.
     /// Calls to functions outside the view will be dropped.
-    pub fn new(hugr: &impl HugrView) -> Self {
+    pub fn new(hugr: &impl HugrView<Node = N>) -> Self {
         let mut g = Graph::default();
-        let non_func_root = (!hugr.get_optype(hugr.root()).is_module()).then_some(hugr.root());
+        let non_func_root =
+            (!hugr.get_optype(hugr.entrypoint()).is_module()).then_some(hugr.entrypoint());
         let node_to_g = hugr
-            .nodes()
+            .entry_descendants()
             .filter_map(|n| {
                 let weight = match hugr.get_optype(n) {
                     OpType::FuncDecl(_) => CallGraphNode::FuncDecl(n),
@@ -57,20 +58,20 @@ impl CallGraph {
                 Some((n, g.add_node(weight)))
             })
             .collect::<HashMap<_, _>>();
-        for (func, cg_node) in node_to_g.iter() {
-            traverse(hugr, *cg_node, *func, &mut g, &node_to_g)
+        for (func, cg_node) in &node_to_g {
+            traverse(hugr, *cg_node, *func, &mut g, &node_to_g);
         }
-        fn traverse(
-            h: &impl HugrView,
-            enclosing_func: NodeIndex<u32>,
-            node: Node, // Nonstrict-descendant of `enclosing_func``
-            g: &mut Graph<CallGraphNode, CallGraphEdge>,
-            node_to_g: &HashMap<Node, NodeIndex<u32>>,
+        fn traverse<N: HugrNode>(
+            h: &impl HugrView<Node = N>,
+            enclosing_func: petgraph::graph::NodeIndex<u32>,
+            node: N, // Nonstrict-descendant of `enclosing_func``
+            g: &mut Graph<CallGraphNode<N>, CallGraphEdge<N>>,
+            node_to_g: &HashMap<N, petgraph::graph::NodeIndex<u32>>,
         ) {
             for ch in h.children(node) {
                 if h.get_optype(ch).is_func_defn() {
                     continue;
-                };
+                }
                 traverse(h, enclosing_func, ch, g, node_to_g);
                 let weight = match h.get_optype(ch) {
                     OpType::Call(_) => CallGraphEdge::Call(ch),
@@ -86,14 +87,15 @@ impl CallGraph {
     }
 
     /// Allows access to the petgraph
-    pub fn graph(&self) -> &Graph<CallGraphNode, CallGraphEdge> {
+    #[must_use]
+    pub fn graph(&self) -> &Graph<CallGraphNode<N>, CallGraphEdge<N>> {
         &self.g
     }
 
     /// Convert a Hugr [Node] into a petgraph node index.
-    /// Result will be `None` if `n` is not a [FuncDefn](OpType::FuncDefn),
-    /// [FuncDecl](OpType::FuncDecl) or the hugr root.
-    pub fn node_index(&self, n: Node) -> Option<NodeIndex<u32>> {
+    /// Result will be `None` if `n` is not a [`FuncDefn`](OpType::FuncDefn),
+    /// [`FuncDecl`](OpType::FuncDecl) or the hugr root.
+    pub fn node_index(&self, n: N) -> Option<petgraph::graph::NodeIndex<u32>> {
         self.node_to_g.get(&n).copied()
     }
 }

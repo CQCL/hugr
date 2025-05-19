@@ -2,19 +2,19 @@ use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
 use crate::{
+    Hugr, HugrView,
     builder::{
-        endo_sig, inout_sig, BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr,
+        BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig,
     },
     extension::prelude::qb_t,
     ops::{
-        handle::{DataflowOpID, NodeHandle},
         Value,
+        handle::{DataflowOpID, NodeHandle},
     },
     std_extensions::logic::LogicOp,
     type_row,
     types::Signature,
     utils::test_quantum_extension::cx_gate,
-    Hugr, HugrView,
 };
 
 /// A Dataflow graph from two qubits to two qubits that applies two CX operations on them.
@@ -108,9 +108,11 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
             (n1.node(), 2.into()),
         ]
     );
-    assert!(all_output_ports
-        .iter()
-        .all(|&(_, p)| all_ports.contains(&p.into())));
+    assert!(
+        all_output_ports
+            .iter()
+            .all(|&(_, p)| all_ports.contains(&p.into()))
+    );
 
     let all_linked_inputs = h.all_linked_inputs(n1.node()).collect_vec();
     assert_eq!(
@@ -142,7 +144,7 @@ fn value_types() {
         .finish_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
         .unwrap();
 
-    let [_, o] = h.get_io(h.root()).unwrap();
+    let [_, o] = h.get_io(h.entrypoint()).unwrap();
     let n1_out_types = h.out_value_types(n1.node()).collect_vec();
 
     assert_eq!(&n1_out_types[..], &[(0.into(), qb_t())]);
@@ -153,7 +155,7 @@ fn value_types() {
 
 #[test]
 fn static_targets() {
-    use crate::extension::prelude::{usize_t, ConstUsize};
+    use crate::extension::prelude::{ConstUsize, usize_t};
     use itertools::Itertools;
     let mut dfg = DFGBuilder::new(inout_sig(type_row![], vec![usize_t()])).unwrap();
 
@@ -168,7 +170,7 @@ fn static_targets() {
     assert_eq!(
         &h.static_targets(c.node()).unwrap().collect_vec()[..],
         &[(load.node(), 0.into())]
-    )
+    );
 }
 
 #[test]
@@ -209,5 +211,5 @@ fn test_dataflow_ports_only() {
             (not.node(), 0.into()),
             (not.node(), 1.into())
         ]
-    )
+    );
 }

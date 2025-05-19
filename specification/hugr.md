@@ -891,71 +891,6 @@ See [Declarative Format](#declarative-format) for more examples.
 
 Note that since a row variable does not have kind Type, it cannot be used as the type of an edge.
 
-### Extension Tracking
-
-The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
-Similarly, every dataflow node in the HUGR has a set of extensions required to execute the node (computed from its operation),
-also known as the "delta". The delta of any node must be a subset of its parent's delta,
-except for FuncDefn's:
-* the delta of any child of a FuncDefn must be a subset of the extensions in the FuncDefn's *type*
-* the FuncDefn itself has no delta (trivially a subset of any parent): this reflects that the extensions
-are not needed to *know* the FuncDefn, only to *execute* it
-(by a Call node, whose delta is taken from the called FuncDefn's *type*).
-
-Keeping track of the extension requirements like this allows extension designers
-and third-party tooling to control how/where a module is run.
-
-Concretely, if a plugin writer adds an extension
-*X*, then some function from
-a plugin needs to provide a mechanism to convert the
-*X* to some other extension
-requirement before it can interface with other plugins which don't know
-about *X*.
-
-A runtime could have access to means of
-running different extensions. By the same mechanism, the runtime can reason
-about where to run different parts of the graph by inspecting their
-extension requirements.
-
-Special operations **lift** and **liftGraph** can add extension requirements:
-* `lift<E: ExtensionId, R: List<Type>>` is a node with input and output rows `R` and extension-delta `{E}`
-* `liftGraph<N: ExtensionSet, I: List<Type>, E: ExtensionSet, O: List<Type>>` has one input
-$ \vec{I}^{\underrightarrow{\;E\;}}\vec{O} $ and one output $ \vec{I}^{\underrightarrow{\;E \cup N\;}}\vec{O}$.
-That is, given a graph, it adds extensions $N$ to the requirements of the graph.
-
-The latter is useful for higher-order operations such as conditionally selecting
-one function or another, where the output must have a consistent type (including
-the extension-requirements of the function).
-
-### Rewriting Extension Requirements
-
-Extension requirements help denote different runtime capabilities.
-For example, a quantum computer may not be able to handle arithmetic
-while running a circuit, so its use is tracked in the function type so that
-rewrites can be performed which remove the arithmetic.
-
-Simple circuits may look something like:
-
-```haskell
-Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
-```
-
-A circuit built using a higher-order extension to manage control flow
-could then look like:
-
-```haskell
-Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
-```
-
-So the compiler would need to perform some graph transformation pass to turn the
-graph-based control flow into a CFG node that a quantum computer could
-run, which removes the `HigherOrder` extension requirement.
-
-```haskell
-precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
-                                         Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
-```
-
 ## Extension System
 
 ### Goals and constraints
@@ -1842,6 +1777,8 @@ Conversions between integers and floats:
 | `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to signed int, rounding towards zero. Returns an error when the float is non-finite. |
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
+| `bytecast_int64_to_float64` | `int<6>`  | `float64`   | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
+| `bytecast_float64_to_int64` | `float64` | `int64`     | reinterpret an float64 as an int based on its bytes, with the same endianness. |
 
 ## Glossary
 

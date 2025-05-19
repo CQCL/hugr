@@ -1,17 +1,16 @@
 use super::{
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
-    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::extension::TO_BE_INFERRED;
-use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
-use crate::{extension::ExtensionSet, types::Signature};
+use crate::ops::{self, DataflowBlock, DataflowParent, ExitBlock, OpType, handle::NodeHandle};
+use crate::types::Signature;
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
-use crate::{hugr::HugrMut, type_row, Hugr};
+use crate::{Hugr, hugr::HugrMut, type_row};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph.
@@ -106,7 +105,6 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     let hugr = cfg_builder.finish_hugr()?;
 ///     Ok(hugr)
 /// };
-/// #[cfg(not(feature = "extension_inference"))]
 /// assert!(make_cfg().is_ok());
 /// ```
 #[derive(Debug, PartialEq)]
@@ -150,17 +148,14 @@ impl CFGBuilder<Hugr> {
             signature: signature.clone(),
         };
 
-        let base = Hugr::new(cfg_op);
-        let cfg_node = base.root();
+        let base = Hugr::new_with_entrypoint(cfg_op).expect("CFG entrypoints be valid");
+        let cfg_node = base.entrypoint();
         CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }
 }
 
 impl HugrBuilder for CFGBuilder<Hugr> {
-    fn finish_hugr(mut self) -> Result<Hugr, crate::hugr::ValidationError> {
-        if cfg!(feature = "extension_inference") {
-            self.base.infer_extensions(false)?;
-        }
+    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError<Node>> {
         self.base.validate()?;
         Ok(self.base)
     }
@@ -192,7 +187,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
     /// and `outputs` and the variants of the branching Sum value
-    /// specified by `sum_rows`. Extension delta will be inferred.
+    /// specified by `sum_rows`.
     ///
     /// # Errors
     ///
@@ -203,36 +198,12 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder_exts(inputs, sum_rows, other_outputs, TO_BE_INFERRED)
-    }
-
-    /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching Sum value
-    /// specified by `sum_rows`. Extension delta will be inferred.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error adding the node.
-    pub fn block_builder_exts(
-        &mut self,
-        inputs: TypeRow,
-        sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_outputs: TypeRow,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.any_block_builder(
-            inputs,
-            extension_delta.into(),
-            sum_rows,
-            other_outputs,
-            false,
-        )
+        self.any_block_builder(inputs, sum_rows, other_outputs, false)
     }
 
     fn any_block_builder(
         &mut self,
         inputs: TypeRow,
-        extension_delta: ExtensionSet,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
         entry: bool,
@@ -242,7 +213,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             sum_rows,
-            extension_delta,
         });
         let parent = self.container_node();
         let block_n = if entry {
@@ -254,12 +224,12 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             self.hugr_mut().add_node_with_parent(parent, op)
         };
 
-        BlockBuilder::create(self.hugr_mut(), block_n)
+        BlockBuilder::create_with_io(self.hugr_mut(), block_n)
     }
 
-    /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and `extension_delta` explicitly specified, plus a UnitSum type
-    /// (a Sum of `n_cases` unit types) to select the successor.
+    /// Return a builder for a non-entry [`DataflowBlock`] child graph with
+    /// `inputs` and `outputs` , plus a `UnitSum` type (a Sum of `n_cases` unit
+    /// types) to select the successor.
     ///
     /// # Errors
     ///
@@ -269,17 +239,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         signature: Signature,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder_exts(
+        self.block_builder(
             signature.input,
             vec![type_row![]; n_cases],
             signature.output,
-            signature.runtime_reqs,
         )
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`
     /// and the variants of the branching Sum value specified by `sum_rows`.
-    /// Extension delta will be inferred.
     ///
     /// # Errors
     ///
@@ -289,38 +257,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder_exts(sum_rows, other_outputs, TO_BE_INFERRED)
-    }
-
-    /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`,
-    /// the variants of the branching Sum value specified by `sum_rows`, and
-    /// `extension_delta` explicitly specified. ([entry_builder](Self::entry_builder)
-    /// may be used to infer.)
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if an entry block has already been built.
-    pub fn entry_builder_exts(
-        &mut self,
-        sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_outputs: TypeRow,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let inputs = self
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.any_block_builder(
-            inputs,
-            extension_delta.into(),
-            sum_rows,
-            other_outputs,
-            true,
-        )
+        self.any_block_builder(inputs, sum_rows, other_outputs, true)
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with
-    /// `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
+    /// `outputs` and a `UnitSum` type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -331,22 +276,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
-    }
-
-    /// Return a builder for the entry [`DataflowBlock`] child graph with
-    /// `outputs` and a Sum of `n_cases` unit types, and explicit `extension_delta`.
-    /// ([simple_entry_builder](Self::simple_entry_builder) may be used to infer.)
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error adding the node.
-    pub fn simple_entry_builder_exts(
-        &mut self,
-        outputs: TypeRow,
-        n_cases: usize,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder_exts(vec![type_row![]; n_cases], outputs, extension_delta)
     }
 
     /// Returns the exit block of this [`CFGBuilder`].
@@ -385,7 +314,29 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
+
+    /// Create a new `BlockBuilder`.
+    ///
+    /// See [`BlockBuilder::create_with_io`] if you need to initialize the input
+    /// and output nodes.
+    ///
+    /// # Parameters
+    /// - `base`: The base HUGR to build on.
+    /// - `block_n`: The block we are building.
     fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
+        let db = DFGBuilder::create(base, block_n)?;
+        Ok(BlockBuilder::from_dfg_builder(db))
+    }
+
+    /// Create a new `BlockBuilder`, initializing the input and output nodes.
+    ///
+    /// See [`BlockBuilder::create`] if you don't need to initialize the input
+    /// and output nodes.
+    ///
+    /// # Parameters
+    /// - `base`: The base HUGR to build on.
+    /// - `block_n`: The block we are building.
+    fn create_with_io(base: B, block_n: Node) -> Result<Self, BuildError> {
         let block_op = base
             .as_ref()
             .get_optype(block_n)
@@ -412,40 +363,39 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 
 impl BlockBuilder<Hugr> {
     /// Initialize a [`DataflowBlock`] rooted HUGR builder.
-    /// Extension delta will be inferred.
     pub fn new(
         inputs: impl Into<TypeRow>,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
-        Self::new_exts(inputs, sum_rows, other_outputs, TO_BE_INFERRED)
-    }
-
-    /// Initialize a [`DataflowBlock`] rooted HUGR builder.
-    /// `extension_delta` is explicitly specified; alternatively, [new](Self::new)
-    /// may be used to infer it.
-    pub fn new_exts(
-        inputs: impl Into<TypeRow>,
-        sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_outputs: impl Into<TypeRow>,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
-        let other_outputs = other_outputs.into();
-        let op = DataflowBlock {
-            inputs: inputs.clone(),
-            other_outputs: other_outputs.clone(),
-            sum_rows,
-            extension_delta: extension_delta.into(),
-        };
+        let other_outputs: TypeRow = other_outputs.into();
+        let num_out_branches = sum_rows.len();
 
-        let base = Hugr::new(op);
-        let root = base.root();
+        // We only support blocks where all the possible `sum_rows` branches have the same types,
+        // as that lets us branch it directly to an exit node.
+        if let Some(row) = sum_rows.first() {
+            if sum_rows.iter().skip(1).any(|r2| row != r2) {
+                return Err(BuildError::BasicBlockTooComplex);
+            }
+        }
+        let cfg_outputs = sum_rows.first().cloned().unwrap_or_default();
+        let cfg_outputs = cfg_outputs.extend(other_outputs.as_slice());
+
+        let mut cfg = CFGBuilder::new(Signature::new(inputs, cfg_outputs))?;
+        let block = cfg.entry_builder(sum_rows, other_outputs)?;
+        let block = block.finish_sub_container()?;
+        for i in 0..num_out_branches {
+            cfg.branch(&block, i, &cfg.exit_block())?;
+        }
+        let mut base = std::mem::take(cfg.hugr_mut());
+        let root = block.node();
+        base.set_entrypoint(root);
         Self::create(base, root)
     }
 
-    /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
+    /// [Set outputs](BlockBuilder::set_outputs) and [`finish_hugr`](`BlockBuilder::finish_hugr`).
     pub fn finish_hugr_with_outputs(
         mut self,
         branch_wire: Wire,
@@ -460,9 +410,9 @@ impl BlockBuilder<Hugr> {
 pub(crate) mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
-    use crate::extension::prelude::usize_t;
-    use crate::hugr::validate::InterGraphEdgeError;
+    use crate::extension::prelude::{bool_t, usize_t};
     use crate::hugr::ValidationError;
+    use crate::hugr::validate::InterGraphEdgeError;
     use crate::type_row;
     use cool_asserts::assert_matches;
 
@@ -502,16 +452,35 @@ pub(crate) mod test {
         Ok(())
     }
 
+    #[test]
+    fn basic_cfg_block() -> Result<(), BuildError> {
+        assert_eq!(
+            BlockBuilder::new(
+                vec![],
+                [vec![usize_t()].into(), vec![bool_t()].into()],
+                vec![]
+            ),
+            Err(BuildError::BasicBlockTooComplex)
+        );
+
+        let sum_rows: Vec<TypeRow> = vec![vec![usize_t()].into(), vec![usize_t()].into()];
+        let mut block_builder =
+            BlockBuilder::new(vec![usize_t()], sum_rows.clone(), vec![usize_t()])?;
+        let [inp] = block_builder.input_wires_arr();
+        let branch = block_builder.make_sum(0, sum_rows, [inp])?;
+        let hugr = block_builder.finish_hugr_with_outputs(branch, [inp])?;
+
+        hugr.validate().unwrap();
+
+        Ok(())
+    }
+
     pub(crate) fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
         let usize_row: TypeRow = vec![usize_t()].into();
         let sum2_variants = vec![usize_row.clone(), usize_row];
-        let mut entry_b = cfg_builder.entry_builder_exts(
-            sum2_variants.clone(),
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
         let entry = {
             let [inw] = entry_b.input_wires_arr();
 
@@ -537,11 +506,7 @@ pub(crate) mod test {
         let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
 
-        let mut entry_b = cfg_builder.entry_builder_exts(
-            sum_variants.clone(),
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), type_row![])?;
         let [inw] = entry_b.input_wires_arr();
         let entry = {
             let sum = entry_b.load_const(&sum_tuple_const);

@@ -13,7 +13,14 @@
             "include-component-in-tag": true,
             "draft": false,
             "prerelease": false,
-            "draft-pull-request": true
+            "draft-pull-request": true,
+            "extra-files": [
+                {
+                    "type": "toml",
+                    "path": "uv.lock",
+                    "jsonpath": "$.package[?(@.name.value=='hugr')].version"
+                }
+            ]
         }
     },
     "changelog-sections": [

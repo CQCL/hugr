@@ -31,10 +31,10 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::Extension;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::ops::OpName;
 use crate::types::TypeName;
-use crate::Extension;
 
 use super::{
     ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionRegistryError, ExtensionSet,
@@ -149,9 +149,14 @@ impl ExtensionDeclaration {
     /// Create an [`Extension`] from this declaration.
     pub fn make_extension(
         &self,
-        imports: &ExtensionSet,
+        _imports: &ExtensionSet,
         ctx: DeclarationContext<'_>,
     ) -> Result<Arc<Extension>, ExtensionDeclarationError> {
+        // TODO: The imports were previously used as runtime extension
+        // requirements for the constructed extension. Now that runtime
+        // extension requirements are removed, they are no longer recorded
+        // anywhere in the `Extension`.
+
         Extension::try_new_arc(
             self.name.clone(),
             // TODO: Get the version as a parameter.
@@ -164,7 +169,6 @@ impl ExtensionDeclaration {
                 for o in &self.operations {
                     o.register(ext, ctx, extension_ref)?;
                 }
-                ext.add_requirements(imports.clone());
 
                 Ok(())
             },
@@ -234,9 +238,7 @@ pub enum ExtensionDeclarationError {
     /// Operation definitions with no signature are not currently supported.
     ///
     /// TODO: Support this.
-    #[error(
-        "Operation {op} in extension {ext} has no signature. This is not currently supported."
-    )]
+    #[error("Operation {op} in extension {ext} has no signature. This is not currently supported.")]
     MissingSignature {
         /// The extension containing the operation.
         ext: ExtensionId,

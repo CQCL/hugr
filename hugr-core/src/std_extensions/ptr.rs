@@ -2,24 +2,24 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::Wire;
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::TypeDefBound;
 use crate::ops::OpName;
 use crate::types::{CustomType, PolyFuncType, Signature, Type, TypeBound, TypeName};
-use crate::Wire;
 use crate::{
+    Extension,
     extension::{
+        ExtensionId, OpDef, SignatureError, SignatureFunc,
         simple_op::{
             HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
         },
-        ExtensionId, OpDef, SignatureError, SignatureFunc,
     },
-    ops::{custom::ExtensionOp, NamedOp},
+    ops::custom::ExtensionOp,
     type_row,
     types::type_param::{TypeArg, TypeParam},
-    Extension,
 };
 use lazy_static::lazy_static;
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -37,12 +37,17 @@ pub enum PtrOpDef {
 
 impl PtrOpDef {
     /// Create a new concrete pointer operation with the given value type.
+    #[must_use]
     pub fn with_type(self, ty: Type) -> PtrOp {
         PtrOp::new(self, ty)
     }
 }
 
 impl MakeOpDef for PtrOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -111,7 +116,7 @@ lazy_static! {
     pub static ref EXTENSION: Arc<Extension> = extension();
 }
 
-/// Integer type of a given bit width (specified by the TypeArg).  Depending on
+/// Integer type of a given bit width (specified by the `TypeArg`).  Depending on
 /// the operation, the semantic interpretation may be unsigned integer, signed
 /// integer or bit string.
 fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> CustomType {
@@ -125,7 +130,7 @@ fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> Cust
     )
 }
 
-/// Integer type of a given bit width (specified by the TypeArg).
+/// Integer type of a given bit width (specified by the `TypeArg`).
 pub fn ptr_type(ty: impl Into<Type>) -> Type {
     ptr_custom_type(ty, &Arc::<Extension>::downgrade(&EXTENSION)).into()
 }
@@ -145,13 +150,11 @@ impl PtrOp {
     }
 }
 
-impl NamedOp for PtrOp {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
-
 impl MakeExtensionOp for PtrOp {
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = PtrOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
@@ -164,7 +167,7 @@ impl MakeExtensionOp for PtrOp {
 
 impl MakeRegisteredOp for PtrOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -220,12 +223,12 @@ impl HasDef for PtrOp {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use crate::HugrView;
     use crate::builder::DFGBuilder;
     use crate::extension::prelude::bool_t;
     use crate::ops::ExtensionOp;
     use crate::{
         builder::{Dataflow, DataflowHugr},
-        ops::NamedOp,
         std_extensions::arithmetic::int_types::INT_TYPES,
     };
     use cool_asserts::assert_matches;
@@ -234,8 +237,8 @@ pub(crate) mod test {
 
     use super::*;
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    fn get_opdef(op: impl NamedOp) -> Option<&'static Arc<OpDef>> {
-        EXTENSION.get_op(&op.name())
+    fn get_opdef(op: impl Into<&'static str>) -> Option<&'static Arc<OpDef>> {
+        EXTENSION.get_op(op.into())
     }
 
     #[test]
@@ -268,10 +271,7 @@ pub(crate) mod test {
         let in_row = vec![bool_t(), float64_type()];
 
         let hugr = {
-            let mut builder = DFGBuilder::new(
-                Signature::new(in_row.clone(), type_row![]).with_extension_delta(EXTENSION_ID),
-            )
-            .unwrap();
+            let mut builder = DFGBuilder::new(Signature::new(in_row.clone(), type_row![])).unwrap();
 
             let in_wires: [Wire; 2] = builder.input_wires_arr();
             for (ty, w) in in_row.into_iter().zip(in_wires.iter()) {
@@ -282,6 +282,6 @@ pub(crate) mod test {
 
             builder.finish_hugr_with_outputs([]).unwrap()
         };
-        assert_matches!(hugr.validate(), Ok(_));
+        assert_matches!(hugr.validate(), Ok(()));
     }
 }

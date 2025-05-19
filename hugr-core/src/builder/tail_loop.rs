@@ -1,4 +1,3 @@
-use crate::extension::{ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{self, DataflowOpTrait};
 
 use crate::hugr::views::HugrView;
@@ -7,8 +6,8 @@ use crate::{Hugr, Node};
 
 use super::handle::BuildHandle;
 use super::{
-    dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
+    dataflow::{DFGBuilder, DFGWrapper},
 };
 
 /// Builder for a [`ops::TailLoop`] node.
@@ -72,32 +71,19 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
 
 impl TailLoopBuilder<Hugr> {
     /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
-    /// Extension delta will be inferred.
     pub fn new(
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,
         just_outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
-        Self::new_exts(just_inputs, inputs_outputs, just_outputs, TO_BE_INFERRED)
-    }
-
-    /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
-    /// `extension_delta` is explicitly specified; alternatively, [new](Self::new)
-    /// may be used to infer it.
-    pub fn new_exts(
-        just_inputs: impl Into<TypeRow>,
-        inputs_outputs: impl Into<TypeRow>,
-        just_outputs: impl Into<TypeRow>,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
-            extension_delta: extension_delta.into(),
         };
-        let base = Hugr::new(tail_loop.clone());
-        let root = base.root();
+        let base = Hugr::new_with_entrypoint(tail_loop.clone())
+            .expect("tail_loop entrypoint should be valid");
+        let root = base.entrypoint();
         Self::create_with_io(base, root, &tail_loop)
     }
 }
@@ -109,7 +95,7 @@ mod test {
     use crate::extension::prelude::bool_t;
     use crate::{
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{usize_t, ConstUsize, Lift, PRELUDE_ID},
+        extension::prelude::{ConstUsize, usize_t},
         hugr::ValidationError,
         ops::Value,
         type_row,
@@ -119,9 +105,8 @@ mod test {
     use super::*;
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
-        let build_result: Result<Hugr, ValidationError> = {
-            let mut loop_b =
-                TailLoopBuilder::new_exts(vec![], vec![bool_t()], vec![usize_t()], PRELUDE_ID)?;
+        let build_result: Result<Hugr, ValidationError<_>> = {
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![bool_t()], vec![usize_t()])?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_value(ConstUsize::new(1));
 
@@ -138,17 +123,10 @@ mod test {
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut fbuild = module_builder.define_function(
-                "main",
-                Signature::new(vec![bool_t()], vec![usize_t()]).with_prelude(),
-            )?;
+            let mut fbuild = module_builder
+                .define_function("main", Signature::new(vec![bool_t()], vec![usize_t()]))?;
             let _fdef = {
-                let [b1] = fbuild
-                    .add_dataflow_op(
-                        Lift::new(vec![bool_t()].into(), PRELUDE_ID),
-                        fbuild.input_wires(),
-                    )?
-                    .outputs_arr();
+                let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
                     let mut loop_b = fbuild.tail_loop_builder(
                         vec![(bool_t(), b1)],
@@ -156,13 +134,7 @@ mod test {
                         vec![usize_t()].into(),
                     )?;
                     let signature = loop_b.loop_signature()?.clone();
-                    let const_val = Value::true_val();
                     let const_wire = loop_b.add_load_const(Value::true_val());
-                    let lift_node = loop_b.add_dataflow_op(
-                        Lift::new(vec![const_val.get_type().clone()].into(), PRELUDE_ID),
-                        [const_wire],
-                    )?;
-                    let [const_wire] = lift_node.outputs_arr();
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
                         let output_row = loop_b.internal_output_row()?;

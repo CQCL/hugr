@@ -5,17 +5,17 @@
 //! Depending on the type of HUGR you want to build, you may want to use one of
 //! the following builders:
 //!
-//! - [ModuleBuilder]: For building a module with function declarations and
-//!       definitions.
-//! - [DFGBuilder]: For building a dataflow graph.
-//! - [FunctionBuilder]: A `DFGBuilder` specialised in defining functions with a
-//!       dataflow graph.
-//! - [CFGBuilder]: For building a control flow graph.
-//! - [ConditionalBuilder]: For building a conditional node.
-//! - [TailLoopBuilder]: For building a tail-loop node.
+//! - [`ModuleBuilder`]: For building a module with function declarations and
+//!   definitions.
+//! - [`DFGBuilder`]: For building a dataflow graph.
+//! - [`FunctionBuilder`]: A `DFGBuilder` specialised in defining functions with a
+//!   dataflow graph.
+//! - [`CFGBuilder`]: For building a control flow graph.
+//! - [`ConditionalBuilder`]: For building a conditional node.
+//! - [`TailLoopBuilder`]: For building a tail-loop node.
 //!
-//! Additionally, the [CircuitBuilder] provides an alternative to the
-//! [DFGBuilder] when working with circuits, where some inputs of operations directly
+//! Additionally, the [`CircuitBuilder`] provides an alternative to the
+//! [`DFGBuilder`] when working with circuits, where some inputs of operations directly
 //! correspond to some outputs and operations can be directly appended using
 //! unit indices.
 //!
@@ -26,7 +26,7 @@
 //! `CircuitBuilder`.
 //!
 //! ```rust
-//! # use hugr::Hugr;
+//! # use hugr::{Hugr, HugrView};
 //! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
 //! use hugr::extension::prelude::bool_t;
 //! use hugr::std_extensions::logic::{self, LogicOp};
@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             Signature::new_endo(bool_t()).with_extension_delta(logic::EXTENSION_ID),
+//!             Signature::new_endo(bool_t()),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,8 +59,7 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             Signature::new_endo(vec![bool_t(), bool_t()])
-//!                 .with_extension_delta(logic::EXTENSION_ID),
+//!             Signature::new_endo(vec![bool_t(), bool_t()]),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
 //!
@@ -88,8 +87,8 @@
 //! ```
 use thiserror::Error;
 
+use crate::extension::SignatureError;
 use crate::extension::simple_op::OpLoadError;
-use crate::extension::{SignatureError, TO_BE_INFERRED};
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
@@ -123,16 +122,14 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 mod circuit;
 pub use circuit::{CircuitBuildError, CircuitBuilder};
 
-/// Return a FunctionType with the same input and output types (specified)
-/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
+/// Return a `FunctionType` with the same input and output types (specified).
 pub fn endo_sig(types: impl Into<TypeRow>) -> Signature {
-    Signature::new_endo(types).with_extension_delta(TO_BE_INFERRED)
+    Signature::new_endo(types)
 }
 
-/// Return a FunctionType with the specified input and output types
-/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
+/// Return a `FunctionType` with the specified input and output types.
 pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Signature {
-    Signature::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
+    Signature::new(inputs, outputs)
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -141,9 +138,9 @@ pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Sig
 pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
-    InvalidHUGR(#[from] ValidationError),
-    /// SignatureError in trying to construct a node (differs from
-    /// [ValidationError::SignatureError] in that we could not construct a node to report about)
+    InvalidHUGR(#[from] ValidationError<Node>),
+    /// `SignatureError` in trying to construct a node (differs from
+    /// [`ValidationError::SignatureError`] in that we could not construct a node to report about)
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// Tried to add a malformed [Const]
@@ -154,6 +151,12 @@ pub enum BuildError {
     /// CFG can only have one entry.
     #[error("CFG entry node already built for CFG node: {0}.")]
     EntryBuiltError(Node),
+    /// We don't allow creating `BasicBlockBuilder<Hugr>`s when the sum-rows
+    /// are not homogeneous. Use a `CFGBuilder` and create a valid graph instead.
+    #[error(
+        "Cannot initialize hugr for a BasicBlockBuilder with complex sum-rows. Use a CFGBuilder instead."
+    )]
+    BasicBlockTooComplex,
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node} does not have type {op_desc} as expected.")]
     #[allow(missing_docs)]
@@ -167,11 +170,18 @@ pub enum BuildError {
     #[error("Error building Conditional node: {0}.")]
     ConditionalError(#[from] conditional::ConditionalBuildError),
 
+    /// Node not found in Hugr
+    #[error("{node} not found in the Hugr")]
+    NodeNotFound {
+        /// Missing node
+        node: Node,
+    },
+
     /// Wire not found in Hugr
     #[error("Wire not found in Hugr: {0}.")]
     WireNotFound(Wire),
 
-    /// Error in CircuitBuilder
+    /// Error in `CircuitBuilder`
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit::CircuitBuildError),
 
@@ -214,7 +224,9 @@ pub enum BuilderWiringError {
         src_offset: Port,
     },
     /// The ancestors of an inter-graph edge are not related.
-    #[error("Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NoRelationIntergraph {
         src: Node,
@@ -223,7 +235,9 @@ pub enum BuilderWiringError {
         dst_offset: Port,
     },
     /// Inter-Graph edges can only carry copyable data.
-    #[error("Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[error(
+        "Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
+    )]
     #[allow(missing_docs)]
     NonCopyableIntergraph {
         src: Node,
@@ -238,11 +252,12 @@ pub enum BuilderWiringError {
 pub(crate) mod test {
     use rstest::fixture;
 
-    use crate::extension::prelude::{bool_t, usize_t};
-    use crate::hugr::{views::HugrView, HugrMut};
-    use crate::ops;
-    use crate::types::{PolyFuncType, Signature};
     use crate::Hugr;
+    use crate::extension::prelude::{bool_t, usize_t};
+    use crate::hugr::{HugrMut, views::HugrView};
+    use crate::ops;
+    use crate::package::Package;
+    use crate::types::{PolyFuncType, Signature};
 
     use super::handle::BuildHandle;
     use super::{
@@ -302,21 +317,35 @@ pub(crate) mod test {
         cfg_builder.finish_hugr().unwrap()
     }
 
+    #[fixture]
+    pub(crate) fn simple_package() -> Package {
+        let hugr = simple_module_hugr();
+        Package::new([hugr])
+    }
+
+    #[fixture]
+    pub(crate) fn multi_module_package() -> Package {
+        let hugr0 = simple_module_hugr();
+        let hugr1 = simple_module_hugr();
+        Package::new([hugr0, hugr1])
+    }
+
     /// A helper method which creates a DFG rooted hugr with Input and Output node
     /// only (no wires), given a function type with extension delta.
     // TODO consider taking two type rows and using TO_BE_INFERRED
     pub(crate) fn closed_dfg_root_hugr(signature: Signature) -> Hugr {
-        let mut hugr = Hugr::new(ops::DFG {
+        let mut hugr = Hugr::new_with_entrypoint(ops::DFG {
             signature: signature.clone(),
-        });
+        })
+        .unwrap();
         hugr.add_node_with_parent(
-            hugr.root(),
+            hugr.entrypoint(),
             ops::Input {
                 types: signature.input,
             },
         );
         hugr.add_node_with_parent(
-            hugr.root(),
+            hugr.entrypoint(),
             ops::Output {
                 types: signature.output,
             },

@@ -7,16 +7,15 @@
 use std::any::Any;
 use std::hash::{Hash, Hasher};
 
-use downcast_rs::{impl_downcast, Downcast};
+use downcast_rs::{Downcast, impl_downcast};
 use thiserror::Error;
 
+use crate::IncomingPort;
 use crate::extension::resolution::{
-    resolve_type_extensions, ExtensionResolutionError, WeakExtensionRegistry,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
 };
-use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFailure, Type};
-use crate::IncomingPort;
 
 use super::{Value, ValueName};
 
@@ -44,7 +43,6 @@ use super::{Value, ValueName};
 /// #[typetag::serde]
 /// impl CustomConst for CC {
 ///   fn name(&self) -> ValueName { "CC".into() }
-///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(int_types::EXTENSION_ID) }
 ///   fn get_type(&self) -> Type { int_types::INT_TYPES[5].clone() }
 /// }
 ///
@@ -60,13 +58,6 @@ pub trait CustomConst:
 {
     /// An identifier for the constant.
     fn name(&self) -> ValueName;
-
-    /// The extension(s) defining the custom constant
-    /// (a set to allow, say, a [List] of [USize])
-    ///
-    /// [List]: crate::std_extensions::collections::list::LIST_TYPENAME
-    /// [USize]: crate::extension::prelude::usize_t
-    fn extension_reqs(&self) -> ExtensionSet;
 
     /// Check the value.
     fn validate(&self) -> Result<(), CustomCheckFailure> {
@@ -111,7 +102,7 @@ pub trait CustomConst:
 /// "not hashable", or else to implement/derive [Hash].
 pub trait TryHash {
     /// Hashes the value, if possible; else return `false` without mutating the `Hasher`.
-    /// This relates with [CustomConst::equal_consts] just like [Hash] with [Eq]:
+    /// This relates with [`CustomConst::equal_consts`] just like [Hash] with [Eq]:
     /// * if `x.equal_consts(y)` ==> `x.try_hash(s)` behaves equivalently to `y.try_hash(s)`
     /// * if `x.hash(s)` behaves differently from `y.hash(s)` ==> `x.equal_consts(y) == false`
     ///
@@ -138,7 +129,7 @@ impl PartialEq for dyn CustomConst {
     }
 }
 
-/// Const equality for types that have PartialEq
+/// Const equality for types that have `PartialEq`
 pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
     constant: &T,
     other: &dyn CustomConst,
@@ -150,7 +141,7 @@ pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
     }
 }
 
-/// Serialize any CustomConst using the `impl Serialize for &dyn CustomConst`.
+/// Serialize any `CustomConst` using the `impl Serialize for &dyn CustomConst`.
 fn serialize_custom_const(cc: &dyn CustomConst) -> Result<serde_json::Value, serde_json::Error> {
     serde_json::to_value(cc)
 }
@@ -185,7 +176,6 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 pub struct CustomSerialized {
     typ: Type,
     value: serde_json::Value,
-    extensions: ExtensionSet,
 }
 
 #[derive(Debug, Error)]
@@ -206,19 +196,15 @@ pub struct DeserializeError {
 
 impl CustomSerialized {
     /// Creates a new [`CustomSerialized`].
-    pub fn new(
-        typ: impl Into<Type>,
-        value: serde_json::Value,
-        exts: impl Into<ExtensionSet>,
-    ) -> Self {
+    pub fn new(typ: impl Into<Type>, value: serde_json::Value) -> Self {
         Self {
             typ: typ.into(),
             value,
-            extensions: exts.into(),
         }
     }
 
     /// Returns the inner value.
+    #[must_use]
     pub fn value(&self) -> &serde_json::Value {
         &self.value
     }
@@ -240,7 +226,6 @@ impl CustomSerialized {
                     err,
                     payload: cc.clone_box(),
                 })?,
-                cc.extension_reqs(),
             ),
         })
     }
@@ -259,10 +244,10 @@ impl CustomSerialized {
         match cc.downcast::<Self>() {
             Ok(x) => Ok(*x),
             Err(cc) => {
-                let (typ, extension_reqs) = (cc.get_type(), cc.extension_reqs());
+                let typ = cc.get_type();
                 let value = serialize_custom_const(cc.as_ref())
                     .map_err(|err| SerializeError { err, payload: cc })?;
-                Ok(Self::new(typ, value, extension_reqs))
+                Ok(Self::new(typ, value))
             }
         }
     }
@@ -274,6 +259,7 @@ impl CustomSerialized {
     ///
     /// Note that if the inner value is a [Self] we do not recursively
     /// deserialize it.
+    #[must_use]
     pub fn into_custom_const_box(self) -> Box<dyn CustomConst> {
         // ideally we would not have to clone, but serde_json does not allow us
         // to recover the value from the error
@@ -313,9 +299,6 @@ impl CustomConst for CustomSerialized {
         Some(self) == other.downcast_ref()
     }
 
-    fn extension_reqs(&self) -> ExtensionSet {
-        self.extensions.clone()
-    }
     fn update_extensions(
         &mut self,
         extensions: &WeakExtensionRegistry,
@@ -358,6 +341,7 @@ pub(super) mod serde_extension_value {
 }
 
 /// Given a singleton list of constant operations, return the value.
+#[must_use]
 pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) -> Option<&T> {
     let [(_, c)] = consts else {
         return None;
@@ -366,6 +350,7 @@ pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) 
 }
 
 /// Given a list of two constant operations, return the values.
+#[must_use]
 pub fn get_pair_of_input_values<T: CustomConst>(
     consts: &[(IncomingPort, Value)],
 ) -> Option<(&T, &T)> {
@@ -382,8 +367,8 @@ mod test {
     use rstest::rstest;
 
     use crate::{
-        extension::prelude::{usize_t, ConstUsize},
-        ops::{constant::custom::serialize_custom_const, Value},
+        extension::prelude::{ConstUsize, usize_t},
+        ops::{Value, constant::custom::serialize_custom_const},
         std_extensions::collections::list::ListValue,
     };
 
@@ -437,11 +422,8 @@ mod test {
         // check serialize_custom_const
         assert_eq!(expected_json, serialize_custom_const(&example.cc).unwrap());
 
-        let expected_custom_serialized = CustomSerialized::new(
-            example.cc.get_type(),
-            expected_json,
-            example.cc.extension_reqs(),
-        );
+        let expected_custom_serialized =
+            CustomSerialized::new(example.cc.get_type(), expected_json);
 
         // check all the try_from/try_into/into variations
         assert_eq!(
@@ -494,11 +476,7 @@ mod test {
         let inner = example_custom_serialized().1;
         (
             inner.clone(),
-            CustomSerialized::new(
-                inner.get_type(),
-                serialize_custom_const(&inner).unwrap(),
-                inner.extension_reqs(),
-            ),
+            CustomSerialized::new(inner.get_type(), serialize_custom_const(&inner).unwrap()),
         )
     }
 
@@ -545,7 +523,6 @@ mod proptest {
     use ::proptest::prelude::*;
 
     use crate::{
-        extension::ExtensionSet,
         ops::constant::CustomSerialized,
         proptest::{any_serde_json_value, any_string},
         types::Type,
@@ -556,7 +533,6 @@ mod proptest {
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             let typ = any::<Type>();
-            let extensions = any::<ExtensionSet>();
             // here we manually construct a serialized `dyn CustomConst`.
             // The "c" and "v" come from the `typetag::serde` annotation on
             // `trait CustomConst`.
@@ -570,12 +546,8 @@ mod proptest {
                     .collect::<serde_json::Map<String, _>>()
                     .into()
             });
-            (typ, value, extensions)
-                .prop_map(|(typ, value, extensions)| CustomSerialized {
-                    typ,
-                    value,
-                    extensions,
-                })
+            (typ, value)
+                .prop_map(|(typ, value)| CustomSerialized { typ, value })
                 .boxed()
         }
     }

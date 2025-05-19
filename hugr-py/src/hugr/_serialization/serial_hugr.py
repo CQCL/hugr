@@ -35,6 +35,7 @@ class SerialHugr(ConfiguredBaseModel):
     encoder: str | None = Field(
         default=None, description="The name of the encoder used to generate the Hugr."
     )
+    entrypoint: NodeIdx | None = None
 
     def to_json(self) -> str:
         """Return a JSON representation of the Hugr."""

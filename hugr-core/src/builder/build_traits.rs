@@ -9,25 +9,25 @@ use crate::{Extension, IncomingPort, Node, OutgoingPort};
 use std::iter;
 use std::sync::Arc;
 
-use super::{
-    handle::{BuildHandle, Outputs},
-    CircuitBuilder,
-};
 use super::{BuilderWiringError, FunctionBuilder};
+use super::{
+    CircuitBuilder,
+    handle::{BuildHandle, Outputs},
+};
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
+use crate::extension::ExtensionRegistry;
 use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
 use super::{
-    cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder,
-    tail_loop::TailLoopBuilder, BuildError, Wire,
+    BuildError, Wire, cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder,
+    tail_loop::TailLoopBuilder,
 };
 
 use crate::Hugr;
@@ -94,12 +94,9 @@ pub trait Container {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature = signature.into();
+        let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn {
-            name: name.into(),
-            signature,
-        });
+        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
 
         // Add the extensions used by the function types.
         self.use_extensions(
@@ -119,7 +116,7 @@ pub trait Container {
     }
 
     /// Insert a copy of a HUGR as a child of the container.
-    fn add_hugr_view(&mut self, child: &impl HugrView) -> InsertionResult {
+    fn add_hugr_view<H: HugrView>(&mut self, child: &H) -> InsertionResult<H::Node, Node> {
         let parent = self.container_node();
         self.hugr_mut().insert_from_view(parent, child)
     }
@@ -153,7 +150,7 @@ pub trait Container {
     where
         ExtensionRegistry: Extend<Reg>,
     {
-        self.hugr_mut().extensions_mut().extend(registry);
+        self.hugr_mut().use_extensions(registry);
     }
 }
 
@@ -161,7 +158,7 @@ pub trait Container {
 /// (with varying root node types)
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
-    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+    fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>>;
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR
@@ -228,9 +225,9 @@ pub trait Dataflow: Container {
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let optype = hugr.get_optype(hugr.root()).clone();
+        let optype = hugr.get_optype(hugr.entrypoint()).clone();
         let num_outputs = optype.value_output_count();
-        let node = self.add_hugr(hugr).new_root;
+        let node = self.add_hugr(hugr).inserted_entrypoint;
 
         wire_up_inputs(input_wires, node, self)
             .map_err(|error| BuildError::OperationWiring { op: optype, error })?;
@@ -250,8 +247,8 @@ pub trait Dataflow: Container {
         hugr: &impl HugrView,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let node = self.add_hugr_view(hugr).new_root;
-        let optype = hugr.get_optype(hugr.root()).clone();
+        let node = self.add_hugr_view(hugr).inserted_entrypoint;
+        let optype = hugr.get_optype(hugr.entrypoint()).clone();
         let num_outputs = optype.value_output_count();
 
         wire_up_inputs(input_wires, node, self)
@@ -284,6 +281,7 @@ pub trait Dataflow: Container {
     /// # Panics
     ///
     /// Panics if the number of input Wires does not match the size of the array.
+    #[track_caller]
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
         collect_array(self.input_wires())
     }
@@ -319,10 +317,7 @@ pub trait Dataflow: Container {
         inputs: impl IntoIterator<Item = (Type, Wire)>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let (types, input_wires): (Vec<Type>, Vec<Wire>) = inputs.into_iter().unzip();
-        self.dfg_builder(
-            Signature::new_endo(types).with_extension_delta(TO_BE_INFERRED),
-            input_wires,
-        )
+        self.dfg_builder(Signature::new_endo(types), input_wires)
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,
@@ -330,7 +325,6 @@ pub trait Dataflow: Container {
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
-    /// The Extension delta will be inferred.
     ///
     /// # Errors
     ///
@@ -341,27 +335,6 @@ pub trait Dataflow: Container {
         inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
-        self.cfg_builder_exts(inputs, output_types, TO_BE_INFERRED)
-    }
-
-    /// Return a builder for a [`crate::ops::CFG`] node,
-    /// i.e. a nested controlflow subgraph.
-    /// The `inputs` must be an iterable over pairs of the type of the input and
-    /// the corresponding wire.
-    /// The `output_types` are the types of the outputs.
-    /// `extension_delta` is explicitly specified. Alternatively
-    /// [cfg_builder](Self::cfg_builder) may be used to infer it.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when building
-    /// the CFG node.
-    fn cfg_builder_exts(
-        &mut self,
-        inputs: impl IntoIterator<Item = (Type, Wire)>,
-        output_types: TypeRow,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<Type>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: TypeRow = input_types.into();
@@ -369,8 +342,7 @@ pub trait Dataflow: Container {
         let (cfg_node, _) = add_node_with_wires(
             self,
             ops::CFG {
-                signature: Signature::new(inputs.clone(), output_types.clone())
-                    .with_extension_delta(extension_delta),
+                signature: Signature::new(inputs.clone(), output_types.clone()),
             },
             input_wires,
         )?;
@@ -426,13 +398,13 @@ pub trait Dataflow: Container {
         let func_node = fid.node();
         let func_op = self.hugr().get_optype(func_node);
         let func_sig = match func_op {
-            OpType::FuncDefn(ops::FuncDefn { signature, .. })
-            | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
+            OpType::FuncDefn(fd) => fd.signature().clone(),
+            OpType::FuncDecl(fd) => fd.signature().clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: func_node,
                     op_desc: "FuncDecl/FuncDefn",
-                })
+                });
             }
         };
 
@@ -449,7 +421,6 @@ pub trait Dataflow: Container {
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
-    /// The extension delta will be inferred.
     ///
     /// # Errors
     ///
@@ -462,27 +433,6 @@ pub trait Dataflow: Container {
         inputs_outputs: impl IntoIterator<Item = (Type, Wire)>,
         just_out_types: TypeRow,
     ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
-        self.tail_loop_builder_exts(just_inputs, inputs_outputs, just_out_types, TO_BE_INFERRED)
-    }
-
-    /// Return a builder for a [`crate::ops::TailLoop`] node.
-    /// The `inputs` must be an iterable over pairs of the type of the input and
-    /// the corresponding wire.
-    /// The `output_types` are the types of the outputs.
-    /// `extension_delta` explicitly specified. Alternatively
-    /// [tail_loop_builder](Self::tail_loop_builder) may be used to infer it.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when building
-    /// the [`ops::TailLoop`] node.
-    fn tail_loop_builder_exts(
-        &mut self,
-        just_inputs: impl IntoIterator<Item = (Type, Wire)>,
-        inputs_outputs: impl IntoIterator<Item = (Type, Wire)>,
-        just_out_types: TypeRow,
-        extension_delta: impl Into<ExtensionSet>,
-    ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
         let (input_types, mut input_wires): (Vec<Type>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
@@ -493,7 +443,6 @@ pub trait Dataflow: Container {
             just_inputs: input_types.into(),
             just_outputs: just_out_types,
             rest: rest_types.into(),
-            extension_delta: extension_delta.into(),
         };
         // TODO: Make input extensions a parameter
         let (loop_node, _) = add_node_with_wires(self, tail_loop.clone(), input_wires)?;
@@ -507,7 +456,7 @@ pub trait Dataflow: Container {
     ///
     /// The `other_inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
-    /// The `output_types` are the types of the outputs. Extension delta will be inferred.
+    /// The `output_types` are the types of the outputs.
     ///
     /// # Errors
     ///
@@ -515,33 +464,9 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder(
         &mut self,
-        sum_input: (impl IntoIterator<Item = TypeRow>, Wire),
-        other_inputs: impl IntoIterator<Item = (Type, Wire)>,
-        output_types: TypeRow,
-    ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
-        self.conditional_builder_exts(sum_input, other_inputs, output_types, TO_BE_INFERRED)
-    }
-
-    /// Return a builder for a [`crate::ops::Conditional`] node.
-    /// `sum_rows` and `sum_wire` define the type of the Sum
-    /// variants and the wire carrying the Sum respectively.
-    ///
-    /// The `other_inputs` must be an iterable over pairs of the type of the input and
-    /// the corresponding wire.
-    /// The `output_types` are the types of the outputs.
-    /// `extension_delta` is explicitly specified. Alternatively
-    /// [conditional_builder](Self::conditional_builder) may be used to infer it.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when building
-    /// the Conditional node.
-    fn conditional_builder_exts(
-        &mut self,
         (sum_rows, sum_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
-        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
         let mut input_wires = vec![sum_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
@@ -558,7 +483,6 @@ pub trait Dataflow: Container {
                 sum_rows,
                 other_inputs: inputs,
                 outputs: output_types,
-                extension_delta: extension_delta.into(),
             },
             input_wires,
         )?;
@@ -624,7 +548,7 @@ pub trait Dataflow: Container {
         let make_op = self.add_dataflow_op(
             Tag {
                 tag,
-                variants: variants.into_iter().map(Into::into).collect_vec(),
+                variants: variants.into_iter().collect_vec(),
             },
             values.into_iter().collect_vec(),
         )?;
@@ -690,13 +614,13 @@ pub trait Dataflow: Container {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
         let type_scheme = match def_op {
-            OpType::FuncDefn(ops::FuncDefn { signature, .. })
-            | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
+            OpType::FuncDefn(fd) => fd.signature().clone(),
+            OpType::FuncDecl(fd) => fd.signature().clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),
                     op_desc: "FuncDecl/FuncDefn",
-                })
+                });
             }
         };
         let op: OpType = ops::Call::try_new(type_scheme, type_args)?.into();
@@ -714,6 +638,27 @@ pub trait Dataflow: Container {
     fn as_circuit(&mut self, wires: impl IntoIterator<Item = Wire>) -> CircuitBuilder<Self> {
         CircuitBuilder::new(wires, self)
     }
+
+    /// Add a [Barrier] to a set of wires and return them in the same order.
+    ///
+    /// [Barrier]: crate::extension::prelude::Barrier
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the Barrier node
+    /// or retrieving the type of the incoming wires.
+    fn add_barrier(
+        &mut self,
+        wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let wires = wires.into_iter().collect_vec();
+        let types: Result<Vec<Type>, _> =
+            wires.iter().map(|&wire| self.get_wire_type(wire)).collect();
+        let types = types?;
+        let barrier_op =
+            self.add_dataflow_op(crate::extension::prelude::Barrier::new(types), wires)?;
+        Ok(barrier_op)
+    }
 }
 
 /// Add a node to the graph, wiring up the `inputs` to the input ports of the resulting node.
@@ -729,7 +674,7 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     nodetype: impl Into<OpType>,
     inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let op = nodetype.into();
+    let op: OpType = nodetype.into();
     let num_outputs = op.value_output_count();
     let op_node = data_builder.add_child_node(op.clone());
 

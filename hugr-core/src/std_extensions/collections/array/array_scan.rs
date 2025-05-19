@@ -1,47 +1,56 @@
 //! Array scanning operation
 
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
 use itertools::Itertools;
 
+use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDef};
-use crate::ops::{ExtensionOp, NamedOp, OpName};
+use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
+use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
-use crate::Extension;
 
-use super::{array_type_def, instantiate_array, ARRAY_TYPENAME};
+use super::array_kind::ArrayKind;
 
 /// Name of the operation for the combined map/fold operation
 pub const ARRAY_SCAN_OP_ID: OpName = OpName::new_inline("scan");
 
-/// Definition of the array scan op.
+/// Definition of the array scan op. Generic over the concrete array implementation.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct ArrayScanDef;
+pub struct GenericArrayScanDef<AK: ArrayKind>(PhantomData<AK>);
 
-impl NamedOp for ArrayScanDef {
-    fn name(&self) -> OpName {
-        ARRAY_SCAN_OP_ID
+impl<AK: ArrayKind> GenericArrayScanDef<AK> {
+    /// Creates a new array scan operation definition.
+    #[must_use]
+    pub fn new() -> Self {
+        GenericArrayScanDef(PhantomData)
     }
 }
 
-impl FromStr for ArrayScanDef {
+impl<AK: ArrayKind> Default for GenericArrayScanDef<AK> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<AK: ArrayKind> FromStr for GenericArrayScanDef<AK> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == ArrayScanDef.name() {
-            Ok(Self)
+        if s == ARRAY_SCAN_OP_ID {
+            Ok(Self::new())
         } else {
             Err(())
         }
     }
 }
 
-impl ArrayScanDef {
+impl<AK: ArrayKind> GenericArrayScanDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition
     /// and a reference to the extension as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
@@ -51,32 +60,27 @@ impl ArrayScanDef {
             TypeBound::Any.into(),
             TypeBound::Any.into(),
             TypeParam::new_list(TypeBound::Any),
-            TypeParam::Extensions,
         ];
         let n = TypeArg::new_var_use(0, TypeParam::max_nat());
         let t1 = Type::new_var_use(1, TypeBound::Any);
         let t2 = Type::new_var_use(2, TypeBound::Any);
         let s = TypeRV::new_row_var_use(3, TypeBound::Any);
-        let es = ExtensionSet::type_var(4);
         PolyFuncTypeRV::new(
             params,
             FuncTypeBase::<RowVariable>::new(
                 vec![
-                    instantiate_array(array_def, n.clone(), t1.clone())
+                    AK::instantiate_ty(array_def, n.clone(), t1.clone())
                         .expect("Array type instantiation failed")
                         .into(),
-                    Type::new_function(
-                        FuncTypeBase::<RowVariable>::new(
-                            vec![t1.into(), s.clone()],
-                            vec![t2.clone().into(), s.clone()],
-                        )
-                        .with_extension_delta(es),
-                    )
+                    Type::new_function(FuncTypeBase::<RowVariable>::new(
+                        vec![t1.into(), s.clone()],
+                        vec![t2.clone().into(), s.clone()],
+                    ))
                     .into(),
                     s.clone(),
                 ],
                 vec![
-                    instantiate_array(array_def, n, t2)
+                    AK::instantiate_ty(array_def, n, t2)
                         .expect("Array type instantiation failed")
                         .into(),
                     s,
@@ -87,7 +91,11 @@ impl ArrayScanDef {
     }
 }
 
-impl MakeOpDef for ArrayScanDef {
+impl<AK: ArrayKind> MakeOpDef for GenericArrayScanDef<AK> {
+    fn opdef_id(&self) -> OpName {
+        ARRAY_SCAN_OP_ID
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized,
@@ -96,15 +104,15 @@ impl MakeOpDef for ArrayScanDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        self.signature_from_def(array_type_def())
+        self.signature_from_def(AK::type_def())
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&super::EXTENSION)
+        Arc::downgrade(AK::extension())
     }
 
     fn extension(&self) -> ExtensionId {
-        super::EXTENSION_ID
+        AK::EXTENSION_ID
     }
 
     fn description(&self) -> String {
@@ -115,8 +123,8 @@ impl MakeOpDef for ArrayScanDef {
             .into()
     }
 
-    /// Add an operation implemented as a [MakeOpDef], which can provide the data
-    /// required to define an [OpDef], to an extension.
+    /// Add an operation implemented as a [`MakeOpDef`], which can provide the data
+    /// required to define an [`OpDef`], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
     // computing the signature, to avoid recursive loops initializing the extension.
@@ -125,8 +133,8 @@ impl MakeOpDef for ArrayScanDef {
         extension: &mut Extension,
         extension_ref: &Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
-        let sig = self.signature_from_def(extension.get_type(&ARRAY_TYPENAME).unwrap());
-        let def = extension.add_op(self.name(), self.description(), sig, extension_ref)?;
+        let sig = self.signature_from_def(extension.get_type(&AK::TYPE_NAME).unwrap());
+        let def = extension.add_op(self.op_id(), self.description(), sig, extension_ref)?;
 
         self.post_opdef(def);
 
@@ -134,9 +142,9 @@ impl MakeOpDef for ArrayScanDef {
     }
 }
 
-/// Definition of the array scan op.
+/// Definition of the array scan op. Generic over the concrete array implementation.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ArrayScan {
+pub struct GenericArrayScan<AK: ArrayKind> {
     /// The element type of the input array.
     pub src_ty: Type,
     /// The target element type of the output array.
@@ -145,41 +153,33 @@ pub struct ArrayScan {
     pub acc_tys: Vec<Type>,
     /// Size of the array.
     pub size: u64,
-    /// The extensions required by the scan function.
-    pub extension_reqs: ExtensionSet,
+    _kind: PhantomData<AK>,
 }
 
-impl ArrayScan {
+impl<AK: ArrayKind> GenericArrayScan<AK> {
     /// Creates a new array scan op.
-    pub fn new(
-        src_ty: Type,
-        tgt_ty: Type,
-        acc_tys: Vec<Type>,
-        size: u64,
-        extension_reqs: ExtensionSet,
-    ) -> Self {
-        ArrayScan {
+    #[must_use]
+    pub fn new(src_ty: Type, tgt_ty: Type, acc_tys: Vec<Type>, size: u64) -> Self {
+        GenericArrayScan {
             src_ty,
             tgt_ty,
             acc_tys,
             size,
-            extension_reqs,
+            _kind: PhantomData,
         }
     }
 }
 
-impl NamedOp for ArrayScan {
-    fn name(&self) -> OpName {
-        ARRAY_SCAN_OP_ID
+impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
+    fn op_id(&self) -> OpName {
+        GenericArrayScanDef::<AK>::default().opdef_id()
     }
-}
 
-impl MakeExtensionOp for ArrayScan {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
-        let def = ArrayScanDef::from_def(ext_op.def())?;
+        let def = GenericArrayScanDef::<AK>::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
     }
 
@@ -191,34 +191,35 @@ impl MakeExtensionOp for ArrayScan {
             TypeArg::Sequence {
                 elems: self.acc_tys.clone().into_iter().map_into().collect(),
             },
-            TypeArg::Extensions {
-                es: self.extension_reqs.clone(),
-            },
         ]
     }
 }
 
-impl MakeRegisteredOp for ArrayScan {
+impl<AK: ArrayKind> MakeRegisteredOp for GenericArrayScan<AK> {
     fn extension_id(&self) -> ExtensionId {
-        super::EXTENSION_ID
+        AK::EXTENSION_ID
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&super::EXTENSION)
+        Arc::downgrade(AK::extension())
     }
 }
 
-impl HasDef for ArrayScan {
-    type Def = ArrayScanDef;
+impl<AK: ArrayKind> HasDef for GenericArrayScan<AK> {
+    type Def = GenericArrayScanDef<AK>;
 }
 
-impl HasConcrete for ArrayScanDef {
-    type Concrete = ArrayScan;
+impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
+    type Concrete = GenericArrayScan<AK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty: src_ty }, TypeArg::Type { ty: tgt_ty }, TypeArg::Sequence { elems: acc_tys }, TypeArg::Extensions { es }] =>
-            {
+            [
+                TypeArg::BoundedNat { n },
+                TypeArg::Type { ty: src_ty },
+                TypeArg::Type { ty: tgt_ty },
+                TypeArg::Sequence { elems: acc_tys },
+            ] => {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
                     .map(|acc_ty| match acc_ty {
@@ -226,12 +227,11 @@ impl HasConcrete for ArrayScanDef {
                         _ => Err(SignatureError::InvalidTypeArgs.into()),
                     })
                     .collect();
-                Ok(ArrayScan::new(
+                Ok(GenericArrayScan::new(
                     src_ty.clone(),
                     tgt_ty.clone(),
                     acc_tys?,
                     *n,
-                    es.clone(),
                 ))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
@@ -241,9 +241,11 @@ impl HasConcrete for ArrayScanDef {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
 
     use crate::extension::prelude::usize_t;
-    use crate::std_extensions::collections::array::{array_type, EXTENSION_ID};
+    use crate::std_extensions::collections::array::Array;
+    use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         extension::prelude::{bool_t, qb_t},
         ops::{OpTrait, OpType},
@@ -252,28 +254,25 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_scan_def() {
-        let op = ArrayScan::new(
-            bool_t(),
-            qb_t(),
-            vec![usize_t()],
-            2,
-            ExtensionSet::singleton(EXTENSION_ID),
-        );
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_scan_def<AK: ArrayKind>(#[case] _kind: AK) {
+        let op = GenericArrayScan::<AK>::new(bool_t(), qb_t(), vec![usize_t()], 2);
         let optype: OpType = op.clone().into();
-        let new_op: ArrayScan = optype.cast().unwrap();
+        let new_op: GenericArrayScan<AK> = optype.cast().unwrap();
         assert_eq!(new_op, op);
     }
 
-    #[test]
-    fn test_scan_map() {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_scan_map<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let src_ty = qb_t();
         let tgt_ty = bool_t();
-        let es = ExtensionSet::singleton(EXTENSION_ID);
 
-        let op = ArrayScan::new(src_ty.clone(), tgt_ty.clone(), vec![], size, es.clone());
+        let op = GenericArrayScan::<AK>::new(src_ty.clone(), tgt_ty.clone(), vec![], size);
         let optype: OpType = op.into();
         let sig = optype.dataflow_signature().unwrap();
 
@@ -281,32 +280,30 @@ mod tests {
             sig.io(),
             (
                 &vec![
-                    array_type(size, src_ty.clone()),
-                    Type::new_function(
-                        Signature::new(vec![src_ty], vec![tgt_ty.clone()]).with_extension_delta(es)
-                    )
+                    AK::ty(size, src_ty.clone()),
+                    Type::new_function(Signature::new(vec![src_ty], vec![tgt_ty.clone()]))
                 ]
                 .into(),
-                &vec![array_type(size, tgt_ty)].into(),
+                &vec![AK::ty(size, tgt_ty)].into(),
             )
         );
     }
 
-    #[test]
-    fn test_scan_accs() {
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    fn test_scan_accs<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let src_ty = qb_t();
         let tgt_ty = bool_t();
         let acc_ty1 = usize_t();
         let acc_ty2 = qb_t();
-        let es = ExtensionSet::singleton(EXTENSION_ID);
 
-        let op = ArrayScan::new(
+        let op = GenericArrayScan::<AK>::new(
             src_ty.clone(),
             tgt_ty.clone(),
             vec![acc_ty1.clone(), acc_ty2.clone()],
             size,
-            es.clone(),
         );
         let optype: OpType = op.into();
         let sig = optype.dataflow_signature().unwrap();
@@ -315,19 +312,16 @@ mod tests {
             sig.io(),
             (
                 &vec![
-                    array_type(size, src_ty.clone()),
-                    Type::new_function(
-                        Signature::new(
-                            vec![src_ty, acc_ty1.clone(), acc_ty2.clone()],
-                            vec![tgt_ty.clone(), acc_ty1.clone(), acc_ty2.clone()]
-                        )
-                        .with_extension_delta(es)
-                    ),
+                    AK::ty(size, src_ty.clone()),
+                    Type::new_function(Signature::new(
+                        vec![src_ty, acc_ty1.clone(), acc_ty2.clone()],
+                        vec![tgt_ty.clone(), acc_ty1.clone(), acc_ty2.clone()]
+                    )),
                     acc_ty1.clone(),
                     acc_ty2.clone()
                 ]
                 .into(),
-                &vec![array_type(size, tgt_ty), acc_ty1, acc_ty2].into(),
+                &vec![AK::ty(size, tgt_ty), acc_ty1, acc_ty2].into(),
             )
         );
     }

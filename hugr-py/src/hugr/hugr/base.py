@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
+from queue import Queue
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -14,10 +15,32 @@ from typing import (
     overload,
 )
 
+from typing_extensions import deprecated
+
+import hugr.model as model
+import hugr.ops as ops
 from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
+from hugr.envelope import (
+    EnvelopeConfig,
+    make_envelope,
+    make_envelope_str,
+    read_envelope_hugr,
+    read_envelope_hugr_str,
+)
 from hugr.exceptions import ParentBeforeChild
-from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
+from hugr.ops import (
+    CFG,
+    Call,
+    Conditional,
+    Const,
+    Custom,
+    DataflowOp,
+    FuncDefn,
+    IncompleteOp,
+    Module,
+    Op,
+)
 from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
 from hugr.val import Value
@@ -79,14 +102,24 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
     Examples:
         >>> h = Hugr()
-        >>> h.root_op()
+        >>> h.entrypoint_op()
         Module()
-        >>> h[h.root].op
+        >>> h[h.entrypoint].op
         Module()
+        >>> dfg_h = Hugr(ops.DFG([tys.Bool]))
+        >>> dfg_h[dfg_h.entrypoint].op
+        DFG(inputs=[Bool])
     """
 
-    #: Root node of the HUGR.
-    root: Node
+    # The module at the root of the HUGR.
+    module_root: Node
+    # Entrypoint node for the HUGR.
+    #
+    # Most traversals and rewrite operations start from this node.
+    #
+    # This node may be of any optype that's the parent to a region, and is a
+    # descendant of the module definition at the HUGR root (or the root itself).
+    entrypoint: Node
     # List of nodes, with None for deleted nodes.
     _nodes: list[NodeData | None]
     # Bidirectional map of links between ports.
@@ -94,11 +127,72 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     # List of free node indices, populated when nodes are deleted.
     _free_nodes: list[Node]
 
-    def __init__(self, root_op: OpVarCov | None = None) -> None:
+    def __init__(self, entrypoint_op: OpVarCov | None = None) -> None:
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
-        self.root = self._add_node(root_op or Module(), None, 0)
+        self.entrypoint = Node(0)
+        self.module_root = Node(0)
+
+        # The root of a HUGR is always a module.
+        self.module_root = self._add_node(Module(), None, 0)
+        self.entrypoint = self.module_root
+
+        unsupported_op_msg = (
+            f"Creating new HUGRs with entrypoint {entrypoint_op} is not supported"
+        )
+
+        # Depending on the entrypoint op, we may need to
+        # wrap nest it inside the root module.
+        match entrypoint_op:
+            case None | Module():
+                pass
+            case ops.FuncDefn():
+                self.entrypoint = self.add_node(entrypoint_op, self.module_root)
+            case _:
+                from hugr.build import Function
+
+                # Some operations are unsupported, as they require additional context to
+                # be valid (e.g. cfg blocks, case statements, etc.).
+                if not ops.is_dataflow_op(entrypoint_op):
+                    raise ValueError(unsupported_op_msg)
+                # Explicit type required to keep mypy happy
+                df_op: ops.DataflowOp = entrypoint_op
+
+                # Only region containers are allowed to be entrypoints
+                match df_op:
+                    case CFG() | Conditional():
+                        pass
+                    case _ if ops.is_df_parent_op(df_op):
+                        pass
+                    case _:
+                        raise ValueError(unsupported_op_msg)
+
+                inputs, outputs = None, None
+                try:
+                    sig = df_op.outer_signature()
+                    inputs = sig.input
+                    outputs = sig.output
+                except IncompleteOp:
+                    match df_op:
+                        case CFG():
+                            inputs = df_op.inputs
+                        case _:
+                            inputs = df_op._inputs()
+
+                parent_op = FuncDefn("main", inputs, [])
+                func = Function.new_nested(parent_op, self, self.module_root)
+
+                if outputs is not None:
+                    self.entrypoint = func.add_op(df_op, *func.inputs())
+                    func.set_outputs(*self.entrypoint.outputs())
+                else:
+                    # Connecting the entrypoint to the function's output is delayed
+                    # until `set_outputs` is called.
+                    # See `hugr._connect_df_entrypoint_outputs`.
+                    self.entrypoint = self.add_node(df_op, func)
+                    func._wire_up(self.entrypoint, func.inputs())
+                    df_op._entrypoint_requires_wiring = True
 
     def __getitem__(self, key: ToNode) -> NodeData:
         key = key.to_node()
@@ -126,7 +220,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return op
 
     def nodes(self) -> Iterable[tuple[Node, NodeData]]:
-        """Iterator over nodes of the hugr and their data."""
+        """Iterator over all the nodes of the hugr and their data.
+
+        To get the descendants of the entrypoint, use `descendants()`.
+        """
         return self.items()
 
     def links(self) -> Iterator[tuple[OutPort, InPort]]:
@@ -141,7 +238,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """The child nodes of a given `node`.
 
         Args:
-            node: Parent node. Defaults to the HUGR root.
+            node: Parent node. Defaults to the HUGR entrypoint.
 
         Returns:
             List of child nodes.
@@ -149,11 +246,33 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Examples:
             >>> h = Hugr()
             >>> n = h.add_node(ops.Const(val.TRUE))
-            >>> h.children(h.root)
+            >>> h.children(h.entrypoint)
             [Node(1)]
         """
-        node = node or self.root
+        node = node or self.entrypoint
         return self[node].children
+
+    def descendants(self, node: ToNode | None = None) -> Iterable[Node]:
+        """Iterator over all the descendants of the hugr entrypoint.
+
+        Traverses the HUGR graph in a breadth-first manner, starting from
+        the entrypoint.
+
+        To get all the nodes in the HUGR, use `nodes()`.
+
+        Args:
+            node: Parent node. Defaults to the HUGR entrypoint.
+
+        Returns:
+            List of child nodes.
+        """
+        queue: Queue[Node] = Queue()
+        queue.put(node.to_node() if node is not None else self.entrypoint)
+        while not queue.empty():
+            node = queue.get()
+            yield node
+            for child in self.children(node):
+                queue.put(child)
 
     def _add_node(
         self,
@@ -174,6 +293,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         node = replace(node, _num_out_ports=num_outs, _metadata=node_data.metadata)
         if parent:
             self[parent].children.append(node)
+
+        self._update_node_outs(node, num_outs)
         return node
 
     def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
@@ -207,6 +328,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 pos = self[parent].children.index(node)
                 self[parent].children[pos] = node
 
+        if node.idx == self.entrypoint.idx:
+            self.entrypoint = node
+        if node.idx == self.module_root.idx:
+            self.module_root = node
+
         return node
 
     def add_node(
@@ -220,7 +346,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         Args:
             op: Operation of the node.
-            parent: Parent node of added node. Defaults to HUGR root if None.
+            parent: Parent node of added node. Defaults to HUGR entrypoint if None.
             num_outs: Number of output ports expected for this node. Defaults to None.
             metadata: A dictionary of metadata to associate with the node.
                 Defaults to None.
@@ -228,7 +354,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Returns:
             Handle to the added node.
         """
-        parent = parent or self.root
+        parent = parent or self.entrypoint
         return self._add_node(op, parent, num_outs, metadata)
 
     def add_const(
@@ -241,7 +367,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         Args:
             value: Value of the constant.
-            parent: Parent node of added node. Defaults to HUGR root if None.
+            parent: Parent node of added node. Defaults to HUGR entrypoint if None.
             metadata: A dictionary of metadata to associate with the node.
                 Defaults to None.
 
@@ -278,10 +404,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         parent = self[node].parent
         if parent:
             self[parent].children.remove(node)
-        for offset in range(self.num_in_ports(node)):
-            self._links.delete_right(_SubPort(node.inp(offset)))
-        for offset in range(self.num_out_ports(node)):
-            self._links.delete_left(_SubPort(node.out(offset)))
+        for inp, _ in self.incoming_links(node):
+            self._links.delete_right(_SubPort(inp))
+        for out, _ in self.outgoing_links(node):
+            self._links.delete_left(_SubPort(out))
 
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
 
@@ -333,7 +459,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df = dfg.Dfg(tys.Bool)
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
             >>> list(df.hugr.linked_ports(df.input_node[0]))
-            [InPort(Node(2), 0)]
+            [InPort(Node(6), 0)]
         """
         src_sub = self._unused_sub_offset(src)
         dst_sub = self._unused_sub_offset(dst)
@@ -343,6 +469,24 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         self[src.node]._num_outs = max(self[src.node]._num_outs, src.offset + 1)
         self[dst.node]._num_inps = max(self[dst.node]._num_inps, dst.offset + 1)
+
+    def add_order_link(self, src: ToNode, dst: ToNode) -> None:
+        """Add a state order link between two nodes.
+
+        Args:
+            src: Source node.
+            dst: Destination node.
+
+        Examples:
+            >>> df = dfg.Dfg()
+            >>> df.hugr.add_order_link(df.input_node, df.output_node)
+            >>> list(df.hugr.outgoing_order_links(df.input_node))
+            [Node(6)]
+        """
+        source = src.out(-1)
+        target = dst.inp(-1)
+        if not self.has_link(source, target):
+            self.add_link(source, target)
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
         """Delete a link (edge) between two nodes from the HUGR.
@@ -360,15 +504,15 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             return
         # TODO make sure sub-offset is handled correctly
 
-    def root_op(self) -> OpVarCov:
+    def entrypoint_op(self) -> OpVarCov:
         """The operation of the root node.
 
         Examples:
             >>> h = Hugr()
-            >>> h.root_op()
+            >>> h.entrypoint_op()
             Module()
         """
-        return cast(OpVarCov, self[self.root].op)
+        return cast("OpVarCov", self[self.entrypoint].op)
 
     def num_nodes(self) -> int:
         """The number of nodes in the HUGR.
@@ -440,7 +584,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df = dfg.Dfg(tys.Bool)
             >>> df.set_outputs(df.input_node[0])
             >>> list(df.hugr.linked_ports(df.input_node[0]))
-            [InPort(Node(2), 0)]
+            [InPort(Node(6), 0)]
 
         """
         match port:
@@ -462,7 +606,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df = dfg.Dfg()
             >>> df.add_state_order(df.input_node, df.output_node)
             >>> list(df.hugr.outgoing_order_links(df.input_node))
-            [Node(2)]
+            [Node(6)]
         """
         return (p.node for p in self.linked_ports(node.out(-1)))
 
@@ -477,7 +621,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df = dfg.Dfg()
             >>> df.add_state_order(df.input_node, df.output_node)
             >>> list(df.hugr.incoming_order_links(df.output_node))
-            [Node(1)]
+            [Node(5)]
         """
         return (p.node for p in self.linked_ports(node.inp(-1)))
 
@@ -490,7 +634,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             return
         # iterate over known offsets
         for offset in range(self.num_ports(node, direction)):
-            port = cast(P, node.port(offset, direction))
+            port = cast("P", node.port(offset, direction))
             yield port, list(self._linked_ports(port, links))
 
     def outgoing_links(self, node: ToNode) -> Iterable[tuple[OutPort, list[InPort]]]:
@@ -508,7 +652,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
             >>> list(df.hugr.outgoing_links(df.input_node))
-            [(OutPort(Node(1), 0), [InPort(Node(2), 0), InPort(Node(2), 1)])]
+            [(OutPort(Node(5), 0), [InPort(Node(6), 0), InPort(Node(6), 1)])]
         """
         return self._node_links(node, self._links.fwd)
 
@@ -527,7 +671,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
             >>> list(df.hugr.incoming_links(df.output_node))
-            [(InPort(Node(2), 0), [OutPort(Node(1), 0)]), (InPort(Node(2), 1), [OutPort(Node(1), 0)])]
+            [(InPort(Node(6), 0), [OutPort(Node(5), 0)]), (InPort(Node(6), 1), [OutPort(Node(5), 0)])]
         """  # noqa: E501
         return self._node_links(node, self._links.bck)
 
@@ -584,7 +728,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return None
 
     def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
-        """Insert a HUGR into this HUGR.
+        """Insert a HUGR entrypoint and all its descendants into this HUGR.
+
+        If the inserted HUGR entrypoint was not its module root, some nodes will
+        be ignored.
 
         Args:
             hugr: HUGR to insert.
@@ -598,16 +745,19 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> d = dfg.Dfg()
             >>> h = Hugr()
             >>> h.insert_hugr(d.hugr)
-            {Node(0): Node(1), Node(1): Node(2), Node(2): Node(3)}
+            {Node(4): Node(1), Node(5): Node(2), Node(6): Node(3)}
         """
         mapping: dict[Node, Node] = {}
 
-        for node, node_data in hugr.nodes():
+        for node in hugr.descendants():
+            node_data = hugr[node]
             # relies on parents being inserted before any children
-            try:
-                node_parent = mapping[node_data.parent] if node_data.parent else parent
-            except KeyError as e:
-                raise ParentBeforeChild from e
+            if node == hugr.entrypoint:
+                node_parent = parent
+            else:
+                if node_data.parent not in mapping:
+                    raise ParentBeforeChild
+                node_parent = mapping[node_data.parent]
             mapping[node] = self.add_node(
                 node_data.op,
                 node_parent,
@@ -616,6 +766,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             )
 
         for src, dst in hugr._links.items():
+            # Neighbours that are not descendants of the entrypoint are ignored.
+            if src.port.node not in mapping or dst.port.node not in mapping:
+                continue
             self.add_link(
                 mapping[src.port.node].out(src.port.offset),
                 mapping[dst.port.node].inp(dst.port.offset),
@@ -624,7 +777,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
     def _to_serial(self) -> SerialHugr:
         """Serialize the HUGR."""
-        node_it = (node for node in self._nodes if node is not None)
 
         def _serialize_link(
             link: tuple[_SO, _SI],
@@ -633,11 +785,26 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             s, d = self._constrain_offset(src.port), self._constrain_offset(dst.port)
             return (src.port.node.idx, s), (dst.port.node.idx, d)
 
-        return SerialHugr(
+        nodes: list[SerialOp] = []
+        metadata = []
+        entrypoint = 0
+        for node_idx, data in enumerate(self._nodes):
+            if data is None:
+                continue
+            node = Node(node_idx)
+            serial_idx = len(nodes)
+
             # non contiguous indices will be erased
-            nodes=[node._to_serial(Node(idx, {})) for idx, node in enumerate(node_it)],
+            nodes.append(data._to_serial(Node(serial_idx, {})))
+            metadata.append(data.metadata if data.metadata else None)
+            if self.entrypoint == node:
+                entrypoint = serial_idx
+
+        return SerialHugr(
+            nodes=nodes,
             edges=[_serialize_link(link) for link in self._links.items()],
-            metadata=[node.metadata if node.metadata else None for node in node_it],
+            metadata=metadata,
+            entrypoint=entrypoint,
         )
 
     def _constrain_offset(self, p: P) -> PortOffset:
@@ -661,16 +828,30 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 self[node].op = op.resolve(registry)
         return self
 
+    def _connect_df_entrypoint_outputs(self) -> None:
+        """If this Hugr was created by wrapping a dataflow operation entrypoint in a
+        function, connect the entrypoint outputs to the function outputs.
+
+        See `hugr.__init__` for more details.
+        """
+        from hugr.build import Function
+
+        if not isinstance(self.entrypoint_op(), DataflowOp):
+            return
+
+        func_node = self[self.entrypoint].parent
+        assert func_node is not None, "Only module entrypoints may be HUGR roots"
+        func_op = self[func_node].op
+        if not isinstance(func_op, FuncDefn) or func_op._outputs is not None:
+            return
+
+        func = Function._new_existing(self, func_node)
+        func.set_outputs(*self.entrypoint.outputs())
+
     @classmethod
     def _from_serial(cls, serial: SerialHugr) -> Hugr:
         """Load a HUGR from a serialized form."""
-        assert serial.nodes, "Empty Hugr is invalid"
-
-        hugr = Hugr.__new__(Hugr)
-        hugr._nodes = []
-        hugr._links = BiMap()
-        hugr._free_nodes = []
-        hugr.root = Node(0)
+        assert serial.nodes, "The encoded Hugr is empty"
 
         def get_meta(idx: int) -> dict[str, Any]:
             if not serial.metadata:
@@ -679,18 +860,36 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 return serial.metadata[idx] or {}
             return {}
 
+        # The first node is always the HUGR root.
+        root_node = serial.nodes[0]
+        assert (
+            root_node.root.parent == 0
+        ), "The encoded Hugr root must be the first node"
+        root_op = root_node.root.deserialize()
+        hugr = Hugr(root_op)
+        hugr[hugr.entrypoint].metadata = get_meta(0)
+        # In older versions, this may not be a module operation. If that's the
+        # case, we rely on hugr's initializer to wrap the root in a module
+        # and ignore the boilerplate nodes.
+        boilerplate_nodes = hugr.num_nodes() - 1
+
         for idx, serial_node in enumerate(serial.nodes):
+            if idx == 0:
+                continue
+
             node_meta = get_meta(idx)
             parent: Node | None = Node(serial_node.root.parent)
-            if serial_node.root.parent == idx:
-                hugr.root = Node(idx, _metadata=node_meta)
-                parent = None
 
             serial_node.root.parent = -1
             n = hugr._add_node(
                 serial_node.root.deserialize(), parent, metadata=node_meta
             )
-            assert n.idx == idx, "Nodes should be added contiguously"
+            assert (
+                n.idx == idx + boilerplate_nodes
+            ), "Nodes should be added contiguously"
+
+            if idx == serial.entrypoint:
+                hugr.entrypoint = n
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
             if src_offset is None or dst_offset is None:
@@ -702,13 +901,83 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         return hugr
 
+    @staticmethod
+    def from_bytes(envelope: bytes) -> Hugr:
+        """Deserialize a byte string to a Hugr object.
+
+        Some envelope formats can be read from a string. See :meth:`from_str`.
+
+        Args:
+            envelope: The byte string representing a Hugr envelope.
+
+        Returns:
+            The deserialized Hugr object.
+
+        Raises:
+            ValueError: If the envelope does not contain exactly one module.
+        """
+        return read_envelope_hugr(envelope)
+
+    @staticmethod
+    def from_str(envelope: str) -> Hugr:
+        """Deserialize a string to a Hugr object.
+
+        Not all envelope formats can be read from a string.
+        See :meth:`from_bytes` for a more general method.
+
+        Args:
+            envelope: The string representing a Hugr envelope.
+
+        Returns:
+            The deserialized Hugr object.
+
+        Raises:
+            ValueError: If the envelope does not contain exactly one module.
+        """
+        return read_envelope_hugr_str(envelope)
+
+    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+        """Serialize the HUGR into an envelope byte string.
+
+        Some envelope formats can be encoded into a string. See :meth:`to_str`.
+        """
+        config = config or EnvelopeConfig.BINARY
+        return make_envelope(self, config)
+
+    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+        """Serialize the package to a HUGR envelope string.
+
+        Not all envelope formats can be encoded into a string.
+        See :meth:`to_bytes` for a more general method.
+        """
+        config = config or EnvelopeConfig.TEXT
+        return make_envelope_str(self, config)
+
+    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:
-        """Serialize the HUGR to a JSON string."""
+        """Serialize the HUGR to a JSON string.
+
+        For most use cases, it is recommended to store a HUGR package instead.
+        See :meth:`hugr.package.Package.to_bytes`.
+        """
         return self._to_serial().to_json()
 
+    def to_model(self) -> model.Module:
+        """Export this module into the hugr model format."""
+        from hugr.model.export import ModelExport
+
+        export = ModelExport(self)
+        region = export.export_region_module(self.module_root)
+        return model.Module(region)
+
     @classmethod
+    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def load_json(cls, json_str: str) -> Hugr:
-        """Deserialize a JSON string into a HUGR."""
+        """Deserialize a JSON string into a HUGR.
+
+        For most use cases, it is recommended to use package serialization instead.
+        See :meth:`hugr.package.Package.from_bytes`.
+        """
         json_dict = json.loads(json_str)
         serial = SerialHugr.load_json(json_dict)
         return cls._from_serial(serial)

@@ -2,25 +2,25 @@
 
 use std::sync::{Arc, Weak};
 
-use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
+use super::int_types::{LOG_WIDTH_TYPE_PARAM, get_log_width, int_tv};
 use crate::extension::prelude::{bool_t, sum_with_error};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
 use crate::extension::{CustomValidator, OpDef, SignatureFunc, ValidateJustArgs};
+use crate::ops::OpName;
 use crate::ops::custom::ExtensionOp;
-use crate::ops::{NamedOp, OpName};
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
 use crate::{
-    extension::{ExtensionId, ExtensionSet, SignatureError},
-    types::{type_param::TypeArg, Type},
     Extension,
+    extension::{ExtensionId, SignatureError},
+    types::{Type, type_param::TypeArg},
 };
 
 use lazy_static::lazy_static;
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 mod const_fold;
 
@@ -100,12 +100,15 @@ pub enum IntOpDef {
 }
 
 impl MakeOpDef for IntOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -221,7 +224,7 @@ impl MakeOpDef for IntOpDef {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
@@ -252,7 +255,6 @@ lazy_static! {
     /// Extension for basic integer operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(ExtensionSet::singleton(super::int_types::EXTENSION_ID));
             IntOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
@@ -285,31 +287,33 @@ pub struct ConcreteIntOp {
     pub def: IntOpDef,
     /// The width parameters of the int op. These are interpreted differently,
     /// depending on `def`. The types of inputs and outputs of the op will have
-    /// [int_type]s of these widths.
+    /// [`int_type`]s of these widths.
     ///
-    /// [int_type]: crate::std_extensions::arithmetic::int_types::int_type
+    /// [`int_type`]: crate::std_extensions::arithmetic::int_types::int_type
     pub log_widths: Vec<u8>,
 }
 
-impl NamedOp for ConcreteIntOp {
-    fn name(&self) -> OpName {
-        self.def.name()
-    }
-}
 impl MakeExtensionOp for ConcreteIntOp {
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
+    }
+
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = IntOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        self.log_widths.iter().map(|&n| (n as u64).into()).collect()
+        self.log_widths
+            .iter()
+            .map(|&n| u64::from(n).into())
+            .collect()
     }
 }
 
 impl MakeRegisteredOp for ConcreteIntOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -318,24 +322,27 @@ impl MakeRegisteredOp for ConcreteIntOp {
 }
 
 impl IntOpDef {
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires no
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires no
     /// integer widths set.
+    #[must_use]
     pub fn without_log_width(self) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
             log_widths: vec![],
         }
     }
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires one
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires one
     /// integer width set.
+    #[must_use]
     pub fn with_log_width(self, log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
             log_widths: vec![log_width],
         }
     }
-    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires two
+    /// Initialize a [`ConcreteIntOp`] from a [`IntOpDef`] which requires two
     /// integer widths set.
+    #[must_use]
     pub fn with_two_log_widths(self, first_log_width: u8, second_log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
             def: self,
@@ -377,7 +384,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
+            &Signature::new(int_type(3), int_type(4))
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -386,7 +393,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
+            &Signature::new_endo(int_type(3))
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -396,7 +403,6 @@ mod test {
                 .signature()
                 .as_ref(),
             &Signature::new(int_type(3), sum_ty_with_err(int_type(3)))
-                .with_extension_delta(EXTENSION_ID)
         );
         assert!(
             IntOpDef::iwiden_u
@@ -414,13 +420,14 @@ mod test {
                 .signature()
                 .as_ref(),
             &Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
-                .with_extension_delta(EXTENSION_ID)
         );
 
-        assert!(IntOpDef::inarrow_u
-            .with_two_log_widths(1, 2)
-            .to_extension_op()
-            .is_none());
+        assert!(
+            IntOpDef::inarrow_u
+                .with_two_log_widths(1, 2)
+                .to_extension_op()
+                .is_none()
+        );
     }
 
     #[rstest]
@@ -433,9 +440,9 @@ mod test {
     #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
     #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
     #[should_panic(expected = "too large to be converted to signed")]
-    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u32::MAX as u64], &[], 5)]
+    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u64::from(u32::MAX)], &[], 5)]
     #[should_panic(expected = "Cannot convert negative integer")]
-    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[(0u32.wrapping_sub(42)) as u64], &[], 5)]
+    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[u64::from(0u32.wrapping_sub(42))], &[], 5)]
     fn int_fold(
         #[case] op: ConcreteIntOp,
         #[case] inputs: &[u64],

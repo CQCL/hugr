@@ -1,0 +1,115 @@
+{
+  "version": "0.1.0",
+  "name": "collections.static_array",
+  "types": {
+    "static_array": {
+      "extension": "collections.static_array",
+      "name": "static_array",
+      "params": [
+        {
+          "tp": "Type",
+          "b": "C"
+        }
+      ],
+      "description": "Fixed-length constant array",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    }
+  },
+  "operations": {
+    "get": {
+      "extension": "collections.static_array",
+      "name": "get",
+      "description": "Get an element from a static array",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.static_array",
+              "id": "static_array",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "len": {
+      "extension": "collections.static_array",
+      "name": "len",
+      "description": "Get the length of a static array",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.static_array",
+              "id": "static_array",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "I"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

@@ -1,13 +1,76 @@
 {
   "version": "0.1.0",
   "name": "arithmetic.conversions",
-  "runtime_reqs": [
-    "arithmetic.float.types",
-    "arithmetic.int.types"
-  ],
   "types": {},
-  "values": {},
   "operations": {
+    "bytecast_float64_to_int64": {
+      "extension": "arithmetic.conversions",
+      "name": "bytecast_float64_to_int64",
+      "description": "reinterpret an float64 as an int based on its bytes, with the same endianness",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "bytecast_int64_to_float64": {
+      "extension": "arithmetic.conversions",
+      "name": "bytecast_int64_to_float64",
+      "description": "reinterpret an int64 as a float64 based on its bytes, with the same endianness",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "convert_s": {
       "extension": "arithmetic.conversions",
       "name": "convert_s",
@@ -46,8 +109,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -90,8 +152,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -123,8 +184,7 @@
               ],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -154,8 +214,7 @@
               ],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -187,8 +246,7 @@
               "s": "Unit",
               "size": 2
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -231,8 +289,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -275,8 +332,7 @@
               "args": [],
               "bound": "C"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -306,8 +362,7 @@
             {
               "t": "I"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -367,8 +422,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -428,8 +482,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

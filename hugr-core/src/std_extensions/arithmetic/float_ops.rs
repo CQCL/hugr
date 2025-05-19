@@ -2,17 +2,18 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use super::float_types::float64_type;
 use crate::{
+    Extension,
     extension::{
+        ExtensionId, OpDef, SignatureFunc,
         prelude::{bool_t, string_type},
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
-        ExtensionId, ExtensionSet, OpDef, SignatureFunc,
     },
+    ops::OpName,
     types::Signature,
-    Extension,
 };
 use lazy_static::lazy_static;
 mod const_fold;
@@ -48,12 +49,16 @@ pub enum FloatOps {
 }
 
 impl MakeOpDef for FloatOps {
+    fn opdef_id(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
+
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -103,7 +108,7 @@ impl MakeOpDef for FloatOps {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        const_fold::set_fold(self, def)
+        const_fold::set_fold(self, def);
     }
 }
 
@@ -111,7 +116,6 @@ lazy_static! {
     /// Extension for basic float operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_requirements(ExtensionSet::singleton(super::int_types::EXTENSION_ID));
             FloatOps::load_all_ops(extension, extension_ref).unwrap();
         })
     };
@@ -119,7 +123,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for FloatOps {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -180,9 +184,7 @@ mod test {
 
             assert!(
                 res_val.abs_diff_eq(expected, f64::EPSILON),
-                "expected {:?}, got {:?}",
-                expected,
-                res_val
+                "expected {expected:?}, got {res_val:?}"
             );
         }
     }

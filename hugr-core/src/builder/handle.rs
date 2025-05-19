@@ -1,6 +1,6 @@
 //! Handles to nodes in HUGR used during the building phase.
-use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle};
 use crate::ops::OpTag;
+use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle};
 use crate::utils::collect_array;
 use crate::{Node, OutgoingPort, Wire};
 
@@ -106,6 +106,7 @@ impl Outputs {
     /// # Panics
     ///
     /// If the length of the slice is not equal to `N`.
+    #[must_use]
     pub fn to_array<const N: usize>(self) -> [Wire; N] {
         collect_array(self)
     }

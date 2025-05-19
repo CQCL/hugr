@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
+import hugr.model as model
 from hugr import tys, val
 from hugr.std import _load_extension
 from hugr.utils import comma_sep_str
@@ -52,7 +54,7 @@ class Array(tys.ExtType):
         return None
 
     def type_bound(self) -> tys.TypeBound:
-        return self.ty.type_bound()
+        return tys.TypeBound.Any
 
 
 @dataclass
@@ -79,3 +81,13 @@ class ArrayVal(val.ExtensionValue):
 
     def __str__(self) -> str:
         return f"array({comma_sep_str(self.v)})"
+
+    def to_model(self) -> model.Term:
+        return model.Apply(
+            "collections.array.const",
+            [
+                model.Literal(len(self.v)),
+                cast(model.Term, self.ty.ty.to_model()),
+                model.List([value.to_model() for value in self.v]),
+            ],
+        )

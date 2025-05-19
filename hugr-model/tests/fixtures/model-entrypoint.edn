@@ -1,0 +1,35 @@
+(hugr 0)
+
+(mod)
+
+(define-func main
+  (core.fn [] [])
+  (meta core.entrypoint)
+  (dfg [] []
+    (signature (core.fn [] []))))
+
+(mod)
+
+(define-func wrapper_dfg
+  (core.fn [] [])
+  (dfg [] []
+    (signature (core.fn [] []))
+    (meta core.entrypoint)))
+
+(mod)
+
+(define-func wrapper_cfg
+  (core.fn [] [])
+  (dfg [] []
+    (signature (core.fn [] []))
+    (cfg [] []
+      (signature (core.fn [] []))
+      (cfg [%entry] [%exit]
+        (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+        (meta core.entrypoint)
+        (block [%entry] [%exit]
+          (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+          (dfg [] [%value]
+            (signature (core.fn [] [(core.adt [[]])]))
+            ((core.make_adt _ _ 0) [] [%value]
+              (signature (core.fn [] [(core.adt [[]])])))))))))

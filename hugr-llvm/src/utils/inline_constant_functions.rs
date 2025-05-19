@@ -1,25 +1,25 @@
 use hugr_core::{
-    hugr::hugrmut::HugrMut,
+    HugrView, Node, NodeIndex as _,
+    hugr::{hugrmut::HugrMut, internal::HugrMutInternals},
     ops::{FuncDefn, LoadFunction, Value},
     types::PolyFuncType,
-    HugrView, Node, NodeIndex as _,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 
 fn const_fn_name(konst_n: Node) -> String {
     format!("const_fun_{}", konst_n.index())
 }
 
-pub fn inline_constant_functions(hugr: &mut impl HugrMut) -> Result<()> {
+pub fn inline_constant_functions(hugr: &mut impl HugrMut<Node = Node>) -> Result<()> {
     while inline_constant_functions_impl(hugr)? {}
     Ok(())
 }
 
-fn inline_constant_functions_impl(hugr: &mut impl HugrMut) -> Result<bool> {
+fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Result<bool> {
     let mut const_funs = vec![];
 
-    for n in hugr.nodes() {
+    for n in hugr.entry_descendants() {
         let konst_hugr = {
             let Some(konst) = hugr.get_optype(n).as_const() else {
                 continue;
@@ -27,11 +27,11 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut) -> Result<bool> {
             let Value::Function { hugr } = konst.value() else {
                 continue;
             };
-            let optype = hugr.get_optype(hugr.root());
+            let optype = hugr.get_optype(hugr.entrypoint());
             if !optype.is_dfg() && !optype.is_func_defn() {
                 bail!(
                     "Constant function has unsupported root: {:?}",
-                    hugr.get_optype(hugr.root())
+                    hugr.get_optype(hugr.entrypoint())
                 )
             }
             hugr.clone()
@@ -51,7 +51,7 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut) -> Result<bool> {
 
     let mut any_changes = false;
 
-    for (konst_n, func_hugr, load_constant_ns) in const_funs {
+    for (konst_n, mut func_hugr, load_constant_ns) in const_funs {
         if !load_constant_ns.is_empty() {
             let polysignature: PolyFuncType = func_hugr
                 .inner_function_type()
@@ -61,15 +61,19 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut) -> Result<bool> {
                 ))?
                 .into_owned()
                 .into();
-            let func_defn = FuncDefn {
-                name: const_fn_name(konst_n),
-                signature: polysignature.clone(),
-            };
-            let func_node = hugr.add_node_with_parent(hugr.root(), func_defn);
-            hugr.insert_hugr(func_node, func_hugr);
+            let func_defn = FuncDefn::new(const_fn_name(konst_n), polysignature.clone());
+            func_hugr.replace_op(func_hugr.entrypoint(), func_defn);
+            let func_node = hugr
+                .insert_hugr(hugr.entrypoint(), func_hugr)
+                .inserted_entrypoint;
+            hugr.set_num_ports(func_node, 0, 1);
 
             for lcn in load_constant_ns {
-                hugr.replace_op(lcn, LoadFunction::try_new(polysignature.clone(), [])?)?;
+                hugr.replace_op(lcn, LoadFunction::try_new(polysignature.clone(), [])?);
+
+                let src_port = hugr.node_outputs(func_node).next().unwrap();
+                let tgt_port = hugr.node_inputs(lcn).next().unwrap();
+                hugr.connect(func_node, src_port, lcn, tgt_port);
             }
             any_changes = true;
         }
@@ -81,6 +85,7 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut) -> Result<bool> {
 #[cfg(test)]
 mod test {
     use hugr_core::{
+        Hugr, HugrView, Wire,
         builder::{
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
@@ -88,7 +93,6 @@ mod test {
         extension::prelude::qb_t,
         ops::{CallIndirect, Const, Value},
         types::Signature,
-        Hugr, HugrView, Wire,
     };
 
     use super::inline_constant_functions;
@@ -131,10 +135,11 @@ mod test {
         };
 
         inline_constant_functions(&mut hugr).unwrap();
+        hugr.validate().unwrap();
 
-        for n in hugr.nodes() {
+        for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
-                assert!(!matches!(konst.value(), Value::Function { .. }))
+                assert!(!matches!(konst.value(), Value::Function { .. }));
             }
         }
     }
@@ -180,10 +185,11 @@ mod test {
         };
 
         inline_constant_functions(&mut hugr).unwrap();
+        hugr.validate().unwrap();
 
-        for n in hugr.nodes() {
+        for n in hugr.entry_descendants() {
             if let Some(konst) = hugr.get_optype(n).as_const() {
-                assert!(!matches!(konst.value(), Value::Function { .. }))
+                assert!(!matches!(konst.value(), Value::Function { .. }));
             }
         }
     }

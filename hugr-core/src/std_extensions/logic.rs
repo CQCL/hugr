@@ -2,22 +2,22 @@
 
 use std::sync::{Arc, Weak};
 
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
-use crate::ops::Value;
+use crate::ops::{OpName, Value};
 use crate::types::Signature;
 use crate::{
+    Extension, IncomingPort,
     extension::{
-        prelude::bool_t,
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, OpDef, SignatureFunc,
+        prelude::bool_t,
+        simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name},
     },
     ops,
     types::type_param::TypeArg,
     utils::sorted_consts,
-    Extension, IncomingPort,
 };
 use lazy_static::lazy_static;
 /// Name of extension false value.
@@ -77,6 +77,10 @@ pub enum LogicOp {
 }
 
 impl MakeOpDef for LogicOp {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
             LogicOp::And | LogicOp::Or | LogicOp::Eq | LogicOp::Xor => {
@@ -107,7 +111,7 @@ impl MakeOpDef for LogicOp {
     }
 
     fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
@@ -124,13 +128,6 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 fn extension() -> Arc<Extension> {
     Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
         LogicOp::load_all_ops(extension, extension_ref).unwrap();
-
-        extension
-            .add_value(FALSE_NAME, ops::Value::false_val())
-            .unwrap();
-        extension
-            .add_value(TRUE_NAME, ops::Value::true_val())
-            .unwrap();
     })
 }
 
@@ -141,7 +138,7 @@ lazy_static! {
 
 impl MakeRegisteredOp for LogicOp {
     fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
+        EXTENSION_ID.clone()
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -172,14 +169,11 @@ fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
 pub(crate) mod test {
     use std::sync::Arc;
 
-    use super::{extension, LogicOp, FALSE_NAME, TRUE_NAME};
+    use super::{LogicOp, extension};
     use crate::{
-        extension::{
-            prelude::bool_t,
-            simple_op::{MakeOpDef, MakeRegisteredOp},
-        },
-        ops::{NamedOp, Value},
         Extension,
+        extension::simple_op::{MakeOpDef, MakeRegisteredOp},
+        ops::Value,
     };
 
     use rstest::rstest;
@@ -193,7 +187,7 @@ pub(crate) mod test {
 
         for op in LogicOp::iter() {
             assert_eq!(
-                LogicOp::from_def(r.get_op(&op.name()).unwrap(),).unwrap(),
+                LogicOp::from_def(r.get_op(op.into()).unwrap(),).unwrap(),
                 op
             );
         }
@@ -204,18 +198,6 @@ pub(crate) mod test {
         for o in LogicOp::iter() {
             let ext_op = o.to_extension_op().unwrap();
             assert_eq!(LogicOp::from_op(&ext_op).unwrap(), o);
-        }
-    }
-
-    #[test]
-    fn test_values() {
-        let r: Arc<Extension> = extension();
-        let false_val = r.get_value(&FALSE_NAME).unwrap();
-        let true_val = r.get_value(&TRUE_NAME).unwrap();
-
-        for v in [false_val, true_val] {
-            let simpl = v.typed_value().get_type();
-            assert_eq!(simpl, bool_t());
         }
     }
 

@@ -2,7 +2,7 @@
 
 use clap::Parser as _;
 
-use hugr_cli::{mermaid, validate, CliArgs};
+use hugr_cli::{CliArgs, mermaid, validate};
 
 use clap_verbosity_flag::log::Level;
 
@@ -22,7 +22,7 @@ fn main() {
             eprintln!("Unknown command");
             std::process::exit(1);
         }
-    };
+    }
 }
 
 /// Run the `validate` subcommand.
@@ -31,7 +31,7 @@ fn run_validate(mut args: validate::ValArgs) {
 
     if let Err(e) = result {
         if args.verbosity(Level::Error) {
-            eprintln!("{}", e);
+            eprintln!("{e}");
         }
         std::process::exit(1);
     }
@@ -42,8 +42,8 @@ fn run_mermaid(mut args: mermaid::MermaidArgs) {
     let result = args.run_print();
 
     if let Err(e) = result {
-        if args.hugr_args.verbosity(Level::Error) {
-            eprintln!("{}", e);
+        if args.other_args.verbosity(Level::Error) {
+            eprintln!("{e}");
         }
         std::process::exit(1);
     }

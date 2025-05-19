@@ -1,6 +1,6 @@
 [package]
 name = "hugr-llvm"
-version = "0.14.3"
+version = "0.20.0"
 description = "A general and extensible crate for lowering HUGRs into LLVM IR"
 
 edition.workspace = true
@@ -16,38 +16,28 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [features]
-test-utils = [
-    "insta",
-    "rstest",
-    "portgraph",
-    "pathsearch",
-    "serde_json",
-    "serde",
-    "typetag",
-]
+test-utils = ["insta", "rstest", "portgraph"]
 
 default = ["llvm14-0"]
 llvm14-0 = ["inkwell/llvm14-0"]
 
+[lints]
+workspace = true
 
 [dependencies]
-inkwell = { version = "0.5.0", default-features = false }
-hugr-core = { path = "../hugr-core", version = "0.14.3" }
-anyhow = "1.0.83"
+inkwell = { version = "0.6.0", default-features = false }
+hugr-core = { path = "../hugr-core", version = "0.20.0" }
+anyhow = "1.0.98"
 itertools.workspace = true
 delegate.workspace = true
 petgraph.workspace = true
-lazy_static.workspace = true
 strum.workspace = true
 
 insta = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 portgraph = { workspace = true, optional = true }
-pathsearch = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
-typetag = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["debug"] }
+lazy_static.workspace = true
 
 [dev-dependencies]
 hugr-llvm = { "path" = ".", features = ["test-utils"] }

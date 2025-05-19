@@ -1,7 +1,6 @@
 {
   "version": "0.1.0",
   "name": "collections.array",
-  "runtime_reqs": [],
   "types": {
     "array": {
       "extension": "collections.array",
@@ -18,15 +17,155 @@
       ],
       "description": "Fixed-length array",
       "bound": {
-        "b": "FromParams",
-        "indices": [
-          1
-        ]
+        "b": "Explicit",
+        "bound": "A"
       }
     }
   },
-  "values": {},
   "operations": {
+    "clone": {
+      "extension": "collections.array",
+      "name": "clone",
+      "description": "Clones an array with copyable elements",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "discard": {
+      "extension": "collections.array",
+      "name": "discard",
+      "description": "Discards an array with copyable elements",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
     "discard_empty": {
       "extension": "collections.array",
       "name": "discard_empty",
@@ -61,8 +200,7 @@
               "bound": "A"
             }
           ],
-          "output": [],
-          "runtime_reqs": []
+          "output": []
         }
       },
       "binary": false
@@ -106,7 +244,7 @@
                   }
                 }
               ],
-              "bound": "C"
+              "bound": "A"
             },
             {
               "t": "I"
@@ -126,9 +264,32 @@
                   }
                 ]
               ]
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -167,9 +328,6 @@
           {
             "tp": "Type",
             "b": "A"
-          },
-          {
-            "tp": "Extensions"
           }
         ],
         "body": {
@@ -183,9 +341,6 @@
                   "i": 1,
                   "b": "A"
                 }
-              ],
-              "runtime_reqs": [
-                "2"
               ]
             }
           ],
@@ -214,8 +369,7 @@
               ],
               "bound": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -244,9 +398,6 @@
               "tp": "Type",
               "b": "A"
             }
-          },
-          {
-            "tp": "Extensions"
           }
         ],
         "body": {
@@ -300,9 +451,6 @@
                   "i": 3,
                   "b": "A"
                 }
-              ],
-              "runtime_reqs": [
-                "4"
               ]
             },
             {
@@ -341,8 +489,7 @@
               "i": 3,
               "b": "A"
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -466,8 +613,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false
@@ -579,8 +725,7 @@
                 ]
               ]
             }
-          ],
-          "runtime_reqs": []
+          ]
         }
       },
       "binary": false

@@ -1,13 +1,13 @@
 use std::{borrow::Cow, rc::Rc};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use delegate::delegate;
 use inkwell::{
     builder::Builder,
     types::{BasicType, BasicTypeEnum},
     values::{BasicValue, BasicValueEnum, PointerValue},
 };
-use itertools::{zip_eq, Itertools as _};
+use itertools::{Itertools as _, zip_eq};
 
 #[derive(Eq, PartialEq, Clone)]
 pub struct ValueMailBox<'c> {
@@ -86,13 +86,14 @@ impl<'c> ValuePromise<'c> {
     }
 }
 
-/// Holds a vector of [PointerValue]s pointing to `alloca`s in the first block
+/// Holds a vector of [`PointerValue`]s pointing to `alloca`s in the first block
 /// of a function.
 #[derive(Eq, PartialEq, Clone)]
 #[allow(clippy::len_without_is_empty)]
 pub struct RowMailBox<'c>(Rc<Vec<ValueMailBox<'c>>>, Cow<'static, str>);
 
 impl<'c> RowMailBox<'c> {
+    #[must_use]
     pub fn new_empty() -> Self {
         Self::new(std::iter::empty(), None)
     }
@@ -107,7 +108,7 @@ impl<'c> RowMailBox<'c> {
         )
     }
 
-    /// Returns a [RowPromise] that when [RowPromise::finish]ed will write to this `RowMailBox`.
+    /// Returns a [`RowPromise`] that when [`RowPromise::finish`]ed will write to this `RowMailBox`.
     pub fn promise(&self) -> RowPromise<'c> {
         RowPromise(self.clone())
     }
@@ -118,6 +119,7 @@ impl<'c> RowMailBox<'c> {
     }
 
     /// Returns the number of values in this `RowMailBox`.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -181,7 +183,7 @@ impl<'c> FromIterator<ValueMailBox<'c>> for RowMailBox<'c> {
 pub struct RowPromise<'c>(RowMailBox<'c>);
 
 impl<'c> RowPromise<'c> {
-    /// Consumes the `RowPromise`, writing the values to the promised [RowMailBox].
+    /// Consumes the `RowPromise`, writing the values to the promised [`RowMailBox`].
     pub fn finish(
         self,
         builder: &Builder<'c>,
@@ -195,7 +197,7 @@ impl<'c> RowPromise<'c> {
             /// Get the LLVM types of this `RowMailBox`.
             pub fn get_types(&'_ self) -> impl Iterator<Item=BasicTypeEnum<'c>> + '_;
             /// Returns the number of values promised to be written.
-            pub fn len(&self) -> usize;
+            #[must_use] pub fn len(&self) -> usize;
         }
     }
 }

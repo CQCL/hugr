@@ -1,8 +1,8 @@
-use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
-use hugr_core::ops::Value;
-use hugr_core::types::{ConstTypeError, SumType, Type, TypeEnum, TypeRow};
-use itertools::{zip_eq, Itertools};
+use ascent::lattice::BoundedLattice;
+use hugr_core::Node;
+use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
+use itertools::{Itertools, zip_eq};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -11,13 +11,13 @@ use thiserror::Error;
 use super::row_contains_bottom;
 
 /// Trait for an underlying domain of abstract values which can form the *elements* of a
-/// [PartialValue] and thus be used in dataflow analysis.
+/// [`PartialValue`] and thus be used in dataflow analysis.
 pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// Computes the join of two values (i.e. towards `Top``), if this is representable
     /// within the underlying domain. Return the new value, and whether this is different from
     /// the old `self`.
     ///
-    /// If the join is not representable, return `None` - i.e., we should use [PartialValue::Top].
+    /// If the join is not representable, return `None` - i.e., we should use [`PartialValue::Top`].
     ///
     /// The default checks equality between `self` and `other` and returns `(self,false)` if
     /// the two are identical, otherwise `None`.
@@ -28,7 +28,7 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// Computes the meet of two values (i.e. towards `Bottom`), if this is representable
     /// within the underlying domain. Return the new value, and whether this is different from
     /// the old `self`.
-    /// If the meet is not representable, return `None` - i.e., we should use [PartialValue::Bottom].
+    /// If the meet is not representable, return `None` - i.e., we should use [`PartialValue::Bottom`].
     ///
     /// The default checks equality between `self` and `other` and returns `(self, false)` if
     /// the two are identical, otherwise `None`.
@@ -51,20 +51,31 @@ pub struct Sum<V> {
     pub st: SumType,
 }
 
-/// A representation of a value of [SumType], that may have one or more possible tags,
-/// with a [PartialValue] representation of each element-value of each possible tag.
-#[derive(PartialEq, Clone, Eq)]
-pub struct PartialSum<V>(pub HashMap<usize, Vec<PartialValue<V>>>);
+/// The output of an [`LoadFunction`](hugr_core::ops::LoadFunction) - a "pointer"
+/// to a function at a specific node, instantiated with the provided type-args.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct LoadedFunction<N> {
+    /// The [FuncDefn](hugr_core::ops::FuncDefn) or `FuncDecl`` that was loaded
+    pub func_node: N,
+    /// The type arguments provided when loading
+    pub args: Vec<TypeArg>,
+}
 
-impl<V> PartialSum<V> {
+/// A representation of a value of [`SumType`], that may have one or more possible tags,
+/// with a [`PartialValue`] representation of each element-value of each possible tag.
+#[derive(PartialEq, Clone, Eq)]
+pub struct PartialSum<V, N = Node>(pub HashMap<usize, Vec<PartialValue<V, N>>>);
+
+impl<V, N> PartialSum<V, N> {
     /// New instance for a single known tag.
-    /// (Multi-tag instances can be created via [Self::try_join_mut].)
-    pub fn new_variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V>>) -> Self {
+    /// (Multi-tag instances can be created via [`Self::try_join_mut`].)
+    pub fn new_variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V, N>>) -> Self {
         Self(HashMap::from([(tag, Vec::from_iter(values))]))
     }
 
     /// The number of possible variants we know about. (NOT the number
-    /// of tags possible for the value's type, whatever [SumType] that might be.)
+    /// of tags possible for the value's type, whatever [`SumType`] that might be.)
+    #[must_use]
     pub fn num_variants(&self) -> usize {
         self.0.len()
     }
@@ -75,10 +86,24 @@ impl<V> PartialSum<V> {
             pv.assert_invariants();
         }
     }
+
+    /// Whether this sum might have the specified tag
+    #[must_use]
+    pub fn supports_tag(&self, tag: usize) -> bool {
+        self.0.contains_key(&tag)
+    }
+
+    /// Can this ever occur at runtime? See [`PartialValue::contains_bottom`]
+    #[must_use]
+    pub fn contains_bottom(&self) -> bool {
+        self.0
+            .iter()
+            .all(|(_tag, elements)| row_contains_bottom(elements))
+    }
 }
 
-impl<V: AbstractValue> PartialSum<V> {
-    /// Joins (towards `Top`) self with another [PartialSum]. If successful, returns
+impl<V: AbstractValue, N: PartialEq + PartialOrd> PartialSum<V, N> {
+    /// Joins (towards `Top`) self with another [`PartialSum`]. If successful, returns
     /// whether `self` has changed.
     ///
     /// Fails (without mutation) with the conflicting tag if any common rows have different lengths.
@@ -108,12 +133,12 @@ impl<V: AbstractValue> PartialSum<V> {
     ///
     /// # Errors
     /// Fails without mutation, either:
-    /// * `Some(tag)` if the two [PartialSum]s both had rows with that `tag` but of different lengths
+    /// * `Some(tag)` if the two [`PartialSum`]s both had rows with that `tag` but of different lengths
     /// * `None` if the two instances had no rows in common (i.e., the result is "Bottom")
     pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, Option<usize>> {
         let mut changed = false;
         let mut keys_to_remove = vec![];
-        for (k, v) in self.0.iter() {
+        for (k, v) in &self.0 {
             match other.0.get(k) {
                 None => keys_to_remove.push(*k),
                 Some(o_v) => {
@@ -141,25 +166,46 @@ impl<V: AbstractValue> PartialSum<V> {
         }
         Ok(changed)
     }
+}
 
-    /// Whether this sum might have the specified tag
-    pub fn supports_tag(&self, tag: usize) -> bool {
-        self.0.contains_key(&tag)
-    }
+/// Trait implemented by value types into which [`PartialValue`]s can be converted,
+/// so long as the PV has no [Top](PartialValue::Top), [Bottom](PartialValue::Bottom)
+/// or [`PartialSum`]s with more than one possible tag. See [`PartialSum::try_into_sum`]
+/// and [`PartialValue::try_into_concrete`].
+///
+/// `V` is the type of [`AbstractValue`] from which `Self` can (fallibly) be constructed,
+/// `N` is the type of [`HugrNode`](hugr_core::core::HugrNode) for function pointers
+pub trait AsConcrete<V, N>: Sized {
+    /// Kind of error raised when creating `Self` from a value `V`, see [`Self::from_value`]
+    type ValErr: std::error::Error;
+    /// Kind of error that may be raised when creating `Self` from a [Sum] of `Self`s,
+    /// see [`Self::from_sum`]
+    type SumErr: std::error::Error;
 
+    /// Convert an abstract value into concrete
+    fn from_value(val: V) -> Result<Self, Self::ValErr>;
+
+    /// Convert a sum (of concrete values, already recursively converted) into concrete
+    fn from_sum(sum: Sum<Self>) -> Result<Self, Self::SumErr>;
+
+    /// Convert a function pointer into a concrete value
+    fn from_func(func: LoadedFunction<N>) -> Result<Self, LoadedFunction<N>>;
+}
+
+impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
     /// Turns this instance into a [Sum] of some "concrete" value type `C`,
-    /// *if* this PartialSum has exactly one possible tag.
+    /// *if* this `PartialSum` has exactly one possible tag.
     ///
     /// # Errors
     ///
-    /// If this PartialSum had multiple possible tags; or if `typ` was not a [TypeEnum::Sum]
+    /// If this `PartialSum` had multiple possible tags; or if `typ` was not a [`TypeEnum::Sum`]
     /// supporting the single possible tag with the correct number of elements and no row variables;
-    /// or if converting a child element failed via [PartialValue::try_into_concrete].
-    pub fn try_into_sum<C, VE, SE>(self, typ: &Type) -> Result<Sum<C>, ExtractValueError<V, VE, SE>>
-    where
-        V: TryInto<C, Error = VE>,
-        Sum<C>: TryInto<C, Error = SE>,
-    {
+    /// or if converting a child element failed via [`PartialValue::try_into_concrete`].
+    #[allow(clippy::type_complexity)] // Since C is a parameter, can't declare type aliases
+    pub fn try_into_sum<C: AsConcrete<V, N>>(
+        self,
+        typ: &Type,
+    ) -> Result<Sum<C>, ExtractValueError<V, N, C::ValErr, C::SumErr>> {
         if self.0.len() != 1 {
             return Err(ExtractValueError::MultipleVariants(self));
         }
@@ -185,22 +231,15 @@ impl<V: AbstractValue> PartialSum<V> {
             num_elements: v.len(),
         })
     }
-
-    /// Can this ever occur at runtime? See [PartialValue::contains_bottom]
-    pub fn contains_bottom(&self) -> bool {
-        self.0
-            .iter()
-            .all(|(_tag, elements)| row_contains_bottom(elements))
-    }
 }
 
-/// An error converting a [PartialValue] or [PartialSum] into a concrete value type
-/// via [PartialValue::try_into_concrete] or [PartialSum::try_into_sum]
+/// An error converting a [`PartialValue`] or [`PartialSum`] into a concrete value type
+/// via [`PartialValue::try_into_concrete`] or [`PartialSum::try_into_sum`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
-pub enum ExtractValueError<V, VE, SE> {
+pub enum ExtractValueError<V, N, VE, SE> {
     #[error("PartialSum value had multiple possible tags: {0}")]
-    MultipleVariants(PartialSum<V>),
+    MultipleVariants(PartialSum<V, N>),
     #[error("Value contained `Bottom`")]
     ValueIsBottom,
     #[error("Value contained `Top`")]
@@ -209,6 +248,8 @@ pub enum ExtractValueError<V, VE, SE> {
     CouldNotConvert(V, #[source] VE),
     #[error("Could not build Sum from concrete element values")]
     CouldNotBuildSum(#[source] SE),
+    #[error("Could not convert into concrete function pointer {0}")]
+    CouldNotLoadFunction(LoadedFunction<N>),
     #[error("Expected a SumType with tag {tag} having {num_elements} elements, found {typ}")]
     BadSumType {
         typ: Type,
@@ -217,14 +258,15 @@ pub enum ExtractValueError<V, VE, SE> {
     },
 }
 
-impl<V: Clone> PartialSum<V> {
+impl<V: Clone, N: Clone> PartialSum<V, N> {
     /// If this Sum might have the specified `tag`, get the elements inside that tag.
-    pub fn variant_values(&self, variant: usize) -> Option<Vec<PartialValue<V>>> {
+    #[must_use]
+    pub fn variant_values(&self, variant: usize) -> Option<Vec<PartialValue<V, N>>> {
         self.0.get(&variant).cloned()
     }
 }
 
-impl<V: PartialEq> PartialOrd for PartialSum<V> {
+impl<V: PartialEq, N: PartialEq + PartialOrd> PartialOrd for PartialSum<V, N> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let max_key = self.0.keys().chain(other.0.keys()).copied().max().unwrap();
         let (mut keys1, mut keys2) = (vec![0; max_key + 1], vec![0; max_key + 1]);
@@ -237,7 +279,7 @@ impl<V: PartialEq> PartialOrd for PartialSum<V> {
         }
 
         Some(match keys1.cmp(&keys2) {
-            ord @ Ordering::Greater | ord @ Ordering::Less => ord,
+            ord @ (Ordering::Greater | Ordering::Less) => ord,
             Ordering::Equal => {
                 for (k, lhs) in &self.0 {
                     let Some(rhs) = other.0.get(k) else {
@@ -254,13 +296,13 @@ impl<V: PartialEq> PartialOrd for PartialSum<V> {
     }
 }
 
-impl<V: std::fmt::Debug> std::fmt::Debug for PartialSum<V> {
+impl<V: std::fmt::Debug, N: std::fmt::Debug> std::fmt::Debug for PartialSum<V, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl<V: Hash> Hash for PartialSum<V> {
+impl<V: Hash, N: Hash> Hash for PartialSum<V, N> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for (k, v) in &self.0 {
             k.hash(state);
@@ -270,33 +312,35 @@ impl<V: Hash> Hash for PartialSum<V> {
 }
 
 /// Wraps some underlying representation (knowledge) of values into a lattice
-/// for use in dataflow analysis, including that an instance may be a [PartialSum]
+/// for use in dataflow analysis, including that an instance may be a [`PartialSum`]
 /// of values of the underlying representation
 #[derive(PartialEq, Clone, Eq, Hash, Debug)]
-pub enum PartialValue<V> {
+pub enum PartialValue<V, N = Node> {
     /// No possibilities known (so far)
     Bottom,
+    /// The output of an [`LoadFunction`](hugr_core::ops::LoadFunction)
+    LoadedFunction(LoadedFunction<N>),
     /// A single value (of the underlying representation)
     Value(V),
     /// Sum (with at least one, perhaps several, possible tags) of underlying values
-    PartialSum(PartialSum<V>),
+    PartialSum(PartialSum<V, N>),
     /// Might be more than one distinct value of the underlying type `V`
     Top,
 }
 
-impl<V> From<V> for PartialValue<V> {
+impl<V, N> From<V> for PartialValue<V, N> {
     fn from(v: V) -> Self {
         Self::Value(v)
     }
 }
 
-impl<V> From<PartialSum<V>> for PartialValue<V> {
-    fn from(v: PartialSum<V>) -> Self {
+impl<V, N> From<PartialSum<V, N>> for PartialValue<V, N> {
+    fn from(v: PartialSum<V, N>) -> Self {
         Self::PartialSum(v)
     }
 }
 
-impl<V> PartialValue<V> {
+impl<V, N> PartialValue<V, N> {
     fn assert_invariants(&self) {
         if let Self::PartialSum(ps) = self {
             ps.assert_invariants();
@@ -309,61 +353,27 @@ impl<V> PartialValue<V> {
     }
 
     /// New instance of unit type (i.e. the only possible value, with no contents)
+    #[must_use]
     pub fn new_unit() -> Self {
         Self::new_variant(0, [])
     }
-}
 
-impl<V: AbstractValue> PartialValue<V> {
-    /// If this value might be a Sum with the specified `tag`, get the elements inside that tag.
-    ///
-    /// # Panics
-    ///
-    /// if the value is believed, for that tag, to have a number of values other than `len`
-    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
-        let vals = match self {
-            PartialValue::Bottom | PartialValue::Value(_) => return None,
-            PartialValue::PartialSum(ps) => ps.variant_values(tag)?,
-            PartialValue::Top => vec![PartialValue::Top; len],
-        };
-        assert_eq!(vals.len(), len);
-        Some(vals)
+    /// New instance of self for a [`LoadFunction`](hugr_core::ops::LoadFunction)
+    pub fn new_load(func_node: N, args: impl Into<Vec<TypeArg>>) -> Self {
+        Self::LoadedFunction(LoadedFunction {
+            func_node,
+            args: args.into(),
+        })
     }
 
     /// Tells us whether this value might be a Sum with the specified `tag`
     pub fn supports_tag(&self, tag: usize) -> bool {
         match self {
-            PartialValue::Bottom | PartialValue::Value(_) => false,
+            PartialValue::Bottom | PartialValue::Value(_) | PartialValue::LoadedFunction(_) => {
+                false
+            }
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
-        }
-    }
-
-    /// Turns this instance into some "concrete" value type `C`, *if* it is a single value,
-    /// or a [Sum](PartialValue::PartialSum) (of a single tag) convertible by
-    /// [PartialSum::try_into_sum].
-    ///
-    /// # Errors
-    ///
-    /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
-    /// that could not be converted into a [Sum] by [PartialSum::try_into_sum] (e.g. if `typ` is
-    /// incorrect), or if that [Sum] could not be converted into a `V2`.
-    pub fn try_into_concrete<C, VE, SE>(self, typ: &Type) -> Result<C, ExtractValueError<V, VE, SE>>
-    where
-        V: TryInto<C, Error = VE>,
-        Sum<C>: TryInto<C, Error = SE>,
-    {
-        match self {
-            Self::Value(v) => v
-                .clone()
-                .try_into()
-                .map_err(|e| ExtractValueError::CouldNotConvert(v.clone(), e)),
-            Self::PartialSum(ps) => ps
-                .try_into_sum(typ)?
-                .try_into()
-                .map_err(ExtractValueError::CouldNotBuildSum),
-            Self::Top => Err(ExtractValueError::ValueIsTop),
-            Self::Bottom => Err(ExtractValueError::ValueIsBottom),
         }
     }
 
@@ -374,21 +384,62 @@ impl<V: AbstractValue> PartialValue<V> {
     pub fn contains_bottom(&self) -> bool {
         match self {
             PartialValue::Bottom => true,
-            PartialValue::Top | PartialValue::Value(_) => false,
+            PartialValue::Top | PartialValue::Value(_) | PartialValue::LoadedFunction(_) => false,
             PartialValue::PartialSum(ps) => ps.contains_bottom(),
         }
     }
 }
 
-impl TryFrom<Sum<Value>> for Value {
-    type Error = ConstTypeError;
-
-    fn try_from(value: Sum<Value>) -> Result<Self, Self::Error> {
-        Self::sum(value.tag, value.values, value.st)
+impl<V: AbstractValue, N: Clone> PartialValue<V, N> {
+    /// If this value might be a Sum with the specified `tag`, get the elements inside that tag.
+    ///
+    /// # Panics
+    ///
+    /// if the value is believed, for that tag, to have a number of values other than `len`
+    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V, N>>> {
+        let vals = match self {
+            PartialValue::Bottom | PartialValue::Value(_) | PartialValue::LoadedFunction(_) => {
+                return None;
+            }
+            PartialValue::PartialSum(ps) => ps.variant_values(tag)?,
+            PartialValue::Top => vec![PartialValue::Top; len],
+        };
+        assert_eq!(vals.len(), len);
+        Some(vals)
     }
 }
 
-impl<V: AbstractValue> Lattice for PartialValue<V> {
+impl<V: AbstractValue, N: std::fmt::Debug> PartialValue<V, N> {
+    /// Turns this instance into some "concrete" value type `C`, *if* it is a single value,
+    /// or a [Sum](PartialValue::PartialSum) (of a single tag) convertible by
+    /// [`PartialSum::try_into_sum`].
+    ///
+    /// # Errors
+    ///
+    /// If this `PartialValue` was `Top` or `Bottom`, or was a [`PartialSum`](PartialValue::PartialSum)
+    /// that could not be converted into a [Sum] by [`PartialSum::try_into_sum`] (e.g. if `typ` is
+    /// incorrect), or if that [Sum] could not be converted into a `V2`.
+    pub fn try_into_concrete<C: AsConcrete<V, N>>(
+        self,
+        typ: &Type,
+    ) -> Result<C, ExtractValueError<V, N, C::ValErr, C::SumErr>> {
+        match self {
+            Self::Value(v) => {
+                C::from_value(v.clone()).map_err(|e| ExtractValueError::CouldNotConvert(v, e))
+            }
+            Self::LoadedFunction(lf) => {
+                C::from_func(lf).map_err(ExtractValueError::CouldNotLoadFunction)
+            }
+            Self::PartialSum(ps) => {
+                C::from_sum(ps.try_into_sum(typ)?).map_err(ExtractValueError::CouldNotBuildSum)
+            }
+            Self::Top => Err(ExtractValueError::ValueIsTop),
+            Self::Bottom => Err(ExtractValueError::ValueIsBottom),
+        }
+    }
+}
+
+impl<V: AbstractValue, N: PartialEq + PartialOrd> Lattice for PartialValue<V, N> {
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
         let mut old_self = Self::Top;
@@ -400,13 +451,17 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 Some((h3, b)) => (Self::Value(h3), b),
                 None => (Self::Top, true),
             },
+            (Self::LoadedFunction(lf1), Self::LoadedFunction(lf2))
+                if lf1.func_node == lf2.func_node =>
+            {
+                // TODO we should also join the TypeArgs but at the moment these are ignored
+                (Self::LoadedFunction(lf1), false)
+            }
             (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_join_mut(ps2) {
                 Ok(ch) => (Self::PartialSum(ps1), ch),
                 Err(_) => (Self::Top, true),
             },
-            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
-                (Self::Top, true)
-            }
+            _ => (Self::Top, true),
         };
         *self = res;
         ch
@@ -423,20 +478,24 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 Some((h3, ch)) => (Self::Value(h3), ch),
                 None => (Self::Bottom, true),
             },
+            (Self::LoadedFunction(lf1), Self::LoadedFunction(lf2))
+                if lf1.func_node == lf2.func_node =>
+            {
+                // TODO we should also meet the TypeArgs but at the moment these are ignored
+                (Self::LoadedFunction(lf1), false)
+            }
             (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_meet_mut(ps2) {
                 Ok(ch) => (Self::PartialSum(ps1), ch),
                 Err(_) => (Self::Bottom, true),
             },
-            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
-                (Self::Bottom, true)
-            }
+            _ => (Self::Bottom, true),
         };
         *self = res;
         ch
     }
 }
 
-impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
+impl<V: AbstractValue, N: PartialEq + PartialOrd> BoundedLattice for PartialValue<V, N> {
     fn top() -> Self {
         Self::Top
     }
@@ -446,7 +505,7 @@ impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
     }
 }
 
-impl<V: PartialEq> PartialOrd for PartialValue<V> {
+impl<V: PartialEq, N: PartialEq + PartialOrd> PartialOrd for PartialValue<V, N> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use std::cmp::Ordering;
         match (self, other) {
@@ -457,6 +516,9 @@ impl<V: PartialEq> PartialOrd for PartialValue<V> {
             (Self::Top, _) => Some(Ordering::Greater),
             (_, Self::Top) => Some(Ordering::Less),
             (Self::Value(v1), Self::Value(v2)) => (v1 == v2).then_some(Ordering::Equal),
+            (Self::LoadedFunction(lf1), Self::LoadedFunction(lf2)) => {
+                (lf1 == lf2).then_some(Ordering::Equal)
+            }
             (Self::PartialSum(ps1), Self::PartialSum(ps2)) => ps1.partial_cmp(ps2),
             _ => None,
         }
@@ -467,20 +529,21 @@ impl<V: PartialEq> PartialOrd for PartialValue<V> {
 mod test {
     use std::sync::Arc;
 
-    use ascent::{lattice::BoundedLattice, Lattice};
-    use itertools::{zip_eq, Itertools as _};
+    use ascent::{Lattice, lattice::BoundedLattice};
+    use hugr_core::NodeIndex;
+    use itertools::{Itertools as _, zip_eq};
     use prop::sample::subsequence;
     use proptest::prelude::*;
 
     use proptest_recurse::{StrategyExt, StrategySet};
 
-    use super::{AbstractValue, PartialSum, PartialValue};
+    use super::{AbstractValue, LoadedFunction, PartialSum, PartialValue};
 
     #[derive(Debug, PartialEq, Eq, Clone)]
     enum TestSumType {
         Branch(Vec<Vec<Arc<TestSumType>>>),
-        /// None => unit, Some => TestValue <= this *usize*
-        Leaf(Option<usize>),
+        LeafVal(usize), // contains a TestValue <= this usize
+        LeafPtr(usize), // contains a LoadedFunction with node <= this *usize*
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -508,9 +571,12 @@ mod test {
     impl TestSumType {
         fn check_value(&self, pv: &PartialValue<TestValue>) -> bool {
             match (self, pv) {
-                (_, PartialValue::Bottom) | (_, PartialValue::Top) => true,
-                (Self::Leaf(None), _) => pv == &PartialValue::new_unit(),
-                (Self::Leaf(Some(max)), PartialValue::Value(TestValue(val))) => val <= max,
+                (_, PartialValue::Bottom | PartialValue::Top) => true,
+                (Self::LeafVal(max), PartialValue::Value(TestValue(val))) => val <= max,
+                (
+                    Self::LeafPtr(max),
+                    PartialValue::LoadedFunction(LoadedFunction { func_node, args }),
+                ) => args.is_empty() && func_node.index() <= *max,
                 (Self::Branch(sop), PartialValue::PartialSum(ps)) => {
                     for (k, v) in &ps.0 {
                         if *k >= sop.len() {
@@ -537,8 +603,11 @@ mod test {
         fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
             fn arb(params: SumTypeParams, set: &mut StrategySet) -> SBoxedStrategy<TestSumType> {
                 use proptest::collection::vec;
-                let int_strat = (0..usize::MAX).prop_map(|i| TestSumType::Leaf(Some(i)));
-                let leaf_strat = prop_oneof![Just(TestSumType::Leaf(None)), int_strat];
+                let leaf_strat = prop_oneof![
+                    (0..usize::MAX).prop_map(TestSumType::LeafVal),
+                    // This is the maximum value accepted by portgraph::NodeIndex::new
+                    (0..((2usize ^ 31) - 2)).prop_map(TestSumType::LeafPtr)
+                ];
                 leaf_strat.prop_mutually_recursive(
                     params.depth as u32,
                     params.desired_size as u32,
@@ -578,7 +647,7 @@ mod test {
 
     fn partial_sum_strat(
         variants: &[Vec<Arc<TestSumType>>],
-    ) -> impl Strategy<Value = PartialSum<TestValue>> {
+    ) -> impl Strategy<Value = PartialSum<TestValue>> + use<> {
         // We have to clone the `variants` here but only as far as the Vec<Vec<Arc<_>>>
         let tagged_variants = variants.iter().cloned().enumerate().collect::<Vec<_>>();
         // The type annotation here (and the .boxed() enabling it) are just for documentation
@@ -603,12 +672,19 @@ mod test {
 
     fn any_partial_value_of_type(
         ust: &TestSumType,
-    ) -> impl Strategy<Value = PartialValue<TestValue>> {
+    ) -> impl Strategy<Value = PartialValue<TestValue>> + use<> {
         match ust {
-            TestSumType::Leaf(None) => Just(PartialValue::new_unit()).boxed(),
-            TestSumType::Leaf(Some(i)) => (0..*i)
+            TestSumType::LeafVal(i) => (0..=*i)
                 .prop_map(TestValue)
                 .prop_map(PartialValue::from)
+                .boxed(),
+            TestSumType::LeafPtr(i) => (0..=*i)
+                .prop_map(|i| {
+                    PartialValue::LoadedFunction(LoadedFunction {
+                        func_node: portgraph::NodeIndex::new(i).into(),
+                        args: vec![],
+                    })
+                })
                 .boxed(),
             TestSumType::Branch(sop) => partial_sum_strat(sop).prop_map(PartialValue::from).boxed(),
         }
@@ -643,7 +719,7 @@ mod test {
     proptest! {
         #[test]
         fn partial_value_type((tst, pv) in any_typed_partial_value()) {
-            prop_assert!(tst.check_value(&pv))
+            prop_assert!(tst.check_value(&pv));
         }
 
         // todo: ValidHandle is valid
@@ -700,7 +776,7 @@ mod test {
 
             let a = v1.clone().join(v2.clone()).join(v3.clone());
             let b = v1.clone().join(v2.clone().join(v3.clone()));
-            prop_assert!(a==b, "join not associative")
+            prop_assert!(a==b, "join not associative");
         }
     }
 }

@@ -4,20 +4,26 @@ use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::views::RootCheckable;
 use itertools::Itertools;
 
-use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
-use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
-use hugr_core::hugr::RootTagged;
+use hugr_core::hugr::patch::inline_dfg::InlineDFG;
+use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
+use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, Output};
 use hugr_core::{Hugr, HugrView, Node};
 
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
-pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
-    let mut worklist = cfg.nodes().collect::<Vec<_>>();
+pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID>)
+where
+    H: 'h + HugrMut<Node = Node>,
+{
+    let checked = cfg.try_into_checked().expect("Hugr must be a CFG region");
+    let cfg = checked.into_hugr();
+
+    let mut worklist = cfg.children(cfg.entrypoint()).collect::<Vec<_>>();
     while let Some(n) = worklist.pop() {
         // Consider merging n with its successor
         let Ok(succ) = cfg.output_neighbours(n).exactly_one() else {
@@ -25,28 +31,26 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
         };
         if cfg.input_neighbours(succ).count() != 1 {
             continue;
-        };
-        if cfg.children(cfg.root()).take(2).contains(&succ) {
+        }
+        if cfg.children(cfg.entrypoint()).take(2).contains(&succ) {
             // If succ is...
             //   - the entry block, that has an implicit extra in-edge, so cannot merge with n.
             //   - the exit block, nodes in n should move *outside* the CFG - a separate pass.
             continue;
-        };
+        }
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
-        let node_map = cfg.hugr_mut().apply_rewrite(rep).unwrap();
+        let node_map = cfg.apply_patch(rep).unwrap();
         let merged_bb = *node_map.get(&merge_bb).unwrap();
         for dfg_id in dfgs {
             let n_id = *node_map.get(&dfg_id).unwrap();
-            cfg.hugr_mut()
-                .apply_rewrite(InlineDFG(n_id.into()))
-                .unwrap();
+            cfg.apply_patch(InlineDFG(n_id.into())).unwrap();
         }
         worklist.push(merged_bb);
     }
 }
 
 fn mk_rep(
-    cfg: &impl RootTagged<RootHandle = CfgID>,
+    cfg: &impl HugrView<Node = Node>,
     pred: Node,
     succ: Node,
 ) -> (Replacement, Node, [Node; 2]) {
@@ -55,17 +59,14 @@ fn mk_rep(
     let succ_sig = succ_ty.inner_signature();
 
     // Make a Hugr with just a single CFG root node having the same signature.
-    let mut replacement: Hugr = Hugr::new(cfg.root_type().clone());
+    let mut replacement: Hugr = Hugr::new_with_entrypoint(cfg.entrypoint_optype().clone())
+        .expect("Replacement should have a CFG entrypoint");
 
-    let merged = replacement.add_node_with_parent(replacement.root(), {
-        let mut merged_block = DataflowBlock {
+    let merged = replacement.add_node_with_parent(replacement.entrypoint(), {
+        DataflowBlock {
             inputs: pred_ty.inputs.clone(),
             ..succ_ty.clone()
-        };
-        merged_block.extension_delta = merged_block
-            .extension_delta
-            .union(pred_ty.extension_delta.clone());
-        merged_block
+        }
     });
     let input = replacement.add_node_with_parent(
         merged,
@@ -87,7 +88,7 @@ fn mk_rep(
         },
     );
     for (i, _) in pred_ty.inputs.iter().enumerate() {
-        replacement.connect(input, i, dfg1, i)
+        replacement.connect(input, i, dfg1, i);
     }
 
     let dfg2 = replacement.add_node_with_parent(
@@ -97,7 +98,7 @@ fn mk_rep(
         },
     );
     for (i, _) in succ_sig.output.iter().enumerate() {
-        replacement.connect(dfg2, i, output, i)
+        replacement.connect(dfg2, i, output, i);
     }
 
     // At the junction, must unpack the first (tuple, branch predicate) output
@@ -106,10 +107,10 @@ fn mk_rep(
     replacement.connect(dfg1, 0, unp, 0);
     let other_start = tuple_elems.len();
     for (i, _) in tuple_elems.iter().enumerate() {
-        replacement.connect(unp, i, dfg2, i)
+        replacement.connect(unp, i, dfg2, i);
     }
     for (i, _) in pred_ty.other_outputs.iter().enumerate() {
-        replacement.connect(dfg1, i + 1, dfg2, i + other_start)
+        replacement.connect(dfg1, i + 1, dfg2, i + other_start);
     }
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
     // edge-maps as both source and target of the new edge are in the replacement Hugr
@@ -159,18 +160,16 @@ mod test {
     use std::collections::HashSet;
     use std::sync::Arc;
 
-    use hugr_core::extension::prelude::{Lift, PRELUDE_ID};
+    use hugr_core::extension::prelude::PRELUDE_ID;
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
-    use hugr_core::extension::prelude::{qb_t, usize_t, ConstUsize};
-    use hugr_core::hugr::views::sibling::SiblingMut;
+    use hugr_core::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder, endo_sig, inout_sig};
+    use hugr_core::extension::prelude::{ConstUsize, qb_t, usize_t};
     use hugr_core::ops::constant::Value;
-    use hugr_core::ops::handle::CfgID;
     use hugr_core::ops::{LoadConstant, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
+    use hugr_core::{Extension, Hugr, HugrView, Wire, const_extension_ids, type_row};
 
     use super::merge_basic_blocks;
 
@@ -197,16 +196,8 @@ mod test {
         )
     }
 
-    fn lifted_unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
-        let lc = b.add_load_value(Value::unary_unit_sum());
-        let lift = b
-            .add_dataflow_op(
-                Lift::new(vec![Type::new_unit_sum(1)].into(), PRELUDE_ID),
-                [lc],
-            )
-            .unwrap();
-        let [w] = lift.outputs_arr();
-        w
+    fn unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
+        b.add_load_value(Value::unary_unit_sum())
     }
 
     #[rstest]
@@ -231,9 +222,9 @@ mod test {
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [])?;
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
-        let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
+        let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1)?;
         let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
-        let br = lifted_unary_unit_sum(&mut no_b1);
+        let br = unary_unit_sum(&mut no_b1);
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
@@ -251,7 +242,7 @@ mod test {
         } else {
             let mut no_b2 = h.simple_block_builder(endo_sig(loop_variants), 1)?;
             let n = no_b2.add_dataflow_op(Noop::new(qb_t()), no_b2.input_wires())?;
-            let br = lifted_unary_unit_sum(&mut no_b2);
+            let br = unary_unit_sum(&mut no_b2);
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
             h.branch(&nid, 0, &no_b1)?;
             nid
@@ -261,10 +252,10 @@ mod test {
         h.branch(&test_block, 1, &h.exit_block())?;
 
         let mut h = h.finish_hugr()?;
-        let r = h.root();
-        merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
+        let r = h.entrypoint();
+        merge_basic_blocks(&mut h);
         h.validate().unwrap();
-        assert_eq!(r, h.root());
+        assert_eq!(r, h.entrypoint());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
         let [entry, exit] = h
             .children(r)
@@ -274,7 +265,7 @@ mod test {
             .unwrap();
         // Check the Noop('s) is/are in the right block(s)
         let nops = h
-            .nodes()
+            .entry_descendants()
             .filter(|n| h.get_optype(*n).cast::<Noop>().is_some());
         let (entry_nop, expected_backedge_target) = if self_loop {
             assert_eq!(h.children(r).count(), 2);
@@ -299,7 +290,7 @@ mod test {
         );
         // And the Noop in the entry block is consumed by the custom Test op
         let tst = find_unique(
-            h.nodes(),
+            h.entry_descendants(),
             |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(entry));
@@ -329,7 +320,7 @@ mod test {
         let mut bb1 = h.simple_entry_builder(vec![usize_t(), qb_t()].into(), 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
-        let pred = lifted_unary_unit_sum(&mut bb1);
+        let pred = unary_unit_sum(&mut bb1);
         let bb1 = bb1.finish_with_outputs(pred, [load_cst, inw])?;
 
         let mut bb2 = h.block_builder(
@@ -338,7 +329,7 @@ mod test {
             vec![qb_t(), usize_t()].into(),
         )?;
         let [u, q] = bb2.input_wires_arr();
-        let pred = lifted_unary_unit_sum(&mut bb2);
+        let pred = unary_unit_sum(&mut bb2);
         let bb2 = bb2.finish_with_outputs(pred, [q, u])?;
 
         let mut bb3 = h.block_builder(
@@ -348,7 +339,7 @@ mod test {
         )?;
         let [q, u] = bb3.input_wires_arr();
         let tst = bb3.add_dataflow_op(tst_op, [q, u])?;
-        let pred = lifted_unary_unit_sum(&mut bb3);
+        let pred = unary_unit_sum(&mut bb3);
         let bb3 = bb3.finish_with_outputs(pred, tst.outputs())?;
         // Now add control-flow edges between basic blocks
         h.branch(&bb1, 0, &bb2)?;
@@ -356,19 +347,24 @@ mod test {
         h.branch(&bb3, 0, &h.exit_block())?;
 
         let mut h = h.finish_hugr()?;
-        let root = h.root();
-        merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
+        merge_basic_blocks(&mut h);
         h.validate()?;
 
         // Should only be one BB left
-        let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
+        let [bb, _exit] = h
+            .children(h.entrypoint())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
         let tst = find_unique(
-            h.nodes(),
+            h.entry_descendants(),
             |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(bb));
 
-        let inp = find_unique(h.nodes(), |n| matches!(h.get_optype(*n), OpType::Input(_)));
+        let inp = find_unique(h.entry_descendants(), |n| {
+            matches!(h.get_optype(*n), OpType::Input(_))
+        });
         let mut tst_inputs = h.input_neighbours(tst).collect::<Vec<_>>();
         tst_inputs.remove(tst_inputs.iter().find_position(|n| **n == inp).unwrap().0);
         let [other_input] = tst_inputs.try_into().unwrap();

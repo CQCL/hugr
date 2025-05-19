@@ -1,13 +1,15 @@
 (hugr 0)
 
+(mod)
+
 (define-func example.loop
   (param ?a core.type)
-  (core.fn [?a] [?a] (ext))
+  (core.fn [?a] [?a])
   (dfg [%0] [%1]
-       (signature (core.fn [?a] [?a] (ext)))
+       (signature (core.fn [?a] [?a]))
        (tail-loop [%0] [%1]
-                  (signature (core.fn [?a] [?a] (ext)))
+                  (signature (core.fn [?a] [?a]))
                   (dfg [%2] [%3]
-                       (signature (core.fn [?a] [(core.adt [[?a] [?a]])] (ext)))
-                       ((core.make_adt _ _ 0) [%2] [%3]
-                                              (signature (core.fn [?a] [(core.adt [[?a] [?a]])] (ext))))))))
+                       (signature (core.fn [?a] [(core.adt [[?a] [?a]])]))
+                       ((core.make_adt 0) [%2] [%3]
+                                              (signature (core.fn [?a] [(core.adt [[?a] [?a]])])))))))

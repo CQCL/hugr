@@ -1,0 +1,36 @@
+HUGRiHJv?@{
+    "modules": [
+        {
+            "version": "live",
+            "nodes": [
+                {
+                    "parent": 0,
+                    "op": "Module"
+                },
+                {
+                    "parent": 0,
+                    "input_extensions": null,
+                    "op": "Const",
+                    "v": {
+                        "v": "Sum",
+                        "tag": 1,
+                        "typ": {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        },
+                        "vs": [
+                            {
+                                "v": "Tuple",
+                                "vs": []
+                            }
+                        ]
+                    }
+                }
+            ],
+            "edges": [],
+            "encoder": null
+        }
+    ],
+    "extensions": []
+}

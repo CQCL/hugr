@@ -206,7 +206,6 @@ class DataflowBlock(BaseOp):
     inputs: TypeRow = Field(default_factory=list)
     other_outputs: TypeRow = Field(default_factory=list)
     sum_rows: list[TypeRow]
-    extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         num_cases = len(out_types)
@@ -384,13 +383,11 @@ class DFG(DataflowOp):
     signature: FunctionType = Field(default_factory=FunctionType.empty)
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
-        self.signature = FunctionType(
-            input=list(inputs), output=list(outputs), runtime_reqs=ExtensionSet([])
-        )
+        self.signature = FunctionType(input=list(inputs), output=list(outputs))
 
     def deserialize(self) -> ops.DFG:
         sig = self.signature.deserialize()
-        return ops.DFG(sig.input, sig.output, sig.runtime_reqs)
+        return ops.DFG(sig.input, sig.output)
 
 
 # ------------------------------------------------
@@ -407,8 +404,6 @@ class Conditional(DataflowOp):
     sum_rows: list[TypeRow] = Field(
         description="The possible rows of the Sum input", default_factory=list
     )
-    # Extensions used to produce the outputs
-    extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         # First port is a predicate, i.e. a sum of tuple types. We need to unpack
@@ -442,9 +437,7 @@ class Case(BaseOp):
     signature: FunctionType = Field(default_factory=FunctionType.empty)
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
-        self.signature = stys.FunctionType(
-            input=list(inputs), output=list(outputs), runtime_reqs=ExtensionSet([])
-        )
+        self.signature = stys.FunctionType(input=list(inputs), output=list(outputs))
 
     def deserialize(self) -> ops.Case:
         sig = self.signature.deserialize()
@@ -455,11 +448,12 @@ class TailLoop(DataflowOp):
     """Tail-controlled loop."""
 
     op: Literal["TailLoop"] = "TailLoop"
-    just_inputs: TypeRow = Field(default_factory=list)  # Types that are only input
-    just_outputs: TypeRow = Field(default_factory=list)  # Types that are only output
+    # Types that are only input
+    just_inputs: TypeRow = Field(default_factory=list)
+    # Types that are only output
+    just_outputs: TypeRow = Field(default_factory=list)
     # Types that are appended to both input and output:
     rest: TypeRow = Field(default_factory=list)
-    extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         assert in_types == out_types
@@ -472,7 +466,6 @@ class TailLoop(DataflowOp):
             just_inputs=deser_it(self.just_inputs),
             _just_outputs=deser_it(self.just_outputs),
             rest=deser_it(self.rest),
-            extension_delta=self.extension_delta,
         )
 
 
@@ -484,7 +477,8 @@ class CFG(DataflowOp):
 
     def insert_port_types(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.signature = FunctionType(
-            input=list(inputs), output=list(outputs), runtime_reqs=ExtensionSet([])
+            input=list(inputs),
+            output=list(outputs),
         )
 
     def deserialize(self) -> ops.CFG:
@@ -504,7 +498,6 @@ class ExtensionOp(DataflowOp):
     extension: ExtensionId
     name: str
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
-    description: str = ""
     args: list[stys.TypeArg] = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:

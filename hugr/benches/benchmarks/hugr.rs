@@ -2,10 +2,11 @@
 
 pub mod examples;
 
-use criterion::{black_box, criterion_group, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
+use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, black_box, criterion_group};
+use hugr::Hugr;
+use hugr::envelope::{EnvelopeConfig, EnvelopeFormat};
 #[allow(unused)]
 use hugr::std_extensions::STD_REG;
-use hugr::Hugr;
 
 pub use examples::{circuit, simple_cfg_hugr, simple_dfg_hugr};
 
@@ -17,28 +18,34 @@ trait Serializer {
 struct JsonSer;
 impl Serializer for JsonSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
-        serde_json::to_vec(hugr).unwrap()
+        let mut cfg = EnvelopeConfig::default();
+        cfg.format = EnvelopeFormat::PackageJson;
+        cfg.zstd = None;
+
+        let mut bytes = Vec::new();
+        hugr.store(&mut bytes, cfg).unwrap();
+        bytes
     }
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
-        serde_json::from_slice(bytes).unwrap()
+        Hugr::load(bytes, None).unwrap()
     }
 }
 
-#[cfg(feature = "model_unstable")]
 struct CapnpSer;
 
-#[cfg(feature = "model_unstable")]
 impl Serializer for CapnpSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
-        let bump = bumpalo::Bump::new();
-        let module = hugr_core::export::export_hugr(hugr, &bump);
-        hugr_model::v0::binary::write_to_vec(&module)
+        let mut cfg = EnvelopeConfig::default();
+        cfg.format = EnvelopeFormat::ModelWithExtensions;
+        cfg.zstd = Some(Default::default());
+
+        let mut bytes = Vec::new();
+        hugr.store(&mut bytes, cfg).unwrap();
+        bytes
     }
 
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
-        let bump = bumpalo::Bump::new();
-        let module = hugr_model::v0::binary::read_from_slice(bytes, &bump).unwrap();
-        hugr_core::import::import_hugr(&module, &STD_REG).unwrap()
+        Hugr::load(bytes, None).unwrap()
     }
 }
 
@@ -65,7 +72,7 @@ fn bench_serialization(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("circuit_roundtrip/json");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-    for size in [0, 1, 10, 100, 1000].iter() {
+    for size in &[0, 1, 10, 100, 1000] {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size).0;
             b.iter(|| {
@@ -77,7 +84,7 @@ fn bench_serialization(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("circuit_serialize/json");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-    for size in [0, 1, 10, 100, 1000].iter() {
+    for size in &[0, 1, 10, 100, 1000] {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size).0;
             b.iter(|| {
@@ -87,20 +94,17 @@ fn bench_serialization(c: &mut Criterion) {
     }
     group.finish();
 
-    #[cfg(feature = "model_unstable")]
-    {
-        let mut group = c.benchmark_group("circuit_roundtrip/capnp");
-        group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-        for size in [0, 1, 10, 100, 1000].iter() {
-            group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
-                let h = circuit(size).0;
-                b.iter(|| {
-                    black_box(roundtrip(&h, CapnpSer));
-                });
+    let mut group = c.benchmark_group("circuit_roundtrip/capnp");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    for size in &[0, 1, 10, 100, 1000] {
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            let h = circuit(size).0;
+            b.iter(|| {
+                black_box(roundtrip(&h, CapnpSer));
             });
-        }
-        group.finish();
+        });
     }
+    group.finish();
 }
 
 criterion_group! {

@@ -1,0 +1,50 @@
+(hugr 0)
+
+(mod)
+
+(define-func main
+  (core.fn
+    [arithmetic.int.types.int
+      arithmetic.int.types.int
+      arithmetic.int.types.int
+      arithmetic.int.types.int]
+    [arithmetic.int.types.int
+      arithmetic.int.types.int
+      arithmetic.int.types.int
+      arithmetic.int.types.int])
+  (dfg [%0 %1 %2 %3] [%4 %5 %6 %7]
+    (signature
+      (core.fn
+        [arithmetic.int.types.int
+         arithmetic.int.types.int
+         arithmetic.int.types.int
+         arithmetic.int.types.int]
+        [arithmetic.int.types.int
+         arithmetic.int.types.int
+         arithmetic.int.types.int
+         arithmetic.int.types.int]))
+
+    (meta (core.order_hint.order 1 2))
+    (meta (core.order_hint.order 1 0))
+    (meta (core.order_hint.order 2 3))
+    (meta (core.order_hint.order 0 3))
+
+    (arithmetic.int.ineg
+      [%0] [%4]
+      (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+      (meta (core.order_hint.key 0)))
+
+    (arithmetic.int.ineg
+      [%1] [%5]
+      (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+      (meta (core.order_hint.key 1)))
+
+    (arithmetic.int.ineg
+      [%2] [%6]
+      (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+      (meta (core.order_hint.key 2)))
+
+    (arithmetic.int.ineg
+      [%3] [%7]
+      (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+      (meta (core.order_hint.key 3)))))

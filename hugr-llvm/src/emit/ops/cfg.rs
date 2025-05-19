@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr_core::{
-    ops::{DataflowBlock, ExitBlock, OpType, CFG},
+    HugrView, Node, NodeIndex,
+    ops::{CFG, DataflowBlock, ExitBlock, OpType},
     types::SumType,
-    HugrView, NodeIndex,
 };
 use inkwell::{basic_block::BasicBlock, values::BasicValueEnum};
 use itertools::Itertools as _;
 
 use crate::{
     emit::{
-        func::{EmitFuncContext, RowMailBox, RowPromise},
         EmitOpArgs,
+        func::{EmitFuncContext, RowMailBox, RowPromise},
     },
     sum::LLVMSumValue,
     utils::fat::FatNode,
@@ -29,7 +29,7 @@ pub struct CfgEmitter<'c, 'hugr, H> {
     exit_node: FatNode<'hugr, ExitBlock, H>,
 }
 
-impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
+impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
     // Constructs a new CfgEmitter. Creates a basic block for each of
     // the children in the llvm function. Note that this does not move the
     // position of the builder.
@@ -64,9 +64,9 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
         let (entry_node, exit_node) = node.get_entry_exit();
         Ok(CfgEmitter {
             bbs,
-            node,
             inputs,
             outputs,
+            node,
             entry_node,
             exit_node,
         })
@@ -109,7 +109,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
         for child_node in self.node.children() {
             let (inputs, outputs) = (vec![], RowMailBox::new_empty().promise());
             match child_node.as_ref() {
-                OpType::DataflowBlock(ref dfb) => self.emit_dataflow_block(
+                OpType::DataflowBlock(dfb) => self.emit_dataflow_block(
                     context,
                     EmitOpArgs {
                         node: child_node.into_ot(dfb),
@@ -117,7 +117,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
                         outputs,
                     },
                 ),
-                OpType::ExitBlock(ref eb) => self.emit_exit_block(
+                OpType::ExitBlock(eb) => self.emit_exit_block(
                     context,
                     EmitOpArgs {
                         node: child_node.into_ot(eb),
@@ -130,7 +130,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
                 // technically not allowed, but there is no harm in allowing it.
                 OpType::Const(_) => Ok(()),
                 OpType::FuncDecl(_) => Ok(()),
-                OpType::FuncDefn(ref fd) => {
+                OpType::FuncDefn(fd) => {
                     context.push_todo_func(child_node.into_ot(fd));
                     Ok(())
                 }
@@ -218,8 +218,8 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer, SubContainer};
+    use hugr_core::extension::ExtensionRegistry;
     use hugr_core::extension::prelude::{self, bool_t};
-    use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
     use hugr_core::ops::Value;
     use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
     use hugr_core::type_row;
@@ -229,18 +229,16 @@ mod test {
 
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::extension::int::add_int_extensions;
-    use crate::test::{llvm_ctx, TestContext};
+    use crate::test::{TestContext, llvm_ctx};
 
     use crate::check_emission;
     use crate::types::HugrType;
 
     #[rstest]
     fn diverse_outputs(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_int_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         let t1 = INT_TYPES[0].clone();
         let t2 = INT_TYPES[1].clone();
-        let es = ExtensionSet::from_iter([int_types::EXTENSION_ID, prelude::PRELUDE_ID]);
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), t2.clone()])
             .with_outs(t2.clone())
@@ -251,11 +249,7 @@ mod test {
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let mut cfg_builder = builder
-                    .cfg_builder_exts(
-                        [(t1.clone(), in1), (t2.clone(), in2)],
-                        t2.clone().into(),
-                        es.clone(),
-                    )
+                    .cfg_builder([(t1.clone(), in1), (t2.clone(), in2)], t2.clone().into())
                     .unwrap();
 
                 // entry block takes (t1,t2) and unconditionally branches to b1 with no other outputs

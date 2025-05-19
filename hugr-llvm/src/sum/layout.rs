@@ -1,5 +1,5 @@
 //! The algorithm for computing the fields of the struct representing a
-//! [HugrSumType].
+//! [`HugrSumType`].
 //!
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
@@ -7,12 +7,13 @@ use std::fmt;
 use std::{borrow::Cow, ops::Range};
 
 use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::values::IntValue;
 use itertools::Itertools as _;
 
 use super::elidable_type;
 
 /// Compute the layout of the non-tag fields of the struct representing a
-/// HugrSumType
+/// `HugrSumType`
 ///
 /// The first return value are the non-tag fields of the struct.
 ///
@@ -39,12 +40,15 @@ pub(super) fn layout_variants<'c>(
 
 fn size_of_type<'c>(t: impl BasicType<'c>) -> Option<u64> {
     match t.as_basic_type_enum() {
-        BasicTypeEnum::ArrayType(t) => t.size_of().and_then(|x| x.get_zero_extended_constant()),
+        BasicTypeEnum::ArrayType(t) => t.size_of().and_then(IntValue::get_zero_extended_constant),
         BasicTypeEnum::FloatType(t) => t.size_of().get_zero_extended_constant(),
         BasicTypeEnum::IntType(t) => t.size_of().get_zero_extended_constant(),
         BasicTypeEnum::PointerType(t) => t.size_of().get_zero_extended_constant(),
-        BasicTypeEnum::StructType(t) => t.size_of().and_then(|x| x.get_zero_extended_constant()),
-        BasicTypeEnum::VectorType(t) => t.size_of().and_then(|x| x.get_zero_extended_constant()),
+        BasicTypeEnum::StructType(t) => t.size_of().and_then(IntValue::get_zero_extended_constant),
+        BasicTypeEnum::VectorType(t) => t.size_of().and_then(IntValue::get_zero_extended_constant),
+        BasicTypeEnum::ScalableVectorType(t) => {
+            t.size_of().and_then(IntValue::get_zero_extended_constant)
+        }
     }
 }
 
@@ -54,7 +58,7 @@ fn size_of_type<'c>(t: impl BasicType<'c>) -> Option<u64> {
 struct BasicTypeOrd<'c>(
     BasicTypeEnum<'c>,
     #[debug(skip)] u64,
-    #[debug(skip)] Cow<'c, String>,
+    #[debug(skip)] Cow<'c, str>,
 );
 
 impl<'c> From<BasicTypeEnum<'c>> for BasicTypeOrd<'c> {
@@ -188,7 +192,7 @@ fn layout_variants_impl<T: Ord + Clone + fmt::Debug>(
         for (variant, variant_layout) in itertools::zip_eq(variants, layout.iter()) {
             for (t, &mb_field_index) in itertools::zip_eq(variant, variant_layout) {
                 if elide(t) {
-                    assert!(mb_field_index.is_none())
+                    assert!(mb_field_index.is_none());
                 } else {
                     assert_eq!(
                         Some(t),

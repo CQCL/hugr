@@ -4,7 +4,7 @@ use fxhash::FxHasher;
 use indexmap::IndexMap;
 use thiserror::Error;
 
-use crate::v0::{NodeId, RegionId};
+use crate::v0::table::{NodeId, RegionId};
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -23,7 +23,7 @@ type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 /// # Examples
 ///
 /// ```
-/// # pub use hugr_model::v0::{NodeId, RegionId};
+/// # pub use hugr_model::v0::table::{NodeId, RegionId};
 /// # pub use hugr_model::v0::scope::SymbolTable;
 /// let mut symbols = SymbolTable::new();
 /// symbols.enter(RegionId(0));
@@ -48,6 +48,7 @@ pub struct SymbolTable<'a> {
 
 impl<'a> SymbolTable<'a> {
     /// Create a new symbol table.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -117,6 +118,7 @@ impl<'a> SymbolTable<'a> {
     }
 
     /// Check whether a symbol is currently visible in the current scope.
+    #[must_use]
     pub fn is_visible(&self, node: NodeId) -> bool {
         let Some(binding) = self.bindings.get(&node) else {
             return false;
@@ -140,11 +142,13 @@ impl<'a> SymbolTable<'a> {
     }
 
     /// Returns the depth of the given region, if it corresponds to a currently open scope.
+    #[must_use]
     pub fn region_to_depth(&self, region: RegionId) -> Option<ScopeDepth> {
         Some(self.scopes.get_index_of(&region)? as _)
     }
 
     /// Returns the region corresponding to the scope at the given depth.
+    #[must_use]
     pub fn depth_to_region(&self, depth: ScopeDepth) -> Option<RegionId> {
         let (region, _) = self.scopes.get_index(depth as _)?;
         Some(*region)

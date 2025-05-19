@@ -1,22 +1,25 @@
-use anyhow::{anyhow, bail, ensure, Ok, Result};
+use anyhow::{Ok, Result, anyhow, bail, ensure};
+use hugr_core::Node;
 use hugr_core::extension::prelude::generic::LoadNat;
 use hugr_core::extension::prelude::{
-    self, error_type, generic, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple,
-    TupleOpDef, UnpackTuple,
+    self, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple, TupleOpDef,
+    UnpackTuple, error_type, generic,
 };
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
+use hugr_core::ops::ExtensionOp;
 use hugr_core::types::TypeArg;
 use hugr_core::{
-    extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst, types::SumType,
-    HugrView,
+    HugrView, extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst,
+    types::SumType,
 };
 use inkwell::{
+    AddressSpace,
     types::{BasicType, IntType, PointerType},
     values::{BasicValue as _, BasicValueEnum, StructValue},
-    AddressSpace,
 };
 use itertools::Itertools;
 
+use crate::emit::EmitOpArgs;
 use crate::{
     custom::{CodegenExtension, CodegenExtsBuilder},
     emit::{
@@ -27,28 +30,28 @@ use crate::{
     types::TypingSession,
 };
 
-/// A helper trait for customising the lowering [hugr_core::extension::prelude]
-/// types, [CustomConst]s, and ops.
+/// A helper trait for customising the lowering [`hugr_core::extension::prelude`]
+/// types, [`CustomConst`]s, and ops.
 ///
-/// All methods have sensible defaults provided, and [DefaultPreludeCodegen] is
+/// All methods have sensible defaults provided, and [`DefaultPreludeCodegen`] is
 /// a trivial implementation of this trait which delegates everything to those
 /// default implementations.
 pub trait PreludeCodegen: Clone {
-    /// Return the llvm type of [hugr_core::extension::prelude::usize_t]. That type
-    /// must be an [IntType].
+    /// Return the llvm type of [`hugr_core::extension::prelude::usize_t`]. That type
+    /// must be an [`IntType`].
     fn usize_type<'c>(&self, session: &TypingSession<'c, '_>) -> IntType<'c> {
         session.iw_context().i64_type()
     }
 
-    /// Return the llvm type of [hugr_core::extension::prelude::qb_t].
+    /// Return the llvm type of [`hugr_core::extension::prelude::qb_t`].
     fn qubit_type<'c>(&self, session: &TypingSession<'c, '_>) -> impl BasicType<'c> {
         session.iw_context().i16_type()
     }
 
-    /// Return the llvm type of [hugr_core::extension::prelude::error_type()].
+    /// Return the llvm type of [`hugr_core::extension::prelude::error_type()`].
     ///
     /// The returned type must always match the type of the returned value of
-    /// [Self::emit_const_error], and the `err` argument of [Self::emit_panic].
+    /// [`Self::emit_const_error`], and the `err` argument of [`Self::emit_panic`].
     ///
     /// The default implementation is a struct type with an i32 field and an i8*
     /// field for the code and message.
@@ -63,8 +66,21 @@ pub trait PreludeCodegen: Clone {
         ))
     }
 
-    /// Emit a [hugr_core::extension::prelude::PRINT_OP_ID] node.
-    fn emit_print<H: HugrView>(
+    /// Return the llvm type of [`hugr_core::extension::prelude::string_type()`].
+    ///
+    /// The returned type must always match the type of the returned value of
+    /// [`Self::emit_const_string`], and the `text` argument of [`Self::emit_print`].
+    ///
+    /// The default implementation is i8*.
+    fn string_type<'c>(&self, session: &TypingSession<'c, '_>) -> Result<impl BasicType<'c>> {
+        Ok(session
+            .iw_context()
+            .i8_type()
+            .ptr_type(AddressSpace::default()))
+    }
+
+    /// Emit a [`hugr_core::extension::prelude::PRINT_OP_ID`] node.
+    fn emit_print<H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<H>,
         text: BasicValueEnum,
@@ -78,11 +94,11 @@ pub trait PreludeCodegen: Clone {
 
     /// Emit instructions to materialise an LLVM value representing `err`.
     ///
-    /// The type of the returned value must match [Self::error_type].
+    /// The type of the returned value must match [`Self::error_type`].
     ///
     /// The default implementation materialises an LLVM struct with the
-    /// [ConstError::signal] and [ConstError::message] of `err`.
-    fn emit_const_error<'c, H: HugrView>(
+    /// [`ConstError::signal`] and [`ConstError::message`] of `err`.
+    fn emit_const_error<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         err: &ConstError,
@@ -93,7 +109,7 @@ pub trait PreludeCodegen: Clone {
             .get_field_type_at_index(0)
             .unwrap()
             .into_int_type()
-            .const_int(err.signal as u64, false);
+            .const_int(u64::from(err.signal), false);
         let message = builder
             .build_global_string_ptr(&err.message, "")?
             .as_basic_value_enum();
@@ -103,13 +119,13 @@ pub trait PreludeCodegen: Clone {
 
     /// Emit instructions to halt execution with the error `err`.
     ///
-    /// The type of `err` must match that returned from [Self::error_type].
+    /// The type of `err` must match that returned from [`Self::error_type`].
     ///
     /// The default implementation emits calls to libc's `printf` and `abort`.
     ///
     /// Note that implementations of `emit_panic` must not emit `unreachable`
     /// terminators, that, if appropriate, is the responsibility of the caller.
-    fn emit_panic<H: HugrView>(
+    fn emit_panic<H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<H>,
         err: BasicValueEnum,
@@ -132,9 +148,59 @@ pub trait PreludeCodegen: Clone {
         emit_libc_printf(ctx, &[format_str.into(), signal.into(), msg.into()])?;
         emit_libc_abort(ctx)
     }
+
+    /// Emit instructions to halt execution with the error `err`.
+    ///
+    /// The type of `err` must match that returned from [`Self::error_type`].
+    ///
+    /// The default implementation emits calls to libc's `printf` and `abort`,
+    /// matching the default implementation of [`Self::emit_panic`].
+    ///
+    /// Note that implementations of `emit_panic` must not emit `unreachable`
+    /// terminators, that, if appropriate, is the responsibility of the caller.
+    fn emit_exit<H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<H>,
+        err: BasicValueEnum,
+    ) -> Result<()> {
+        self.emit_panic(ctx, err)
+    }
+
+    /// Emit instructions to materialise an LLVM value representing `str`.
+    ///
+    /// The type of the returned value must match [`Self::string_type`].
+    ///
+    /// The default implementation creates a global C string.
+    fn emit_const_string<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        str: &ConstString,
+    ) -> Result<BasicValueEnum<'c>> {
+        let default_str_type = ctx
+            .iw_context()
+            .i8_type()
+            .ptr_type(AddressSpace::default())
+            .as_basic_type_enum();
+        let str_type = ctx.llvm_type(&str.get_type())?.as_basic_type_enum();
+        ensure!(
+            str_type == default_str_type,
+            "The default implementation of PreludeCodegen::string_type was overridden, but the default implementation of emit_const_string was not. String type is: {str_type}"
+        );
+        let s = ctx.builder().build_global_string_ptr(str.value(), "")?;
+        Ok(s.as_basic_value_enum())
+    }
+
+    fn emit_barrier<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    ) -> Result<()> {
+        // By default, treat barriers as no-ops.
+        args.outputs.finish(ctx.builder(), args.inputs)
+    }
 }
 
-/// A trivial implementation of [PreludeCodegen] which passes all methods
+/// A trivial implementation of [`PreludeCodegen`] which passes all methods
 /// through to their default implementations.
 #[derive(Default, Clone)]
 pub struct DefaultPreludeCodegen;
@@ -157,7 +223,7 @@ impl<PCG: PreludeCodegen> From<PCG> for PreludeCodegenExtension<PCG> {
 }
 
 impl<PCG: PreludeCodegen> CodegenExtension for PreludeCodegenExtension<PCG> {
-    fn add_extension<'a, H: HugrView + 'a>(
+    fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H>
@@ -168,23 +234,24 @@ impl<PCG: PreludeCodegen> CodegenExtension for PreludeCodegenExtension<PCG> {
     }
 }
 
-impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [PreludeCodegenExtension] to the given [CodegenExtsBuilder] using `pcg`
+impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
+    /// Add a [`PreludeCodegenExtension`] to the given [`CodegenExtsBuilder`] using `pcg`
     /// as the implementation.
+    #[must_use]
     pub fn add_default_prelude_extensions(self) -> Self {
         self.add_prelude_extensions(DefaultPreludeCodegen)
     }
 
-    /// Add a [PreludeCodegenExtension] to the given [CodegenExtsBuilder] using
-    /// [DefaultPreludeCodegen] as the implementation.
+    /// Add a [`PreludeCodegenExtension`] to the given [`CodegenExtsBuilder`] using
+    /// [`DefaultPreludeCodegen`] as the implementation.
     pub fn add_prelude_extensions(self, pcg: impl PreludeCodegen + 'a) -> Self {
         self.add_extension(PreludeCodegenExtension::from(pcg))
     }
 }
 
-/// Add a [PreludeCodegenExtension] to the given [CodegenExtsMap] using `pcg`
+/// Add a [`PreludeCodegenExtension`] to the given [`CodegenExtsBuilder`] using `pcg`
 /// as the implementation.
-fn add_prelude_extensions<'a, H: HugrView + 'a>(
+pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
     cem: CodegenExtsBuilder<'a, H>,
     pcg: impl PreludeCodegen + 'a,
 ) -> CodegenExtsBuilder<'a, H> {
@@ -196,25 +263,19 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.usize_type(&ts).as_basic_type_enum())
     })
-    .custom_type((prelude::PRELUDE_ID, STRING_TYPE_NAME.clone()), {
-        move |ts, _| {
-            // TODO allow customising string type
-            Ok(ts
-                .iw_context()
-                .i8_type()
-                .ptr_type(AddressSpace::default())
-                .into())
-        }
-    })
     .custom_type((prelude::PRELUDE_ID, ERROR_TYPE_NAME.clone()), {
         let pcg = pcg.clone();
         move |ts, _| Ok(pcg.error_type(&ts)?.as_basic_type_enum())
+    })
+    .custom_type((prelude::PRELUDE_ID, STRING_TYPE_NAME.clone()), {
+        let pcg = pcg.clone();
+        move |ts, _| Ok(pcg.string_type(&ts)?.as_basic_type_enum())
     })
     .custom_const::<ConstUsize>(|context, k| {
         let ty: IntType = context
             .llvm_type(&k.get_type())?
             .try_into()
-            .map_err(|_| anyhow!("Failed to get ConstUsize as IntType"))?;
+            .map_err(|()| anyhow!("Failed to get ConstUsize as IntType"))?;
         Ok(ty.const_int(k.value(), false).into())
     })
     .custom_const::<ConstExternalSymbol>(|context, k| {
@@ -226,10 +287,18 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             .builder()
             .build_load(global.as_pointer_value(), &k.symbol)?)
     })
-    .custom_const::<ConstString>(|context, k| {
-        // TODO we should allow overriding the representation of strings
-        let s = context.builder().build_global_string_ptr(k.value(), "")?;
-        Ok(s.as_basic_value_enum())
+    .custom_const::<ConstString>({
+        let pcg = pcg.clone();
+        move |context, k| {
+            let err = pcg.emit_const_string(context, k)?;
+            ensure!(
+                err.get_type()
+                    == pcg
+                        .string_type(&context.typing_session())?
+                        .as_basic_type_enum()
+            );
+            Ok(err)
+        }
     })
     .custom_const::<ConstError>({
         let pcg = pcg.clone();
@@ -243,6 +312,9 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             );
             Ok(err)
         }
+    })
+    .extension_op(prelude::PRELUDE_ID, prelude::NOOP_OP_ID, |context, args| {
+        args.outputs.finish(context.builder(), args.inputs)
     })
     .simple_extension_op::<TupleOpDef>(|context, args, op| match op {
         TupleOpDef::UnpackTuple => {
@@ -287,12 +359,32 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             let returns = args
                 .outputs
                 .get_types()
-                .map(|ty| ty.const_zero())
+                .map(inkwell::types::BasicTypeEnum::const_zero)
                 .collect_vec();
             args.outputs.finish(context.builder(), returns)
         }
     })
-    .extension_op(prelude::PRELUDE_ID, generic::LOAD_NAT_OP_ID, {
+    .extension_op(prelude::PRELUDE_ID, prelude::EXIT_OP_ID, {
+        // by default treat an exit like a panic
+        let pcg = pcg.clone();
+        move |context, args| {
+            let err = args.inputs[0];
+            ensure!(
+                err.get_type()
+                    == pcg
+                        .error_type(&context.typing_session())?
+                        .as_basic_type_enum()
+            );
+            pcg.emit_exit(context, err)?;
+            let returns = args
+                .outputs
+                .get_types()
+                .map(inkwell::types::BasicTypeEnum::const_zero)
+                .collect_vec();
+            args.outputs.finish(context.builder(), returns)
+        }
+    })
+    .extension_op(prelude::PRELUDE_ID, generic::LOAD_NAT_OP_ID.clone(), {
         let pcg = pcg.clone();
         move |context, args| {
             let load_nat = LoadNat::from_extension_op(args.node().as_ref())?;
@@ -305,21 +397,26 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
             args.outputs.finish(context.builder(), vec![v.into()])
         }
     })
+    .extension_op(prelude::PRELUDE_ID, prelude::BARRIER_OP_ID, {
+        let pcg = pcg.clone();
+        move |context, args| pcg.emit_barrier(context, args)
+    })
 }
 
 #[cfg(test)]
 mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
     use hugr_core::extension::PRELUDE;
+    use hugr_core::extension::prelude::{EXIT_OP_ID, Noop};
     use hugr_core::types::{Type, TypeArg};
-    use hugr_core::{type_row, Hugr};
-    use prelude::{bool_t, qb_t, usize_t, PANIC_OP_ID, PRINT_OP_ID};
-    use rstest::rstest;
+    use hugr_core::{Hugr, type_row};
+    use prelude::{PANIC_OP_ID, PRINT_OP_ID, bool_t, qb_t, usize_t};
+    use rstest::{fixture, rstest};
 
     use crate::check_emission;
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
-    use crate::test::{llvm_ctx, TestContext};
+    use crate::test::{TestContext, exec_ctx, llvm_ctx};
     use crate::types::HugrType;
 
     use super::*;
@@ -411,6 +508,23 @@ mod test {
     }
 
     #[rstest]
+    fn prelude_noop(prelude_llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(usize_t())
+            .with_outs(usize_t())
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let in_wires = builder.input_wires();
+                let r = builder
+                    .add_dataflow_op(Noop::new(usize_t()), in_wires)
+                    .unwrap()
+                    .outputs();
+                builder.finish_with_outputs(r).unwrap()
+            });
+        check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[rstest]
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![bool_t(), bool_t()])
@@ -471,6 +585,34 @@ mod test {
     }
 
     #[rstest]
+    fn prelude_exit(prelude_llvm_ctx: TestContext) {
+        let error_val = ConstError::new(42, "EXIT");
+        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
+        let type_arg_2q: TypeArg = TypeArg::Sequence {
+            elems: vec![type_arg_q.clone(), type_arg_q],
+        };
+        let exit_op = PRELUDE
+            .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
+            .unwrap();
+
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(vec![qb_t(), qb_t()])
+            .with_outs(vec![qb_t(), qb_t()])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let [q0, q1] = builder.input_wires_arr();
+                let err = builder.add_load_value(error_val);
+                let [q0, q1] = builder
+                    .add_dataflow_op(exit_op, [err, q0, q1])
+                    .unwrap()
+                    .outputs_arr();
+                builder.finish_with_outputs([q0, q1]).unwrap()
+            });
+
+        check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[rstest]
     fn prelude_print(prelude_llvm_ctx: TestContext) {
         let greeting: ConstString = ConstString::new("Hello, world!".into());
         let print_op = PRELUDE.instantiate_extension_op(&PRINT_OP_ID, []).unwrap();
@@ -499,5 +641,27 @@ mod test {
                 builder.finish_with_outputs([v]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[fixture]
+    fn barrier_hugr() -> Hugr {
+        SimpleHugrConfig::new()
+            .with_outs(vec![usize_t()])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let i = builder.add_load_value(ConstUsize::new(42));
+                let [w1, _w2] = builder.add_barrier([i, i]).unwrap().outputs_arr();
+                builder.finish_with_outputs([w1]).unwrap()
+            })
+    }
+
+    #[rstest]
+    fn prelude_barrier(prelude_llvm_ctx: TestContext, barrier_hugr: Hugr) {
+        check_emission!(barrier_hugr, prelude_llvm_ctx);
+    }
+    #[rstest]
+    fn prelude_barrier_exec(mut exec_ctx: TestContext, barrier_hugr: Hugr) {
+        exec_ctx.add_extensions(|cem| add_prelude_extensions(cem, TestPreludeCodegen));
+        assert_eq!(exec_ctx.exec_hugr_u64(barrier_hugr, "main"), 42);
     }
 }

@@ -30,6 +30,10 @@ if TYPE_CHECKING:
 OpVar = TypeVar("OpVar", bound=ops.Op)
 
 
+class DataflowError(Exception):
+    """Error building a :class:`DfBase` dataflow graph."""
+
+
 @dataclass()
 class DefinitionBuilder(Generic[OpVar]):
     """Base class for builders that can define functions, constants, and aliases.
@@ -55,12 +59,12 @@ class DefinitionBuilder(Generic[OpVar]):
             output_types: The output types for the function.
                 If not provided, it will be inferred after the function is built.
             type_params: The type parameters for the function, if polymorphic.
-            parent: The parent node of the constant. Defaults to the root node.
+            parent: The parent node of the constant. Defaults to the entrypoint node.
 
         Returns:
             The new function builder.
         """
-        parent_node = parent or self.hugr.root
+        parent_node = parent or self.hugr.entrypoint
         parent_op = ops.FuncDefn(name, input_types, type_params or [])
         func = Function.new_nested(parent_op, self.hugr, parent_node)
         if output_types is not None:
@@ -72,7 +76,7 @@ class DefinitionBuilder(Generic[OpVar]):
 
         Args:
             value: The constant value to add.
-            parent: The parent node of the constant. Defaults to the root node.
+            parent: The parent node of the constant. Defaults to the entrypoint node.
 
         Returns:
             The node holding the :class:`Const <hugr.ops.Const>` operation.
@@ -83,12 +87,12 @@ class DefinitionBuilder(Generic[OpVar]):
             >>> dfg.hugr[const_n].op
             Const(TRUE)
         """
-        parent_node = parent or self.hugr.root
+        parent_node = parent or self.hugr.entrypoint
         return self.hugr.add_node(ops.Const(value), parent_node)
 
     def add_alias_defn(self, name: str, ty: Type, parent: ToNode | None = None) -> Node:
         """Add a type alias definition."""
-        parent_node = parent or self.hugr.root
+        parent_node = parent or self.hugr.entrypoint
         return self.hugr.add_node(ops.AliasDefn(name, ty), parent_node)
 
 
@@ -114,7 +118,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
 
     def __init__(self, parent_op: DP) -> None:
         self.hugr = Hugr(parent_op)
-        self.parent_node = self.hugr.root
+        self.parent_node = self.hugr.entrypoint
         self._init_io_nodes(parent_op)
 
     def _init_io_nodes(self, parent_op: DP):
@@ -141,7 +145,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             parent_op: The parent operation of the new dataflow graph.
             hugr: The host HUGR instance to build the dataflow graph in.
             parent: Parent of new dataflow graph's root node: defaults to the
-            host HUGR root.
+            host HUGR entrypoint.
 
         Example:
             >>> hugr = Hugr()
@@ -152,8 +156,42 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         new = cls.__new__(cls)
 
         new.hugr = hugr
-        new.parent_node = hugr.add_node(parent_op, parent or hugr.root)
+        new.parent_node = hugr.add_node(parent_op, parent or hugr.entrypoint)
         new._init_io_nodes(parent_op)
+        return new
+
+    @classmethod
+    def _new_existing(cls, hugr: Hugr, root: ToNode | None = None) -> Self:
+        """Start a dataflow graph builder for an existing node.
+
+        Args:
+            hugr: The host HUGR instance to build the dataflow graph in.
+            root: The dataflow graph's root node.
+                Defaults to the host HUGR's entrypoint.
+
+        Example:
+            >>> hugr = Hugr(ops.DFG([]))
+            >>> dfg = Dfg._new_existing(hugr)
+            >>> dfg.parent_node
+            Node(4)
+
+        Raises:
+            :class:`DataflowError` if the `root` operation is not a dataflow
+            parent.
+        """
+        root = root or hugr.entrypoint
+
+        if not ops.is_df_parent_op(hugr[root].op):
+            msg = f"{hugr[root].op} is not a dataflow parent"
+            raise DataflowError(msg)
+
+        new = cls.__new__(cls)
+        new.hugr = hugr
+        new.parent_node = root.to_node()
+        [inp, out] = hugr.children(root)[:2]
+        new.input_node = inp
+        new.output_node = out
+
         return new
 
     def _input_op(self) -> ops.Input:
@@ -256,7 +294,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             args: The input wires to the graph.
 
         Returns:
-            The root node of the inserted graph.
+            The entrypoint node of the inserted graph.
 
         Example:
             >>> dfg = Dfg(tys.Bool)
@@ -482,7 +520,14 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> dfg.set_outputs(dfg.inputs()[0]) # connect input to output
         """
         self._wire_up(self.output_node, args)
-        self.parent_op._set_out_types(self._output_op().types)
+        out_types = self._output_op().types
+        self.parent_op._set_out_types(out_types)
+        if (
+            isinstance(self.parent_op, ops.DataflowOp)
+            and self.parent_op._entrypoint_requires_wiring
+            and self.hugr.entrypoint == self.parent_node
+        ):
+            self.hugr._connect_df_entrypoint_outputs()
 
     def _set_parent_output_count(self, count: int) -> None:
         """Set the final number of output ports on the parent operation.
@@ -510,10 +555,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             [Node(2)]
         """
         # adds edge to the right of all existing edges
-        source = src.out(-1)
-        target = dst.inp(-1)
-        if not self.hugr.has_link(source, target):
-            self.hugr.add_link(source, target)
+        self.hugr.add_order_link(src, dst)
 
     def load(
         self, const: ToNode | val.Value, const_parent: ToNode | None = None
@@ -647,7 +689,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
 
 
 class Dfg(DfBase[ops.DFG]):
-    """Builder for a simple nested Dataflow graph, with root node of type
+    """Builder for a simple nested Dataflow graph, with entrypoint node of type
     :class:`DFG <hugr.ops.DFG>`.
 
     Args:
@@ -665,8 +707,8 @@ class Dfg(DfBase[ops.DFG]):
         super().__init__(parent_op)
 
     def set_outputs(self, *outputs: Wire) -> None:
-        super().set_outputs(*outputs)
         self._set_parent_output_count(len(outputs))
+        super().set_outputs(*outputs)
 
 
 def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
