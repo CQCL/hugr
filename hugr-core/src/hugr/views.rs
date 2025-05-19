@@ -642,7 +642,7 @@ impl HugrView for Hugr {
         self.graph
             .mermaid_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(self, config))
+            .with_node_style(render::node_style(self, config, |n| n.index().to_string()))
             .with_edge_style(render::edge_style(self, config))
             .finish()
     }
@@ -658,7 +658,7 @@ impl HugrView for Hugr {
         self.graph
             .dot_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(self, config))
+            .with_node_style(render::node_style(self, config, |n| n.index().to_string()))
             .with_port_style(render::port_style(self, config))
             .with_edge_style(render::edge_style(self, config))
             .finish()
