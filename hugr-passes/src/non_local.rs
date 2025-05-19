@@ -296,7 +296,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             output_node: o,
             variant_source_prefixes: new_sum_row_prefixes,
         }
-        .go(&mut hugr, psm);
+        .go(hugr, None);
         self.thread_dataflow_parent(hugr, node, 0, srcs);
     }
 
@@ -327,7 +327,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             output_node,
             variant_source_prefixes,
         }
-        .go(&mut hugr, psm)
+        .go(hugr, None)
     }
 }
 
@@ -452,7 +452,14 @@ struct ControlWorkItem<N: HugrNode> {
 }
 
 impl<N: HugrNode> ControlWorkItem<N> {
-    fn go(self, hugr: &mut impl HugrMut<Node = N>, psm: &ParentSourceMap<N>) {
+    fn go<'a>(
+        self,
+        hugr: &mut impl HugrMut<Node = N>,
+        psm: impl Into<Option<&'a ParentSourceMap<N>>>,
+    ) where
+        N: 'a,
+    {
+        let psm = psm.into();
         let parent = hugr.get_parent(self.output_node).unwrap();
         let Some(mut output) = hugr.get_optype(self.output_node).as_output().cloned() else {
             panic!("impossible")
@@ -470,7 +477,17 @@ impl<N: HugrNode> ControlWorkItem<N> {
             };
 
             let mut type_for_source = |source: &Wire<N>| {
-                let (w, t) = psm.get_source_in_parent(parent, *source, &hugr);
+                let (w, t) = match psm {
+                    Some(psm) => psm.get_source_in_parent(parent, *source, &hugr),
+                    None => (
+                        *source,
+                        hugr.signature(source.node())
+                            .unwrap()
+                            .out_port_type(source.source())
+                            .unwrap()
+                            .clone(),
+                    ),
+                };
                 let replaced = needed_sources.insert(*source, (w, t.clone()));
                 debug_assert!(!replaced.is_some_and(|x| x != (w, t.clone())));
                 t
