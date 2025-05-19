@@ -211,7 +211,9 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
                         .collect::<Vec<_>>()
                 ); // Entry node
                 for bb in hugr.children(node).collect::<Vec<_>>() {
-                    self.thread_bb(hugr, bb);
+                    if hugr.get_optype(bb).is_dataflow_block() {
+                        self.thread_bb(hugr, bb);
+                    }
                 }
                 0
             }
@@ -258,6 +260,15 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
                 .collect()
         };
         for ch in hugr.children(node).collect::<Vec<_>>() {
+            for (inp, _) in hugr.in_value_types(ch).collect::<Vec<_>>() {
+                if let Some((src_n, src_p)) = hugr.single_linked_output(ch, inp) {
+                    if hugr.get_parent(src_n) != Some(node) {
+                        hugr.disconnect(ch, inp);
+                        let new_p = nlocals.get(&Wire::new(src_n, src_p)).unwrap();
+                        hugr.connect(new_p.node(), new_p.source(), ch, inp);
+                    }
+                }
+            }
             self.thread_node(hugr, ch, &nlocals);
         }
         nlocals
@@ -307,7 +318,6 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             0,
             self.get(node).map(|(w, t)| (*w, t.clone())).collect(),
         );
-        let [_, output_node] = hugr.get_io(node).unwrap();
         let variant_source_prefixes = hugr
             .output_neighbours(node)
             .map(|succ| {
@@ -323,6 +333,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
                     .collect()
             })
             .collect();
+        let [_, output_node] = hugr.get_io(node).unwrap();
         ControlWorkItem {
             output_node,
             variant_source_prefixes,
@@ -856,25 +867,7 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), NonLocalEdg
         }
     }
 
-    // Here we mutate the HUGR; adding ports to parent nodes and their Input nodes.
-    // The result is:
-    //  * parent_source_map: A map from parent and source to the wire that should substitute for that source in that parent.
-    //  * worklist: a list of workitems. Each should be fulfilled by connecting the source, substituted through parent_source_map, to the target.
-    //  * control_worklist: A list of control ports (i.e. 0th output port of DataflowBlock or TailLoop) that must be rewired.
-    let (parent_source_map, worklist, control_worklist) = {
-        let mut worklist = nonlocal_edges_map.into_values().collect_vec();
-        let (wl, psm, control_worklist) = thread_sources(hugr, &bb_needs_sources_map);
-        worklist.extend(wl);
-        (psm, worklist, control_worklist)
-    };
-
-    for wi in worklist {
-        wi.go(hugr, &parent_source_map)
-    }
-
-    for cwi in control_worklist {
-        cwi.go(hugr, &parent_source_map)
-    }
+    bb_needs_sources_map.thread_node(hugr, hugr.entrypoint(), &HashMap::new());
 
     Ok(())
 }
