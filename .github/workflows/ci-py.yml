@@ -16,7 +16,7 @@ env:
   HUGR_BIN_DIR: ${{ github.workspace }}/target/debug
   HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
   # Pinned version for the uv package manager
-  UV_VERSION: "0.4.20"
+  UV_VERSION: "0.7.4"
   UV_FROZEN: 1
 
 jobs:
