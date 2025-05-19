@@ -312,13 +312,20 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
     }
 
     fn thread_bb(&self, hugr: &mut impl HugrMut<Node = N>, node: N) {
+        let OpType::DataflowBlock(this_dfb) = hugr.optype_mut(node) else {
+            panic!("Expected dataflow block")
+        };
+        vec_prepend(
+            this_dfb.inputs.to_mut(),
+            self.get(node).map(|(_, t)| t.clone()),
+        );
         let locals = self.thread_dataflow_parent(
             hugr,
             node,
             0,
             self.get(node).map(|(w, t)| (*w, t.clone())).collect(),
         );
-        let variant_source_prefixes = hugr
+        let variant_source_prefixes: Vec<Vec<(Wire<N>, Type)>> = hugr
             .output_neighbours(node)
             .map(|succ| {
                 // The wires required for each successor block, should be available in the predecessor
@@ -336,6 +343,18 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
                     .collect()
             })
             .collect();
+        let OpType::DataflowBlock(this_dfb) = hugr.optype_mut(node) else {
+            panic!("It worked earlier!")
+        };
+        for (source_prefix, sum_row) in variant_source_prefixes
+            .iter()
+            .zip_eq(this_dfb.sum_rows.iter_mut())
+        {
+            vec_prepend(
+                sum_row.to_mut(),
+                source_prefix.iter().map(|(_, t)| t.clone()),
+            );
+        }
         let [_, output_node] = hugr.get_io(node).unwrap();
         ControlWorkItem {
             output_node,
