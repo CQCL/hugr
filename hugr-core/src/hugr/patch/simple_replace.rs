@@ -653,9 +653,6 @@ pub(in crate::hugr::patch) mod test {
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;
     use crate::hugr::patch::{BoundaryPort, HostPort, PatchVerification, ReplacementPort};
-    use crate::hugr::views::sibling_subgraph::tests::{
-        build_3not_hugr, build_hugr_classical, build_multiport_hugr,
-    };
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
     use crate::ops::OpTag;
