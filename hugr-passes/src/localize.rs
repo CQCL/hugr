@@ -1,5 +1,5 @@
-//! This module provides functions for inspecting and modifying the nature of
-//! non local edges in a Hugr.
+//! This module provides functions for finding non-local edges
+//! in a Hugr and converting them to local edges.
 use delegate::delegate;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -10,41 +10,29 @@ use hugr_core::{HugrView, IncomingPort, core::HugrNode};
 use itertools::{Either, Itertools as _};
 
 use hugr_core::{
-    Direction, PortIndex, Wire,
+    Direction, Wire,
     builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder},
     hugr::{HugrError, hugrmut::HugrMut},
     ops::{DataflowOpTrait as _, OpType, Tag, TailLoop},
     types::{EdgeKind, Type, TypeRow},
 };
 
-// use crate::validation::{ValidatePassError, ValidationLevel};
+use crate::ComposablePass;
 
-/// TODO docs
-// #[derive(Debug, Clone, Default)]
-// pub struct UnNonLocalPass {
-//     validation: ValidationLevel,
-// }
+/// [ComposablePass] that converts all non-local edges in a Hugr
+/// into local ones, by inserting extra inputs to container nodes
+/// and extra outports to Input nodes.
+struct LocalizeEdges;
 
-// impl UnNonLocalPass {
-//     /// Sets the validation level used before and after the pass is run.
-//     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
-//         self.validation = level;
-//         self
-//     }
+impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
+    type Error = NonLocalEdgesError<H::Node>;
 
-//     /// Run the Monomorphization pass.
-//     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), NonLocalEdgesError> {
-//         let root = hugr.root();
-//         remove_nonlocal_edges(hugr, root)?;
-//         Ok(())
-//     }
+    type Result = ();
 
-//     /// Run the pass using specified configuration.
-//     pub fn run<H: HugrMut>(&self, hugr: &mut H) -> Result<(), NonLocalEdgesError> {
-//         self.validation
-//             .run_validated_pass(hugr, |hugr: &mut H, _| self.run_no_validate(hugr))
-//     }
-// }
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        remove_nonlocal_edges(hugr)
+    }
+}
 
 /// Returns an iterator over all non local edges in a Hugr.
 ///
@@ -62,7 +50,7 @@ pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, I
 // Analysis: determining all extra ports that must be added =============================
 #[derive(Debug, Clone)]
 // Map from (parent of target node) to source Wire to Type.
-// `BB` is any (dataflow?) container, not necessarily a Basic Block or in a CFG
+// `BB` is any container, not necessarily a Basic Block or in a CFG
 struct BBNeedsSourcesMap<N: HugrNode>(BTreeMap<N, BTreeMap<Wire<N>, Type>>);
 
 impl<N: HugrNode> Default for BBNeedsSourcesMap<N> {
@@ -610,7 +598,7 @@ mod test {
     }
 
     #[test]
-    fn unnonlocal_dfg() {
+    fn localize_dfg() {
         let mut hugr = {
             let mut outer = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
             let [w0] = outer.input_wires_arr();
@@ -629,7 +617,7 @@ mod test {
     }
 
     #[test]
-    fn unnonlocal_tailloop() {
+    fn localize_tailloop() {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
         let mut hugr = {
             let mut outer = DFGBuilder::new(Signature::new_endo(vec![
@@ -672,7 +660,7 @@ mod test {
     }
 
     #[test]
-    fn unnonlocal_conditional() {
+    fn localize_conditional() {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
         let out_variants = vec![t1.clone().into(), t2.clone().into()];
         let out_type = Type::new_sum(out_variants.clone());
@@ -724,7 +712,7 @@ mod test {
     }
 
     #[test]
-    fn unnonlocal_cfg() {
+    fn localize_cfg() {
         // Cfg consists of 4 dataflow blocks and an exit block
         //
         // The 4 dataflow blocks form a diamond, and the bottom block branches
