@@ -307,7 +307,7 @@ def test_higher_order(snapshot) -> None:
     (q,) = d.inputs()
     f_val = d.load(val.Function(noop_fn.hugr))
     call = d.add(ops.CallIndirect()(f_val, q))[0]
-    d.add_state_order(f_val, call.node)
+    d.add_state_order(d.input_node, f_val)
     d.set_outputs(call)
 
     validate(d.hugr, snap=snapshot)

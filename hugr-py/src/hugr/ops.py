@@ -1286,7 +1286,7 @@ class _CallOrLoad:
             self.type_args = list(type_args)
 
 
-class Call(_CallOrLoad, Op):
+class Call(_CallOrLoad, DataflowOp):
     """Call a function inside a dataflow graph. Connects to :class:`FuncDefn` or
     :class:`FuncDecl` operations.
 
@@ -1319,13 +1319,17 @@ class Call(_CallOrLoad, Op):
         match port:
             case InPort(_, offset) if offset == self._function_port_offset():
                 return tys.FunctionKind(self.signature)
-            case InPort(_, -1) | OutPort(_, -1):
-                return tys.OrderKind()
             case _:
-                return tys.ValueKind(_sig_port_type(self.instantiation, port))
+                return DataflowOp.port_kind(self, port)
 
     def name(self) -> str:
         return "Call"
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.instantiation.input
+
+    def outer_signature(self) -> tys.FunctionType:
+        return self.instantiation
 
 
 @dataclass()
