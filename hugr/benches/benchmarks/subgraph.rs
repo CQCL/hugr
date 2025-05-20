@@ -2,9 +2,9 @@
 #![allow(clippy::unit_arg)]
 use hugr::hugr::views::SiblingSubgraph;
 
-use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, black_box, criterion_group};
-
 use super::hugr::circuit;
+use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
+use std::hint::black_box;
 
 fn bench_singleton_subgraph(c: &mut Criterion) {
     let mut group = c.benchmark_group("singleton_subgraph");

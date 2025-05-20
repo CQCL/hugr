@@ -2,11 +2,12 @@
 
 pub mod examples;
 
-use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, black_box, criterion_group};
+use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
 use hugr::Hugr;
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat};
 #[allow(unused)]
 use hugr::std_extensions::STD_REG;
+use std::hint::black_box;
 
 pub use examples::{circuit, simple_cfg_hugr, simple_dfg_hugr};
 

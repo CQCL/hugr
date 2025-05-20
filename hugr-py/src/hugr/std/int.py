@@ -66,7 +66,6 @@ class IntVal(val.ExtensionValue):
             name,
             typ=int_t(self.width),
             val=payload,
-            extensions=[INT_TYPES_EXTENSION.name],
         )
 
     def __str__(self) -> str:

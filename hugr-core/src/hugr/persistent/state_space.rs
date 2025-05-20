@@ -7,13 +7,13 @@ use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use super::{
-    find_conflicting_node, parents_view::ParentsView, Commit, PersistentHugr,
-    PersistentReplacement, PointerEqResolver,
+    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, find_conflicting_node,
+    parents_view::ParentsView,
 };
 use crate::{
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
     hugr::{internal::HugrInternals, patch::BoundaryPort},
     ops::OpType,
-    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
 };
 
 /// A copyable handle to a [`Commit`] vertex within a [`CommitStateSpace`]

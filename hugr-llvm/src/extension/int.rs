@@ -1463,35 +1463,43 @@ mod test {
     }
 
     #[rstest]
-    fn test_exec_widen(int_exec_ctx: TestContext) {
-        let from: u8 = 1;
+    #[case(-127)]
+    #[case(-1)]
+    #[case(0)]
+    #[case(1)]
+    #[case(127)]
+    fn test_exec_widen(int_exec_ctx: TestContext, #[case] num: i16) {
+        let from: u8 = 3;
         let to: u8 = 6;
         let ty = INT_TYPES[to as usize].clone();
-        let input = ConstInt::new_u(from, 1).unwrap();
 
-        let ext_op = int_ops::EXTENSION
-            .instantiate_extension_op(
-                "iwiden_u".as_ref(),
-                [u64::from(from).into(), u64::from(to).into()],
-            )
-            .unwrap();
+        if num >= 0 {
+            let input = ConstInt::new_u(from, num as u64).unwrap();
 
-        let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
+            let ext_op = int_ops::EXTENSION
+                .instantiate_extension_op(
+                    "iwiden_u".as_ref(),
+                    [(from as u64).into(), (to as u64).into()],
+                )
+                .unwrap();
 
-        assert_eq!(int_exec_ctx.exec_hugr_u64(hugr, "main"), 1);
+            let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
 
-        let input = ConstInt::new_s(from, 1).unwrap();
+            assert_eq!(int_exec_ctx.exec_hugr_u64(hugr, "main"), num as u64);
+        }
+
+        let input = ConstInt::new_s(from, num as i64).unwrap();
 
         let ext_op = int_ops::EXTENSION
             .instantiate_extension_op(
                 "iwiden_s".as_ref(),
-                [u64::from(from).into(), u64::from(to).into()],
+                [(from as u64).into(), (to as u64).into()],
             )
             .unwrap();
 
         let hugr = test_int_op_with_results::<1>(ext_op, to, Some([input]), ty.clone());
 
-        assert_eq!(int_exec_ctx.exec_hugr_u64(hugr, "main"), 1);
+        assert_eq!(int_exec_ctx.exec_hugr_i64(hugr, "main"), num as i64);
     }
 
     #[rstest]
