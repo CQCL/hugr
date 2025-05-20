@@ -975,6 +975,8 @@ class LoadConst(DataflowOp):
                 return tys.ConstKind(self.type_)
             case OutPort(_, 0):
                 return tys.ValueKind(self.type_)
+            case InPort(_, -1) | OutPort(_, -1):
+                return tys.OrderKind()
             case _:
                 raise self._invalid_port(port)
 
@@ -1317,6 +1319,8 @@ class Call(_CallOrLoad, Op):
         match port:
             case InPort(_, offset) if offset == self._function_port_offset():
                 return tys.FunctionKind(self.signature)
+            case InPort(_, -1) | OutPort(_, -1):
+                return tys.OrderKind()
             case _:
                 return tys.ValueKind(_sig_port_type(self.instantiation, port))
 
@@ -1410,6 +1414,8 @@ class LoadFunc(_CallOrLoad, DataflowOp):
                 return tys.FunctionKind(self.signature)
             case OutPort(_, 0):
                 return tys.ValueKind(self.instantiation)
+            case InPort(_, -1) | OutPort(_, -1):
+                return tys.OrderKind()
             case _:
                 raise self._invalid_port(port)
 
