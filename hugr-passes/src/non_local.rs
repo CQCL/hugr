@@ -2,19 +2,18 @@
 //! in a Hugr and converting them to local edges.
 use std::collections::HashMap;
 
-use hugr_core::{HugrView, IncomingPort, core::HugrNode};
 use itertools::Itertools as _;
 
-mod localize;
-use localize::{BBNeedsSourcesMap, BBNeedsSourcesMapBuilder};
-
 use hugr_core::{
-    Wire,
+    HugrView, IncomingPort, Wire,
     hugr::{HugrError, hugrmut::HugrMut},
     types::{EdgeKind, Type},
 };
 
 use crate::ComposablePass;
+
+mod localize;
+use localize::BBNeedsSourcesMap;
 
 /// [ComposablePass] that converts all non-local edges in a Hugr
 /// into local ones, by inserting extra inputs to container nodes
@@ -50,20 +49,6 @@ pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, I
     })
 }
 
-// Identify all required extra inputs (for both Dom and Ext edges)
-fn build_needs_sources_map<N: HugrNode>(
-    hugr: impl HugrView<Node = N>,
-    nonlocal_edges: &HashMap<N, WorkItem<N>>,
-) -> BBNeedsSourcesMap<N> {
-    let mut bnsm = BBNeedsSourcesMapBuilder::new(&hugr);
-    for (target_node, workitem) in nonlocal_edges.iter() {
-        let parent = hugr.get_parent(*target_node).unwrap();
-        debug_assert!(hugr.get_parent(parent).is_some());
-        bnsm.insert(parent, workitem.source, workitem.ty.clone());
-    }
-    bnsm.finish()
-}
-
 #[deprecated(note = "Use FindNonLocalEdgesError")]
 pub type NonLocalEdgesError<N> = FindNonLocalEdgesError<N>;
 
@@ -86,12 +71,6 @@ pub fn ensure_no_nonlocal_edges<H: HugrView>(
     } else {
         Err(FindNonLocalEdgesError::Edges(non_local_edges))?
     }
-}
-
-#[derive(Debug, Clone)]
-struct WorkItem<N: HugrNode> {
-    source: Wire<N>,
-    ty: Type,
 }
 
 fn just_types<'a, X: 'a>(v: impl IntoIterator<Item = &'a (X, Type)>) -> impl Iterator<Item = Type> {
@@ -118,7 +97,7 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
             else {
                 panic!("impossible")
             };
-            Some((node, WorkItem { source, ty }))
+            Some((node, (source, ty)))
         })
         .collect();
 
@@ -127,25 +106,27 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
     }
 
     // We now compute the sources needed by each parent node.
-    // For a given non-local edge every intermediate node in the hierarchy
-    // between the source's parent and the target needs that source.
-    let bb_needs_sources_map = build_needs_sources_map(&hugr, &nonlocal_edges_map);
+    let bb_needs_sources_map = {
+        let mut bnsm = BBNeedsSourcesMap::default();
+        for (target_node, (source, ty)) in nonlocal_edges_map.iter() {
+            let parent = hugr.get_parent(*target_node).unwrap();
+            debug_assert!(hugr.get_parent(parent).is_some());
+            bnsm.add_edge(&*hugr, parent, *source, ty.clone());
+        }
+        bnsm
+    };
 
     // TODO move this out-of-line
     #[cfg(debug_assertions)]
     {
-        for (&n, wi) in nonlocal_edges_map.iter() {
+        for (&n, (source, _)) in nonlocal_edges_map.iter() {
             let mut m = n;
             loop {
                 let parent = hugr.get_parent(m).unwrap();
-                if hugr.get_parent(wi.source.node()).unwrap() == parent {
+                if hugr.get_parent(source.node()).unwrap() == parent {
                     break;
                 }
-                assert!(
-                    bb_needs_sources_map
-                        .get(parent)
-                        .any(|(w, _)| *w == wi.source)
-                );
+                assert!(bb_needs_sources_map.get(parent).any(|(w, _)| w == source));
                 m = parent;
             }
         }

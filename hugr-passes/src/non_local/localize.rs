@@ -45,43 +45,37 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             pub(super) fn keys(&self) -> impl Iterator<Item=&N>;
         }
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct BBNeedsSourcesMapBuilder<H: HugrView> {
-    hugr: H,
-    needs_sources: BBNeedsSourcesMap<H::Node>,
-}
-
-impl<H: HugrView> BBNeedsSourcesMapBuilder<H> {
-    pub fn new(hugr: H) -> Self {
-        Self {
-            hugr,
-            needs_sources: Default::default(),
-        }
-    }
-
-    pub fn insert(&mut self, mut parent: H::Node, source: Wire<H::Node>, ty: Type) {
-        let source_parent = self.hugr.get_parent(source.node()).unwrap();
+    // Identify all required extra inputs (deals with both Dom and Ext edges).
+    // Every intermediate node in the hierarchy
+    // between the source's parent and the target needs that source.
+    pub(super) fn add_edge(
+        &mut self,
+        hugr: &impl HugrView<Node = N>,
+        mut parent: N,
+        source: Wire<N>,
+        ty: Type,
+    ) {
+        let source_parent = hugr.get_parent(source.node()).unwrap();
         while source_parent != parent {
-            if !self.needs_sources.insert(parent, source, ty.clone()) {
+            if !self.insert(parent, source, ty.clone()) {
                 break;
             }
-            if self.hugr.get_optype(parent).is_conditional() {
+            if hugr.get_optype(parent).is_conditional() {
                 // One of these we must have just done on the previous iteration
-                for case in self.hugr.children(parent) {
+                for case in hugr.children(parent) {
                     // Full recursion unnecessary as we've just added parent:
-                    self.needs_sources.insert(case, source, ty.clone());
+                    self.insert(case, source, ty.clone());
                 }
             }
             // this will panic if source_parent is not an ancestor of target
-            let parent_parent = self.hugr.get_parent(parent).unwrap();
-            if self.hugr.get_optype(parent).is_dataflow_block() {
-                assert!(self.hugr.get_optype(parent_parent).is_cfg());
-                for pred in self.hugr.input_neighbours(parent).collect::<Vec<_>>() {
-                    self.insert(pred, source, ty.clone());
+            let parent_parent = hugr.get_parent(parent).unwrap();
+            if hugr.get_optype(parent).is_dataflow_block() {
+                assert!(hugr.get_optype(parent_parent).is_cfg());
+                for pred in hugr.input_neighbours(parent).collect::<Vec<_>>() {
+                    self.add_edge(hugr, pred, source, ty.clone());
                 }
-                if Some(parent) != self.hugr.children(parent_parent).next() {
+                if Some(parent) != hugr.children(parent_parent).next() {
                     // Recursive calls on predecessors will have traced back to entry block
                     // (or source_parent itself if a dominating Basic Block)
                     break;
@@ -92,13 +86,6 @@ impl<H: HugrView> BBNeedsSourcesMapBuilder<H> {
         }
     }
 
-    pub fn finish(self) -> BBNeedsSourcesMap<H::Node> {
-        self.needs_sources
-    }
-}
-
-// Transformation: adding extra ports, and wiring them up ===============================
-impl<N: HugrNode> BBNeedsSourcesMap<N> {
     pub(super) fn thread_hugr(&self, hugr: &mut impl HugrMut<Node = N>) {
         self.thread_node(hugr, hugr.entrypoint(), &HashMap::new())
     }
