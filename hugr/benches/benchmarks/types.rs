@@ -4,7 +4,8 @@ use hugr::extension::prelude::{qb_t, usize_t};
 use hugr::ops::AliasDecl;
 use hugr::types::{Signature, Type, TypeBound};
 
-use criterion::{AxisScale, Criterion, PlotConfiguration, black_box, criterion_group};
+use criterion::{AxisScale, Criterion, PlotConfiguration, criterion_group};
+use std::hint::black_box;
 
 /// Construct a complex type.
 fn make_complex_type() -> Type {

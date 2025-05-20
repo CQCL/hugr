@@ -3,10 +3,10 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1741670053,
+        "lastModified": 1747543288,
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "47abb5dfd5b7824a0979ef86f3986aea48847312",
+        "rev": "3a8a52386bde1cf14fc2f4c4df80f91417348480",
         "type": "github"
       },
       "original": {
@@ -24,10 +24,10 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1741934023,
+        "lastModified": 1747392669,
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "4f956eacc9ec619bcd98f4580c663a8749978cc8",
+        "rev": "c3c27e603b0d9b5aac8a16236586696338856fbb",
         "type": "github"
       },
       "original": {
@@ -39,10 +39,10 @@
     "flake-compat": {
       "flake": false,
       "locked": {
-        "lastModified": 1733328505,
+        "lastModified": 1747046372,
         "owner": "edolstra",
         "repo": "flake-compat",
-        "rev": "ff81ac966bb2cae68946d5ed5fc4994f96d0ffec",
+        "rev": "9100a0f413b0c601e0533d1d94ffd501ce2e7885",
         "type": "github"
       },
       "original": {
@@ -60,10 +60,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1741379162,
+        "lastModified": 1747372754,
         "owner": "cachix",
         "repo": "git-hooks.nix",
-        "rev": "b5a62751225b2f62ff3147d0a334055ebadcd5cc",
+        "rev": "80479b6ec16fefd9c1db3ea13aeb038c60530f46",
         "type": "github"
       },
       "original": {
@@ -94,10 +94,10 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1741865919,
+        "lastModified": 1747467164,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "573c650e8a14b2faa0041645ab18aed7e60f0c9a",
+        "rev": "3fcbdcfc707e0aa42c541b7743e05820472bdaec",
         "type": "github"
       },
       "original": {
@@ -121,10 +121,10 @@
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1741895161,
+        "lastModified": 1747557850,
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "185f9deb452760f3abc2fde0500398e3198678cd",
+        "rev": "e464ff8c755c6e12540a45b83274ec4de4829191",
         "type": "github"
       },
       "original": {

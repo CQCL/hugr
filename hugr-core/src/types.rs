@@ -11,6 +11,9 @@ pub mod type_row;
 pub(crate) use row_var::MaybeRV;
 pub use row_var::{NoRV, RowVariable};
 
+use crate::extension::resolution::{
+    ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
+};
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
@@ -32,7 +35,7 @@ use itertools::{Either, Itertools as _};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-use crate::extension::SignatureError;
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::AliasDecl;
 
 use self::type_param::TypeParam;
@@ -572,6 +575,23 @@ impl<RV: MaybeRV> TypeBase<RV> {
             TypeEnum::Sum(SumType::General { rows }) => {
                 vec![TypeBase::new_sum(rows.iter().map(|r| r.substitute(t)))]
             }
+        }
+    }
+
+    /// Returns a registry with the concrete extensions used by this type.
+    ///
+    /// This includes the extensions of custom types that may be nested
+    /// inside other types.
+    pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
+        let mut used = WeakExtensionRegistry::default();
+        let mut missing = ExtensionSet::new();
+
+        collect_type_exts(self, &mut used, &mut missing);
+
+        if missing.is_empty() {
+            Ok(used.try_into().expect("all extensions are present"))
+        } else {
+            Err(ExtensionCollectionError::dropped_type(self, missing))
         }
     }
 }

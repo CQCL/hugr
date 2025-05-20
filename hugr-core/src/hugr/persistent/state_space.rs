@@ -1,23 +1,18 @@
-use std::{
-    collections::{BTreeSet, VecDeque},
-    iter,
-};
+use std::collections::{BTreeSet, VecDeque};
 
 use delegate::delegate;
 use derive_more::From;
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use super::{
     Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, find_conflicting_node,
+    parents_view::ParentsView,
 };
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::{
-        internal::HugrInternals,
-        patch::{HostPort, ReplacementPort},
-    },
+    hugr::{internal::HugrInternals, patch::BoundaryPort},
     ops::OpType,
 };
 
@@ -267,107 +262,125 @@ impl CommitStateSpace {
         }
     }
 
-    /// Get the input boundary ports that are equivalent to `(node, port)` in
-    /// the children of the commit of `node`.
-    pub(super) fn children_input_ports(
+    /// Whether the edge at `(node, port)` is a boundary edge of `child`.
+    ///
+    /// Check if `(node, port)` is outside of the subgraph of the patch of child
+    /// and at least one opposite node is inside the subgraph.
+    pub fn is_boundary_edge(
         &self,
         node: PatchNode,
-        port: IncomingPort,
-    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
-        let commit_id = node.0;
-        let host_port = (node, port);
-        self.children(commit_id).flat_map(move |child| {
-            let repl = self
-                .get_commit(child)
-                .replacement()
-                .expect("child cannot be base");
-            let to_patch_node = move |ReplacementPort(repl_node, repl_port)| {
-                (PatchNode(child, repl_node), repl_port)
-            };
-            repl.map_host_input(host_port).map(to_patch_node)
-        })
+        port: impl Into<Port>,
+        child: CommitId,
+    ) -> bool {
+        let deleted_nodes: BTreeSet<_> = self.get_commit(child).deleted_nodes().collect();
+        if deleted_nodes.contains(&node) {
+            return false;
+        }
+        let mut opp_nodes = self
+            .commit_hugr(node.0)
+            .linked_ports(node.1, port)
+            .map(|(n, _)| PatchNode(node.0, n));
+        opp_nodes.any(|n| deleted_nodes.contains(&n))
     }
 
-    /// Get the output boundary ports that are equivalent to `(node, port)` in
-    /// the children of the commit of `node`.
-    pub(super) fn children_output_ports(
+    /// Get the boundary inputs linked to `(node, port)` in `child`.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
+    /// a valid commit ID.
+    pub(super) fn linked_child_inputs(
         &self,
         node: PatchNode,
-        port: IncomingPort,
+        port: OutgoingPort,
+        child: CommitId,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
-        let commit_id = node.0;
-        let host_port = (node, port);
-        self.children(commit_id).filter_map(move |child| {
-            let repl = self
-                .get_commit(child)
-                .replacement()
-                .expect("child cannot be base");
-            let to_patch_node = move |ReplacementPort(repl_node, repl_port)| {
-                (PatchNode(child, repl_node), repl_port)
-            };
-            // Manually check whether the repl output boundary expects incoming
-            // or outgoing ports, and call `map_host_output` accordingly.
-            // TODO: simplify this once PersistentHugr implements HugrView
-            match repl.outgoing_boundary_type() {
-                Direction::Incoming => repl.map_host_output(host_port).map(to_patch_node),
-                Direction::Outgoing => {
-                    let (out_node, out_port) = self
-                        .commit_hugr(commit_id)
-                        .single_linked_output(node.1, port)
-                        .expect("valid DFG graph");
-                    let patch_node = PatchNode(commit_id, out_node);
-                    repl.map_host_output((patch_node, out_port))
-                        .map(to_patch_node)
-                }
-            }
-        })
-    }
+        assert!(
+            self.is_boundary_edge(node, port, child),
+            "not a boundary edge"
+        );
 
-    /// Get the input boundary port in a parent of the commit of `node`
-    /// that is equivalent to `(node, port)`.
-    pub(super) fn parent_input_port(
-        &self,
-        PatchNode(commit_id, node): PatchNode,
-        port: IncomingPort,
-    ) -> Option<(PatchNode, IncomingPort)> {
-        let repl = self.replacement(commit_id)?;
-
-        repl.map_replacement_input((node, port))
-            .map(|HostPort(n, p)| (n, p))
-    }
-
-    /// Get the output boundary ports that are equivalent to `(node, port)` in
-    /// the parents of the commit of `node`.
-    pub(super) fn parents_output_ports(
-        &self,
-        PatchNode(commit_id, node): PatchNode,
-        port: IncomingPort,
-    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
-        self.replacement(commit_id)
+        let parent_hugrs = ParentsView::from_commit(child, self);
+        let repl = self.replacement(child).expect("valid child commit");
+        repl.linked_replacement_inputs((node, port), &parent_hugrs)
+            .collect_vec()
             .into_iter()
-            .flat_map(move |repl| {
-                repl.map_replacement_output((node, port))
-                    .flat_map(|HostPort(n, p)| match p.as_directed() {
-                        Either::Left(incoming) => Either::Left(iter::once((n, incoming))),
-                        Either::Right(outgoing) => Either::Right(self.as_incoming(n, outgoing)),
-                    })
+            .map(move |np| match np {
+                BoundaryPort::Host(patch_node, port) => (patch_node, port),
+                BoundaryPort::Replacement(node, port) => (PatchNode(child, node), port),
             })
+    }
+
+    /// Get the single boundary output linked to `(node, port)` in `child`.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if `child` is not a valid commit ID.
+    pub(super) fn linked_child_output(
+        &self,
+        node: PatchNode,
+        port: IncomingPort,
+        child: CommitId,
+    ) -> Option<(PatchNode, OutgoingPort)> {
+        let parent_hugrs = ParentsView::from_commit(child, self);
+        let repl = self.replacement(child).expect("valid child commit");
+        match repl.linked_replacement_output((node, port), &parent_hugrs)? {
+            BoundaryPort::Host(patch_node, port) => (patch_node, port),
+            BoundaryPort::Replacement(node, port) => (PatchNode(child, node), port),
+        }
+        .into()
+    }
+
+    /// Get the single output boundary port linked to `(node, port)` in a
+    /// parent of the commit of `node`.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if `(node, port)` is not connected to the input node in the
+    /// commit of `node`, or if the node is not valid.
+    pub(super) fn linked_parent_input(
+        &self,
+        PatchNode(commit_id, node): PatchNode,
+        port: IncomingPort,
+    ) -> (PatchNode, OutgoingPort) {
+        let repl = self.replacement(commit_id).expect("valid commit");
+
+        assert!(
+            repl.replacement()
+                .input_neighbours(node)
+                .contains(&repl.get_replacement_io()[0]),
+            "not connected to input"
+        );
+
+        let parent_hugrs = ParentsView::from_commit(commit_id, self);
+        repl.linked_host_input((node, port), &parent_hugrs).into()
+    }
+
+    pub(super) fn linked_parent_outputs(
+        &self,
+        PatchNode(commit_id, node): PatchNode,
+        port: OutgoingPort,
+    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
+        let repl = self.replacement(commit_id).expect("valid commit");
+
+        assert!(
+            repl.replacement()
+                .output_neighbours(node)
+                .contains(&repl.get_replacement_io()[1]),
+            "not connected to output"
+        );
+
+        let parent_hugrs = ParentsView::from_commit(commit_id, self);
+        repl.linked_host_outputs((node, port), &parent_hugrs)
+            .map_into()
+            .collect_vec()
+            .into_iter()
     }
 
     /// Get the replacement for `commit_id`.
     pub(super) fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>> {
         let commit = self.get_commit(commit_id);
         commit.replacement()
-    }
-
-    fn as_incoming(
-        &self,
-        PatchNode(commit_id, node): PatchNode,
-        port: OutgoingPort,
-    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
-        let hugr = self.commit_hugr(commit_id);
-        hugr.linked_inputs(node, port)
-            .map(move |(n, p)| (PatchNode(commit_id, n), p))
     }
 }
 

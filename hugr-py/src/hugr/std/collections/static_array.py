@@ -57,9 +57,7 @@ class StaticArrayVal(val.ExtensionValue):
             },
             "name": self.name,
         }
-        return val.Extension(
-            "StaticArrayValue", typ=self.ty, val=serial_val, extensions=[EXTENSION.name]
-        )
+        return val.Extension("StaticArrayValue", typ=self.ty, val=serial_val)
 
     def __str__(self) -> str:
         return f"static_array({comma_sep_str(self.v)})"

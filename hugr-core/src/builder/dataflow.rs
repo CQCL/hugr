@@ -162,10 +162,7 @@ impl FunctionBuilder<Hugr> {
     ) -> Result<Self, BuildError> {
         let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
-        let op = ops::FuncDefn {
-            signature,
-            name: name.into(),
-        };
+        let op = ops::FuncDefn::new(name, signature);
 
         let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");
         let root = base.entrypoint();
@@ -187,7 +184,7 @@ impl FunctionBuilder<Hugr> {
         });
 
         // Update the inner input node
-        let types = new_optype.signature.body().input.clone();
+        let types = new_optype.signature().body().input.clone();
         self.hugr_mut().replace_op(inp_node, Input { types });
         let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
         let new_port = new_port.next().unwrap();
@@ -222,7 +219,7 @@ impl FunctionBuilder<Hugr> {
         });
 
         // Update the inner input node
-        let types = new_optype.signature.body().output.clone();
+        let types = new_optype.signature().body().output.clone();
         self.hugr_mut().replace_op(out_node, Output { types });
         let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
         let new_port = new_port.next().unwrap();
@@ -253,22 +250,12 @@ impl FunctionBuilder<Hugr> {
     /// Returns a reference to the new optype.
     fn update_fn_signature(&mut self, f: impl FnOnce(Signature) -> Signature) -> &ops::FuncDefn {
         let parent = self.container_node();
-        let old_optype = self
-            .hugr()
-            .get_optype(parent)
-            .as_func_defn()
-            .expect("FunctionBuilder node must be a FuncDefn");
-        let signature = old_optype.inner_signature().into_owned();
-        let name = old_optype.name.clone();
-        self.hugr_mut().replace_op(
-            parent,
-            ops::FuncDefn {
-                signature: f(signature).into(),
-                name,
-            },
-        );
 
-        self.hugr().get_optype(parent).as_func_defn().unwrap()
+        let ops::OpType::FuncDefn(fd) = self.hugr_mut().optype_mut(parent) else {
+            panic!("FunctionBuilder node must be a FuncDefn")
+        };
+        *fd.signature_mut() = f(fd.inner_signature().into_owned()).into();
+        &*fd
     }
 }
 
@@ -531,8 +518,8 @@ pub(crate) mod test {
         let mut module_builder = ModuleBuilder::new();
 
         let (dfg_node, f_node) = {
-            let mut f_build = module_builder
-                .define_function("main", Signature::new(vec![bool_t()], vec![bool_t()]))?;
+            let mut f_build =
+                module_builder.define_function("main", Signature::new_endo(bool_t()))?;
 
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;

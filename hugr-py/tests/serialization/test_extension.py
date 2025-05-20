@@ -98,7 +98,6 @@ def test_extension():
         version=SemanticVersion(0, 1, 0),
         name="ext",
         types={"foo": type_def},
-        values={},
         operations={"New": op_def},
     )
 
@@ -119,7 +118,6 @@ def test_package():
         version=SemanticVersion(0, 1, 0),
         name="ext",
         types={},
-        values={},
         operations={},
     )
     ext_load = Extension.model_validate_json(EXAMPLE)

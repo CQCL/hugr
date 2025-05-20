@@ -178,17 +178,15 @@ impl HugrView for PersistentHugr {
                     .map(to_patch_node),
             );
         } else {
-            let (out_node, out_port) = self.get_single_outgoing_port(node, port);
-            match port.direction() {
-                Direction::Outgoing => {
-                    assert_eq!(out_node, node);
-                    assert_eq!(port, out_port.into());
-                    ret_ports.extend(
-                        self.get_all_incoming_ports(out_node, out_port)
-                            .map(|(node, port)| (node, port.into())),
-                    )
+            match port.as_directed() {
+                Either::Left(incoming) => {
+                    let (out_node, out_port) = self.get_single_outgoing_port(node, incoming);
+                    ret_ports.push((out_node, out_port.into()))
                 }
-                Direction::Incoming => ret_ports.push((out_node, out_port.into())),
+                Either::Right(outgoing) => ret_ports.extend(
+                    self.get_all_incoming_ports(node, outgoing)
+                        .map(|(node, port)| (node, port.into())),
+                ),
             }
         }
 

@@ -13,7 +13,7 @@ use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
 
-/// Collects every extension used te define the types in an operation.
+/// Collects every extension used to define the types in an operation.
 ///
 /// Custom types store a [`Weak`] reference to their extension, which can be
 /// invalidated if the original `Arc<Extension>` is dropped. This normally
@@ -42,8 +42,12 @@ pub(crate) fn collect_op_types_extensions(
             }
             collect_signature_exts(&ext.signature(), &mut used, &mut missing);
         }
-        OpType::FuncDefn(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
-        OpType::FuncDecl(f) => collect_signature_exts(f.signature.body(), &mut used, &mut missing),
+        OpType::FuncDefn(f) => {
+            collect_signature_exts(f.signature().body(), &mut used, &mut missing)
+        }
+        OpType::FuncDecl(f) => {
+            collect_signature_exts(f.signature().body(), &mut used, &mut missing)
+        }
         OpType::Const(c) => collect_value_exts(&c.value, &mut used, &mut missing),
         OpType::Input(inp) => collect_type_row_exts(&inp.types, &mut used, &mut missing),
         OpType::Output(out) => collect_type_row_exts(&out.types, &mut used, &mut missing),
@@ -160,7 +164,7 @@ fn collect_type_row_exts<RV: MaybeRV>(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-pub(super) fn collect_type_exts<RV: MaybeRV>(
+pub(crate) fn collect_type_exts<RV: MaybeRV>(
     typ: &TypeBase<RV>,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,

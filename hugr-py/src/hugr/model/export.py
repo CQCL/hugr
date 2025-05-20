@@ -40,6 +40,8 @@ class ModelExport:
         self.link_ports: _UnionFind[InPort | OutPort] = _UnionFind()
         self.link_names: dict[InPort | OutPort, str] = {}
 
+        # TODO: Store the hugr entrypoint
+
         for a, b in self.hugr.links():
             self.link_ports.union(a, b)
 

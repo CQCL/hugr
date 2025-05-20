@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import pathlib
 import subprocess
@@ -11,7 +10,6 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import Self
 
 from hugr import ext, tys
-from hugr._serialization.serial_hugr import SerialHugr
 from hugr.envelope import EnvelopeConfig
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
@@ -131,7 +129,7 @@ def _base_command() -> list[str]:
 def mermaid(h: Hugr):
     """Render the Hugr as a mermaid diagram for debugging."""
     cmd = [*_base_command(), "mermaid", "-"]
-    _run_hugr_cmd(h.to_json().encode(), cmd)
+    _run_hugr_cmd(h.to_str().encode(), cmd)
 
 
 def validate(
@@ -151,21 +149,17 @@ def validate(
     # TODO: Use envelopes instead of legacy hugr-json
     cmd = [*_base_command(), "validate", "-"]
 
-    if isinstance(h, Hugr):
-        cmd += ["--hugr-json"]
-        _run_hugr_cmd(h.to_json().encode(), cmd)
-    else:
-        serial = h.to_bytes(EnvelopeConfig.BINARY)
-        _run_hugr_cmd(serial, cmd)
+    serial = h.to_bytes(EnvelopeConfig.BINARY)
+    _run_hugr_cmd(serial, cmd)
 
     if not roundtrip:
         return
 
     # Roundtrip checks
     if isinstance(h, Hugr):
-        starting_json = json.loads(h.to_json())
-        h2 = Hugr._from_serial(SerialHugr.load_json(starting_json))
-        roundtrip_json = json.loads(h2._to_serial().to_json())
+        starting_json = h.to_str()
+        h2 = Hugr.from_str(starting_json)
+        roundtrip_json = h2.to_str()
         assert roundtrip_json == starting_json
 
         if snap is not None:

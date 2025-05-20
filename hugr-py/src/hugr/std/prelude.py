@@ -27,7 +27,6 @@ class StringVal(val.ExtensionValue):
             name,
             typ=STRING_T,
             val=payload,
-            extensions=[PRELUDE_EXTENSION.name],
         )
 
     def __str__(self) -> str:

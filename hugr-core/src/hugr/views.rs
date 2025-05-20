@@ -363,8 +363,8 @@ pub trait HugrView: HugrInternals {
     /// a [`FuncDecl`][crate::ops::FuncDecl] or [`FuncDefn`][crate::ops::FuncDefn].
     fn poly_func_type(&self) -> Option<PolyFuncType> {
         match self.entrypoint_optype() {
-            OpType::FuncDecl(decl) => Some(decl.signature.clone()),
-            OpType::FuncDefn(defn) => Some(defn.signature.clone()),
+            OpType::FuncDecl(decl) => Some(decl.signature().clone()),
+            OpType::FuncDefn(defn) => Some(defn.signature().clone()),
             _ => None,
         }
     }

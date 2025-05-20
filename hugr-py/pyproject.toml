@@ -1,6 +1,6 @@
 [project]
 name = "hugr"
-version = "0.11.5"
+version = "0.12.0"
 requires-python = ">=3.10"
 description = "Quantinuum's common representation for quantum programs"
 license = { file = "LICENCE" }
@@ -32,11 +32,11 @@ dependencies = [
     "pydantic-extra-types>=2.9.0",
     "semver>=3.0.2",
     "typing-extensions~=4.12",
-    "pyzstd~=0.16.2",
+    "pyzstd>=0.16.2,<0.18.0",
 ]
 
 [project.optional-dependencies]
-docs = ["sphinx>=8.1.3,<9.0.0", "sphinx-book-theme>=1.1.2"]
+docs = ["sphinx>=8.1.3,<9.0.0", "furo"]
 pytket = ["pytket >= 1.34.0"]
 
 [project.urls]

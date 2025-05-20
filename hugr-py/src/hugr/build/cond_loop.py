@@ -112,11 +112,13 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
     def __init__(self, sum_ty: Sum, other_inputs: TypeRow) -> None:
         root_op = ops.Conditional(sum_ty, other_inputs)
         hugr = Hugr(root_op)
-        self._init_impl(hugr, hugr.root, len(sum_ty.variant_rows))
+        self._init_impl(hugr, hugr.entrypoint, len(sum_ty.variant_rows))
 
-    def _init_impl(self: Conditional, hugr: Hugr, root: Node, n_cases: int) -> None:
+    def _init_impl(
+        self: Conditional, hugr: Hugr, entrypoint: Node, n_cases: int
+    ) -> None:
         self.hugr = hugr
-        self.parent_node = root
+        self.parent_node = entrypoint
         self._case_builders = []
 
         for case_id in range(n_cases):
@@ -163,18 +165,18 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
             other_inputs: The inputs for the conditional that aren't included in the
                 sum variants. These are passed to all cases.
             hugr: The HUGR instance this Conditional is part of.
-            parent: The parent node for the Conditional: defaults to the root of
+            parent: The parent node for the Conditional: defaults to the entrypoint of
               the HUGR instance.
 
         Returns:
             The new Conditional builder.
         """
         new = cls.__new__(cls)
-        root = hugr.add_node(
+        entrypoint = hugr.add_node(
             ops.Conditional(sum_ty, other_inputs),
-            parent or hugr.root,
+            parent or hugr.entrypoint,
         )
-        new._init_impl(hugr, root, len(sum_ty.variant_rows))
+        new._init_impl(hugr, entrypoint, len(sum_ty.variant_rows))
         return new
 
     def _update_outputs(self, outputs: TypeRow) -> None:
@@ -183,6 +185,11 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
             self.parent_node = self.hugr._update_node_outs(
                 self.parent_node, len(outputs)
             )
+            if (
+                self.parent_op._entrypoint_requires_wiring
+                and self.hugr.entrypoint == self.parent_node
+            ):
+                self.hugr._connect_df_entrypoint_outputs()
         else:
             if outputs != self.parent_op._outputs:
                 msg = "Mismatched case outputs."
@@ -239,14 +246,14 @@ class TailLoop(DfBase[ops.TailLoop]):
         super().__init__(root_op)
 
     def set_outputs(self, *outputs: Wire) -> None:
-        super().set_outputs(*outputs)
-
         assert len(outputs) > 0
         sum_wire = outputs[0]
         sum_type = self.hugr.port_type(sum_wire.out_port())
         assert isinstance(sum_type, Sum)
         assert len(sum_type.variant_rows) == 2
         self._set_parent_output_count(len(sum_type.variant_rows[1]) + len(outputs) - 1)
+
+        super().set_outputs(*outputs)
 
     def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
         """Set the outputs of the loop body. The first wire must be the sum type

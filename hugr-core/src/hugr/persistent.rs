@@ -61,6 +61,7 @@
 //! [`CommitStateSpace::try_extract_hugr`]. A [`PersistentHugr`] can always be
 //! materialized into a [`Hugr`] type using [`PersistentHugr::to_hugr`].
 
+mod parents_view;
 mod resolver;
 mod state_space;
 mod trait_impls;
@@ -456,97 +457,170 @@ impl PersistentHugr {
     }
 
     /// The unique outgoing port in `self` that `port` is attached to.
+    ///
+    /// Panics if `node` is not in `self` (in particular if it is deleted) or if
+    /// `port` is not a value port in `node`.
     fn get_single_outgoing_port(
         &self,
         node: PatchNode,
-        port: impl Into<Port>,
+        port: impl Into<IncomingPort>,
     ) -> (PatchNode, OutgoingPort) {
-        let port = port.into();
+        let mut in_port = port.into();
+        let PatchNode(commit_id, mut in_node) = node;
 
-        assert!(self.is_value_port(node, port), "not a dataflow wire");
+        assert!(self.is_value_port(node, in_port), "not a dataflow wire");
+        assert!(self.contains_node(node), "node not in self");
 
-        use itertools::Either::{Left, Right};
-        let (mut node, mut port) = match port.as_directed() {
-            Left(incoming) => (node, incoming),
-            Right(outgoing) => {
-                // pick any incoming port, the result is the same by uniqueness
-                // of the outgoing port
-                let commit_id = node.0;
-                let (node, port) = self
-                    .commit_hugr(commit_id)
-                    .linked_inputs(node.1, outgoing)
-                    .next()
-                    .expect("invalid dfg graph");
-                (PatchNode(commit_id, node), port)
-            }
-        };
+        let hugr = self.commit_hugr(commit_id);
+        let (mut out_node, mut out_port) = hugr
+            .single_linked_output(in_node, in_port)
+            .map(|(n, p)| (PatchNode(commit_id, n), p))
+            .expect("invalid HUGR");
 
+        // invariant: (out_node, out_port) -> (in_node, in_port) is a boundary
+        // edge, i.e. it never is the case that both are deleted by the same
+        // child commit
         loop {
-            let commit_id = node.0;
-            let hugr = self.commit_hugr(commit_id);
-            let (outgoing_node, outgoing_port) = hugr
-                .single_linked_output(node.1, port)
-                .expect("invalid HUGR");
+            let commit_id = out_node.0;
 
-            let is_input = {
-                if let Some(repl) = self.replacement(commit_id) {
-                    repl.get_replacement_io().expect("invalid replacement")[0] == outgoing_node
-                } else {
-                    false
-                }
+            let is_input = || {
+                let Some(repl) = self.replacement(commit_id) else {
+                    return false;
+                };
+                repl.get_replacement_io()[0] == out_node.1
             };
-            let is_deleted = || self.deleted_nodes(commit_id).contains(&outgoing_node);
-            if is_input || is_deleted() {
-                if let Some((child_node, child_port)) = self.child_output_port(node, port) {
-                    node = child_node;
-                    port = child_port;
-                } else {
-                    debug_assert!(is_input, "found deleted node but no replacement for it");
-                    (node, port) = self
-                        .parent_input_port(node, port)
-                        .expect("found input replacement port with no equivalent port in parents");
-                }
+            if let Some(deleted_by) = self.find_deleting_commit(out_node) {
+                (out_node, out_port) = self
+                    .state_space
+                    .linked_child_output(PatchNode(commit_id, in_node), in_port, deleted_by)
+                    .expect("valid boundary edge");
+                // update (in_node, in_port)
+                (in_node, in_port) = {
+                    let new_commit_id = out_node.0;
+                    let hugr = self.commit_hugr(new_commit_id);
+                    hugr.linked_inputs(out_node.1, out_port)
+                        .find(|&(n, _)| {
+                            self.find_deleting_commit(PatchNode(commit_id, n)).is_none()
+                        })
+                        .expect("out_node is connected to output node (which is never deleted)")
+                };
+            } else if is_input() {
+                // out_node is an input node
+                (out_node, out_port) = self
+                    .as_state_space()
+                    .linked_parent_input(PatchNode(commit_id, in_node), in_port);
+                // update (in_node, in_port)
+                (in_node, in_port) = {
+                    let new_commit_id = out_node.0;
+                    let hugr = self.commit_hugr(new_commit_id);
+                    hugr.linked_inputs(out_node.1, out_port)
+                        .find(|&(n, _)| {
+                            self.find_deleting_commit(PatchNode(new_commit_id, n))
+                                == Some(commit_id)
+                        })
+                        .expect("boundary edge must connect out_node to deleted node")
+                };
             } else {
-                // outgoing_node is a valid node in the current hugr!
-                let outgoing_node = PatchNode(commit_id, outgoing_node);
-                return (outgoing_node, outgoing_port);
+                // valid outgoing node!
+                return (out_node, out_port);
             }
         }
     }
 
     /// All incoming ports that the given outgoing port is attached to.
+    ///
+    /// Panics if `out_node` is not in `self` (in particular if it is deleted)
+    /// or if `out_port` is not a value port in `out_node`.
     fn get_all_incoming_ports(
         &self,
-        node: PatchNode,
-        port: OutgoingPort,
+        out_node: PatchNode,
+        out_port: OutgoingPort,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> {
-        let mut valid_incoming_ports = BTreeSet::new();
-        let mut visited = BTreeSet::new();
-        let mut queue = {
-            let start_hugr = self.commit_hugr(node.0);
-            let to_patch_node = |(n, p)| (PatchNode(node.0, n), p);
-            VecDeque::from_iter(start_hugr.linked_inputs(node.1, port).map(to_patch_node))
-        };
+        assert!(
+            self.is_value_port(out_node, out_port),
+            "not a dataflow wire"
+        );
+        assert!(self.contains_node(out_node), "node not in self");
 
-        // A simple BFS to find all equivalent incoming ports.
-        while let Some((node, port)) = queue.pop_front() {
-            if !visited.insert((node, port)) {
+        let mut visited = BTreeSet::new();
+        // enqueue the outport and initialise the set of valid incoming ports
+        // to the valid incoming ports in this commit
+        let mut queue = VecDeque::from([(out_node, out_port)]);
+        let mut valid_incoming_ports = BTreeSet::from_iter(
+            self.commit_hugr(out_node.0)
+                .linked_inputs(out_node.1, out_port)
+                .map(|(in_node, in_port)| (PatchNode(out_node.0, in_node), in_port))
+                .filter(|(in_node, _)| self.contains_node(*in_node)),
+        );
+
+        // A simple BFS across the commit history to find all equivalent incoming ports.
+        while let Some((out_node, out_port)) = queue.pop_front() {
+            if !visited.insert((out_node, out_port)) {
                 continue;
             }
-            let commit_id = node.0;
-            let is_output = {
-                if let Some(repl) = self.replacement(commit_id) {
-                    repl.get_replacement_io().expect("invalid replacement")[1] == node.1
-                } else {
-                    false
-                }
+            let commit_id = out_node.0;
+            let hugr = self.commit_hugr(commit_id);
+            let out_deleted_by = self.find_deleting_commit(out_node);
+            let curr_repl_out = {
+                let repl = self.replacement(commit_id);
+                repl.map(|r| r.get_replacement_io()[1])
             };
-            let is_deleted = || self.deleted_nodes(commit_id).contains(&node.1);
-            if !is_output && !is_deleted() {
-                valid_incoming_ports.insert((node, port));
+            // incoming ports are of interest to us if
+            //  (i) they are connected to the output of a replacement (then there will be a
+            //      linked port in a parent commit), or
+            //  (ii) they are deleted by a child commit and is not the same as the out_node
+            //      (then there will be a linked port in a child commit)
+            let (is_linked_to_output, deleted_by_child): (IteratorNonEmpty, BTreeSet<_>) = hugr
+                .linked_inputs(out_node.1, out_port)
+                .filter_map(|(in_node, _)| {
+                    if Some(in_node) == curr_repl_out {
+                        // Flag that we have found a link to output
+                        Some(Either::Left(()))
+                    } else {
+                        let other_deleted_by =
+                            self.find_deleting_commit(PatchNode(commit_id, in_node))?;
+                        // (out_node, out_port) -> (in_node, in_port) is a boundary edge
+                        // into the child commit `other_deleted_by`
+                        (Some(other_deleted_by) != out_deleted_by)
+                            .then_some(Either::Right(other_deleted_by))
+                    }
+                })
+                .partition_map(|x| x);
+
+            // Convert an incoming port to the unique outgoing port that it is linked to
+            let to_outgoing_port = |(PatchNode(commit_id, in_node), in_port)| {
+                let hugr = self.commit_hugr(commit_id);
+                let (out_node, out_port) = hugr
+                    .single_linked_output(in_node, in_port)
+                    .expect("valid dfg wire");
+                (PatchNode(commit_id, out_node), out_port)
+            };
+
+            if is_linked_to_output.0 {
+                // Traverse boundary to parent(s)
+                let new_ins = self
+                    .as_state_space()
+                    .linked_parent_outputs(out_node, out_port);
+                for (in_node, in_port) in new_ins {
+                    if self.contains_node(in_node) {
+                        valid_incoming_ports.insert((in_node, in_port));
+                    }
+                    queue.push_back(to_outgoing_port((in_node, in_port)));
+                }
             }
-            queue.extend(self.children_input_ports(node, port));
-            queue.extend(self.parents_output_ports(node, port));
+
+            for child in deleted_by_child {
+                // Traverse boundary to `child`
+                let new_ins = self
+                    .as_state_space()
+                    .linked_child_inputs(out_node, out_port, child);
+                for (in_node, in_port) in new_ins {
+                    if self.contains_node(in_node) {
+                        valid_incoming_ports.insert((in_node, in_port));
+                    }
+                    queue.push_back(to_outgoing_port((in_node, in_port)));
+                }
+            }
         }
 
         valid_incoming_ports.into_iter()
@@ -570,27 +644,6 @@ impl PersistentHugr {
             ///
             /// All nodes will be PatchNodes with commit ID `commit_id`.
             pub fn inserted_nodes(&self, commit_id: CommitId) -> impl Iterator<Item = PatchNode> + '_;
-            /// Get the input boundary ports that are equivalent to `(node, port)` in
-            /// the children of the commit of `node`.
-            fn children_input_ports(
-                &self,
-                node: PatchNode,
-                port: IncomingPort,
-            ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_;
-            /// Get the input boundary port in a parent of the commit of `node`
-            /// that is equivalent to `(node, port)`.
-            fn parent_input_port(
-                &self,
-                patch_node: PatchNode,
-                port: IncomingPort,
-            ) -> Option<(PatchNode, IncomingPort)>;
-            /// Get the output boundary ports that are equivalent to `(node, port)` in
-            /// the parents of the commit of `node`.
-            pub(super) fn parents_output_ports(
-                &self,
-                node: PatchNode,
-                port: IncomingPort,
-            ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_;
             /// Get the replacement for `commit_id`.
             fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>>;
             /// Get the Hugr inserted by `commit_id`.
@@ -601,24 +654,6 @@ impl PersistentHugr {
             /// Get an iterator over all commit IDs in the persistent HUGR.
             pub fn all_commit_ids(&self) -> impl Iterator<Item = CommitId> + Clone + '_;
         }
-    }
-
-    /// Get the output boundary ports that are equivalent to `(node, port)` in
-    /// the children of the commit of `node`.
-    ///
-    /// By compatibility of all commits in `self`, there can be at most one
-    /// child replacement that defines at most one port equivalent to `(node,
-    /// port)`.
-    fn child_output_port(
-        &self,
-        node: PatchNode,
-        port: IncomingPort,
-    ) -> Option<(PatchNode, IncomingPort)> {
-        self.as_state_space()
-            .children_output_ports(node, port)
-            .at_most_one()
-            .ok()
-            .expect("at most one definition of output port in children replacements")
     }
 
     /// Get all commits in `self` in topological order.
@@ -660,10 +695,23 @@ impl PersistentHugr {
             .unique()
     }
 
+    fn find_deleting_commit(&self, node @ PatchNode(commit_id, _): PatchNode) -> Option<CommitId> {
+        let mut children = self.state_space.children(commit_id);
+        children.find(move |&child_id| {
+            let child = self.get_commit(child_id);
+            child.deleted_nodes().contains(&node)
+        })
+    }
+
     /// Check if a patch node is in the PersistentHugr, that is, it belongs to
     /// a commit in the state space and is not deleted by any child commit.
     pub fn contains_node(&self, PatchNode(commit_id, node): PatchNode) -> bool {
-        self.contains_id(commit_id) && !self.deleted_nodes(commit_id).contains(&node)
+        let is_replacement_io = || {
+            self.replacement(commit_id)
+                .is_some_and(|repl| repl.get_replacement_io().contains(&node))
+        };
+        let is_deleted = || self.deleted_nodes(commit_id).contains(&node);
+        self.contains_id(commit_id) && !is_replacement_io() && !is_deleted()
     }
 
     fn is_value_port(&self, PatchNode(commit_id, node): PatchNode, port: impl Into<Port>) -> bool {
@@ -712,5 +760,34 @@ fn find_conflicting_node<'a>(
     })
 }
 
+/// A wrapper around a boolean that implements `Extend<V>`. The boolean
+/// is true if a non-empty iterator was appended to `self`.
+#[derive(Debug, Copy, Clone, Default)]
+struct IteratorNonEmpty(bool);
+
+impl<V> Extend<V> for IteratorNonEmpty {
+    fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
+        self.0 |= iter.into_iter().next().is_some();
+    }
+}
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod test_iterator_non_empty {
+    use super::IteratorNonEmpty;
+
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(vec![])]
+    #[case(vec![1])]
+    #[case(vec![1, 2, 3])]
+    fn test_extend(#[case] input: Vec<i32>) {
+        let expected = !input.is_empty();
+        let mut res = IteratorNonEmpty::default();
+        res.extend(input);
+        assert_eq!(res.0, expected);
+    }
+}

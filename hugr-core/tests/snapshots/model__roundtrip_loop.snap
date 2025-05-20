@@ -21,5 +21,5 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-loop
       (signature (core.fn [?0] [?0]))
       (dfg [%2] [%3]
         (signature (core.fn [?0] [(core.adt [[?0] [?0]])]))
-        ((core.make_adt _ _ 0) [%2] [%3]
+        ((core.make_adt 0) [%2] [%3]
           (signature (core.fn [?0] [(core.adt [[?0] [?0]])])))))))

@@ -182,7 +182,7 @@ mod test {
             .filter_map(|n| {
                 hugr.get_optype(n)
                     .as_func_defn()
-                    .map(|fd| (fd.name.clone(), n))
+                    .map(|fd| (fd.func_name().clone(), n))
             })
             .collect::<HashMap<_, _>>();
 
@@ -197,7 +197,11 @@ mod test {
 
         let remaining_funcs = hugr
             .nodes()
-            .filter_map(|n| hugr.get_optype(n).as_func_defn().map(|fd| fd.name.as_str()))
+            .filter_map(|n| {
+                hugr.get_optype(n)
+                    .as_func_defn()
+                    .map(|fd| fd.func_name().as_str())
+            })
             .sorted()
             .collect_vec();
         assert_eq!(remaining_funcs, retained_funcs);

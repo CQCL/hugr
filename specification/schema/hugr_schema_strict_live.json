@@ -338,13 +338,6 @@
                     "title": "ValueTag",
                     "type": "string"
                 },
-                "extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extensions",
-                    "type": "array"
-                },
                 "typ": {
                     "$ref": "#/$defs/Type"
                 },
@@ -353,7 +346,6 @@
                 }
             },
             "required": [
-                "extensions",
                 "typ",
                 "value"
             ],
@@ -536,11 +528,6 @@
                 },
                 "signature": {
                     "$ref": "#/$defs/FunctionType"
-                },
-                "description": {
-                    "default": "",
-                    "title": "Description",
-                    "type": "string"
                 },
                 "args": {
                     "items": {
@@ -1307,6 +1294,18 @@
                     "default": null,
                     "description": "The name of the encoder used to generate the Hugr.",
                     "title": "Encoder"
+                },
+                "entrypoint": {
+                    "anyOf": [
+                        {
+                            "type": "integer"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Entrypoint"
                 }
             },
             "required": [

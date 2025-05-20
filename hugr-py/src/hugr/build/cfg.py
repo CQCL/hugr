@@ -23,13 +23,13 @@ class Block(DfBase[ops.DataflowBlock]):
     """Builder class for a basic block in a HUGR control flow graph."""
 
     def set_outputs(self, *outputs: Wire) -> None:
-        super().set_outputs(*outputs)
-
         assert len(outputs) > 0
         branching = outputs[0]
         branch_type = self.hugr.port_type(branching.out_port())
         assert isinstance(branch_type, tys.Sum)
         self._set_parent_output_count(len(branch_type.variant_rows))
+
+        super().set_outputs(*outputs)
 
     def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
         self.set_outputs(branching, *other_outputs)
@@ -50,7 +50,7 @@ class Block(DfBase[ops.DataflowBlock]):
             # it does not check for valid dominance between basic blocks
             # that is deferred to full HUGR validation.
             while cfg_node != src_parent:
-                if src_parent is None or src_parent == self.hugr.root:
+                if src_parent is None or src_parent == self.hugr.module_root:
                     raise NotInSameCfg(src.node.idx, node.idx) from e
                 src_parent = self.hugr[src_parent].parent
 
@@ -60,7 +60,7 @@ class Block(DfBase[ops.DataflowBlock]):
 
 @dataclass
 class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
-    """Builder class for a HUGR control flow graph, with the HUGR root node
+    """Builder class for a HUGR control flow graph, with the HUGR entrypoint node
     being a :class:`CFG <hugr.ops.CFG>`.
 
     Args:
@@ -85,13 +85,17 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
         input_typs = list(input_types)
         root_op = ops.CFG(inputs=input_typs)
         hugr = Hugr(root_op)
-        self._init_impl(hugr, hugr.root, input_typs)
+        self._init_impl(hugr, hugr.entrypoint, input_typs)
 
-    def _init_impl(self: Cfg, hugr: Hugr, root: Node, input_types: TypeRow) -> None:
+    def _init_impl(
+        self: Cfg, hugr: Hugr, entrypoint: Node, input_types: TypeRow
+    ) -> None:
         self.hugr = hugr
-        self.parent_node = root
+        self.parent_node = entrypoint
         # to ensure entry is first child, add a dummy entry at the start
-        self._entry_block = Block.new_nested(ops.DataflowBlock(input_types), hugr, root)
+        self._entry_block = Block.new_nested(
+            ops.DataflowBlock(input_types), hugr, entrypoint
+        )
 
         self.exit = self.hugr.add_node(ops.ExitBlock(), self.parent_node)
 
@@ -128,7 +132,7 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
         new = cls.__new__(cls)
         root = hugr.add_node(
             ops.CFG(inputs=input_types),
-            parent or hugr.root,
+            parent or hugr.entrypoint,
         )
         new._init_impl(hugr, root, input_types)
         return new
@@ -261,3 +265,8 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
             self.parent_node = self.hugr._update_node_outs(
                 self.parent_node, len(out_types)
             )
+            if (
+                self.parent_op._entrypoint_requires_wiring
+                and self.hugr.entrypoint == self.parent_node
+            ):
+                self.hugr._connect_df_entrypoint_outputs()

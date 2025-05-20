@@ -6,10 +6,8 @@ use std::sync::Arc;
 use thiserror::Error;
 #[cfg(test)]
 use {
-    crate::extension::test::SimpleOpDef,
-    crate::proptest::{any_nonempty_smolstr, any_nonempty_string},
-    ::proptest::prelude::*,
-    ::proptest_derive::Arbitrary,
+    crate::extension::test::SimpleOpDef, crate::proptest::any_nonempty_smolstr,
+    ::proptest::prelude::*, ::proptest_derive::Arbitrary,
 };
 
 use crate::core::HugrNode;
@@ -114,7 +112,6 @@ impl ExtensionOp {
         OpaqueOp {
             extension: self.def.extension_id().clone(),
             name: self.def.name().clone(),
-            description: self.def.description().into(),
             args: self.args.clone(),
             signature: self.signature.clone(),
         }
@@ -168,7 +165,6 @@ impl From<ExtensionOp> for OpaqueOp {
         OpaqueOp {
             extension: def.extension_id().clone(),
             name: def.name().clone(),
-            description: def.description().into(),
             args,
             signature,
         }
@@ -239,8 +235,6 @@ pub struct OpaqueOp {
     extension: ExtensionId,
     #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
     name: OpName,
-    #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
-    description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     // note that the `signature` field might not include `extension`. Thus this must
     // remain private, and should be accessed through
@@ -257,14 +251,12 @@ impl OpaqueOp {
     pub fn new(
         extension: ExtensionId,
         name: impl Into<OpName>,
-        description: String,
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
         Self {
             extension,
             name: name.into(),
-            description,
             args: args.into(),
             signature,
         }
@@ -317,7 +309,7 @@ impl DataflowOpTrait for OpaqueOp {
     const TAG: OpTag = OpTag::Leaf;
 
     fn description(&self) -> &str {
-        &self.description
+        "Opaque operation"
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -414,12 +406,10 @@ mod test {
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
-            "desc".into(),
             vec![TypeArg::Type { ty: usize_t() }],
             sig.clone(),
         );
         assert_eq!(op.name(), "OpaqueOp:res.op");
-        assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
         assert_eq!(op.signature().as_ref(), &sig);
     }
@@ -431,7 +421,6 @@ mod test {
         let opaque = OpaqueOp::new(
             conversions::EXTENSION_ID,
             "itobool",
-            "description".into(),
             vec![],
             Signature::new(i0.clone(), bool_t()),
         );
@@ -472,14 +461,8 @@ mod test {
 
         let registry = ExtensionRegistry::new([ext]);
         registry.validate().unwrap();
-        let opaque_val = OpaqueOp::new(
-            ext_id.clone(),
-            val_name,
-            String::new(),
-            vec![],
-            endo_sig.clone(),
-        );
-        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, String::new(), vec![], endo_sig);
+        let opaque_val = OpaqueOp::new(ext_id.clone(), val_name, vec![], endo_sig.clone());
+        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, vec![], endo_sig);
         let mut resolved_val = opaque_val.into();
         resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
