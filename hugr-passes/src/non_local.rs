@@ -374,10 +374,8 @@ fn add_control_prefixes<H: HugrMut>(
     output_node: H::Node,
     variant_source_prefixes: Vec<Vec<(Wire<H::Node>, Type)>>,
 ) {
+    debug_assert!(hugr.get_optype(output_node).is_output()); // Just to fail fast
     let parent = hugr.get_parent(output_node).unwrap();
-    let Some(mut output) = hugr.get_optype(output_node).as_output().cloned() else {
-        panic!("impossible")
-    };
     let mut needed_sources = BTreeMap::new();
     let (cond, new_control_type) = {
         let Some(EdgeKind::Value(control_type)) = hugr
@@ -452,8 +450,10 @@ fn add_control_prefixes<H: HugrMut>(
     }
     hugr.disconnect(output_node, IncomingPort::from(0));
     hugr.connect(cond_node, 0, output_node, 0);
+    let OpType::Output(output) = hugr.optype_mut(output_node) else {
+        panic!("impossible")
+    };
     output.types.to_mut()[0] = new_control_type;
-    hugr.replace_op(output_node, output);
 }
 
 pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdgesError> {
