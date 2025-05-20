@@ -6,7 +6,7 @@ use itertools::Itertools as _;
 
 use hugr_core::{
     HugrView, IncomingPort, Wire,
-    hugr::{HugrError, hugrmut::HugrMut},
+    hugr::hugrmut::HugrMut,
     types::{EdgeKind, Type},
 };
 
@@ -22,9 +22,7 @@ pub struct LocalizeEdges;
 
 #[derive(derive_more::Error, derive_more::Display, derive_more::From, Debug, PartialEq)]
 #[non_exhaustive]
-pub enum LocalizeEdgesError {
-    HugrError(#[from] HugrError),
-}
+pub enum LocalizeEdgesError {}
 
 impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
     type Error = LocalizeEdgesError;
