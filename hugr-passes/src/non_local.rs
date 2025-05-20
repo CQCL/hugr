@@ -112,9 +112,14 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
     };
 
     debug_assert!(nonlocal_edges_map.iter().all(|(n, (source, _))| {
+        let source_parent = hugr.get_parent(source.node()).unwrap();
+        let source_gp = hugr.get_parent(source_parent);
+        let stop_at = source_gp
+            .map(|gp| vec![source_parent, gp])
+            .unwrap_or(vec![source_parent]);
         std::iter::successors(Some(*n), |n| {
             let parent = hugr.get_parent(*n).unwrap();
-            (Some(parent) != hugr.get_parent(source.node())).then_some(parent)
+            (!stop_at.contains(&parent)).then_some(parent)
         })
         .skip(1)
         .all(|parent| bb_needs_sources_map.parent_needs(parent, *source))
@@ -309,103 +314,143 @@ mod test {
         // sums.
         //
         // All branches have an other-output.
-        let mut hugr = {
-            let branch_sum_type = either_type(Type::UNIT, Type::UNIT);
-            let branch_type = Type::from(branch_sum_type.clone());
-            let branch_variants = branch_sum_type
-                .variants()
-                .cloned()
-                .map(|x| x.try_into().unwrap())
-                .collect_vec();
-            let nonlocal1_type = bool_t();
-            let nonlocal2_type = Type::new_unit_sum(3);
-            let other_output_type = branch_type.clone();
-            let mut outer = DFGBuilder::new(Signature::new(
-                vec![
-                    branch_type.clone(),
-                    nonlocal1_type.clone(),
-                    nonlocal2_type.clone(),
-                    Type::UNIT,
-                ],
-                vec![Type::UNIT, other_output_type.clone()],
-            ))
+        let branch_sum_type = either_type(Type::UNIT, Type::UNIT);
+        let branch_type = Type::from(branch_sum_type.clone());
+        let branch_variants = branch_sum_type
+            .variants()
+            .cloned()
+            .map(|x| x.try_into().unwrap())
+            .collect_vec();
+        let nonlocal1_type = bool_t();
+        let nonlocal2_type = Type::new_unit_sum(3);
+        let other_output_type = branch_type.clone();
+        let mut outer = DFGBuilder::new(Signature::new(
+            vec![branch_type.clone(), nonlocal1_type.clone(), Type::UNIT],
+            vec![Type::UNIT, other_output_type.clone()],
+        ))
+        .unwrap();
+        let [b, nl1, unit] = outer.input_wires_arr();
+        let mut cfg = outer
+            .cfg_builder(
+                [(Type::UNIT, unit), (branch_type.clone(), b)],
+                vec![Type::UNIT, other_output_type.clone()].into(),
+            )
             .unwrap();
-            let [b, nl1, nl2, unit] = outer.input_wires_arr();
-            let [unit, out] = {
-                let mut cfg = outer
-                    .cfg_builder(
-                        [(Type::UNIT, unit), (branch_type.clone(), b)],
-                        vec![Type::UNIT, other_output_type.clone()].into(),
-                    )
-                    .unwrap();
 
-                let entry = {
-                    let entry = cfg
-                        .entry_builder(branch_variants.clone(), other_output_type.clone().into())
-                        .unwrap();
-                    let [_, b] = entry.input_wires_arr();
+        let (entry, cst) = {
+            let mut entry = cfg
+                .entry_builder(branch_variants.clone(), other_output_type.clone().into())
+                .unwrap();
+            let [_, b] = entry.input_wires_arr();
 
-                    entry.finish_with_outputs(b, [b]).unwrap()
-                };
-                let exit = cfg.exit_block();
+            let cst = entry.add_load_value(Value::unit_sum(1, 3).unwrap());
 
-                let bb_left = {
-                    let mut entry = cfg
-                        .block_builder(
-                            vec![Type::UNIT, other_output_type.clone()].into(),
-                            [type_row![]],
-                            other_output_type.clone().into(),
-                        )
-                        .unwrap();
-                    let [unit, oo] = entry.input_wires_arr();
-                    let [_] = entry
-                        .add_dataflow_op(Noop::new(nonlocal1_type), [nl1])
-                        .unwrap()
-                        .outputs_arr();
-                    let [_] = entry
-                        .add_dataflow_op(Noop::new(nonlocal2_type), [nl2])
-                        .unwrap()
-                        .outputs_arr();
-                    entry.finish_with_outputs(unit, [oo]).unwrap()
-                };
-
-                let bb_right = {
-                    let entry = cfg
-                        .block_builder(
-                            vec![Type::UNIT, other_output_type.clone()].into(),
-                            [type_row![]],
-                            other_output_type.clone().into(),
-                        )
-                        .unwrap();
-                    let [_b, oo] = entry.input_wires_arr();
-                    entry.finish_with_outputs(unit, [oo]).unwrap()
-                };
-
-                let bb_bottom = {
-                    let entry = cfg
-                        .block_builder(
-                            branch_type.clone().into(),
-                            branch_variants,
-                            other_output_type.clone().into(),
-                        )
-                        .unwrap();
-                    let [oo] = entry.input_wires_arr();
-                    entry.finish_with_outputs(oo, [oo]).unwrap()
-                };
-                cfg.branch(&entry, 0, &bb_left).unwrap();
-                cfg.branch(&entry, 1, &bb_right).unwrap();
-                cfg.branch(&bb_left, 0, &bb_bottom).unwrap();
-                cfg.branch(&bb_right, 0, &bb_bottom).unwrap();
-                cfg.branch(&bb_bottom, 0, &entry).unwrap();
-                cfg.branch(&bb_bottom, 1, &exit).unwrap();
-                cfg.finish_sub_container().unwrap().outputs_arr()
-            };
-            outer.finish_hugr_with_outputs([unit, out]).unwrap()
+            (entry.finish_with_outputs(b, [b]).unwrap(), cst)
         };
-        assert!(ensure_no_nonlocal_edges(&hugr).is_err());
+        let exit = cfg.exit_block();
+
+        let (bb_left, tgt_ext, tgt_dom) = {
+            let mut bb = cfg
+                .block_builder(
+                    vec![Type::UNIT, other_output_type.clone()].into(),
+                    [type_row![]],
+                    other_output_type.clone().into(),
+                )
+                .unwrap();
+            let [unit, oo] = bb.input_wires_arr();
+            let tgt_ext = bb
+                .add_dataflow_op(Noop::new(nonlocal1_type.clone()), [nl1])
+                .unwrap();
+
+            let tgt_dom = bb
+                .add_dataflow_op(Noop::new(nonlocal2_type.clone()), [cst])
+                .unwrap();
+            (
+                bb.finish_with_outputs(unit, [oo]).unwrap(),
+                tgt_ext,
+                tgt_dom,
+            )
+        };
+
+        let bb_right = {
+            let mut bb = cfg
+                .block_builder(
+                    vec![Type::UNIT, other_output_type.clone()].into(),
+                    [type_row![]],
+                    other_output_type.clone().into(),
+                )
+                .unwrap();
+            let [_b, oo] = bb.input_wires_arr();
+            let unit = bb.add_load_value(Value::unit());
+            bb.finish_with_outputs(unit, [oo]).unwrap()
+        };
+
+        let bb_bottom = {
+            let bb = cfg
+                .block_builder(
+                    branch_type.clone().into(),
+                    branch_variants,
+                    other_output_type.clone().into(),
+                )
+                .unwrap();
+            let [oo] = bb.input_wires_arr();
+            bb.finish_with_outputs(oo, [oo]).unwrap()
+        };
+        cfg.branch(&entry, 0, &bb_left).unwrap();
+        cfg.branch(&entry, 1, &bb_right).unwrap();
+        cfg.branch(&bb_left, 0, &bb_bottom).unwrap();
+        cfg.branch(&bb_right, 0, &bb_bottom).unwrap();
+        cfg.branch(&bb_bottom, 0, &entry).unwrap();
+        cfg.branch(&bb_bottom, 1, &exit).unwrap();
+        let [unit, out] = cfg.finish_sub_container().unwrap().outputs_arr();
+
+        let mut hugr = outer.finish_hugr_with_outputs([unit, out]).unwrap();
+        eprintln!("ALAN tgt_ext {tgt_ext:?} tgt_dom {tgt_dom:?}");
+        eprintln!("{}", hugr.mermaid_string());
+        let Err(FindNonLocalEdgesError::Edges(es)) = ensure_no_nonlocal_edges(&hugr) else {
+            panic!()
+        };
+        assert_eq!(
+            es,
+            vec![
+                (tgt_ext.node(), IncomingPort::from(0)),
+                (tgt_dom.node(), IncomingPort::from(0))
+            ]
+        );
         remove_nonlocal_edges(&mut hugr).unwrap();
-        println!("{}", hugr.mermaid_string());
-        hugr.validate().unwrap_or_else(|e| panic!("{e}"));
+        hugr.validate().unwrap();
         assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
+        // Entry node gets nonlocal1_type added, only
+        assert_eq!(
+            hugr.get_optype(entry.node())
+                .as_dataflow_block()
+                .unwrap()
+                .inputs
+                .as_slice(),
+            &[nonlocal1_type.clone(), Type::UNIT, branch_type.clone()]
+        );
+        // Left node gets both nonlocal1_type and nonlocal2_type
+        assert_eq!(
+            hugr.get_optype(bb_left.node())
+                .as_dataflow_block()
+                .unwrap()
+                .inputs
+                .as_slice(),
+            &[
+                nonlocal1_type.clone(),
+                nonlocal2_type,
+                Type::UNIT,
+                other_output_type
+            ]
+        );
+        // Bottom node gets nonlocal1_type added, only
+        assert_eq!(
+            hugr.get_optype(bb_bottom.node())
+                .as_dataflow_block()
+                .unwrap()
+                .inputs
+                .as_slice(),
+            &[nonlocal1_type, branch_type]
+        );
     }
 }
