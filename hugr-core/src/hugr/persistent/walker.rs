@@ -57,17 +57,17 @@
 mod pinned;
 pub use pinned::PinnedWire;
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeSet, VecDeque},
-};
+use std::{borrow::Cow, collections::BTreeSet};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use thiserror::Error;
 
-use crate::{Direction, HugrView, Port};
+use crate::{Direction, HugrView, Port, hugr::patch::BoundaryPort};
 
-use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr};
+use super::{
+    CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, parents_view::ParentsView,
+    state_space::CommitId,
+};
 
 /// A walker over a [`CommitStateSpace`].
 ///
@@ -235,58 +235,79 @@ impl<'a> Walker<'a> {
     ///
     /// The ports in the returned iterator will be in the same direction as
     /// `port`.
-    fn equivalent_descendant_ports(
-        &self,
-        node: PatchNode,
-        port: Port,
-    ) -> BTreeSet<(PatchNode, Port)> {
-        // First, convert everything into incoming ports (but keep track of whether the
-        // port was originally outgoing)
-        let port_direction = port.direction();
-        use itertools::Either::{Left, Right};
-        let mut ports_queue = match port.as_directed() {
-            Left(incoming) => VecDeque::from(vec![(node, incoming)]),
-            Right(outgoing) => {
-                let hugr = self.state_space.commit_hugr(node.0);
-                VecDeque::from_iter(
-                    hugr.linked_inputs(node.1, outgoing)
-                        .map(|(n, p)| (PatchNode(node.0, n), p)),
-                )
-            }
-        };
-
+    fn equivalent_descendant_ports(&self, node: PatchNode, port: Port) -> Vec<(PatchNode, Port)> {
         // Now, perform a BFS to find all equivalent ports
-        let mut all_equivalent_ports = BTreeSet::new();
-        while let Some((node, port)) = ports_queue.pop_front() {
-            let equivalent_node_port = match port_direction {
-                Direction::Incoming => (node, port.into()),
-                Direction::Outgoing => {
-                    let commit_id = node.0;
-                    let hugr = self.state_space.commit_hugr(commit_id);
-                    let (node, port) = hugr
-                        .single_linked_output(node.1, port)
-                        .expect("invalid DFG wire");
-                    (PatchNode(commit_id, node), port.into())
-                }
-            };
-            if !all_equivalent_ports.insert(equivalent_node_port) {
-                continue;
-            }
+        let mut all_ports = vec![(node, port)];
+        let mut index = 0;
+        while index < all_ports.len() {
+            let (node, port) = all_ports[index];
+            index += 1;
 
-            match port_direction {
-                Direction::Incoming => {
-                    ports_queue.extend(self.state_space.children_input_ports(node, port))
+            for (child_id, (opp_node, opp_port)) in
+                self.state_space.children_at_boundary_port(node, port)
+            {
+                match opp_port.as_directed() {
+                    Either::Left(opp_port) => {
+                        let Some((n, p)) = self
+                            .state_space
+                            .linked_child_output(opp_node, opp_port, child_id)
+                        else {
+                            continue;
+                        };
+                        all_ports.push((n, p.into()));
+                    }
+                    Either::Right(opp_port) => {
+                        all_ports.extend(
+                            self.state_space
+                                .linked_child_inputs(opp_node, opp_port, child_id)
+                                .map(|(n, p)| (n, p.into())),
+                        );
+                    }
                 }
-                Direction::Outgoing => {
-                    ports_queue.extend(self.state_space.children_output_ports(node, port))
-                }
-            };
+            }
         }
-        all_equivalent_ports
+        all_ports
     }
 
     fn is_pinned(&self, node: PatchNode) -> bool {
         self.pinned_nodes.contains(&node)
+    }
+}
+
+impl CommitStateSpace {
+    /// Given a node and port, return all children commit of the current `node`
+    /// that delete `node` but do not delete a linked port of `(node, port)`.
+    /// In other words, (node, port) is a boundary port of the subgraph of
+    /// the child replacement.
+    ///
+    /// Return all tuples of children and linked port of (node, port) that is
+    /// outside of the subgraph of the child. The returned ports are opposite
+    /// to the direction of `port`.
+    fn children_at_boundary_port(
+        &self,
+        patch_node @ PatchNode(commit_id, node): PatchNode,
+        port: Port,
+    ) -> impl Iterator<Item = (CommitId, (PatchNode, Port))> + '_ {
+        let linked_ports = self
+            .commit_hugr(commit_id)
+            .linked_ports(node, port)
+            .collect_vec();
+
+        self.children(commit_id).flat_map(move |child_id| {
+            let deleted_nodes: BTreeSet<_> = self.get_commit(child_id).deleted_nodes().collect();
+            if !deleted_nodes.contains(&patch_node) {
+                vec![]
+            } else {
+                linked_ports
+                    .iter()
+                    .filter_map(move |&(linked_node, linked_port)| {
+                        let linked_node = PatchNode(commit_id, linked_node);
+                        (!deleted_nodes.contains(&linked_node))
+                            .then_some((child_id, (linked_node, linked_port)))
+                    })
+                    .collect_vec()
+            }
+        })
     }
 }
 
