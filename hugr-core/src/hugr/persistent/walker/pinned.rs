@@ -79,8 +79,12 @@ impl PinnedWire {
     pub fn from_pinned_port(node: PatchNode, port: impl Into<Port>, walker: &Walker) -> Self {
         assert!(walker.is_pinned(node), "node must be pinned");
 
-        let (outgoing_node, outgoing_port) =
-            walker.selected_commits.get_single_outgoing_port(node, port);
+        let (outgoing_node, outgoing_port) = match port.into().as_directed() {
+            Either::Left(incoming) => walker
+                .selected_commits
+                .get_single_outgoing_port(node, incoming),
+            Either::Right(outgoing) => (node, outgoing),
+        };
 
         let outgoing = MaybePinned::new(outgoing_node, outgoing_port, walker);
 

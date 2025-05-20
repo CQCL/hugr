@@ -62,12 +62,9 @@ use std::{borrow::Cow, collections::BTreeSet};
 use itertools::{Either, Itertools};
 use thiserror::Error;
 
-use crate::{Direction, HugrView, Port, hugr::patch::BoundaryPort};
+use crate::{Direction, HugrView, Port};
 
-use super::{
-    CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, parents_view::ParentsView,
-    state_space::CommitId,
-};
+use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, state_space::CommitId};
 
 /// A walker over a [`CommitStateSpace`].
 ///
@@ -432,7 +429,7 @@ mod tests {
         let not4_node = {
             let repl4 = state_space.replacement(commit4).unwrap();
             let hugr4 = state_space.commit_hugr(commit4);
-            let [_, output] = repl4.get_replacement_io().unwrap();
+            let [_, output] = repl4.get_replacement_io();
             let (second_not_node, _) = hugr4.single_linked_output(output, 0).unwrap();
             PatchNode(commit4, second_not_node)
         };

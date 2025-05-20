@@ -1,12 +1,12 @@
 //! A test of the walker as it would typically be used by a user in practice.
 
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeSet, VecDeque};
 
 use hugr::types::EdgeKind;
 use itertools::Itertools;
 
 use hugr_core::{
-    Hugr, HugrView, IncomingPort, OutgoingPort, PortIndex, SimpleReplacement,
+    Hugr, HugrView, PortIndex, SimpleReplacement,
     builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
     extension::prelude::qb_t,
     hugr::{
@@ -256,79 +256,47 @@ fn create_replacement(wire: PinnedWire, walker: &Walker) -> Option<PersistentRep
     let all_edges = hugr.node_connections(out_node, in_node).collect_vec();
     let n_shared_qubits = all_edges.len();
 
-    // The subgraph that we will replace
-    let subgraph_nodes = [out_node, in_node];
-    let subgraph = SiblingSubgraph::try_from_nodes(subgraph_nodes, &hugr).ok()?;
-
-    let (repl_hugr, nu_inp, nu_out) = match n_shared_qubits {
+    let (repl_hugr, subgraph) = match n_shared_qubits {
         2 => {
             // out_node and in_node act on the same qubits
             // => cancel out the two CZ gates
-
-            let repl_hugr = empty_2qb_hugr();
-            let [repl_hugr_inp, repl_hugr_out] = repl_hugr.get_io(repl_hugr.entrypoint()).unwrap();
-
-            // The input boundary
-            let nu_inp = repl_hugr
-                .all_linked_inputs(repl_hugr_inp)
-                .zip(
-                    hugr.node_inputs(subgraph_nodes[0])
-                        .map(|p| (subgraph_nodes[0], p)),
-                )
-                .collect();
-
-            // The output boundary
-            let nu_out: HashMap<_, _> = hugr
-                .node_outputs(subgraph_nodes[1])
-                .map(|p| (subgraph_nodes[1], p))
-                .zip(repl_hugr.node_inputs(repl_hugr_out))
-                .collect();
-
-            (repl_hugr, nu_inp, nu_out)
+            (
+                empty_2qb_hugr(),
+                SiblingSubgraph::try_from_nodes([out_node, in_node], &hugr).ok()?,
+            )
         }
         1 => {
             // out_node and in_node share just one qubit
             // => commute the two CZ gates past each other
-            let [out_port, in_port] = all_edges.into_iter().exactly_one().unwrap();
+            let repl_hugr = two_cz_3qb_hugr();
 
-            // we need to establish which qubit is shared between the two CZ gates
+            // Need to figure out the permutation of the qubits
+            // => establish which qubit is shared between the two CZ gates
+            let [out_port, in_port] = all_edges.into_iter().exactly_one().unwrap();
             let shared_qb_on_out_node = out_port.index();
             let shared_qb_on_in_node = in_port.index();
 
-            let second_qb = 1 - shared_qb_on_out_node;
-            let third_qb = 1 - shared_qb_on_in_node;
+            let subgraph = SiblingSubgraph::try_new(
+                vec![
+                    vec![(out_node, shared_qb_on_out_node.into())],
+                    vec![(out_node, (1 - shared_qb_on_out_node).into())],
+                    vec![(in_node, (1 - shared_qb_on_in_node).into())],
+                ],
+                vec![
+                    (in_node, shared_qb_on_in_node.into()),
+                    (out_node, (1 - shared_qb_on_out_node).into()),
+                    (in_node, (1 - shared_qb_on_in_node).into()),
+                ],
+                &hugr,
+            )
+            .ok()?;
 
-            let repl_hugr = two_cz_3qb_hugr();
-            let [repl_hugr_inp, repl_hugr_out] = repl_hugr.get_io(repl_hugr.entrypoint()).unwrap();
-
-            let subgraph_input = vec![
-                (subgraph_nodes[0], IncomingPort::from(shared_qb_on_out_node)),
-                (subgraph_nodes[0], IncomingPort::from(second_qb)),
-                (subgraph_nodes[1], IncomingPort::from(third_qb)),
-            ];
-            let subgraph_output = vec![
-                (subgraph_nodes[1], OutgoingPort::from(shared_qb_on_in_node)),
-                (subgraph_nodes[0], OutgoingPort::from(second_qb)),
-                (subgraph_nodes[1], OutgoingPort::from(third_qb)),
-            ];
-
-            // The input boundary
-            let nu_inp = repl_hugr
-                .all_linked_inputs(repl_hugr_inp)
-                .zip(subgraph_input)
-                .collect();
-            // The output boundary
-            let nu_out = subgraph_output
-                .into_iter()
-                .zip(repl_hugr.node_inputs(repl_hugr_out))
-                .collect();
-
-            (repl_hugr, nu_inp, nu_out)
+            (repl_hugr, subgraph)
         }
         _ => unreachable!(),
     };
 
-    SimpleReplacement::new(subgraph, repl_hugr, nu_inp, nu_out).into()
+    SimpleReplacement::try_new(subgraph, &hugr, repl_hugr).ok()
 }
 
 #[test]
