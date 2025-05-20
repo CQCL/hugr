@@ -135,9 +135,10 @@ mod test {
     use hugr_core::{
         builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer},
         extension::prelude::{Noop, bool_t, either_type},
-        ops::{Tag, TailLoop, Value, handle::NodeHandle},
+        ops::handle::{BasicBlockID, NodeHandle},
+        ops::{Tag, TailLoop, Value},
         type_row,
-        types::Signature,
+        types::{Signature, TypeRow},
     };
 
     use super::*;
@@ -420,23 +421,16 @@ mod test {
         remove_nonlocal_edges(&mut hugr).unwrap();
         hugr.validate().unwrap();
         assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
+        let dfb = |bb: BasicBlockID| hugr.get_optype(bb.node()).as_dataflow_block().unwrap();
         // Entry node gets nonlocal1_type added, only
         assert_eq!(
-            hugr.get_optype(entry.node())
-                .as_dataflow_block()
-                .unwrap()
-                .inputs
-                .as_slice(),
-            &[nonlocal1_type.clone(), Type::UNIT, branch_type.clone()]
+            dfb(entry).inputs[..],
+            [nonlocal1_type.clone(), Type::UNIT, branch_type.clone()]
         );
         // Left node gets both nonlocal1_type and nonlocal2_type
         assert_eq!(
-            hugr.get_optype(bb_left.node())
-                .as_dataflow_block()
-                .unwrap()
-                .inputs
-                .as_slice(),
-            &[
+            dfb(bb_left).inputs[..],
+            [
                 nonlocal1_type.clone(),
                 nonlocal2_type,
                 Type::UNIT,
@@ -444,13 +438,6 @@ mod test {
             ]
         );
         // Bottom node gets nonlocal1_type added, only
-        assert_eq!(
-            hugr.get_optype(bb_bottom.node())
-                .as_dataflow_block()
-                .unwrap()
-                .inputs
-                .as_slice(),
-            &[nonlocal1_type, branch_type]
-        );
+        assert_eq!(dfb(bb_bottom).inputs[..], [nonlocal1_type, branch_type]);
     }
 }
