@@ -299,7 +299,7 @@ def test_invalid_recursive_function() -> None:
         f_recursive.set_outputs(f_recursive.input_node[0])
 
 
-def test_higher_order() -> None:
+def test_higher_order(snapshot) -> None:
     noop_fn = Dfg(tys.Qubit)
     noop_fn.set_outputs(noop_fn.add(ops.Noop()(noop_fn.input_node[0])))
 
@@ -307,9 +307,10 @@ def test_higher_order() -> None:
     (q,) = d.inputs()
     f_val = d.load(val.Function(noop_fn.hugr))
     call = d.add(ops.CallIndirect()(f_val, q))[0]
+    d.add_state_order(f_val, call.node)
     d.set_outputs(call)
 
-    validate(d.hugr)
+    validate(d.hugr, snap=snapshot)
 
 
 def test_state_order() -> None:
