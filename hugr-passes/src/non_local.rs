@@ -76,11 +76,8 @@ fn just_types<'a, X: 'a>(v: impl IntoIterator<Item = &'a (X, Type)>) -> impl Ite
 }
 
 pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdgesError> {
-    // First we collect all the non-local edges in the graph. We associate them to a WorkItem, which tracks:
-    //  * the source of the non-local edge
-    //  * the target of the non-local edge
-    //  * the type of the non-local edge. Note that all non-local edges are
-    //    value edges, so the type is well defined.
+    // Group all the non-local edges in the graph by target node,
+    // storing for each the source and type (well-defined as these are Value edges).
     let nonlocal_edges_map: HashMap<_, _> = nonlocal_edges(hugr)
         .filter_map(|(node, inport)| {
             let source = {

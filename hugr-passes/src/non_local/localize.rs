@@ -14,7 +14,6 @@ use itertools::{Either, Itertools};
 
 use super::just_types;
 
-// Analysis: determining all extra ports that must be added =============================
 #[derive(Debug, Clone)]
 // Map from (parent of target node) to source Wire to Type.
 // `BB` is any container, not necessarily a Basic Block or in a CFG
@@ -72,12 +71,13 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
                 for pred in hugr.input_neighbours(parent).collect::<Vec<_>>() {
                     self.add_edge(hugr, pred, source, ty.clone());
                 }
-                if Some(parent) != hugr.children(parent_parent).next() {
+                if Some(parent) == hugr.children(parent_parent).next() {
+                    // We've just added to entry node - so carry on and add to CFG as well
+                } else {
                     // Recursive calls on predecessors will have traced back to entry block
                     // (or source_parent itself if a dominating Basic Block)
                     break;
                 }
-                // We've just added to entry node - so must add to CFG as well
             }
             parent = parent_parent;
         }
@@ -88,6 +88,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         self.thread_node(hugr, hugr.entrypoint(), &HashMap::new())
     }
 
+    // keys of `locals` are the *original* sources of the non-local edges, in self.0.
     fn thread_node(
         &self,
         hugr: &mut impl HugrMut<Node = N>,
@@ -159,6 +160,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         }
     }
 
+    // Add to Input node; assume container type already updated.
     fn thread_dataflow_parent(
         &self,
         hugr: &mut impl HugrMut<Node = N>,
@@ -198,6 +200,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         nlocals
     }
 
+    // Add to children (assuming conditional already updated).
     fn thread_conditional(
         &self,
         hugr: &mut impl HugrMut<Node = N>,
@@ -215,6 +218,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         }
     }
 
+    // Add to body of loop (assume TailLoop node itself already updated).
     fn thread_tailloop(
         &self,
         hugr: &mut impl HugrMut<Node = N>,
@@ -231,6 +235,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         self.thread_dataflow_parent(hugr, node, 0, srcs);
     }
 
+    // Add to DataflowBlock *and* inner dataflow sibling subgraph
     fn thread_bb(&self, hugr: &mut impl HugrMut<Node = N>, node: N) {
         let OpType::DataflowBlock(this_dfb) = hugr.optype_mut(node) else {
             panic!("Expected dataflow block")
