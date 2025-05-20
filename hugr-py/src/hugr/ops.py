@@ -79,17 +79,6 @@ class Op(Protocol):
         return str(self)
 
 
-def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
-    """Get the type of the given dataflow port given the signature of the operation."""
-    if port.offset == -1:
-        # Order port
-        msg = "Order port has no type."
-        raise ValueError(msg)
-    if port.direction == Direction.INCOMING:
-        return sig.input[port.offset]
-    return sig.output[port.offset]
-
-
 @runtime_checkable
 class DataflowOp(Op, Protocol):
     """Abstract dataflow operation. Can be assumed to have a signature and Value-
@@ -142,7 +131,17 @@ class DataflowOp(Op, Protocol):
             Bool
 
         """
-        return _sig_port_type(self.outer_signature(), port)
+        sig = self.outer_signature()
+        if port.offset == -1:
+            # Order port
+            msg = "Order port has no type."
+            raise ValueError(msg)
+        try:
+            if port.direction == Direction.INCOMING:
+                return sig.input[port.offset]
+            return sig.output[port.offset]
+        except IndexError as e:
+            raise self._invalid_port(port) from e
 
     def __call__(self, *args) -> Command:
         """Calling with incoming :class:`Wire` arguments returns a
@@ -973,10 +972,8 @@ class LoadConst(DataflowOp):
         match port:
             case InPort(_, 0):
                 return tys.ConstKind(self.type_)
-            case OutPort(_, 0):
-                return tys.ValueKind(self.type_)
             case _:
-                raise self._invalid_port(port)
+                return DataflowOp.port_kind(self, port)
 
     def __repr__(self) -> str:
         return "LoadConst" + (f"({self._typ})" if self._typ is not None else "")
@@ -1284,7 +1281,7 @@ class _CallOrLoad:
             self.type_args = list(type_args)
 
 
-class Call(_CallOrLoad, Op):
+class Call(_CallOrLoad, DataflowOp):
     """Call a function inside a dataflow graph. Connects to :class:`FuncDefn` or
     :class:`FuncDecl` operations.
 
@@ -1318,10 +1315,16 @@ class Call(_CallOrLoad, Op):
             case InPort(_, offset) if offset == self._function_port_offset():
                 return tys.FunctionKind(self.signature)
             case _:
-                return tys.ValueKind(_sig_port_type(self.instantiation, port))
+                return DataflowOp.port_kind(self, port)
 
     def name(self) -> str:
         return "Call"
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.instantiation.input
+
+    def outer_signature(self) -> tys.FunctionType:
+        return self.instantiation
 
 
 @dataclass()
@@ -1408,10 +1411,8 @@ class LoadFunc(_CallOrLoad, DataflowOp):
         match port:
             case InPort(_, 0):
                 return tys.FunctionKind(self.signature)
-            case OutPort(_, 0):
-                return tys.ValueKind(self.instantiation)
             case _:
-                raise self._invalid_port(port)
+                return DataflowOp.port_kind(self, port)
 
     def name(self) -> str:
         return "LoadFunc"
