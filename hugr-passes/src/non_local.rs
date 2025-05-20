@@ -283,11 +283,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             v[TailLoop::CONTINUE_TAG] = srcs.clone();
             v
         };
-        ControlWorkItem {
-            output_node: o,
-            variant_source_prefixes: new_sum_row_prefixes,
-        }
-        .go(hugr);
+        add_control_prefixes(hugr, o, new_sum_row_prefixes);
         self.thread_dataflow_parent(hugr, node, 0, srcs);
     }
 
@@ -326,11 +322,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
             vec_prepend(sum_row.to_mut(), just_types(source_prefix));
         }
         let [_, output_node] = hugr.get_io(node).unwrap();
-        ControlWorkItem {
-            output_node,
-            variant_source_prefixes,
-        }
-        .go(hugr)
+        add_control_prefixes(hugr, output_node, variant_source_prefixes);
     }
 }
 
@@ -375,95 +367,93 @@ struct WorkItem<N: HugrNode> {
     ty: Type,
 }
 
-#[derive(Clone, Debug)]
-struct ControlWorkItem<N: HugrNode> {
-    output_node: N,                                     // Output node of CFG / TailLoop
-    variant_source_prefixes: Vec<Vec<(Wire<N>, Type)>>, // prefixes to each element of Sum type
-}
-
-impl<N: HugrNode> ControlWorkItem<N> {
-    fn go(self, hugr: &mut impl HugrMut<Node = N>) {
-        let parent = hugr.get_parent(self.output_node).unwrap();
-        let Some(mut output) = hugr.get_optype(self.output_node).as_output().cloned() else {
+/// `variant_source_prefixes` are extra wires/types to prepend onto each variant
+/// (must have one element per variant of control Sum)
+fn add_control_prefixes<H: HugrMut>(
+    hugr: &mut H,
+    output_node: H::Node,
+    variant_source_prefixes: Vec<Vec<(Wire<H::Node>, Type)>>,
+) {
+    let parent = hugr.get_parent(output_node).unwrap();
+    let Some(mut output) = hugr.get_optype(output_node).as_output().cloned() else {
+        panic!("impossible")
+    };
+    let mut needed_sources = BTreeMap::new();
+    let (cond, new_control_type) = {
+        let Some(EdgeKind::Value(control_type)) = hugr
+            .get_optype(output_node)
+            .port_kind(IncomingPort::from(0))
+        else {
             panic!("impossible")
         };
-        let mut needed_sources = BTreeMap::new();
-        let (cond, new_control_type) = {
-            let Some(EdgeKind::Value(control_type)) = hugr
-                .get_optype(self.output_node)
-                .port_kind(IncomingPort::from(0))
-            else {
-                panic!("impossible")
-            };
-            let Some(sum_type) = control_type.as_sum() else {
-                panic!("impossible")
-            };
-
-            let mut type_for_source = |source: &(Wire<N>, Type)| {
-                let (w, t) = source;
-                let replaced = needed_sources.insert(*w, (*w, t.clone()));
-                debug_assert!(!replaced.is_some_and(|x| x != (*w, t.clone())));
-                t.clone()
-            };
-            let old_sum_rows: Vec<TypeRow> = sum_type
-                .variants()
-                .map(|x| x.clone().try_into().unwrap())
-                .collect_vec();
-            let new_sum_rows: Vec<TypeRow> =
-                itertools::zip_eq(self.variant_source_prefixes.iter(), old_sum_rows.iter())
-                    .map(|(new_sources, old_tys)| {
-                        new_sources
-                            .iter()
-                            .map(&mut type_for_source)
-                            .chain(old_tys.iter().cloned())
-                            .collect_vec()
-                            .into()
-                    })
-                    .collect_vec();
-
-            let new_control_type = Type::new_sum(new_sum_rows.clone());
-            let mut cond = ConditionalBuilder::new(
-                old_sum_rows.clone(),
-                just_types(needed_sources.values()).collect_vec(),
-                new_control_type.clone(),
-            )
-            .unwrap();
-            for (i, new_sources) in self.variant_source_prefixes.into_iter().enumerate() {
-                let mut case = cond.case_builder(i).unwrap();
-                let case_inputs = case.input_wires().collect_vec();
-                let mut args = new_sources
-                    .into_iter()
-                    .map(|(s, _ty)| {
-                        case_inputs[old_sum_rows[i].len()
-                            + needed_sources
-                                .iter()
-                                .find_position(|(w, _)| **w == s)
-                                .unwrap()
-                                .0]
-                    })
-                    .collect_vec();
-                args.extend(&case_inputs[..old_sum_rows[i].len()]);
-                let case_outputs = case
-                    .add_dataflow_op(Tag::new(i, new_sum_rows.clone()), args)
-                    .unwrap()
-                    .outputs();
-                case.finish_with_outputs(case_outputs).unwrap();
-            }
-            (cond.finish_hugr().unwrap(), new_control_type)
+        let Some(sum_type) = control_type.as_sum() else {
+            panic!("impossible")
         };
-        let cond_node = hugr.insert_hugr(parent, cond).inserted_entrypoint;
-        let (old_output_source_node, old_output_source_port) =
-            hugr.single_linked_output(self.output_node, 0).unwrap();
-        debug_assert_eq!(hugr.get_parent(old_output_source_node).unwrap(), parent);
-        hugr.connect(old_output_source_node, old_output_source_port, cond_node, 0);
-        for (i, &(w, _)) in needed_sources.values().enumerate() {
-            hugr.connect(w.node(), w.source(), cond_node, i + 1);
+
+        let mut type_for_source = |source: &(Wire<H::Node>, Type)| {
+            let (w, t) = source;
+            let replaced = needed_sources.insert(*w, (*w, t.clone()));
+            debug_assert!(!replaced.is_some_and(|x| x != (*w, t.clone())));
+            t.clone()
+        };
+        let old_sum_rows: Vec<TypeRow> = sum_type
+            .variants()
+            .map(|x| x.clone().try_into().unwrap())
+            .collect_vec();
+        let new_sum_rows: Vec<TypeRow> =
+            itertools::zip_eq(variant_source_prefixes.iter(), old_sum_rows.iter())
+                .map(|(new_sources, old_tys)| {
+                    new_sources
+                        .iter()
+                        .map(&mut type_for_source)
+                        .chain(old_tys.iter().cloned())
+                        .collect_vec()
+                        .into()
+                })
+                .collect_vec();
+
+        let new_control_type = Type::new_sum(new_sum_rows.clone());
+        let mut cond = ConditionalBuilder::new(
+            old_sum_rows.clone(),
+            just_types(needed_sources.values()).collect_vec(),
+            new_control_type.clone(),
+        )
+        .unwrap();
+        for (i, new_sources) in variant_source_prefixes.into_iter().enumerate() {
+            let mut case = cond.case_builder(i).unwrap();
+            let case_inputs = case.input_wires().collect_vec();
+            let mut args = new_sources
+                .into_iter()
+                .map(|(s, _ty)| {
+                    case_inputs[old_sum_rows[i].len()
+                        + needed_sources
+                            .iter()
+                            .find_position(|(w, _)| **w == s)
+                            .unwrap()
+                            .0]
+                })
+                .collect_vec();
+            args.extend(&case_inputs[..old_sum_rows[i].len()]);
+            let case_outputs = case
+                .add_dataflow_op(Tag::new(i, new_sum_rows.clone()), args)
+                .unwrap()
+                .outputs();
+            case.finish_with_outputs(case_outputs).unwrap();
         }
-        hugr.disconnect(self.output_node, IncomingPort::from(0));
-        hugr.connect(cond_node, 0, self.output_node, 0);
-        output.types.to_mut()[0] = new_control_type;
-        hugr.replace_op(self.output_node, output);
+        (cond.finish_hugr().unwrap(), new_control_type)
+    };
+    let cond_node = hugr.insert_hugr(parent, cond).inserted_entrypoint;
+    let (old_output_source_node, old_output_source_port) =
+        hugr.single_linked_output(output_node, 0).unwrap();
+    debug_assert_eq!(hugr.get_parent(old_output_source_node).unwrap(), parent);
+    hugr.connect(old_output_source_node, old_output_source_port, cond_node, 0);
+    for (i, &(w, _)) in needed_sources.values().enumerate() {
+        hugr.connect(w.node(), w.source(), cond_node, i + 1);
     }
+    hugr.disconnect(output_node, IncomingPort::from(0));
+    hugr.connect(cond_node, 0, output_node, 0);
+    output.types.to_mut()[0] = new_control_type;
+    hugr.replace_op(output_node, output);
 }
 
 pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdgesError> {
