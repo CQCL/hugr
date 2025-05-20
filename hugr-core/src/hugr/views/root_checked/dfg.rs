@@ -1,0 +1,412 @@
+//! RootChecked methods specific to dataflow graphs.
+
+use std::collections::BTreeMap;
+
+use itertools::Itertools;
+use thiserror::Error;
+
+use crate::{
+    IncomingPort, OutgoingPort, PortIndex,
+    hugr::HugrMut,
+    ops::{DFG, FuncDefn, Input, OpTrait, OpType, Output, dataflow::IOTrait, handle::DfgID},
+    types::{NoRV, Signature, TypeBase},
+};
+
+use super::RootChecked;
+
+impl<H: HugrMut> RootChecked<H, DfgID<H::Node>> {
+    /// Get the input and output nodes of the DFG at the entrypoint node.
+    pub fn get_io(&self) -> [H::Node; 2] {
+        self.hugr()
+            .get_io(self.hugr().entrypoint())
+            .expect("valid DFG graph")
+    }
+
+    /// Rewire the inputs and outputs of the DFG to modify its signature.
+    ///
+    /// Reorder the outgoing resp. incoming wires at the input resp. output
+    /// node of the DFG to modify the signature of the DFG HUGR. This will
+    /// recursively update the signatures of all ancestors of the entrypoint.
+    ///
+    /// ### Arguments
+    ///
+    /// * `new_inputs`: The new input signature. After the map, the i-th input
+    ///   wire will be connected to the ports connected to the
+    ///   `new_inputs[i]`-th input of the old DFG.
+    /// * `new_outputs`: The new output signature. After the map, the i-th
+    ///   output wire will be connected to the ports connected to the
+    ///   `new_outputs[i]`-th output of the old DFG.
+    ///
+    /// Returns an `InvalidSignature` error if the new_inputs and new_outputs
+    /// map are not valid signatures.
+    ///
+    /// ### Panics
+    ///
+    /// Panics if the DFG is not trivially nested, i.e. if there is an ancestor
+    /// DFG of the entrypoint that has more than one inner DFG.
+    pub fn map_function_type(
+        &mut self,
+        new_inputs: &[usize],
+        new_outputs: &[usize],
+    ) -> Result<(), InvalidSignature> {
+        let [inp, out] = self.get_io();
+        let Self(hugr, _) = self;
+
+        // Record the old connections from and to the input and output nodes
+        let old_inputs_incoming = hugr
+            .node_outputs(inp)
+            .map(|p| hugr.linked_inputs(inp, p).collect_vec())
+            .collect_vec();
+        let old_outputs_outgoing = hugr
+            .node_inputs(out)
+            .map(|p| hugr.linked_outputs(out, p).collect_vec())
+            .collect_vec();
+
+        // The old signature types
+        let old_inp_sig = hugr
+            .get_optype(inp)
+            .dataflow_signature()
+            .expect("input has signature");
+        let old_inp_sig = old_inp_sig.output_types();
+        let old_out_sig = hugr
+            .get_optype(out)
+            .dataflow_signature()
+            .expect("output has signature");
+        let old_out_sig = old_out_sig.input_types();
+
+        // Check if the signature map is valid
+        check_valid_inputs(&old_inputs_incoming, old_inp_sig, new_inputs)?;
+        check_valid_outputs(old_out_sig, new_outputs)?;
+
+        // The new signature types
+        let new_inp_sig = new_inputs
+            .iter()
+            .map(|&i| old_inp_sig[i].clone())
+            .collect_vec();
+        let new_out_sig = new_outputs
+            .iter()
+            .map(|&i| old_out_sig[i].clone())
+            .collect_vec();
+        let new_sig = Signature::new(new_inp_sig, new_out_sig);
+
+        // Remove all edges of the input and output nodes
+        disconnect_all(hugr, inp);
+        disconnect_all(hugr, out);
+
+        // Update the signatures of the IO and their ancestors
+        let mut is_ancestor = false;
+        let mut node = hugr.entrypoint();
+        while matches!(hugr.get_optype(node), OpType::FuncDefn(_) | OpType::DFG(_)) {
+            let [inner_inp, inner_out] = hugr.get_io(node).expect("valid DFG graph");
+            for node in [node, inner_inp, inner_out] {
+                update_signature(hugr, node, &new_sig);
+            }
+            if is_ancestor {
+                update_inner_dfg_links(hugr, node);
+            }
+            if let Some(parent) = hugr.get_parent(node) {
+                node = parent;
+                is_ancestor = true;
+            } else {
+                break;
+            }
+        }
+
+        // Insert the new edges at the input
+        let mut old_output_to_new_input = BTreeMap::<IncomingPort, OutgoingPort>::new();
+        for (inp_pos, &old_pos) in new_inputs.iter().enumerate() {
+            for &(node, port) in &old_inputs_incoming[old_pos] {
+                if node != out {
+                    hugr.connect(inp, inp_pos, node, port);
+                } else {
+                    old_output_to_new_input.insert(port, inp_pos.into());
+                }
+            }
+        }
+
+        // Insert the new edges at the output
+        for (out_pos, &old_pos) in new_outputs.iter().enumerate() {
+            for &(node, port) in &old_outputs_outgoing[old_pos] {
+                if node != inp {
+                    hugr.connect(node, port, out, out_pos);
+                } else {
+                    let &inp_pos = old_output_to_new_input.get(&old_pos.into()).unwrap();
+                    hugr.connect(inp, inp_pos, out, out_pos);
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Panics if the DFG within `node` is not a single inner DFG.
+fn update_inner_dfg_links<H: HugrMut>(hugr: &mut H, node: H::Node) {
+    // connect all edges of the inner DFG to the input and output nodes
+    let inner_dfg = hugr
+        .children(node)
+        .skip(2)
+        .exactly_one()
+        .ok()
+        .expect("no non-trivial inner DFG");
+
+    let [inp, out] = hugr.get_io(node).expect("valid DFG graph");
+    disconnect_all(hugr, inner_dfg);
+    for (out_port, _) in hugr.out_value_types(inp).collect_vec() {
+        hugr.connect(inp, out_port, inner_dfg, out_port.index());
+    }
+    for (in_port, _) in hugr.in_value_types(out).collect_vec() {
+        hugr.connect(inner_dfg, in_port.index(), out, in_port);
+    }
+}
+
+fn disconnect_all<H: HugrMut>(hugr: &mut H, node: H::Node) {
+    let all_ports = hugr.all_node_ports(node).collect_vec();
+    for port in all_ports {
+        hugr.disconnect(node, port);
+    }
+}
+
+fn update_signature<H: HugrMut>(hugr: &mut H, node: H::Node, new_sig: &Signature) {
+    let new_op: OpType = match hugr.get_optype(node) {
+        OpType::DFG(_) => DFG {
+            signature: new_sig.clone(),
+        }
+        .into(),
+        OpType::FuncDefn(fn_def_op) => {
+            FuncDefn::new(fn_def_op.func_name().clone(), new_sig.clone()).into()
+        }
+        OpType::Input(_) => Input::new(new_sig.input().clone()).into(),
+        OpType::Output(_) => Output::new(new_sig.output().clone()).into(),
+        _ => panic!("only update signature of DFG, FuncDefn, Input, or Output"),
+    };
+    hugr.set_num_ports(node, new_op.input_count(), new_op.output_count());
+    hugr.replace_op(node, new_op);
+}
+
+fn check_valid_inputs<V>(
+    old_ports: &[Vec<V>],
+    old_sig: &[TypeBase<NoRV>],
+    map_sig: &[usize],
+) -> Result<(), InvalidSignature> {
+    if let Some(old_pos) = map_sig
+        .iter()
+        .find_map(|&old_pos| (old_pos >= old_sig.len()).then_some(old_pos))
+    {
+        return Err(InvalidSignature::UnknownIO(old_pos, "input"));
+    }
+
+    let counts = map_sig.iter().copied().counts();
+    if let Some(old_pos) = old_ports.iter().enumerate().find_map(|(old_pos, vec)| {
+        ((!vec.is_empty() || old_sig.get(old_pos).is_some_and(|t| !t.copyable()))
+            && !counts.contains_key(&old_pos))
+        .then_some(old_pos)
+    }) {
+        return Err(InvalidSignature::MissingIO(old_pos, "input"));
+    }
+
+    if let Some(old_pos) = counts
+        .iter()
+        .find_map(|(&old_pos, &count)| (count > 1).then_some(old_pos))
+    {
+        return Err(InvalidSignature::DuplicateInput(old_pos));
+    }
+
+    Ok(())
+}
+
+fn check_valid_outputs(
+    old_sig: &[TypeBase<NoRV>],
+    map_sig: &[usize],
+) -> Result<(), InvalidSignature> {
+    if let Some(old_pos) = map_sig
+        .iter()
+        .find_map(|&old_pos| (old_pos >= old_sig.len()).then_some(old_pos))
+    {
+        return Err(InvalidSignature::UnknownIO(old_pos, "output"));
+    }
+
+    let counts = map_sig.iter().copied().counts();
+    let linear_types = old_sig
+        .iter()
+        .enumerate()
+        .filter_map(|(pos, t)| (!t.copyable()).then_some(pos));
+    for old_pos in linear_types {
+        let Some(&cnt) = counts.get(&old_pos) else {
+            return Err(InvalidSignature::MissingIO(old_pos, "output"));
+        };
+        if cnt != 1 {
+            return Err(InvalidSignature::LinearityViolation(old_pos, "output"));
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
+#[non_exhaustive]
+pub enum InvalidSignature {
+    #[error("{0}-th {1} is required but missing in new signature")]
+    MissingIO(usize, &'static str),
+    #[error("No {0}-th {1} in signature")]
+    UnknownIO(usize, &'static str),
+    #[error("Linearity of {0}-th {1} is not preserved in new signature")]
+    LinearityViolation(usize, &'static str),
+    #[error("{0}-th input is duplicated in new signature")]
+    DuplicateInput(usize),
+}
+
+#[cfg(test)]
+mod test {
+    use insta::assert_snapshot;
+
+    use super::*;
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
+    use crate::extension::prelude::{bool_t, qb_t};
+    use crate::hugr::views::root_checked::RootChecked;
+    use crate::ops::handle::{DfgID, NodeHandle};
+    use crate::types::Signature;
+    use crate::utils::test_quantum_extension::cx_gate;
+    use crate::{Hugr, HugrView};
+
+    fn new_empty_dfg(sig: Signature) -> Hugr {
+        let dfg_builder = DFGBuilder::new(sig).unwrap();
+        let wires = dfg_builder.input_wires();
+        dfg_builder.finish_hugr_with_outputs(wires).unwrap()
+    }
+
+    #[test]
+    fn test_map_io() {
+        // Create a DFG with 2 inputs and 2 outputs
+        let sig = Signature::new_endo(vec![qb_t(), qb_t()]);
+        let mut hugr = new_empty_dfg(sig);
+
+        // Wrap in RootChecked
+        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+
+        // Test mapping inputs: [0,1] -> [1,0]
+        let input_map = vec![1, 0];
+        let output_map = vec![0, 1];
+
+        // Map the I/O
+        dfg_view.map_function_type(&input_map, &output_map).unwrap();
+
+        // Verify the new signature
+        let dfg_hugr = dfg_view.hugr();
+        let new_sig = dfg_hugr
+            .get_optype(dfg_hugr.entrypoint())
+            .dataflow_signature()
+            .unwrap();
+        assert_eq!(new_sig.input_count(), 2);
+        assert_eq!(new_sig.output_count(), 2);
+
+        // Test invalid mapping - missing input
+        let invalid_input_map = vec![0, 0];
+        let err = dfg_view.map_function_type(&invalid_input_map, &output_map);
+        assert!(matches!(err, Err(InvalidSignature::MissingIO(1, "input"))));
+
+        // Test invalid mapping - duplicate input
+        let invalid_input_map = vec![0, 0, 1];
+        assert!(matches!(
+            dfg_view.map_function_type(&invalid_input_map, &output_map),
+            Err(InvalidSignature::DuplicateInput(0))
+        ));
+
+        // Test invalid mapping - unknown output
+        let invalid_output_map = vec![0, 2];
+        assert!(matches!(
+            dfg_view.map_function_type(&input_map, &invalid_output_map),
+            Err(InvalidSignature::UnknownIO(2, "output"))
+        ));
+    }
+
+    #[test]
+    fn test_map_io_duplicate_output() {
+        // Create a DFG with 1 input and 1 output
+        let sig = Signature::new_endo(vec![bool_t()]);
+        let mut hugr = new_empty_dfg(sig);
+
+        // Wrap in RootChecked
+        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+
+        // Test mapping outputs: [0] -> [0,0] (duplicating the output)
+        let input_map = vec![0];
+        let output_map = vec![0, 0];
+
+        // Map the I/O
+        dfg_view.map_function_type(&input_map, &output_map).unwrap();
+
+        let dfg_hugr = dfg_view.hugr();
+        if let Err(err) = dfg_hugr.validate() {
+            panic!("Invalid Hugr: {err}");
+        }
+
+        // Verify the new signature
+        let new_sig = dfg_hugr
+            .get_optype(dfg_hugr.entrypoint())
+            .dataflow_signature()
+            .unwrap();
+        assert_eq!(new_sig.input_count(), 1);
+        assert_eq!(new_sig.output_count(), 2);
+        assert_snapshot!(dfg_hugr.mermaid_string());
+    }
+
+    #[test]
+    fn test_map_io_cx_gate() {
+        // Create a DFG with 2 inputs and 2 outputs for a CX gate
+        let mut dfg_builder = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()])).unwrap();
+        let [wire0, wire1] = dfg_builder.input_wires_arr();
+        let cx_handle = dfg_builder
+            .add_dataflow_op(cx_gate(), vec![wire0, wire1])
+            .unwrap();
+        let cx_node = cx_handle.node();
+        let [wire0, wire1] = cx_handle.outputs_arr();
+        let mut hugr = dfg_builder
+            .finish_hugr_with_outputs(vec![wire0, wire1])
+            .unwrap();
+
+        // Wrap in RootChecked
+        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+
+        // Test mapping inputs: [0,1] -> [1,0] (swapping inputs)
+        let input_map = vec![1, 0];
+        let output_map = vec![0, 1];
+
+        // Map the I/O
+        dfg_view.map_function_type(&input_map, &output_map).unwrap();
+
+        let dfg_hugr = dfg_view.hugr();
+        if let Err(err) = dfg_hugr.validate() {
+            panic!("Invalid Hugr: {err}");
+        }
+
+        // Verify the new signature
+        let new_sig = dfg_hugr
+            .get_optype(dfg_hugr.entrypoint())
+            .dataflow_signature()
+            .unwrap();
+        assert_eq!(new_sig.input_count(), 2);
+        assert_eq!(new_sig.output_count(), 2);
+
+        // Verify the connections are preserved but swapped
+        let [new_inp, new_out] = dfg_view.get_io();
+        assert_eq!(
+            dfg_hugr.linked_inputs(new_inp, 0).collect_vec(),
+            vec![(cx_node, 1.into())]
+        );
+        assert_eq!(
+            dfg_hugr.linked_inputs(new_inp, 1).collect_vec(),
+            vec![(cx_node, 0.into())]
+        );
+        assert_eq!(
+            dfg_hugr.linked_outputs(new_out, 0).collect_vec(),
+            vec![(cx_node, 0.into())]
+        );
+        assert_eq!(
+            dfg_hugr.linked_outputs(new_out, 1).collect_vec(),
+            vec![(cx_node, 1.into())]
+        );
+
+        assert_snapshot!(dfg_hugr.mermaid_string());
+    }
+}

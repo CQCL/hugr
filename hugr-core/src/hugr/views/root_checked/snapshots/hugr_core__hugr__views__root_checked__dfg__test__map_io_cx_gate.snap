@@ -1,0 +1,28 @@
+---
+source: hugr-core/src/hugr/views/root_checked/dfg.rs
+expression: dfg_hugr.mermaid_string()
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) FuncDefn: #quot;main#quot;"]
+            direction LR
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) [**DFG**]"]
+                direction LR
+                style 4 stroke:#832561,stroke-width:3px
+                5["(5) Input"]
+                6["(6) Output"]
+                7["(7) test.quantum.CX"]
+                5--"0:1<br>qubit"-->7
+                5--"1:0<br>qubit"-->7
+                7--"0:0<br>qubit"-->6
+                7--"1:1<br>qubit"-->6
+            end
+            2--"0:0<br>qubit"-->4
+            2--"1:1<br>qubit"-->4
+            4--"0:0<br>qubit"-->3
+            4--"1:1<br>qubit"-->3
+        end
+    end
