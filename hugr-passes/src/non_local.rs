@@ -56,8 +56,8 @@ fn build_needs_sources_map<N: HugrNode>(
     nonlocal_edges: &HashMap<N, WorkItem<N>>,
 ) -> BBNeedsSourcesMap<N> {
     let mut bnsm = BBNeedsSourcesMapBuilder::new(&hugr);
-    for workitem in nonlocal_edges.values() {
-        let parent = hugr.get_parent(workitem.target.0).unwrap();
+    for (target_node, workitem) in nonlocal_edges.iter() {
+        let parent = hugr.get_parent(*target_node).unwrap();
         debug_assert!(hugr.get_parent(parent).is_some());
         bnsm.insert(parent, workitem.source, workitem.ty.clone());
     }
@@ -91,7 +91,6 @@ pub fn ensure_no_nonlocal_edges<H: HugrView>(
 #[derive(Debug, Clone)]
 struct WorkItem<N: HugrNode> {
     source: Wire<N>,
-    target: (N, IncomingPort),
     ty: Type,
 }
 
@@ -106,7 +105,7 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
     //  * the type of the non-local edge. Note that all non-local edges are
     //    value edges, so the type is well defined.
     let nonlocal_edges_map: HashMap<_, _> = nonlocal_edges(hugr)
-        .filter_map(|target @ (node, inport)| {
+        .filter_map(|(node, inport)| {
             let source = {
                 let (n, p) = hugr.single_linked_output(node, inport)?;
                 Wire::new(n, p)
@@ -119,7 +118,7 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
             else {
                 panic!("impossible")
             };
-            Some((node, WorkItem { source, target, ty }))
+            Some((node, WorkItem { source, ty }))
         })
         .collect();
 
