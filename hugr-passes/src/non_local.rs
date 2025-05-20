@@ -25,7 +25,7 @@ use crate::ComposablePass;
 struct LocalizeEdges;
 
 impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
-    type Error = NonLocalEdgesError<H::Node>;
+    type Error = LocalizeEdgesError;
 
     type Result = ();
 
@@ -338,24 +338,34 @@ fn just_types<'a, X: 'a>(v: impl IntoIterator<Item = &'a (X, Type)>) -> impl Ite
     v.into_iter().map(|(_, t)| t.clone())
 }
 
-#[derive(derive_more::Error, derive_more::From, derive_more::Display, Debug, PartialEq)]
+#[deprecated(note = "Use FindNonLocalEdgesError")]
+pub type NonLocalEdgesError<N> = FindNonLocalEdgesError<N>;
+
+/// An error from [ensure_no_nonlocal_edges]
+#[derive(Clone, derive_more::Error, derive_more::Display, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum NonLocalEdgesError<N> {
+pub enum FindNonLocalEdgesError<N> {
     #[display("Found {} nonlocal edges", _0.len())]
     #[error(ignore)]
     Edges(Vec<(N, IncomingPort)>),
-    #[from]
-    HugrError(HugrError),
 }
 
 /// Verifies that there are no non local value edges in the Hugr.
-pub fn ensure_no_nonlocal_edges<H: HugrView>(hugr: &H) -> Result<(), NonLocalEdgesError<H::Node>> {
+pub fn ensure_no_nonlocal_edges<H: HugrView>(
+    hugr: &H,
+) -> Result<(), FindNonLocalEdgesError<H::Node>> {
     let non_local_edges: Vec<_> = nonlocal_edges(hugr).collect_vec();
     if non_local_edges.is_empty() {
         Ok(())
     } else {
-        Err(NonLocalEdgesError::Edges(non_local_edges))?
+        Err(FindNonLocalEdgesError::Edges(non_local_edges))?
     }
+}
+
+#[derive(derive_more::Error, derive_more::Display, derive_more::From, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum LocalizeEdgesError {
+    HugrError(#[from] HugrError),
 }
 
 #[derive(Debug, Clone)]
@@ -456,7 +466,7 @@ impl<N: HugrNode> ControlWorkItem<N> {
     }
 }
 
-pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), NonLocalEdgesError<H::Node>> {
+pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdgesError> {
     // First we collect all the non-local edges in the graph. We associate them to a WorkItem, which tracks:
     //  * the source of the non-local edge
     //  * the target of the non-local edge
@@ -593,7 +603,7 @@ mod test {
         };
         assert_eq!(
             ensure_no_nonlocal_edges(&hugr).unwrap_err(),
-            NonLocalEdgesError::Edges(vec![edge])
+            FindNonLocalEdgesError::Edges(vec![edge])
         );
     }
 
