@@ -112,15 +112,12 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
     };
 
     debug_assert!(nonlocal_edges_map.iter().all(|(n, (source, _))| {
-        let mut m = *n;
-        loop {
-            let parent = hugr.get_parent(m).unwrap();
-            if hugr.get_parent(source.node()).unwrap() == parent {
-                return true;
-            }
-            assert!(bb_needs_sources_map.parent_needs(parent, *source));
-            m = parent;
-        }
+        std::iter::successors(Some(*n), |n| {
+            let parent = hugr.get_parent(*n).unwrap();
+            (Some(parent) != hugr.get_parent(source.node())).then_some(parent)
+        })
+        .skip(1)
+        .all(|parent| bb_needs_sources_map.parent_needs(parent, *source))
     }));
 
     bb_needs_sources_map.thread_hugr(hugr);
