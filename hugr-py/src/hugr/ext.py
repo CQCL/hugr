@@ -417,6 +417,14 @@ class ExtensionRegistry:
 
         extension_id: ExtensionId
 
+    def ids(self) -> set[ExtensionId]:
+        """Get the set of extension IDs in the registry.
+
+        Returns:
+            Set of extension IDs.
+        """
+        return set(self.extensions.keys())
+
     def add_extension(self, extension: Extension) -> Extension:
         """Add an extension to the registry.
 
@@ -450,3 +458,20 @@ class ExtensionRegistry:
             return self.extensions[name]
         except KeyError as e:
             raise self.ExtensionNotFound(name) from e
+
+    def extend(self, other: ExtensionRegistry) -> None:
+        """Add a registry of extensions to this registry.
+
+        If an extension with the same name already exists, the one with the
+        higher version is kept.
+
+        Args:
+            other: The extension registry to add.
+        """
+        for name, ext in other.extensions.items():
+            if name in self.extensions and self.extensions[name].version >= ext.version:
+                continue
+            self.extensions[name] = ext
+
+    def __str__(self) -> str:
+        return "ExtensionRegistry(" + ", ".join(self.extensions.keys()) + ")"
