@@ -2,8 +2,6 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use delegate::delegate;
-
 use hugr_core::{
     Direction, HugrView, IncomingPort, Wire,
     builder::{ConditionalBuilder, Dataflow, DataflowSubContainer, HugrBuilder},
@@ -33,17 +31,15 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         self.0.entry(node).or_default().insert(source, ty).is_none()
     }
 
-    pub(super) fn get(&self, node: N) -> impl Iterator<Item = (&Wire<N>, &Type)> + '_ {
+    fn get(&self, node: N) -> impl Iterator<Item = (&Wire<N>, &Type)> + '_ {
         match self.0.get(&node) {
             Some(x) => Either::Left(x.iter()),
             None => Either::Right(std::iter::empty()),
         }
     }
 
-    delegate! {
-        to self.0 {
-            pub(super) fn keys(&self) -> impl Iterator<Item=&N>;
-        }
+    pub(super) fn parent_needs(&self, parent: N, source: Wire<N>) -> bool {
+        self.get(parent).any(|(w, _)| *w == source)
     }
 
     // Identify all required extra inputs (deals with both Dom and Ext edges).
@@ -58,6 +54,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
     ) {
         let source_parent = hugr.get_parent(source.node()).unwrap();
         while source_parent != parent {
+            debug_assert!(hugr.get_parent(parent).is_some());
             if !self.insert(parent, source, ty.clone()) {
                 break;
             }
@@ -86,6 +83,7 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         }
     }
 
+    /// Threads the extra connections required throughout the Hugr
     pub(super) fn thread_hugr(&self, hugr: &mut impl HugrMut<Node = N>) {
         self.thread_node(hugr, hugr.entrypoint(), &HashMap::new())
     }

@@ -116,25 +116,17 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
         bnsm
     };
 
-    // TODO move this out-of-line
-    #[cfg(debug_assertions)]
-    {
-        for (&n, (source, _)) in nonlocal_edges_map.iter() {
-            let mut m = n;
-            loop {
-                let parent = hugr.get_parent(m).unwrap();
-                if hugr.get_parent(source.node()).unwrap() == parent {
-                    break;
-                }
-                assert!(bb_needs_sources_map.get(parent).any(|(w, _)| w == source));
-                m = parent;
+    debug_assert!(nonlocal_edges_map.iter().all(|(n, (source, _))| {
+        let mut m = *n;
+        loop {
+            let parent = hugr.get_parent(m).unwrap();
+            if hugr.get_parent(source.node()).unwrap() == parent {
+                return true;
             }
+            assert!(bb_needs_sources_map.parent_needs(parent, *source));
+            m = parent;
         }
-
-        for &bb in bb_needs_sources_map.keys() {
-            assert!(hugr.get_parent(bb).is_some());
-        }
-    }
+    }));
 
     bb_needs_sources_map.thread_hugr(hugr);
 
