@@ -81,8 +81,8 @@ pub use state_space::{CommitStateSpace, InvalidCommit, PatchNode};
 pub use resolver::PointerEqResolver;
 
 use crate::{
+    hugr::patch::{simple_replace, Patch, PatchVerification},
     Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::patch::{Patch, PatchVerification, simple_replace},
 };
 
 /// A replacement operation that can be applied to a [`PersistentHugr`].
@@ -479,11 +479,10 @@ impl PersistentHugr {
                 repl.get_replacement_io()[0] == out_node.1
             };
             if let Some(deleted_by) = self.find_deleting_commit(out_node) {
-                (out_node, out_port) = self.state_space.linked_child_output(
-                    PatchNode(commit_id, in_node),
-                    in_port,
-                    deleted_by,
-                );
+                (out_node, out_port) = self
+                    .state_space
+                    .linked_child_output(PatchNode(commit_id, in_node), in_port, deleted_by)
+                    .expect("valid boundary edge");
                 // update (in_node, in_port)
                 (in_node, in_port) = {
                     let new_commit_id = out_node.0;

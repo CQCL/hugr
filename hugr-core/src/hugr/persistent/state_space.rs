@@ -7,13 +7,13 @@ use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use super::{
-    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, find_conflicting_node,
-    parents_view::ParentsView,
+    find_conflicting_node, parents_view::ParentsView, Commit, PersistentHugr,
+    PersistentReplacement, PointerEqResolver,
 };
 use crate::{
-    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
     hugr::{internal::HugrInternals, patch::BoundaryPort},
     ops::OpType,
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
 };
 
 /// A copyable handle to a [`Commit`] vertex within a [`CommitStateSpace`]
@@ -315,25 +315,20 @@ impl CommitStateSpace {
     ///
     /// ## Panics
     ///
-    /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
-    /// a valid commit ID.
+    /// Panics if `child` is not a valid commit ID.
     pub(super) fn linked_child_output(
         &self,
         node: PatchNode,
         port: IncomingPort,
         child: CommitId,
-    ) -> (PatchNode, OutgoingPort) {
-        assert!(
-            self.is_boundary_edge(node, port, child),
-            "not a boundary edge"
-        );
-
+    ) -> Option<(PatchNode, OutgoingPort)> {
         let parent_hugrs = ParentsView::from_commit(child, self);
         let repl = self.replacement(child).expect("valid child commit");
-        match repl.linked_replacement_output((node, port), &parent_hugrs) {
+        match repl.linked_replacement_output((node, port), &parent_hugrs)? {
             BoundaryPort::Host(patch_node, port) => (patch_node, port),
             BoundaryPort::Replacement(node, port) => (PatchNode(child, node), port),
         }
+        .into()
     }
 
     /// Get the single output boundary port linked to `(node, port)` in a

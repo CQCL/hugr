@@ -129,16 +129,15 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         &self,
         port: impl Into<HostPort<HostNode, IncomingPort>>,
         host: &impl HugrView<Node = HostNode>,
-    ) -> BoundaryPort<HostNode, OutgoingPort> {
+    ) -> Option<BoundaryPort<HostNode, OutgoingPort>> {
         let HostPort(node, port) = port.into();
         let pos = self
             .subgraph
             .outgoing_ports()
             .iter()
-            .position(move |&(n, p)| host.linked_inputs(n, p).contains(&(node, port)))
-            .expect("valid incoming output port");
+            .position(move |&(n, p)| host.linked_inputs(n, p).contains(&(node, port)))?;
 
-        self.linked_replacement_output_by_position(pos, host)
+        Some(self.linked_replacement_output_by_position(pos, host))
     }
 
     /// The outgoing port linked to the i-th output boundary edge of `subgraph`.
@@ -186,13 +185,10 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     ) -> impl Iterator<Item = HostPort<HostNode, IncomingPort>> {
         let ReplacementPort(node, port) = port.into();
         let [_, repl_out] = self.get_replacement_io();
-        let mut positions = self
+        let positions = self
             .replacement
             .linked_inputs(node, port)
-            .filter_map(move |(n, p)| (n == repl_out).then_some(p.index()))
-            .peekable();
-
-        assert!(positions.peek().is_some(), "not a boundary port");
+            .filter_map(move |(n, p)| (n == repl_out).then_some(p.index()));
 
         positions
             .map(|pos| self.subgraph.outgoing_ports()[pos])
@@ -1154,7 +1150,10 @@ pub(in crate::hugr::patch) mod test {
 
         // Test linked_replacement_output with empty replacement
         let replacement_output = (0..4)
-            .map(|i| repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr))
+            .map(|i| {
+                repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr)
+                    .unwrap()
+            })
             .collect_vec();
 
         assert_eq!(
@@ -1196,7 +1195,10 @@ pub(in crate::hugr::patch) mod test {
         );
 
         let replacement_output = (0..4)
-            .map(|i| repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr))
+            .map(|i| {
+                repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr)
+                    .unwrap()
+            })
             .collect_vec();
 
         assert_eq!(
@@ -1247,7 +1249,10 @@ pub(in crate::hugr::patch) mod test {
         );
 
         let replacement_output = (0..4)
-            .map(|i| repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr))
+            .map(|i| {
+                repl.linked_replacement_output((out, IncomingPort::from(i)), &hugr)
+                    .unwrap()
+            })
             .collect_vec();
 
         assert_eq!(
