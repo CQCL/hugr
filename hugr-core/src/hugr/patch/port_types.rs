@@ -10,7 +10,7 @@ use derive_more::From;
 ///
 /// This is used to represent boundary edges that will be added between the host
 /// and replacement graphs when applying a rewrite.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BoundaryPort<HostNode, P> {
     /// A port in the host graph.
     Host(HostNode, P),
@@ -19,11 +19,11 @@ pub enum BoundaryPort<HostNode, P> {
 }
 
 /// A port in the host graph.
-#[derive(Debug, Clone, Copy, From, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, From, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HostPort<N, P>(pub N, pub P);
 
 /// A port in the replacement graph.
-#[derive(Debug, Clone, Copy, From, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, From, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ReplacementPort<P>(pub Node, pub P);
 
 impl<HostNode: Copy, P> BoundaryPort<HostNode, P> {
