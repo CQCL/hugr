@@ -52,9 +52,7 @@ class ListVal(val.ExtensionValue):
         vs = [v._to_serial_root() for v in self.v]
         element_ty = self.ty.ty._to_serial_root()
         serial_val = {"values": vs, "typ": element_ty}
-        return val.Extension(
-            name, typ=self.ty, val=serial_val, extensions=[EXTENSION.name]
-        )
+        return val.Extension(name, typ=self.ty, val=serial_val)
 
     def __str__(self) -> str:
         return f"[{comma_sep_str(self.v)}]"
