@@ -863,14 +863,21 @@ impl<'a> Context<'a> {
             TypeArg::Type { ty } => self.export_type(ty),
             TypeArg::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
             TypeArg::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
-            TypeArg::Sequence { elems } => {
-                // For now we assume that the sequence is meant to be a list.
+            TypeArg::List { elems } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
                         .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
                 );
                 self.make_term(table::Term::List(parts))
+            }
+            TypeArg::Tuple { elems } => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    elems
+                        .iter()
+                        .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
+                );
+                self.make_term(table::Term::Tuple(parts))
             }
             TypeArg::Variable { v } => self.export_type_arg_var(v),
         }

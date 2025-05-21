@@ -378,7 +378,7 @@ mod test {
             outputs: vec![usize_t(), tv1].into(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[
-            TypeArg::Sequence {
+            TypeArg::List {
                 elems: vec![usize_t().into(); 3],
             },
             qb_t().into(),
