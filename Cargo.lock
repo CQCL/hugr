@@ -1253,6 +1253,7 @@ dependencies = [
  "itertools 0.14.0",
  "jsonschema",
  "lazy_static",
+ "once_cell",
  "paste",
  "petgraph 0.8.1",
  "portgraph",
@@ -1270,6 +1271,7 @@ dependencies = [
  "static_assertions",
  "strum",
  "thiserror 2.0.12",
+ "triomphe",
  "typetag",
  "zstd",
 ]
@@ -3110,6 +3112,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e672c95779cf947c5311f83787af4fa8fffd12fb27e4993211a84bdfd9610f9c"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "triomphe"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef8f7726da4807b58ea5c96fdc122f80702030edc33b35aff9190a51148ccc85"
+dependencies = [
+ "serde",
+ "stable_deref_trait",
 ]
 
 [[package]]

@@ -61,6 +61,8 @@ typetag = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
 relrc = { workspace = true, features = ["petgraph"] }
+once_cell = "1.21.3"
+triomphe = "0.1.14"
 
 [dev-dependencies]
 rstest = { workspace = true }
