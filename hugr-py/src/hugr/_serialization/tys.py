@@ -187,12 +187,7 @@ class TypeArg(RootModel):
     """A type argument."""
 
     root: Annotated[
-        TypeTypeArg
-        | BoundedNatArg
-        | StringArg
-        | ListArg
-        | TupleArg
-        | VariableArg,
+        TypeTypeArg | BoundedNatArg | StringArg | ListArg | TupleArg | VariableArg,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 
