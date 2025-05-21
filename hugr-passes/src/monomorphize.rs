@@ -1,20 +1,20 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     convert::Infallible,
     fmt::Write,
 };
 
 use hugr_core::{
+    Node,
     ops::{Call, FuncDefn, LoadFunction, OpTrait},
     types::{Signature, Substitution, TypeArg},
-    Node,
 };
 
-use hugr_core::hugr::{hugrmut::HugrMut, HugrView, OpType};
+use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::composable::{validate_if_test, ValidatePassError};
 use crate::ComposablePass;
+use crate::composable::{ValidatePassError, validate_if_test};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -280,7 +280,7 @@ mod test {
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
         HugrBuilder, ModuleBuilder,
     };
-    use hugr_core::extension::prelude::{usize_t, ConstUsize, UnpackTuple, UnwrapBuilder};
+    use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
