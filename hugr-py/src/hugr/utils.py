@@ -8,6 +8,10 @@ L = TypeVar("L", bound=Hashable)
 R = TypeVar("R", bound=Hashable)
 
 
+class UnresolvedExtensionError(Exception):
+    """Expected element to have resolved extensions. Call `resolve` to ensure this."""
+
+
 class NotBijection(Exception):
     """Initial map is not a bijection."""
 
