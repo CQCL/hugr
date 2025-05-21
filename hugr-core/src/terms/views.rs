@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use super::{Apply, List, Term};
+use super::{Apply, Term, Typed};
 use hugr_model::v0::SymbolName;
 use thiserror::Error;
 
@@ -16,10 +16,6 @@ macro_rules! make_ctr {
             }
         }
 
-        impl $ident {
-            pub const SYMBOL: SymbolName = SymbolName::new_static($symbol);
-        }
-
         impl From<$ident> for Apply {
             fn from(value: $ident) -> Self {
                 Apply::new(
@@ -30,11 +26,13 @@ macro_rules! make_ctr {
             }
         }
 
-        impl From<$ident> for Term {
-            fn from(value: $ident) -> Self {
-                Term::Apply(value.into())
+        impl From<&$ident> for Apply {
+            fn from(value: &$ident) -> Self {
+                value.clone().into()
             }
         }
+
+        make_ctr!(@common $ident, $symbol);
     };
 
     ($ident:ident, $symbol:expr) => {
@@ -47,10 +45,6 @@ macro_rules! make_ctr {
             }
         }
 
-        impl $ident {
-            pub const SYMBOL: SymbolName = SymbolName::new_static($symbol);
-        }
-
         impl From<$ident> for Apply {
             fn from($ident: $ident) -> Self {
                 static TERM: ::once_cell::sync::Lazy<Apply> = ::once_cell::sync::Lazy::new(|| {
@@ -60,83 +54,109 @@ macro_rules! make_ctr {
             }
         }
 
+        impl From<&$ident> for Apply {
+            fn from(value: &$ident) -> Self {
+                value.into()
+            }
+        }
+
+        make_ctr!(@common $ident, $symbol);
+    };
+
+    (@common $ident:ident, $symbol:expr) => {
+        impl $ident {
+            /// The symbol name of the constructor.
+            pub const SYMBOL: SymbolName = SymbolName::new_static($symbol);
+        }
+
         impl From<$ident> for Term {
             fn from(value: $ident) -> Self {
                 Term::Apply(value.into())
             }
         }
+
+        impl From<&$ident> for Term {
+            fn from(value: &$ident) -> Self {
+                Term::Apply(value.into())
+            }
+        }
+
+        impl ::std::fmt::Display for $ident {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                write!(f, "{}", Term::from(self))
+            }
+        }
     }
 }
 
+macro_rules! impl_typed_static {
+    ($ident:ident) => {
+        impl Typed for $ident {
+            #[allow(refining_impl_trait)]
+            fn type_(&self) -> Term {
+                Term::StaticType
+            }
+        }
+    };
+}
+
+/// `core.fn`: The type of runtime functions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoreFn {
-    pub inputs: List,
-    pub outputs: List,
+    pub inputs: Term,
+    pub outputs: Term,
 }
 
 make_ctr!(CoreFn { inputs, outputs }, "core.fn");
+impl_typed_static!(CoreFn);
 
+/// `core.list`: The type of static lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoreList {
     pub item_type: Term,
 }
 
 make_ctr!(CoreList { item_type }, "core.list");
+impl_typed_static!(CoreList);
 
+/// `core.tuple`: The type of static tuples.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoreTuple {
-    pub item_types: List,
+    pub item_types: Term,
 }
 
 make_ctr!(CoreTuple { item_types }, "core.tuple");
+impl_typed_static!(CoreTuple);
 
+/// `core.str`: The type of static strings.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreStr;
 
 make_ctr!(CoreStr, "core.str");
+impl_typed_static!(CoreStr);
 
+/// `core.nat`: The type of static natural numbers.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreNat;
 
 make_ctr!(CoreNat, "core.nat");
+impl_typed_static!(CoreNat);
 
+/// `core.bytes`: The type of static byte strings.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreBytes;
 
 make_ctr!(CoreBytes, "core.bytes");
+impl_typed_static!(CoreBytes);
 
+/// `core.float`: The type of static floating point numbers.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreFloat;
 
 make_ctr!(CoreFloat, "core.float");
+impl_typed_static!(CoreFloat);
 
-// impl CoreFn {
-//     pub const SYMBOL: SymbolName = SymbolName::new_static("core.fn");
-// }
-
-// impl TryFrom<Term> for CoreFn {
-//     type Error = ViewError;
-
-//     fn try_from(value: Term) -> Result<Self, Self::Error> {
-//         let [inputs, outputs] = value.view_apply(&Self::SYMBOL)?;
-//         let inputs = inputs.try_into()?;
-//         let outputs = outputs.try_into()?;
-//         Ok(CoreFn { inputs, outputs })
-//     }
-// }
-
-// impl From<CoreFn> for Term {
-//     fn from(value: CoreFn) -> Self {
-//         Apply::new(
-//             CoreFn::SYMBOL,
-//             [value.inputs.into(), value.outputs.into()],
-//             Term::default(),
-//         )
-//         .into()
-//     }
-// }
-
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum ViewError {
     /// The viewed term does not match the pattern of the view.
     ///
