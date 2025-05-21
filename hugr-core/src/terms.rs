@@ -1,23 +1,30 @@
-use hugr_model::v0::ast;
 use hugr_model::v0::{Literal, SymbolName};
+use hugr_model::v0::{VarName, ast};
 use std::fmt::Display;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+mod views;
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Term {
+    #[default]
+    Wildcard,
     Literal(Literal),
     List(List),
     Tuple(Tuple),
     Apply(Apply),
+    Var(Var),
 }
 
 impl From<&Term> for ast::Term {
     fn from(value: &Term) -> Self {
         match value {
+            Term::Wildcard => ast::Term::Wildcard,
             Term::Literal(literal) => ast::Term::Literal(literal.clone()),
             Term::List(list) => list.into(),
             Term::Tuple(tuple) => tuple.into(),
             Term::Apply(apply) => apply.into(),
+            Term::Var(var) => var.into(),
         }
     }
 }
@@ -52,6 +59,12 @@ impl From<Apply> for Term {
     }
 }
 
+impl From<Var> for Term {
+    fn from(value: Var) -> Self {
+        Self::Var(value)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SeqPart {
     Item(Term),
@@ -70,8 +83,14 @@ impl Display for SeqPart {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct List(Arc<[SeqPart]>);
+
+impl List {
+    pub fn new(parts: impl IntoIterator<Item = SeqPart>) -> Self {
+        Self(parts.into_iter().collect())
+    }
+}
 
 impl From<&List> for ast::Term {
     fn from(value: &List) -> Self {
@@ -82,6 +101,18 @@ impl From<&List> for ast::Term {
 impl Display for List {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", ast::Term::from(self))
+    }
+}
+
+impl TryFrom<Term> for List {
+    type Error = ();
+
+    fn try_from(value: Term) -> Result<Self, Self::Error> {
+        match value {
+            Term::List(list) => Ok(list),
+            Term::Var(var) => Ok(List::new([SeqPart::Splice(Term::Var(var))])),
+            _ => Err(()),
+        }
     }
 }
 
@@ -132,6 +163,23 @@ impl From<&Apply> for ast::Term {
 }
 
 impl Display for Apply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", ast::Term::from(self))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Var {
+    name: VarName,
+}
+
+impl From<&Var> for ast::Term {
+    fn from(value: &Var) -> Self {
+        Self::Var(value.name.clone())
+    }
+}
+
+impl Display for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", ast::Term::from(self))
     }
