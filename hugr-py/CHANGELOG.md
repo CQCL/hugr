@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.0...hugr-py-v0.12.1) (2025-05-20)
+
+
+### Bug Fixes
+
+* handle order port case for missing dataflow ops ([#2238](https://github.com/CQCL/hugr/issues/2238)) ([dc44b81](https://github.com/CQCL/hugr/commit/dc44b811b19537a763cfe789c595fc26ed69c34d))
+* **py:** deprecate extensions sets in values ([#2233](https://github.com/CQCL/hugr/issues/2233)) ([fe98ba1](https://github.com/CQCL/hugr/commit/fe98ba10684b9cf38d96c0cf9cde89a736b27bf3))
+
+
+### Documentation
+
+* update hugr-py docs appearance, add HUGR logo ([#2222](https://github.com/CQCL/hugr/issues/2222)) ([fefa599](https://github.com/CQCL/hugr/commit/fefa599f12a0ddb3335b01abad87bb80ecf2ed36))
+
 ## [0.12.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.11.5...hugr-py-v0.12.0) (2025-05-16)
 
 

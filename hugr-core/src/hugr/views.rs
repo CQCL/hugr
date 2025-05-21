@@ -16,7 +16,7 @@ use std::collections::HashMap;
 pub use self::petgraph::PetgraphWrapper;
 use self::render::RenderConfig;
 pub use rerooted::Rerooted;
-pub use root_checked::{RootCheckable, RootChecked, check_tag};
+pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
 use itertools::Itertools;
@@ -439,7 +439,7 @@ pub trait HugrView: HugrInternals {
             .map(|(p, t)| (p.as_incoming().unwrap(), t))
     }
 
-    /// Iterator over all incoming ports that have Value type, along
+    /// Iterator over all outgoing ports that have Value type, along
     /// with corresponding types.
     fn out_value_types(&self, node: Self::Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
         self.value_types(node, Direction::Outgoing)
