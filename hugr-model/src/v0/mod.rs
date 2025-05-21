@@ -399,6 +399,11 @@ impl VarName {
     pub fn new(name: impl Into<SmolStr>) -> Self {
         Self(name.into())
     }
+
+    /// Create a variable link name from a static string.
+    pub const fn new_static(name: &'static str) -> Self {
+        Self(SmolStr::new_static(name))
+    }
 }
 
 impl AsRef<str> for VarName {
@@ -435,6 +440,11 @@ impl SymbolName {
     pub fn new(name: impl Into<SmolStr>) -> Self {
         Self(name.into())
     }
+
+    /// Create a new symbol name from a static string.
+    pub const fn new_static(name: &'static str) -> Self {
+        Self(SmolStr::new_static(name))
+    }
 }
 
 impl AsRef<str> for SymbolName {
@@ -466,6 +476,11 @@ impl LinkName {
     pub fn new_index(index: LinkIndex) -> Self {
         // TODO: Should named and numbered links have different namespaces?
         Self(format!("{index}").into())
+    }
+
+    /// Create a new link name from a static string.
+    pub const fn new_static(name: &'static str) -> Self {
+        Self(SmolStr::new_static(name))
     }
 }
 
