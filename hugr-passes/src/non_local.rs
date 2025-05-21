@@ -13,7 +13,7 @@ use hugr_core::{
 use crate::ComposablePass;
 
 mod localize;
-use localize::BBNeedsSourcesMap;
+use localize::ExtraSourceReqs;
 
 /// [ComposablePass] that converts all non-local edges in a Hugr
 /// into local ones, by inserting extra inputs to container nodes
@@ -102,7 +102,7 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
 
     // We now compute the sources needed by each parent node.
     let bb_needs_sources_map = {
-        let mut bnsm = BBNeedsSourcesMap::default();
+        let mut bnsm = ExtraSourceReqs::default();
         for (target_node, (source, ty)) in nonlocal_edges_map.iter() {
             let parent = hugr.get_parent(*target_node).unwrap();
             debug_assert!(hugr.get_parent(parent).is_some());
@@ -138,7 +138,7 @@ mod test {
         ops::handle::{BasicBlockID, NodeHandle},
         ops::{Tag, TailLoop, Value},
         type_row,
-        types::{Signature, TypeRow},
+        types::Signature,
     };
 
     use super::*;

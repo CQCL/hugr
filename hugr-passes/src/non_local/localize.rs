@@ -15,17 +15,17 @@ use itertools::{Either, Itertools};
 use super::just_types;
 
 #[derive(Debug, Clone)]
-// Map from (parent of target node) to source Wire to Type.
-// `BB` is any container, not necessarily a Basic Block or in a CFG
-pub struct BBNeedsSourcesMap<N: HugrNode>(BTreeMap<N, BTreeMap<Wire<N>, Type>>);
+// For each parent/container node, a map from the source Wires that need to be added
+// as extra inputs to that container, to the Type of each.
+pub(super) struct ExtraSourceReqs<N: HugrNode>(BTreeMap<N, BTreeMap<Wire<N>, Type>>);
 
-impl<N: HugrNode> Default for BBNeedsSourcesMap<N> {
+impl<N: HugrNode> Default for ExtraSourceReqs<N> {
     fn default() -> Self {
         Self(BTreeMap::default())
     }
 }
 
-impl<N: HugrNode> BBNeedsSourcesMap<N> {
+impl<N: HugrNode> ExtraSourceReqs<N> {
     fn insert(&mut self, node: N, source: Wire<N>, ty: Type) -> bool {
         self.0.entry(node).or_default().insert(source, ty).is_none()
     }
@@ -37,14 +37,14 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
         }
     }
 
-    pub(super) fn parent_needs(&self, parent: N, source: Wire<N>) -> bool {
+    pub fn parent_needs(&self, parent: N, source: Wire<N>) -> bool {
         self.get(parent).any(|(w, _)| *w == source)
     }
 
-    // Identify all required extra inputs (deals with both Dom and Ext edges).
-    // Every intermediate node in the hierarchy
-    // between the source's parent and the target needs that source.
-    pub(super) fn add_edge(
+    /// Identify all required extra inputs (deals with both Dom and Ext edges).
+    /// Every intermediate node in the hierarchy
+    /// between the source's parent and the target needs that source.
+    pub fn add_edge(
         &mut self,
         hugr: &impl HugrView<Node = N>,
         mut parent: N,
@@ -64,10 +64,14 @@ impl<N: HugrNode> BBNeedsSourcesMap<N> {
                     self.insert(case, source, ty.clone());
                 }
             }
-            // this will panic if source_parent is not an ancestor of target
+            // this will eventually panic if source_parent is not an ancestor of target
             let parent_parent = hugr.get_parent(parent).unwrap();
+
             if hugr.get_optype(parent).is_dataflow_block() {
                 assert!(hugr.get_optype(parent_parent).is_cfg());
+                // For both Dom edges and Ext edges from outside the CFG, also add to all
+                // reaching BBs (for a Dom edge, up to but not including the source BB:
+                // all paths eventually come from the source since it dominates the target).
                 for pred in hugr.input_neighbours(parent).collect::<Vec<_>>() {
                     self.add_edge(hugr, pred, source, ty.clone());
                 }
