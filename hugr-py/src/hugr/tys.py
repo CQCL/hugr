@@ -8,7 +8,13 @@ from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
 import hugr._serialization.tys as stys
 import hugr.model as model
-from hugr.utils import comma_sep_repr, comma_sep_str, comma_sep_str_paren, ser_it
+from hugr.utils import (
+    UnresolvedExtensionError,
+    comma_sep_repr,
+    comma_sep_str,
+    comma_sep_str_paren,
+    ser_it,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -62,7 +68,7 @@ class TypeArg(Protocol):
         """Get the set of extensions required to define this type argument.
 
         Raises:
-            UnknownTypeExtensionError: if a type argument contains is a
+            UnresolvedExtensionError: if a type argument contains a
                 :class:`Opaque` type that has not been resolved.
 
         Example:
@@ -118,10 +124,10 @@ class Type(Protocol):
 
         Note that :class:`Opaque` types do not know their extension, so they
         will raise an error. Use :meth:`resolve` to get the actual type
-        and then call this method.
+        before calling this method.
 
         Raises:
-            UnknownTypeExtensionError: if the type is an :class:`Opaque` type
+            UnresolvedExtensionError: if the type contains an :class:`Opaque` type
                 and has not been resolved.
 
         Example:
@@ -137,8 +143,27 @@ class Type(Protocol):
 TypeRow = list[Type]
 
 
-class UnknownTypeExtensionError(Exception):
-    """Exception raised when querying the extension of an :method:`Opaque` type."""
+def row_used_extensions(row: TypeRow) -> ExtensionRegistry:
+    """Get the set of extensions required to define a row of types.
+
+    Note that :class:`Opaque` types do not know their extension, so they
+    will raise an error. Use :meth:`resolve` to get the actual type
+    before calling this function.
+
+    Raises:
+        UnresolvedExtensionError: if the type contains an :class:`Opaque` type
+            and has not been resolved.
+
+    Example:
+        >>> row_used_extensions([Qubit, USize()]).ids()
+        {'prelude'}
+    """
+    from hugr.ext import ExtensionRegistry
+
+    reg = ExtensionRegistry()
+    for ty in row:
+        reg = reg.extend(ty.used_extensions())
+    return reg
 
 
 # --------------------------------------------
@@ -759,11 +784,8 @@ class FunctionType(Type):
         return model.Apply("core.fn", [inputs, outputs])
 
     def used_extensions(self) -> ExtensionRegistry:
-        reg = super().used_extensions()
-        for ty in self.input:
-            reg.extend(ty.used_extensions())
-        for ty in self.output:
-            reg.extend(ty.used_extensions())
+        reg = row_used_extensions(self.input)
+        reg.extend(row_used_extensions(self.output))
         return reg
 
 
@@ -918,7 +940,7 @@ class Opaque(Type):
 
     def used_extensions(self) -> ExtensionRegistry:
         msg = "Opaque types do not know their extension. Call `resolve` first."
-        raise UnknownTypeExtensionError(msg)
+        raise UnresolvedExtensionError(msg)
 
 
 @dataclass

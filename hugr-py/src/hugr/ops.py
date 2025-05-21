@@ -19,13 +19,14 @@ from typing_extensions import Self
 import hugr._serialization.ops as sops
 from hugr import tys, val
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
-from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
+from hugr.utils import UnresolvedExtensionError, comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from hugr import ext
     from hugr._serialization.ops import BaseOp
+    from hugr.ext import ExtensionRegistry
     from hugr.tys import Visibility
 
 
@@ -78,6 +79,17 @@ class Op(Protocol):
     def name(self) -> str:
         """Name of the operation."""
         return str(self)
+
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this operation.
+
+        Example:
+            >>> TypeTypeArg(ty=Qubit).used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        return ExtensionRegistry()
 
 
 @runtime_checkable
@@ -257,6 +269,15 @@ class Input(DataflowOp):
     def name(self) -> str:
         return "Input"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this operation.
+
+        Example:
+            >>> Input([tys.Qubit]).used_extensions().ids()
+            {'prelude'}
+        """
+        return tys.row_used_extensions(self.types)
+
 
 @dataclass()
 class Output(DataflowOp, _PartialOp):
@@ -294,6 +315,24 @@ class Output(DataflowOp, _PartialOp):
 
     def name(self) -> str:
         return "Output"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this operation.
+
+        Example:
+            >>> out = Output(num_out = 1)
+            >>> out.used_extensions().ids()
+            set()
+            >>> out._set_in_types([tys.Qubit])
+            >>> out.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        if self._types is None:
+            return ExtensionRegistry()
+
+        return tys.row_used_extensions(self._types)
 
 
 @runtime_checkable
@@ -391,6 +430,9 @@ class AsExtOp(DataflowOp, Protocol):
             return name
         return f"{name}<{comma_sep_str(self.type_args())}>"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.ext_op.used_extensions()
+
 
 @dataclass(frozen=True, eq=False)
 class Custom(DataflowOp):
@@ -448,6 +490,13 @@ class Custom(DataflowOp):
     def name(self) -> str:
         return f"Custom({self.op_name})"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        msg = (
+            "Custom operations do not have a known set of extensions."
+            "Call resolve() before this method."
+        )
+        raise UnresolvedExtensionError(msg)
+
 
 @dataclass(frozen=True, eq=False)
 class ExtOp(AsExtOp):
@@ -504,6 +553,13 @@ class ExtOp(AsExtOp):
             msg = "Polymorphic signature must be cached."
             raise ValueError(msg)
         return poly_func.body
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = self.outer_signature().used_extensions()
+        reg.add_extension(self._op_def.get_extension())
+        for arg in self.args:
+            reg.extend(arg.used_extensions())
+        return reg
 
 
 class RegisteredOp(AsExtOp):
@@ -564,6 +620,27 @@ class MakeTuple(AsExtOp, _PartialOp):
 
     def name(self) -> str:
         return "MakeTuple"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this operation.
+
+        Example:
+            >>> out = Output(num_out = 1)
+            >>> out.used_extensions().ids()
+            set()
+            >>> out._set_in_types([tys.Qubit])
+            >>> out.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr import std
+        from hugr.ext import ExtensionRegistry
+
+        reg = ExtensionRegistry()
+        reg.add_extension(std.PRELUDE)
+        if self._types is not None:
+            reg.extend(tys.row_used_extensions(self._types))
+
+        return reg
 
 
 @dataclass()
