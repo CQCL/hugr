@@ -8,6 +8,7 @@ use crate::{Hugr, Node};
 use super::HugrView;
 
 mod dfg;
+pub use dfg::InvalidSignature;
 
 /// A wrapper over a Hugr that ensures the entrypoint optype is of the required
 /// [`OpTag`].

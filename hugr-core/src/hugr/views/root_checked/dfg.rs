@@ -243,15 +243,21 @@ fn check_valid_outputs(
     Ok(())
 }
 
+/// Errors that can occur when mapping the I/O of a DFG.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
 #[non_exhaustive]
 pub enum InvalidSignature {
+    /// Error when a required input/output is missing from the new signature
     #[error("{0}-th {1} is required but missing in new signature")]
     MissingIO(usize, &'static str),
+    /// Error when trying to access an input/output that doesn't exist in the
+    /// signature
     #[error("No {0}-th {1} in signature")]
     UnknownIO(usize, &'static str),
+    /// Error when a linear input/output is used multiple times or not at all
     #[error("Linearity of {0}-th {1} is not preserved in new signature")]
     LinearityViolation(usize, &'static str),
+    /// Error when an input is used multiple times in the new signature
     #[error("{0}-th input is duplicated in new signature")]
     DuplicateInput(usize),
 }
