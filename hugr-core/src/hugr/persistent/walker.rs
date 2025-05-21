@@ -43,9 +43,9 @@
 //!    of possible HUGRs.
 //! 5. Once exploration is complete (e.g. a pattern was fully matched), the
 //!    walker can be converted into a [`PersistentHugr`] instance using
-//!    [`Walker::into_hugr`]. The matched nodes and ports can then be used to
-//!    create a [`SiblingSubgraph`](crate::hugr::views::SiblingSubgraph) object,
-//!    which can then be used to create new
+//!    [`Walker::into_persistent_hugr`]. The matched nodes and ports can then be
+//!    used to create a [`SiblingSubgraph`](crate::hugr::views::SiblingSubgraph)
+//!    object, which can then be used to create new
 //!    [`SimpleReplacement`](crate::SimpleReplacement) instances---and possibly
 //!    in turn be added to the commit state space and the exploration of the
 //!    state space restarted!
@@ -76,11 +76,12 @@ use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, state_sp
 /// pinned node.
 ///
 /// The set of selected commits of a walker defines a [`PersistentHugr`]
-/// instance that can be retrieved by calling [`Walker::into_hugr`]. As the
-/// walker is expanded and more of the state space is explored, more commits are
-/// selected, and the [`PersistentHugr`] will change accordingly. Pinned nodes
-/// (and pinned ports, i.e. ports at pinned nodes) are guaranteed to be valid in
-/// all [`PersistentHugr`] instances obtained as a result of expansions of the
+/// instance that can be retrieved by calling [`Walker::into_persistent_hugr`].
+/// As the walker is expanded and more of the state space is explored, more
+/// commits are selected, and the [`PersistentHugr`] will change accordingly.
+/// Pinned nodes (and pinned ports, i.e. ports at pinned nodes) are guaranteed
+/// to be valid in all [`PersistentHugr`] instances obtained as a result of
+/// expansions of the current walker.
 /// current walker.
 #[derive(Debug, Clone)]
 pub struct Walker<'a> {

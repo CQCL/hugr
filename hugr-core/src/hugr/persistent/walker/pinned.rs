@@ -20,7 +20,7 @@ use super::Walker;
 /// A [`PinnedWire`] always has at least one pinned port.
 ///
 /// All pinned ports of a [`PinnedWire`] can be retrieved using
-/// [`PinnedWire::incoming_ports`] and [`PinnedWire::outgoing_port`]. Unpinned
+/// [`PinnedWire::pinned_inports`] and [`PinnedWire::pinned_outport`]. Unpinned
 /// ports, on the other hand, represent undetermined connections, which may
 /// still change as the walker is expanded (see [`Walker::expand`]).
 ///
