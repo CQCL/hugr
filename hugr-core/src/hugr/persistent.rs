@@ -84,7 +84,7 @@ pub use state_space::{CommitStateSpace, InvalidCommit, PatchNode};
 pub use resolver::PointerEqResolver;
 
 use crate::{
-    Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
     hugr::patch::{Patch, PatchVerification, simple_replace},
 };
 
@@ -110,9 +110,11 @@ impl Commit {
     /// Requires a reference to the commit state space that the nodes in
     /// `replacement` refer to.
     ///
+    /// Use [`Self::try_new`] instead if the parents of the commit cannot be
+    /// inferred from the invalidation set of `replacement` alone.
+    ///
     /// The replacement must act on a non-empty subgraph, otherwise this
     /// function will return an [`InvalidCommit::EmptyReplacement`] error.
-    ///
     /// If any of the parents of the replacement are not in the commit state
     /// space, this function will return an [`InvalidCommit::UnknownParent`]
     /// error.
@@ -120,19 +122,33 @@ impl Commit {
         replacement: PersistentReplacement,
         graph: &CommitStateSpace,
     ) -> Result<Commit, InvalidCommit> {
+        Self::try_new(replacement, [], graph)
+    }
+
+    /// Create a new commit
+    ///
+    /// Requires a reference to the commit state space that the nodes in
+    /// `replacement` refer to.
+    ///
+    /// The returned commit will correspond to the application of `replacement`
+    /// and will be the child of the commits in `parents` as well as of all
+    /// the commits in the invalidation set of `replacement`.
+    ///
+    /// The replacement must act on a non-empty subgraph, otherwise this
+    /// function will return an [`InvalidCommit::EmptyReplacement`] error.
+    /// If any of the parents of the replacement are not in the commit state
+    /// space, this function will return an [`InvalidCommit::UnknownParent`]
+    /// error.
+    pub fn try_new(
+        replacement: PersistentReplacement,
+        parents: impl IntoIterator<Item = Commit>,
+        graph: &CommitStateSpace,
+    ) -> Result<Commit, InvalidCommit> {
         if replacement.subgraph().nodes().is_empty() {
             return Err(InvalidCommit::EmptyReplacement);
         }
-        let parent_ids = replacement.invalidation_set().map(|n| n.0).unique();
-        let parents = parent_ids
-            .map(|id| {
-                if graph.contains_id(id) {
-                    Ok(graph.get_commit(id).clone())
-                } else {
-                    Err(InvalidCommit::UnknownParent(id))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let repl_parents = get_parent_commits(&replacement, graph)?;
+        let parents = parents.into_iter().chain(repl_parents);
         let rc = RelRc::with_parents(
             replacement.into(),
             parents.into_iter().map(|p| (p.into(), ())),
@@ -495,6 +511,8 @@ impl PersistentHugr {
                     .linked_child_output(PatchNode(commit_id, in_node), in_port, deleted_by)
                     .expect("valid boundary edge");
                 // update (in_node, in_port)
+                dbg!(out_node);
+                println!("{}", hugr.mermaid_string());
                 (in_node, in_port) = {
                     let new_commit_id = out_node.0;
                     let hugr = self.commit_hugr(new_commit_id);
@@ -536,16 +554,32 @@ impl PersistentHugr {
         out_node: PatchNode,
         out_port: OutgoingPort,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> {
+        self.get_all_incoming_ports_with_callback(out_node, out_port, ())
+    }
+
+    /// All incoming ports that the given outgoing port is attached to.
+    ///
+    /// Panics if `out_node` is not in `self` (in particular if it is deleted)
+    /// or if `out_port` is not a value port in `out_node`.
+    ///
+    /// Takes an additional callback to register visits to commits that may not
+    /// be contained in the commits that the returned ports belong to.
+    fn get_all_incoming_ports_with_callback(
+        &self,
+        out_node: PatchNode,
+        out_port: OutgoingPort,
+        mut mark_visited: impl CommitVisitCallback,
+    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> {
         assert!(
             self.is_value_port(out_node, out_port),
             "not a dataflow wire"
         );
         assert!(self.contains_node(out_node), "node not in self");
 
-        let mut visited = BTreeSet::new();
+        let mut nodes_visited = BTreeSet::new();
         // enqueue the outport and initialise the set of valid incoming ports
         // to the valid incoming ports in this commit
-        let mut queue = VecDeque::from([(out_node, out_port)]);
+        let mut queue = VecDeque::from([(out_node, out_port, BTreeSet::new())]);
         let mut valid_incoming_ports = BTreeSet::from_iter(
             self.commit_hugr(out_node.0)
                 .linked_inputs(out_node.1, out_port)
@@ -554,11 +588,13 @@ impl PersistentHugr {
         );
 
         // A simple BFS across the commit history to find all equivalent incoming ports.
-        while let Some((out_node, out_port)) = queue.pop_front() {
-            if !visited.insert((out_node, out_port)) {
+        while let Some((out_node, out_port, mut empty_commits)) = queue.pop_front() {
+            let commit_id = out_node.0;
+
+            if !nodes_visited.insert((out_node, out_port)) {
                 continue;
             }
-            let commit_id = out_node.0;
+
             let hugr = self.commit_hugr(commit_id);
             let out_deleted_by = self.find_deleting_commit(out_node);
             let curr_repl_out = {
@@ -588,12 +624,12 @@ impl PersistentHugr {
                 .partition_map(|x| x);
 
             // Convert an incoming port to the unique outgoing port that it is linked to
-            let to_outgoing_port = |(PatchNode(commit_id, in_node), in_port)| {
+            let to_outgoing_port = |PatchNode(commit_id, in_node), in_port, commits_visited| {
                 let hugr = self.commit_hugr(commit_id);
                 let (out_node, out_port) = hugr
                     .single_linked_output(in_node, in_port)
                     .expect("valid dfg wire");
-                (PatchNode(commit_id, out_node), out_port)
+                (PatchNode(commit_id, out_node), out_port, commits_visited)
             };
 
             if is_linked_to_output.0 {
@@ -604,8 +640,12 @@ impl PersistentHugr {
                 for (in_node, in_port) in new_ins {
                     if self.contains_node(in_node) {
                         valid_incoming_ports.insert((in_node, in_port));
+                        for commit_id in mem::take(&mut empty_commits) {
+                            // mark all traversed commits as visited
+                            mark_visited.visit(commit_id);
+                        }
                     }
-                    queue.push_back(to_outgoing_port((in_node, in_port)));
+                    queue.push_back(to_outgoing_port(in_node, in_port, empty_commits.clone()));
                 }
             }
 
@@ -615,10 +655,17 @@ impl PersistentHugr {
                     .as_state_space()
                     .linked_child_inputs(out_node, out_port, child);
                 for (in_node, in_port) in new_ins {
+                    if in_node.0 != child {
+                        empty_commits.insert(child);
+                    }
                     if self.contains_node(in_node) {
                         valid_incoming_ports.insert((in_node, in_port));
+                        for commit_id in mem::take(&mut empty_commits) {
+                            // mark all traversed commits as visited
+                            mark_visited.visit(commit_id);
+                        }
                     }
-                    queue.push_back(to_outgoing_port((in_node, in_port)));
+                    queue.push_back(to_outgoing_port(in_node, in_port, empty_commits.clone()));
                 }
             }
         }
@@ -721,6 +768,32 @@ impl PersistentHugr {
             .expect("invalid port")
             .is_value()
     }
+
+    fn value_ports(
+        &self,
+        patch_node @ PatchNode(commit_id, node): PatchNode,
+        dir: Direction,
+    ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
+        let hugr = self.commit_hugr(commit_id);
+        let ports = hugr.node_ports(node, dir);
+        ports.filter_map(move |p| self.is_value_port(patch_node, p).then_some((patch_node, p)))
+    }
+
+    fn output_value_ports(
+        &self,
+        patch_node: PatchNode,
+    ) -> impl Iterator<Item = (PatchNode, OutgoingPort)> + '_ {
+        self.value_ports(patch_node, Direction::Outgoing)
+            .map(|(n, p)| (n, p.as_outgoing().expect("unexpected port direction")))
+    }
+
+    fn input_value_ports(
+        &self,
+        patch_node: PatchNode,
+    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
+        self.value_ports(patch_node, Direction::Incoming)
+            .map(|(n, p)| (n, p.as_incoming().expect("unexpected port direction")))
+    }
 }
 
 impl IntoIterator for PersistentHugr {
@@ -760,6 +833,21 @@ fn find_conflicting_node<'a>(
     })
 }
 
+fn get_parent_commits(
+    repl: &PersistentReplacement,
+    graph: &CommitStateSpace,
+) -> Result<Vec<Commit>, InvalidCommit> {
+    let ids = repl.invalidation_set().map(|n| n.0).unique();
+    ids.map(|id| {
+        if graph.contains_id(id) {
+            Ok(graph.get_commit(id).clone())
+        } else {
+            Err(InvalidCommit::UnknownParent(id))
+        }
+    })
+    .collect()
+}
+
 /// A wrapper around a boolean that implements `Extend<V>`. The boolean
 /// is true if a non-empty iterator was appended to `self`.
 #[derive(Debug, Copy, Clone, Default)]
@@ -769,6 +857,20 @@ impl<V> Extend<V> for IteratorNonEmpty {
     fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
         self.0 |= iter.into_iter().next().is_some();
     }
+}
+
+trait CommitVisitCallback {
+    fn visit(&mut self, commit_id: CommitId);
+}
+
+impl CommitVisitCallback for &mut BTreeSet<CommitId> {
+    fn visit(&mut self, commit_id: CommitId) {
+        self.insert(commit_id);
+    }
+}
+
+impl CommitVisitCallback for () {
+    fn visit(&mut self, _commit_id: CommitId) {}
 }
 
 #[cfg(test)]

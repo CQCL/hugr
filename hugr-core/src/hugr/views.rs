@@ -60,8 +60,8 @@ pub trait HugrView: HugrInternals {
     /// [`OpTag::Any`] may be returned for any node, but more specific tags may
     /// be used instead.
     ///
-    /// The tag returned may vary if the entrypoint node's operation is modified,
-    /// or if the entrypoint node is replaced with another node.
+    /// The tag returned may vary if the entrypoint node's operation is
+    /// modified, or if the entrypoint node is replaced with another node.
     #[inline]
     fn entrypoint_tag(&self) -> OpTag {
         self.entrypoint_optype().tag()
@@ -123,14 +123,16 @@ pub trait HugrView: HugrInternals {
     fn num_ports(&self, node: Self::Node, dir: Direction) -> usize;
 
     /// Number of inputs to a node.
-    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Incoming)`.
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node,
+    /// Direction::Incoming)`.
     #[inline]
     fn num_inputs(&self, node: Self::Node) -> usize {
         self.num_ports(node, Direction::Incoming)
     }
 
     /// Number of outputs from a node.
-    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Outgoing)`.
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node,
+    /// Direction::Outgoing)`.
     #[inline]
     fn num_outputs(&self, node: Self::Node) -> usize {
         self.num_ports(node, Direction::Outgoing)
@@ -177,7 +179,8 @@ pub trait HugrView: HugrInternals {
         port: impl Into<Port>,
     ) -> impl Iterator<Item = (Self::Node, Port)> + Clone;
 
-    /// Iterator over all the nodes and ports connected to a node in a given direction.
+    /// Iterator over all the nodes and ports connected to a node in a given
+    /// direction.
     fn all_linked_ports(
         &self,
         node: Self::Node,
@@ -228,8 +231,8 @@ pub trait HugrView: HugrInternals {
         self.linked_ports(node, port).exactly_one().ok()
     }
 
-    /// If there is exactly one `OutgoingPort` connected to this `IncomingPort`, return
-    /// it and its node.
+    /// If there is exactly one `OutgoingPort` connected to this `IncomingPort`,
+    /// return it and its node.
     fn single_linked_output(
         &self,
         node: Self::Node,
@@ -239,8 +242,8 @@ pub trait HugrView: HugrInternals {
             .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
 
-    /// If there is exactly one `IncomingPort` connected to this `OutgoingPort`, return
-    /// it and its node.
+    /// If there is exactly one `IncomingPort` connected to this `OutgoingPort`,
+    /// return it and its node.
     fn single_linked_input(
         &self,
         node: Self::Node,
@@ -249,9 +252,9 @@ pub trait HugrView: HugrInternals {
         self.single_linked_port(node, port.into())
             .map(|(n, p)| (n, p.as_incoming().unwrap()))
     }
-    /// Iterator over the nodes and output ports connected to a given *input* port.
-    /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
-    /// that the linked ports are [`OutgoingPort`]s.
+    /// Iterator over the nodes and output ports connected to a given *input*
+    /// port. Like [`linked_ports`][HugrView::linked_ports] but preserves
+    /// knowledge that the linked ports are [`OutgoingPort`]s.
     fn linked_outputs(
         &self,
         node: Self::Node,
@@ -261,9 +264,9 @@ pub trait HugrView: HugrInternals {
             .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
 
-    /// Iterator over the nodes and input ports connected to a given *output* port
-    /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
-    /// that the linked ports are [`IncomingPort`]s.
+    /// Iterator over the nodes and input ports connected to a given *output*
+    /// port Like [`linked_ports`][HugrView::linked_ports] but preserves
+    /// knowledge that the linked ports are [`IncomingPort`]s.
     fn linked_inputs(
         &self,
         node: Self::Node,
@@ -291,13 +294,15 @@ pub trait HugrView: HugrInternals {
     /// Returns an iterator over all the descendants of a node,
     /// including the node itself.
     ///
-    /// Yields the node itself first, followed by its children in breath-first order.
+    /// Yields the node itself first, followed by its children in breath-first
+    /// order.
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Returns an iterator over all the descendants of the hugr entrypoint,
     /// including the node itself.
     ///
-    /// Yields the node itself first, followed by its children in breath-first order.
+    /// Yields the node itself first, followed by its children in breath-first
+    /// order.
     fn entry_descendants(&self) -> impl Iterator<Item = Self::Node> + Clone {
         self.descendants(self.entrypoint())
     }
@@ -317,14 +322,16 @@ pub trait HugrView: HugrInternals {
     ) -> impl Iterator<Item = Self::Node> + Clone;
 
     /// Iterates over the input neighbours of the `node`.
-    /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Incoming)`.
+    /// Shorthand for [`neighbours`][HugrView::neighbours]`(node,
+    /// Direction::Incoming)`.
     #[inline]
     fn input_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
         self.neighbours(node, Direction::Incoming)
     }
 
     /// Iterates over the output neighbours of the `node`.
-    /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Outgoing)`.
+    /// Shorthand for [`neighbours`][HugrView::neighbours]`(node,
+    /// Direction::Outgoing)`.
     #[inline]
     fn output_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
         self.neighbours(node, Direction::Outgoing)
@@ -338,7 +345,8 @@ pub trait HugrView: HugrInternals {
     #[inline]
     fn get_io(&self, node: Self::Node) -> Option<[Self::Node; 2]> {
         let op = self.get_optype(node);
-        // Nodes outside the view have no children (and a non-DataflowParent OpType::default())
+        // Nodes outside the view have no children (and a non-DataflowParent
+        // OpType::default())
         if OpTag::DataflowParent.is_superset(op.tag()) {
             self.children(node).take(2).collect_vec().try_into().ok()
         } else {
@@ -359,8 +367,9 @@ pub trait HugrView: HugrInternals {
         self.entrypoint_optype().inner_function_type()
     }
 
-    /// Returns the function type defined by this HUGR, i.e. `Some` iff the root is
-    /// a [`FuncDecl`][crate::ops::FuncDecl] or [`FuncDefn`][crate::ops::FuncDefn].
+    /// Returns the function type defined by this HUGR, i.e. `Some` iff the root
+    /// is a [`FuncDecl`][crate::ops::FuncDecl] or
+    /// [`FuncDefn`][crate::ops::FuncDefn].
     fn poly_func_type(&self) -> Option<PolyFuncType> {
         match self.entrypoint_optype() {
             OpType::FuncDecl(decl) => Some(decl.signature().clone()),
@@ -396,9 +405,11 @@ pub trait HugrView: HugrInternals {
     /// format instead.
     fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String;
 
-    /// Return the graphviz representation of the underlying graph and hierarchy side by side.
+    /// Return the graphviz representation of the underlying graph and hierarchy
+    /// side by side.
     ///
-    /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
+    /// For a simpler representation, use the [`HugrView::mermaid_string`]
+    /// format instead.
     fn dot_string(&self) -> String
     where
         Self: Sized;
@@ -482,8 +493,8 @@ pub trait HugrView: HugrInternals {
 
 /// Records the result of extracting a Hugr via [`HugrView::extract_hugr`].
 ///
-/// Contains a map from the nodes in the source HUGR to the nodes in the extracted
-/// HUGR, using their respective `Node` types.
+/// Contains a map from the nodes in the source HUGR to the nodes in the
+/// extracted HUGR, using their respective `Node` types.
 pub trait ExtractionResult<SourceN> {
     /// Returns the node in the extracted HUGR that corresponds to the given
     /// node in the source HUGR.
@@ -677,8 +688,9 @@ impl HugrView for Hugr {
         }
 
         // Initialize a new HUGR with the desired entrypoint operation.
-        // If we cannot create a new hugr with the parent's optype (e.g. if it's a `BasicBlock`),
-        // find the first ancestor that can be extracted and use that instead.
+        // If we cannot create a new hugr with the parent's optype (e.g. if it's a
+        // `BasicBlock`), find the first ancestor that can be extracted and use
+        // that instead.
         //
         // The final entrypoint will be set to the original `parent`.
         let mut parent = target;
@@ -783,12 +795,14 @@ where
 {
 }
 
-/// Returns `true` if the node exists in the graph and is not the entrypoint node.
+/// Returns `true` if the node exists in the graph and is not the entrypoint
+/// node.
 pub(super) fn check_valid_non_entrypoint<H: HugrView + ?Sized>(hugr: &H, node: H::Node) -> bool {
     hugr.contains_node(node) && node != hugr.entrypoint()
 }
 
-/// Returns `true` if the node exists in the graph and is not the module at the hierarchy root.
+/// Returns `true` if the node exists in the graph and is not the module at the
+/// hierarchy root.
 pub(super) fn check_valid_non_root<H: HugrView + ?Sized>(hugr: &H, node: H::Node) -> bool {
     hugr.contains_node(node) && node != hugr.module_root().node()
 }

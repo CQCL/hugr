@@ -62,9 +62,16 @@ use std::{borrow::Cow, collections::BTreeSet};
 use itertools::{Either, Itertools};
 use thiserror::Error;
 
-use crate::{Direction, HugrView, Port};
+use crate::{
+    Direction, Hugr, HugrView, Port, PortIndex as _,
+    hugr::views::{RootCheckable, SiblingSubgraph},
+    ops::handle::DfgID,
+};
 
-use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, state_space::CommitId};
+use super::{
+    Commit, CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, PersistentReplacement,
+    state_space::CommitId,
+};
 
 /// A walker over a [`CommitStateSpace`].
 ///
@@ -202,7 +209,10 @@ impl<'a> Walker<'a> {
         &'b self,
         wire: &'b PinnedWire,
         dir: impl Into<Option<Direction>>,
-    ) -> impl Iterator<Item = Walker<'a>> + 'b {
+    ) -> impl Iterator<Item = Walker<'a>> + 'b
+    where
+        'a: 'b,
+    {
         let dir = dir.into();
 
         // Find unpinned ports on the wire (satisfying the direction constraint)
@@ -212,38 +222,152 @@ impl<'a> Walker<'a> {
         // commits) equivalent to currently unpinned ports.
         let pinnable_nodes = unpinned_ports
             .flat_map(|(node, port)| self.equivalent_descendant_ports(node, port))
-            .map(|(n, _)| n)
+            .map(|(n, _, commits)| (n, commits))
             .unique();
 
-        pinnable_nodes.filter_map(|pinnable_node| {
+        pinnable_nodes.filter_map(|(pinnable_node, new_commits)| {
             debug_assert!(
                 !self.is_pinned(pinnable_node),
                 "trying to pin already pinned node"
             );
 
             // Construct a new walker by pinning `pinnable_node` (if possible).
-            let mut new_walker = self.clone();
+            let new_selected_commits = self
+                .state_space
+                .try_extract_hugr(self.selected_commits.all_commit_ids().chain(new_commits))
+                .ok()?;
+            let mut new_walker = Walker {
+                state_space: self.state_space.clone(),
+                selected_commits: new_selected_commits,
+                pinned_nodes: self.pinned_nodes.clone(),
+            };
             new_walker.try_pin_node(pinnable_node).ok()?;
             Some(new_walker)
         })
+    }
+
+    /// Create a new commit from a set of complete pinned wires and a
+    /// replacement.
+    ///
+    /// The subgraph of the commit is the subgraph given by the set of edges
+    /// in `wires`. `map_boundary` must provide a map from the boundary ports
+    /// of the subgraph to the inputs/output ports in `repl`. The returned port
+    /// must be of the opposite direction as the port passed as argument:
+    ///  - an incoming subgraph port must be mapped to an outgoing port of the
+    ///    input node of `repl`
+    /// - an outgoing subgraph port must be mapped to an incoming port of the
+    ///   output node of `repl`
+    ///
+    /// ## Panics
+    ///
+    /// This will panic if repl is not a DFG graph.
+    pub fn try_create_commit(
+        self,
+        wires: impl IntoIterator<Item = PinnedWire>,
+        repl: impl RootCheckable<Hugr, DfgID>,
+        map_boundary: impl Fn(PatchNode, Port) -> Port,
+    ) -> Result<Commit, InvalidCommit> {
+        let mut wire_ports_incoming = BTreeSet::new();
+        let mut wire_ports_outgoing = BTreeSet::new();
+        let mut additional_parents = Vec::new();
+
+        for w in wires {
+            if let Some((n, p)) = w.unpinned_ports(None).next() {
+                return Err(InvalidCommit::IncompleteWire(n, p));
+            }
+            wire_ports_incoming.extend(w.pinned_inports());
+            wire_ports_outgoing.extend(w.pinned_outport());
+            additional_parents.extend(w.bridge_commits());
+        }
+        let additional_parents: Vec<_> = additional_parents
+            .into_iter()
+            .map(|id| {
+                if self.state_space.contains_id(id) {
+                    Ok(self.state_space.get_commit(id).clone())
+                } else {
+                    Err(InvalidCommit::UnknownParent(id))
+                }
+            })
+            .try_collect()?;
+
+        let all_nodes: BTreeSet<_> = wire_ports_incoming
+            .iter()
+            .map(|&(n, _)| n)
+            .chain(wire_ports_outgoing.iter().map(|&(n, _)| n))
+            .collect();
+
+        // (in/out) boundary: all in/out ports on the nodes of the wire, minus ports
+        // that are part of the wires
+        let incoming = all_nodes
+            .iter()
+            .flat_map(|&n| self.as_hugr_view().input_value_ports(n))
+            .filter(|node_port| !wire_ports_incoming.contains(node_port))
+            .map(|np| vec![np])
+            .collect_vec();
+        let outgoing = all_nodes
+            .iter()
+            .flat_map(|&n| self.as_hugr_view().output_value_ports(n))
+            .filter(|node_port| !wire_ports_outgoing.contains(node_port))
+            .collect_vec();
+
+        let repl = {
+            let mut repl = repl.try_into_checked().expect("replacement is not DFG");
+            let new_inputs = incoming
+                .iter()
+                .flatten()
+                .map(|&(n, p)| {
+                    map_boundary(n, p.into())
+                        .as_outgoing()
+                        .expect("unexpected port direction returned by map_boundary")
+                        .index()
+                })
+                .collect_vec();
+            let new_outputs = outgoing
+                .iter()
+                .map(|&(n, p)| {
+                    map_boundary(n, p.into())
+                        .as_incoming()
+                        .expect("unexpected port direction returned by map_boundary")
+                        .index()
+                })
+                .collect_vec();
+            repl.map_function_type(&new_inputs, &new_outputs)?;
+            let subgraph = SiblingSubgraph::try_new(incoming, outgoing, self.as_hugr_view())?;
+            PersistentReplacement::try_new(subgraph, self.as_hugr_view(), repl.into_hugr())?
+        };
+
+        Commit::try_new(repl, additional_parents, &self.state_space)
     }
 
     /// Get all equivalent ports among the commits that are descendants of the
     /// current commit.
     ///
     /// The ports in the returned iterator will be in the same direction as
-    /// `port`.
-    fn equivalent_descendant_ports(&self, node: PatchNode, port: Port) -> Vec<(PatchNode, Port)> {
+    /// `port`. For each equivalent port, also return the set of empty commits
+    /// that were visited to find it.
+    fn equivalent_descendant_ports(
+        &self,
+        node: PatchNode,
+        port: Port,
+    ) -> Vec<(PatchNode, Port, BTreeSet<CommitId>)> {
         // Now, perform a BFS to find all equivalent ports
-        let mut all_ports = vec![(node, port)];
+        let mut all_ports = vec![(node, port, BTreeSet::new())];
         let mut index = 0;
         while index < all_ports.len() {
-            let (node, port) = all_ports[index];
+            let (node, port, empty_commits) = all_ports[index].clone();
             index += 1;
 
             for (child_id, (opp_node, opp_port)) in
                 self.state_space.children_at_boundary_port(node, port)
             {
+                let mut enqueue = |node: PatchNode, port: Port| {
+                    let mut empty_commits = empty_commits.clone();
+                    if node.0 != child_id {
+                        empty_commits.insert(child_id);
+                    }
+                    all_ports.push((node, port, empty_commits));
+                };
+
                 match opp_port.as_directed() {
                     Either::Left(opp_port) => {
                         let Some((n, p)) = self
@@ -252,14 +376,12 @@ impl<'a> Walker<'a> {
                         else {
                             continue;
                         };
-                        all_ports.push((n, p.into()));
+                        enqueue(n, p.into());
                     }
                     Either::Right(opp_port) => {
-                        all_ports.extend(
-                            self.state_space
-                                .linked_child_inputs(opp_node, opp_port, child_id)
-                                .map(|(n, p)| (n, p.into())),
-                        );
+                        self.state_space
+                            .linked_child_inputs(opp_node, opp_port, child_id)
+                            .for_each(|(n, p)| enqueue(n, p.into()));
                     }
                 }
             }
@@ -345,11 +467,22 @@ impl From<CommitStateSpace> for Cow<'_, CommitStateSpace> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
+    use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::hugr::persistent::{state_space::CommitId, tests::test_state_space};
-    use crate::std_extensions::logic::LogicOp;
-    use crate::{IncomingPort, OutgoingPort};
+    use crate::{
+        Direction, HugrView, IncomingPort, OutgoingPort,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+        extension::prelude::bool_t,
+        hugr::persistent::{
+            PersistentHugr, Walker,
+            state_space::CommitId,
+            tests::{persistent_hugr_empty_child, test_state_space},
+        },
+        std_extensions::logic::LogicOp,
+    };
 
     use super::*;
 
@@ -523,5 +656,102 @@ mod tests {
             .unwrap();
         assert_eq!(new_and_node.0, commit2);
         assert_eq!(in_port, 1.into());
+    }
+
+    #[rstest]
+    fn test_walk_over_empty_repls(
+        persistent_hugr_empty_child: (PersistentHugr, [CommitId; 2], [PatchNode; 3]),
+    ) {
+        let (hugr, [_base_commit, empty_commit], [not0_node, _not1_node, and_node]) =
+            persistent_hugr_empty_child;
+        let [base_inp, _base_out] = hugr.get_io(hugr.entrypoint()).unwrap();
+        let walker = Walker::from_pinned_node(base_inp, hugr.as_state_space());
+
+        let base_inp_outwire = walker.get_wire(base_inp, OutgoingPort::from(0));
+        let expanded_wires = walker
+            .expand(&base_inp_outwire, Direction::Incoming)
+            .collect_vec();
+
+        assert_eq!(expanded_wires.len(), 2);
+
+        let connected_inports: BTreeSet<_> = expanded_wires
+            .iter()
+            .map(|new_walker| {
+                let wire = new_walker.get_wire(base_inp, OutgoingPort::from(0));
+                wire.pinned_inports().exactly_one().ok().unwrap()
+            })
+            .collect();
+
+        assert_eq!(
+            connected_inports,
+            BTreeSet::from_iter([
+                (not0_node, IncomingPort::from(0)),
+                (and_node, IncomingPort::from(0))
+            ])
+        );
+
+        let bridge_commits: BTreeSet<_> = expanded_wires
+            .iter()
+            .map(|new_walker| {
+                let wire = new_walker.get_wire(base_inp, OutgoingPort::from(0));
+                wire.bridge_commits().collect_vec()
+            })
+            .collect();
+
+        assert_eq!(
+            bridge_commits,
+            BTreeSet::from_iter([vec![], vec![empty_commit]])
+        );
+    }
+
+    #[rstest]
+    fn test_create_commit_over_empty(
+        persistent_hugr_empty_child: (PersistentHugr, [CommitId; 2], [PatchNode; 3]),
+    ) {
+        let (hugr, [base_commit, empty_commit], [_not0_node, not1_node, and_node]) =
+            persistent_hugr_empty_child;
+        let mut walker = Walker {
+            state_space: hugr.as_state_space().into(),
+            selected_commits: hugr.clone(),
+            pinned_nodes: BTreeSet::from_iter([not1_node]),
+        };
+
+        // wire: Not1 -> And
+        let wire = walker.get_wire(not1_node, OutgoingPort::from(0));
+        walker = walker.expand(&wire, None).exactly_one().ok().unwrap();
+        let wire = walker.get_wire(not1_node, OutgoingPort::from(0));
+        assert!(wire.is_complete(None));
+
+        let xor_hugr = {
+            let mut dfg_builder = DFGBuilder::new(inout_sig(vec![bool_t(); 2], bool_t())).unwrap();
+            let inputs = dfg_builder.input_wires();
+            let xor_handle = dfg_builder.add_dataflow_op(LogicOp::Xor, inputs).unwrap();
+            let outputs = xor_handle.outputs();
+            dfg_builder.finish_hugr_with_outputs(outputs).unwrap()
+        };
+        let commit = walker
+            .try_create_commit(vec![wire], xor_hugr, |node, port| {
+                println!("requested boundary port for {node:?} {port:?}");
+                match port.direction() {
+                    Direction::Incoming if node == not1_node => OutgoingPort::from(1).into(),
+                    Direction::Incoming if node == and_node => OutgoingPort::from(0).into(),
+                    Direction::Outgoing => IncomingPort::from(0).into(),
+                    _ => panic!("unexpected boundary port"),
+                }
+            })
+            .unwrap();
+
+        let mut new_state_space = hugr.as_state_space().to_owned();
+        let commit_id = new_state_space.try_add_commit(commit.clone()).unwrap();
+        assert_eq!(
+            new_state_space.parents(commit_id).collect::<BTreeSet<_>>(),
+            BTreeSet::from_iter([base_commit, empty_commit])
+        );
+
+        let res_hugr = PersistentHugr::from_commit(commit);
+
+        // should be an empty DFG hugr
+        // module root + function def + DFG entrypoint + I/O nodes
+        assert_eq!(res_hugr.num_nodes(), 1 + 1 + 1 + 2);
     }
 }

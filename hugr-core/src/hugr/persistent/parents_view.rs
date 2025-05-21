@@ -31,7 +31,7 @@ impl<'a> ParentsView<'a> {
     }
 }
 
-impl<'a> HugrInternals for ParentsView<'a> {
+impl HugrInternals for ParentsView<'_> {
     type RegionPortgraph<'p>
         = portgraph::MultiPortGraph
     where
@@ -60,7 +60,7 @@ impl<'a> HugrInternals for ParentsView<'a> {
     }
 }
 
-impl<'a> HugrView for ParentsView<'a> {
+impl HugrView for ParentsView<'_> {
     fn entrypoint(&self) -> Self::Node {
         unimplemented!()
     }

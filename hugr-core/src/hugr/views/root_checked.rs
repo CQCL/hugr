@@ -19,7 +19,8 @@ impl<H: HugrView, Handle: NodeHandle<H::Node>> RootChecked<H, Handle> {
     /// A tag that can contain the operation of the hugr entrypoint node.
     const TAG: OpTag = Handle::TAG;
 
-    /// Returns the most specific tag that can be applied to the entrypoint node.
+    /// Returns the most specific tag that can be applied to the entrypoint
+    /// node.
     pub fn tag(&self) -> OpTag {
         let tag = self.0.get_optype(self.0.entrypoint()).tag();
         debug_assert!(Self::TAG.is_superset(tag));
@@ -29,7 +30,8 @@ impl<H: HugrView, Handle: NodeHandle<H::Node>> RootChecked<H, Handle> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
-    /// Returns [`HugrError::InvalidTag`] if the entrypoint isn't a node of the required [`OpTag`]
+    /// Returns [`HugrError::InvalidTag`] if the entrypoint isn't a node of the
+    /// required [`OpTag`]
     ///
     /// [`OpTag`]: crate::ops::OpTag
     pub fn try_new(hugr: H) -> Result<Self, HugrError> {
@@ -67,11 +69,14 @@ impl<H: AsRef<Hugr>, Handle> AsRef<Hugr> for RootChecked<H, Handle> {
     }
 }
 
-/// A trait for types that can be checked for a specific [`OpTag`] at their entrypoint node.
+/// A trait for types that can be checked for a specific [`OpTag`] at their
+/// entrypoint node.
 ///
-/// This is used mainly specifying function inputs that may either be a [`HugrView`] or an already checked [`RootChecked`].
+/// This is used mainly specifying function inputs that may either be a
+/// [`HugrView`] or an already checked [`RootChecked`].
 pub trait RootCheckable<H: HugrView, Handle: NodeHandle<H::Node>>: Sized {
-    /// Wrap the Hugr in a [`RootChecked`] if it is valid for the required [`OpTag`].
+    /// Wrap the Hugr in a [`RootChecked`] if it is valid for the required
+    /// [`OpTag`].
     ///
     /// If `Self` is already a [`RootChecked`], it is a no-op.
     fn try_into_checked(self) -> Result<RootChecked<H, Handle>, HugrError>;

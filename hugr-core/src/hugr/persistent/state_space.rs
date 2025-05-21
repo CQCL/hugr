@@ -11,8 +11,12 @@ use super::{
     parents_view::ParentsView,
 };
 use crate::{
-    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::{internal::HugrInternals, patch::BoundaryPort},
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port,
+    hugr::{
+        internal::HugrInternals,
+        patch::{BoundaryPort, simple_replace::InvalidReplacement},
+        views::{InvalidSignature, sibling_subgraph::InvalidSubgraph},
+    },
     ops::OpType,
 };
 
@@ -291,6 +295,9 @@ impl CommitStateSpace {
 
     /// Get the boundary inputs linked to `(node, port)` in `child`.
     ///
+    /// The returned ports will be in the `child` commit unless the child commit
+    /// is empty, in which case they will be in one of the parents of `child`.
+    ///
     /// ## Panics
     ///
     /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
@@ -318,6 +325,9 @@ impl CommitStateSpace {
     }
 
     /// Get the single boundary output linked to `(node, port)` in `child`.
+    ///
+    /// The returned port will be in the `child` commit unless the child commit
+    /// is empty, in which case it will be in one of the parents of `child`.
     ///
     /// ## Panics
     ///
@@ -384,7 +394,7 @@ impl CommitStateSpace {
     }
 
     /// Get the replacement for `commit_id`.
-    pub(super) fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>> {
+    pub(super) fn replacement(&self, commit_id: CommitId) -> Option<&PersistentReplacement> {
         let commit = self.get_commit(commit_id);
         commit.replacement()
     }
@@ -487,4 +497,20 @@ pub enum InvalidCommit {
     /// The commit is an empty replacement.
     #[error("Not allowed: empty replacement")]
     EmptyReplacement,
+
+    #[error("Invalid subgraph: {0}")]
+    /// The subgraph of the replacement is not convex.
+    InvalidSubgraph(#[from] InvalidSubgraph<PatchNode>),
+
+    /// The replacement of the commit is invalid.
+    #[error("Invalid replacement: {0}")]
+    InvalidReplacement(#[from] InvalidReplacement),
+
+    /// The signature of the replacement is invalid.
+    #[error("Invalid signature: {0}")]
+    InvalidSignature(#[from] InvalidSignature),
+
+    /// A wire has an unpinned port.
+    #[error("Incomplete wire: {0} is unpinned")]
+    IncompleteWire(PatchNode, Port),
 }

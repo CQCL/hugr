@@ -4,7 +4,7 @@ use rstest::*;
 
 use crate::{
     IncomingPort, Node, OutgoingPort, SimpleReplacement,
-    builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+    builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig},
     extension::prelude::bool_t,
     hugr::{
         Hugr, HugrView,
@@ -16,7 +16,7 @@ use crate::{
     std_extensions::logic::LogicOp,
 };
 
-use super::{CommitStateSpace, state_space::CommitId};
+use super::{CommitStateSpace, PersistentHugr, PersistentReplacement, state_space::CommitId};
 
 /// Creates a simple test Hugr with a DFG that contains a small boolean circuit
 ///
@@ -280,6 +280,36 @@ pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
     };
 
     (state_space, [commit1, commit2, commit3, commit4])
+}
+
+#[fixture]
+pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [PatchNode; 3]) {
+    let (base_hugr, [not0_node, not1_node, and_node]) = simple_hugr();
+    let mut hugr = PersistentHugr::with_base(base_hugr);
+    let empty_hugr = {
+        let dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+        let inputs = dfg_builder.input_wires();
+        dfg_builder.finish_hugr_with_outputs(inputs).unwrap()
+    };
+    let subg_nodes = [PatchNode(hugr.base(), not0_node)];
+    let repl = PersistentReplacement::try_new(
+        SiblingSubgraph::try_from_nodes(subg_nodes, &hugr).unwrap(),
+        &hugr,
+        empty_hugr,
+    )
+    .unwrap();
+
+    let empty_commit = hugr.try_add_replacement(repl).unwrap();
+    let base_commit = hugr.base();
+    (
+        hugr,
+        [base_commit, empty_commit],
+        [
+            PatchNode(base_commit, not0_node),
+            PatchNode(base_commit, not1_node),
+            PatchNode(base_commit, and_node),
+        ],
+    )
 }
 
 #[rstest]
