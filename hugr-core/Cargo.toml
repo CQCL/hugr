@@ -19,7 +19,7 @@ workspace = true
 [features]
 declarative = ["serde_yaml"]
 zstd = ["dep:zstd"]
-default = ["model_unstable"]
+default = []
 
 [lib]
 bench = false

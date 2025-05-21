@@ -12,8 +12,8 @@ use thiserror::Error;
 
 use super::row_var::MaybeRV;
 use super::{
-    check_typevar_decl, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound,
-    TypeTransformer,
+    NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound, TypeTransformer,
+    check_typevar_decl,
 };
 use crate::extension::SignatureError;
 
@@ -307,7 +307,6 @@ impl TypeArg {
                 elems.iter().try_for_each(|a| a.validate(var_decls))
             }
             TypeArg::Tuple { elems } => elems.iter().try_for_each(|a| a.validate(var_decls)),
-            TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => {
@@ -337,7 +336,7 @@ impl TypeArg {
                 let elems = match are_types.next() {
                     Some(true) => {
                         assert!(are_types.all(|b| b)); // If one is a Type, so must the rest be
-                                                       // So, anything that doesn't produce a Type, was a row variable => multiple Types
+                        // So, anything that doesn't produce a Type, was a row variable => multiple Types
                         elems
                             .iter()
                             .flat_map(|ta| match ta.substitute(t) {
@@ -356,9 +355,6 @@ impl TypeArg {
             }
             TypeArg::Tuple { elems } => TypeArg::Tuple {
                 elems: elems.iter().map(|elem| elem.substitute(t)).collect(),
-            },
-            TypeArg::Extensions { es } => TypeArg::Extensions {
-                es: es.substitute(t),
             },
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
@@ -497,9 +493,9 @@ pub enum TypeArgError {
 mod test {
     use itertools::Itertools;
 
-    use super::{check_type_arg, Substitution, TypeArg, TypeParam};
+    use super::{Substitution, TypeArg, TypeParam, check_type_arg};
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::types::{type_param::TypeArgError, TypeBound, TypeRV};
+    use crate::types::{TypeBound, TypeRV, type_param::TypeArgError};
 
     #[test]
     fn type_arg_fits_param() {
