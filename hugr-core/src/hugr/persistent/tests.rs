@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
+use itertools::Itertools;
 use rstest::*;
 
 use crate::{
@@ -284,14 +285,27 @@ pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
 
 #[fixture]
 pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [PatchNode; 3]) {
-    let (base_hugr, [not0_node, not1_node, and_node]) = simple_hugr();
-    let mut hugr = PersistentHugr::with_base(base_hugr);
+    let (triple_not_hugr, not_nodes) = {
+        let mut dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+        let [mut w] = dfg_builder.input_wires_arr();
+        let mut not_nodes = Vec::with_capacity(3);
+        for _ in 0..3 {
+            let handle = dfg_builder.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
+            [w] = handle.outputs_arr();
+            not_nodes.push(handle.node());
+        }
+        (
+            dfg_builder.finish_hugr_with_outputs([w]).unwrap(),
+            not_nodes.into_iter().collect_array::<3>().unwrap(),
+        )
+    };
+    let mut hugr = PersistentHugr::with_base(triple_not_hugr);
     let empty_hugr = {
         let dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
         let inputs = dfg_builder.input_wires();
         dfg_builder.finish_hugr_with_outputs(inputs).unwrap()
     };
-    let subg_nodes = [PatchNode(hugr.base(), not0_node)];
+    let subg_nodes = [PatchNode(hugr.base(), not_nodes[1])];
     let repl = PersistentReplacement::try_new(
         SiblingSubgraph::try_from_nodes(subg_nodes, &hugr).unwrap(),
         &hugr,
@@ -304,11 +318,7 @@ pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [
     (
         hugr,
         [base_commit, empty_commit],
-        [
-            PatchNode(base_commit, not0_node),
-            PatchNode(base_commit, not1_node),
-            PatchNode(base_commit, and_node),
-        ],
+        not_nodes.map(|n| PatchNode(base_commit, n)),
     )
 }
 

@@ -511,16 +511,20 @@ impl PersistentHugr {
                     .linked_child_output(PatchNode(commit_id, in_node), in_port, deleted_by)
                     .expect("valid boundary edge");
                 // update (in_node, in_port)
-                dbg!(out_node);
-                println!("{}", hugr.mermaid_string());
                 (in_node, in_port) = {
                     let new_commit_id = out_node.0;
                     let hugr = self.commit_hugr(new_commit_id);
                     hugr.linked_inputs(out_node.1, out_port)
+                        // the out_node is either:
+                        //  - connected to output node of replacement
+                        //   => deleting commit is None
+                        //  - a boundary edge in a parent commit of `deleted_by`
+                        //   => there is in_node with deleting commit `deleted_by`)
                         .find(|&(n, _)| {
-                            self.find_deleting_commit(PatchNode(commit_id, n)).is_none()
+                            let del_commit = self.find_deleting_commit(PatchNode(new_commit_id, n));
+                            del_commit.is_none() || del_commit == Some(deleted_by)
                         })
-                        .expect("out_node is connected to output node (which is never deleted)")
+                        .expect("out_node is connected to output node or is boundary of deleted_by")
                 };
             } else if is_input() {
                 // out_node is an input node

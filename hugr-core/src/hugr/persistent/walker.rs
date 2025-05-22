@@ -231,17 +231,30 @@ impl<'a> Walker<'a> {
                 "trying to pin already pinned node"
             );
 
-            // Construct a new walker by pinning `pinnable_node` (if possible).
+            // Update the selected commits to include the new commits.
             let new_selected_commits = self
                 .state_space
                 .try_extract_hugr(self.selected_commits.all_commit_ids().chain(new_commits))
                 .ok()?;
+
+            // Make sure that the pinned nodes are still valid after including the new
+            // selected commits.
+            if self
+                .pinned_nodes
+                .iter()
+                .any(|&pnode| !new_selected_commits.contains_node(pnode))
+            {
+                return None;
+            }
+
+            // Construct a new walker and pin `pinnable_node`.
             let mut new_walker = Walker {
                 state_space: self.state_space.clone(),
                 selected_commits: new_selected_commits,
                 pinned_nodes: self.pinned_nodes.clone(),
             };
             new_walker.try_pin_node(pinnable_node).ok()?;
+
             Some(new_walker)
         })
     }
@@ -262,7 +275,7 @@ impl<'a> Walker<'a> {
     ///
     /// This will panic if repl is not a DFG graph.
     pub fn try_create_commit(
-        self,
+        &self,
         wires: impl IntoIterator<Item = PinnedWire>,
         repl: impl RootCheckable<Hugr, DfgID>,
         map_boundary: impl Fn(PatchNode, Port) -> Port,
@@ -474,7 +487,7 @@ mod tests {
 
     use crate::{
         Direction, HugrView, IncomingPort, OutgoingPort,
-        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
         extension::prelude::bool_t,
         hugr::persistent::{
             PersistentHugr, Walker,
@@ -658,18 +671,21 @@ mod tests {
         assert_eq!(in_port, 1.into());
     }
 
+    /// Test that the walker handles empty replacements correctly.
+    ///
+    /// The base hugr is a sequence of 3 NOT gates, with a single input/output
+    /// boolean. A single replacement exists in the state space, which replaces
+    /// the middle NOT gate with nothing.
     #[rstest]
     fn test_walk_over_empty_repls(
         persistent_hugr_empty_child: (PersistentHugr, [CommitId; 2], [PatchNode; 3]),
     ) {
-        let (hugr, [_base_commit, empty_commit], [not0_node, _not1_node, and_node]) =
-            persistent_hugr_empty_child;
-        let [base_inp, _base_out] = hugr.get_io(hugr.entrypoint()).unwrap();
-        let walker = Walker::from_pinned_node(base_inp, hugr.as_state_space());
+        let (hugr, [_base_commit, empty_commit], [not0, not1, not2]) = persistent_hugr_empty_child;
+        let walker = Walker::from_pinned_node(not0, hugr.as_state_space());
 
-        let base_inp_outwire = walker.get_wire(base_inp, OutgoingPort::from(0));
+        let not0_outwire = walker.get_wire(not0, OutgoingPort::from(0));
         let expanded_wires = walker
-            .expand(&base_inp_outwire, Direction::Incoming)
+            .expand(&not0_outwire, Direction::Incoming)
             .collect_vec();
 
         assert_eq!(expanded_wires.len(), 2);
@@ -677,23 +693,20 @@ mod tests {
         let connected_inports: BTreeSet<_> = expanded_wires
             .iter()
             .map(|new_walker| {
-                let wire = new_walker.get_wire(base_inp, OutgoingPort::from(0));
+                let wire = new_walker.get_wire(not0, OutgoingPort::from(0));
                 wire.pinned_inports().exactly_one().ok().unwrap()
             })
             .collect();
 
         assert_eq!(
             connected_inports,
-            BTreeSet::from_iter([
-                (not0_node, IncomingPort::from(0)),
-                (and_node, IncomingPort::from(0))
-            ])
+            BTreeSet::from_iter([(not1, IncomingPort::from(0)), (not2, IncomingPort::from(0))])
         );
 
         let bridge_commits: BTreeSet<_> = expanded_wires
             .iter()
             .map(|new_walker| {
-                let wire = new_walker.get_wire(base_inp, OutgoingPort::from(0));
+                let wire = new_walker.get_wire(not0, OutgoingPort::from(0));
                 wire.bridge_commits().collect_vec()
             })
             .collect();
@@ -708,35 +721,31 @@ mod tests {
     fn test_create_commit_over_empty(
         persistent_hugr_empty_child: (PersistentHugr, [CommitId; 2], [PatchNode; 3]),
     ) {
-        let (hugr, [base_commit, empty_commit], [_not0_node, not1_node, and_node]) =
-            persistent_hugr_empty_child;
+        let (hugr, [base_commit, empty_commit], [not0, _not1, not2]) = persistent_hugr_empty_child;
         let mut walker = Walker {
             state_space: hugr.as_state_space().into(),
             selected_commits: hugr.clone(),
-            pinned_nodes: BTreeSet::from_iter([not1_node]),
+            pinned_nodes: BTreeSet::from_iter([not0]),
         };
 
-        // wire: Not1 -> And
-        let wire = walker.get_wire(not1_node, OutgoingPort::from(0));
+        // wire: Not0 -> Not2 (bridging over Not1)
+        let wire = walker.get_wire(not0, OutgoingPort::from(0));
         walker = walker.expand(&wire, None).exactly_one().ok().unwrap();
-        let wire = walker.get_wire(not1_node, OutgoingPort::from(0));
+        let wire = walker.get_wire(not0, OutgoingPort::from(0));
         assert!(wire.is_complete(None));
 
-        let xor_hugr = {
-            let mut dfg_builder = DFGBuilder::new(inout_sig(vec![bool_t(); 2], bool_t())).unwrap();
+        let empty_hugr = {
+            let dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
             let inputs = dfg_builder.input_wires();
-            let xor_handle = dfg_builder.add_dataflow_op(LogicOp::Xor, inputs).unwrap();
-            let outputs = xor_handle.outputs();
-            dfg_builder.finish_hugr_with_outputs(outputs).unwrap()
+            dfg_builder.finish_hugr_with_outputs(inputs).unwrap()
         };
         let commit = walker
-            .try_create_commit(vec![wire], xor_hugr, |node, port| {
-                println!("requested boundary port for {node:?} {port:?}");
+            .try_create_commit(vec![wire], empty_hugr, |node, port| {
+                assert_eq!(port.index(), 0);
+                assert!([not0, not2].contains(&node));
                 match port.direction() {
-                    Direction::Incoming if node == not1_node => OutgoingPort::from(1).into(),
-                    Direction::Incoming if node == and_node => OutgoingPort::from(0).into(),
+                    Direction::Incoming => OutgoingPort::from(0).into(),
                     Direction::Outgoing => IncomingPort::from(0).into(),
-                    _ => panic!("unexpected boundary port"),
                 }
             })
             .unwrap();
@@ -749,9 +758,10 @@ mod tests {
         );
 
         let res_hugr = PersistentHugr::from_commit(commit);
+        assert!(res_hugr.validate().is_ok());
 
         // should be an empty DFG hugr
-        // module root + function def + DFG entrypoint + I/O nodes
-        assert_eq!(res_hugr.num_nodes(), 1 + 1 + 1 + 2);
+        // module root + function def + func I/O nodes + DFG entrypoint + I/O nodes
+        assert_eq!(res_hugr.num_nodes(), 1 + 1 + 2 + 1 + 2);
     }
 }
