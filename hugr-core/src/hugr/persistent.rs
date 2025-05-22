@@ -520,6 +520,8 @@ impl PersistentHugr {
 
     /// All incoming ports that the given outgoing port is attached to.
     ///
+    /// # Panics
+    ///
     /// Panics if `out_node` is not in `self` (in particular if it is deleted)
     /// or if `out_port` is not a value port in `out_node`.
     fn get_all_incoming_ports(
