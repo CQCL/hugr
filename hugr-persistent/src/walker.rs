@@ -62,7 +62,7 @@ use std::{borrow::Cow, collections::BTreeSet};
 use itertools::{Either, Itertools};
 use thiserror::Error;
 
-use crate::{Direction, HugrView, Port};
+use hugr_core::{Direction, HugrView, Port};
 
 use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, state_space::CommitId};
 
@@ -365,9 +365,8 @@ impl From<CommitStateSpace> for Cow<'_, CommitStateSpace> {
 mod tests {
     use rstest::rstest;
 
-    use crate::hugr::persistent::{state_space::CommitId, tests::test_state_space};
-    use crate::std_extensions::logic::LogicOp;
-    use crate::{IncomingPort, OutgoingPort};
+    use crate::{state_space::CommitId, tests::test_state_space};
+    use hugr_core::{IncomingPort, OutgoingPort, std_extensions::logic::LogicOp};
 
     use super::*;
 

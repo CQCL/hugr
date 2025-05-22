@@ -1,18 +1,19 @@
 use std::collections::HashMap;
 
 use itertools::{Either, Itertools};
-use portgraph::render::MermaidFormat;
 
-use crate::{
+use hugr_core::{
     Direction, Hugr, HugrView, Node, Port,
+    extension::ExtensionRegistry,
     hugr::{
-        Patch, SimpleReplacementError,
+        self, Patch, SimpleReplacementError,
         internal::HugrInternals,
         views::{
             ExtractionResult,
-            render::{self, FullRenderConfig, NodeLabel, RenderConfig},
+            render::{FullRenderConfig, NodeLabel, RenderConfig},
         },
     },
+    ops::OpType,
 };
 
 use super::{
@@ -57,15 +58,10 @@ impl HugrInternals for PersistentHugr {
         let (hugr, node_map) = self.apply_all();
         let parent = node_map[&parent];
 
-        let region = portgraph::view::FlatRegion::new_without_root(
-            hugr.graph,
-            hugr.hierarchy,
-            parent.into_portgraph(),
-        );
-        (region, node_map)
+        (hugr.into_region_portgraph(parent), node_map)
     }
 
-    fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap {
+    fn node_metadata_map(&self, node: Self::Node) -> &hugr::NodeMetadataMap {
         self.as_state_space().node_metadata_map(node)
     }
 }
@@ -111,7 +107,7 @@ impl HugrView for PersistentHugr {
         Some(parent_inv)
     }
 
-    fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType {
+    fn get_optype(&self, node: Self::Node) -> &OpType {
         self.as_state_space().get_optype(node)
     }
 
@@ -243,12 +239,12 @@ impl HugrView for PersistentHugr {
     }
 
     fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_config(RenderConfig {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-            entrypoint: Some(self.entrypoint()),
-        })
+        let mut config = RenderConfig::default();
+        config.node_indices = true;
+        config.port_offsets_in_edges = true;
+        config.type_labels_in_edges = true;
+        config.entrypoint = Some(self.entrypoint());
+        self.mermaid_string_with_config(config)
     }
 
     fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String {
@@ -269,19 +265,13 @@ impl HugrView for PersistentHugr {
         };
 
         // Map config accordingly
-        let config = FullRenderConfig {
-            entrypoint,
-            node_labels,
-            port_offsets_in_edges: config.port_offsets_in_edges,
-            type_labels_in_edges: config.type_labels_in_edges,
-        };
+        let mut hugr_config = FullRenderConfig::default();
+        hugr_config.entrypoint = entrypoint;
+        hugr_config.node_labels = node_labels;
+        hugr_config.port_offsets_in_edges = config.port_offsets_in_edges;
+        hugr_config.type_labels_in_edges = config.type_labels_in_edges;
 
-        hugr.graph
-            .mermaid_format()
-            .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(render::node_style(&hugr, config.clone()))
-            .with_edge_style(render::edge_style(&hugr, config))
-            .finish()
+        hugr.mermaid_string_with_full_config(hugr_config)
     }
 
     fn dot_string(&self) -> String
@@ -291,8 +281,8 @@ impl HugrView for PersistentHugr {
         unimplemented!("use mermaid_string instead")
     }
 
-    fn extensions(&self) -> &crate::extension::ExtensionRegistry {
-        &self.base_hugr().extensions
+    fn extensions(&self) -> &ExtensionRegistry {
+        &self.base_hugr().extensions()
     }
 
     fn extract_hugr(
@@ -300,7 +290,7 @@ impl HugrView for PersistentHugr {
         parent: Self::Node,
     ) -> (
         Hugr,
-        impl crate::hugr::views::ExtractionResult<Self::Node> + 'static,
+        impl hugr::views::ExtractionResult<Self::Node> + 'static,
     ) {
         let (hugr, apply_node_map) = self.apply_all();
         let (extracted_hugr, extracted_node_map) = hugr.extract_hugr(apply_node_map[&parent]);
@@ -325,7 +315,7 @@ impl HugrView for PersistentHugr {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::hugr::persistent::{CommitStateSpace, state_space::CommitId};
+    use crate::{CommitStateSpace, state_space::CommitId};
 
     use super::super::tests::test_state_space;
     use super::*;
@@ -341,18 +331,17 @@ mod tests {
             .try_extract_hugr([commit1, commit2, commit4])
             .unwrap();
 
-        let mermaid_str = hugr.mermaid_string_with_config(RenderConfig {
-            node_indices: false,
-            entrypoint: Some(hugr.entrypoint()),
-            ..Default::default()
-        });
+        let mut config = RenderConfig::default();
+        config.node_indices = false;
+        config.entrypoint = Some(hugr.entrypoint());
+        let mermaid_str = hugr.mermaid_string_with_config(config);
+
         let extracted_hugr = hugr.to_hugr();
+        let mut config = RenderConfig::default();
+        config.node_indices = false;
+        config.entrypoint = Some(extracted_hugr.entrypoint());
         let exp_str = extracted_hugr
-            .mermaid_string_with_config(RenderConfig {
-                node_indices: false,
-                entrypoint: Some(extracted_hugr.entrypoint()),
-                ..Default::default()
-            })
+            .mermaid_string_with_config(config)
             .to_string();
 
         assert_eq!(mermaid_str, exp_str);

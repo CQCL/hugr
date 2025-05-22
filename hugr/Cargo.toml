@@ -28,12 +28,14 @@ declarative = ["hugr-core/declarative"]
 llvm = ["hugr-llvm/llvm14-0"]
 llvm-test = ["hugr-llvm/llvm14-0", "hugr-llvm/test-utils"]
 zstd = ["hugr-core/zstd"]
+persistent_unstable = ["hugr-persistent"]
 
 [dependencies]
 hugr-model = { path = "../hugr-model", version = "0.20.0" }
 hugr-core = { path = "../hugr-core", version = "0.20.0" }
 hugr-passes = { path = "../hugr-passes", version = "0.20.0" }
 hugr-llvm = { path = "../hugr-llvm", version = "0.20.0", optional = true }
+hugr-persistent = { path = "../hugr-persistent", version = "0.1.0", optional = true }
 
 [dev-dependencies]
 lazy_static = { workspace = true }

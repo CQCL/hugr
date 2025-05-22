@@ -4,7 +4,8 @@
 
 use itertools::Either;
 
-use crate::{Direction, IncomingPort, OutgoingPort, Port, hugr::persistent::PatchNode};
+use crate::PatchNode;
+use hugr_core::{Direction, IncomingPort, OutgoingPort, Port};
 
 use super::Walker;
 
@@ -137,7 +138,7 @@ impl PinnedWire {
 
     /// Get all unpinned ports of the wire, optionally filtering to only those
     /// in the given direction.
-    pub(super) fn unpinned_ports(
+    pub(crate) fn unpinned_ports(
         &self,
         dir: impl Into<Option<Direction>>,
     ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {

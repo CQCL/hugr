@@ -1,74 +1,3 @@
-//! Persistent data structure for HUGR mutations.
-//!
-//! This module provides a persistent data structure [`PersistentHugr`] that
-//! implements [`crate::HugrView`]; mutations to the data are stored
-//! persistently as a set of [`Commit`]s along with the dependencies between the
-//! commits.
-//!
-//! As a result of persistency, the entire mutation history of a HUGR can be
-//! traversed and references to previous versions of the data remain valid even
-//! as the HUGR graph is "mutated" by applying patches: the patches are in
-//! effect added to the history as new commits.
-//!
-//! The data structure underlying [`PersistentHugr`], which stores the history
-//! of all commits, is [`CommitStateSpace`]. Multiple [`PersistentHugr`] can be
-//! stored within a single [`CommitStateSpace`], which allows for the efficient
-//! exploration of the space of all possible graph rewrites.
-//!
-//! ## Overlapping commits
-//!
-//! In general, [`CommitStateSpace`] may contain overlapping commits. Such
-//! mutations are mutually exclusive as they modify the same nodes. It is
-//! therefore not possible to apply all commits in a [`CommitStateSpace`]
-//! simultaneously. A [`PersistentHugr`] on the other hand always corresponds to
-//! a subgraph of a [`CommitStateSpace`] that is guaranteed to contain only
-//! non-overlapping, compatible commits. By applying all commits in a
-//! [`PersistentHugr`], we can materialize a [`Hugr`]. Traversing the
-//! materialized HUGR is equivalent to using the [`crate::HugrView`]
-//! implementation of the corresponding [`PersistentHugr`].
-//!
-//! ## Summary of data types
-//!
-//! - [`Commit`] A modification to a [`Hugr`] (currently a
-//!   [`SimpleReplacement`]) that forms the atomic unit of change for a
-//!   [`PersistentHugr`] (like a commit in git). This is a reference-counted
-//!   value that is cheap to clone and will be freed when the last reference is
-//!   dropped.
-//! - [`PersistentHugr`] A data structure that implements [`crate::HugrView`]
-//!   and can be used as a drop-in replacement for a [`crate::Hugr`] for
-//!   read-only access and mutations through the [`PatchVerification`] and
-//!   [`Patch`] traits. Mutations are stored as a history of commits. Unlike
-//!   [`CommitStateSpace`], it maintains the invariant that all contained
-//!   commits are compatible with eachother.
-//! - [`CommitStateSpace`] Stores commits, recording the dependencies between
-//!   them. Includes the base HUGR and any number of possibly incompatible
-//!   (overlapping) commits. Unlike a [`PersistentHugr`], a state space can
-//!   contain mutually exclusive commits.
-//!
-//! ## Usage
-//!
-//! A [`PersistentHugr`] can be created from a base HUGR using
-//! [`PersistentHugr::with_base`]. Replacements can then be applied to it
-//! using [`PersistentHugr::add_replacement`]. Alternatively, if you already
-//! have a populated state space, use [`PersistentHugr::try_new`] to create a
-//! new HUGR with those commits.
-//!
-//! Add a sequence of commits to a state space by merging a [`PersistentHugr`]
-//! into it using [`CommitStateSpace::extend`] or directly using
-//! [`CommitStateSpace::try_add_commit`].
-//!
-//! To obtain a [`PersistentHugr`] from your state space, use
-//! [`CommitStateSpace::try_extract_hugr`]. A [`PersistentHugr`] can always be
-//! materialized into a [`Hugr`] type using [`PersistentHugr::to_hugr`].
-
-mod parents_view;
-mod resolver;
-mod state_space;
-mod trait_impls;
-pub mod walker;
-
-pub use walker::{PinnedWire, Walker};
-
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
     mem, vec,
@@ -76,20 +5,16 @@ use std::{
 
 use delegate::delegate;
 use derive_more::derive::From;
-use itertools::{Either, Itertools};
-use relrc::RelRc;
-use state_space::CommitData;
-pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
-
-pub use resolver::PointerEqResolver;
-
-use crate::{
+use hugr_core::{
     Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
     hugr::patch::{Patch, PatchVerification, simple_replace},
 };
+use itertools::{Either, Itertools};
+use relrc::RelRc;
 
-/// A replacement operation that can be applied to a [`PersistentHugr`].
-pub type PersistentReplacement = SimpleReplacement<PatchNode>;
+use crate::{
+    CommitData, CommitId, CommitStateSpace, InvalidCommit, PatchNode, PersistentReplacement,
+};
 
 /// A patch that can be applied to a [`PersistentHugr`] or a
 /// [`CommitStateSpace`] as an atomic commit.
@@ -140,7 +65,7 @@ impl Commit {
         Ok(Self(rc))
     }
 
-    fn as_relrc(&self) -> &RelRc<CommitData, ()> {
+    pub(crate) fn as_relrc(&self) -> &RelRc<CommitData, ()> {
         &self.0
     }
 
@@ -184,8 +109,8 @@ impl Commit {
 
     delegate! {
         to self.0 {
-            fn value(&self) -> &CommitData;
-            fn as_ptr(&self) -> *const relrc::node::InnerData<CommitData, ()>;
+            pub(crate) fn value(&self) -> &CommitData;
+            pub(crate) fn as_ptr(&self) -> *const relrc::node::InnerData<CommitData, ()>;
         }
     }
 
@@ -306,7 +231,7 @@ impl PersistentHugr {
     /// Construct a [`PersistentHugr`] from a [`CommitStateSpace`].
     ///
     /// Does not check that the commits are compatible.
-    fn from_state_space_unsafe(state_space: CommitStateSpace) -> Self {
+    pub(crate) fn from_state_space_unsafe(state_space: CommitStateSpace) -> Self {
         Self { state_space }
     }
 
@@ -415,7 +340,9 @@ impl PersistentHugr {
                 continue;
             };
 
-            let repl = repl.map_host_nodes(|n| node_map[&n]);
+            let repl = repl
+                .map_host_nodes(|n| node_map[&n], &hugr)
+                .expect("invalid replacement");
 
             let simple_replace::Outcome {
                 node_map: new_node_map,
@@ -461,7 +388,7 @@ impl PersistentHugr {
     ///
     /// Panics if `node` is not in `self` (in particular if it is deleted) or if
     /// `port` is not a value port in `node`.
-    fn get_single_outgoing_port(
+    pub(crate) fn get_single_outgoing_port(
         &self,
         node: PatchNode,
         port: impl Into<IncomingPort>,
@@ -531,7 +458,7 @@ impl PersistentHugr {
     ///
     /// Panics if `out_node` is not in `self` (in particular if it is deleted)
     /// or if `out_port` is not a value port in `out_node`.
-    fn get_all_incoming_ports(
+    pub(crate) fn get_all_incoming_ports(
         &self,
         out_node: PatchNode,
         out_port: OutgoingPort,
@@ -650,7 +577,7 @@ impl PersistentHugr {
             ///
             /// This is either the replacement Hugr of a [`CommitData::Replacement`] or
             /// the base Hugr of a [`CommitData::Base`].
-            pub(super) fn commit_hugr(&self, commit_id: CommitId) -> &Hugr;
+            pub(crate) fn commit_hugr(&self, commit_id: CommitId) -> &Hugr;
             /// Get an iterator over all commit IDs in the persistent HUGR.
             pub fn all_commit_ids(&self) -> impl Iterator<Item = CommitId> + Clone + '_;
         }
@@ -714,7 +641,11 @@ impl PersistentHugr {
         self.contains_id(commit_id) && !is_replacement_io() && !is_deleted()
     }
 
-    fn is_value_port(&self, PatchNode(commit_id, node): PatchNode, port: impl Into<Port>) -> bool {
+    pub(crate) fn is_value_port(
+        &self,
+        PatchNode(commit_id, node): PatchNode,
+        port: impl Into<Port>,
+    ) -> bool {
         self.commit_hugr(commit_id)
             .get_optype(node)
             .port_kind(port)
@@ -739,7 +670,7 @@ impl IntoIterator for PersistentHugr {
 
 /// Find a node in `commit` that is invalidated by more than one child commit
 /// among `children`.
-fn find_conflicting_node<'a>(
+pub(crate) fn find_conflicting_node<'a>(
     commit_id: CommitId,
     mut children: impl Iterator<Item = &'a Commit>,
 ) -> Option<Node> {
@@ -759,6 +690,3 @@ fn find_conflicting_node<'a>(
         new_invalidated.find(|&n| !all_invalidated.insert(n))
     })
 }
-
-#[cfg(test)]
-mod tests;
