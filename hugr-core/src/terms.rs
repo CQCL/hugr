@@ -39,6 +39,28 @@ impl Term {
             Term::StaticType => Err(ViewError::Mismatch),
         }
     }
+
+    fn has_vars(&self) -> bool {
+        match self {
+            Term::Wildcard => false,
+            Term::Literal(_) => false,
+            Term::List(list) => todo!(),
+            Term::Tuple(tuple) => todo!(),
+            Term::Apply(apply) => apply.has_vars(),
+            Term::Var(var) => true,
+            Term::StaticType => false,
+        }
+    }
+
+    pub fn substitute(mut self, terms: &[Term]) -> Self {
+        match self {
+            Term::List(list) => todo!(),
+            Term::Tuple(tuple) => todo!(),
+            Term::Apply(apply) => todo!(),
+            Term::Var(var) => todo!(),
+            this => this,
+        }
+    }
 }
 
 impl From<&Term> for ast::Term {

@@ -17,6 +17,9 @@ pub struct Apply(ThinArc<ApplyHeader, Term>);
 struct ApplyHeader {
     name: SymbolName,
     type_: Term,
+
+    // TODO: Compact flags field
+    has_vars: bool,
 }
 
 impl Apply {
@@ -46,10 +49,24 @@ impl Apply {
         A: IntoIterator<Item = Term>,
         A::IntoIter: ExactSizeIterator,
     {
-        Self(ThinArc::from_header_and_iter(
-            ApplyHeader { name, type_ },
+        let mut arc = ThinArc::from_header_and_iter(
+            ApplyHeader {
+                name,
+                type_,
+                has_vars: false,
+            },
             args.into_iter(),
-        ))
+        );
+
+        let arc_ref = Arc::get_mut(&mut arc).unwrap();
+        let mut has_vars = false;
+
+        for arg in arc_ref.slice() {
+            has_vars = has_vars || arg.has_vars();
+        }
+
+        arc_ref.header.has_vars = has_vars;
+        Self(arc)
     }
 
     /// Tries to create a new symbol application.
@@ -57,6 +74,28 @@ impl Apply {
     /// # Errors
     ///
     /// When creating an argument fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_core::terms::{SymbolName, Term, Apply, Literal, Typed};
+    /// let symbol = SymbolName::new("some.symbol");
+    /// let arg0 = Term::Literal(Literal::Nat(42));
+    /// let arg1 = Term::Literal(Literal::Nat(1337));
+    /// let type_ = Term::Wildcard;
+    ///
+    /// assert!(Apply::try_new::<_, ()>(
+    ///     symbol.clone(),
+    ///     [Ok(arg0.clone()), Ok(arg1.clone())],
+    ///     type_.clone()
+    /// ).is_ok());
+    ///
+    /// assert!(Apply::try_new(
+    ///     symbol,
+    ///     [Ok(arg0), Err(())],
+    ///     type_
+    /// ).is_err());
+    /// ```
     pub fn try_new<A, E>(name: SymbolName, args: A, type_: Term) -> Result<Self, E>
     where
         A: IntoIterator<Item = Result<Term, E>>,
@@ -64,20 +103,24 @@ impl Apply {
     {
         let args = args.into_iter();
 
-        // Use wildcard terms as placeholders.
         let mut arc = ThinArc::from_header_and_iter(
-            ApplyHeader { name, type_ },
+            ApplyHeader {
+                name,
+                type_,
+                has_vars: false,
+            },
             (0..args.len()).map(|_| Term::Wildcard),
         );
 
-        // Then fill in the arguments one by one.
-        // The `unwrap` always succeeds since we have the only copy of the `Arc`.
-        let arg_slots = Arc::get_mut(&mut arc).unwrap().slice_mut().iter_mut();
+        let arc_ref = Arc::get_mut(&mut arc).unwrap();
+        let mut has_vars = false;
 
-        for (arg_slot, arg) in arg_slots.zip_eq(args) {
+        for (arg_slot, arg) in arc_ref.slice_mut().iter_mut().zip_eq(args) {
             *arg_slot = arg?;
+            has_vars = has_vars || arg_slot.has_vars();
         }
 
+        arc_ref.header.has_vars = has_vars;
         Ok(Self(arc))
     }
 
@@ -138,6 +181,10 @@ impl Apply {
         });
 
         Ok(result)
+    }
+
+    pub(super) fn has_vars(&self) -> bool {
+        self.0.header.has_vars
     }
 }
 

@@ -18,10 +18,11 @@ macro_rules! make_ctr {
 
         impl From<$ident> for Apply {
             fn from(value: $ident) -> Self {
+                let type_ = Term::from(value.type_());
                 Apply::new(
                     $ident::SYMBOL,
                     [$(value.$arg.into()),*],
-                    Term::default(),
+                    type_
                 )
             }
         }
@@ -48,7 +49,8 @@ macro_rules! make_ctr {
         impl From<$ident> for Apply {
             fn from($ident: $ident) -> Self {
                 static TERM: ::once_cell::sync::Lazy<Apply> = ::once_cell::sync::Lazy::new(|| {
-                    Apply::new($ident::SYMBOL, [], Term::Wildcard)
+                    let type_ = Term::from($ident.type_());
+                    Apply::new($ident::SYMBOL, [], type_)
                 });
                 TERM.clone()
             }
