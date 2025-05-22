@@ -150,7 +150,6 @@ impl Commit {
                 Either::Right(repl.replacement().entry_descendants().skip(3))
             }
         }
-        .into_iter()
     }
 
     fn all_parents(&self) -> impl Iterator<Item = &Commit> + '_ {

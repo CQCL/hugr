@@ -53,10 +53,9 @@ impl HugrInternals for PersistentHugr {
         portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
         Self::RegionPortgraphNodes,
     ) {
-        // TODO: this is currently not very efficient
+        // TODO: this is currently not very efficient (see #2248)
         let (hugr, node_map) = self.apply_all();
         let parent = node_map[&parent];
-        // let (region, DefaultPGNodeMap) = hugr.region_portgraph(parent);
 
         let region = portgraph::view::FlatRegion::new_without_root(
             hugr.graph,
@@ -75,7 +74,7 @@ impl HugrInternals for PersistentHugr {
 // hierarchies) are very inefficient as they (often unnecessarily) construct
 // the whole extracted HUGR in memory. We are currently prioritizing correctness
 // and clarity over performance and will optimise some of these operations in
-// the future as bottlenecks are encountered.
+// the future as bottlenecks are encountered. (see #2248)
 impl HugrView for PersistentHugr {
     fn entrypoint(&self) -> Self::Node {
         // The entrypoint remains unchanged throughout the patch history, and is
@@ -83,7 +82,7 @@ impl HugrView for PersistentHugr {
         let entry = self.base_hugr().entrypoint();
         let node = PatchNode(self.base(), entry);
 
-        assert!(self.contains_node(node), "invalid entrypoint");
+        debug_assert!(self.contains_node(node), "invalid entrypoint");
         node
     }
 
@@ -93,7 +92,7 @@ impl HugrView for PersistentHugr {
         let root = self.base_hugr().module_root();
         let node = PatchNode(self.base(), root);
 
-        assert!(self.contains_node(node), "invalid module root");
+        debug_assert!(self.contains_node(node), "invalid module root");
         node
     }
 
