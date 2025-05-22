@@ -20,6 +20,7 @@ use crate::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
     },
+    terms::{Apply, List, SeqPart, Term, Var},
     types::{
         CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
         Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow, type_param::TypeParam,
@@ -1612,6 +1613,43 @@ impl<'a> Context<'a> {
     ) -> Result<[table::TermId; N], ImportError> {
         self.match_symbol(term_id, name)?
             .ok_or(table::ModelError::TypeError(term_id).into())
+    }
+
+    fn import_term(&self, term_id: table::TermId) -> Result<Term, ImportError> {
+        match self.get_term(term_id)? {
+            table::Term::Wildcard => Ok(Term::Wildcard),
+            table::Term::Var(var) => {
+                let var_info = self
+                    .local_vars
+                    .get(var)
+                    .ok_or(table::ModelError::InvalidVar(*var))?;
+                let name = model::VarName::new("TODO");
+                let type_ = self.import_term(var_info.r#type)?;
+                // TODO: We shouldn't throw away the node id here.
+                Ok(Var::new(name, var.1, type_).into())
+            }
+            table::Term::Apply(symbol, args) => {
+                let symbol = model::SymbolName::new(self.get_symbol_name(*symbol)?);
+                let args = args.iter().map(|arg| self.import_term(*arg));
+                let type_ = Term::Wildcard;
+                Ok(Apply::try_new(symbol, args, type_)?.into())
+            }
+            table::Term::List(parts) => {
+                let parts = parts.iter().map(|part| self.import_term_seq_part(*part));
+                let item_type = Term::Wildcard;
+                Ok(List::try_new(parts, item_type)?.into())
+            }
+            table::Term::Literal(literal) => Ok(literal.clone().into()),
+            table::Term::Func(region_id) => todo!(),
+            table::Term::Tuple(seq_parts) => todo!(),
+        }
+    }
+
+    fn import_term_seq_part(&self, part: table::SeqPart) -> Result<SeqPart, ImportError> {
+        Ok(match part {
+            table::SeqPart::Item(term) => SeqPart::Item(self.import_term(term)?),
+            table::SeqPart::Splice(term) => SeqPart::Splice(self.import_term(term)?),
+        })
     }
 }
 
