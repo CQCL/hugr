@@ -1,7 +1,7 @@
 use hugr_model::v0::ast;
 pub use hugr_model::v0::{Literal, SymbolName, VarName};
+use servo_arc::{Arc, ThinArc};
 use std::fmt::Display;
-use triomphe::{Arc, ThinArc};
 pub use views::ViewError;
 use views::{CoreBytes, CoreFloat, CoreList, CoreNat, CoreStr};
 
@@ -152,7 +152,7 @@ impl List {
     }
 
     pub fn parts(&self) -> &[SeqPart] {
-        &self.0.slice
+        self.0.slice()
     }
 
     pub fn item_type(&self) -> &Term {
@@ -163,7 +163,7 @@ impl List {
 impl Typed for List {
     #[allow(refining_impl_trait)]
     fn type_(&self) -> &CoreList {
-        &self.0.header.header.list_type
+        &self.0.header.list_type
     }
 }
 
@@ -234,12 +234,12 @@ impl Apply {
 
     /// The name of the applied symbol.
     pub fn name(&self) -> &SymbolName {
-        &self.0.header.header.name
+        &self.0.header.name
     }
 
     /// The arguments to the symbol.
     pub fn args(&self) -> &[Term] {
-        &self.0.slice
+        self.0.slice()
     }
 
     /// Attempt to view this term as an application of a particular symbol with a given arity.
@@ -295,7 +295,7 @@ impl Apply {
 impl Typed for Apply {
     #[allow(refining_impl_trait)]
     fn type_(&self) -> &Term {
-        &self.0.header.header.type_
+        &self.0.header.type_
     }
 }
 
