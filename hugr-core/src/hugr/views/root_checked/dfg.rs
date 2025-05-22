@@ -255,7 +255,7 @@ pub enum InvalidSignature {
     #[error("No {1} at position {0} in signature")]
     UnknownIO(usize, &'static str),
     /// Error when a linear input/output is used multiple times or not at all
-    #[error("Linearity of {0}-th {1} is not preserved in new signature")]
+    #[error("Linearity of {1} at position {0} is not preserved in new signature")]
     LinearityViolation(usize, &'static str),
     /// Error when an input is used multiple times in the new signature
     #[error("{0}-th input is duplicated in new signature")]
