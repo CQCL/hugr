@@ -258,7 +258,7 @@ pub enum InvalidSignature {
     #[error("Linearity of {1} at position {0} is not preserved in new signature")]
     LinearityViolation(usize, &'static str),
     /// Error when an input is used multiple times in the new signature
-    #[error("{0}-th input is duplicated in new signature")]
+    #[error("{Input at position {0} is duplicated in new signature")]
     DuplicateInput(usize),
 }
 
