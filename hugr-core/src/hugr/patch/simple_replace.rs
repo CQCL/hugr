@@ -442,10 +442,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         Some(ReplacementPort(rep_output, incoming_port))
     }
 
-    /// Get the incoming ports in the input boundary of `subgraph` that
-    /// correspond to the given output port at the input node of `replacement`
-    ///
-    /// Return ports in `self.subgraph().incoming_ports()`.
+    /// Get the incoming port in `subgraph` that corresponds to the given
+    /// replacement input port.
     ///
     /// This panics if self.replacement is not a DFG.
     pub fn map_replacement_input(

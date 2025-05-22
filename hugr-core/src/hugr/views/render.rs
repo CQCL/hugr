@@ -34,10 +34,11 @@ impl<N> Default for RenderConfig<N> {
 }
 
 /// Formatter method to compute a node style.
-pub(super) fn node_style(
-    h: &Hugr,
+pub(in crate::hugr) fn node_style<'a>(
+    h: &'a Hugr,
     config: RenderConfig,
-) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
+    fmt_node_index: impl Fn(NodeIndex) -> String + 'a,
+) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
     fn node_name(h: &Hugr, n: NodeIndex) -> String {
         match h.get_optype(n.into()) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
@@ -56,14 +57,14 @@ pub(super) fn node_style(
             if Some(n) == entrypoint {
                 NodeStyle::boxed(format!(
                     "({ni}) [**{name}**]",
-                    ni = n.index(),
+                    ni = fmt_node_index(n),
                     name = node_name(h, n)
                 ))
                 .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(format!(
                     "({ni}) {name}",
-                    ni = n.index(),
+                    ni = fmt_node_index(n),
                     name = node_name(h, n)
                 ))
             }
@@ -81,7 +82,7 @@ pub(super) fn node_style(
 }
 
 /// Formatter method to compute a port style.
-pub(super) fn port_style(
+pub(in crate::hugr) fn port_style(
     h: &Hugr,
     _config: RenderConfig,
 ) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
@@ -109,7 +110,7 @@ pub(super) fn port_style(
 
 /// Formatter method to compute an edge style.
 #[allow(clippy::type_complexity)]
-pub(super) fn edge_style(
+pub(in crate::hugr) fn edge_style(
     h: &Hugr,
     config: RenderConfig<Node>,
 ) -> Box<

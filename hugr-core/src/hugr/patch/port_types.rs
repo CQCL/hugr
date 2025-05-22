@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{IncomingPort, Node, OutgoingPort, Port};
 
-use derive_more::From;
+use derive_more::{From, derive::Into};
 
 /// A port in either the host or replacement graph.
 ///
@@ -19,7 +19,7 @@ pub enum BoundaryPort<HostNode, P> {
 }
 
 /// A port in the host graph.
-#[derive(Debug, Clone, Copy, From, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, From, Into, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HostPort<N, P>(pub N, pub P);
 
 /// A port in the replacement graph.
