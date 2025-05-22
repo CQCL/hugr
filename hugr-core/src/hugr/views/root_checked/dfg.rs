@@ -252,7 +252,7 @@ pub enum InvalidSignature {
     MissingIO(usize, &'static str),
     /// Error when trying to access an input/output that doesn't exist in the
     /// signature
-    #[error("No {0}-th {1} in signature")]
+    #[error("No {1} at position {0} in signature")]
     UnknownIO(usize, &'static str),
     /// Error when a linear input/output is used multiple times or not at all
     #[error("Linearity of {0}-th {1} is not preserved in new signature")]
