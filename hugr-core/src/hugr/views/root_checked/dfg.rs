@@ -248,7 +248,7 @@ fn check_valid_outputs(
 #[non_exhaustive]
 pub enum InvalidSignature {
     /// Error when a required input/output is missing from the new signature
-    #[error("{0}-th {1} is required but missing in new signature")]
+    #[error("{1} at position {0} is required but missing in new signature")]
     MissingIO(usize, &'static str),
     /// Error when trying to access an input/output that doesn't exist in the
     /// signature
