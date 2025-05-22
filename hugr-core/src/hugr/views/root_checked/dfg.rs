@@ -258,7 +258,7 @@ pub enum InvalidSignature {
     #[error("Linearity of {1} at position {0} is not preserved in new signature")]
     LinearityViolation(usize, &'static str),
     /// Error when an input is used multiple times in the new signature
-    #[error("{Input at position {0} is duplicated in new signature")]
+    #[error("Input at position {0} is duplicated in new signature")]
     DuplicateInput(usize),
 }
 
@@ -267,10 +267,13 @@ mod test {
     use insta::assert_snapshot;
 
     use super::*;
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
+    use crate::builder::{
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, endo_sig,
+    };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::views::root_checked::RootChecked;
     use crate::ops::handle::{DfgID, NodeHandle};
+    use crate::ops::{NamedOp, OpParent};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension::cx_gate;
     use crate::{Hugr, HugrView};
@@ -414,5 +417,127 @@ mod test {
         );
 
         assert_snapshot!(dfg_hugr.mermaid_string());
+    }
+
+    #[test]
+    fn test_map_io_cycle_3qb() {
+        // Create a DFG with 3 inputs and 3 outputs: CX[0, 1] and empty 2nd qubit
+        let mut dfg_builder = DFGBuilder::new(endo_sig(vec![qb_t(); 3])).unwrap();
+        let [wire0, wire1, wire2] = dfg_builder.input_wires_arr();
+        let cx_handle = dfg_builder
+            .add_dataflow_op(cx_gate(), vec![wire0, wire1])
+            .unwrap();
+        let cx_node = cx_handle.node();
+        let [wire0, wire1] = cx_handle.outputs_arr();
+        let mut hugr = dfg_builder
+            .finish_hugr_with_outputs(vec![wire0, wire1, wire2])
+            .unwrap();
+
+        // Wrap in RootChecked
+        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+
+        // Test cycling outputs: [0,1,2] -> [1,2,0]
+        let input_map = vec![1, 2, 0];
+        let output_map = vec![0, 1, 2];
+
+        // Map the I/O
+        dfg_view.map_function_type(&input_map, &output_map).unwrap();
+        let [dfg_inp, dfg_out] = dfg_view.get_io();
+
+        let dfg_hugr = dfg_view.hugr();
+        if let Err(err) = dfg_hugr.validate() {
+            panic!("Invalid Hugr: {err}");
+        }
+
+        // Verify the new signature
+        let new_sig = dfg_hugr
+            .get_optype(dfg_hugr.entrypoint())
+            .dataflow_signature()
+            .unwrap();
+        assert_eq!(new_sig.input_count(), 3);
+        assert_eq!(new_sig.output_count(), 3);
+
+        // Verify inp(0) -> cx(1), inp(1) -> out(2), inp(2) -> cx(0)
+        for (i, exp_gate) in [cx_node, dfg_out, cx_node].into_iter().enumerate() {
+            assert_eq!(
+                dfg_hugr.linked_inputs(dfg_inp, i).collect_vec(),
+                vec![(exp_gate, ((i + 1) % 3).into())]
+            );
+        }
+        // Verify cx(0) -> out(0), cx(1) -> out(1), inp(1) -> out(2)
+        for (i, exp_gate) in [cx_node, cx_node, dfg_inp].into_iter().enumerate() {
+            let exp_outport = std::cmp::min(i, 1);
+            assert_eq!(
+                dfg_hugr.linked_outputs(dfg_out, i).collect_vec(),
+                vec![(exp_gate, exp_outport.into())],
+                "expected {}({exp_outport}) -> out({i})",
+                dfg_hugr.get_optype(exp_gate).name()
+            );
+        }
+
+        assert_snapshot!(dfg_hugr.mermaid_string());
+    }
+
+    #[test]
+    fn test_map_io_recursive() {
+        use crate::builder::ModuleBuilder;
+        use crate::extension::prelude::{bool_t, qb_t};
+        use crate::types::Signature;
+
+        // Create a module with two functions: "foo" and "bar"
+        let mut module_builder = ModuleBuilder::new();
+
+        // Define function "foo" with nested DFGs
+        let dfg_roots = {
+            let mut foo_builder = module_builder
+                .define_function("foo", Signature::new_endo(vec![qb_t(), bool_t()]))
+                .unwrap();
+
+            let [qb, b] = foo_builder.input_wires_arr();
+
+            // Create first nested DFG
+            let mut dfg1_builder = foo_builder
+                .dfg_builder_endo([(qb_t(), qb), (bool_t(), b)])
+                .unwrap();
+            let [dfg1_qb, dfg1_b] = dfg1_builder.input_wires_arr();
+
+            // Create second nested DFG inside the first one
+            let dfg2_builder = dfg1_builder
+                .dfg_builder_endo([(qb_t(), dfg1_qb), (bool_t(), dfg1_b)])
+                .unwrap();
+            let [dfg2_qb, dfg2_b] = dfg2_builder.input_wires_arr();
+
+            // Connect inputs to outputs in innermost DFG
+            let dfg2_id = dfg2_builder.finish_with_outputs([dfg2_qb, dfg2_b]).unwrap();
+
+            // Connect through first DFG
+            let dfg1_id = dfg1_builder.finish_with_outputs(dfg2_id.outputs()).unwrap();
+
+            // Finish function
+            let foo_id = foo_builder.finish_with_outputs(dfg1_id.outputs()).unwrap();
+
+            [foo_id.node(), dfg1_id.node(), dfg2_id.node()]
+        };
+
+        let mut hugr = module_builder.finish_hugr().unwrap();
+        hugr.set_entrypoint(dfg_roots[2]);
+
+        // Test successful signature update in "foo"
+        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+
+        // Swap the outputs: [0,1] -> [1,0]
+        let input_map = vec![0, 1];
+        let output_map = vec![1, 0];
+
+        dfg_view.map_function_type(&input_map, &output_map).unwrap();
+
+        // Verify the new signature at each level
+        for node in dfg_roots {
+            let sig = hugr.get_optype(node).inner_function_type().unwrap();
+            assert_eq!(sig.input_types(), vec![qb_t(), bool_t()]);
+            assert_eq!(sig.output_types(), vec![bool_t(), qb_t()]);
+        }
+
+        assert_snapshot!(hugr.mermaid_string());
     }
 }
