@@ -153,7 +153,6 @@ impl Commit {
                 Either::Right(repl.replacement().entry_descendants().skip(3))
             }
         }
-        .into_iter()
     }
 
     fn all_parents(&self) -> impl Iterator<Item = &Commit> + '_ {
@@ -458,6 +457,8 @@ impl PersistentHugr {
 
     /// The unique outgoing port in `self` that `port` is attached to.
     ///
+    /// # Panics
+    ///
     /// Panics if `node` is not in `self` (in particular if it is deleted) or if
     /// `port` is not a value port in `node`.
     fn get_single_outgoing_port(
@@ -528,6 +529,8 @@ impl PersistentHugr {
     }
 
     /// All incoming ports that the given outgoing port is attached to.
+    ///
+    /// # Panics
     ///
     /// Panics if `out_node` is not in `self` (in particular if it is deleted)
     /// or if `out_port` is not a value port in `out_node`.

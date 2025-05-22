@@ -1,5 +1,6 @@
 import pytest
 
+from hugr.hugr.node_port import InPort, Node, OutPort
 from hugr.ops import (
     CFG,
     DFG,
@@ -28,7 +29,7 @@ from hugr.ops import (
 )
 from hugr.std.int import DivMod
 from hugr.std.logic import Not
-from hugr.tys import Bool, PolyFuncType, TypeBound
+from hugr.tys import Bool, OrderKind, PolyFuncType, TypeBound
 from hugr.val import TRUE
 
 
@@ -64,3 +65,12 @@ from hugr.val import TRUE
 )
 def test_ops_str(op: Op, string: str):
     assert op.name() == string
+
+
+@pytest.mark.parametrize(
+    "op",
+    [Noop(), Call(PolyFuncType.empty()), LoadFunc(PolyFuncType.empty()), LoadConst()],
+)
+def test_order_ports(op: Op):
+    assert op.port_kind(InPort(Node(0), -1)) == OrderKind()
+    assert op.port_kind(OutPort(Node(0), -1)) == OrderKind()
