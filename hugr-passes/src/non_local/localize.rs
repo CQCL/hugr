@@ -10,7 +10,7 @@ use hugr_core::{
     ops::{DataflowOpTrait, OpType, Tag, TailLoop},
     types::{EdgeKind, Type, TypeRow},
 };
-use itertools::{Either, Itertools};
+use itertools::Itertools as _;
 
 use super::just_types;
 
@@ -31,10 +31,7 @@ impl<N: HugrNode> ExtraSourceReqs<N> {
     }
 
     fn get(&self, node: N) -> impl Iterator<Item = (&Wire<N>, &Type)> + '_ {
-        match self.0.get(&node) {
-            Some(x) => Either::Left(x.iter()),
-            None => Either::Right(std::iter::empty()),
-        }
+        self.0.get(&node).into_iter().flat_map(BTreeMap::iter)
     }
 
     pub fn parent_needs(&self, parent: N, source: Wire<N>) -> bool {
