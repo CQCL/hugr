@@ -1,7 +1,5 @@
 //! This module provides functions for finding non-local edges
 //! in a Hugr and converting them to local edges.
-use std::collections::HashMap;
-
 use itertools::Itertools as _;
 
 use hugr_core::{
@@ -78,10 +76,11 @@ fn just_types<'a, X: 'a>(v: impl IntoIterator<Item = &'a (X, Type)>) -> impl Ite
 pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdgesError> {
     // Group all the non-local edges in the graph by target node,
     // storing for each the source and type (well-defined as these are Value edges).
-    let nonlocal_edges_map: HashMap<_, _> = nonlocal_edges(hugr)
-        .filter_map(|(node, inport)| {
+    let nonlocal_edges: Vec<_> = nonlocal_edges(hugr)
+        .map(|(node, inport)| {
             let source = {
-                let (n, p) = hugr.single_linked_output(node, inport)?;
+                // unwrap because nonlocal_edges(hugr) already skips in-ports with !=1 linked outputs.
+                let (n, p) = hugr.single_linked_output(node, inport).unwrap();
                 Wire::new(n, p)
             };
             debug_assert!(
@@ -92,18 +91,18 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
             else {
                 panic!("impossible")
             };
-            Some((node, (source, ty)))
+            (node, (source, ty))
         })
         .collect();
 
-    if nonlocal_edges_map.is_empty() {
+    if nonlocal_edges.is_empty() {
         return Ok(());
     }
 
     // We now compute the sources needed by each parent node.
     let bb_needs_sources_map = {
         let mut bnsm = ExtraSourceReqs::default();
-        for (target_node, (source, ty)) in nonlocal_edges_map.iter() {
+        for (target_node, (source, ty)) in nonlocal_edges.iter() {
             let parent = hugr.get_parent(*target_node).unwrap();
             debug_assert!(hugr.get_parent(parent).is_some());
             bnsm.add_edge(&*hugr, parent, *source, ty.clone());
@@ -111,7 +110,7 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
         bnsm
     };
 
-    debug_assert!(nonlocal_edges_map.iter().all(|(n, (source, _))| {
+    debug_assert!(nonlocal_edges.iter().all(|(n, (source, _))| {
         let source_parent = hugr.get_parent(source.node()).unwrap();
         let source_gp = hugr.get_parent(source_parent);
         let stop_at = source_gp
