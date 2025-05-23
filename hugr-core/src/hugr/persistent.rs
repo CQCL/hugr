@@ -573,11 +573,11 @@ impl PersistentHugr {
                     if Some(in_node) == curr_repl_out {
                         None
                     } else {
-                        let other_deleted_by =
-                            self.find_deleting_commit(PatchNode(commit_id, in_node))?;
-                        // (out_node, out_port) -> (in_node, in_port) is a boundary edge
-                        // into the child commit `other_deleted_by`
-                        (Some(other_deleted_by) != out_deleted_by).then_some(other_deleted_by)
+                        self.find_deleting_commit(PatchNode(commit_id, in_node))
+                            .filter(|other_deleted_by|
+                                // (out_node, out_port) -> (in_node, in_port) is a boundary edge
+                                // into the child commit `other_deleted_by`
+                                (Some(other_deleted_by) != out_deleted_by.as_ref()))
                     }
                 })
                 .collect();
