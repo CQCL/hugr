@@ -562,22 +562,25 @@ impl PersistentHugr {
             //      linked port in a parent commit), or
             //  (ii) they are deleted by a child commit and is not the same as the out_node
             //      (then there will be a linked port in a child commit)
-            let (is_linked_to_output, deleted_by_child): (IteratorNonEmpty, BTreeSet<_>) = hugr
+            let is_linked_to_output = curr_repl_out.is_some_and(|curr_repl_out| {
+                hugr.linked_inputs(out_node.1, out_port)
+                    .any(|(in_node, _)| in_node == curr_repl_out)
+            });
+
+            let deleted_by_child: BTreeSet<_> = hugr
                 .linked_inputs(out_node.1, out_port)
                 .filter_map(|(in_node, _)| {
                     if Some(in_node) == curr_repl_out {
-                        // Flag that we have found a link to output
-                        Some(Either::Left(()))
+                        None
                     } else {
                         let other_deleted_by =
                             self.find_deleting_commit(PatchNode(commit_id, in_node))?;
                         // (out_node, out_port) -> (in_node, in_port) is a boundary edge
                         // into the child commit `other_deleted_by`
-                        (Some(other_deleted_by) != out_deleted_by)
-                            .then_some(Either::Right(other_deleted_by))
+                        (Some(other_deleted_by) != out_deleted_by).then_some(other_deleted_by)
                     }
                 })
-                .partition_map(|x| x);
+                .collect();
 
             // Convert an incoming port to the unique outgoing port that it is linked to
             let to_outgoing_port = |(PatchNode(commit_id, in_node), in_port)| {
@@ -588,7 +591,7 @@ impl PersistentHugr {
                 (PatchNode(commit_id, out_node), out_port)
             };
 
-            if is_linked_to_output.0 {
+            if is_linked_to_output {
                 // Traverse boundary to parent(s)
                 let new_ins = self
                     .as_state_space()
