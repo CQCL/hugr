@@ -473,10 +473,6 @@ impl PersistentHugr {
         loop {
             let commit_id = out_node.0;
 
-            let is_input = || {
-                self.replacement(commit_id)
-                    .is_some_and(|repl| repl.get_replacement_io()[0] == out_node.1)
-            };
             if let Some(deleted_by) = self.find_deleting_commit(out_node) {
                 (out_node, out_port) = self
                     .state_space
@@ -492,7 +488,10 @@ impl PersistentHugr {
                         })
                         .expect("out_node is connected to output node (which is never deleted)")
                 };
-            } else if is_input() {
+            } else if self
+                .replacement(commit_id)
+                .is_some_and(|repl| repl.get_replacement_io()[0] == out_node.1)
+            {
                 // out_node is an input node
                 (out_node, out_port) = self
                     .as_state_space()
