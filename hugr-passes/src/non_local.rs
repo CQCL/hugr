@@ -1,5 +1,6 @@
 //! This module provides functions for finding non-local edges
 //! in a Hugr and converting them to local edges.
+#![warn(missing_docs)]
 use itertools::Itertools as _;
 
 use hugr_core::{
@@ -13,11 +14,10 @@ use crate::ComposablePass;
 mod localize;
 use localize::ExtraSourceReqs;
 
-/// [ComposablePass] that converts all non-local edges in a Hugr
-/// into local ones, by inserting extra inputs to container nodes
-/// and extra outports to Input nodes.
+/// [ComposablePass] wrapper for [remove_nonlocal_edges]
 pub struct LocalizeEdges;
 
+/// Error from [LocalizeEdges] or [remove_nonlocal_edges]
 #[derive(derive_more::Error, derive_more::Display, derive_more::From, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum LocalizeEdgesError {}
@@ -45,6 +45,7 @@ pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, I
     })
 }
 
+/// Legacy alias of [FindNonLocalEdgesError]
 #[deprecated(note = "Use FindNonLocalEdgesError")]
 pub type NonLocalEdgesError<N> = FindNonLocalEdgesError<N>;
 
@@ -52,8 +53,9 @@ pub type NonLocalEdgesError<N> = FindNonLocalEdgesError<N>;
 #[derive(Clone, derive_more::Error, derive_more::Display, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FindNonLocalEdgesError<N> {
+    /// Some nonlocal edges were found
     #[display("Found {} nonlocal edges", _0.len())]
-    #[error(ignore)]
+    #[error(ignore)] // Vec not convertible
     Edges(Vec<(N, IncomingPort)>),
 }
 
@@ -73,6 +75,11 @@ fn just_types<'a, X: 'a>(v: impl IntoIterator<Item = &'a (X, Type)>) -> impl Ite
     v.into_iter().map(|(_, t)| t.clone())
 }
 
+/// Converts all non-local edges in a Hugr into local ones, by inserting extra inputs
+/// to container nodes and extra outports to Input nodes (and conversely to outputs of
+/// [DataflowBlock]s).
+///
+/// [DataflowBlock]: hugr_core::ops::DataflowBlock
 pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdgesError> {
     // Group all the non-local edges in the graph by target node,
     // storing for each the source and type (well-defined as these are Value edges).
@@ -100,7 +107,7 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
     }
 
     // We now compute the sources needed by each parent node.
-    let bb_needs_sources_map = {
+    let needs_sources_map = {
         let mut bnsm = ExtraSourceReqs::default();
         for (target_node, (source, ty)) in nonlocal_edges.iter() {
             let parent = hugr.get_parent(*target_node).unwrap();
@@ -121,10 +128,10 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
             (!stop_at.contains(&parent)).then_some(parent)
         })
         .skip(1)
-        .all(|parent| bb_needs_sources_map.parent_needs(parent, *source))
+        .all(|parent| needs_sources_map.parent_needs(parent, *source))
     }));
 
-    bb_needs_sources_map.thread_hugr(hugr);
+    needs_sources_map.thread_hugr(hugr);
 
     Ok(())
 }
