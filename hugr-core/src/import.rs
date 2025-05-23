@@ -1624,15 +1624,14 @@ impl<'a> Context<'a> {
                     .get(var)
                     .ok_or(table::ModelError::InvalidVar(*var))?;
                 let name = model::VarName::new("TODO");
-                let type_ = self.import_term(var_info.r#type)?;
                 // TODO: We shouldn't throw away the node id here.
-                Ok(Var::new(name, var.1, type_).into())
+                Ok(Var::new(name, var.1).into())
             }
             table::Term::Apply(symbol, args) => {
                 let symbol = model::SymbolName::new(self.get_symbol_name(*symbol)?);
                 let args = args.iter().map(|arg| self.import_term(*arg));
                 let type_ = Term::Wildcard;
-                Ok(Apply::try_new(symbol, args, type_)?.into())
+                Ok(Apply::try_new(symbol, args)?.into())
             }
             table::Term::List(parts) => {
                 let parts = parts.iter().map(|part| self.import_term_seq_part(*part));

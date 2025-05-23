@@ -3,7 +3,7 @@ use itertools::Itertools as _;
 use servo_arc::{Arc, ThinArc};
 use std::{fmt::Display, hash::Hash};
 
-use super::{SeqPart, Term, Typed, ViewError, views::CoreList};
+use super::{SeqPart, Term, ViewError};
 
 /// Homogeneous sequences of [`Term`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,7 +11,7 @@ pub struct List(ThinArc<ListHeader, SeqPart>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ListHeader {
-    list_type: CoreList,
+    item_type: Term,
 }
 
 impl List {
@@ -21,9 +21,7 @@ impl List {
         I::IntoIter: ExactSizeIterator,
     {
         Self(ThinArc::from_header_and_iter(
-            ListHeader {
-                list_type: CoreList { item_type },
-            },
+            ListHeader { item_type },
             parts.into_iter(),
         ))
     }
@@ -36,9 +34,7 @@ impl List {
         let parts = parts.into_iter();
 
         let mut arc = ThinArc::from_header_and_iter(
-            ListHeader {
-                list_type: CoreList { item_type },
-            },
+            ListHeader { item_type },
             (0..parts.len()).map(|_| SeqPart::Item(Term::Wildcard)),
         );
 
@@ -56,20 +52,13 @@ impl List {
     }
 
     pub fn item_type(&self) -> &Term {
-        &self.type_().item_type
+        &self.0.header.item_type
     }
 }
 
 impl Hash for List {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         todo!()
-    }
-}
-
-impl Typed for List {
-    #[allow(refining_impl_trait)]
-    fn type_(&self) -> &CoreList {
-        &self.0.header.list_type
     }
 }
 
@@ -91,10 +80,7 @@ impl TryFrom<Term> for List {
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         match value {
             Term::List(list) => Ok(list),
-            Term::Var(var) => {
-                let type_ = var.type_().clone();
-                Ok(List::new([SeqPart::Splice(Term::Var(var))], type_))
-            }
+            Term::Var(var) => Ok(List::new([SeqPart::Splice(Term::Var(var))], Term::Wildcard)),
             _ => Err(ViewError::Mismatch),
         }
     }

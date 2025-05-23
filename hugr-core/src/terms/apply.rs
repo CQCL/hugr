@@ -10,7 +10,6 @@ use servo_arc::HeaderSlice;
 use servo_arc::ThinArc;
 use servo_arc::UniqueArc;
 
-use super::Typed;
 use super::{Term, ViewError};
 
 /// [`Term`]s obtained by applying a symbol.
@@ -20,8 +19,6 @@ pub struct Apply(ThinArc<ApplyHeader, Term>);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ApplyHeader {
     name: SymbolName,
-    type_: Term,
-
     // TODO: Compact flags field
     has_vars: bool,
     hash: u64,
@@ -49,7 +46,7 @@ impl Apply {
     /// assert_eq!(apply.args(), &[arg0, arg1]);
     /// assert_eq!(apply.type_(), &type_);
     /// ```
-    pub fn new<A>(name: SymbolName, args: A, type_: Term) -> Self
+    pub fn new<A>(name: SymbolName, args: A) -> Self
     where
         A: IntoIterator<Item = Term>,
         A::IntoIter: ExactSizeIterator,
@@ -57,7 +54,6 @@ impl Apply {
         Self::finish(UniqueArc::from_header_and_iter(
             ApplyHeader {
                 name,
-                type_,
                 has_vars: false,
                 hash: 0,
             },
@@ -88,7 +84,7 @@ impl Apply {
     ///
     /// assert!(Apply::try_new(symbol, [Ok(arg0), Err(())], type_).is_err());
     /// ```
-    pub fn try_new<A, E>(name: SymbolName, args: A, type_: Term) -> Result<Self, E>
+    pub fn try_new<A, E>(name: SymbolName, args: A) -> Result<Self, E>
     where
         A: IntoIterator<Item = Result<Term, E>>,
         A::IntoIter: ExactSizeIterator,
@@ -99,7 +95,6 @@ impl Apply {
             ApplyHeader {
                 name,
                 has_vars: false,
-                type_,
                 hash: 0,
             },
             (0..args.len()).map(|_| Term::Wildcard),
@@ -115,9 +110,6 @@ impl Apply {
     fn finish(mut arc: UniqueArc<HeaderSlice<ApplyHeader, Term>>) -> Self {
         let mut has_vars = false;
         let mut hasher = FxHasher::default();
-
-        has_vars = has_vars || arc.header.type_.has_vars();
-        arc.header.type_.hash(&mut hasher);
 
         for arg in arc.slice() {
             has_vars = has_vars || arg.has_vars();
@@ -212,13 +204,6 @@ impl Apply {
 impl Hash for Apply {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         state.write_u64(self.0.header.hash);
-    }
-}
-
-impl Typed for Apply {
-    #[allow(refining_impl_trait)]
-    fn type_(&self) -> &Term {
-        &self.0.header.type_
     }
 }
 

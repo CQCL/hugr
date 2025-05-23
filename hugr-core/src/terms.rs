@@ -5,7 +5,6 @@ pub use list::List;
 use servo_arc::Arc;
 use std::fmt::Display;
 pub use views::ViewError;
-use views::{CoreBytes, CoreFloat, CoreNat, CoreStr};
 
 mod apply;
 mod list;
@@ -106,31 +105,6 @@ impl Display for Term {
     }
 }
 
-/// Trait for objects that have a type.
-pub trait Typed {
-    fn type_(&self) -> impl Into<Term>;
-}
-
-impl Typed for Term {
-    #[allow(refining_impl_trait)]
-    fn type_(&self) -> Term {
-        match self {
-            Term::Wildcard => Term::Wildcard,
-            Term::Literal(literal) => match literal {
-                Literal::Str(_) => CoreStr.into(),
-                Literal::Nat(_) => CoreNat.into(),
-                Literal::Bytes(_) => CoreBytes.into(),
-                Literal::Float(_) => CoreFloat.into(),
-            },
-            Term::List(list) => list.type_().into(),
-            Term::Tuple(tuple) => todo!(),
-            Term::Apply(apply) => apply.type_().into(),
-            Term::Var(var) => var.type_().into(),
-            Term::StaticType => Term::StaticType,
-        }
-    }
-}
-
 impl From<&Term> for Term {
     fn from(value: &Term) -> Self {
         value.clone()
@@ -189,12 +163,11 @@ pub struct Var(Arc<VarInner>);
 struct VarInner {
     name: VarName,
     index: u16,
-    type_: Term,
 }
 
 impl Var {
-    pub fn new(name: VarName, index: u16, type_: Term) -> Self {
-        Self(Arc::new(VarInner { name, index, type_ }))
+    pub fn new(name: VarName, index: u16) -> Self {
+        Self(Arc::new(VarInner { name, index }))
     }
 
     pub fn name(&self) -> &VarName {
@@ -215,12 +188,5 @@ impl From<&Var> for ast::Term {
 impl Display for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", ast::Term::from(self))
-    }
-}
-
-impl Typed for Var {
-    #[allow(refining_impl_trait)]
-    fn type_(&self) -> &Term {
-        &self.0.type_
     }
 }

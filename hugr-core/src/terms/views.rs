@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use super::{Apply, Term, Typed};
+use super::{Apply, Term};
 use hugr_model::v0::SymbolName;
 use thiserror::Error;
 
@@ -18,11 +18,9 @@ macro_rules! make_ctr {
 
         impl From<$ident> for Apply {
             fn from(value: $ident) -> Self {
-                let type_ = Term::from(value.type_());
                 Apply::new(
                     $ident::SYMBOL,
                     [$(value.$arg.into()),*],
-                    type_
                 )
             }
         }
@@ -49,8 +47,7 @@ macro_rules! make_ctr {
         impl From<$ident> for Apply {
             fn from($ident: $ident) -> Self {
                 static TERM: ::once_cell::sync::Lazy<Apply> = ::once_cell::sync::Lazy::new(|| {
-                    let type_ = Term::from($ident.type_());
-                    Apply::new($ident::SYMBOL, [], type_)
+                    Apply::new($ident::SYMBOL, [])
                 });
                 TERM.clone()
             }
@@ -91,17 +88,6 @@ macro_rules! make_ctr {
     }
 }
 
-macro_rules! impl_typed_static {
-    ($ident:ident) => {
-        impl Typed for $ident {
-            #[allow(refining_impl_trait)]
-            fn type_(&self) -> Term {
-                Term::StaticType
-            }
-        }
-    };
-}
-
 /// `core.fn`: The type of runtime functions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoreFn {
@@ -110,7 +96,6 @@ pub struct CoreFn {
 }
 
 make_ctr!(CoreFn { inputs, outputs }, "core.fn");
-impl_typed_static!(CoreFn);
 
 /// `core.list`: The type of static lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,7 +104,6 @@ pub struct CoreList {
 }
 
 make_ctr!(CoreList { item_type }, "core.list");
-impl_typed_static!(CoreList);
 
 /// `core.tuple`: The type of static tuples.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,35 +112,30 @@ pub struct CoreTuple {
 }
 
 make_ctr!(CoreTuple { item_types }, "core.tuple");
-impl_typed_static!(CoreTuple);
 
 /// `core.str`: The type of static strings.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreStr;
 
 make_ctr!(CoreStr, "core.str");
-impl_typed_static!(CoreStr);
 
 /// `core.nat`: The type of static natural numbers.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreNat;
 
 make_ctr!(CoreNat, "core.nat");
-impl_typed_static!(CoreNat);
 
 /// `core.bytes`: The type of static byte strings.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreBytes;
 
 make_ctr!(CoreBytes, "core.bytes");
-impl_typed_static!(CoreBytes);
 
 /// `core.float`: The type of static floating point numbers.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub struct CoreFloat;
 
 make_ctr!(CoreFloat, "core.float");
-impl_typed_static!(CoreFloat);
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ViewError {
