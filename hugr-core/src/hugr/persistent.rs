@@ -65,6 +65,9 @@ mod parents_view;
 mod resolver;
 mod state_space;
 mod trait_impls;
+pub mod walker;
+
+pub use walker::{PinnedWire, Walker};
 
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
@@ -276,6 +279,14 @@ impl PersistentHugr {
     /// All replacements added in the future will apply on top of `hugr`.
     pub fn with_base(hugr: Hugr) -> Self {
         let state_space = CommitStateSpace::with_base(hugr);
+        Self { state_space }
+    }
+
+    /// Create a [`PersistentHugr`] from a single commit and its ancestors.
+    // This always defines a valid `PersistentHugr` as the ancestors of a commit
+    // are guaranteed to be compatible with each other.
+    pub fn from_commit(commit: Commit) -> Self {
+        let state_space = CommitStateSpace::try_from_commits([commit]).expect("commit is valid");
         Self { state_space }
     }
 

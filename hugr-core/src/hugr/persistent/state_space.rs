@@ -155,13 +155,19 @@ impl CommitStateSpace {
     /// All commits in the resulting `PersistentHugr` are guaranteed to be
     /// compatible. If the selected commits would include two commits which
     /// are incompatible, a [`InvalidCommit::IncompatibleHistory`] error is
-    /// returned.
+    /// returned. If `commits` is empty, a [`InvalidCommit::NonUniqueBase`]
+    /// error is returned.
     pub fn try_extract_hugr(
         &self,
         commits: impl IntoIterator<Item = CommitId>,
     ) -> Result<PersistentHugr, InvalidCommit> {
         // Define commits as the set of all ancestors of the given commits
         let all_commit_ids = get_all_ancestors(&self.graph, commits);
+
+        if all_commit_ids.is_empty() {
+            return Err(InvalidCommit::NonUniqueBase(0));
+        }
+        debug_assert!(all_commit_ids.contains(&self.base()));
 
         // Check that all commits are compatible
         for &commit_id in &all_commit_ids {
