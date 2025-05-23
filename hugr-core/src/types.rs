@@ -171,7 +171,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
     .into_inner()
 }
 
-#[derive(Clone, PartialEq, Debug, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 #[serde(tag = "s")]
 #[non_exhaustive]
 /// Representation of a Sum type.
@@ -184,6 +184,18 @@ pub enum SumType {
     /// General case of a Sum type.
     #[allow(missing_docs)]
     General { rows: Vec<TypeRowRV> },
+}
+
+impl std::hash::Hash for SumType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.variants().for_each(|v| v.hash(state));
+    }
+}
+
+impl PartialEq for SumType {
+    fn eq(&self, other: &Self) -> bool {
+        self.num_variants() == other.num_variants() && self.variants().eq(other.variants())
+    }
 }
 
 impl std::fmt::Display for SumType {
@@ -839,6 +851,7 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
+    use std::hash::{Hash, Hasher};
     use std::sync::Weak;
 
     use super::*;
@@ -917,20 +930,26 @@ pub(crate) mod test {
 
     #[test]
     fn sum_variants() {
-        {
-            let variants: Vec<TypeRowRV> = vec![
-                TypeRV::UNIT.into(),
-                vec![TypeRV::new_row_var_use(0, TypeBound::Any)].into(),
-            ];
-            let t = SumType::new(variants.clone());
-            assert_eq!(variants, t.variants().cloned().collect_vec());
-        }
-        {
-            assert_eq!(
-                vec![&TypeRV::EMPTY_TYPEROW; 3],
-                SumType::new_unary(3).variants().collect_vec()
-            );
-        }
+        let variants: Vec<TypeRowRV> = vec![
+            TypeRV::UNIT.into(),
+            vec![TypeRV::new_row_var_use(0, TypeBound::Any)].into(),
+        ];
+        let t = SumType::new(variants.clone());
+        assert_eq!(variants, t.variants().cloned().collect_vec());
+
+        let empty_rows = vec![TypeRV::EMPTY_TYPEROW; 3];
+        let sum_unary = SumType::new_unary(3);
+        let sum_general = SumType::General {
+            rows: empty_rows.clone(),
+        };
+        assert_eq!(&empty_rows, &sum_unary.variants().cloned().collect_vec());
+        assert_eq!(sum_general, sum_unary);
+
+        let mut hasher_general = std::hash::DefaultHasher::new();
+        sum_general.hash(&mut hasher_general);
+        let mut hasher_unary = std::hash::DefaultHasher::new();
+        sum_unary.hash(&mut hasher_unary);
+        assert_eq!(hasher_general.finish(), hasher_unary.finish());
     }
 
     pub(super) struct FnTransformer<T>(pub(super) T);
