@@ -752,34 +752,5 @@ fn find_conflicting_node<'a>(
     })
 }
 
-/// A wrapper around a boolean that implements `Extend<V>`. The boolean
-/// is true if a non-empty iterator was appended to `self`.
-#[derive(Debug, Copy, Clone, Default)]
-struct IteratorNonEmpty(bool);
-
-impl<V> Extend<V> for IteratorNonEmpty {
-    fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
-        self.0 |= iter.into_iter().next().is_some();
-    }
-}
-
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod test_iterator_non_empty {
-    use super::IteratorNonEmpty;
-
-    use rstest::rstest;
-
-    #[rstest]
-    #[case(vec![])]
-    #[case(vec![1])]
-    #[case(vec![1, 2, 3])]
-    fn test_extend(#[case] input: Vec<i32>) {
-        let expected = !input.is_empty();
-        let mut res = IteratorNonEmpty::default();
-        res.extend(input);
-        assert_eq!(res.0, expected);
-    }
-}
