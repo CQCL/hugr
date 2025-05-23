@@ -474,10 +474,8 @@ impl PersistentHugr {
             let commit_id = out_node.0;
 
             let is_input = || {
-                let Some(repl) = self.replacement(commit_id) else {
-                    return false;
-                };
-                repl.get_replacement_io()[0] == out_node.1
+                self.replacement(commit_id)
+                    .is_some_and(|repl| repl.get_replacement_io()[0] == out_node.1)
             };
             if let Some(deleted_by) = self.find_deleting_commit(out_node) {
                 (out_node, out_port) = self
