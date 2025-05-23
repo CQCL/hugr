@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.20.0...hugr-core-v0.20.1) - 2025-05-23
+
+### Bug Fixes
+
+- check well-definedness of DFG wires in validate ([#2221](https://github.com/CQCL/hugr/pull/2221))
+- Check for order edges in SiblingSubgraph::from_node ([#2223](https://github.com/CQCL/hugr/pull/2223))
+- Make SumType::Unit(N) equal to SumType::General([(); N]) ([#2250](https://github.com/CQCL/hugr/pull/2250))
+
+### New Features
+
+- Add PersistentHugr ([#2080](https://github.com/CQCL/hugr/pull/2080))
+- Add `Type::used_extensions` ([#2224](https://github.com/CQCL/hugr/pull/2224))
+- Add boundary edge traversal in SimpleReplacement ([#2231](https://github.com/CQCL/hugr/pull/2231))
+- Add signature map function for DFGs ([#2239](https://github.com/CQCL/hugr/pull/2239))
+- PersistentHugr implements HugrView ([#2202](https://github.com/CQCL/hugr/pull/2202))
+
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.15.4...hugr-core-v0.20.0) - 2025-05-14
 
 ### Bug Fixes
