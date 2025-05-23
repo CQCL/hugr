@@ -569,16 +569,13 @@ impl PersistentHugr {
 
             let deleted_by_child: BTreeSet<_> = hugr
                 .linked_inputs(out_node.1, out_port)
+                .filter(|(in_node, _)| Some(in_node) != curr_repl_out.as_ref())
                 .filter_map(|(in_node, _)| {
-                    if Some(in_node) == curr_repl_out {
-                        None
-                    } else {
-                        self.find_deleting_commit(PatchNode(commit_id, in_node))
-                            .filter(|other_deleted_by|
+                    self.find_deleting_commit(PatchNode(commit_id, in_node))
+                        .filter(|other_deleted_by|
                                 // (out_node, out_port) -> (in_node, in_port) is a boundary edge
                                 // into the child commit `other_deleted_by`
                                 (Some(other_deleted_by) != out_deleted_by.as_ref()))
-                    }
                 })
                 .collect();
 
