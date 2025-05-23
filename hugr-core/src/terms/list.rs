@@ -1,7 +1,7 @@
 use hugr_model::v0::ast;
 use itertools::Itertools as _;
 use servo_arc::{Arc, ThinArc};
-use std::fmt::Display;
+use std::{fmt::Display, hash::Hash};
 
 use super::{SeqPart, Term, Typed, ViewError, views::CoreList};
 
@@ -57,6 +57,12 @@ impl List {
 
     pub fn item_type(&self) -> &Term {
         &self.type_().item_type
+    }
+}
+
+impl Hash for List {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        todo!()
     }
 }
 

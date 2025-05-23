@@ -1,10 +1,14 @@
 use std::fmt::Display;
+use std::hash::Hash;
+use std::hash::Hasher;
 
+use fxhash::FxHasher;
 use hugr_model::v0::SymbolName;
 use hugr_model::v0::ast;
 use itertools::Itertools as _;
-use servo_arc::Arc;
+use servo_arc::HeaderSlice;
 use servo_arc::ThinArc;
+use servo_arc::UniqueArc;
 
 use super::Typed;
 use super::{Term, ViewError};
@@ -13,13 +17,14 @@ use super::{Term, ViewError};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Apply(ThinArc<ApplyHeader, Term>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ApplyHeader {
     name: SymbolName,
     type_: Term,
 
     // TODO: Compact flags field
     has_vars: bool,
+    hash: u64,
 }
 
 impl Apply {
@@ -49,24 +54,15 @@ impl Apply {
         A: IntoIterator<Item = Term>,
         A::IntoIter: ExactSizeIterator,
     {
-        let mut arc = ThinArc::from_header_and_iter(
+        Self::finish(UniqueArc::from_header_and_iter(
             ApplyHeader {
                 name,
                 type_,
                 has_vars: false,
+                hash: 0,
             },
             args.into_iter(),
-        );
-
-        let arc_ref = Arc::get_mut(&mut arc).unwrap();
-        let mut has_vars = false;
-
-        for arg in arc_ref.slice() {
-            has_vars = has_vars || arg.has_vars();
-        }
-
-        arc_ref.header.has_vars = has_vars;
-        Self(arc)
+        ))
     }
 
     /// Tries to create a new symbol application.
@@ -90,11 +86,7 @@ impl Apply {
     ///     type_.clone()
     /// ).is_ok());
     ///
-    /// assert!(Apply::try_new(
-    ///     symbol,
-    ///     [Ok(arg0), Err(())],
-    ///     type_
-    /// ).is_err());
+    /// assert!(Apply::try_new(symbol, [Ok(arg0), Err(())], type_).is_err());
     /// ```
     pub fn try_new<A, E>(name: SymbolName, args: A, type_: Term) -> Result<Self, E>
     where
@@ -103,25 +95,39 @@ impl Apply {
     {
         let args = args.into_iter();
 
-        let mut arc = ThinArc::from_header_and_iter(
+        let mut arc = UniqueArc::from_header_and_iter(
             ApplyHeader {
                 name,
-                type_,
                 has_vars: false,
+                type_,
+                hash: 0,
             },
             (0..args.len()).map(|_| Term::Wildcard),
         );
 
-        let arc_ref = Arc::get_mut(&mut arc).unwrap();
-        let mut has_vars = false;
-
-        for (arg_slot, arg) in arc_ref.slice_mut().iter_mut().zip_eq(args) {
+        for (arg_slot, arg) in arc.slice_mut().iter_mut().zip_eq(args) {
             *arg_slot = arg?;
-            has_vars = has_vars || arg_slot.has_vars();
         }
 
-        arc_ref.header.has_vars = has_vars;
-        Ok(Self(arc))
+        Ok(Self::finish(arc))
+    }
+
+    fn finish(mut arc: UniqueArc<HeaderSlice<ApplyHeader, Term>>) -> Self {
+        let mut has_vars = false;
+        let mut hasher = FxHasher::default();
+
+        has_vars = has_vars || arc.header.type_.has_vars();
+        arc.header.type_.hash(&mut hasher);
+
+        for arg in arc.slice() {
+            has_vars = has_vars || arg.has_vars();
+            arg.hash(&mut hasher);
+        }
+
+        arc.header.has_vars = has_vars;
+        arc.header.hash = hasher.finish();
+
+        Self(arc.shareable())
     }
 
     /// The name of the applied symbol.
@@ -183,8 +189,29 @@ impl Apply {
         Ok(result)
     }
 
-    pub(super) fn has_vars(&self) -> bool {
+    /// Whether the term or its type contains any variables.
+    ///
+    /// See [`Term::has_vars`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_core::terms::{Term, Apply, Var, VarName, SymbolName};
+    /// let symbol = SymbolName::new("symbol");
+    /// let var = Term::Var(Var::new(VarName::new("x"), 0, Term::Wildcard));
+    ///
+    /// assert!(Apply::new(symbol.clone(), [var.clone()], Term::Wildcard).has_vars());
+    /// assert!(Apply::new(symbol.clone(), [], var.clone()).has_vars());
+    /// assert!(!Apply::new(symbol.clone(), [], Term::Wildcard).has_vars());
+    /// ```
+    pub fn has_vars(&self) -> bool {
         self.0.header.has_vars
+    }
+}
+
+impl Hash for Apply {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_u64(self.0.header.hash);
     }
 }
 

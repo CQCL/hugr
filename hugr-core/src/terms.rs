@@ -12,7 +12,7 @@ mod list;
 pub mod views;
 
 /// A term in the language of static parameters.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub enum Term {
     #[default]
     Wildcard,
@@ -40,7 +40,12 @@ impl Term {
         }
     }
 
-    fn has_vars(&self) -> bool {
+    /// Whether this term or its type contains any variables.
+    ///
+    /// This method runs in constant time without deeply traversing the term. It
+    /// can therefore be used to optimize transformations, such as substitution,
+    /// which do not affect terms without variables.
+    pub fn has_vars(&self) -> bool {
         match self {
             Term::Wildcard => false,
             Term::Literal(_) => false,
@@ -133,7 +138,7 @@ impl From<&Term> for Term {
 }
 
 /// Part of a [`List`] or [`Tuple`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SeqPart {
     Item(Term),
     Splice(Term),
@@ -155,7 +160,7 @@ impl Display for SeqPart {
 }
 
 /// Heterogeneous sequences of [`Term`]s.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Tuple(Arc<[SeqPart]>);
 
 impl From<&Tuple> for ast::Term {
@@ -177,10 +182,10 @@ impl Display for Tuple {
 /// let x = Var::new(VarName::new("x"), 0, Term::Wildcard);
 /// assert_eq!(x.to_string(), "?x");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Var(Arc<VarInner>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct VarInner {
     name: VarName,
     index: u16,
