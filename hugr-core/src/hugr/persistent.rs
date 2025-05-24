@@ -78,8 +78,8 @@ use delegate::delegate;
 use derive_more::derive::From;
 use itertools::{Either, Itertools};
 use relrc::RelRc;
-use state_space::{CommitData, CommitId};
-pub use state_space::{CommitStateSpace, InvalidCommit, PatchNode};
+use state_space::CommitData;
+pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
 
 pub use resolver::PointerEqResolver;
 
