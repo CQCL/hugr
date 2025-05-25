@@ -63,6 +63,7 @@
 
 mod parents_view;
 mod resolver;
+mod serialize;
 mod state_space;
 mod trait_impls;
 

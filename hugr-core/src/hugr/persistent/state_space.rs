@@ -20,7 +20,9 @@ use crate::{
 pub(super) type CommitId = relrc::NodeId;
 
 /// A HUGR node within a commit of the commit state space
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
+#[derive(
+    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct PatchNode(pub CommitId, pub Node);
 
 impl std::fmt::Display for PatchNode {
@@ -31,7 +33,7 @@ impl std::fmt::Display for PatchNode {
 
 /// The data stored in a [`Commit`], either the base [`Hugr`] (on which all
 /// other commits apply), or a [`PersistentReplacement`]
-#[derive(Debug, Clone, From)]
+#[derive(Debug, Clone, From, serde::Serialize)]
 pub(super) enum CommitData {
     Base(Hugr),
     Replacement(PersistentReplacement),
@@ -56,18 +58,19 @@ pub(super) enum CommitData {
 /// general case: pairs of commits may be mutually exclusive if they modify the
 /// same subgraph. Use [`Self::try_extract_hugr`] to get a [`PersistentHugr`]
 /// with a set of compatible commits.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct CommitStateSpace {
     /// A set of commits with directed (acyclic) dependencies between them.
     ///
     /// Each commit is stored as a [`RelRc`].
-    graph: HistoryGraph<CommitData, (), PointerEqResolver>,
+    #[serde(serialize_with = "super::serialize::serialize_history_graph")]
+    pub(super) graph: HistoryGraph<CommitData, (), PointerEqResolver>,
     /// The unique root of the commit graph.
     ///
     /// The only commit in the graph with variant [`CommitData::Base`]. All
     /// other commits are [`CommitData::Replacement`]s, and are descendants
     /// of this.
-    base_commit: CommitId,
+    pub(super) base_commit: CommitId,
 }
 
 impl CommitStateSpace {

@@ -7,7 +7,7 @@ use relrc::EquivalenceResolver;
 ///
 /// This is a trivial resolver (to be expanded on later), that considers two
 /// patches equivalent if they point to the same data in memory.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct PointerEqResolver;
 
 impl<N, E: Clone> EquivalenceResolver<N, E> for PointerEqResolver {

@@ -60,7 +60,7 @@ thiserror = { workspace = true }
 typetag = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
-relrc = { workspace = true, features = ["petgraph"] }
+relrc = { workspace = true, features = ["petgraph", "serde"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
