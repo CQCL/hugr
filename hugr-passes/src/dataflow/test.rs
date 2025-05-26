@@ -452,40 +452,24 @@ fn test_region() {
     let hugr = builder.finish_hugr_with_outputs(nested.outputs()).unwrap();
     let [nested_input, _] = hugr.get_io(nested.node()).unwrap();
     let whole_hugr_results = Machine::new(&hugr).run(TestContext, [(0.into(), pv_true())]);
-    assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
-        Some(pv_true())
-    );
-    assert_eq!(whole_hugr_results.read_out_wire(cst_w), Some(pv_false()));
-    assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), 0)),
-        Some(pv_true())
-    );
-    assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), 1)),
-        Some(pv_false())
-    );
-
     let sub_hugr_results =
         Machine::new(hugr.with_entrypoint(nested.node())).run(TestContext, [(0.into(), pv_true())]);
-    assert_eq!(
-        sub_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
-        Some(pv_true())
-    );
-    assert_eq!(sub_hugr_results.read_out_wire(cst_w), None);
-    assert_eq!(
-        sub_hugr_results.read_out_wire(Wire::new(nested.node(), 0)),
-        Some(pv_true())
-    );
-    assert_eq!(
-        sub_hugr_results.read_out_wire(Wire::new(nested.node(), 1)),
-        Some(pv_false())
-    );
-    for w in [0, 1] {
-        assert_eq!(
-            sub_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), w)),
-            None
-        );
+    for (wire, val) in [
+        (Wire::new(nested_input, 0), Some(pv_true())),
+        (Wire::new(nested.node(), 0), Some(pv_true())),
+        (Wire::new(nested.node(), 1), Some(pv_false())),
+    ] {
+        assert_eq!(whole_hugr_results.read_out_wire(wire), val);
+        assert_eq!(sub_hugr_results.read_out_wire(wire), val);
+    }
+
+    for (wire, val) in [
+        (cst_w, pv_false()),
+        (Wire::new(hugr.entrypoint(), 0), pv_true()),
+        (Wire::new(hugr.entrypoint(), 1), pv_false()),
+    ] {
+        assert_eq!(whole_hugr_results.read_out_wire(wire), Some(val));
+        assert_eq!(sub_hugr_results.read_out_wire(wire), None);
     }
 }
 
