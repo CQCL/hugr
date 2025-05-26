@@ -56,10 +56,6 @@ pub enum OpTag {
     LoadConst,
     /// A function load operation.
     LoadFunc,
-    /// A definition that could be at module level or inside a DSG.
-    /// Note that this means only Constants, as all other defn/decls
-    /// must be at Module level.
-    ScopedDefn,
     /// A tail-recursive loop.
     TailLoop,
     /// A conditional operation.
@@ -120,14 +116,9 @@ impl OpTag {
             OpTag::BasicBlockExit => &[OpTag::ControlFlowChild],
             OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],
             OpTag::ModuleRoot => &[OpTag::Any],
-            OpTag::Const => &[OpTag::ScopedDefn, OpTag::StaticOutput],
+            OpTag::Const => &[OpTag::DataflowChild, OpTag::ControlFlowChild, OpTag::ModuleOp, OpTag::StaticOutput],
             OpTag::Dfg => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Cfg => &[OpTag::DataflowChild],
-            OpTag::ScopedDefn => &[
-                OpTag::DataflowChild,
-                OpTag::ControlFlowChild,
-                OpTag::ModuleOp,
-            ],
             OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Conditional => &[OpTag::DataflowChild],
             OpTag::StaticInput => &[OpTag::Any],
@@ -169,7 +160,6 @@ impl OpTag {
             OpTag::LoadConst => "Constant load operation",
             OpTag::LoadFunc => "Function load operation",
             OpTag::Leaf => "Leaf operation",
-            OpTag::ScopedDefn => "Definitions that can live at global or local scope",
             OpTag::DataflowParent => "Operation whose children form a Dataflow Sibling Graph",
         }
     }
