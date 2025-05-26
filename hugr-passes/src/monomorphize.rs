@@ -133,25 +133,7 @@ fn instantiate(
     mono_sig: Signature,
     cache: &mut Instantiations,
 ) -> Node {
-    let for_func = cache.entry(poly_func).or_insert_with(|| {
-        // First time we've instantiated poly_func. Lift any nested FuncDefn's out to the same level.
-        let outer_name = h
-            .get_optype(poly_func)
-            .as_func_defn()
-            .unwrap()
-            .func_name()
-            .clone();
-        let mut to_scan = Vec::from_iter(h.children(poly_func));
-        while let Some(n) = to_scan.pop() {
-            if let OpType::FuncDefn(fd) = h.optype_mut(n) {
-                *fd.func_name_mut() = mangle_inner_func(&outer_name, fd.func_name());
-                h.move_after_sibling(n, poly_func);
-            } else {
-                to_scan.extend(h.children(n));
-            }
-        }
-        HashMap::new()
-    });
+    let for_func = cache.entry(poly_func).or_default();
 
     let ve = match for_func.entry(type_args.clone()) {
         Entry::Occupied(n) => return *n.get(),
@@ -278,10 +260,6 @@ pub fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
     format!("${name}${}", TypeArgsList(type_args.as_ref()))
 }
 
-fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
-    format!("${outer_name}${inner_name}")
-}
-
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
@@ -296,8 +274,8 @@ mod test {
     use itertools::Itertools;
 
     use hugr_core::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-        HugrBuilder, ModuleBuilder,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        ModuleBuilder,
     };
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
@@ -308,7 +286,7 @@ mod test {
 
     use crate::{monomorphize, remove_dead_funcs};
 
-    use super::{is_polymorphic, mangle_inner_func, mangle_name};
+    use super::{is_polymorphic, mangle_name};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -425,54 +403,31 @@ mod test {
     }
 
     #[test]
-    fn test_flattening_multiargs_nats() {
+    fn test_multiargs_nats() {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
         let tv = |i| Type::new_var_use(i, TypeBound::Copyable);
         let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
         let sa = |n| TypeArg::BoundedNat { n };
-
         let n: u64 = 5;
-        let mut outer = FunctionBuilder::new(
-            "mainish",
-            Signature::new(
-                ValueArray::ty_parametric(
-                    sa(n),
-                    ValueArray::ty_parametric(sa(2), usize_t()).unwrap(),
-                )
-                .unwrap(),
-                vec![usize_t(); 2],
-            ),
-        )
-        .unwrap();
-
         let arr2u = || ValueArray::ty_parametric(sa(2), usize_t()).unwrap();
-        let pf1t = PolyFuncType::new(
-            [TypeParam::max_nat()],
-            Signature::new(
-                ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
-                usize_t(),
-            ),
-        );
-        let mut pf1 = outer.define_function("pf1", pf1t).unwrap();
 
-        let pf2t = PolyFuncType::new(
-            [TypeParam::max_nat(), TypeBound::Copyable.into()],
-            Signature::new(
-                vec![ValueArray::ty_parametric(sv(0), tv(1)).unwrap()],
-                tv(1),
-            ),
-        );
-        let mut pf2 = pf1.define_function("pf2", pf2t).unwrap();
+        let mut mb = ModuleBuilder::new();
 
         let mono_func = {
-            let mut fb = pf2
+            let mut fb = mb
                 .define_function("get_usz", Signature::new(vec![], usize_t()))
                 .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
         };
+
         let pf2 = {
+            let pf2t = PolyFuncType::new(
+                [TypeParam::max_nat(), TypeBound::Copyable.into()],
+                Signature::new(ValueArray::ty_parametric(sv(0), tv(1)).unwrap(), tv(1)),
+            );
+            let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
             let [inw] = pf2.input_wires_arr();
             let [idx] = pf2.call(mono_func.handle(), &[], []).unwrap().outputs_arr();
             let op_def = collections::value_array::EXTENSION.get_op("get").unwrap();
@@ -484,6 +439,16 @@ mod test {
                 .unwrap();
             pf2.finish_with_outputs([got]).unwrap()
         };
+
+        let pf1t = PolyFuncType::new(
+            [TypeParam::max_nat()],
+            Signature::new(
+                ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
+                usize_t(),
+            ),
+        );
+        let mut pf1 = mb.define_function("pf1", pf1t).unwrap();
+
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
         let inner = pf1
             .call(pf2.handle(), &[sv(0), arr2u().into()], pf1.input_wires())
@@ -496,43 +461,60 @@ mod test {
             )
             .unwrap();
         let pf1 = pf1.finish_with_outputs(elem.outputs()).unwrap();
+
         // Outer: two calls to pf1 with different TypeArgs
-        let [e1] = outer
-            .call(pf1.handle(), &[sa(n)], outer.input_wires())
-            .unwrap()
-            .outputs_arr();
-        let popleft = VArrayOpDef::pop_left.to_concrete(arr2u(), n);
-        let ar2 = outer
-            .add_dataflow_op(popleft.clone(), outer.input_wires())
-            .unwrap();
-        let sig = popleft.to_extension_op().unwrap().signature().into_owned();
-        let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
-            panic!()
+        let outer = {
+            let mut outer = mb
+                .define_function(
+                    "mainish",
+                    Signature::new(
+                        ValueArray::ty_parametric(
+                            sa(n),
+                            ValueArray::ty_parametric(sa(2), usize_t()).unwrap(),
+                        )
+                        .unwrap(),
+                        vec![usize_t(); 2],
+                    ),
+                )
+                .unwrap();
+
+            let [e1] = outer
+                .call(pf1.handle(), &[sa(n)], outer.input_wires())
+                .unwrap()
+                .outputs_arr();
+            let popleft = VArrayOpDef::pop_left.to_concrete(arr2u(), n);
+            let ar2 = outer
+                .add_dataflow_op(popleft.clone(), outer.input_wires())
+                .unwrap();
+            let sig = popleft.to_extension_op().unwrap().signature().into_owned();
+            let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
+                panic!()
+            };
+            let [_, ar2_unwrapped] = outer
+                .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
+                .unwrap();
+            let [e2] = outer
+                .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
+                .unwrap()
+                .outputs_arr();
+            outer.finish_with_outputs([e1, e2]).unwrap()
         };
-        let [_, ar2_unwrapped] = outer
-            .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
-            .unwrap();
-        let [e2] = outer
-            .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
-            .unwrap()
-            .outputs_arr();
-        let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
+        let mut hugr = mb.finish_hugr().unwrap();
 
         monomorphize(&mut hugr).unwrap();
         let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
-        let pf2_name = mangle_inner_func("pf1", "pf2");
         assert_eq!(
             funcs.keys().copied().sorted().collect_vec(),
             vec![
                 &mangle_name("pf1", &[TypeArg::BoundedNat { n: 5 }]),
                 &mangle_name("pf1", &[TypeArg::BoundedNat { n: 4 }]),
-                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 5 }, arr2u().into()]), // from pf1<5>
-                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 4 }, arr2u().into()]), // from pf1<4>
-                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 2 }, usize_t().into()]), // from both pf1<4> and <5>
-                &mangle_inner_func(&pf2_name, "get_usz"),
-                &pf2_name,
+                &mangle_name("pf2", &[TypeArg::BoundedNat { n: 5 }, arr2u().into()]), // from pf1<5>
+                &mangle_name("pf2", &[TypeArg::BoundedNat { n: 4 }, arr2u().into()]), // from pf1<4>
+                &mangle_name("pf2", &[TypeArg::BoundedNat { n: 2 }, usize_t().into()]), // from both pf1<4> and <5>
+                "get_usz",
+                "pf2",
                 "mainish",
                 "pf1"
             ]
@@ -540,13 +522,9 @@ mod test {
             .sorted()
             .collect_vec()
         );
-        for (n, fd) in funcs.into_values() {
-            if n == mono_hugr.entrypoint() {
-                assert_eq!(fd.func_name(), "mainish");
-            } else {
-                assert_ne!(fd.func_name(), "mainish");
-            }
-        }
+        let (n, fd) = *funcs.get(&"mainish".to_string()).unwrap();
+        assert_eq!(n, outer.node());
+        assert_eq!(fd.func_name(), "mainish"); // just a sanity check on list_funcs
     }
 
     fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
@@ -557,50 +535,6 @@ mod test {
                     .map(|fd| (fd.func_name(), (n, fd)))
             })
             .collect::<HashMap<_, _>>()
-    }
-
-    #[test]
-    fn test_no_flatten_out_of_mono_func() -> Result<(), Box<dyn std::error::Error>> {
-        let ity = || INT_TYPES[4].clone();
-        let sig = Signature::new_endo(vec![usize_t(), ity()]);
-        let mut dfg = DFGBuilder::new(sig.clone()).unwrap();
-        let mut mono = dfg.define_function("id2", sig).unwrap();
-        let pf = mono
-            .define_function(
-                "id",
-                PolyFuncType::new(
-                    [TypeBound::Any.into()],
-                    Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
-                ),
-            )
-            .unwrap();
-        let outs = pf.input_wires();
-        let pf = pf.finish_with_outputs(outs).unwrap();
-        let [a, b] = mono.input_wires_arr();
-        let [a] = mono
-            .call(pf.handle(), &[usize_t().into()], [a])
-            .unwrap()
-            .outputs_arr();
-        let [b] = mono
-            .call(pf.handle(), &[ity().into()], [b])
-            .unwrap()
-            .outputs_arr();
-        let mono = mono.finish_with_outputs([a, b]).unwrap();
-        let c = dfg.call(mono.handle(), &[], dfg.input_wires()).unwrap();
-        let mut hugr = dfg.finish_hugr_with_outputs(c.outputs()).unwrap();
-        monomorphize(&mut hugr)?;
-        let mono_hugr = hugr;
-
-        let mut funcs = list_funcs(&mono_hugr);
-        #[allow(clippy::unnecessary_to_owned)] // It is necessary
-        let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
-        assert_eq!(m, mono.handle().node());
-        assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.entrypoint()));
-        for t in [usize_t(), ity()] {
-            let (n, _) = funcs.remove(&mangle_name("id", &[t.into()])).unwrap();
-            assert_eq!(mono_hugr.get_parent(n), Some(m)); // Not lifted to top
-        }
-        Ok(())
     }
 
     #[test]
