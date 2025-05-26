@@ -442,11 +442,13 @@ fn test_region() {
     let mut builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t(); 2])).unwrap();
     let [in_w] = builder.input_wires_arr();
     let cst_w = builder.add_load_const(Value::false_val());
+    // Create a nested DFG which gets in_w passed as an input, but has a nonlocal edge
+    // from the LoadConstant
     let nested = builder
-        .dfg_builder(Signature::new_endo(vec![bool_t(); 2]), [in_w, cst_w])
+        .dfg_builder(Signature::new(bool_t(), vec![bool_t(); 2]), [in_w])
         .unwrap();
-    let nested_ins = nested.input_wires();
-    let nested = nested.finish_with_outputs(nested_ins).unwrap();
+    let [nested_in] = nested.input_wires_arr();
+    let nested = nested.finish_with_outputs([nested_in, cst_w]).unwrap();
     let hugr = builder.finish_hugr_with_outputs(nested.outputs()).unwrap();
     let [nested_input, _] = hugr.get_io(nested.node()).unwrap();
     let whole_hugr_results = Machine::new(&hugr).run(TestContext, [(0.into(), pv_true())]);
@@ -454,10 +456,7 @@ fn test_region() {
         whole_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
         Some(pv_true())
     );
-    assert_eq!(
-        whole_hugr_results.read_out_wire(Wire::new(nested_input, 1)),
-        Some(pv_false())
-    );
+    assert_eq!(whole_hugr_results.read_out_wire(cst_w), Some(pv_false()));
     assert_eq!(
         whole_hugr_results.read_out_wire(Wire::new(hugr.entrypoint(), 0)),
         Some(pv_true())
@@ -467,16 +466,22 @@ fn test_region() {
         Some(pv_false())
     );
 
-    // Do not provide a value on the second input (constant false in the whole hugr, above)
     let sub_hugr_results =
         Machine::new(hugr.with_entrypoint(nested.node())).run(TestContext, [(0.into(), pv_true())]);
     assert_eq!(
         sub_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
         Some(pv_true())
     );
+    assert_eq!(sub_hugr_results.read_out_wire(cst_w), None);
     assert_eq!(
-        sub_hugr_results.read_out_wire(Wire::new(nested_input, 1)),
-        Some(PartialValue::Top)
+        sub_hugr_results.read_out_wire(Wire::new(nested.node(), 0)),
+        Some(pv_true())
+    );
+    // `Bottom` is a terrible (unsound!) result to get here for a Wire within the desired region.
+    // See https://github.com/CQCL/hugr/issues/2254.
+    assert_eq!(
+        sub_hugr_results.read_out_wire(Wire::new(nested.node(), 1)),
+        Some(PartialValue::Bottom)
     );
     for w in [0, 1] {
         assert_eq!(
