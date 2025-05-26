@@ -248,6 +248,11 @@ edges. The following operations are *only* valid as immediate children of a
 - `AliasDecl`: an external type alias declaration. At link time this can be
   replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
   named opaque type.
+- `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
+  The function body is defined by the sibling graph formed by its children.
+  At link time `FuncDecl` nodes are replaced by `FuncDefn`.
+- `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
+  `AliasDefn`.
 
 There may also be other [scoped definitions](#scoped-definitions).
 
@@ -258,11 +263,6 @@ regions and control-flow regions:
 
 - `Const<T>` : a static constant value of type T stored in the node
   weight. Like `FuncDecl` and `FuncDefn` this has one `Const<T>` out-edge per use.
-- `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
-  The function body is defined by the sibling graph formed by its children.
-  At link time `FuncDecl` nodes are replaced by `FuncDefn`.
-- `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
-  `AliasDefn`.
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
