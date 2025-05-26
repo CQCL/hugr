@@ -742,6 +742,18 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         to_offset: Port,
         ty: EdgeKind,
     },
+    /// Inter-Graph edges may not enter into `FuncDefns` unless they are static
+    #[deprecated(note = "FuncDefns at top level only so cannot occur")]
+    #[error(
+        "Inter-graph Value edges cannot enter into FuncDefns. Inter-graph edge from {from} ({from_offset}) to {to} ({to_offset} enters FuncDefn {func}"
+    )]
+    ValueEdgeIntoFunc {
+        from: N,
+        from_offset: Port,
+        to: N,
+        to_offset: Port,
+        func: N,
+    },
     /// The grandparent of a dominator inter-graph edge must be a CFG container.
     #[error(
         "The grandparent of a dominator inter-graph edge must be a CFG container. Found operation {ancestor_parent_op}. In a dominator inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
