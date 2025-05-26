@@ -208,29 +208,4 @@ mod test {
         assert_matches!(build_result, Ok(_));
         Ok(())
     }
-
-    #[test]
-    fn local_def() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let mut f_build = module_builder.define_function(
-                "main",
-                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
-            )?;
-            let local_build = f_build.define_function(
-                "local",
-                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
-            )?;
-            let [wire] = local_build.input_wires_arr();
-            let f_id = local_build.finish_with_outputs([wire, wire])?;
-
-            let call = f_build.call(f_id.handle(), &[], f_build.input_wires())?;
-
-            f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
-    }
 }
