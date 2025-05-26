@@ -82,33 +82,6 @@ pub trait Container {
         self.add_child_node(constant.into()).into()
     }
 
-    /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
-    /// body graph.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`ops::FuncDefn`] node.
-    fn define_function(
-        &mut self,
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
-
-        // Add the extensions used by the function types.
-        self.use_extensions(
-            body.used_extensions().unwrap_or_else(|e| {
-                panic!("Build-time signatures should have valid extensions. {e}")
-            }),
-        );
-
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
-        Ok(FunctionBuilder::from_dfg_builder(db))
-    }
-
     /// Insert a HUGR as a child of the container.
     fn add_hugr(&mut self, child: Hugr) -> InsertionResult {
         let parent = self.container_node();
