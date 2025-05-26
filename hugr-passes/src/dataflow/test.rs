@@ -408,22 +408,35 @@ fn test_call(
     #[case] inp1: PartialValue<Void>,
     #[case] out: PartialValue<Void>,
 ) {
-    let mut builder = DFGBuilder::new(Signature::new_endo(vec![bool_t(); 2])).unwrap();
-    let func_bldr = builder
-        .define_function("id", Signature::new_endo(bool_t()))
+    let mut mb = ModuleBuilder::new();
+    let func_defn = {
+        let func_bldr = mb
+            .define_function("id", Signature::new_endo(bool_t()))
+            .unwrap();
+        let [v] = func_bldr.input_wires_arr();
+        func_bldr.finish_with_outputs([v]).unwrap()
+    };
+    let mut main = mb
+        .define_function("main", Signature::new_endo(vec![bool_t(); 2]))
         .unwrap();
-    let [v] = func_bldr.input_wires_arr();
-    let func_defn = func_bldr.finish_with_outputs([v]).unwrap();
-    let [a, b] = builder.input_wires_arr();
-    let [a2] = builder
-        .call(func_defn.handle(), &[], [a])
-        .unwrap()
-        .outputs_arr();
-    let [b2] = builder
-        .call(func_defn.handle(), &[], [b])
-        .unwrap()
-        .outputs_arr();
-    let hugr = builder.finish_hugr_with_outputs([a2, b2]).unwrap();
+    let dfg = {
+        let mut builder = main
+            .dfg_builder(Signature::new_endo(vec![bool_t(); 2]), main.input_wires())
+            .unwrap();
+        let [a, b] = builder.input_wires_arr();
+        let [a2] = builder
+            .call(func_defn.handle(), &[], [a])
+            .unwrap()
+            .outputs_arr();
+        let [b2] = builder
+            .call(func_defn.handle(), &[], [b])
+            .unwrap()
+            .outputs_arr();
+        builder.finish_with_outputs([a2, b2]).unwrap()
+    };
+    main.finish_with_outputs(dfg.outputs()).unwrap();
+    let module = mb.finish_hugr().unwrap();
+    let hugr = module.with_entrypoint(dfg.node());
 
     let results = Machine::new(&hugr).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
 
@@ -551,13 +564,16 @@ fn test_module() {
 #[case(pv_true(), pv_true())]
 fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
     let b2b = || Signature::new_endo(bool_t());
-    let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
-
+    let mut mb = ModuleBuilder::new();
     let [id1, id2] = ["id1", "[id2]"].map(|name| {
-        let fb = dfb.define_function(name, b2b()).unwrap();
+        let fb = mb.define_function(name, b2b()).unwrap();
         let [inp] = fb.input_wires_arr();
         fb.finish_with_outputs([inp]).unwrap()
     });
+
+    let mut dfb = mb
+        .define_function("main", inout_sig(vec![bool_t(); 3], vec![bool_t(); 2]))
+        .unwrap();
 
     let [inp_direct, which, inp_indirect] = dfb.input_wires_arr();
     let [res1] = dfb
@@ -588,10 +604,11 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
         .add_dataflow_op(CallIndirect { signature: b2b() }, [tgt, inp_indirect])
         .unwrap()
         .outputs_arr();
-    let h = dfb.finish_hugr_with_outputs([res1, res2]).unwrap();
+    let main = dfb.finish_with_outputs([res1, res2]).unwrap();
+    let h = mb.finish_hugr().unwrap();
 
     let run = |which| {
-        Machine::new(&h).run(
+        Machine::new(h.with_entrypoint(main.node())).run(
             TestContext,
             [
                 (0.into(), inp1.clone()),
@@ -600,7 +617,8 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
             ],
         )
     };
-    let (w1, w2) = (Wire::new(h.entrypoint(), 0), Wire::new(h.entrypoint(), 1));
+    let [_, main_out] = h.get_io(main.node()).unwrap();
+    let [w1, w2] = [0, 1].map(|i| Wire::from(h.single_linked_output(main_out, i).unwrap()));
 
     // 1. Test with `which` unknown -> second output unknown
     let results = run(PartialValue::Top);
