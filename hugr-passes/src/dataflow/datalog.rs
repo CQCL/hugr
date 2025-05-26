@@ -1,6 +1,6 @@
 //! [ascent] datalog implementation of analysis.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use ascent::Lattice;
 use ascent::lattice::BoundedLattice;
@@ -125,8 +125,6 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
                 self.prepopulate_inputs(root, p).unwrap();
             }
         }
-        // Note/TODO, if analysis is running on a subregion then we should do similar
-        // for any nonlocal edges providing values from outside the region.
         run_datalog(
             context,
             self.0,
@@ -164,7 +162,13 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
 
-        node(n) <-- for n in hugr.entry_descendants();
+        // Analyse all nodes as this will compute the most accurate results for the desired nodes
+        // (i.e. the entry_descendants). Moreover, this is the only sound policy until we correctly
+        // mark incoming edges as `Top`, see https://github.com/CQCL/hugr/issues/2254), so is a
+        // workaround for that.
+        // When that issue is solved, we can consider a flag to restrict analysis to the subregion
+        // (for efficiency - will still decrease accuracy of solutions, but will at least be safe).
+        node(n) <-- for n in hugr.nodes();
 
         in_wire(n, p) <-- node(n), for (p,_) in hugr.in_value_types(*n); // Note, gets connected inports only
         out_wire(n, p) <-- node(n), for (p,_) in hugr.out_value_types(*n); // (and likewise)
@@ -359,17 +363,31 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             if matches!(v, PartialValue::Top | PartialValue::Value(_)),
             for p in ci.signature().output_ports();
     };
+    let entry_descs = hugr.entry_descendants().collect::<HashSet<_>>();
     let out_wire_values = all_results
         .out_wire_value
         .iter()
+        .filter(|(n, _, _)| entry_descs.contains(n))
         .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
         .collect();
     AnalysisResults {
         hugr,
         out_wire_values,
-        in_wire_value: all_results.in_wire_value,
-        case_reachable: all_results.case_reachable,
-        bb_reachable: all_results.bb_reachable,
+        in_wire_value: all_results
+            .in_wire_value
+            .into_iter()
+            .filter(|(n, _, _)| entry_descs.contains(n))
+            .collect(),
+        case_reachable: all_results
+            .case_reachable
+            .into_iter()
+            .filter(|(_, n)| entry_descs.contains(n))
+            .collect(),
+        bb_reachable: all_results
+            .bb_reachable
+            .into_iter()
+            .filter(|(_, n)| entry_descs.contains(n))
+            .collect(),
     }
 }
 

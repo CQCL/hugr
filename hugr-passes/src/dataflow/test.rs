@@ -477,11 +477,9 @@ fn test_region() {
         sub_hugr_results.read_out_wire(Wire::new(nested.node(), 0)),
         Some(pv_true())
     );
-    // `Bottom` is a terrible (unsound!) result to get here for a Wire within the desired region.
-    // See https://github.com/CQCL/hugr/issues/2254.
     assert_eq!(
         sub_hugr_results.read_out_wire(Wire::new(nested.node(), 1)),
-        Some(PartialValue::Bottom)
+        Some(pv_false())
     );
     for w in [0, 1] {
         assert_eq!(
