@@ -552,11 +552,8 @@ parent(n<sub>2</sub>) when the edge's locality is:
 Each of these localities have additional constraints as follows:
 
 1. For Ext edges, we require parent(n<sub>1</sub>) ==
-   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only:
-     * there must be a order edge from n<sub>1</sub> to
-       parent<sup>i-1</sup>(n<sub>2</sub>).
-     * None of the parent<sup>j</sup>(n<sub>2</sub>), for i\>j\>=1,
-       may be a FuncDefn node
+   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
+   parent<sup>i-1</sup>(n<sub>2</sub>).
 
    The order edge records the
    ordering requirement that results, i.e. it must be possible to
@@ -569,9 +566,6 @@ Each of these localities have additional constraints as follows:
    For Static edges this order edge is not required since the source is
    guaranteed to causally precede the target.
 
-   The FuncDefn restriction means that FuncDefn really are static,
-   and do not capture runtime values from their environment.
-
 2. For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
    == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
    **and** parent(n<sub>1</sub>) strictly dominates
@@ -579,8 +573,6 @@ Each of these localities have additional constraints as follows:
    parent(n<sub>1</sub>) \!= parent<sup>i-1</sup>(n<sub>2</sub>). (The
    i\>1 allows the node to target an arbitrarily-deep descendant of the
    dominated block, similar to an Ext edge.)
-
-   The same FuncDefn restriction also applies here, on the parent(<sup>j</sup>)(n<sub>2</sub>) for i\>j\>=1 (of course j=i is the CFG and j=i-1 is the basic block).
 
 Specifically, these rules allow for edges where in a given execution of
 the HUGR the source of the edge executes once, but the target may
