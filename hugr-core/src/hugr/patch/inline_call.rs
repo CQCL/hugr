@@ -114,10 +114,7 @@ mod test {
 
     use itertools::Itertools;
 
-    use crate::builder::{
-        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        ModuleBuilder,
-    };
+    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::usize_t;
     use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{Input, OpType, Value};

@@ -8,7 +8,7 @@ use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, inout_sig,
+    FunctionBuilder, HugrBuilder, ModuleBuilder, inout_sig,
 };
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t};
@@ -17,7 +17,7 @@ use crate::hugr::HugrMut;
 use crate::hugr::internal::HugrMutInternals;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
-use crate::ops::{self, FuncDefn, OpType, Value};
+use crate::ops::{self, OpType, Value};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError};

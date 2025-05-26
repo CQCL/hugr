@@ -9,7 +9,7 @@ use crate::{Extension, IncomingPort, Node, OutgoingPort};
 use std::iter;
 use std::sync::Arc;
 
-use super::{BuilderWiringError, FunctionBuilder};
+use super::BuilderWiringError;
 use super::{
     CircuitBuilder,
     handle::{BuildHandle, Outputs},
@@ -21,7 +21,7 @@ use crate::{
 };
 
 use crate::extension::ExtensionRegistry;
-use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
+use crate::types::{Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 

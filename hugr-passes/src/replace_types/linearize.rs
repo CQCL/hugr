@@ -367,8 +367,8 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder, SubContainer, inout_sig,
+        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        ModuleBuilder, SubContainer, inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};

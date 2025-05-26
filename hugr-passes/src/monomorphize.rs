@@ -522,6 +522,7 @@ mod test {
             .sorted()
             .collect_vec()
         );
+        #[allow(clippy::unnecessary_to_owned)] // it is necessary
         let (n, fd) = *funcs.get(&"mainish".to_string()).unwrap();
         assert_eq!(n, outer.node());
         assert_eq!(fd.func_name(), "mainish"); // just a sanity check on list_funcs

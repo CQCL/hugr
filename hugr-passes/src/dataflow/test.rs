@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use ascent::{Lattice, lattice::BoundedLattice};
 
-use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder, inout_sig};
+use hugr_core::builder::{CFGBuilder, DataflowHugr, ModuleBuilder, inout_sig};
 use hugr_core::ops::{CallIndirect, TailLoop};
 use hugr_core::types::{ConstTypeError, TypeRow};
 use hugr_core::{Hugr, Node, Wire};

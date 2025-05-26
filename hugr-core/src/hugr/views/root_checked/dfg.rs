@@ -268,7 +268,7 @@ mod test {
 
     use super::*;
     use crate::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, endo_sig,
+        DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, endo_sig,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::views::root_checked::RootChecked;
