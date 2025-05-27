@@ -492,9 +492,13 @@ pub(crate) mod test {
 
     use super::*;
 
+    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::envelope::{EnvelopeError, PackageEncodingError};
+    use crate::extension::prelude::bool_t;
     use crate::ops::OpaqueOp;
+    use crate::ops::handle::{FuncID, NodeHandle};
     use crate::test_file;
+    use crate::types::Signature;
     use cool_asserts::assert_matches;
     use portgraph::LinkView;
 
@@ -557,7 +561,6 @@ pub(crate) mod test {
     #[test]
     fn io_node() {
         use crate::builder::test::simple_dfg_hugr;
-        use cool_asserts::assert_matches;
 
         let hugr = simple_dfg_hugr();
         assert_matches!(hugr.get_io(hugr.entrypoint()), Some(_));
@@ -611,5 +614,42 @@ pub(crate) mod test {
             None,
         );
         assert_matches!(&hugr, Ok(_));
+    }
+
+    #[test]
+    fn canonicalize_nodes() {
+        let sig = Signature::new(vec![bool_t(); 2], bool_t());
+        let mut mb = ModuleBuilder::new();
+        let mut fa = mb.define_function("a", sig.clone()).unwrap();
+        // Recursive call requires getting the handle from builder
+        let f_id = FuncID::<true>::from(fa.container_node());
+        let mut dfg = fa.dfg_builder(sig.clone(), fa.input_wires()).unwrap();
+        let call = dfg.call(&f_id, &[], dfg.input_wires()).unwrap();
+        let dfg = dfg.finish_with_outputs(call.outputs()).unwrap();
+        let fa = fa.finish_with_outputs(dfg.outputs()).unwrap();
+        let fb = mb.define_function("b", sig).unwrap();
+        let [fst, _] = fb.input_wires_arr();
+        let fb = fb.finish_with_outputs([fst]).unwrap();
+        let mut h = mb.finish_hugr().unwrap();
+        h.set_entrypoint(dfg.node());
+        let static_in = h.get_optype(call.node()).static_input_port().unwrap();
+        let static_out = h.get_optype(fb.node()).static_output_port().unwrap();
+        assert_eq!(
+            h.single_linked_output(call.node(), static_in)
+                .map(|(n, _p)| n),
+            Some(fa.node())
+        );
+        h.disconnect(call.node(), static_in);
+        h.connect(fb.node(), static_out, call.node(), static_in);
+
+        fn find_dfgs(h: &Hugr) -> Vec<Node> {
+            h.nodes().filter(|n| h.get_optype(*n).is_dfg()).collect()
+        }
+        assert_eq!(find_dfgs(&h), [dfg.node()]);
+        assert_eq!(h.entrypoint(), dfg.node());
+
+        h.canonicalize_nodes(|_, _| ());
+        let [dfg] = find_dfgs(&h).try_into().unwrap();
+        assert_ne!(h.entrypoint(), dfg); // OOOPS
     }
 }
