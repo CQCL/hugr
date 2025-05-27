@@ -368,7 +368,7 @@ mod test {
 
     use hugr_core::builder::{
         BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder, SubContainer, inout_sig,
+        inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
@@ -797,14 +797,10 @@ mod test {
         let lin_ct = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
         let lin_t: Type = lin_ct.clone().into();
 
-        let mut mb = ModuleBuilder::new();
-        // A simple function that discards a usize_t (just by having no outgoing edges)
-        mb.define_function("main", inout_sig(usize_t(), type_row![]))
-            .unwrap()
-            .finish_sub_container()
-            .unwrap();
-        // "drop" function using the discard *op*
+        // A simple Hugr that discards a usize_t, with a "drop" function
+        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
         let discard_fn = {
+            let mut mb = dfb.module_root_builder();
             let mut fb = mb
                 .define_function("drop", Signature::new(lin_t.clone(), type_row![]))
                 .unwrap();
@@ -817,7 +813,7 @@ mod test {
             fb.finish_with_outputs([]).unwrap()
         }
         .node();
-        let backup = mb.finish_hugr().unwrap();
+        let backup = dfb.finish_hugr().unwrap();
 
         let mut lower_discard_to_call = ReplaceTypes::default();
         // The `copy_fn` here is just any random node, we don't use it
@@ -840,22 +836,22 @@ mod test {
         }
 
         // But if we lower usize_t to array<lin_t>, the call will fail.
-        // Note the error (or success) can be quite fragile, according to what the `discard_fn`
-        // Node points at in the (hidden here) inner Hugr inside the Value::Function built by
-        // the array linearization helper.
         lower_discard_to_call.replace_type(
             usize_t().as_extension().unwrap().clone(),
             value_array_type(4, lin_ct.into()),
         );
         let r = lower_discard_to_call.run(&mut backup.clone());
+        // Note the error (or success) can be quite fragile, according to what the `discard_fn`
+        // Node points at in the (hidden here) inner Hugr inside the Value::Function built by
+        // the array linearization helper.
         assert!(matches!(
             r,
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::NestedTemplateError(
                     nested_t,
-                    BuildError::UnexpectedType { node, op_desc }
+                    BuildError::NodeNotFound { node } // Note `..` would be somewhat less fragile
                 )
-            )) if nested_t == lin_t && node == discard_fn && op_desc.contains("FuncDefn")
+            )) if nested_t == lin_t && node == discard_fn
         ));
     }
 }

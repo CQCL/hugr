@@ -5,7 +5,7 @@ use crate::{
     Hugr, HugrView,
     builder::{
         BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, HugrBuilder,
-        ModuleBuilder, endo_sig, inout_sig,
+        endo_sig, inout_sig,
     },
     extension::prelude::qb_t,
     ops::{
@@ -182,23 +182,23 @@ fn test_dataflow_ports_only() {
 
     use itertools::Itertools;
 
-    let mut mb = ModuleBuilder::new();
-    let and = {
-        let and = mb
-            .define_function("and", Signature::new(vec![bool_t(); 2], vec![bool_t()]))
+    let mut dfg = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+    let local_and = {
+        let mut mb = dfg.module_root_builder();
+        let local_and = mb
+            .define_function("and", Signature::new(vec![bool_t(); 2], bool_t()))
             .unwrap();
-        let first_input = and.input().out_wire(0);
-        and.finish_with_outputs([first_input]).unwrap()
+        let first_input = local_and.input().out_wire(0);
+        local_and.finish_with_outputs([first_input]).unwrap()
     };
-
-    let mut dfg = mb.define_function("main", endo_sig(bool_t())).unwrap();
     let [in_bool] = dfg.input_wires_arr();
 
     let not = dfg.add_dataflow_op(LogicOp::Not, [in_bool]).unwrap();
-    let call = dfg.call(and.handle(), &[], [not.out_wire(0); 2]).unwrap();
+    let call = dfg
+        .call(local_and.handle(), &[], [not.out_wire(0); 2])
+        .unwrap();
     dfg.add_other_wire(not.node(), call.node());
-    dfg.finish_with_outputs(not.outputs()).unwrap();
-    let h = mb.finish_hugr().unwrap();
+    let h = dfg.finish_hugr_with_outputs(not.outputs()).unwrap();
     let filtered_ports = h
         .all_linked_outputs(call.node())
         .dataflow_ports_only(&h)

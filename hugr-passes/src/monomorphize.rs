@@ -266,6 +266,7 @@ mod test {
     use std::iter;
 
     use hugr_core::extension::simple_op::MakeRegisteredOp as _;
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections;
     use hugr_core::std_extensions::collections::array::ArrayKind;
@@ -274,8 +275,8 @@ mod test {
     use itertools::Itertools;
 
     use hugr_core::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+        HugrBuilder, ModuleBuilder,
     };
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
@@ -410,9 +411,22 @@ mod test {
         let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
         let sa = |n| TypeArg::BoundedNat { n };
         let n: u64 = 5;
+        let mut outer = FunctionBuilder::new(
+            "mainish",
+            Signature::new(
+                ValueArray::ty_parametric(
+                    sa(n),
+                    ValueArray::ty_parametric(sa(2), usize_t()).unwrap(),
+                )
+                .unwrap(),
+                vec![usize_t(); 2],
+            ),
+        )
+        .unwrap();
+
         let arr2u = || ValueArray::ty_parametric(sa(2), usize_t()).unwrap();
 
-        let mut mb = ModuleBuilder::new();
+        let mut mb = outer.module_root_builder();
 
         let mono_func = {
             let mut fb = mb
@@ -463,43 +477,28 @@ mod test {
         let pf1 = pf1.finish_with_outputs(elem.outputs()).unwrap();
 
         // Outer: two calls to pf1 with different TypeArgs
-        let outer = {
-            let mut outer = mb
-                .define_function(
-                    "mainish",
-                    Signature::new(
-                        ValueArray::ty_parametric(
-                            sa(n),
-                            ValueArray::ty_parametric(sa(2), usize_t()).unwrap(),
-                        )
-                        .unwrap(),
-                        vec![usize_t(); 2],
-                    ),
-                )
-                .unwrap();
-
-            let [e1] = outer
-                .call(pf1.handle(), &[sa(n)], outer.input_wires())
-                .unwrap()
-                .outputs_arr();
-            let popleft = VArrayOpDef::pop_left.to_concrete(arr2u(), n);
-            let ar2 = outer
-                .add_dataflow_op(popleft.clone(), outer.input_wires())
-                .unwrap();
-            let sig = popleft.to_extension_op().unwrap().signature().into_owned();
-            let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
-                panic!()
-            };
-            let [_, ar2_unwrapped] = outer
-                .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
-                .unwrap();
-            let [e2] = outer
-                .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
-                .unwrap()
-                .outputs_arr();
-            outer.finish_with_outputs([e1, e2]).unwrap()
+        let [e1] = outer
+            .call(pf1.handle(), &[sa(n)], outer.input_wires())
+            .unwrap()
+            .outputs_arr();
+        let popleft = VArrayOpDef::pop_left.to_concrete(arr2u(), n);
+        let ar2 = outer
+            .add_dataflow_op(popleft.clone(), outer.input_wires())
+            .unwrap();
+        let sig = popleft.to_extension_op().unwrap().signature().into_owned();
+        let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
+            panic!()
         };
-        let mut hugr = mb.finish_hugr().unwrap();
+        let [_, ar2_unwrapped] = outer
+            .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
+            .unwrap();
+        let [e2] = outer
+            .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
+            .unwrap()
+            .outputs_arr();
+        let outer_func = outer.container_node();
+        let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
+        hugr.set_entrypoint(hugr.module_root()); // We want to act on everything, not just `main`
 
         monomorphize(&mut hugr).unwrap();
         let mono_hugr = hugr;
@@ -524,7 +523,7 @@ mod test {
         );
         #[allow(clippy::unnecessary_to_owned)] // it is necessary
         let (n, fd) = *funcs.get(&"mainish".to_string()).unwrap();
-        assert_eq!(n, outer.node());
+        assert_eq!(n, outer_func);
         assert_eq!(fd.func_name(), "mainish"); // just a sanity check on list_funcs
     }
 

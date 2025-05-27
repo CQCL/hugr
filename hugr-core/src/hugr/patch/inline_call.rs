@@ -114,7 +114,10 @@ mod test {
 
     use itertools::Itertools;
 
-    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::builder::{
+        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        ModuleBuilder,
+    };
     use crate::extension::prelude::usize_t;
     use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{Input, OpType, Value};
@@ -287,25 +290,24 @@ mod test {
     #[test]
     fn test_polymorphic() -> Result<(), Box<dyn std::error::Error>> {
         let tuple_ty = Type::new_tuple(vec![usize_t(); 2]);
-        let mut mb = ModuleBuilder::new();
+        let mut fb = FunctionBuilder::new("mkpair", Signature::new(usize_t(), tuple_ty.clone()))?;
         let helper = {
-            let bldr = mb.define_function(
+            let mut mb = fb.module_root_builder();
+            let fb2 = mb.define_function(
                 "id",
                 PolyFuncType::new(
                     [TypeBound::Copyable.into()],
                     Signature::new_endo(Type::new_var_use(0, TypeBound::Copyable)),
                 ),
             )?;
-            let inps = bldr.input_wires();
-            bldr.finish_with_outputs(inps)?
+            let inps = fb2.input_wires();
+            fb2.finish_with_outputs(inps)?
         };
-        let mut fb = mb.define_function("mkpair", Signature::new(usize_t(), tuple_ty.clone()))?;
         let call1 = fb.call(helper.handle(), &[usize_t().into()], fb.input_wires())?;
         let [call1_out] = call1.outputs_arr();
         let tup = fb.make_tuple([call1_out, call1_out])?;
         let call2 = fb.call(helper.handle(), &[tuple_ty.into()], [tup])?;
-        fb.finish_with_outputs(call2.outputs())?;
-        let mut hugr = mb.finish_hugr()?;
+        let mut hugr = fb.finish_hugr_with_outputs(call2.outputs()).unwrap();
 
         assert_eq!(
             hugr.output_neighbours(helper.node()).collect::<Vec<_>>(),

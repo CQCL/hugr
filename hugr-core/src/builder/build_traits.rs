@@ -9,7 +9,7 @@ use crate::{Extension, IncomingPort, Node, OutgoingPort};
 use std::iter;
 use std::sync::Arc;
 
-use super::BuilderWiringError;
+use super::{BuilderWiringError, ModuleBuilder};
 use super::{
     CircuitBuilder,
     handle::{BuildHandle, Outputs},
@@ -128,8 +128,19 @@ pub trait Container {
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
-/// (with varying root node types)
+/// (with varying entrypoint node types)
 pub trait HugrBuilder: Container {
+    /// Allows adding definitions to the module root of which
+    /// this builder is building a part
+    fn module_root_builder(&mut self) -> ModuleBuilder<&mut Hugr> {
+        debug_assert!(
+            self.hugr()
+                .get_optype(self.hugr().module_root())
+                .is_module()
+        );
+        ModuleBuilder(self.hugr_mut())
+    }
+
     /// Finish building the HUGR, perform any validation checks and return it.
     fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>>;
 }

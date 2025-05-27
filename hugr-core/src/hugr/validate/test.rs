@@ -560,13 +560,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
     let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), usize_t().into()]));
-    let mut mb = ModuleBuilder::new();
-    let f_id = {
-        let bldr = mb.define_function("id_usz", Signature::new_endo(usize_t()))?;
-        let vals = bldr.input_wires();
-        bldr.finish_with_outputs(vals)?
-    };
-    let mut fb = mb.define_function(
+    let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
             [TypeParam::new_list(TypeBound::Any)],
@@ -575,14 +569,19 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
-    let id_usz = fb.load_func(f_id.handle(), &[])?;
+    let id_usz = {
+        let mut mb = fb.module_root_builder();
+        let bldr = mb.define_function("id_usz", Signature::new_endo(usize_t()))?;
+        let vals = bldr.input_wires();
+        let helper_def = bldr.finish_with_outputs(vals)?;
+        fb.load_func(helper_def.handle(), &[])?
+    };
     let par = e.instantiate_extension_op(
         "parallel",
         [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(seq1ty),
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
-    fb.finish_with_outputs(par_func.outputs())?;
-    mb.finish_hugr()?;
+    fb.finish_hugr_with_outputs(par_func.outputs())?;
     Ok(())
 }
 
