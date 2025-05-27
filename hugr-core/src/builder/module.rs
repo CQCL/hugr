@@ -16,13 +16,13 @@ use crate::{Hugr, Node};
 use smol_str::SmolStr;
 
 /// Builder for a HUGR module.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().entrypoint()
+        self.0.as_ref().module_root()
     }
 
     #[inline]
@@ -39,13 +39,7 @@ impl ModuleBuilder<Hugr> {
     /// Begin building a new module.
     #[must_use]
     pub fn new() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl Default for ModuleBuilder<Hugr> {
-    fn default() -> Self {
-        Self::new()
+        Self::default()
     }
 }
 
