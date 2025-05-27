@@ -310,7 +310,7 @@ impl Hugr {
         let mut ordered = Vec::with_capacity(self.num_nodes());
         let root = self.module_root();
         let mut new_entrypoint = self.entrypoint;
-        ordered.extend(self.as_mut().canonical_order(root));
+        ordered.extend(self.canonical_order(root));
 
         // Permute the nodes in the graph to match the order.
         //
