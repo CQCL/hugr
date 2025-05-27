@@ -377,7 +377,7 @@ pub trait FatExt: HugrView {
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
-        self.try_fat(self.entrypoint())
+        self.try_fat(self.module_root())
     }
 }
 

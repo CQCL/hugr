@@ -10,14 +10,5 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = call i1 @_hl.scoped_func.8()
-  ret i1 %0
-}
-
-define i1 @_hl.scoped_func.8() {
-alloca_block:
-  br label %entry_block
-
-entry_block:                                      ; preds = %alloca_block
   ret i1 false
 }
