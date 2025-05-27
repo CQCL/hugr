@@ -43,34 +43,6 @@ class DefinitionBuilder(Generic[OpVar]):
 
     hugr: Hugr[OpVar]
 
-    def define_function(
-        self,
-        name: str,
-        input_types: TypeRow,
-        output_types: TypeRow | None = None,
-        type_params: list[TypeParam] | None = None,
-        parent: ToNode | None = None,
-    ) -> Function:
-        """Start building a function definition in the graph.
-
-        Args:
-            name: The name of the function.
-            input_types: The input types for the function.
-            output_types: The output types for the function.
-                If not provided, it will be inferred after the function is built.
-            type_params: The type parameters for the function, if polymorphic.
-            parent: The parent node of the constant. Defaults to the entrypoint node.
-
-        Returns:
-            The new function builder.
-        """
-        parent_node = parent or self.hugr.entrypoint
-        parent_op = ops.FuncDefn(name, input_types, type_params or [])
-        func = Function.new_nested(parent_op, self.hugr, parent_node)
-        if output_types is not None:
-            func.declare_outputs(output_types)
-        return func
-
     def add_const(self, value: val.Value, parent: ToNode | None = None) -> Node:
         """Add a static constant to the graph.
 
@@ -89,11 +61,6 @@ class DefinitionBuilder(Generic[OpVar]):
         """
         parent_node = parent or self.hugr.entrypoint
         return self.hugr.add_node(ops.Const(value), parent_node)
-
-    def add_alias_defn(self, name: str, ty: Type, parent: ToNode | None = None) -> Node:
-        """Add a type alias definition."""
-        parent_node = parent or self.hugr.entrypoint
-        return self.hugr.add_node(ops.AliasDefn(name, ty), parent_node)
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
