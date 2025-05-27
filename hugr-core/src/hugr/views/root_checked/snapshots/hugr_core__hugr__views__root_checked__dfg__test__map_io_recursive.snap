@@ -1,0 +1,34 @@
+---
+source: hugr-core/src/hugr/views/root_checked/dfg.rs
+expression: hugr.mermaid_string()
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) FuncDefn: #quot;foo#quot;"]
+            direction LR
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) DFG"]
+                direction LR
+                5["(5) Input"]
+                6["(6) Output"]
+                subgraph 7 ["(7) [**DFG**]"]
+                    direction LR
+                    style 7 stroke:#832561,stroke-width:3px
+                    8["(8) Input"]
+                    9["(9) Output"]
+                    8--"0:1<br>qubit"-->9
+                    8--"1:0<br>Bool"-->9
+                end
+                5--"0:0<br>qubit"-->7
+                5--"1:1<br>Bool"-->7
+                7--"0:0<br>Bool"-->6
+                7--"1:1<br>qubit"-->6
+            end
+            2--"0:0<br>qubit"-->4
+            2--"1:1<br>Bool"-->4
+            4--"0:0<br>Bool"-->3
+            4--"1:1<br>qubit"-->3
+        end
+    end
