@@ -1,6 +1,6 @@
 //! Low-level interface for modifying a HUGR.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
@@ -178,22 +178,78 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph, or if the port is invalid.
     fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
-    /// Insert another hugr into this one, under a given parent node.
+    /// Insert (the entrypoint-subtree) of another hugr into this one, under a given parent node.
+    /// Unless `other.entrypoint() == other.module_root()`, then any children of
+    /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will be copied
+    /// under the Module root of this Hugr - see [Self:insert_hugr_with_defns].
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
-    fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node>;
+    fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
+        let mut n = other.entrypoint();
+        let mut children = HashSet::new();
+        if n != other.module_root() {
+            children.extend(other.children(other.module_root()));
+            while !children.remove(&n) {
+                n = other.get_parent(n).unwrap()
+            }
+        };
+        self.insert_hugr_with_defns(root, other, children)
+    }
 
-    /// Copy another hugr into this one, under a given parent node.
+    /// Insert another Hugr into this one, copying the entrypoint-subtree under the specified
+    /// 'parent', and any number of other subtrees under the Module root.
+    ///
+    /// # Errors
+    ///
+    /// If `children` are not `children` of the root of `other`; or any node in `other`
+    /// is reachable in the hierarchy from both `other` and a node in `children`.
     ///
     /// # Panics
     ///
-    /// If the root node is not in the graph.
+    /// If `parent` is not in this graph.
+    fn insert_hugr_with_defns(
+        &mut self,
+        parent: Self::Node,
+        other: Hugr,
+        children: HashSet<Node>,
+    ) -> InsertionResult<Node, Self::Node>;
+
+    /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
+    /// This will result in an invalid Hugr (with disconnected edges) if there are any
+    /// nonlocal (including [EdgeKind::Constant] / [EdgeKind::Function]) edges into the
+    /// entrypoint-subtree. (See [Self::insert_from_view_with_defns].)
+    ///
+    /// # Panics
+    ///
+    /// If `parent` is not in the graph.
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
         other: &H,
+    ) -> InsertionResult<H::Node, Self::Node> {
+        self.insert_from_view_with_defns(root, other, HashSet::new())
+    }
+
+    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
+    /// is placed under the specified `parent` of this; each element of `children`,
+    /// which must be a child of `other.root()`, will be copied to beneath the Module
+    /// root of this HugrMut.
+    ///
+    /// # Errors
+    ///
+    /// If `children` are not `children` of the root of `other`; or any node in `other`
+    /// is reachable in the hierarchy from both `other` and a node in `children`.
+    ///
+    /// # Panics
+    ///
+    /// If `parent` is not in the graph.
+    fn insert_from_view_with_defns<H: HugrView>(
+        &mut self,
+        parent: Self::Node,
+        other: &H,
+        children: HashSet<H::Node>,
     ) -> InsertionResult<H::Node, Self::Node>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
@@ -394,18 +450,13 @@ impl HugrMut for Hugr {
         (src_port, dst_port)
     }
 
-    fn insert_hugr(
+    fn insert_hugr_with_defns(
         &mut self,
-        root: Self::Node,
+        parent: Self::Node,
         mut other: Hugr,
+        children: HashSet<Node>,
     ) -> InsertionResult<Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, &other, other.entry_descendants(), |&n| {
-            if n == other.entrypoint() {
-                Some(root)
-            } else {
-                None
-            }
-        });
+        let node_map = insert_hugr_internal(self, parent, &other, children);
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, taking them from the other graph.
@@ -425,18 +476,13 @@ impl HugrMut for Hugr {
         }
     }
 
-    fn insert_from_view<H: HugrView>(
+    fn insert_from_view_with_defns<H: HugrView>(
         &mut self,
-        root: Self::Node,
+        parent: Self::Node,
         other: &H,
+        children: HashSet<H::Node>,
     ) -> InsertionResult<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, other, other.entry_descendants(), |&n| {
-            if n == other.entrypoint() {
-                Some(root)
-            } else {
-                None
-            }
-        });
+        let node_map = insert_hugr_internal(self, parent, other, children);
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, copying them from the other graph.
@@ -464,7 +510,7 @@ impl HugrMut for Hugr {
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
     ) -> HashMap<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, other, subgraph.nodes().iter().copied(), |_| {
+        let node_map = insert_hugr_nodes(self, other, subgraph.nodes().iter().copied(), |_| {
             Some(root)
         });
         // Update the optypes and metadata, copying them from the other graph.
@@ -535,6 +581,27 @@ impl HugrMut for Hugr {
     }
 }
 
+fn insert_hugr_internal<H: HugrView>(
+    hugr: &mut Hugr,
+    parent: Node,
+    other: &H,
+    children: HashSet<H::Node>,
+) -> HashMap<H::Node, Node> {
+    let nodes = children
+        .iter()
+        .copied()
+        .chain(std::iter::once(other.entrypoint()))
+        .flat_map(|n| other.descendants(n));
+    let hugr_root = hugr.module_root();
+    insert_hugr_nodes(hugr, &other, nodes, |&n| {
+        if n == other.entrypoint() {
+            Some(parent)
+        } else {
+            children.contains(&n).then_some(hugr_root)
+        }
+    })
+}
+
 /// Internal implementation of `insert_hugr`, `insert_view`, and
 /// `insert_subgraph`.
 ///
@@ -553,7 +620,7 @@ impl HugrMut for Hugr {
 /// - `reroot`: A function that returns the new parent for each inserted node.
 ///   If `None`, the parent is set to the original parent after it has been inserted into `hugr`.
 ///   If that is the case, the parent must come before the child in the `other_nodes` iterator.
-fn insert_hugr_internal<H: HugrView>(
+fn insert_hugr_nodes<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
     other_nodes: impl Iterator<Item = H::Node>,
