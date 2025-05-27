@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from hugr.hugr.node_port import Node, OutPort, PortOffset, ToNode, Wire
-    from hugr.tys import Type, TypeParam, TypeRow
+    from hugr.tys import TypeParam, TypeRow
 
     from .cfg import Cfg
     from .cond_loop import Conditional, If, TailLoop

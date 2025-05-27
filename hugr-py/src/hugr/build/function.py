@@ -10,8 +10,8 @@ from hugr.build.dfg import DefinitionBuilder, Function
 from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
-    from hugr.hugr.node_port import Node
-    from hugr.tys import PolyFuncType, TypeBound, TypeRow
+    from hugr.hugr.node_port import Node, ToNode
+    from hugr.tys import PolyFuncType, Type, TypeBound, TypeParam, TypeRow
 
 __all__ = ["Function", "Module"]
 
