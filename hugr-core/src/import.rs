@@ -33,53 +33,74 @@ use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
-/// Error during import.
+/// An error that can occur during import.
 #[derive(Debug, Clone, Error)]
-#[non_exhaustive]
-pub enum ImportError {
+#[error("failed to import hugr")]
+pub struct ImportError(#[from] ImportErrorInner);
+
+#[derive(Debug, Clone, Error)]
+enum ImportErrorInner {
     /// The model contains a feature that is not supported by the importer yet.
     /// Errors of this kind are expected to be removed as the model format and
     /// the core HUGR representation converge.
     #[error("currently unsupported: {0}")]
     Unsupported(String),
+
     /// The model contains implicit information that has not yet been inferred.
     /// This includes wildcards and application of functions with implicit parameters.
     #[error("uninferred implicit: {0}")]
     Uninferred(String),
+
+    /// The model is not well-formed.
+    #[error("{0}")]
+    Invalid(String),
+
     /// A signature mismatch was detected during import.
     #[error("signature error: {0}")]
     Signature(#[from] SignatureError),
-    /// A required extension is missing.
-    #[error("Importing the hugr requires extension {missing_ext}, which was not found in the registry. The available extensions are: [{}]",
-            available.iter().map(std::string::ToString::to_string).collect::<Vec<_>>().join(", "))]
-    Extension {
-        /// The missing extension.
-        missing_ext: ExtensionId,
-        /// The available extensions in the registry.
-        available: Vec<ExtensionId>,
-    },
-    /// An extension type is missing.
-    #[error(
-        "Importing the hugr requires extension {ext} to have a type named {name}, but it was not found."
-    )]
-    ExtensionType {
-        /// The extension that is missing the type.
-        ext: ExtensionId,
-        /// The name of the missing type.
-        name: TypeName,
-    },
-    /// The model is not well-formed.
-    #[error("validate error: {0}")]
-    Model(#[from] table::ModelError),
+
+    /// An error relating to the loaded extension registry.
+    #[error("extension error: {0}")]
+    Extension(#[from] ExtensionError),
+
     /// Incorrect order hints.
     #[error("incorrect order hint: {0}")]
     OrderHint(#[from] OrderHintError),
 }
 
+#[derive(Debug, Clone, Error)]
+enum ExtensionError {
+    /// An extension is missing.
+    #[error("Importing the hugr requires extension {missing_ext}, which was not found in the registry. The available extensions are: [{}]",
+            available.iter().map(std::string::ToString::to_string).collect::<Vec<_>>().join(", "))]
+    Missing {
+        /// The missing extension.
+        missing_ext: ExtensionId,
+        /// The available extensions in the registry.
+        available: Vec<ExtensionId>,
+    },
+
+    /// An extension type is missing.
+    #[error(
+        "Importing the hugr requires extension {ext} to have a type named {name}, but it was not found."
+    )]
+    MissingType {
+        /// The extension that is missing the type.
+        ext: ExtensionId,
+        /// The name of the missing type.
+        name: TypeName,
+    },
+}
+
+impl From<ExtensionError> for ImportError {
+    fn from(value: ExtensionError) -> Self {
+        Self::from(ImportErrorInner::from(value))
+    }
+}
+
 /// Import error caused by incorrect order hints.
 #[derive(Debug, Clone, Error)]
-#[non_exhaustive]
-pub enum OrderHintError {
+enum OrderHintError {
     /// Duplicate order hint key in the same region.
     #[error("duplicate order hint key {0}")]
     DuplicateKey(table::NodeId, u64),
@@ -91,14 +112,25 @@ pub enum OrderHintError {
     NoOrderPort(table::NodeId),
 }
 
+impl From<OrderHintError> for ImportError {
+    fn from(value: OrderHintError) -> Self {
+        Self::from(ImportErrorInner::from(value))
+    }
+}
+
 /// Helper macro to create an `ImportError::Unsupported` error with a formatted message.
 macro_rules! error_unsupported {
-    ($($e:expr),*) => { ImportError::Unsupported(format!($($e),*)) }
+    ($($e:expr),*) => { ImportError(ImportErrorInner::Unsupported(format!($($e),*))) }
 }
 
 /// Helper macro to create an `ImportError::Uninferred` error with a formatted message.
 macro_rules! error_uninferred {
-    ($($e:expr),*) => { ImportError::Uninferred(format!($($e),*)) }
+    ($($e:expr),*) => { ImportError(ImportErrorInner::Uninferred(format!($($e),*))) }
+}
+
+/// Helper macro to create an `ImportError::Invalid` error with a formatted message.
+macro_rules! error_invalid {
+    ($($e:expr),*) => { ImportError(ImportErrorInner::Invalid(format!($($e),*))) }
 }
 
 /// Import a [`Package`] from its model representation.
@@ -186,7 +218,7 @@ impl<'a> Context<'a> {
     fn get_node(&self, node_id: table::NodeId) -> Result<&'a table::Node<'a>, ImportError> {
         self.module
             .get_node(node_id)
-            .ok_or_else(|| table::ModelError::NodeNotFound(node_id).into())
+            .ok_or_else(|| error_invalid!("unknown node {}", node_id))
     }
 
     /// Get the term with the given `TermId`, or return an error if it does not exist.
@@ -194,7 +226,7 @@ impl<'a> Context<'a> {
     fn get_term(&self, term_id: table::TermId) -> Result<&'a table::Term<'a>, ImportError> {
         self.module
             .get_term(term_id)
-            .ok_or_else(|| table::ModelError::TermNotFound(term_id).into())
+            .ok_or_else(|| error_invalid!("unknown term {}", term_id))
     }
 
     /// Get the region with the given `RegionId`, or return an error if it does not exist.
@@ -202,7 +234,7 @@ impl<'a> Context<'a> {
     fn get_region(&self, region_id: table::RegionId) -> Result<&'a table::Region<'a>, ImportError> {
         self.module
             .get_region(region_id)
-            .ok_or_else(|| table::ModelError::RegionNotFound(region_id).into())
+            .ok_or_else(|| error_invalid!("unknown region {}", region_id))
     }
 
     fn make_node(
@@ -233,16 +265,26 @@ impl<'a> Context<'a> {
         // Import the JSON metadata
         if let Some([name_arg, json_arg]) = self.match_symbol(meta_item, model::COMPAT_META_JSON)? {
             let table::Term::Literal(model::Literal::Str(name)) = self.get_term(name_arg)? else {
-                return Err(table::ModelError::TypeError(meta_item).into());
+                return Err(error_invalid!(
+                    "`{}` expects a string literal as its first argument",
+                    model::COMPAT_META_JSON
+                ));
             };
 
             let table::Term::Literal(model::Literal::Str(json_str)) = self.get_term(json_arg)?
             else {
-                return Err(table::ModelError::TypeError(meta_item).into());
+                return Err(error_invalid!(
+                    "`{}` expects a string literal as its second argument",
+                    model::COMPAT_CONST_JSON
+                ));
             };
 
-            let json_value: NodeMetadata = serde_json::from_str(json_str)
-                .map_err(|_| table::ModelError::TypeError(meta_item))?;
+            let json_value: NodeMetadata = serde_json::from_str(json_str).map_err(|_| {
+                error_invalid!(
+                    "failed to parse JSON string for `{}` metadata",
+                    model::COMPAT_CONST_JSON
+                )
+            })?;
 
             self.hugr.set_metadata(node, name, json_value);
         }
@@ -337,7 +379,7 @@ impl<'a> Context<'a> {
         let name = node_data
             .operation
             .symbol()
-            .ok_or(table::ModelError::InvalidSymbol(node_id))?;
+            .ok_or_else(|| error_invalid!("node {} is expected to be a symbol", node_id))?;
         Ok(name)
     }
 
@@ -348,7 +390,12 @@ impl<'a> Context<'a> {
         let symbol = match self.get_node(func_node)?.operation {
             table::Operation::DefineFunc(symbol) => symbol,
             table::Operation::DeclareFunc(symbol) => symbol,
-            _ => return Err(table::ModelError::UnexpectedOperation(func_node).into()),
+            _ => {
+                return Err(error_invalid!(
+                    "node {} is expected to be a function declaration or definition",
+                    func_node
+                ));
+            }
         };
 
         self.import_poly_func_type(func_node, *symbol, |_, signature| Ok(signature))
@@ -378,17 +425,19 @@ impl<'a> Context<'a> {
         let node_data = self.get_node(node_id)?;
 
         match node_data.operation {
-            table::Operation::Invalid => Err(table::ModelError::InvalidOperation(node_id).into()),
+            table::Operation::Invalid => {
+                Err(error_invalid!("tried to import an `invalid` operation"))
+            }
             table::Operation::Dfg => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::DFG(DFG { signature });
                 let node = self.make_node(node_id, optype, parent)?;
 
                 let [region] = node_data.regions else {
-                    return Err(table::ModelError::InvalidRegions(node_id).into());
+                    return Err(error_invalid!("dfg region expects a single region"));
                 };
 
-                self.import_dfg_region(node_id, *region, node)?;
+                self.import_dfg_region(*region, node)?;
                 Ok(Some(node))
             }
 
@@ -398,10 +447,10 @@ impl<'a> Context<'a> {
                 let node = self.make_node(node_id, optype, parent)?;
 
                 let [region] = node_data.regions else {
-                    return Err(table::ModelError::InvalidRegions(node_id).into());
+                    return Err(error_invalid!("cfg nodes expect a single region"));
                 };
 
-                self.import_cfg_region(node_id, *region, node)?;
+                self.import_cfg_region(*region, node)?;
                 Ok(Some(node))
             }
 
@@ -417,10 +466,12 @@ impl<'a> Context<'a> {
                     let node = ctx.make_node(node_id, optype, parent)?;
 
                     let [region] = node_data.regions else {
-                        return Err(table::ModelError::InvalidRegions(node_id).into());
+                        return Err(error_invalid!(
+                            "function definition nodes expect a single region"
+                        ));
                     };
 
-                    ctx.import_dfg_region(node_id, *region, node)?;
+                    ctx.import_dfg_region(*region, node)?;
 
                     Ok(Some(node))
                 })
@@ -455,7 +506,10 @@ impl<'a> Context<'a> {
 
                 if let Some([_, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
                     let table::Term::Apply(symbol, args) = self.get_term(func)? else {
-                        return Err(table::ModelError::TypeError(func).into());
+                        return Err(error_invalid!(
+                            "expected a symbol application to be passed to `{}`",
+                            model::CORE_CALL
+                        ));
                     };
 
                     let func_sig = self.get_func_signature(*symbol)?;
@@ -466,7 +520,9 @@ impl<'a> Context<'a> {
                         .collect::<Result<Vec<TypeArg>, _>>()?;
 
                     self.static_edges.push((*symbol, node_id));
-                    let optype = OpType::Call(Call::try_new(func_sig, type_args)?);
+                    let optype = OpType::Call(
+                        Call::try_new(func_sig, type_args).map_err(ImportErrorInner::Signature)?,
+                    );
 
                     let node = self.make_node(node_id, optype, parent)?;
                     return Ok(Some(node));
@@ -475,10 +531,7 @@ impl<'a> Context<'a> {
                 if let Some([_, value]) = self.match_symbol(operation, model::CORE_LOAD_CONST)? {
                     // If the constant refers directly to a function, import this as the `LoadFunc` operation.
                     if let table::Term::Apply(symbol, args) = self.get_term(value)? {
-                        let func_node_data = self
-                            .module
-                            .get_node(*symbol)
-                            .ok_or(table::ModelError::NodeNotFound(*symbol))?;
+                        let func_node_data = self.get_node(*symbol)?;
 
                         if let table::Operation::DefineFunc(_) | table::Operation::DeclareFunc(_) =
                             func_node_data.operation
@@ -491,8 +544,10 @@ impl<'a> Context<'a> {
 
                             self.static_edges.push((*symbol, node_id));
 
-                            let optype =
-                                OpType::LoadFunction(LoadFunction::try_new(func_sig, type_args)?);
+                            let optype = OpType::LoadFunction(
+                                LoadFunction::try_new(func_sig, type_args)
+                                    .map_err(ImportErrorInner::Signature)?,
+                            );
 
                             let node = self.make_node(node_id, optype, parent)?;
                             return Ok(Some(node));
@@ -505,9 +560,9 @@ impl<'a> Context<'a> {
                         .ok_or_else(|| error_uninferred!("node signature"))?;
                     let [_, outputs] = self.get_func_type(signature)?;
                     let outputs = self.import_closed_list(outputs)?;
-                    let output = outputs
-                        .first()
-                        .ok_or(table::ModelError::TypeError(signature))?;
+                    let output = outputs.first().ok_or_else(|| {
+                        error_invalid!("`{}` expects a single output", model::CORE_LOAD_CONST)
+                    })?;
                     let datatype = self.import_type(*output)?;
 
                     let imported_value = self.import_value(value, *output)?;
@@ -531,14 +586,17 @@ impl<'a> Context<'a> {
 
                 if let Some([_, _, tag]) = self.match_symbol(operation, model::CORE_MAKE_ADT)? {
                     let table::Term::Literal(model::Literal::Nat(tag)) = self.get_term(tag)? else {
-                        return Err(table::ModelError::TypeError(tag).into());
+                        return Err(error_invalid!(
+                            "`{}` expects a nat literal tag",
+                            model::CORE_MAKE_ADT
+                        ));
                     };
 
                     let signature = node_data
                         .signature
                         .ok_or_else(|| error_uninferred!("node signature"))?;
                     let [_, outputs] = self.get_func_type(signature)?;
-                    let (variants, _) = self.import_adt_and_rest(node_id, outputs)?;
+                    let (variants, _) = self.import_adt_and_rest(outputs)?;
                     let node = self.make_node(
                         node_id,
                         OpType::Tag(Tag {
@@ -551,7 +609,9 @@ impl<'a> Context<'a> {
                 }
 
                 let table::Term::Apply(node, params) = self.get_term(operation)? else {
-                    return Err(table::ModelError::TypeError(operation).into());
+                    return Err(error_invalid!(
+                        "custom operations expect a symbol application referencing an operation"
+                    ));
                 };
                 let name = self.get_symbol_name(*node)?;
                 let args = params
@@ -614,7 +674,6 @@ impl<'a> Context<'a> {
 
     fn import_dfg_region(
         &mut self,
-        node_id: table::NodeId,
         region: table::RegionId,
         node: Node,
     ) -> Result<(), ImportError> {
@@ -626,7 +685,7 @@ impl<'a> Context<'a> {
         }
 
         if region_data.kind != model::RegionKind::DataFlow {
-            return Err(table::ModelError::InvalidRegions(node_id).into());
+            return Err(error_invalid!("expected dfg region"));
         }
 
         let signature = self.import_func_type(
@@ -739,13 +798,12 @@ impl<'a> Context<'a> {
 
     fn import_adt_and_rest(
         &mut self,
-        node_id: table::NodeId,
         list: table::TermId,
     ) -> Result<(Vec<TypeRow>, TypeRow), ImportError> {
         let items = self.import_closed_list(list)?;
 
         let Some((first, rest)) = items.split_first() else {
-            return Err(table::ModelError::InvalidRegions(node_id).into());
+            return Err(error_invalid!("expected list to have at least one element"));
         };
 
         let sum_rows: Vec<_> = {
@@ -771,7 +829,10 @@ impl<'a> Context<'a> {
         debug_assert_eq!(node_data.operation, table::Operation::TailLoop);
 
         let [region] = node_data.regions else {
-            return Err(table::ModelError::InvalidRegions(node_id).into());
+            return Err(error_invalid!(
+                "loop node {} expect a single region",
+                node_id
+            ));
         };
         let region_data = self.get_region(*region)?;
 
@@ -780,21 +841,17 @@ impl<'a> Context<'a> {
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
-        let (sum_rows, rest) = self.import_adt_and_rest(node_id, region_outputs)?;
+        let (sum_rows, rest) = self.import_adt_and_rest(region_outputs)?;
 
-        let (just_inputs, just_outputs) = {
-            let mut sum_rows = sum_rows.into_iter();
+        if sum_rows.len() != 2 {
+            return Err(error_invalid!(
+                "loop nodes expect their first target to be an ADT with two variants"
+            ));
+        }
 
-            let Some(just_inputs) = sum_rows.next() else {
-                return Err(table::ModelError::TypeError(region_outputs).into());
-            };
-
-            let Some(just_outputs) = sum_rows.next() else {
-                return Err(table::ModelError::TypeError(region_outputs).into());
-            };
-
-            (just_inputs, just_outputs)
-        };
+        let mut sum_rows = sum_rows.into_iter();
+        let just_inputs = sum_rows.next().unwrap();
+        let just_outputs = sum_rows.next().unwrap();
 
         let optype = OpType::TailLoop(TailLoop {
             just_inputs,
@@ -804,7 +861,7 @@ impl<'a> Context<'a> {
 
         let node = self.make_node(node_id, optype, parent)?;
 
-        self.import_dfg_region(node_id, *region, node)?;
+        self.import_dfg_region(*region, node)?;
         Ok(node)
     }
 
@@ -820,7 +877,7 @@ impl<'a> Context<'a> {
                 .signature
                 .ok_or_else(|| error_uninferred!("node signature"))?,
         )?;
-        let (sum_rows, other_inputs) = self.import_adt_and_rest(node_id, inputs)?;
+        let (sum_rows, other_inputs) = self.import_adt_and_rest(inputs)?;
         let outputs = self.import_type_row(outputs)?;
 
         let optype = OpType::Conditional(Conditional {
@@ -843,7 +900,7 @@ impl<'a> Context<'a> {
                 .hugr
                 .add_node_with_parent(node, OpType::Case(Case { signature }));
 
-            self.import_dfg_region(node_id, *region, case_node)?;
+            self.import_dfg_region(*region, case_node)?;
         }
 
         Ok(node)
@@ -851,14 +908,13 @@ impl<'a> Context<'a> {
 
     fn import_cfg_region(
         &mut self,
-        node_id: table::NodeId,
         region: table::RegionId,
         node: Node,
     ) -> Result<(), ImportError> {
         let region_data = self.get_region(region)?;
 
         if region_data.kind != model::RegionKind::ControlFlow {
-            return Err(table::ModelError::InvalidRegions(node_id).into());
+            return Err(error_invalid!("expected cfg region"));
         }
 
         let prev_region = self.region_scope;
@@ -878,7 +934,7 @@ impl<'a> Context<'a> {
         // a block whose input is linked to the sole source port of the CFG region.
         let entry_node = 'find_entry: {
             let [entry_link] = region_data.sources else {
-                return Err(table::ModelError::InvalidRegions(node_id).into());
+                return Err(error_invalid!("cfg region expects a single source"));
             };
 
             for child in region_data.children {
@@ -894,7 +950,7 @@ impl<'a> Context<'a> {
             // directly from the source to the target of the region. This is
             // currently not allowed in hugr core directly, but may be simulated
             // by constructing an empty entry block.
-            return Err(table::ModelError::InvalidRegions(node_id).into());
+            return Err(error_invalid!("cfg region without entry node"));
         };
 
         // The entry node in core control flow regions is identified by being
@@ -912,7 +968,7 @@ impl<'a> Context<'a> {
         {
             let cfg_outputs = {
                 let [ctrl_type] = region_target_types.as_slice() else {
-                    return Err(table::ModelError::TypeError(region_targets).into());
+                    return Err(error_invalid!("cfg region expects a single target"));
                 };
 
                 let [types] = self.expect_symbol(*ctrl_type, model::CORE_CTRL)?;
@@ -943,7 +999,7 @@ impl<'a> Context<'a> {
         debug_assert_eq!(node_data.operation, table::Operation::Block);
 
         let [region] = node_data.regions else {
-            return Err(table::ModelError::InvalidRegions(node_id).into());
+            return Err(error_invalid!("basic block expects a single region"));
         };
         let region_data = self.get_region(*region)?;
         let [inputs, outputs] = self.get_func_type(
@@ -952,7 +1008,7 @@ impl<'a> Context<'a> {
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
         let inputs = self.import_type_row(inputs)?;
-        let (sum_rows, other_outputs) = self.import_adt_and_rest(node_id, outputs)?;
+        let (sum_rows, other_outputs) = self.import_adt_and_rest(outputs)?;
 
         let optype = OpType::DataflowBlock(DataflowBlock {
             inputs,
@@ -961,7 +1017,7 @@ impl<'a> Context<'a> {
         });
         let node = self.make_node(node_id, optype, parent)?;
 
-        self.import_dfg_region(node_id, *region, node)?;
+        self.import_dfg_region(*region, node)?;
         Ok(node)
     }
 
@@ -988,7 +1044,7 @@ impl<'a> Context<'a> {
 
                 self.local_vars
                     .get_mut(var)
-                    .ok_or(table::ModelError::InvalidVar(*var))?
+                    .ok_or_else(|| error_invalid!("unknown variable {}", var))?
                     .bound = TypeBound::Copyable;
             } else {
                 return Err(error_unsupported!("constraint other than copy or discard"));
@@ -1087,7 +1143,7 @@ impl<'a> Context<'a> {
             table::Term::Tuple(_)
             | table::Term::List { .. }
             | table::Term::Func { .. }
-            | table::Term::Literal(_) => Err(table::ModelError::TypeError(term_id).into()),
+            | table::Term::Literal(_) => Err(error_invalid!("expected a static type")),
         }
     }
 
@@ -1161,7 +1217,7 @@ impl<'a> Context<'a> {
                 let var_info = self
                     .local_vars
                     .get(var)
-                    .ok_or(table::ModelError::InvalidVar(*var))?;
+                    .ok_or_else(|| error_invalid!("unknown variable {}", var))?;
                 let decl = self.import_type_param(var_info.r#type, var_info.bound)?;
                 Ok(TypeArg::new_var_use(var.1 as _, decl))
             }
@@ -1240,7 +1296,7 @@ impl<'a> Context<'a> {
                 let extension_ref =
                     self.extensions
                         .get(&extension)
-                        .ok_or_else(|| ImportError::Extension {
+                        .ok_or_else(|| ExtensionError::Missing {
                             missing_ext: extension.clone(),
                             available: self.extensions.ids().cloned().collect(),
                         })?;
@@ -1248,7 +1304,7 @@ impl<'a> Context<'a> {
                 let ext_type =
                     extension_ref
                         .get_type(&id)
-                        .ok_or_else(|| ImportError::ExtensionType {
+                        .ok_or_else(|| ExtensionError::MissingType {
                             ext: extension.clone(),
                             name: id.clone(),
                         })?;
@@ -1268,7 +1324,7 @@ impl<'a> Context<'a> {
                 let local_var = self
                     .local_vars
                     .get(var)
-                    .ok_or(table::ModelError::InvalidVar(*var))?;
+                    .ok_or(error_invalid!("unknown var {}", var))?;
                 Ok(TypeBase::new_var_use(*index as _, local_var.bound))
             }
 
@@ -1277,13 +1333,13 @@ impl<'a> Context<'a> {
             table::Term::List { .. }
             | table::Term::Tuple { .. }
             | table::Term::Literal(_)
-            | table::Term::Func { .. } => Err(table::ModelError::TypeError(term_id).into()),
+            | table::Term::Func { .. } => Err(error_invalid!("expected a runtime type")),
         }
     }
 
     fn get_func_type(&mut self, term_id: table::TermId) -> Result<[table::TermId; 2], ImportError> {
         self.match_symbol(term_id, model::CORE_FN)?
-            .ok_or(table::ModelError::TypeError(term_id).into())
+            .ok_or(error_invalid!("expected a function type"))
     }
 
     fn import_func_type<RV: MaybeRV>(
@@ -1320,7 +1376,7 @@ impl<'a> Context<'a> {
                         }
                     }
                 }
-                _ => return Err(table::ModelError::TypeError(term_id).into()),
+                _ => return Err(error_invalid!("expected a closed list")),
             }
 
             Ok(())
@@ -1355,7 +1411,7 @@ impl<'a> Context<'a> {
                         }
                     }
                 }
-                _ => return Err(table::ModelError::TypeError(term_id).into()),
+                _ => return Err(error_invalid!("expected a closed tuple")),
             }
 
             Ok(())
@@ -1402,10 +1458,10 @@ impl<'a> Context<'a> {
                 }
                 table::Term::Var(table::VarId(_, index)) => {
                     let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Any))
-                        .map_err(|_| table::ModelError::TypeError(term_id))?;
+                        .map_err(|_| error_invalid!("expected a closed list"))?;
                     types.push(TypeBase::new(TypeEnum::RowVar(var)));
                 }
-                _ => return Err(table::ModelError::TypeError(term_id).into()),
+                _ => return Err(error_invalid!("expected a list")),
             }
 
             Ok(())
@@ -1425,11 +1481,11 @@ impl<'a> Context<'a> {
             Entry::Occupied(occupied_entry) => Ok(occupied_entry.get().clone()),
             Entry::Vacant(vacant_entry) => {
                 let qualified_name = ExtensionId::new(symbol)
-                    .map_err(|_| table::ModelError::MalformedName(symbol.to_smolstr()))?;
+                    .map_err(|_| error_invalid!("`{}` is not a valid symbol name", symbol))?;
 
                 let (extension, id) = qualified_name
                     .split_last()
-                    .ok_or_else(|| table::ModelError::MalformedName(symbol.to_smolstr()))?;
+                    .ok_or_else(|| error_invalid!("`{}` is not a valid symbol name", symbol))?;
 
                 vacant_entry.insert((extension.clone(), id.clone()));
                 Ok((extension, id))
@@ -1449,7 +1505,10 @@ impl<'a> Context<'a> {
 
         if let Some([runtime_type, json]) = self.match_symbol(term_id, model::COMPAT_CONST_JSON)? {
             let table::Term::Literal(model::Literal::Str(json)) = self.get_term(json)? else {
-                return Err(table::ModelError::TypeError(term_id).into());
+                return Err(error_invalid!(
+                    "`{}` expects a string literal",
+                    model::COMPAT_CONST_JSON
+                ));
             };
 
             // We attempt to deserialize as the custom const directly.
@@ -1462,8 +1521,12 @@ impl<'a> Context<'a> {
                 return Ok(Value::Extension { e: opaque_value });
             } else {
                 let runtime_type = self.import_type(runtime_type)?;
-                let value: serde_json::Value = serde_json::from_str(json)
-                    .map_err(|_| table::ModelError::TypeError(term_id))?;
+                let value: serde_json::Value = serde_json::from_str(json).map_err(|_| {
+                    error_invalid!(
+                        "unable to parse JSON string for `{}`",
+                        model::COMPAT_CONST_JSON
+                    )
+                })?;
                 let custom_const = CustomSerialized::new(runtime_type, value);
                 let opaque_value = OpaqueValue::new(custom_const);
                 return Ok(Value::Extension { e: opaque_value });
@@ -1487,29 +1550,42 @@ impl<'a> Context<'a> {
                 let table::Term::Literal(model::Literal::Nat(bitwidth)) =
                     self.get_term(bitwidth)?
                 else {
-                    return Err(table::ModelError::TypeError(term_id).into());
+                    return Err(error_invalid!(
+                        "`{}` expects a nat literal in its `bitwidth` argument",
+                        ConstInt::CTR_NAME
+                    ));
                 };
                 if *bitwidth > 6 {
-                    return Err(table::ModelError::TypeError(term_id).into());
+                    return Err(error_invalid!(
+                        "`{}` expects the bitwidth to be at most 6, got {}",
+                        ConstInt::CTR_NAME,
+                        bitwidth
+                    ));
                 }
                 *bitwidth as u8
             };
 
             let value = {
                 let table::Term::Literal(model::Literal::Nat(value)) = self.get_term(value)? else {
-                    return Err(table::ModelError::TypeError(term_id).into());
+                    return Err(error_invalid!(
+                        "`{}` expects a nat literal value",
+                        ConstInt::CTR_NAME
+                    ));
                 };
                 *value
             };
 
             return Ok(ConstInt::new_u(bitwidth, value)
-                .map_err(|_| table::ModelError::TypeError(term_id))?
+                .map_err(|_| error_invalid!("failed to create int constant"))?
                 .into());
         }
 
         if let Some([value]) = self.match_symbol(term_id, ConstF64::CTR_NAME)? {
             let table::Term::Literal(model::Literal::Float(value)) = self.get_term(value)? else {
-                return Err(table::ModelError::TypeError(term_id).into());
+                return Err(error_invalid!(
+                    "`{}` expects a float literal value",
+                    ConstF64::CTR_NAME
+                ));
             };
 
             return Ok(ConstF64::new(value.into_inner()).into());
@@ -1521,12 +1597,16 @@ impl<'a> Context<'a> {
             let variants = self.import_closed_list(variants)?;
 
             let table::Term::Literal(model::Literal::Nat(tag)) = self.get_term(tag)? else {
-                return Err(table::ModelError::TypeError(term_id).into());
+                return Err(error_invalid!(
+                    "`{}` expects a nat literal tag",
+                    model::CORE_ADT
+                ));
             };
 
-            let variant = variants
-                .get(*tag as usize)
-                .ok_or(table::ModelError::TypeError(term_id))?;
+            let variant = variants.get(*tag as usize).ok_or(error_invalid!(
+                "the tag of a `{}` must be a valid index into the list of variants",
+                model::CORE_CONST_ADT
+            ))?;
 
             let variant = self.import_closed_list(*variant)?;
 
@@ -1564,7 +1644,7 @@ impl<'a> Context<'a> {
             }
 
             table::Term::List { .. } | table::Term::Tuple(_) | table::Term::Literal(_) => {
-                Err(table::ModelError::TypeError(term_id).into())
+                Err(error_invalid!("expected constant"))
             }
 
             table::Term::Func { .. } => Err(error_unsupported!("constant function value")),
@@ -1610,8 +1690,11 @@ impl<'a> Context<'a> {
         term_id: table::TermId,
         name: &str,
     ) -> Result<[table::TermId; N], ImportError> {
-        self.match_symbol(term_id, name)?
-            .ok_or(table::ModelError::TypeError(term_id).into())
+        self.match_symbol(term_id, name)?.ok_or(error_invalid!(
+            "expected symbol `{}` with arity {}",
+            name,
+            N
+        ))
     }
 }
 
