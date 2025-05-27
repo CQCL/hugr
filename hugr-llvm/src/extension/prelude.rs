@@ -405,7 +405,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
 
 #[cfg(test)]
 mod test {
-    use hugr_core::builder::{Dataflow, DataflowSubContainer};
+    use hugr_core::builder::{Dataflow, DataflowHugr};
     use hugr_core::extension::PRELUDE;
     use hugr_core::extension::prelude::{EXIT_OP_ID, Noop};
     use hugr_core::types::{Type, TypeArg};
@@ -479,7 +479,7 @@ mod test {
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(17));
-                builder.finish_with_outputs([k]).unwrap()
+                builder.finish_hugr_with_outputs([k]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -502,7 +502,7 @@ mod test {
             .finish(|mut builder| {
                 let k1 = builder.add_load_value(konst1);
                 let k2 = builder.add_load_value(konst2);
-                builder.finish_with_outputs([k1, k2]).unwrap()
+                builder.finish_hugr_with_outputs([k1, k2]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -519,7 +519,7 @@ mod test {
                     .add_dataflow_op(Noop::new(usize_t()), in_wires)
                     .unwrap()
                     .outputs();
-                builder.finish_with_outputs(r).unwrap()
+                builder.finish_hugr_with_outputs(r).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -533,7 +533,7 @@ mod test {
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
                 let r = builder.make_tuple(in_wires).unwrap();
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -551,7 +551,7 @@ mod test {
                         builder.input_wires(),
                     )
                     .unwrap();
-                builder.finish_with_outputs(unpack.outputs()).unwrap()
+                builder.finish_hugr_with_outputs(unpack.outputs()).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -578,7 +578,7 @@ mod test {
                     .add_dataflow_op(panic_op, [err, q0, q1])
                     .unwrap()
                     .outputs_arr();
-                builder.finish_with_outputs([q0, q1]).unwrap()
+                builder.finish_hugr_with_outputs([q0, q1]).unwrap()
             });
 
         check_emission!(hugr, prelude_llvm_ctx);
@@ -606,7 +606,7 @@ mod test {
                     .add_dataflow_op(exit_op, [err, q0, q1])
                     .unwrap()
                     .outputs_arr();
-                builder.finish_with_outputs([q0, q1]).unwrap()
+                builder.finish_hugr_with_outputs([q0, q1]).unwrap()
             });
 
         check_emission!(hugr, prelude_llvm_ctx);
@@ -622,7 +622,7 @@ mod test {
             .finish(|mut builder| {
                 let greeting_out = builder.add_load_value(greeting);
                 builder.add_dataflow_op(print_op, [greeting_out]).unwrap();
-                builder.finish_with_outputs([]).unwrap()
+                builder.finish_hugr_with_outputs([]).unwrap()
             });
 
         check_emission!(hugr, prelude_llvm_ctx);
@@ -638,7 +638,7 @@ mod test {
                     .add_dataflow_op(LoadNat::new(TypeArg::BoundedNat { n: 42 }), vec![])
                     .unwrap()
                     .out_wire(0);
-                builder.finish_with_outputs([v]).unwrap()
+                builder.finish_hugr_with_outputs([v]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -651,7 +651,7 @@ mod test {
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstUsize::new(42));
                 let [w1, _w2] = builder.add_barrier([i, i]).unwrap().outputs_arr();
-                builder.finish_with_outputs([w1]).unwrap()
+                builder.finish_hugr_with_outputs([w1]).unwrap()
             })
     }
 

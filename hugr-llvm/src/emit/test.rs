@@ -1,7 +1,7 @@
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
 use anyhow::{Result, anyhow};
-use hugr_core::builder::{BuildHandle, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer};
+use hugr_core::builder::{BuildHandle, DFGWrapper, FunctionBuilder};
 use hugr_core::extension::ExtensionRegistry;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::types::TypeRow;
@@ -13,7 +13,7 @@ use inkwell::values::GenericValue;
 use super::EmitHugr;
 
 #[allow(clippy::upper_case_acronyms)]
-pub type DFGW<'a> = DFGWrapper<&'a mut Hugr, BuildHandle<FuncID<true>>>;
+pub type DFGW = DFGWrapper<Hugr, BuildHandle<FuncID<true>>>;
 
 pub struct SimpleHugrConfig {
     ins: TypeRow,
@@ -129,31 +129,13 @@ impl SimpleHugrConfig {
         self
     }
 
-    pub fn finish(
-        self,
-        make: impl for<'a> FnOnce(DFGW<'a>) -> <DFGW<'a> as SubContainer>::ContainerHandle,
-    ) -> Hugr {
+    pub fn finish(self, make: impl FnOnce(DFGW) -> Hugr) -> Hugr {
         self.finish_with_exts(|builder, _| make(builder))
     }
-    pub fn finish_with_exts(
-        self,
-        make: impl for<'a> FnOnce(
-            DFGW<'a>,
-            &ExtensionRegistry,
-        ) -> <DFGW<'a> as SubContainer>::ContainerHandle,
-    ) -> Hugr {
-        let mut mod_b = ModuleBuilder::new();
-        let func_b = mod_b
-            .define_function("main", HugrFuncType::new(self.ins, self.outs))
-            .unwrap();
-        make(func_b, &self.extensions);
 
-        // Intentionally left as a debugging aid. If the HUGR you construct
-        // fails validation, uncomment the following line to print it out
-        // unvalidated.
-        // println!("{}", mod_b.hugr().mermaid_string());
-
-        mod_b.finish_hugr().unwrap_or_else(|e| panic!("{e}"))
+    pub fn finish_with_exts(self, make: impl FnOnce(DFGW, &ExtensionRegistry) -> Hugr) -> Hugr {
+        let func_b = FunctionBuilder::new("main", HugrFuncType::new(self.ins, self.outs)).unwrap();
+        make(func_b, &self.extensions)
     }
 }
 
@@ -235,8 +217,8 @@ mod test_fns {
     use crate::custom::CodegenExtsBuilder;
     use crate::types::{HugrFuncType, HugrSumType};
 
-    use hugr_core::builder::DataflowSubContainer;
     use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
+    use hugr_core::builder::{DataflowHugr, DataflowSubContainer};
     use hugr_core::extension::PRELUDE_REGISTRY;
     use hugr_core::extension::prelude::{ConstUsize, bool_t, usize_t};
     use hugr_core::ops::constant::CustomConst;
@@ -264,7 +246,7 @@ mod test_fns {
                         builder.input_wires(),
                     )
                     .unwrap();
-                builder.finish_with_outputs(tag.outputs()).unwrap()
+                builder.finish_hugr_with_outputs(tag.outputs()).unwrap()
             });
         let _ = check_emission!(hugr, llvm_ctx);
     }
@@ -282,7 +264,7 @@ mod test_fns {
                     let w = b.input_wires();
                     b.finish_with_outputs(w).unwrap()
                 };
-                builder.finish_with_outputs(dfg.outputs()).unwrap()
+                builder.finish_hugr_with_outputs(dfg.outputs()).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }
@@ -327,7 +309,7 @@ mod test_fns {
                         cond_b.finish_sub_container().unwrap()
                     };
                     let [o1, o2] = cond.outputs_arr();
-                    builder.finish_with_outputs([o1, o2]).unwrap()
+                    builder.finish_hugr_with_outputs([o1, o2]).unwrap()
                 })
         };
         check_emission!(hugr, llvm_ctx);
@@ -347,7 +329,7 @@ mod test_fns {
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(v);
-                builder.finish_with_outputs([konst]).unwrap()
+                builder.finish_hugr_with_outputs([konst]).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }
@@ -409,7 +391,7 @@ mod test_fns {
                     .instantiate_extension_op("iadd", [4.into()])
                     .unwrap();
                 let add = builder.add_dataflow_op(ext_op, [k1, k2]).unwrap();
-                builder.finish_with_outputs(add.outputs()).unwrap()
+                builder.finish_hugr_with_outputs(add.outputs()).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }
@@ -464,7 +446,7 @@ mod test_fns {
                     let r = builder.load_const(&konst);
                     builder.finish_with_outputs([r]).unwrap().outputs_arr()
                 };
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }
@@ -489,7 +471,7 @@ mod test_fns {
                     builder.branch(&entry, 0, &exit).unwrap();
                     builder.finish_sub_container().unwrap().outputs_arr()
                 };
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }
@@ -553,7 +535,7 @@ mod test_fns {
                         .finish_with_outputs(sum_inp_w, [])
                         .unwrap()
                         .outputs_arr();
-                    builder.finish_with_outputs(outs).unwrap()
+                    builder.finish_hugr_with_outputs(outs).unwrap()
                 })
         };
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
@@ -674,7 +656,7 @@ mod test_fns {
                 };
                 let [out_int] = tail_l.outputs_arr();
                 builder
-                    .finish_with_outputs([out_int])
+                    .finish_hugr_with_outputs([out_int])
                     .unwrap_or_else(|e| panic!("{e}"))
             })
     }
@@ -709,7 +691,7 @@ mod test_fns {
             .with_extensions(PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(ConstUsize::new(42));
-                builder.finish_with_outputs([konst]).unwrap()
+                builder.finish_hugr_with_outputs([konst]).unwrap()
             });
         exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
