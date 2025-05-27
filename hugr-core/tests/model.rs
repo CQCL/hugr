@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use eyre::Result;
-use std::{error::Error, str::FromStr};
+use std::str::FromStr;
 
 use hugr::std_extensions::std_reg;
 use hugr_core::{export::export_package, import::import_package};
