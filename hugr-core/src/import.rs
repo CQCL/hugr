@@ -55,6 +55,10 @@ enum ImportErrorInner {
     #[error("{0}")]
     Invalid(String),
 
+    /// An error with additional context.
+    #[error("{1}")]
+    Context(#[source] Box<ImportError>, String),
+
     /// A signature mismatch was detected during import.
     #[error("signature error: {0}")]
     Signature(#[from] SignatureError),
@@ -131,6 +135,11 @@ macro_rules! error_uninferred {
 /// Helper macro to create an `ImportError::Invalid` error with a formatted message.
 macro_rules! error_invalid {
     ($($e:expr),*) => { ImportError(ImportErrorInner::Invalid(format!($($e),*))) }
+}
+
+/// Helper macro to create an `ImportError::Context` error with a formatted message.
+macro_rules! error_context {
+    ($err:expr, $($e:expr),*) => { ImportError(ImportErrorInner::Context(Box::new($err), format!($($e),*))) }
 }
 
 /// Import a [`Package`] from its model representation.
@@ -251,7 +260,8 @@ impl<'a> Context<'a> {
         self.record_links(node, Direction::Outgoing, node_data.outputs);
 
         for meta_item in node_data.meta {
-            self.import_node_metadata(node, *meta_item)?;
+            self.import_node_metadata(node, *meta_item)
+                .map_err(|err| error_context!(err, "node metadata"))?;
         }
 
         Ok(node)
@@ -422,254 +432,115 @@ impl<'a> Context<'a> {
         node_id: table::NodeId,
         parent: Node,
     ) -> Result<Option<Node>, ImportError> {
-        let node_data = self.get_node(node_id)?;
+        (|| {
+            let node_data = self.get_node(node_id)?;
 
-        match node_data.operation {
-            table::Operation::Invalid => {
-                Err(error_invalid!("tried to import an `invalid` operation"))
-            }
-            table::Operation::Dfg => {
-                let signature = self.get_node_signature(node_id)?;
-                let optype = OpType::DFG(DFG { signature });
-                let node = self.make_node(node_id, optype, parent)?;
-
-                let [region] = node_data.regions else {
-                    return Err(error_invalid!("dfg region expects a single region"));
-                };
-
-                self.import_dfg_region(*region, node)?;
-                Ok(Some(node))
-            }
-
-            table::Operation::Cfg => {
-                let signature = self.get_node_signature(node_id)?;
-                let optype = OpType::CFG(CFG { signature });
-                let node = self.make_node(node_id, optype, parent)?;
-
-                let [region] = node_data.regions else {
-                    return Err(error_invalid!("cfg nodes expect a single region"));
-                };
-
-                self.import_cfg_region(*region, node)?;
-                Ok(Some(node))
-            }
-
-            table::Operation::Block => {
-                let node = self.import_cfg_block(node_id, parent)?;
-                Ok(Some(node))
-            }
-
-            table::Operation::DefineFunc(symbol) => {
-                self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-                    let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, signature));
-
-                    let node = ctx.make_node(node_id, optype, parent)?;
-
-                    let [region] = node_data.regions else {
-                        return Err(error_invalid!(
-                            "function definition nodes expect a single region"
-                        ));
-                    };
-
-                    ctx.import_dfg_region(*region, node)?;
-
-                    Ok(Some(node))
-                })
-            }
-
-            table::Operation::DeclareFunc(symbol) => {
-                self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-                    let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, signature));
-
-                    let node = ctx.make_node(node_id, optype, parent)?;
-
-                    Ok(Some(node))
-                })
-            }
-
-            table::Operation::TailLoop => {
-                let node = self.import_tail_loop(node_id, parent)?;
-                Ok(Some(node))
-            }
-            table::Operation::Conditional => {
-                let node = self.import_conditional(node_id, parent)?;
-                Ok(Some(node))
-            }
-
-            table::Operation::Custom(operation) => {
-                if let Some([_, _]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
-                    let signature = self.get_node_signature(node_id)?;
-                    let optype = OpType::CallIndirect(CallIndirect { signature });
-                    let node = self.make_node(node_id, optype, parent)?;
-                    return Ok(Some(node));
+            let result = match node_data.operation {
+                table::Operation::Invalid => {
+                    return Err(error_invalid!("tried to import an `invalid` operation"));
                 }
 
-                if let Some([_, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
-                    let table::Term::Apply(symbol, args) = self.get_term(func)? else {
-                        return Err(error_invalid!(
-                            "expected a symbol application to be passed to `{}`",
-                            model::CORE_CALL
-                        ));
-                    };
+                table::Operation::Dfg => Some(
+                    self.import_node_dfg(node_id, parent, node_data)
+                        .map_err(|err| error_context!(err, "dfg node {}", node_id))?,
+                ),
 
-                    let func_sig = self.get_func_signature(*symbol)?;
+                table::Operation::Cfg => Some(
+                    self.import_node_cfg(node_id, parent, node_data)
+                        .map_err(|err| error_context!(err, "cfg node {}", node_id))?,
+                ),
 
-                    let type_args = args
-                        .iter()
-                        .map(|term| self.import_type_arg(*term))
-                        .collect::<Result<Vec<TypeArg>, _>>()?;
+                table::Operation::Block => Some(
+                    self.import_node_block(node_id, parent)
+                        .map_err(|err| error_context!(err, "block node {}", node_id))?,
+                ),
 
-                    self.static_edges.push((*symbol, node_id));
-                    let optype = OpType::Call(
-                        Call::try_new(func_sig, type_args).map_err(ImportErrorInner::Signature)?,
-                    );
+                table::Operation::DefineFunc(symbol) => Some(
+                    self.import_node_define_func(node_id, symbol, node_data, parent)
+                        .map_err(|err| error_context!(err, "define-func node {}", node_id))?,
+                ),
 
-                    let node = self.make_node(node_id, optype, parent)?;
-                    return Ok(Some(node));
-                }
+                table::Operation::DeclareFunc(symbol) => Some(
+                    self.import_node_declare_func(node_id, symbol, parent)
+                        .map_err(|err| error_context!(err, "declare-func node {}", node_id))?,
+                ),
 
-                if let Some([_, value]) = self.match_symbol(operation, model::CORE_LOAD_CONST)? {
-                    // If the constant refers directly to a function, import this as the `LoadFunc` operation.
-                    if let table::Term::Apply(symbol, args) = self.get_term(value)? {
-                        let func_node_data = self.get_node(*symbol)?;
+                table::Operation::TailLoop => Some(
+                    self.import_tail_loop(node_id, parent)
+                        .map_err(|err| error_context!(err, "tail-loop node {}", node_id))?,
+                ),
 
-                        if let table::Operation::DefineFunc(_) | table::Operation::DeclareFunc(_) =
-                            func_node_data.operation
-                        {
-                            let func_sig = self.get_func_signature(*symbol)?;
-                            let type_args = args
-                                .iter()
-                                .map(|term| self.import_type_arg(*term))
-                                .collect::<Result<Vec<TypeArg>, _>>()?;
+                table::Operation::Conditional => Some(
+                    self.import_conditional(node_id, parent)
+                        .map_err(|err| error_context!(err, "conditional node {}", node_id))?,
+                ),
 
-                            self.static_edges.push((*symbol, node_id));
+                table::Operation::Custom(operation) => Some(
+                    self.import_node_custom(node_id, operation, node_data, parent)
+                        .map_err(|err| error_context!(err, "custom node {}", node_id))?,
+                ),
 
-                            let optype = OpType::LoadFunction(
-                                LoadFunction::try_new(func_sig, type_args)
-                                    .map_err(ImportErrorInner::Signature)?,
-                            );
+                table::Operation::DefineAlias(symbol, value) => Some(
+                    self.import_node_define_alias(node_id, symbol, value, parent)
+                        .map_err(|err| error_context!(err, "define-alias node {}", node_id))?,
+                ),
 
-                            let node = self.make_node(node_id, optype, parent)?;
-                            return Ok(Some(node));
-                        }
-                    }
+                table::Operation::DeclareAlias(symbol) => Some(
+                    self.import_node_declare_alias(node_id, symbol, parent)
+                        .map_err(|err| error_context!(err, "declare-alias node {}", node_id))?,
+                ),
 
-                    // Otherwise use const nodes
-                    let signature = node_data
-                        .signature
-                        .ok_or_else(|| error_uninferred!("node signature"))?;
-                    let [_, outputs] = self.get_func_type(signature)?;
-                    let outputs = self.import_closed_list(outputs)?;
-                    let output = outputs.first().ok_or_else(|| {
-                        error_invalid!("`{}` expects a single output", model::CORE_LOAD_CONST)
-                    })?;
-                    let datatype = self.import_type(*output)?;
+                table::Operation::Import { .. } => None,
 
-                    let imported_value = self.import_value(value, *output)?;
+                table::Operation::DeclareConstructor { .. } => None,
+                table::Operation::DeclareOperation { .. } => None,
+            };
 
-                    let load_const_node = self.make_node(
-                        node_id,
-                        OpType::LoadConstant(LoadConstant {
-                            datatype: datatype.clone(),
-                        }),
-                        parent,
-                    )?;
+            Ok(result)
+        })()
+        .map_err(|err| error_context!(err, "node {}", node_id))
+    }
 
-                    let const_node = self
-                        .hugr
-                        .add_node_with_parent(parent, OpType::Const(Const::new(imported_value)));
+    fn import_node_dfg(
+        &mut self,
+        node_id: table::NodeId,
+        parent: Node,
+        node_data: &'a table::Node<'a>,
+    ) -> Result<Node, ImportError> {
+        let signature = self
+            .get_node_signature(node_id)
+            .map_err(|err| error_context!(err, "node signature"))?;
 
-                    self.hugr.connect(const_node, 0, load_const_node, 0);
+        let optype = OpType::DFG(DFG { signature });
+        let node = self.make_node(node_id, optype, parent)?;
 
-                    return Ok(Some(load_const_node));
-                }
+        let [region] = node_data.regions else {
+            return Err(error_invalid!("dfg region expects a single region"));
+        };
 
-                if let Some([_, _, tag]) = self.match_symbol(operation, model::CORE_MAKE_ADT)? {
-                    let table::Term::Literal(model::Literal::Nat(tag)) = self.get_term(tag)? else {
-                        return Err(error_invalid!(
-                            "`{}` expects a nat literal tag",
-                            model::CORE_MAKE_ADT
-                        ));
-                    };
+        self.import_dfg_region(*region, node)?;
+        Ok(node)
+    }
 
-                    let signature = node_data
-                        .signature
-                        .ok_or_else(|| error_uninferred!("node signature"))?;
-                    let [_, outputs] = self.get_func_type(signature)?;
-                    let (variants, _) = self.import_adt_and_rest(outputs)?;
-                    let node = self.make_node(
-                        node_id,
-                        OpType::Tag(Tag {
-                            variants,
-                            tag: *tag as usize,
-                        }),
-                        parent,
-                    )?;
-                    return Ok(Some(node));
-                }
+    fn import_node_cfg(
+        &mut self,
+        node_id: table::NodeId,
+        parent: Node,
+        node_data: &'a table::Node<'a>,
+    ) -> Result<Node, ImportError> {
+        let signature = self
+            .get_node_signature(node_id)
+            .map_err(|err| error_context!(err, "node signature"))?;
 
-                let table::Term::Apply(node, params) = self.get_term(operation)? else {
-                    return Err(error_invalid!(
-                        "custom operations expect a symbol application referencing an operation"
-                    ));
-                };
-                let name = self.get_symbol_name(*node)?;
-                let args = params
-                    .iter()
-                    .map(|param| self.import_type_arg(*param))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let (extension, name) = self.import_custom_name(name)?;
-                let signature = self.get_node_signature(node_id)?;
+        let optype = OpType::CFG(CFG { signature });
+        let node = self.make_node(node_id, optype, parent)?;
 
-                // TODO: Currently we do not have the description or any other metadata for
-                // the custom op. This will improve with declarative extensions being able
-                // to declare operations as a node, in which case the description will be attached
-                // to that node as metadata.
+        let [region] = node_data.regions else {
+            return Err(error_invalid!("cfg nodes expect a single region"));
+        };
 
-                let optype = OpType::OpaqueOp(OpaqueOp::new(extension, name, args, signature));
-
-                let node = self.make_node(node_id, optype, parent)?;
-
-                Ok(Some(node))
-            }
-
-            table::Operation::DefineAlias(symbol, value) => {
-                if !symbol.params.is_empty() {
-                    return Err(error_unsupported!(
-                        "parameters or constraints in alias definition"
-                    ));
-                }
-
-                let optype = OpType::AliasDefn(AliasDefn {
-                    name: symbol.name.to_smolstr(),
-                    definition: self.import_type(value)?,
-                });
-
-                let node = self.make_node(node_id, optype, parent)?;
-                Ok(Some(node))
-            }
-
-            table::Operation::DeclareAlias(symbol) => {
-                if !symbol.params.is_empty() {
-                    return Err(error_unsupported!(
-                        "parameters or constraints in alias declaration"
-                    ));
-                }
-
-                let optype = OpType::AliasDecl(AliasDecl {
-                    name: symbol.name.to_smolstr(),
-                    bound: TypeBound::Copyable,
-                });
-
-                let node = self.make_node(node_id, optype, parent)?;
-                Ok(Some(node))
-            }
-
-            table::Operation::Import { .. } => Ok(None),
-
-            table::Operation::DeclareConstructor { .. } => Ok(None),
-            table::Operation::DeclareOperation { .. } => Ok(None),
-        }
+        self.import_cfg_region(*region, node)?;
+        Ok(node)
     }
 
     fn import_dfg_region(
@@ -834,24 +705,30 @@ impl<'a> Context<'a> {
                 node_id
             ));
         };
+
         let region_data = self.get_region(*region)?;
 
-        let [_, region_outputs] = self.get_func_type(
-            region_data
-                .signature
-                .ok_or_else(|| error_uninferred!("region signature"))?,
-        )?;
-        let (sum_rows, rest) = self.import_adt_and_rest(region_outputs)?;
+        let (just_inputs, just_outputs, rest) = (|| {
+            let [_, region_outputs] = self.get_func_type(
+                region_data
+                    .signature
+                    .ok_or_else(|| error_uninferred!("region signature"))?,
+            )?;
+            let (sum_rows, rest) = self.import_adt_and_rest(region_outputs)?;
 
-        if sum_rows.len() != 2 {
-            return Err(error_invalid!(
-                "loop nodes expect their first target to be an ADT with two variants"
-            ));
-        }
+            if sum_rows.len() != 2 {
+                return Err(error_invalid!(
+                    "loop nodes expect their first target to be an ADT with two variants"
+                ));
+            }
 
-        let mut sum_rows = sum_rows.into_iter();
-        let just_inputs = sum_rows.next().unwrap();
-        let just_outputs = sum_rows.next().unwrap();
+            let mut sum_rows = sum_rows.into_iter();
+            let just_inputs = sum_rows.next().unwrap();
+            let just_outputs = sum_rows.next().unwrap();
+
+            Ok((just_inputs, just_outputs, rest))
+        })()
+        .map_err(|err| error_context!(err, "region signature"))?;
 
         let optype = OpType::TailLoop(TailLoop {
             just_inputs,
@@ -872,13 +749,19 @@ impl<'a> Context<'a> {
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
         debug_assert_eq!(node_data.operation, table::Operation::Conditional);
-        let [inputs, outputs] = self.get_func_type(
-            node_data
-                .signature
-                .ok_or_else(|| error_uninferred!("node signature"))?,
-        )?;
-        let (sum_rows, other_inputs) = self.import_adt_and_rest(inputs)?;
-        let outputs = self.import_type_row(outputs)?;
+
+        let (sum_rows, other_inputs, outputs) = (|| {
+            let [inputs, outputs] = self.get_func_type(
+                node_data
+                    .signature
+                    .ok_or_else(|| error_uninferred!("node signature"))?,
+            )?;
+            let (sum_rows, other_inputs) = self.import_adt_and_rest(inputs)?;
+            let outputs = self.import_type_row(outputs)?;
+
+            Ok((sum_rows, other_inputs, outputs))
+        })()
+        .map_err(|err| error_context!(err, "node signature"))?;
 
         let optype = OpType::Conditional(Conditional {
             sum_rows,
@@ -990,7 +873,7 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    fn import_cfg_block(
+    fn import_node_block(
         &mut self,
         node_id: table::NodeId,
         parent: Node,
@@ -1018,6 +901,226 @@ impl<'a> Context<'a> {
         let node = self.make_node(node_id, optype, parent)?;
 
         self.import_dfg_region(*region, node)?;
+        Ok(node)
+    }
+
+    fn import_node_define_func(
+        &mut self,
+        node_id: table::NodeId,
+        symbol: &'a table::Symbol<'a>,
+        node_data: &'a table::Node<'a>,
+        parent: Node,
+    ) -> Result<Node, ImportError> {
+        self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
+            let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, signature));
+
+            let node = ctx.make_node(node_id, optype, parent)?;
+
+            let [region] = node_data.regions else {
+                return Err(error_invalid!(
+                    "function definition nodes expect a single region"
+                ));
+            };
+
+            ctx.import_dfg_region(*region, node)?;
+
+            Ok(node)
+        })
+    }
+
+    fn import_node_declare_func(
+        &mut self,
+        node_id: table::NodeId,
+        symbol: &'a table::Symbol<'a>,
+        parent: Node,
+    ) -> Result<Node, ImportError> {
+        self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
+            let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, signature));
+            let node = ctx.make_node(node_id, optype, parent)?;
+            Ok(node)
+        })
+    }
+
+    fn import_node_custom(
+        &mut self,
+        node_id: table::NodeId,
+        operation: table::TermId,
+        node_data: &'a table::Node<'a>,
+        parent: Node,
+    ) -> Result<Node, ImportError> {
+        if let Some([_, _]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
+            let signature = self.get_node_signature(node_id)?;
+            let optype = OpType::CallIndirect(CallIndirect { signature });
+            let node = self.make_node(node_id, optype, parent)?;
+            return Ok(node);
+        }
+
+        if let Some([_, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
+            let table::Term::Apply(symbol, args) = self.get_term(func)? else {
+                return Err(error_invalid!(
+                    "expected a symbol application to be passed to `{}`",
+                    model::CORE_CALL
+                ));
+            };
+
+            let func_sig = self.get_func_signature(*symbol)?;
+
+            let type_args = args
+                .iter()
+                .map(|term| self.import_type_arg(*term))
+                .collect::<Result<Vec<TypeArg>, _>>()?;
+
+            self.static_edges.push((*symbol, node_id));
+            let optype = OpType::Call(
+                Call::try_new(func_sig, type_args).map_err(ImportErrorInner::Signature)?,
+            );
+
+            let node = self.make_node(node_id, optype, parent)?;
+            return Ok(node);
+        }
+
+        if let Some([_, value]) = self.match_symbol(operation, model::CORE_LOAD_CONST)? {
+            // If the constant refers directly to a function, import this as the `LoadFunc` operation.
+            if let table::Term::Apply(symbol, args) = self.get_term(value)? {
+                let func_node_data = self.get_node(*symbol)?;
+
+                if let table::Operation::DefineFunc(_) | table::Operation::DeclareFunc(_) =
+                    func_node_data.operation
+                {
+                    let func_sig = self.get_func_signature(*symbol)?;
+                    let type_args = args
+                        .iter()
+                        .map(|term| self.import_type_arg(*term))
+                        .collect::<Result<Vec<TypeArg>, _>>()?;
+
+                    self.static_edges.push((*symbol, node_id));
+
+                    let optype = OpType::LoadFunction(
+                        LoadFunction::try_new(func_sig, type_args)
+                            .map_err(ImportErrorInner::Signature)?,
+                    );
+
+                    let node = self.make_node(node_id, optype, parent)?;
+                    return Ok(node);
+                }
+            }
+
+            // Otherwise use const nodes
+            let signature = node_data
+                .signature
+                .ok_or_else(|| error_uninferred!("node signature"))?;
+            let [_, outputs] = self.get_func_type(signature)?;
+            let outputs = self.import_closed_list(outputs)?;
+            let output = outputs.first().ok_or_else(|| {
+                error_invalid!("`{}` expects a single output", model::CORE_LOAD_CONST)
+            })?;
+            let datatype = self.import_type(*output)?;
+
+            let imported_value = self.import_value(value, *output)?;
+
+            let load_const_node = self.make_node(
+                node_id,
+                OpType::LoadConstant(LoadConstant {
+                    datatype: datatype.clone(),
+                }),
+                parent,
+            )?;
+
+            let const_node = self
+                .hugr
+                .add_node_with_parent(parent, OpType::Const(Const::new(imported_value)));
+
+            self.hugr.connect(const_node, 0, load_const_node, 0);
+
+            return Ok(load_const_node);
+        }
+
+        if let Some([_, _, tag]) = self.match_symbol(operation, model::CORE_MAKE_ADT)? {
+            let table::Term::Literal(model::Literal::Nat(tag)) = self.get_term(tag)? else {
+                return Err(error_invalid!(
+                    "`{}` expects a nat literal tag",
+                    model::CORE_MAKE_ADT
+                ));
+            };
+
+            let signature = node_data
+                .signature
+                .ok_or_else(|| error_uninferred!("node signature"))?;
+            let [_, outputs] = self.get_func_type(signature)?;
+            let (variants, _) = self.import_adt_and_rest(outputs)?;
+            let node = self.make_node(
+                node_id,
+                OpType::Tag(Tag {
+                    variants,
+                    tag: *tag as usize,
+                }),
+                parent,
+            )?;
+            return Ok(node);
+        }
+
+        let table::Term::Apply(node, params) = self.get_term(operation)? else {
+            return Err(error_invalid!(
+                "custom operations expect a symbol application referencing an operation"
+            ));
+        };
+        let name = self.get_symbol_name(*node)?;
+        let args = params
+            .iter()
+            .map(|param| self.import_type_arg(*param))
+            .collect::<Result<Vec<_>, _>>()?;
+        let (extension, name) = self.import_custom_name(name)?;
+        let signature = self.get_node_signature(node_id)?;
+
+        // TODO: Currently we do not have the description or any other metadata for
+        // the custom op. This will improve with declarative extensions being able
+        // to declare operations as a node, in which case the description will be attached
+        // to that node as metadata.
+
+        let optype = OpType::OpaqueOp(OpaqueOp::new(extension, name, args, signature));
+        self.make_node(node_id, optype, parent)
+    }
+
+    fn import_node_define_alias(
+        &mut self,
+        node_id: table::NodeId,
+        symbol: &'a table::Symbol<'a>,
+        value: table::TermId,
+        parent: Node,
+    ) -> Result<Node, ImportError> {
+        if !symbol.params.is_empty() {
+            return Err(error_unsupported!(
+                "parameters or constraints in alias definition"
+            ));
+        }
+
+        let optype = OpType::AliasDefn(AliasDefn {
+            name: symbol.name.to_smolstr(),
+            definition: self.import_type(value)?,
+        });
+
+        let node = self.make_node(node_id, optype, parent)?;
+        Ok(node)
+    }
+
+    fn import_node_declare_alias(
+        &mut self,
+        node_id: table::NodeId,
+        symbol: &'a table::Symbol<'a>,
+        parent: Node,
+    ) -> Result<Node, ImportError> {
+        if !symbol.params.is_empty() {
+            return Err(error_unsupported!(
+                "parameters or constraints in alias declaration"
+            ));
+        }
+
+        let optype = OpType::AliasDecl(AliasDecl {
+            name: symbol.name.to_smolstr(),
+            bound: TypeBound::Copyable,
+        });
+
+        let node = self.make_node(node_id, optype, parent)?;
         Ok(node)
     }
 
