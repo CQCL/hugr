@@ -56,8 +56,8 @@ enum ImportErrorInner {
     Invalid(String),
 
     /// An error with additional context.
-    #[error("within: {1}")]
-    Context(#[source] Box<ImportError>, String),
+    #[error("import failed in context: {1}")]
+    Context(#[source] Box<ImportErrorInner>, String),
 
     /// A signature mismatch was detected during import.
     #[error("signature error: {0}")]
@@ -139,7 +139,12 @@ macro_rules! error_invalid {
 
 /// Helper macro to create an `ImportError::Context` error with a formatted message.
 macro_rules! error_context {
-    ($err:expr, $($e:expr),*) => { ImportError(ImportErrorInner::Context(Box::new($err), format!($($e),*))) }
+    ($err:expr, $($e:expr),*) => {
+        {
+            let ImportError(__err) = $err;
+            ImportError(ImportErrorInner::Context(Box::new(__err), format!($($e),*)))
+        }
+    }
 }
 
 /// Import a [`Package`] from its model representation.
@@ -432,73 +437,76 @@ impl<'a> Context<'a> {
         node_id: table::NodeId,
         parent: Node,
     ) -> Result<Option<Node>, ImportError> {
-        (|| {
-            let node_data = self.get_node(node_id)?;
+        let node_data = self.get_node(node_id)?;
 
-            let result = match node_data.operation {
-                table::Operation::Invalid => {
-                    return Err(error_invalid!("tried to import an `invalid` operation"));
-                }
+        let result = match node_data.operation {
+            table::Operation::Invalid => {
+                return Err(error_invalid!("tried to import an `invalid` operation"));
+            }
 
-                table::Operation::Dfg => Some(
-                    self.import_node_dfg(node_id, parent, node_data)
-                        .map_err(|err| error_context!(err, "dfg node {}", node_id))?,
-                ),
+            table::Operation::Dfg => Some(
+                self.import_node_dfg(node_id, parent, node_data)
+                    .map_err(|err| error_context!(err, "`dfg` node with id {}", node_id))?,
+            ),
 
-                table::Operation::Cfg => Some(
-                    self.import_node_cfg(node_id, parent, node_data)
-                        .map_err(|err| error_context!(err, "cfg node {}", node_id))?,
-                ),
+            table::Operation::Cfg => Some(
+                self.import_node_cfg(node_id, parent, node_data)
+                    .map_err(|err| error_context!(err, "`cfg` node with id {}", node_id))?,
+            ),
 
-                table::Operation::Block => Some(
-                    self.import_node_block(node_id, parent)
-                        .map_err(|err| error_context!(err, "block node {}", node_id))?,
-                ),
+            table::Operation::Block => Some(
+                self.import_node_block(node_id, parent)
+                    .map_err(|err| error_context!(err, "`block` node with id {}", node_id))?,
+            ),
 
-                table::Operation::DefineFunc(symbol) => Some(
-                    self.import_node_define_func(node_id, symbol, node_data, parent)
-                        .map_err(|err| error_context!(err, "define-func node {}", node_id))?,
-                ),
+            table::Operation::DefineFunc(symbol) => Some(
+                self.import_node_define_func(node_id, symbol, node_data, parent)
+                    .map_err(|err| error_context!(err, "`define-func` node with id {}", node_id))?,
+            ),
 
-                table::Operation::DeclareFunc(symbol) => Some(
-                    self.import_node_declare_func(node_id, symbol, parent)
-                        .map_err(|err| error_context!(err, "declare-func node {}", node_id))?,
-                ),
+            table::Operation::DeclareFunc(symbol) => Some(
+                self.import_node_declare_func(node_id, symbol, parent)
+                    .map_err(|err| {
+                        error_context!(err, "`declare-func` node with id {}", node_id)
+                    })?,
+            ),
 
-                table::Operation::TailLoop => Some(
-                    self.import_tail_loop(node_id, parent)
-                        .map_err(|err| error_context!(err, "tail-loop node {}", node_id))?,
-                ),
+            table::Operation::TailLoop => Some(
+                self.import_tail_loop(node_id, parent)
+                    .map_err(|err| error_context!(err, "`tail-loop` node with id {}", node_id))?,
+            ),
 
-                table::Operation::Conditional => Some(
-                    self.import_conditional(node_id, parent)
-                        .map_err(|err| error_context!(err, "conditional node {}", node_id))?,
-                ),
+            table::Operation::Conditional => Some(
+                self.import_conditional(node_id, parent)
+                    .map_err(|err| error_context!(err, "`cond` node with id {}", node_id))?,
+            ),
 
-                table::Operation::Custom(operation) => Some(
-                    self.import_node_custom(node_id, operation, node_data, parent)
-                        .map_err(|err| error_context!(err, "custom node {}", node_id))?,
-                ),
+            table::Operation::Custom(operation) => Some(
+                self.import_node_custom(node_id, operation, node_data, parent)
+                    .map_err(|err| error_context!(err, "custom node with id {}", node_id))?,
+            ),
 
-                table::Operation::DefineAlias(symbol, value) => Some(
-                    self.import_node_define_alias(node_id, symbol, value, parent)
-                        .map_err(|err| error_context!(err, "define-alias node {}", node_id))?,
-                ),
+            table::Operation::DefineAlias(symbol, value) => Some(
+                self.import_node_define_alias(node_id, symbol, value, parent)
+                    .map_err(|err| {
+                        error_context!(err, "`define-alias` node with id {}", node_id)
+                    })?,
+            ),
 
-                table::Operation::DeclareAlias(symbol) => Some(
-                    self.import_node_declare_alias(node_id, symbol, parent)
-                        .map_err(|err| error_context!(err, "declare-alias node {}", node_id))?,
-                ),
+            table::Operation::DeclareAlias(symbol) => Some(
+                self.import_node_declare_alias(node_id, symbol, parent)
+                    .map_err(|err| {
+                        error_context!(err, "`declare-alias` node with id {}", node_id)
+                    })?,
+            ),
 
-                table::Operation::Import { .. } => None,
+            table::Operation::Import { .. } => None,
 
-                table::Operation::DeclareConstructor { .. } => None,
-                table::Operation::DeclareOperation { .. } => None,
-            };
+            table::Operation::DeclareConstructor { .. } => None,
+            table::Operation::DeclareOperation { .. } => None,
+        };
 
-            Ok(result)
-        })()
-        .map_err(|err| error_context!(err, "node {}", node_id))
+        Ok(result)
     }
 
     fn import_node_dfg(
@@ -559,11 +567,13 @@ impl<'a> Context<'a> {
             return Err(error_invalid!("expected dfg region"));
         }
 
-        let signature = self.import_func_type(
-            region_data
-                .signature
-                .ok_or_else(|| error_uninferred!("region signature"))?,
-        )?;
+        let signature = self
+            .import_func_type(
+                region_data
+                    .signature
+                    .ok_or_else(|| error_uninferred!("region signature"))?,
+            )
+            .map_err(|err| error_context!(err, "signature of dfg region with id {}", region))?;
 
         // Create the input and output nodes
         let input = self.hugr.add_node_with_parent(
@@ -805,13 +815,16 @@ impl<'a> Context<'a> {
             self.region_scope = region;
         }
 
-        let [_, region_targets] = self.get_func_type(
-            region_data
-                .signature
-                .ok_or_else(|| error_uninferred!("region signature"))?,
-        )?;
+        let region_target_types = (|| {
+            let [_, region_targets] = self.get_func_type(
+                region_data
+                    .signature
+                    .ok_or_else(|| error_uninferred!("region signature"))?,
+            )?;
 
-        let region_target_types = self.import_closed_list(region_targets)?;
+            self.import_closed_list(region_targets)
+        })()
+        .map_err(|err| error_context!(err, "signature of cfg region with id {}", region))?;
 
         // Identify the entry node of the control flow region by looking for
         // a block whose input is linked to the sole source port of the CFG region.
@@ -901,7 +914,9 @@ impl<'a> Context<'a> {
         });
         let node = self.make_node(node_id, optype, parent)?;
 
-        self.import_dfg_region(*region, node)?;
+        self.import_dfg_region(*region, node).map_err(|err| {
+            error_context!(err, "block body defined by region with id {}", *region)
+        })?;
         Ok(node)
     }
 
@@ -923,7 +938,9 @@ impl<'a> Context<'a> {
                 ));
             };
 
-            ctx.import_dfg_region(*region, node)?;
+            ctx.import_dfg_region(*region, node).map_err(|err| {
+                error_context!(err, "function body defined by region with id {}", *region)
+            })?;
 
             Ok(node)
         })
