@@ -1,9 +1,7 @@
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
 use anyhow::{Result, anyhow};
-use hugr_core::builder::{
-    BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
-};
+use hugr_core::builder::{BuildHandle, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer};
 use hugr_core::extension::ExtensionRegistry;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::types::TypeRow;
@@ -463,17 +461,7 @@ mod test_fns {
                         .dfg_builder(HugrFuncType::new(type_row![], bool_t()), [])
                         .unwrap();
                     let konst = builder.add_constant(Value::false_val());
-                    let func = {
-                        let mut builder = builder
-                            .define_function(
-                                "scoped_func",
-                                HugrFuncType::new(type_row![], bool_t()),
-                            )
-                            .unwrap();
-                        let w = builder.load_const(&konst);
-                        builder.finish_with_outputs([w]).unwrap()
-                    };
-                    let [r] = builder.call(func.handle(), &[], []).unwrap().outputs_arr();
+                    let r = builder.load_const(&konst);
                     builder.finish_with_outputs([r]).unwrap().outputs_arr()
                 };
                 builder.finish_with_outputs([r]).unwrap()
@@ -489,22 +477,12 @@ mod test_fns {
                 let [r] = {
                     let mut builder = builder.cfg_builder([], vec![bool_t()].into()).unwrap();
                     let konst = builder.add_constant(Value::false_val());
-                    let func = {
-                        let mut builder = builder
-                            .define_function(
-                                "scoped_func",
-                                HugrFuncType::new(type_row![], bool_t()),
-                            )
-                            .unwrap();
-                        let w = builder.load_const(&konst);
-                        builder.finish_with_outputs([w]).unwrap()
-                    };
                     let entry = {
                         let mut builder = builder
                             .entry_builder([type_row![]], vec![bool_t()].into())
                             .unwrap();
                         let control = builder.add_load_value(Value::unary_unit_sum());
-                        let [r] = builder.call(func.handle(), &[], []).unwrap().outputs_arr();
+                        let r = builder.load_const(&konst);
                         builder.finish_with_outputs(control, [r]).unwrap()
                     };
                     let exit = builder.exit_block();
