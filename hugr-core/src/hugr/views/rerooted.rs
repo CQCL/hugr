@@ -1,7 +1,9 @@
 //! A HUGR wrapper with a modified entrypoint node, returned by
 //! [`HugrView::with_entrypoint`] and [`HugrMut::with_entrypoint_mut`].
+use std::collections::HashSet;
 
 use crate::hugr::HugrMut;
+use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 
 use super::render::RenderConfig;
@@ -139,8 +141,8 @@ impl<H: HugrMut> HugrMut for Rerooted<H> {
                 fn connect(&mut self, src: Self::Node, src_port: impl Into<crate::OutgoingPort>, dst: Self::Node, dst_port: impl Into<crate::IncomingPort>);
                 fn disconnect(&mut self, node: Self::Node, port: impl Into<crate::Port>);
                 fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (crate::OutgoingPort, crate::IncomingPort);
-                fn insert_hugr(&mut self, root: Self::Node, other: crate::Hugr) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
-                fn insert_from_view<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other) -> crate::hugr::hugrmut::InsertionResult<Other::Node, Self::Node>;
+                fn insert_hugr_with_defns(&mut self, root: Self::Node, other: crate::Hugr, children: HashSet<crate::Node>) -> InsertionResult<crate::Node, Self::Node>;
+                fn insert_from_view_with_defns<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, children: HashSet<Other::Node>) -> InsertionResult<Other::Node, Self::Node>;
                 fn insert_subgraph<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, subgraph: &crate::hugr::views::SiblingSubgraph<Other::Node>) -> std::collections::HashMap<Other::Node, Self::Node>;
                 fn use_extension(&mut self, extension: impl Into<std::sync::Arc<crate::extension::Extension>>);
                 fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>) where crate::extension::ExtensionRegistry: Extend<Reg>;
