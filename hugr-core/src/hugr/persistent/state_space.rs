@@ -7,8 +7,8 @@ use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use super::{
-    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, find_conflicting_node,
-    parents_view::ParentsView,
+    Commit, PersistentHugr, PersistentReplacement, find_conflicting_node,
+    parents_view::ParentsView, resolver::SerdeHashResolver,
 };
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port,
@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// A copyable handle to a [`Commit`] vertex within a [`CommitStateSpace`]
-pub(super) type CommitId = relrc::NodeId;
+pub type CommitId = relrc::NodeId;
 
 /// A HUGR node within a commit of the commit state space
 #[derive(
@@ -68,7 +68,7 @@ pub struct CommitStateSpace {
     ///
     /// Each commit is stored as a [`RelRc`].
     #[serde(serialize_with = "super::serialize::serialize_history_graph")]
-    pub(super) graph: HistoryGraph<CommitData, (), PointerEqResolver>,
+    pub(super) graph: HistoryGraph<CommitData, (), SerdeHashResolver>,
     /// The unique root of the commit graph.
     ///
     /// The only commit in the graph with variant [`CommitData::Base`]. All
@@ -81,7 +81,7 @@ impl CommitStateSpace {
     /// Create a new commit state space with a single base commit.
     pub fn with_base(hugr: Hugr) -> Self {
         let commit = RelRc::new(CommitData::Base(hugr));
-        let graph = HistoryGraph::new([commit.clone()], PointerEqResolver);
+        let graph = HistoryGraph::new([commit.clone()], SerdeHashResolver);
         let base_commit = graph
             .all_node_ids()
             .exactly_one()
@@ -97,7 +97,7 @@ impl CommitStateSpace {
     pub fn try_from_commits(
         commits: impl IntoIterator<Item = Commit>,
     ) -> Result<Self, InvalidCommit> {
-        let graph = HistoryGraph::new(commits.into_iter().map_into(), PointerEqResolver);
+        let graph = HistoryGraph::new(commits.into_iter().map_into(), SerdeHashResolver);
         let base_commits = graph
             .all_node_ids()
             .filter(|&id| matches!(graph.get_node(id).value(), CommitData::Base(_)))
@@ -190,7 +190,7 @@ impl CommitStateSpace {
         let commits = all_commit_ids
             .into_iter()
             .map(|id| self.get_commit(id).as_relrc().clone());
-        let subgraph = HistoryGraph::new(commits, PointerEqResolver);
+        let subgraph = HistoryGraph::new(commits, SerdeHashResolver);
 
         Ok(PersistentHugr::from_state_space_unsafe(Self {
             graph: subgraph,
@@ -237,7 +237,7 @@ impl CommitStateSpace {
     }
 
     /// Get the set of nodes invalidated by `commit_id` in `parent`.
-    pub(super) fn invalidation_set(
+    pub fn invalidation_set(
         &self,
         commit_id: CommitId,
         parent: CommitId,
@@ -259,7 +259,7 @@ impl CommitStateSpace {
         }
     }
 
-    pub(super) fn as_history_graph(&self) -> &HistoryGraph<CommitData, (), PointerEqResolver> {
+    pub(super) fn as_history_graph(&self) -> &HistoryGraph<CommitData, (), SerdeHashResolver> {
         &self.graph
     }
 
@@ -357,7 +357,7 @@ impl CommitStateSpace {
     ///
     /// Panics if `(node, port)` is not connected to the input node in the
     /// commit of `node`, or if the node is not valid.
-    pub(super) fn linked_parent_input(
+    pub fn linked_parent_input(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: IncomingPort,
@@ -375,7 +375,14 @@ impl CommitStateSpace {
         repl.linked_host_input((node, port), &parent_hugrs).into()
     }
 
-    pub(super) fn linked_parent_outputs(
+    /// Get the input boundary ports linked to `(node, port)` in a
+    /// parent of the commit of `node`.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if `(node, port)` is not connected to the output node in the
+    /// commit of `node`, or if the node is not valid.
+    pub fn linked_parent_outputs(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: OutgoingPort,

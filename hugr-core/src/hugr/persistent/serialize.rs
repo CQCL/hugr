@@ -15,7 +15,7 @@ use relrc::{
 use serde::{Deserialize, Serialize, de::VariantAccess};
 use std::collections::BTreeMap;
 
-use super::{CommitStateSpace, PointerEqResolver, state_space::CommitData};
+use super::{CommitStateSpace, resolver::SerdeHashResolver, state_space::CommitData};
 
 impl<'de> serde::de::DeserializeSeed<'de> for ExtensionsSeed<'_, CommitData> {
     type Value = CommitData;
@@ -33,7 +33,7 @@ impl<'de> serde::de::DeserializeSeed<'de> for ExtensionsSeed<'_, CommitData> {
         struct Visitor<'a> {
             extensions: &'a ExtensionRegistry,
         }
-        impl<'de> serde::de::Visitor<'de> for Visitor<'_> {
+        impl<'de, 'a> serde::de::Visitor<'de> for Visitor<'a> {
             type Value = CommitData;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -71,7 +71,7 @@ impl<'de> serde::de::DeserializeSeed<'de> for ExtensionsSeed<'_, CommitData> {
 }
 
 pub(super) fn serialize_history_graph<S: serde::Serializer>(
-    graph: &relrc::HistoryGraph<CommitData, (), PointerEqResolver>,
+    graph: &relrc::HistoryGraph<CommitData, (), SerdeHashResolver>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
     let ser_graph = graph.to_serialized();
@@ -112,12 +112,12 @@ impl<'de> serde::de::DeserializeSeed<'de> for ExtensionsSeed<'_, CommitStateSpac
                     match key {
                         Fields::Graph => {
                             let ser_graph = map.next_value_seed(ExtensionsSeed::<
-                                SerializedHistoryGraph<CommitData, (), PointerEqResolver>,
+                                SerializedHistoryGraph<CommitData, (), SerdeHashResolver>,
                             >::new(
                                 self.extensions
                             ))?;
                             graph = Some(
-                                HistoryGraph::try_from_serialized(ser_graph, PointerEqResolver)
+                                HistoryGraph::try_from_serialized(ser_graph, SerdeHashResolver)
                                     .expect("support SerdeHashResolver"),
                             );
                         }

@@ -153,21 +153,33 @@ impl<'a> Walker<'a> {
             }
         } else {
             let commit = self.state_space.get_commit(commit_id).clone();
-            // TODO: we should be able to check for an AlreadyPinned error at
-            // the same time that we check the ancestors are compatible in
-            // `PersistentHugr`, with e.g. a callback, instead of storing a backup
-            let backup = self.selected_commits.clone();
-            self.selected_commits.try_add_commit(commit)?;
-            if let Some(&pinned_node) = self
-                .pinned_nodes
-                .iter()
-                .find(|&&n| !self.selected_commits.contains_node(n))
-            {
-                self.selected_commits = backup;
-                return Err(PinNodeError::AlreadyPinned(pinned_node));
-            }
+            self.try_select_commit(commit)?;
         }
         Ok(self.pinned_nodes.insert(node))
+    }
+
+    /// Add a commit to the selected commits of the Walker.
+    ///
+    /// Return the ID of the added commit if it was added successfully, or the
+    /// existing ID of the commit if it was already selected.
+    ///
+    /// Return an error if the commit is not compatible with the current set of
+    /// selected commits, or if the commit deletes an already pinned node.
+    pub fn try_select_commit(&mut self, commit: Commit) -> Result<CommitId, PinNodeError> {
+        // TODO: we should be able to check for an AlreadyPinned error at
+        // the same time that we check the ancestors are compatible in
+        // `PersistentHugr`, with e.g. a callback, instead of storing a backup
+        let backup = self.selected_commits.clone();
+        let commit_id = self.selected_commits.try_add_commit(commit)?;
+        if let Some(&pinned_node) = self
+            .pinned_nodes
+            .iter()
+            .find(|&&n| !self.selected_commits.contains_node(n))
+        {
+            self.selected_commits = backup;
+            return Err(PinNodeError::AlreadyPinned(pinned_node));
+        }
+        Ok(commit_id)
     }
 
     /// Get the wire connected to a specified port of a pinned node.
@@ -352,6 +364,16 @@ impl<'a> Walker<'a> {
         Commit::try_new(repl, additional_parents, &self.state_space)
     }
 
+    /// Check if a node is pinned in the [`Walker`].
+    pub fn is_pinned(&self, node: PatchNode) -> bool {
+        self.pinned_nodes.contains(&node)
+    }
+
+    /// Iterate over all pinned nodes in the [`Walker`].
+    pub fn pinned_nodes(&self) -> impl Iterator<Item = PatchNode> + '_ {
+        self.pinned_nodes.iter().copied()
+    }
+
     /// Get all equivalent ports among the commits that are descendants of the
     /// current commit.
     ///
@@ -400,10 +422,6 @@ impl<'a> Walker<'a> {
             }
         }
         all_ports
-    }
-
-    fn is_pinned(&self, node: PatchNode) -> bool {
-        self.pinned_nodes.contains(&node)
     }
 }
 
