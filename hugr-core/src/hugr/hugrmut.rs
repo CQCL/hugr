@@ -677,14 +677,11 @@ fn insert_hugr_nodes<H: HugrView>(
 
 #[cfg(test)]
 mod test {
-    use rstest::rstest;
-
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
     use crate::extension::PRELUDE;
     use crate::extension::prelude::{Noop, bool_t, usize_t};
     use crate::hugr::ValidationError;
-    use crate::ops::handle::FuncID;
     use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait, handle::NodeHandle};
     use crate::types::Signature;
 
@@ -766,61 +763,44 @@ mod test {
         assert_eq!(hugr.num_nodes(), 1);
     }
 
-    fn call_func_defn() -> (Hugr, FuncID<true>) {
-        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
-        let mut mb = dfb.module_root_builder();
-        let new_func = {
-            let fb = mb
-                .define_function("helper_id", Signature::new_endo(bool_t()))
-                .unwrap();
-            let [f_inp] = fb.input_wires_arr();
-            fb.finish_with_outputs([f_inp]).unwrap()
+    #[test]
+    fn insert_hugr_defns() {
+        let (new, new_defn, new_decl) = {
+            let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let new_defn = {
+                let fb = mb
+                    .define_function("helper_id", Signature::new_endo(bool_t()))
+                    .unwrap();
+                let [f_inp] = fb.input_wires_arr();
+                fb.finish_with_outputs([f_inp]).unwrap()
+            };
+            let new_decl = mb.declare("helper2", Signature::new_endo(bool_t()).into()).unwrap();
+            let cst = dfb.add_load_value(ops::Value::true_val());
+            let [c1] = dfb
+                .call(new_defn.handle(), &[], [cst])
+                .unwrap()
+                .outputs_arr();
+            let [c2] = dfb
+                .call(&new_decl, &[], [c1])
+                .unwrap()
+                .outputs_arr();
+            (dfb.finish_hugr_with_outputs([c2]).unwrap(), new_defn, new_decl)
         };
-        let cst = dfb.add_load_value(ops::Value::true_val());
-        let [c1] = dfb
-            .call(new_func.handle(), &[], [cst])
-            .unwrap()
-            .outputs_arr();
-        let [c2] = dfb
-            .call(new_func.handle(), &[], [c1])
-            .unwrap()
-            .outputs_arr();
-        (
-            dfb.finish_hugr_with_outputs([c2]).unwrap(),
-            *new_func.handle(),
-        )
-    }
 
-    fn call_func_decl() -> (Hugr, FuncID<false>) {
-        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
-        let mut mb = dfb.module_root_builder();
-        let new_func = mb
-            .declare("helper-decl", Signature::new_endo(bool_t()).into())
-            .unwrap();
-        let cst = dfb.add_load_value(ops::Value::true_val());
-        let [c1] = dfb.call(&new_func, &[], [cst]).unwrap().outputs_arr();
-        let [c2] = dfb.call(&new_func, &[], [c1]).unwrap().outputs_arr();
-        (dfb.finish_hugr_with_outputs([c2]).unwrap(), new_func)
-    }
-
-    #[rstest]
-    #[case(call_func_decl(), |op: &OpType| op.as_func_decl().is_some_and(|f|f.func_name() == "helper-decl"))]
-    #[case(call_func_defn(), |op: &OpType| op.as_func_defn().is_some_and(|f|f.func_name() == "helper_id"))]
-    fn insert_hugr_defns<const B: bool>(#[case] inserted_and_func: (Hugr, FuncID<B>), #[case] check: impl Fn(&OpType) -> bool) {
-        let (new, new_func) = inserted_and_func;
         let [
             mut view_default,
-            mut view_with_func,
+            mut view_with_funcs,
             mut hugr_default,
-            mut hugr_no_func,
+            mut hugr_no_funcs,
         ] = std::array::from_fn(|_| simple_dfg_hugr());
         let ep = view_default.entrypoint(); // Same for all
         view_default.insert_from_view(ep, &new);
-        view_with_func.insert_from_view_with_defns(ep, &new, HashSet::from([new_func.node()]));
+        view_with_funcs.insert_from_view_with_defns(ep, &new, HashSet::from([new_defn.node(), new_decl.node()]));
         hugr_default.insert_hugr(ep, new.clone());
-        hugr_no_func.insert_hugr_with_defns(ep, new, HashSet::new());
+        hugr_no_funcs.insert_hugr_with_defns(ep, new, HashSet::new());
 
-        for h in [view_default, hugr_no_func] {
+        for h in [view_default, hugr_no_funcs] {
             assert!(matches!(
                 h.validate(),
                 Err(ValidationError::UnconnectedPort { .. })
@@ -829,23 +809,23 @@ mod test {
                 assert_eq!(h.static_source(call), None);
             }
             for n in h.nodes() {
-<<<<<<< Updated upstream
-                if let Some(fd) = h.get_optype(n).as_func_defn() {
-                    assert_eq!(fd.func_name(), "main");
+                match h.get_optype(n) {
+                    OpType::FuncDefn(fd) => assert_eq!(fd.func_name(), "main"),
+                    OpType::FuncDecl(_) => panic!("No Decls expected"),
+                    _ => ()
                 }
-||||||| Stash base
-                assert!(h.get_optype(n).as_func_defn().is_none_or(|fd| fd.func_name() == "main"));
-=======
-                assert!(!check(h.get_optype(n)));
->>>>>>> Stashed changes
             }
         }
 
-        for h in [view_with_func, hugr_default] {
+        for h in [view_with_funcs, hugr_default] {
             h.validate().unwrap();
             for call in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
                 let target = h.static_source(call).unwrap();
-                assert!(check(h.get_optype(target)));
+                match h.get_optype(target) {
+                    OpType::FuncDefn(fd) => assert_eq!(fd.func_name(), "helper_id"),
+                    OpType::FuncDecl(fd) => assert_eq!(fd.func_name(), "helper2"),
+                    _ => panic!("Target of Call not FuncDefn/Decl")
+                }
             }
         }
     }
