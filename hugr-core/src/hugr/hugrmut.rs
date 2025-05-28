@@ -678,7 +678,6 @@ fn insert_hugr_nodes<H: HugrView>(
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
-    use rstest::rstest;
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
@@ -795,58 +794,40 @@ mod test {
         )
     }
 
-    enum WhatInsertion {
-        DefaultView,
-        DefaultHugr,
-        ViewWithDefns(bool, bool),
-        HugrWithDefns(bool, bool),
-    }
+    #[test]
+    fn test_insert_hugr() {
+        let mut h = simple_dfg_hugr();
+        let (insert, _, _) = inserted_defn_decl();
 
-    impl WhatInsertion {
-        fn into_hugr(self) -> (Hugr, bool, bool) {
-            let mut h = simple_dfg_hugr();
+        // Defaults
+        h.insert_from_view(h.entrypoint(), &insert);
+        check_insertion(h, false, false);
+
+        let mut h = simple_dfg_hugr();
+        h.insert_hugr(h.entrypoint(), insert);
+        check_insertion(h, true, true);
+
+        // Specify which decls to transfer
+        for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
             let (insert, defn, decl) = inserted_defn_decl();
-            let mk = |df: bool, dc: bool| {
-                HashSet::from_iter(
-                    df.then_some(defn.node())
-                        .into_iter()
-                        .chain(dc.then_some(decl.node())),
-                )
-            };
-            match self {
-                WhatInsertion::DefaultView => {
-                    h.insert_from_view(h.entrypoint(), &insert);
-                    (h, false, false)
-                }
-                WhatInsertion::DefaultHugr => {
-                    h.insert_hugr(h.entrypoint(), insert);
-                    (h, true, true)
-                }
-                WhatInsertion::ViewWithDefns(do_defn, do_decl) => {
-                    h.insert_from_view_with_defns(h.entrypoint(), &insert, mk(do_defn, do_decl));
-                    (h, do_defn, do_decl)
-                }
-                WhatInsertion::HugrWithDefns(do_defn, do_decl) => {
-                    h.insert_hugr_with_defns(h.entrypoint(), insert, mk(do_defn, do_decl));
-                    (h, do_defn, do_decl)
-                }
-            }
+            let mod_children = HashSet::from_iter(
+                call1
+                    .then_some(defn.node())
+                    .into_iter()
+                    .chain(call2.then_some(decl.node())),
+            );
+
+            let mut h = simple_dfg_hugr();
+            h.insert_from_view_with_defns(h.entrypoint(), &insert, mod_children.clone());
+            check_insertion(h, call1, call2);
+
+            let mut h = simple_dfg_hugr();
+            h.insert_hugr_with_defns(h.entrypoint(), insert, mod_children);
+            check_insertion(h, call1, call2);
         }
     }
 
-    #[rstest]
-    #[case(WhatInsertion::DefaultHugr)]
-    #[case(WhatInsertion::HugrWithDefns(false, false))]
-    #[case(WhatInsertion::HugrWithDefns(false, true))]
-    #[case(WhatInsertion::HugrWithDefns(true, false))]
-    #[case(WhatInsertion::HugrWithDefns(true, true))]
-    #[case(WhatInsertion::DefaultView)]
-    #[case(WhatInsertion::ViewWithDefns(false, false))]
-    #[case(WhatInsertion::ViewWithDefns(false, true))]
-    #[case(WhatInsertion::ViewWithDefns(true, false))]
-    #[case(WhatInsertion::ViewWithDefns(true, true))]
-    fn insert_hugr_defns(#[case] which: WhatInsertion) {
-        let (h, call1_ok, call2_ok) = which.into_hugr();
+    fn check_insertion(h: Hugr, call1_ok: bool, call2_ok: bool) {
         if call1_ok && call2_ok {
             h.validate().unwrap();
         } else {
