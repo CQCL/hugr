@@ -310,8 +310,9 @@ mod test {
         // The 4 dataflow blocks form a diamond, and the bottom block branches
         // either to the entry block or the exit block.
         //
-        // Two non-local uses in the left block means that these values must
-        // be threaded through all blocks, because of the loop.
+        // The left block contains non-local uses of a value from outside the CFG (ext edge)
+        // and a value from the entry block (dom edge) - the `ext` must be threaded through
+        // all blocks because of the loop, the `dom` stays within (the same iter of) the loop.
         //
         // All non-trivial(i.e. more than one choice of successor) branching is
         // done on an option type to exercise both empty and occupied control
@@ -325,15 +326,15 @@ mod test {
             .cloned()
             .map(|x| x.try_into().unwrap())
             .collect_vec();
-        let nonlocal1_type = bool_t();
-        let nonlocal2_type = Type::new_unit_sum(3);
+        let ext_edge_type = bool_t();
+        let dom_edge_type = Type::new_unit_sum(3);
         let other_output_type = branch_type.clone();
         let mut outer = DFGBuilder::new(Signature::new(
-            vec![branch_type.clone(), nonlocal1_type.clone(), Type::UNIT],
+            vec![branch_type.clone(), ext_edge_type.clone(), Type::UNIT],
             vec![Type::UNIT, other_output_type.clone()],
         ))
         .unwrap();
-        let [b, nl1, unit] = outer.input_wires_arr();
+        let [b, src_ext, unit] = outer.input_wires_arr();
         let mut cfg = outer
             .cfg_builder(
                 [(Type::UNIT, unit), (branch_type.clone(), b)],
@@ -341,7 +342,7 @@ mod test {
             )
             .unwrap();
 
-        let (entry, cst) = {
+        let (entry, src_dom) = {
             let mut entry = cfg
                 .entry_builder(branch_variants.clone(), other_output_type.clone().into())
                 .unwrap();
@@ -363,11 +364,11 @@ mod test {
                 .unwrap();
             let [unit, oo] = bb.input_wires_arr();
             let tgt_ext = bb
-                .add_dataflow_op(Noop::new(nonlocal1_type.clone()), [nl1])
+                .add_dataflow_op(Noop::new(ext_edge_type.clone()), [src_ext])
                 .unwrap();
 
             let tgt_dom = bb
-                .add_dataflow_op(Noop::new(nonlocal2_type.clone()), [cst])
+                .add_dataflow_op(Noop::new(dom_edge_type.clone()), [src_dom])
                 .unwrap();
             (
                 bb.finish_with_outputs(unit, [oo]).unwrap(),
@@ -409,8 +410,6 @@ mod test {
         let [unit, out] = cfg.finish_sub_container().unwrap().outputs_arr();
 
         let mut hugr = outer.finish_hugr_with_outputs([unit, out]).unwrap();
-        eprintln!("ALAN tgt_ext {tgt_ext:?} tgt_dom {tgt_dom:?}");
-        eprintln!("{}", hugr.mermaid_string());
         let Err(FindNonLocalEdgesError::Edges(es)) = ensure_no_nonlocal_edges(&hugr) else {
             panic!()
         };
@@ -425,22 +424,22 @@ mod test {
         hugr.validate().unwrap();
         assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
         let dfb = |bb: BasicBlockID| hugr.get_optype(bb.node()).as_dataflow_block().unwrap();
-        // Entry node gets nonlocal1_type added, only
+        // Entry node gets ext_edge_type added, only
         assert_eq!(
             dfb(entry).inputs[..],
-            [nonlocal1_type.clone(), Type::UNIT, branch_type.clone()]
+            [ext_edge_type.clone(), Type::UNIT, branch_type.clone()]
         );
-        // Left node gets both nonlocal1_type and nonlocal2_type
+        // Left node gets both ext_edge_type and dom_edge_type
         assert_eq!(
             dfb(bb_left).inputs[..],
             [
-                nonlocal1_type.clone(),
-                nonlocal2_type,
+                ext_edge_type.clone(),
+                dom_edge_type,
                 Type::UNIT,
                 other_output_type
             ]
         );
-        // Bottom node gets nonlocal1_type added, only
-        assert_eq!(dfb(bb_bottom).inputs[..], [nonlocal1_type, branch_type]);
+        // Bottom node gets ext_edge_type added, only
+        assert_eq!(dfb(bb_bottom).inputs[..], [ext_edge_type, branch_type]);
     }
 }
