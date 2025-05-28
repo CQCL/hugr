@@ -42,7 +42,7 @@ pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, I
         hugr.in_value_types(node).filter_map(move |(in_p, _)| {
             let (src, _) = hugr.single_linked_output(node, in_p)?;
             (hugr.get_parent(node) != hugr.get_parent(src)
-                && ancestors(src, hugr).any(|a| *a == hugr.entrypoint()))
+                && ancestors(src, hugr).any(|a| a == hugr.entrypoint()))
             .then_some((node, in_p))
         })
     })
