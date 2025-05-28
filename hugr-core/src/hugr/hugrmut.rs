@@ -677,12 +677,13 @@ fn insert_hugr_nodes<H: HugrView>(
 
 #[cfg(test)]
 mod test {
+    use crate::builder::test::simple_dfg_hugr;
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
     use crate::extension::PRELUDE;
-    use crate::{
-        extension::prelude::{Noop, usize_t},
-        ops::{self, FuncDefn, Input, Output, dataflow::IOTrait},
-        types::Signature,
-    };
+    use crate::extension::prelude::{Noop, bool_t, usize_t};
+    use crate::hugr::ValidationError;
+    use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait, handle::NodeHandle};
+    use crate::types::Signature;
 
     use super::*;
 
@@ -760,5 +761,72 @@ mod test {
         hugr.remove_subtree(bar);
         hugr.validate().unwrap();
         assert_eq!(hugr.num_nodes(), 1);
+    }
+
+    #[test]
+    fn insert_hugr_defns() {
+        let (new, new_defn, new_decl) = {
+            let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let new_defn = {
+                let fb = mb
+                    .define_function("helper_id", Signature::new_endo(bool_t()))
+                    .unwrap();
+                let [f_inp] = fb.input_wires_arr();
+                fb.finish_with_outputs([f_inp]).unwrap()
+            };
+            let new_decl = mb.declare("helper2", Signature::new_endo(bool_t()).into()).unwrap();
+            let cst = dfb.add_load_value(ops::Value::true_val());
+            let [c1] = dfb
+                .call(new_defn.handle(), &[], [cst])
+                .unwrap()
+                .outputs_arr();
+            let [c2] = dfb
+                .call(&new_decl, &[], [c1])
+                .unwrap()
+                .outputs_arr();
+            (dfb.finish_hugr_with_outputs([c2]).unwrap(), new_defn, new_decl)
+        };
+
+        let [
+            mut view_default,
+            mut view_with_funcs,
+            mut hugr_default,
+            mut hugr_no_funcs,
+        ] = std::array::from_fn(|_| simple_dfg_hugr());
+        let ep = view_default.entrypoint(); // Same for all
+        view_default.insert_from_view(ep, &new);
+        view_with_funcs.insert_from_view_with_defns(ep, &new, HashSet::from([new_defn.node(), new_decl.node()]));
+        hugr_default.insert_hugr(ep, new.clone());
+        hugr_no_funcs.insert_hugr_with_defns(ep, new, HashSet::new());
+
+        for h in [view_default, hugr_no_funcs] {
+            assert!(matches!(
+                h.validate(),
+                Err(ValidationError::UnconnectedPort { .. })
+            ));
+            for call in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
+                assert_eq!(h.static_source(call), None);
+            }
+            for n in h.nodes() {
+                match h.get_optype(n) {
+                    OpType::FuncDefn(fd) => assert_eq!(fd.func_name(), "main"),
+                    OpType::FuncDecl(_) => panic!("No Decls expected"),
+                    _ => ()
+                }
+            }
+        }
+
+        for h in [view_with_funcs, hugr_default] {
+            h.validate().unwrap();
+            for call in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
+                let target = h.static_source(call).unwrap();
+                match h.get_optype(target) {
+                    OpType::FuncDefn(fd) => assert_eq!(fd.func_name(), "helper_id"),
+                    OpType::FuncDecl(fd) => assert_eq!(fd.func_name(), "helper2"),
+                    _ => panic!("Target of Call not FuncDefn/Decl")
+                }
+            }
+        }
     }
 }
