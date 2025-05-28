@@ -15,6 +15,7 @@ mod localize;
 use localize::ExtraSourceReqs;
 
 /// [ComposablePass] wrapper for [remove_nonlocal_edges]
+#[derive(Clone, Debug, Hash)]
 pub struct LocalizeEdges;
 
 /// Error from [LocalizeEdges] or [remove_nonlocal_edges]
