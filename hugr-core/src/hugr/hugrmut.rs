@@ -678,13 +678,15 @@ fn insert_hugr_nodes<H: HugrView>(
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
+    use rstest::rstest;
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
     use crate::extension::PRELUDE;
     use crate::extension::prelude::{Noop, bool_t, usize_t};
     use crate::hugr::ValidationError;
-    use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait, handle::NodeHandle};
+    use crate::ops::handle::{FuncID, NodeHandle};
+    use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
     use crate::types::Signature;
 
     use super::*;
@@ -765,8 +767,8 @@ mod test {
         assert_eq!(hugr.num_nodes(), 1);
     }
 
-    #[test]
-    fn insert_hugr_defns() {
+    // Tests of insert_{hugr,from_view}(_with_defns) ====================================
+    fn inserted_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
         let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
         let new_defn = {
             let mut mb = dfb.module_root_builder();
@@ -786,75 +788,99 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [c2] = dfb.call(&new_decl, &[], [c1]).unwrap().outputs_arr();
-        let new = dfb.finish_hugr_with_outputs([c2]).unwrap();
+        (
+            dfb.finish_hugr_with_outputs([c2]).unwrap(),
+            *new_defn.handle(),
+            new_decl,
+        )
+    }
 
-        let [
-            mut view_default,
-            mut view_with_funcs,
-            mut hugr_default,
-            mut hugr_no_funcs,
-        ] = std::array::from_fn(|_| simple_dfg_hugr());
-        let ep = view_default.entrypoint(); // Same for all
-        view_default.insert_from_view(ep, &new);
-        view_with_funcs.insert_from_view_with_defns(
-            ep,
-            &new,
-            HashSet::from([new_defn.node(), new_decl.node()]),
-        );
-        hugr_default.insert_hugr(ep, new.clone());
-        hugr_no_funcs.insert_hugr_with_defns(ep, new.clone(), HashSet::new());
+    enum WhatInsertion {
+        DefaultView,
+        DefaultHugr,
+        ViewWithDefns(bool, bool),
+        HugrWithDefns(bool, bool),
+    }
 
-        // Hugr, first call should be ok, second call should be ok
-        let mut examples = vec![
-            (view_default, false, false),
-            (hugr_no_funcs, false, false),
-            (view_with_funcs, true, true),
-            (hugr_default, true, true),
-        ];
-
-        // Examples with just one FuncDefn/Decl copied (and the other not)
-        for mod_child in [new_decl.node(), new_defn.node()] {
-            let mut hs = [simple_dfg_hugr(), simple_dfg_hugr()];
-            hs[0].insert_from_view_with_defns(ep, &new, HashSet::from([mod_child]));
-            hs[1].insert_hugr_with_defns(ep, new.clone(), HashSet::from([mod_child]));
-            let (call1_ok, call2_ok) = (mod_child == new_defn.node(), mod_child == new_decl.node());
-            examples.extend(hs.map(|h| (h, call1_ok, call2_ok)));
-        }
-
-        for (h, call1_ok, call2_ok) in examples {
-            if call1_ok && call2_ok {
-                h.validate().unwrap();
-            } else {
-                assert!(matches!(
-                    h.validate(),
-                    Err(ValidationError::UnconnectedPort { .. })
-                ));
+    impl WhatInsertion {
+        fn into_hugr(self) -> (Hugr, bool, bool) {
+            let mut h = simple_dfg_hugr();
+            let (insert, defn, decl) = inserted_defn_decl();
+            let mk = |df: bool, dc: bool| {
+                HashSet::from_iter(
+                    df.then_some(defn.node())
+                        .into_iter()
+                        .chain(dc.then_some(decl.node())),
+                )
+            };
+            match self {
+                WhatInsertion::DefaultView => {
+                    h.insert_from_view(h.entrypoint(), &insert);
+                    (h, false, false)
+                }
+                WhatInsertion::DefaultHugr => {
+                    h.insert_hugr(h.entrypoint(), insert);
+                    (h, true, true)
+                }
+                WhatInsertion::ViewWithDefns(do_defn, do_decl) => {
+                    h.insert_from_view_with_defns(h.entrypoint(), &insert, mk(do_defn, do_decl));
+                    (h, do_defn, do_decl)
+                }
+                WhatInsertion::HugrWithDefns(do_defn, do_decl) => {
+                    h.insert_hugr_with_defns(h.entrypoint(), insert, mk(do_defn, do_decl));
+                    (h, do_defn, do_decl)
+                }
             }
-            assert_eq!(
-                h.children(h.module_root()).count(),
-                1 + (call1_ok as usize) + (call2_ok as usize)
-            );
-            let [call1, call2] = h
-                .nodes()
-                .filter(|n| h.get_optype(*n).is_call())
-                .collect_array()
-                .unwrap();
-
-            let tgt1 = h.nodes().find(|n| {
-                h.get_optype(*n)
-                    .as_func_defn()
-                    .is_some_and(|fd| fd.func_name() == "helper_id")
-            });
-            assert_eq!(tgt1.is_some(), call1_ok);
-            assert_eq!(h.static_source(call1), tgt1);
-
-            let tgt2 = h.nodes().find(|n| {
-                h.get_optype(*n)
-                    .as_func_decl()
-                    .is_some_and(|fd| fd.func_name() == "helper2")
-            });
-            assert_eq!(tgt2.is_some(), call2_ok);
-            assert_eq!(h.static_source(call2), tgt2);
         }
     }
+
+    #[rstest]
+    #[case(WhatInsertion::DefaultHugr)]
+    #[case(WhatInsertion::HugrWithDefns(false, false))]
+    #[case(WhatInsertion::HugrWithDefns(false, true))]
+    #[case(WhatInsertion::HugrWithDefns(true, false))]
+    #[case(WhatInsertion::HugrWithDefns(true, true))]
+    #[case(WhatInsertion::DefaultView)]
+    #[case(WhatInsertion::ViewWithDefns(false, false))]
+    #[case(WhatInsertion::ViewWithDefns(false, true))]
+    #[case(WhatInsertion::ViewWithDefns(true, false))]
+    #[case(WhatInsertion::ViewWithDefns(true, true))]
+    fn insert_hugr_defns(#[case] which: WhatInsertion) {
+        let (h, call1_ok, call2_ok) = which.into_hugr();
+        if call1_ok && call2_ok {
+            h.validate().unwrap();
+        } else {
+            assert!(matches!(
+                h.validate(),
+                Err(ValidationError::UnconnectedPort { .. })
+            ));
+        }
+        assert_eq!(
+            h.children(h.module_root()).count(),
+            1 + (call1_ok as usize) + (call2_ok as usize)
+        );
+        let [call1, call2] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_call())
+            .collect_array()
+            .unwrap();
+
+        let tgt1 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_defn()
+                .is_some_and(|fd| fd.func_name() == "helper_id")
+        });
+        assert_eq!(tgt1.is_some(), call1_ok);
+        assert_eq!(h.static_source(call1), tgt1);
+
+        let tgt2 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_decl()
+                .is_some_and(|fd| fd.func_name() == "helper2")
+        });
+        assert_eq!(tgt2.is_some(), call2_ok);
+        assert_eq!(h.static_source(call2), tgt2);
+    }
+
+    // (End) tests of insert_{hugr,from_view}(_with_defns) ====================================
 }
