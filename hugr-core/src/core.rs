@@ -80,12 +80,6 @@ pub type Direction = portgraph::Direction;
 // Stores node and offset to output port
 pub struct Wire<N = Node>(N, OutgoingPort);
 
-impl<N: HugrNode> From<(N, OutgoingPort)> for Wire<N> {
-    fn from(value: (N, OutgoingPort)) -> Self {
-        Self(value.0, value.1)
-    }
-}
-
 impl Node {
     /// Returns the node as a portgraph `NodeIndex`.
     #[inline]
