@@ -143,6 +143,7 @@ mod test {
         type_row,
         types::Signature,
     };
+    use rstest::rstest;
 
     use super::*;
 
@@ -189,18 +190,25 @@ mod test {
         );
     }
 
-    #[test]
-    fn localize_dfg() {
+    #[rstest]
+    fn localize_dfg(#[values(true, false)] same_src: bool) {
         let mut hugr = {
-            let mut outer = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
-            let [w0] = outer.input_wires_arr();
-            let [w1] = {
+            let mut outer = DFGBuilder::new(Signature::new_endo(vec![bool_t(); 2])).unwrap();
+            let [w0, mut w1] = outer.input_wires_arr();
+            if !same_src {
+                [w1] = outer
+                    .add_dataflow_op(Noop::new(bool_t()), [w1])
+                    .unwrap()
+                    .outputs_arr();
+            }
+            let inner_outs = {
                 let inner = outer
-                    .dfg_builder(Signature::new_endo(bool_t()), [w0])
+                    .dfg_builder(Signature::new(vec![], vec![bool_t(); 2]), [])
                     .unwrap();
-                inner.finish_with_outputs([w0]).unwrap().outputs_arr()
+                // Note two `ext` edges to the same (Input) node here
+                inner.finish_with_outputs([w0, w1]).unwrap().outputs()
             };
-            outer.finish_hugr_with_outputs([w1]).unwrap()
+            outer.finish_hugr_with_outputs(inner_outs).unwrap()
         };
         assert!(ensure_no_nonlocal_edges(&hugr).is_err());
         remove_nonlocal_edges(&mut hugr).unwrap();
