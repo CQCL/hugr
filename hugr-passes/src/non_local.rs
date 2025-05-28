@@ -33,15 +33,19 @@ impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
     }
 }
 
-/// Returns an iterator over all non local edges in a Hugr.
+/// Returns an iterator over all non local edges in a Hugr beneath the entrypoint.
 ///
-/// All `(node, in_port)` pairs are returned where `in_port` is a value port
-/// connected to a node with a parent other than the parent of `node`.
+/// All `(node, in_port)` pairs are returned where `in_port` is a value port connected
+/// to a node beneath the entrypoint but with a parent other than the parent of `node`.
 pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, IncomingPort)> + '_ {
     hugr.entry_descendants().flat_map(move |node| {
         hugr.in_value_types(node).filter_map(move |(in_p, _)| {
             let (src, _) = hugr.single_linked_output(node, in_p)?;
-            (hugr.get_parent(node) != hugr.get_parent(src)).then_some((node, in_p))
+            (hugr.get_parent(node) != hugr.get_parent(src)
+                && ancestors(src, hugr)
+                    .find(|a| *a == hugr.entrypoint())
+                    .is_some())
+            .then_some((node, in_p))
         })
     })
 }
@@ -114,20 +118,19 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
     debug_assert!(nonlocal_edges.iter().all(|(n, (source, _))| {
         let source_parent = hugr.get_parent(source.node()).unwrap();
         let source_gp = hugr.get_parent(source_parent);
-        let stop_at = source_gp
-            .map(|gp| vec![source_parent, gp])
-            .unwrap_or(vec![source_parent]);
-        std::iter::successors(Some(*n), |n| {
-            let parent = hugr.get_parent(*n).unwrap();
-            (!stop_at.contains(&parent)).then_some(parent)
-        })
-        .skip(1)
-        .all(|parent| needs_sources_map.parent_needs(parent, *source))
+        ancestors(*n, hugr)
+            .skip(1)
+            .take_while(|&a| a != source_parent && source_gp.is_none_or(|gp| a != gp))
+            .all(|parent| needs_sources_map.parent_needs(parent, *source))
     }));
 
     needs_sources_map.thread_hugr(hugr);
 
     Ok(())
+}
+
+fn ancestors<H: HugrView>(n: H::Node, h: &H) -> impl Iterator<Item = H::Node> {
+    std::iter::successors(Some(n), |n| h.get_parent(*n))
 }
 
 #[cfg(test)]
