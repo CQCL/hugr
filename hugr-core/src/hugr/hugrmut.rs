@@ -677,11 +677,14 @@ fn insert_hugr_nodes<H: HugrView>(
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
     use crate::extension::PRELUDE;
     use crate::extension::prelude::{Noop, bool_t, usize_t};
     use crate::hugr::ValidationError;
+    use crate::ops::handle::FuncID;
     use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait, handle::NodeHandle};
     use crate::types::Signature;
 
@@ -763,30 +766,48 @@ mod test {
         assert_eq!(hugr.num_nodes(), 1);
     }
 
-    #[test]
-    fn insert_hugr_defns() {
-        let (new, new_func) = {
-            let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
-            let mut mb = dfb.module_root_builder();
-            let new_func = {
-                let fb = mb
-                    .define_function("helper_id", Signature::new_endo(bool_t()))
-                    .unwrap();
-                let [f_inp] = fb.input_wires_arr();
-                fb.finish_with_outputs([f_inp]).unwrap()
-            };
-            let cst = dfb.add_load_value(ops::Value::true_val());
-            let [c1] = dfb
-                .call(new_func.handle(), &[], [cst])
-                .unwrap()
-                .outputs_arr();
-            let [c2] = dfb
-                .call(new_func.handle(), &[], [c1])
-                .unwrap()
-                .outputs_arr();
-            (dfb.finish_hugr_with_outputs([c2]).unwrap(), new_func)
+    fn call_func_defn() -> (Hugr, FuncID<true>) {
+        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+        let mut mb = dfb.module_root_builder();
+        let new_func = {
+            let fb = mb
+                .define_function("helper_id", Signature::new_endo(bool_t()))
+                .unwrap();
+            let [f_inp] = fb.input_wires_arr();
+            fb.finish_with_outputs([f_inp]).unwrap()
         };
+        let cst = dfb.add_load_value(ops::Value::true_val());
+        let [c1] = dfb
+            .call(new_func.handle(), &[], [cst])
+            .unwrap()
+            .outputs_arr();
+        let [c2] = dfb
+            .call(new_func.handle(), &[], [c1])
+            .unwrap()
+            .outputs_arr();
+        (
+            dfb.finish_hugr_with_outputs([c2]).unwrap(),
+            *new_func.handle(),
+        )
+    }
 
+    fn call_func_decl() -> (Hugr, FuncID<false>) {
+        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+        let mut mb = dfb.module_root_builder();
+        let new_func = mb
+            .declare("helper-decl", Signature::new_endo(bool_t()).into())
+            .unwrap();
+        let cst = dfb.add_load_value(ops::Value::true_val());
+        let [c1] = dfb.call(&new_func, &[], [cst]).unwrap().outputs_arr();
+        let [c2] = dfb.call(&new_func, &[], [c1]).unwrap().outputs_arr();
+        (dfb.finish_hugr_with_outputs([c2]).unwrap(), new_func)
+    }
+
+    #[rstest]
+    #[case(call_func_decl(), |op: &OpType| op.as_func_decl().is_some_and(|f|f.func_name() == "helper-decl"))]
+    #[case(call_func_defn(), |op: &OpType| op.as_func_defn().is_some_and(|f|f.func_name() == "helper_id"))]
+    fn insert_hugr_defns<const B: bool>(#[case] inserted_and_func: (Hugr, FuncID<B>), #[case] check: impl Fn(&OpType) -> bool) {
+        let (new, new_func) = inserted_and_func;
         let [
             mut view_default,
             mut view_with_func,
@@ -808,9 +829,15 @@ mod test {
                 assert_eq!(h.static_source(call), None);
             }
             for n in h.nodes() {
+<<<<<<< Updated upstream
                 if let Some(fd) = h.get_optype(n).as_func_defn() {
                     assert_eq!(fd.func_name(), "main");
                 }
+||||||| Stash base
+                assert!(h.get_optype(n).as_func_defn().is_none_or(|fd| fd.func_name() == "main"));
+=======
+                assert!(!check(h.get_optype(n)));
+>>>>>>> Stashed changes
             }
         }
 
@@ -818,8 +845,7 @@ mod test {
             h.validate().unwrap();
             for call in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
                 let target = h.static_source(call).unwrap();
-                let called_fn = h.get_optype(target).as_func_defn().unwrap();
-                assert_eq!(called_fn.func_name(), "helper_id")
+                assert!(check(h.get_optype(target)));
             }
         }
     }
