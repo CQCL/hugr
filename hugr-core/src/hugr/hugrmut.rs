@@ -804,37 +804,21 @@ mod test {
         hugr_default.insert_hugr(ep, new.clone());
         hugr_no_funcs.insert_hugr_with_defns(ep, new.clone(), HashSet::new());
 
-        for h in [view_default, hugr_no_funcs] {
-            assert!(matches!(
-                h.validate(),
-                Err(ValidationError::UnconnectedPort { .. })
-            ));
-            for call in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
-                assert_eq!(h.static_source(call), None);
-            }
-            for n in h.nodes() {
-                match h.get_optype(n) {
-                    OpType::FuncDefn(fd) => assert_eq!(fd.func_name(), "main"),
-                    OpType::FuncDecl(_) => panic!("No Decls expected"),
-                    _ => (),
-                }
-            }
-        }
-
         // Hugr, first call should be ok, second call should be ok
-        let mut examples = vec![(view_with_funcs, true, true), (hugr_default, true, true)];
+        let mut examples = vec![
+            (view_default, false, false),
+            (hugr_no_funcs, false, false),
+            (view_with_funcs, true, true),
+            (hugr_default, true, true),
+        ];
 
+        // Examples with just one FuncDefn/Decl copied (and the other not)
         for mod_child in [new_decl.node(), new_defn.node()] {
             let mut hs = [simple_dfg_hugr(), simple_dfg_hugr()];
             hs[0].insert_from_view_with_defns(ep, &new, HashSet::from([mod_child]));
             hs[1].insert_hugr_with_defns(ep, new.clone(), HashSet::from([mod_child]));
-            examples.extend(hs.map(|h| {
-                (
-                    h,
-                    mod_child == new_defn.node(),
-                    mod_child == new_decl.node(),
-                )
-            }));
+            let (call1_ok, call2_ok) = (mod_child == new_defn.node(), mod_child == new_decl.node());
+            examples.extend(hs.map(|h| (h, call1_ok, call2_ok)));
         }
 
         for (h, call1_ok, call2_ok) in examples {
@@ -846,31 +830,31 @@ mod test {
                     Err(ValidationError::UnconnectedPort { .. })
                 ));
             }
-            let [tgt1, tgt2] = h
+            assert_eq!(
+                h.children(h.module_root()).count(),
+                1 + (call1_ok as usize) + (call2_ok as usize)
+            );
+            let [call1, call2] = h
                 .nodes()
                 .filter(|n| h.get_optype(*n).is_call())
-                .map(|n| h.static_source(n))
                 .collect_array()
                 .unwrap();
 
-            if call1_ok {
-                assert!(
-                    h.get_optype(tgt1.unwrap())
-                        .as_func_defn()
-                        .is_some_and(|fd| fd.func_name() == "helper_id")
-                );
-            } else {
-                assert!(tgt1.is_none());
-            }
-            if call2_ok {
-                assert!(
-                    h.get_optype(tgt2.unwrap())
-                        .as_func_decl()
-                        .is_some_and(|fd| fd.func_name() == "helper2")
-                );
-            } else {
-                assert!(tgt2.is_none());
-            }
+            let tgt1 = h.nodes().find(|n| {
+                h.get_optype(*n)
+                    .as_func_defn()
+                    .is_some_and(|fd| fd.func_name() == "helper_id")
+            });
+            assert_eq!(tgt1.is_some(), call1_ok);
+            assert_eq!(h.static_source(call1), tgt1);
+
+            let tgt2 = h.nodes().find(|n| {
+                h.get_optype(*n)
+                    .as_func_decl()
+                    .is_some_and(|fd| fd.func_name() == "helper2")
+            });
+            assert_eq!(tgt2.is_some(), call2_ok);
+            assert_eq!(h.static_source(call2), tgt2);
         }
     }
 }
