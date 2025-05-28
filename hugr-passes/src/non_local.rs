@@ -86,20 +86,13 @@ pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdg
     // storing for each the source and type (well-defined as these are Value edges).
     let nonlocal_edges: Vec<_> = nonlocal_edges(hugr)
         .map(|(node, inport)| {
-            let source = {
-                // unwrap because nonlocal_edges(hugr) already skips in-ports with !=1 linked outputs.
-                let (n, p) = hugr.single_linked_output(node, inport).unwrap();
-                Wire::new(n, p)
-            };
-            debug_assert!(
-                hugr.get_parent(source.node()).unwrap() != hugr.get_parent(node).unwrap()
-            );
-            let Some(EdgeKind::Value(ty)) =
-                hugr.get_optype(source.node()).port_kind(source.source())
-            else {
+            // unwrap because nonlocal_edges(hugr) already skips in-ports with !=1 linked outputs.
+            let (src_n, outp) = hugr.single_linked_output(node, inport).unwrap();
+            debug_assert!(hugr.get_parent(src_n).unwrap() != hugr.get_parent(node).unwrap());
+            let Some(EdgeKind::Value(ty)) = hugr.get_optype(src_n).port_kind(outp) else {
                 panic!("impossible")
             };
-            (node, (source, ty))
+            (node, (Wire::new(src_n, outp), ty))
         })
         .collect();
 
