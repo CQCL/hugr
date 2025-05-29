@@ -3,10 +3,14 @@ use hugr_model::v0::ast;
 use hugr_model::v0::{Literal, SymbolName, VarName};
 use once_cell::sync::Lazy;
 use servo_arc::ThinArc;
+use std::error::Error;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
+use thiserror::Error;
 
 use crate::Node;
+
+pub mod core;
 
 /// A term in the static language that is used to parameterise `Hugr`s.
 ///
@@ -146,6 +150,36 @@ impl Term {
             TermData::Var(var) => TermKind::Var(var),
         }
     }
+
+    #[inline]
+    pub fn view<V: View>(&self) -> Result<V, ViewError> {
+        V::view(self)
+    }
+
+    pub fn view_apply<const N: usize>(&self, symbol: &SymbolName) -> Result<[Term; N], ViewError> {
+        let TermKind::Apply(term_symbol, term_args) = self.get() else {
+            return Err(ViewError::Mismatch);
+        };
+
+        if symbol != term_symbol {
+            return Err(ViewError::Mismatch);
+        }
+
+        if term_args.len() > N {
+            return Err(ViewError::Invalid(
+                format!("`{}` expects at most `{}` arguments", symbol, N).into(),
+            ));
+        }
+
+        let args = std::array::from_fn(|i| {
+            (i + term_args.len())
+                .checked_sub(N)
+                .map(|i| term_args[i].clone())
+                .unwrap_or_default()
+        });
+
+        Ok(args)
+    }
 }
 
 impl Hash for Term {
@@ -249,4 +283,88 @@ impl Var {
     pub fn index(&self) -> u16 {
         self.index
     }
+}
+
+pub trait View: Sized {
+    fn view(term: &Term) -> Result<Self, ViewError>;
+}
+
+#[derive(Debug, Error)]
+pub enum ViewError {
+    #[error("the term does not match the pattern of the view")]
+    Mismatch,
+    #[error("invalid term")]
+    Invalid(#[source] Box<dyn Error>),
+}
+
+#[macro_export]
+macro_rules! term_view_ctr {
+    (
+        $name:expr;
+        $(#[$attr:meta])*
+        $vis:vis struct $ident:ident {
+            $($(#[$field_meta:meta])* pub $field_name:ident: $field_type:ty,)*
+        }
+    ) => {
+        $(#[$attr])*
+        #[derive(Debug, Clone)]
+        pub struct $ident {
+            $($(#[$field_meta])* pub $field_name: $field_type,)*
+        }
+
+        impl $ident {
+            /// The name of the term constructor for this type.
+            pub const CTR_NAME: ::hugr_model::v0::SymbolName = ::hugr_model::v0::SymbolName::new_static($name);
+        }
+
+        impl $crate::terms::View for $ident {
+            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
+                let [$($field_name),*] = term.view_apply(&Self::CTR_NAME)?;
+                Ok(Self { $($field_name),* })
+            }
+        }
+
+        impl From<$ident> for $crate::terms::Term {
+            fn from(value: $ident) -> Self {
+                $crate::terms::Term::new($crate::terms::TermKind::Apply(
+                    &$ident::CTR_NAME,
+                    &[$(value.$field_name),*],
+                ))
+            }
+        }
+    };
+
+    (
+        $name:expr;
+        $(#[$attr:meta])*
+        $vis:vis struct $ident:ident;
+    ) => {
+        $(#[$attr])*
+        #[derive(Debug, Clone, Copy)]
+        pub struct $ident;
+
+        impl $ident {
+            /// The name of the term constructor for this type.
+            pub const CTR_NAME: ::hugr_model::v0::SymbolName = ::hugr_model::v0::SymbolName::new_static($name);
+        }
+
+        impl $crate::terms::View for $ident {
+            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
+                let [] = term.view_apply(&Self::CTR_NAME)?;
+                Ok(Self)
+            }
+        }
+
+        impl From<$ident> for $crate::terms::Term {
+            fn from(_: $ident) -> Self {
+                static TERM: ::once_cell::sync::Lazy<$crate::terms::Term> =
+                    ::once_cell::sync::Lazy::new(|| {
+                        $crate::terms::Term::new_static(
+                            $crate::terms::TermKind::Apply(&$ident::CTR_NAME, &[])
+                        )
+                    });
+                TERM.clone()
+            }
+        }
+    };
 }
