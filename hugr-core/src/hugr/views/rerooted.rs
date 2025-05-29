@@ -104,6 +104,7 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
                 fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
                 fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig<Self::Node>) -> String;
+                fn mermaid_string_with_full_config(&self, config: impl Into<crate::hugr::views::render::FullRenderConfig<Self::Node>>) -> String;
                 fn dot_string(&self) -> String;
                 fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
                 fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
