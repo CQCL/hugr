@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use eyre::Result;
+use anyhow::Result;
 use std::str::FromStr;
 
 use hugr::std_extensions::std_reg;
