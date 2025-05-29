@@ -77,4 +77,3 @@ proptest-derive = { workspace = true }
 # Required for documentation examples
 hugr = { path = "../hugr" }
 serde_yaml = "0.9.34"
-anyhow = { workspace = true }

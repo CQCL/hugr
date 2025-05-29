@@ -1238,7 +1238,6 @@ dependencies = [
 name = "hugr-core"
 version = "0.20.0"
 dependencies = [
- "anyhow",
  "cgmath",
  "cool_asserts",
  "delegate",
