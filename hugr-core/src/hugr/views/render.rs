@@ -259,3 +259,34 @@ pub(in crate::hugr) fn edge_style(
         style.with_label(label)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{NodeIndex, builder::test::simple_dfg_hugr};
+
+    use super::*;
+
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    #[test]
+    fn test_custom_node_labels() {
+        let h = simple_dfg_hugr();
+        let node_labels = h
+            .nodes()
+            .map(|n| (n, format!("node_{}", n.index())))
+            .collect();
+        let config = FullRenderConfig {
+            node_labels: NodeLabel::Custom(node_labels),
+            ..Default::default()
+        };
+        insta::assert_snapshot!(h.mermaid_string_with_full_config(config));
+    }
+
+    #[test]
+    fn convert_full_render_config_to_render_config() {
+        let config: FullRenderConfig = FullRenderConfig {
+            node_labels: NodeLabel::Custom(HashMap::new()),
+            ..Default::default()
+        };
+        assert!(RenderConfig::try_from(config).is_err());
+    }
+}
