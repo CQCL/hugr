@@ -110,8 +110,8 @@ class TypeDef(ExtensionObject):
         >>> td = TypeDef(
         ...     name="MyType",
         ...     description="A type definition.",
-        ...     params=[tys.TypeTypeParam(tys.Bool)],
-        ...     bound=ExplicitBound(tys.TypeBound.Copyable),
+        ...     params=[tys.TypeTypeParam(tys.TypeBound.Copyable)],
+        ...     bound=FromParamsBound([0]),
         ... )
         >>> td.name
         'MyType'
