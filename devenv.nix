@@ -24,14 +24,7 @@ in
       # These are required for hugr-llvm to be able to link to llvm.
       pkgs.libffi
       pkgs.libxml2
-    ] ++ lib.optionals
-      pkgs.stdenv.isDarwin
-      (with pkgs.darwin.apple_sdk; [
-        frameworks.CoreServices
-        frameworks.CoreFoundation
-        # added for json schema validation tests
-        frameworks.SystemConfiguration
-      ]);
+    ];
 
     env = {
       "LLVM_SYS_${cfg.llvmVersion}0_PREFIX" = "${pkgs."llvmPackages_${cfg.llvmVersion}".libllvm.dev}";
