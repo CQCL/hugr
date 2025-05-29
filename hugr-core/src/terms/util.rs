@@ -13,19 +13,15 @@ pub struct LoopRegionSignature {
 
 impl View for LoopRegionSignature {
     fn view(term: &Term) -> Result<Self, ViewError> {
-        let core::Fn { outputs, .. } = term.expect()?;
-        let ListPrefix([adt], rest) = outputs.expect()?;
-        let core::Adt { variants } = adt.expect()?;
-        let ExactList([just_inputs, just_outputs], _) = variants.expect()?;
+        let core::Fn { outputs, .. } = term.view()?;
+        let ListPrefix([adt], rest) = outputs.view()?;
+        let core::Adt { variants } = adt.view()?;
+        let ExactList([just_inputs, just_outputs], _) = variants.view()?;
         Ok(Self {
             just_inputs,
             just_outputs,
             rest,
         })
-    }
-
-    fn expect(term: &Term) -> Result<Self, ViewError> {
-        todo!()
     }
 }
 
@@ -61,10 +57,6 @@ impl<const N: usize> View for ListPrefix<N> {
     fn view(term: &Term) -> Result<Self, ViewError> {
         todo!()
     }
-
-    fn expect(term: &Term) -> Result<Self, ViewError> {
-        todo!()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,10 +76,6 @@ impl<const N: usize> From<ExactList<N>> for Term {
 
 impl<const N: usize> View for ExactList<N> {
     fn view(term: &Term) -> Result<Self, ViewError> {
-        todo!()
-    }
-
-    fn expect(term: &Term) -> Result<Self, ViewError> {
         todo!()
     }
 }
