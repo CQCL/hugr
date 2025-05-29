@@ -54,6 +54,12 @@ impl Display for Term {
     }
 }
 
+impl Hash for Term {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.0.header.hash);
+    }
+}
+
 /// The constant-sized part of the [`Term`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 enum TermData {
@@ -152,11 +158,14 @@ impl Term {
     }
 
     #[inline]
-    pub fn view<V: View>(&self) -> Result<V, ViewError> {
+    pub fn view<V: View>(&self) -> Result<V, ViewError<V::Error>> {
         V::view(self)
     }
 
-    pub fn view_apply<const N: usize>(&self, symbol: &SymbolName) -> Result<[Term; N], ViewError> {
+    pub fn view_apply<const N: usize>(
+        &self,
+        symbol: &SymbolName,
+    ) -> Result<[Term; N], ViewError<ArityError>> {
         let TermKind::Apply(term_symbol, term_args) = self.get() else {
             return Err(ViewError::Mismatch);
         };
@@ -166,9 +175,12 @@ impl Term {
         }
 
         if term_args.len() > N {
-            return Err(ViewError::Invalid(
-                format!("`{}` expects at most `{}` arguments", symbol, N).into(),
-            ));
+            return Err(ViewError::Invalid(ArityError {
+                expected: N,
+                actual: term_args.len(),
+                term: self.clone(),
+                constructor: symbol.clone(),
+            }));
         }
 
         let args = std::array::from_fn(|i| {
@@ -179,12 +191,6 @@ impl Term {
         });
 
         Ok(args)
-    }
-}
-
-impl Hash for Term {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.0.header.hash);
     }
 }
 
@@ -286,15 +292,33 @@ impl Var {
 }
 
 pub trait View: Sized {
-    fn view(term: &Term) -> Result<Self, ViewError>;
+    type Error: Error;
+
+    fn view(term: &Term) -> Result<Self, ViewError<Self::Error>>;
 }
 
-#[derive(Debug, Error)]
-pub enum ViewError {
+#[derive(Debug, Clone, Error)]
+pub enum ViewError<E> {
     #[error("the term does not match the pattern of the view")]
     Mismatch,
     #[error("invalid term")]
-    Invalid(#[source] Box<dyn Error>),
+    Invalid(#[source] E),
+}
+
+/// Error that occurs when a constructor is applied to the wrong number of arguments.
+#[derive(Debug, Error)]
+#[error(
+    "`{constructor}` expects `{expected}` arguments but got `{actual}` in term:\n```\n{term}\n```"
+)]
+pub struct ArityError {
+    /// The number of arguments that the constructor expects.
+    pub expected: usize,
+    /// The number of arguments that were passed to the constructor.
+    pub actual: usize,
+    /// The term in which the error occured.
+    pub term: Term,
+    /// The constructor that is applied to the wrong number of arguments.
+    pub constructor: SymbolName,
 }
 
 #[macro_export]
@@ -318,7 +342,9 @@ macro_rules! term_view_ctr {
         }
 
         impl $crate::terms::View for $ident {
-            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
+            type Error = $crate::terms::ArityError;
+
+            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError<Self::Error>> {
                 let [$($field_name),*] = term.view_apply(&Self::CTR_NAME)?;
                 Ok(Self { $($field_name),* })
             }
@@ -349,7 +375,9 @@ macro_rules! term_view_ctr {
         }
 
         impl $crate::terms::View for $ident {
-            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
+            type Error = $crate::terms::ArityError;
+
+            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError<Self::Error>> {
                 let [] = term.view_apply(&Self::CTR_NAME)?;
                 Ok(Self)
             }
