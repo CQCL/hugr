@@ -11,6 +11,7 @@ use thiserror::Error;
 use crate::Node;
 
 pub mod core;
+pub mod util;
 
 /// A term in the static language that is used to parameterise `Hugr`s.
 ///
@@ -67,8 +68,9 @@ enum TermData {
     Wildcard,
     Apply(SymbolName),
     Literal(Literal),
-    List,
-    ListConcat,
+    ListEmpty(Term),
+    ListCons(Term, Term),
+    ListConcat(Term, Term),
     Tuple,
     TupleConcat,
     Var(Var),
@@ -80,8 +82,11 @@ impl TermData {
             TermKind::Wildcard => (TermData::Wildcard, &[]),
             TermKind::Apply(symbol, terms) => (TermData::Apply(symbol.clone()), terms),
             TermKind::Literal(literal) => (TermData::Literal(literal.clone()), &[] as &[_]),
-            TermKind::List(terms) => (TermData::List, terms),
-            TermKind::ListConcat(terms) => (TermData::ListConcat, terms),
+            TermKind::ListEmpty(item_type) => (TermData::ListEmpty(item_type.clone()), &[]),
+            TermKind::ListCons(head, tail) => (TermData::ListCons(head.clone(), tail.clone()), &[]),
+            TermKind::ListConcat(first, second) => {
+                (TermData::ListConcat(first.clone(), second.clone()), &[])
+            }
             TermKind::Tuple(terms) => (TermData::Tuple, terms),
             TermKind::TupleConcat(terms) => (TermData::TupleConcat, terms),
             TermKind::Var(var) => (TermData::Var(var.clone()), &[] as &[_]),
@@ -149,8 +154,9 @@ impl Term {
             TermData::Wildcard => TermKind::Wildcard,
             TermData::Apply(symbol) => TermKind::Apply(symbol, self.0.slice()),
             TermData::Literal(literal) => TermKind::Literal(literal),
-            TermData::List => TermKind::List(self.0.slice()),
-            TermData::ListConcat => TermKind::ListConcat(self.0.slice()),
+            TermData::ListEmpty(item_type) => TermKind::ListEmpty(item_type),
+            TermData::ListCons(head, tail) => TermKind::ListCons(head, tail),
+            TermData::ListConcat(first, second) => TermKind::ListConcat(first, second),
             TermData::Tuple => TermKind::Tuple(self.0.slice()),
             TermData::TupleConcat => TermKind::TupleConcat(self.0.slice()),
             TermData::Var(var) => TermKind::Var(var),
@@ -158,14 +164,11 @@ impl Term {
     }
 
     #[inline]
-    pub fn view<V: View>(&self) -> Result<V, ViewError<V::Error>> {
+    pub fn view<V: View>(&self) -> Result<V, ViewError> {
         V::view(self)
     }
 
-    pub fn view_apply<const N: usize>(
-        &self,
-        symbol: &SymbolName,
-    ) -> Result<[Term; N], ViewError<ArityError>> {
+    pub fn view_apply<const N: usize>(&self, symbol: &SymbolName) -> Result<[Term; N], ViewError> {
         let TermKind::Apply(term_symbol, term_args) = self.get() else {
             return Err(ViewError::Mismatch);
         };
@@ -175,12 +178,15 @@ impl Term {
         }
 
         if term_args.len() > N {
-            return Err(ViewError::Invalid(ArityError {
-                expected: N,
-                actual: term_args.len(),
-                term: self.clone(),
-                constructor: symbol.clone(),
-            }));
+            return Err(ViewError::Invalid(
+                ArityError {
+                    expected: N,
+                    actual: term_args.len(),
+                    constructor: symbol.clone(),
+                    term: self.clone(),
+                }
+                .into(),
+            ));
         }
 
         let args = std::array::from_fn(|i| {
@@ -191,6 +197,14 @@ impl Term {
         });
 
         Ok(args)
+    }
+
+    pub fn view_list_prefix<const N: usize>(&self) -> Result<([Term; N], Term), ViewError> {
+        todo!()
+    }
+
+    pub fn view_list_exact<const N: usize>(&self) -> Result<[Term; N], ViewError> {
+        todo!()
     }
 }
 
@@ -214,8 +228,9 @@ pub enum TermKind<'a> {
     Wildcard,
     Apply(&'a SymbolName, &'a [Term]),
     Literal(&'a Literal),
-    List(&'a [Term]),
-    ListConcat(&'a [Term]),
+    ListEmpty(&'a Term),
+    ListCons(&'a Term, &'a Term),
+    ListConcat(&'a Term, &'a Term),
     Tuple(&'a [Term]),
     TupleConcat(&'a [Term]),
     Var(&'a Var),
@@ -231,17 +246,20 @@ impl From<TermKind<'_>> for ast::Term {
                 ast::Term::Apply(symbol, args)
             }
             TermKind::Literal(literal) => ast::Term::Literal(literal.clone()),
-            TermKind::List(items) => ast::Term::List(
-                items
-                    .iter()
-                    .map(|item| ast::SeqPart::Item(item.into()))
-                    .collect(),
+            TermKind::ListEmpty(_) => ast::Term::List(Default::default()),
+            TermKind::ListCons(head, tail) => ast::Term::List(
+                vec![
+                    ast::SeqPart::Item(head.into()),
+                    ast::SeqPart::Splice(tail.into()),
+                ]
+                .into(),
             ),
-            TermKind::ListConcat(lists) => ast::Term::List(
-                lists
-                    .iter()
-                    .map(|list| ast::SeqPart::Splice(list.into()))
-                    .collect(),
+            TermKind::ListConcat(first, second) => ast::Term::List(
+                vec![
+                    ast::SeqPart::Splice(first.into()),
+                    ast::SeqPart::Splice(second.into()),
+                ]
+                .into(),
             ),
             TermKind::Var(var) => ast::Term::Var(var.name().clone()),
             TermKind::Tuple(items) => ast::Term::Tuple(
@@ -292,17 +310,15 @@ impl Var {
 }
 
 pub trait View: Sized {
-    type Error: Error;
-
-    fn view(term: &Term) -> Result<Self, ViewError<Self::Error>>;
+    fn view(term: &Term) -> Result<Self, ViewError>;
 }
 
-#[derive(Debug, Clone, Error)]
-pub enum ViewError<E> {
+#[derive(Debug, Error)]
+pub enum ViewError {
     #[error("the term does not match the pattern of the view")]
     Mismatch,
     #[error("invalid term")]
-    Invalid(#[source] E),
+    Invalid(#[source] Box<dyn Error>),
 }
 
 /// Error that occurs when a constructor is applied to the wrong number of arguments.
@@ -315,7 +331,7 @@ pub struct ArityError {
     pub expected: usize,
     /// The number of arguments that were passed to the constructor.
     pub actual: usize,
-    /// The term in which the error occured.
+    /// The term that caused the error.
     pub term: Term,
     /// The constructor that is applied to the wrong number of arguments.
     pub constructor: SymbolName,
@@ -342,9 +358,7 @@ macro_rules! term_view_ctr {
         }
 
         impl $crate::terms::View for $ident {
-            type Error = $crate::terms::ArityError;
-
-            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError<Self::Error>> {
+            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
                 let [$($field_name),*] = term.view_apply(&Self::CTR_NAME)?;
                 Ok(Self { $($field_name),* })
             }
@@ -375,9 +389,7 @@ macro_rules! term_view_ctr {
         }
 
         impl $crate::terms::View for $ident {
-            type Error = $crate::terms::ArityError;
-
-            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError<Self::Error>> {
+            fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
                 let [] = term.view_apply(&Self::CTR_NAME)?;
                 Ok(Self)
             }
