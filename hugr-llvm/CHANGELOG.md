@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.0...hugr-llvm-v0.21.0) - 2025-05-29
+
+### Bug Fixes
+
+- Make SumType::Unit(N) equal to SumType::General([(); N]) ([#2250](https://github.com/CQCL/hugr/pull/2250))
+
+### New Features
+
+- More helpful error messages in model import ([#2264](https://github.com/CQCL/hugr/pull/2264))
+
+### Testing
+
+- Add exec tests for widen op ([#2043](https://github.com/CQCL/hugr/pull/2043))
+
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.15.4...hugr-llvm-v0.20.0) - 2025-05-14
 
 ### Bug Fixes
