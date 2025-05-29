@@ -399,6 +399,11 @@ impl VarName {
     pub fn new(name: impl Into<SmolStr>) -> Self {
         Self(name.into())
     }
+
+    /// Create a new statically known variable name.
+    pub const fn new_static(name: &'static str) -> Self {
+        Self(SmolStr::new_static(name))
+    }
 }
 
 impl AsRef<str> for VarName {

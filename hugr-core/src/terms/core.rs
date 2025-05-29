@@ -131,3 +131,28 @@ term_view_ctr! {
         pub item_types: Term,
     }
 }
+
+/// Term views for the `core.order_hint` extension.
+pub mod order_hint {
+    use crate::term_view_ctr;
+
+    term_view_ctr! {
+        "core.order_hint.order";
+        /// `core.order_hint.order`: Metadata constructor for order hints.
+        pub struct Order {
+            /// The order key that has to be run first.
+            pub before: u64,
+            /// The order key that has to be run after.
+            pub after: u64,
+        }
+    }
+
+    term_view_ctr! {
+        "core.order_hint.key";
+        /// `core.order_hint.key`: Metadata constructor to attach order keys to nodes.
+        pub struct Key {
+            /// The order key to attach to the node.
+            pub key: u64,
+        }
+    }
+}

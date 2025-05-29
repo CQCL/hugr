@@ -125,6 +125,8 @@ impl TermHeader {
 impl Term {
     /// Create a new [`Term`].
     pub fn new(view: TermKind) -> Self {
+        // TODO: Normalise list and tuple terms
+
         let (data, terms) = TermData::split(view);
         Self(ThinArc::from_header_and_iter(
             TermHeader::new(data, terms),
@@ -166,6 +168,11 @@ impl Term {
     #[inline]
     pub fn view<V: View>(&self) -> Result<V, ViewError> {
         V::view(self)
+    }
+
+    #[inline]
+    pub fn expect<V: View>(&self) -> Result<V, ViewError> {
+        V::expect(self)
     }
 
     pub fn view_apply<const N: usize>(&self, symbol: &SymbolName) -> Result<[Term; N], ViewError> {
@@ -311,6 +318,43 @@ impl Var {
 
 pub trait View: Sized {
     fn view(term: &Term) -> Result<Self, ViewError>;
+    fn expect(term: &Term) -> Result<Self, ViewError>;
+}
+
+impl View for Term {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        Ok(term.clone())
+    }
+
+    fn expect(term: &Term) -> Result<Self, ViewError> {
+        Ok(term.clone())
+    }
+}
+
+impl View for u64 {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        match term.get() {
+            TermKind::Literal(literal) => match literal {
+                Literal::Nat(value) => Ok(*value),
+                _ => Err(ViewError::Mismatch),
+            },
+            _ => Err(ViewError::Mismatch),
+        }
+    }
+
+    fn expect(term: &Term) -> Result<Self, ViewError> {
+        #[derive(Debug, Error)]
+        #[error("expected natural number literal, got term:\n```\n{0}\n```")]
+        struct ExpectNatError(Term);
+
+        Self::view(term).map_err(|err| err.expect(|| ExpectNatError(term.clone())))
+    }
+}
+
+impl From<u64> for Term {
+    fn from(value: u64) -> Self {
+        Term::new(TermKind::Literal(&Literal::Nat(value)))
+    }
 }
 
 #[derive(Debug, Error)]
@@ -318,10 +362,36 @@ pub enum ViewError {
     #[error("the term does not match the pattern of the view")]
     Mismatch,
     #[error("invalid term")]
-    Invalid(#[source] Box<dyn Error>),
+    Invalid(#[from] AnyError),
+    // TODO: Error type to account for situations in which the term is too incomplete,
+    // e.g. by containing variables or uninferred wildcards.
 }
 
-/// Error that occurs when a constructor is applied to the wrong number of arguments.
+impl ViewError {
+    pub fn expect<E>(self, f: impl FnOnce() -> E) -> Self
+    where
+        E: Error + Send + Sync + 'static,
+    {
+        match self {
+            Self::Mismatch => Self::Invalid(Box::new(f())),
+            error => error,
+        }
+    }
+
+    pub fn map<E>(self, f: impl FnOnce(AnyError) -> E) -> Self
+    where
+        E: Error + Send + Sync + 'static,
+    {
+        match self {
+            Self::Invalid(error) => Self::Invalid(Box::new(f(error))),
+            error => error,
+        }
+    }
+}
+
+type AnyError = Box<dyn Error + Send + Sync>;
+
+/// Constructor is applied to wrong number of arguments.
 #[derive(Debug, Error)]
 #[error(
     "`{constructor}` expects `{expected}` arguments but got `{actual}` in term:\n```\n{term}\n```"
@@ -335,6 +405,35 @@ pub struct ArityError {
     pub term: Term,
     /// The constructor that is applied to the wrong number of arguments.
     pub constructor: SymbolName,
+}
+
+/// There is an error within a field of a constructor.
+#[derive(Debug, Error)]
+#[error(
+    "invalid field `{name}` (index {index}) of constructor `{constructor}` in term:\n```\n{term}\n```"
+)]
+pub struct FieldError {
+    /// The original error in the field.
+    #[source]
+    pub error: AnyError,
+    /// The index of the field within the constructor's parameter list.
+    pub index: usize,
+    /// The name of the field.
+    pub name: VarName,
+    /// The name of the constructor.
+    pub constructor: SymbolName,
+    /// The constructor application that caused the error.
+    pub term: Term,
+}
+
+/// A particular term constructor was expected.
+#[derive(Debug, Error)]
+#[error("expected constructor `{constructor}` but got term:\n```\n{term}\n```")]
+pub struct ConstructorError {
+    /// The constructor that was expected.
+    pub constructor: SymbolName,
+    /// The term that caused the error.
+    pub term: Term,
 }
 
 #[macro_export]
@@ -360,7 +459,27 @@ macro_rules! term_view_ctr {
         impl $crate::terms::View for $ident {
             fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
                 let [$($field_name),*] = term.view_apply(&Self::CTR_NAME)?;
+                let mut index = 0;
+                $(
+                    index += 1;
+                    let $field_name = $field_name
+                        .view()
+                        .map_err(|error| error.map(|error| $crate::terms::FieldError {
+                            error,
+                            index,
+                            name: ::hugr_model::v0::VarName::new_static(stringify!($field_name)),
+                            constructor: Self::CTR_NAME,
+                            term: term.clone(),
+                        }))?;
+                )*
                 Ok(Self { $($field_name),* })
+            }
+
+            fn expect(term: &crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
+                Self::view(term).map_err(|error| error.expect(|| $crate::terms::ConstructorError {
+                    term: term.clone(),
+                    constructor: Self::CTR_NAME
+                }))
             }
         }
 
@@ -368,7 +487,7 @@ macro_rules! term_view_ctr {
             fn from(value: $ident) -> Self {
                 $crate::terms::Term::new($crate::terms::TermKind::Apply(
                     &$ident::CTR_NAME,
-                    &[$(value.$field_name),*],
+                    &[$(value.$field_name.into()),*],
                 ))
             }
         }
@@ -392,6 +511,13 @@ macro_rules! term_view_ctr {
             fn view(term: &$crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
                 let [] = term.view_apply(&Self::CTR_NAME)?;
                 Ok(Self)
+            }
+
+            fn expect(term: &crate::terms::Term) -> Result<Self, $crate::terms::ViewError> {
+                Self::view(term).map_err(|error| error.expect(|| $crate::terms::ConstructorError {
+                    term: term.clone(),
+                    constructor: Self::CTR_NAME
+                }))
             }
         }
 

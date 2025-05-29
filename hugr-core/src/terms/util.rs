@@ -13,15 +13,19 @@ pub struct LoopRegionSignature {
 
 impl View for LoopRegionSignature {
     fn view(term: &Term) -> Result<Self, ViewError> {
-        let core::Fn { outputs, .. } = term.view()?;
+        let core::Fn { outputs, .. } = term.expect()?;
         let ([adt], rest) = outputs.view_list_prefix()?;
-        let core::Adt { variants } = adt.view()?;
+        let core::Adt { variants } = adt.expect()?;
         let [just_inputs, just_outputs] = variants.view_list_exact()?;
         Ok(Self {
             just_inputs,
             just_outputs,
             rest,
         })
+    }
+
+    fn expect(term: &Term) -> Result<Self, ViewError> {
+        todo!()
     }
 }
 
