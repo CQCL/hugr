@@ -711,7 +711,7 @@ impl<'a> Context<'a> {
 
         let [region] = node_data.regions else {
             return Err(error_invalid!(
-                "loop node {} expect a single region",
+                "loop node {} expects a single region",
                 node_id
             ));
         };
