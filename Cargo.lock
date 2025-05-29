@@ -1266,6 +1266,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "servo_arc",
  "smol_str",
  "static_assertions",
  "strum",
@@ -2772,6 +2773,15 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "servo_arc"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae65c4249478a2647db249fb43e23cec56a2c8974a427e7bd8cb5a1d0964921a"
+dependencies = [
+ "stable_deref_trait",
 ]
 
 [[package]]

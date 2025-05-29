@@ -435,6 +435,11 @@ impl SymbolName {
     pub fn new(name: impl Into<SmolStr>) -> Self {
         Self(name.into())
     }
+
+    /// Create a new statically known symbol name.
+    pub const fn new_static(name: &'static str) -> Self {
+        Self(SmolStr::new_static(name))
+    }
 }
 
 impl AsRef<str> for SymbolName {
