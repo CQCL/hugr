@@ -18,7 +18,9 @@ use self::upgrade::UpgradeError;
 
 use super::{HugrError, HugrMut, HugrView, NodeMetadataMap};
 
+mod serde_seed;
 mod upgrade;
+pub use serde_seed::ExtensionsSeed;
 
 /// A wrapper over the available HUGR serialization formats.
 ///

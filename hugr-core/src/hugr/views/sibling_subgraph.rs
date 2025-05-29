@@ -50,7 +50,7 @@ use super::root_checked::RootCheckable;
 /// The `boundary_port` and `signature` methods will panic if any are found.
 /// State order edges are also unsupported in replacements in
 /// `create_simple_replacement`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SiblingSubgraph<N = Node> {
     /// The nodes of the induced subgraph.
     nodes: Vec<N>,

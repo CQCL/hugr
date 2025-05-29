@@ -17,12 +17,14 @@ use thiserror::Error;
 use super::inline_dfg::InlineDFGError;
 use super::{BoundaryPort, HostPort, PatchHugrMut, PatchVerification, ReplacementPort};
 
+mod serialize;
+
 /// Specification of a simple replacement operation.
 ///
 /// # Type parameters
 ///
 /// - `N`: The type of nodes in the host hugr.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SimpleReplacement<HostNode = Node> {
     /// The subgraph of the host hugr to be replaced.
     subgraph: SiblingSubgraph<HostNode>,
@@ -1102,7 +1104,7 @@ pub(in crate::hugr::patch) mod test {
 
     /// A dfg hugr with 1 input -> copy -> 2x NOT -> 2x copy -> 4 outputs
     #[fixture]
-    fn copy_not_not_copy_hugr() -> Hugr {
+    pub(super) fn copy_not_not_copy_hugr() -> Hugr {
         let mut b = DFGBuilder::new(inout_sig(vec![bool_t()], vec![bool_t(); 4])).unwrap();
         let [w] = b.input_wires_arr();
         let not1 = b.add_dataflow_op(LogicOp::Not, [w]).unwrap();
