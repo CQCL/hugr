@@ -65,6 +65,9 @@ mod parents_view;
 mod resolver;
 mod state_space;
 mod trait_impls;
+pub mod walker;
+
+pub use walker::{PinnedWire, Walker};
 
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
@@ -75,8 +78,8 @@ use delegate::delegate;
 use derive_more::derive::From;
 use itertools::{Either, Itertools};
 use relrc::RelRc;
-use state_space::{CommitData, CommitId};
-pub use state_space::{CommitStateSpace, InvalidCommit, PatchNode};
+use state_space::CommitData;
+pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
 
 pub use resolver::PointerEqResolver;
 
@@ -276,6 +279,14 @@ impl PersistentHugr {
     /// All replacements added in the future will apply on top of `hugr`.
     pub fn with_base(hugr: Hugr) -> Self {
         let state_space = CommitStateSpace::with_base(hugr);
+        Self { state_space }
+    }
+
+    /// Create a [`PersistentHugr`] from a single commit and its ancestors.
+    // This always defines a valid `PersistentHugr` as the ancestors of a commit
+    // are guaranteed to be compatible with each other.
+    pub fn from_commit(commit: Commit) -> Self {
+        let state_space = CommitStateSpace::try_from_commits([commit]).expect("commit is valid");
         Self { state_space }
     }
 
@@ -557,7 +568,7 @@ impl PersistentHugr {
             // incoming ports are of interest to us if
             //  (i) they are connected to the output of a replacement (then there will be a
             //      linked port in a parent commit), or
-            //  (ii) they are deleted by a child commit and is not the same as the out_node
+            //  (ii) they are deleted by a child commit and are not equal to the out_node
             //      (then there will be a linked port in a child commit)
             let is_linked_to_output = curr_repl_out.is_some_and(|curr_repl_out| {
                 hugr.linked_inputs(out_node.1, out_port)
