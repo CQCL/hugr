@@ -7,6 +7,7 @@ use std::error::Error;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
+use tinyvec::TinyVec;
 
 use crate::Node;
 
@@ -82,11 +83,7 @@ impl TermData {
             TermKind::Wildcard => (TermData::Wildcard, &[]),
             TermKind::Apply(symbol, terms) => (TermData::Apply(symbol.clone()), terms),
             TermKind::Literal(literal) => (TermData::Literal(literal.clone()), &[] as &[_]),
-            TermKind::ListEmpty(item_type) => (TermData::ListEmpty(item_type.clone()), &[]),
-            TermKind::ListCons(head, tail) => (TermData::ListCons(head.clone(), tail.clone()), &[]),
-            TermKind::ListConcat(first, second) => {
-                (TermData::ListConcat(first.clone(), second.clone()), &[])
-            }
+            TermKind::List(_) => todo!(),
             TermKind::Tuple(terms) => (TermData::Tuple, terms),
             TermKind::TupleConcat(terms) => (TermData::TupleConcat, terms),
             TermKind::Var(var) => (TermData::Var(var.clone()), &[] as &[_]),
@@ -123,11 +120,17 @@ impl TermHeader {
 }
 
 impl Term {
-    /// Create a new [`Term`].
-    pub fn new(view: TermKind) -> Self {
-        // TODO: Normalise list and tuple terms
+    pub fn new_apply(symbol: &SymbolName, args: &[Term]) -> Self {
+        Self::new(TermData::Apply(symbol.clone()), args)
+    }
 
-        let (data, terms) = TermData::split(view);
+    pub fn new_apply_static(symbol: &SymbolName, args: &[Term]) -> Self {
+        Self::new_static(TermData::Apply(symbol.clone()), args)
+    }
+
+    /// Create a new [`Term`].
+    fn new(data: TermData, terms: &[Term]) -> Self {
+        // TODO: Normalise list and tuple terms
         Self(ThinArc::from_header_and_iter(
             TermHeader::new(data, terms),
             terms.iter().cloned(),
@@ -138,8 +141,7 @@ impl Term {
     ///
     /// Terms created with this method will never be deallocated. This is useful
     /// for [`Term`]s that are known at Rust compile time.
-    pub fn new_static(view: TermKind) -> Self {
-        let (data, terms) = TermData::split(view);
+    fn new_static(data: TermData, terms: &[Term]) -> Self {
         Self(ThinArc::from_header_and_iter_alloc(
             |layout| unsafe { std::alloc::alloc(layout) },
             TermHeader::new(data, terms),
@@ -156,9 +158,9 @@ impl Term {
             TermData::Wildcard => TermKind::Wildcard,
             TermData::Apply(symbol) => TermKind::Apply(symbol, self.0.slice()),
             TermData::Literal(literal) => TermKind::Literal(literal),
-            TermData::ListEmpty(item_type) => TermKind::ListEmpty(item_type),
-            TermData::ListCons(head, tail) => TermKind::ListCons(head, tail),
-            TermData::ListConcat(first, second) => TermKind::ListConcat(first, second),
+            TermData::ListEmpty(_) => TermKind::List(List(self.clone())),
+            TermData::ListCons(_, _) => TermKind::List(List(self.clone())),
+            TermData::ListConcat(_, _) => TermKind::List(List(self.clone())),
             TermData::Tuple => TermKind::Tuple(self.0.slice()),
             TermData::TupleConcat => TermKind::TupleConcat(self.0.slice()),
             TermData::Var(var) => TermKind::Var(var),
@@ -202,6 +204,12 @@ impl Term {
     }
 }
 
+impl From<Literal> for Term {
+    fn from(value: Literal) -> Self {
+        Term::new(TermData::Literal(value), &[])
+    }
+}
+
 /// The default [`Term`] is a wildcard term.
 ///
 /// ```
@@ -210,7 +218,7 @@ impl Term {
 /// ```
 impl Default for Term {
     fn default() -> Self {
-        static WILDCARD: Lazy<Term> = Lazy::new(|| Term::new_static(TermKind::Wildcard));
+        static WILDCARD: Lazy<Term> = Lazy::new(|| Term::new_static(TermData::Wildcard, &[]));
         WILDCARD.clone()
     }
 }
@@ -222,9 +230,7 @@ pub enum TermKind<'a> {
     Wildcard,
     Apply(&'a SymbolName, &'a [Term]),
     Literal(&'a Literal),
-    ListEmpty(&'a Term),
-    ListCons(&'a Term, &'a Term),
-    ListConcat(&'a Term, &'a Term),
+    List(List),
     Tuple(&'a [Term]),
     TupleConcat(&'a [Term]),
     Var(&'a Var),
@@ -240,21 +246,7 @@ impl From<TermKind<'_>> for ast::Term {
                 ast::Term::Apply(symbol, args)
             }
             TermKind::Literal(literal) => ast::Term::Literal(literal.clone()),
-            TermKind::ListEmpty(_) => ast::Term::List(Default::default()),
-            TermKind::ListCons(head, tail) => ast::Term::List(
-                vec![
-                    ast::SeqPart::Item(head.into()),
-                    ast::SeqPart::Splice(tail.into()),
-                ]
-                .into(),
-            ),
-            TermKind::ListConcat(first, second) => ast::Term::List(
-                vec![
-                    ast::SeqPart::Splice(first.into()),
-                    ast::SeqPart::Splice(second.into()),
-                ]
-                .into(),
-            ),
+            TermKind::List(list) => list.into(),
             TermKind::Var(var) => ast::Term::Var(var.name().clone()),
             TermKind::Tuple(items) => ast::Term::Tuple(
                 items
@@ -276,6 +268,124 @@ impl Display for TermKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let term: ast::Term = self.clone().into();
         Display::fmt(&term, f)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct List(Term);
+
+impl From<List> for ast::Term {
+    fn from(value: List) -> Self {
+        ast::Term::List(value.iter().map(ast::SeqPart::from).collect())
+    }
+}
+
+impl From<List> for Term {
+    fn from(value: List) -> Self {
+        value.0
+    }
+}
+
+impl List {
+    pub fn new<I>(parts: I, item_type: Term) -> Self
+    where
+        I: IntoIterator<Item = SeqPart>,
+    {
+        Self::new_prepend(parts, Self::new_empty(item_type).into())
+    }
+
+    fn new_prepend<I>(parts: I, tail: Term) -> Self
+    where
+        I: IntoIterator<Item = SeqPart>,
+    {
+        let mut parts: TinyVec<[SeqPart; 8]> = parts.into_iter().collect();
+        let mut list = tail;
+
+        while let Some(part) = parts.pop() {
+            match part {
+                SeqPart::Item(term) => list = Term::new(TermData::ListCons(term, list), &[]),
+                SeqPart::Splice(term) => match term.get() {
+                    TermKind::List(list) => parts.extend(list.iter()),
+                    _ => list = Term::new(TermData::ListConcat(term, list), &[]),
+                },
+            }
+        }
+
+        Self(list)
+    }
+
+    pub fn new_empty(item_type: Term) -> Self {
+        Self(Term::new(TermData::ListEmpty(item_type), &[]))
+    }
+
+    pub fn new_cons(head: Term, tail: Term) -> Self {
+        Self(Term::new(TermData::ListCons(head, tail), &[]))
+    }
+
+    pub fn new_concat(first: Term, second: Term) -> Self {
+        Self::new_prepend([SeqPart::Splice(first)], second)
+    }
+
+    pub fn iter(&self) -> ListIter {
+        ListIter {
+            term: self.0.clone(),
+        }
+    }
+}
+
+impl IntoIterator for List {
+    type Item = SeqPart;
+    type IntoIter = ListIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ListIter {
+    term: Term,
+}
+
+impl Iterator for ListIter {
+    type Item = SeqPart;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &self.term.0.header.data {
+            TermData::ListEmpty(_) => None,
+            TermData::ListCons(head, tail) => {
+                let item = head.clone();
+                self.term = tail.clone();
+                Some(SeqPart::Item(item))
+            }
+            TermData::ListConcat(splice, rest) => {
+                let splice = splice.clone();
+                self.term = rest.clone();
+                Some(SeqPart::Splice(splice))
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SeqPart {
+    Item(Term),
+    Splice(Term),
+}
+
+impl From<SeqPart> for ast::SeqPart {
+    fn from(value: SeqPart) -> Self {
+        match value {
+            SeqPart::Item(term) => ast::SeqPart::Item(term.into()),
+            SeqPart::Splice(term) => ast::SeqPart::Item(term.into()),
+        }
+    }
+}
+
+impl Default for SeqPart {
+    fn default() -> Self {
+        Self::Splice(Term::default())
     }
 }
 
@@ -327,7 +437,7 @@ impl View for u64 {
 
 impl From<u64> for Term {
     fn from(value: u64) -> Self {
-        Term::new(TermKind::Literal(&Literal::Nat(value)))
+        Literal::Nat(value).into()
     }
 }
 
@@ -416,10 +526,10 @@ macro_rules! term_view_ctr {
 
         impl From<$ident> for $crate::terms::Term {
             fn from(value: $ident) -> Self {
-                $crate::terms::Term::new($crate::terms::TermKind::Apply(
+                $crate::terms::Term::new_apply(
                     &$ident::CTR_NAME,
                     &[$(value.$field_name.into()),*],
-                ))
+                )
             }
         }
     };
@@ -449,9 +559,7 @@ macro_rules! term_view_ctr {
             fn from(_: $ident) -> Self {
                 static TERM: ::once_cell::sync::Lazy<$crate::terms::Term> =
                     ::once_cell::sync::Lazy::new(|| {
-                        $crate::terms::Term::new_static(
-                            $crate::terms::TermKind::Apply(&$ident::CTR_NAME, &[])
-                        )
+                        $crate::terms::Term::new_apply_static(&$ident::CTR_NAME, &[])
                     });
                 TERM.clone()
             }

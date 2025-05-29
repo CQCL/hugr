@@ -1,4 +1,4 @@
-use super::{Term, TermKind, View, ViewError, core};
+use super::{List, SeqPart, Term, TermKind, View, ViewError, core};
 
 /// The signature of a tail loop region.
 #[derive(Debug, Clone)]
@@ -32,7 +32,13 @@ impl From<LoopRegionSignature> for Term {
             Term::default(),
         ));
         let adt = Term::from(core::Adt { variants });
-        let inputs = Term::new(TermKind::ListConcat(&value.just_inputs, &value.rest));
+        let inputs = Term::from(List::new(
+            [
+                SeqPart::Splice(value.just_inputs.clone()),
+                SeqPart::Splice(value.rest.clone()),
+            ],
+            Term::default(),
+        ));
         let outputs = Term::from(ListPrefix([adt], value.rest.clone()));
         core::Fn { inputs, outputs }.into()
     }
@@ -43,10 +49,10 @@ struct ListPrefix<const N: usize>(pub [Term; N], pub Term);
 
 impl<const N: usize> From<ListPrefix<N>> for Term {
     fn from(value: ListPrefix<N>) -> Self {
-        let mut list = value.1.clone();
+        let mut list = value.1;
 
-        for item in value.0.iter().rev() {
-            list = Term::new(TermKind::ListCons(item, &list));
+        for item in value.0.into_iter().rev() {
+            list = Term::from(List::new_cons(item, list));
         }
 
         list
@@ -64,10 +70,10 @@ struct ExactList<const N: usize>(pub [Term; N], pub Term);
 
 impl<const N: usize> From<ExactList<N>> for Term {
     fn from(value: ExactList<N>) -> Self {
-        let mut list = Term::new(TermKind::ListEmpty(&value.1));
+        let mut list = Term::from(List::new_empty(value.1));
 
-        for item in value.0.iter().rev() {
-            list = Term::new(TermKind::ListCons(item, &list));
+        for item in value.0.into_iter().rev() {
+            list = Term::from(List::new_cons(item, list))
         }
 
         list
