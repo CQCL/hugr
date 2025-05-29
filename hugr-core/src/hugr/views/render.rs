@@ -1,14 +1,19 @@
 //! Helper methods to compute the node/edge/port style when rendering a HUGR
 //! into dot or mermaid format.
 
+use std::collections::HashMap;
+
 use portgraph::render::{EdgeStyle, NodeStyle, PortStyle, PresentationStyle};
 use portgraph::{LinkView, MultiPortGraph, NodeIndex, PortIndex, PortView};
 
+use crate::core::HugrNode;
 use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
-/// Configuration for rendering a HUGR graph.
+/// Reduced configuration for rendering a HUGR graph.
+///
+/// Additional options are available in the [`FullRenderConfig`] struct.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct RenderConfig<N = Node> {
@@ -22,6 +27,74 @@ pub struct RenderConfig<N = Node> {
     pub entrypoint: Option<N>,
 }
 
+/// Configuration for rendering a HUGR graph.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct FullRenderConfig<N: HugrNode = Node> {
+    /// How to display the node indices.
+    pub node_labels: NodeLabel<N>,
+    /// Show port offsets in the graph edges.
+    pub port_offsets_in_edges: bool,
+    /// Show type labels on edges.
+    pub type_labels_in_edges: bool,
+    /// A node to highlight as the graph entrypoint.
+    pub entrypoint: Option<N>,
+}
+
+impl<N: HugrNode> From<RenderConfig<N>> for FullRenderConfig<N> {
+    fn from(config: RenderConfig<N>) -> Self {
+        let node_labels = if config.node_indices {
+            NodeLabel::Numeric
+        } else {
+            NodeLabel::None
+        };
+        Self {
+            node_labels,
+            port_offsets_in_edges: config.port_offsets_in_edges,
+            type_labels_in_edges: config.type_labels_in_edges,
+            entrypoint: config.entrypoint,
+        }
+    }
+}
+
+/// An error that occurs when trying to convert a `FullRenderConfig` into a
+/// `RenderConfig`.
+#[derive(Debug, thiserror::Error)]
+pub enum UnsupportedRenderConfig {
+    /// Custom node labels are not supported in the `RenderConfig` struct.
+    #[error("Custom node labels are not supported in the `RenderConfig` struct")]
+    CustomNodeLabels,
+}
+
+impl<N: HugrNode> TryFrom<FullRenderConfig<N>> for RenderConfig<N> {
+    type Error = UnsupportedRenderConfig;
+
+    fn try_from(value: FullRenderConfig<N>) -> Result<Self, Self::Error> {
+        if matches!(value.node_labels, NodeLabel::Custom(_)) {
+            return Err(UnsupportedRenderConfig::CustomNodeLabels);
+        }
+        let node_indices = matches!(value.node_labels, NodeLabel::Numeric);
+        Ok(Self {
+            node_indices,
+            port_offsets_in_edges: value.port_offsets_in_edges,
+            type_labels_in_edges: value.type_labels_in_edges,
+            entrypoint: value.entrypoint,
+        })
+    }
+}
+
+/// How to display the node indices.
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub enum NodeLabel<N: HugrNode = Node> {
+    /// Do not display the node index.
+    None,
+    /// Display the node index as a number.
+    #[default]
+    Numeric,
+    /// Display the labels corresponding to the node indices.
+    Custom(HashMap<N, String>),
+}
+
 impl<N> Default for RenderConfig<N> {
     fn default() -> Self {
         Self {
@@ -33,12 +106,23 @@ impl<N> Default for RenderConfig<N> {
     }
 }
 
+impl<N: HugrNode> Default for FullRenderConfig<N> {
+    fn default() -> Self {
+        Self {
+            node_labels: NodeLabel::Numeric,
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+            entrypoint: None,
+        }
+    }
+}
+
 /// Formatter method to compute a node style.
 pub(in crate::hugr) fn node_style<'a>(
     h: &'a Hugr,
-    config: RenderConfig,
-    fmt_node_index: impl Fn(NodeIndex) -> String + 'a,
+    config: impl Into<FullRenderConfig>,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
+    let config = config.into();
     fn node_name(h: &Hugr, n: NodeIndex) -> String {
         match h.get_optype(n.into()) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
@@ -52,40 +136,52 @@ pub(in crate::hugr) fn node_style<'a>(
     entrypoint_style.stroke_width = Some("3px".to_string());
     let entrypoint = config.entrypoint.map(Node::into_portgraph);
 
-    if config.node_indices {
-        Box::new(move |n| {
+    match config.node_labels {
+        NodeLabel::Numeric => Box::new(move |n| {
             if Some(n) == entrypoint {
                 NodeStyle::boxed(format!(
                     "({ni}) [**{name}**]",
-                    ni = fmt_node_index(n),
+                    ni = n.index(),
                     name = node_name(h, n)
                 ))
                 .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(format!(
                     "({ni}) {name}",
-                    ni = fmt_node_index(n),
+                    ni = n.index(),
                     name = node_name(h, n)
                 ))
             }
-        })
-    } else {
-        Box::new(move |n| {
+        }),
+        NodeLabel::None => Box::new(move |n| {
             if Some(n) == entrypoint {
                 NodeStyle::boxed(format!("[**{name}**]", name = node_name(h, n)))
                     .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(node_name(h, n))
             }
-        })
+        }),
+        NodeLabel::Custom(labels) => Box::new(move |n| {
+            if Some(n) == entrypoint {
+                NodeStyle::boxed(format!(
+                    "({label}) [**{name}**]",
+                    label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
+                    name = node_name(h, n)
+                ))
+                .with_attrs(entrypoint_style.clone())
+            } else {
+                NodeStyle::boxed(format!(
+                    "({label}) {name}",
+                    label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
+                    name = node_name(h, n)
+                ))
+            }
+        }),
     }
 }
 
 /// Formatter method to compute a port style.
-pub(in crate::hugr) fn port_style(
-    h: &Hugr,
-    _config: RenderConfig,
-) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
+pub(in crate::hugr) fn port_style(h: &Hugr) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
     let graph = &h.graph;
     Box::new(move |port| {
         let node = graph.port_node(port).unwrap();
@@ -112,7 +208,7 @@ pub(in crate::hugr) fn port_style(
 #[allow(clippy::type_complexity)]
 pub(in crate::hugr) fn edge_style(
     h: &Hugr,
-    config: RenderConfig<Node>,
+    config: impl Into<FullRenderConfig>,
 ) -> Box<
     dyn FnMut(
             <MultiPortGraph as LinkView>::LinkEndpoint,
@@ -121,6 +217,7 @@ pub(in crate::hugr) fn edge_style(
         + '_,
 > {
     let graph = &h.graph;
+    let config = config.into();
     Box::new(move |src, tgt| {
         let src_node = graph.port_node(src).unwrap();
         let src_optype = h.get_optype(src_node.into());

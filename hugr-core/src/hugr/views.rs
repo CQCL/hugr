@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 pub use self::petgraph::PetgraphWrapper;
-use self::render::RenderConfig;
+use self::render::{FullRenderConfig, RenderConfig};
 pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
@@ -396,6 +396,28 @@ pub trait HugrView: HugrInternals {
     /// format instead.
     fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String;
 
+    /// Return the mermaid representation of the underlying hierarchical graph,
+    /// accepting the full set of configuration options.
+    ///
+    /// By default, the configuration will be converted to a [`RenderConfig`]
+    /// struct and may panic if the configuration is not supported. Where
+    /// possible, users are encouraged to provide an implementation for this
+    /// method instead and forward calls to [HugrView::mermaid_string_with_config]
+    /// to this method.
+    ///
+    /// The hierarchy is represented using subgraphs. Edges are labelled with
+    /// their source and target ports.
+    ///
+    /// For a more detailed representation, use the [`HugrView::dot_string`]
+    /// format instead.
+    fn mermaid_string_with_full_config(
+        &self,
+        config: impl Into<FullRenderConfig<Self::Node>>,
+    ) -> String {
+        let config: RenderConfig<_> = config.into().try_into().expect("unsupported config");
+        self.mermaid_string_with_config(config)
+    }
+
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
     /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
@@ -639,10 +661,15 @@ impl HugrView for Hugr {
     }
 
     fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
+        self.mermaid_string_with_full_config(config)
+    }
+
+    fn mermaid_string_with_full_config(&self, config: impl Into<FullRenderConfig>) -> String {
+        let config = config.into();
         self.graph
             .mermaid_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(self, config, |n| n.index().to_string()))
+            .with_node_style(render::node_style(self, config.clone()))
             .with_edge_style(render::edge_style(self, config))
             .finish()
     }
@@ -651,15 +678,15 @@ impl HugrView for Hugr {
     where
         Self: Sized,
     {
-        let config = RenderConfig {
+        let config = FullRenderConfig {
             entrypoint: Some(self.entrypoint()),
-            ..RenderConfig::default()
+            ..FullRenderConfig::default()
         };
         self.graph
             .dot_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(self, config, |n| n.index().to_string()))
-            .with_port_style(render::port_style(self, config))
+            .with_node_style(render::node_style(self, config.clone()))
+            .with_port_style(render::port_style(self))
             .with_edge_style(render::edge_style(self, config))
             .finish()
     }
