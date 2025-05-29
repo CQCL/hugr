@@ -571,7 +571,7 @@ impl PersistentHugr {
             // incoming ports are of interest to us if
             //  (i) they are connected to the output of a replacement (then there will be a
             //      linked port in a parent commit), or
-            //  (ii) they are deleted by a child commit and is not the same as the out_node
+            //  (ii) they are deleted by a child commit and are not equal to the out_node
             //      (then there will be a linked port in a child commit)
             let (is_linked_to_output, deleted_by_child): (IteratorNonEmpty, BTreeSet<_>) = hugr
                 .linked_inputs(out_node.1, out_port)

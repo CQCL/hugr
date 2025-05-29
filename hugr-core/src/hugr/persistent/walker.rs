@@ -33,7 +33,7 @@
 //! A typical usage flow involves:
 //! 1. Create a [`Walker`] over a [`CommitStateSpace`].
 //! 2. Pin (at least one) initial node of interest using
-//!    [`Walker::try_pin_node`].
+//!    [`Walker::try_pin_node`] or [`Walker::from_pinned_node`].
 //! 3. Traverse wires starting from a pinned node to explore the neighbourhood
 //!    in the graph using [`Walker::expand`]. Each new walker thus obtained will
 //!    correspond to a different selction of commits, which will result in
@@ -146,7 +146,7 @@ impl<'a> Walker<'a> {
             }
         } else {
             let commit = self.state_space.get_commit(commit_id).clone();
-            // TODO: we should be able to check for an AlreadyPinned error at
+            // TODO/Optimize: we should be able to check for an AlreadyPinned error at
             // the same time that we check the ancestors are compatible in
             // `PersistentHugr`, with e.g. a callback, instead of storing a backup
             let backup = self.selected_commits.clone();
@@ -178,12 +178,31 @@ impl<'a> Walker<'a> {
     }
 
     /// View the [`PersistentHugr`] containing all the compatible commits that
-    /// have been selected during exploration.
+    /// have been selected so far during exploration.
+    ///
+    /// Of the space of all possible HUGRs that can be obtained from future
+    /// expansions of the walker, this is the HUGR corresponding to selecting
+    /// as few commits as possible (i.e. all the commits that have been selected
+    /// so far and no more).
     pub fn as_hugr_view(&self) -> &PersistentHugr {
         &self.selected_commits
     }
 
     /// Expand the Walker by pinning a node connected to the given wire.
+    ///
+    /// To understand how Walkers are expanded, it is useful to understand how
+    /// in a walker, the HUGR graph is partitioned into two parts:
+    ///  - a subgraph made of pinned nodes: this part of the HUGR is frozen: it cannot be
+    ///    modified by further expansions the Walker.
+    ///  - the complement subgraph: the unpinned part of the HUGR has not been
+    ///    explored yet. Multiple alternative HUGRs can be obtained depending
+    ///    on which commits are selected.
+    ///
+    /// To every walker thus corresponds a space of possible HUGRs that can be
+    /// obtained, depending on which commits are selected and which further nodes
+    /// are pinned. The expansion of a walker returns a set of walkers, which
+    /// together cover the same space of possible HUGRs, each having a different
+    /// additional node pinned.
     ///
     /// Return an iterator over all possible [`Walker`]s that can be created by
     /// pinning exactly one additional node connected to `wire`. Each returned
@@ -245,19 +264,18 @@ impl<'a> Walker<'a> {
                 self.state_space.children_at_boundary_port(node, port)
             {
                 match opp_port.as_directed() {
-                    Either::Left(opp_port) => {
-                        let Some((n, p)) = self
+                    Either::Left(in_port) => {
+                        if let Some((n, p)) = self
                             .state_space
-                            .linked_child_output(opp_node, opp_port, child_id)
-                        else {
-                            continue;
-                        };
-                        all_ports.push((n, p.into()));
+                            .linked_child_output(opp_node, in_port, child_id)
+                        {
+                            all_ports.push((n, p.into()));
+                        }
                     }
-                    Either::Right(opp_port) => {
+                    Either::Right(out_port) => {
                         all_ports.extend(
                             self.state_space
-                                .linked_child_inputs(opp_node, opp_port, child_id)
+                                .linked_child_inputs(opp_node, out_port, child_id)
                                 .map(|(n, p)| (n, p.into())),
                         );
                     }
@@ -273,8 +291,8 @@ impl<'a> Walker<'a> {
 }
 
 impl CommitStateSpace {
-    /// Given a node and port, return all children commit of the current `node`
-    /// that delete `node` but do not delete a linked port of `(node, port)`.
+    /// Given a node and port, return all child commits of the current `node`
+    /// that delete `node` but keep at least one port linked to `(node, port)`.
     /// In other words, (node, port) is a boundary port of the subgraph of
     /// the child replacement.
     ///

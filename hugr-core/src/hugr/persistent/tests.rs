@@ -155,6 +155,9 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
 ///    └─────────┘      └─────────┘
 /// ```
 ///
+/// Note that for the sake of these tests, we do not care about the semantics of
+/// the rewrites. Unlike real-world use cases, the LHS and RHS here are not
+/// functionally equivalent.
 /// The state space will contain the following commits:
 ///
 /// ```
