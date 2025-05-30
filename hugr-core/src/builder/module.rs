@@ -108,7 +108,6 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 
     /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
     /// body graph.
-    /// ALAN: could put this on HugrBuilder (subtrait of Container) as utility??
     ///
     /// # Errors
     ///
