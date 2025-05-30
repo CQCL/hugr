@@ -1254,6 +1254,7 @@ dependencies = [
  "jsonschema",
  "lazy_static",
  "once_cell",
+ "ordered-float",
  "paste",
  "petgraph 0.8.1",
  "portgraph",

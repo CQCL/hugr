@@ -64,6 +64,7 @@ relrc = { workspace = true, features = ["petgraph"] }
 servo_arc = "0.4.0"
 once_cell = "1.21.3"
 tinyvec = { version = "1.9.0", features = ["alloc"] }
+ordered-float.workspace = true
 
 [dev-dependencies]
 rstest = { workspace = true }

@@ -3,7 +3,9 @@ use fxhash::FxHasher;
 use hugr_model::v0::ast;
 use hugr_model::v0::{Literal, SymbolName, VarName};
 use once_cell::sync::Lazy;
+use ordered_float::OrderedFloat;
 use servo_arc::ThinArc;
+use smol_str::SmolStr;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
@@ -261,6 +263,24 @@ impl From<u64> for Term {
     }
 }
 
+impl From<f64> for Term {
+    fn from(value: f64) -> Self {
+        Literal::Float(OrderedFloat(value)).into()
+    }
+}
+
+impl From<OrderedFloat<f64>> for Term {
+    fn from(value: OrderedFloat<f64>) -> Self {
+        Literal::Float(value).into()
+    }
+}
+
+impl From<SmolStr> for Term {
+    fn from(value: SmolStr) -> Self {
+        Literal::Str(value).into()
+    }
+}
+
 /// The default [`Term`] is a wildcard term.
 ///
 /// ```
@@ -376,13 +396,48 @@ impl View for Term {
     }
 }
 
-impl View for u64 {
+impl View for Literal {
     fn view(term: &Term) -> Result<Self, ViewError> {
         match term.get() {
-            TermKind::Literal(literal) => match literal {
-                Literal::Nat(value) => Ok(*value),
-                _ => Err(ViewError::Mismatch),
-            },
+            TermKind::Literal(literal) => Ok(literal.clone()),
+            TermKind::Wildcard => Err(ViewError::Uninferred),
+            TermKind::Var(_) => Err(ViewError::Variable),
+            _ => Err(ViewError::Mismatch),
+        }
+    }
+}
+
+impl View for u64 {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        match term.view()? {
+            Literal::Nat(value) => Ok(value),
+            _ => Err(ViewError::Mismatch),
+        }
+    }
+}
+
+impl View for f64 {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        match term.view()? {
+            Literal::Float(value) => Ok(value.into_inner()),
+            _ => Err(ViewError::Mismatch),
+        }
+    }
+}
+
+impl View for OrderedFloat<f64> {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        match term.view()? {
+            Literal::Float(value) => Ok(value),
+            _ => Err(ViewError::Mismatch),
+        }
+    }
+}
+
+impl View for SmolStr {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        match term.view()? {
+            Literal::Str(string) => Ok(string),
             _ => Err(ViewError::Mismatch),
         }
     }

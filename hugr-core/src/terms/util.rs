@@ -1,3 +1,4 @@
+//! Utility types to view and construct terms.
 use super::{Term, TermKind, View, ViewError, core};
 
 /// The signature of a tail loop region.
