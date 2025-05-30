@@ -1,18 +1,18 @@
+//! Terms in the static language that parameterises Hugrs.
 use fxhash::FxHasher;
 use hugr_model::v0::ast;
 use hugr_model::v0::{Literal, SymbolName, VarName};
 use once_cell::sync::Lazy;
 use servo_arc::ThinArc;
-use std::error::Error;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
-use tinyvec::TinyVec;
 
 use crate::Node;
 
 pub mod core;
-pub mod util;
+mod errors;
+// pub mod util;
 
 /// A term in the static language that is used to parameterise `Hugr`s.
 ///
@@ -63,30 +63,36 @@ impl Hash for Term {
 }
 
 /// The constant-sized part of the [`Term`].
+///
+/// See [`TermKind`] for more information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 enum TermData {
     #[default]
     Wildcard,
     Apply(SymbolName),
     Literal(Literal),
-    ListEmpty(Term),
-    ListCons(Term, Term),
-    ListConcat(Term, Term),
-    Tuple,
-    TupleConcat,
+    List(Term),
+    ListConcat(Term),
+    Tuple(Term),
+    TupleConcat(Term),
     Var(Var),
 }
 
 impl TermData {
-    pub fn split<'a>(view: TermKind<'a>) -> (Self, &'a [Term]) {
-        match view {
+    pub fn split<'a>(term: TermKind<'a>) -> (Self, &'a [Term]) {
+        match term {
             TermKind::Wildcard => (TermData::Wildcard, &[]),
             TermKind::Apply(symbol, terms) => (TermData::Apply(symbol.clone()), terms),
-            TermKind::Literal(literal) => (TermData::Literal(literal.clone()), &[] as &[_]),
-            TermKind::List(_) => todo!(),
-            TermKind::Tuple(terms) => (TermData::Tuple, terms),
-            TermKind::TupleConcat(terms) => (TermData::TupleConcat, terms),
-            TermKind::Var(var) => (TermData::Var(var.clone()), &[] as &[_]),
+            TermKind::Literal(literal) => (TermData::Literal(literal.clone()), &[]),
+            TermKind::List(item_type, items) => (TermData::List(item_type.clone()), items),
+            TermKind::ListConcat(item_type, lists) => {
+                (TermData::ListConcat(item_type.clone()), lists)
+            }
+            TermKind::Tuple(item_types, items) => (TermData::Tuple(item_types.clone()), items),
+            TermKind::TupleConcat(item_types, tuples) => {
+                (TermData::TupleConcat(item_types.clone()), tuples)
+            }
+            TermKind::Var(var) => (TermData::Var(var.clone()), &[]),
         }
     }
 }
@@ -107,6 +113,7 @@ struct TermHeader {
 }
 
 impl TermHeader {
+    /// Creates a new term header by computing the derived information.
     pub fn new(data: TermData, terms: &[Term]) -> Self {
         let hash = {
             let mut hasher = FxHasher::default();
@@ -120,17 +127,9 @@ impl TermHeader {
 }
 
 impl Term {
-    pub fn new_apply(symbol: &SymbolName, args: &[Term]) -> Self {
-        Self::new(TermData::Apply(symbol.clone()), args)
-    }
-
-    pub fn new_apply_static(symbol: &SymbolName, args: &[Term]) -> Self {
-        Self::new_static(TermData::Apply(symbol.clone()), args)
-    }
-
     /// Create a new [`Term`].
-    fn new(data: TermData, terms: &[Term]) -> Self {
-        // TODO: Normalise list and tuple terms
+    pub fn new(term: TermKind) -> Self {
+        let (data, terms) = TermData::split(term);
         Self(ThinArc::from_header_and_iter(
             TermHeader::new(data, terms),
             terms.iter().cloned(),
@@ -141,7 +140,8 @@ impl Term {
     ///
     /// Terms created with this method will never be deallocated. This is useful
     /// for [`Term`]s that are known at Rust compile time.
-    fn new_static(data: TermData, terms: &[Term]) -> Self {
+    pub fn new_static(term: TermKind) -> Self {
+        let (data, terms) = TermData::split(term);
         Self(ThinArc::from_header_and_iter_alloc(
             |layout| unsafe { std::alloc::alloc(layout) },
             TermHeader::new(data, terms),
@@ -151,30 +151,83 @@ impl Term {
         ))
     }
 
-    /// Borrow this term's data as a [`TermKind`].
+    /// Borrows this term's data as a [`TermKind`].
     #[inline]
     pub fn get(&self) -> TermKind {
         match &self.0.header.data {
             TermData::Wildcard => TermKind::Wildcard,
             TermData::Apply(symbol) => TermKind::Apply(symbol, self.0.slice()),
             TermData::Literal(literal) => TermKind::Literal(literal),
-            TermData::ListEmpty(_) => TermKind::List(List(self.clone())),
-            TermData::ListCons(_, _) => TermKind::List(List(self.clone())),
-            TermData::ListConcat(_, _) => TermKind::List(List(self.clone())),
-            TermData::Tuple => TermKind::Tuple(self.0.slice()),
-            TermData::TupleConcat => TermKind::TupleConcat(self.0.slice()),
+            TermData::List(item_type) => TermKind::List(item_type, self.0.slice()),
+            TermData::ListConcat(item_type) => TermKind::List(item_type, self.0.slice()),
+            TermData::Tuple(item_types) => TermKind::Tuple(item_types, self.0.slice()),
+            TermData::TupleConcat(item_types) => TermKind::TupleConcat(item_types, self.0.slice()),
             TermData::Var(var) => TermKind::Var(var),
         }
     }
 
+    /// Tries to apply a [`View`] to this term.
     #[inline]
     pub fn view<V: View>(&self) -> Result<V, ViewError> {
         V::view(self)
     }
 
+    /// Tries to match this term with a symbol application, given a symbol name and statically known arity.
+    ///
+    /// Instead of using this method directly, consider implementing a view type for the symbol.
+    ///
+    /// # Errors
+    ///
+    /// - [`ViewError::Mismatch`] when the term is not a symbol application.
+    /// - [`ViewError::Mismatch`] when the term is a symbol application for a different symbol.
+    /// - [`ViewError::Mismatch`] when the term is a symbol application with more arguments than expected.
+    /// - [`ViewError::Uninferred`] when the term is a wildcard.
+    /// - [`ViewError::Variable`] when the term is a variable.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_core::terms::{Term, TermKind, ViewError};
+    /// # use hugr_model::v0::SymbolName;
+    /// let this = SymbolName::new_static("this");
+    /// let that = SymbolName::new_static("that");
+    ///
+    /// let arg0 = Term::from(0u64);
+    /// let arg1 = Term::from(1u64);
+    /// let term = Term::new(TermKind::Apply(&this, &[arg0.clone(), arg1.clone()]));
+    ///
+    /// assert_eq!(term.view_apply(&this), Ok([arg0.clone(), arg1.clone()]));
+    /// assert_eq!(term.view_apply::<2>(&that), Err(ViewError::Mismatch));
+    /// assert_eq!(Term::from(42u64).view_apply::<2>(&this), Err(ViewError::Mismatch));
+    /// assert_eq!(Term::default().view_apply::<2>(&this), Err(ViewError::Uninferred));
+    /// ```
+    ///
+    /// When the symbol is applied to fewer arguments than expected, the argument list is padded
+    /// with wildcards from the front:
+    /// ```
+    /// # use hugr_core::terms::{Term, TermKind, ViewError};
+    /// # use hugr_model::v0::SymbolName;
+    /// let symbol = SymbolName::new_static("symbol");
+    /// let arg = Term::from(42u64);
+    /// let too_few = Term::new(TermKind::Apply(&symbol, &[arg.clone()]));
+    /// assert_eq!(too_few.view_apply(&symbol), Ok([Term::default(), arg]));
+    /// ```
+    ///
+    /// The view fails to match when the symbol is applied to more arguments than expected:
+    /// ```
+    /// # use hugr_core::terms::{Term, TermKind, ViewError};
+    /// # use hugr_model::v0::SymbolName;
+    /// let symbol = SymbolName::new_static("symbol");
+    /// let args = [Term::from(0u64), Term::from(1u64), Term::from(2u64)];
+    /// let too_many = Term::new(TermKind::Apply(&symbol, &args));
+    /// assert_eq!(too_many.view_apply::<2>(&symbol), Err(ViewError::Mismatch));
+    /// ```
     pub fn view_apply<const N: usize>(&self, symbol: &SymbolName) -> Result<[Term; N], ViewError> {
-        let TermKind::Apply(term_symbol, term_args) = self.get() else {
-            return Err(ViewError::Mismatch);
+        let (term_symbol, term_args) = match self.get() {
+            TermKind::Wildcard => return Err(ViewError::Uninferred),
+            TermKind::Apply(term_symbol, term_args) => (term_symbol, term_args),
+            TermKind::Var(_) => return Err(ViewError::Variable),
+            _ => return Err(ViewError::Mismatch),
         };
 
         if symbol != term_symbol {
@@ -194,19 +247,17 @@ impl Term {
 
         Ok(args)
     }
-
-    pub fn view_list_prefix<const N: usize>(&self) -> Result<([Term; N], Term), ViewError> {
-        todo!()
-    }
-
-    pub fn view_list_exact<const N: usize>(&self) -> Result<[Term; N], ViewError> {
-        todo!()
-    }
 }
 
 impl From<Literal> for Term {
     fn from(value: Literal) -> Self {
-        Term::new(TermData::Literal(value), &[])
+        Term::new(TermKind::Literal(&value))
+    }
+}
+
+impl From<u64> for Term {
+    fn from(value: u64) -> Self {
+        Literal::Nat(value).into()
     }
 }
 
@@ -218,7 +269,7 @@ impl From<Literal> for Term {
 /// ```
 impl Default for Term {
     fn default() -> Self {
-        static WILDCARD: Lazy<Term> = Lazy::new(|| Term::new_static(TermData::Wildcard, &[]));
+        static WILDCARD: Lazy<Term> = Lazy::new(|| Term::new_static(TermKind::Wildcard));
         WILDCARD.clone()
     }
 }
@@ -230,9 +281,10 @@ pub enum TermKind<'a> {
     Wildcard,
     Apply(&'a SymbolName, &'a [Term]),
     Literal(&'a Literal),
-    List(List),
-    Tuple(&'a [Term]),
-    TupleConcat(&'a [Term]),
+    List(&'a Term, &'a [Term]),
+    ListConcat(&'a Term, &'a [Term]),
+    Tuple(&'a Term, &'a [Term]),
+    TupleConcat(&'a Term, &'a [Term]),
     Var(&'a Var),
 }
 
@@ -246,15 +298,26 @@ impl From<TermKind<'_>> for ast::Term {
                 ast::Term::Apply(symbol, args)
             }
             TermKind::Literal(literal) => ast::Term::Literal(literal.clone()),
-            TermKind::List(list) => list.into(),
             TermKind::Var(var) => ast::Term::Var(var.name().clone()),
-            TermKind::Tuple(items) => ast::Term::Tuple(
+            TermKind::Tuple(_, items) => ast::Term::Tuple(
                 items
                     .iter()
                     .map(|item| ast::SeqPart::Item(item.into()))
                     .collect(),
             ),
-            TermKind::TupleConcat(lists) => ast::Term::Tuple(
+            TermKind::TupleConcat(_, lists) => ast::Term::Tuple(
+                lists
+                    .iter()
+                    .map(|list| ast::SeqPart::Splice(list.into()))
+                    .collect(),
+            ),
+            TermKind::List(_, items) => ast::Term::List(
+                items
+                    .iter()
+                    .map(|item| ast::SeqPart::Item(item.into()))
+                    .collect(),
+            ),
+            TermKind::ListConcat(_, lists) => ast::Term::List(
                 lists
                     .iter()
                     .map(|list| ast::SeqPart::Splice(list.into()))
@@ -268,124 +331,6 @@ impl Display for TermKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let term: ast::Term = self.clone().into();
         Display::fmt(&term, f)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct List(Term);
-
-impl From<List> for ast::Term {
-    fn from(value: List) -> Self {
-        ast::Term::List(value.iter().map(ast::SeqPart::from).collect())
-    }
-}
-
-impl From<List> for Term {
-    fn from(value: List) -> Self {
-        value.0
-    }
-}
-
-impl List {
-    pub fn new<I>(parts: I, item_type: Term) -> Self
-    where
-        I: IntoIterator<Item = SeqPart>,
-    {
-        Self::new_prepend(parts, Self::new_empty(item_type).into())
-    }
-
-    fn new_prepend<I>(parts: I, tail: Term) -> Self
-    where
-        I: IntoIterator<Item = SeqPart>,
-    {
-        let mut parts: TinyVec<[SeqPart; 8]> = parts.into_iter().collect();
-        let mut list = tail;
-
-        while let Some(part) = parts.pop() {
-            match part {
-                SeqPart::Item(term) => list = Term::new(TermData::ListCons(term, list), &[]),
-                SeqPart::Splice(term) => match term.get() {
-                    TermKind::List(list) => parts.extend(list.iter()),
-                    _ => list = Term::new(TermData::ListConcat(term, list), &[]),
-                },
-            }
-        }
-
-        Self(list)
-    }
-
-    pub fn new_empty(item_type: Term) -> Self {
-        Self(Term::new(TermData::ListEmpty(item_type), &[]))
-    }
-
-    pub fn new_cons(head: Term, tail: Term) -> Self {
-        Self(Term::new(TermData::ListCons(head, tail), &[]))
-    }
-
-    pub fn new_concat(first: Term, second: Term) -> Self {
-        Self::new_prepend([SeqPart::Splice(first)], second)
-    }
-
-    pub fn iter(&self) -> ListIter {
-        ListIter {
-            term: self.0.clone(),
-        }
-    }
-}
-
-impl IntoIterator for List {
-    type Item = SeqPart;
-    type IntoIter = ListIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ListIter {
-    term: Term,
-}
-
-impl Iterator for ListIter {
-    type Item = SeqPart;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match &self.term.0.header.data {
-            TermData::ListEmpty(_) => None,
-            TermData::ListCons(head, tail) => {
-                let item = head.clone();
-                self.term = tail.clone();
-                Some(SeqPart::Item(item))
-            }
-            TermData::ListConcat(splice, rest) => {
-                let splice = splice.clone();
-                self.term = rest.clone();
-                Some(SeqPart::Splice(splice))
-            }
-            _ => unreachable!(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum SeqPart {
-    Item(Term),
-    Splice(Term),
-}
-
-impl From<SeqPart> for ast::SeqPart {
-    fn from(value: SeqPart) -> Self {
-        match value {
-            SeqPart::Item(term) => ast::SeqPart::Item(term.into()),
-            SeqPart::Splice(term) => ast::SeqPart::Item(term.into()),
-        }
-    }
-}
-
-impl Default for SeqPart {
-    fn default() -> Self {
-        Self::Splice(Term::default())
     }
 }
 
@@ -413,7 +358,15 @@ impl Var {
     }
 }
 
+impl From<Var> for Term {
+    fn from(value: Var) -> Self {
+        Term::new(TermKind::Var(&value))
+    }
+}
+
+/// Trait for view types that can pattern match terms.
 pub trait View: Sized {
+    /// Attempts to match a term as an instance of this type.
     fn view(term: &Term) -> Result<Self, ViewError>;
 }
 
@@ -435,67 +388,27 @@ impl View for u64 {
     }
 }
 
-impl From<u64> for Term {
-    fn from(value: u64) -> Self {
-        Literal::Nat(value).into()
-    }
-}
-
-#[derive(Debug, Error)]
+/// A [`Term`] does not fit the pattern expected by a [`View`].
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum ViewError {
+    /// The term does not match the pattern of the view.
     #[error("the term does not match the pattern of the view")]
     Mismatch,
-    // TODO: Error type to account for situations in which the term is too incomplete,
-    // e.g. by containing variables or uninferred wildcards.
+
+    /// The view did not match the term because relevant parts of the term are
+    /// uninferred. Filling in the uninferred parts of the term can potentially
+    /// lead to a match.
+    #[error("the term has uninferred parts that prevent a match")]
+    Uninferred,
+
+    /// The view did not match the term because relevant parts of the term are
+    /// abstracted behind a variable. Substituting more concrete terms for the
+    /// variables can potentially lead to a match.
+    #[error("the term contains variables that prevent a match")]
+    Variable,
 }
 
-type AnyError = Box<dyn Error + Send + Sync>;
-
-/// Constructor is applied to wrong number of arguments.
-#[derive(Debug, Error)]
-#[error(
-    "`{constructor}` expects `{expected}` arguments but got `{actual}` in term:\n```\n{term}\n```"
-)]
-pub struct ArityError {
-    /// The number of arguments that the constructor expects.
-    pub expected: usize,
-    /// The number of arguments that were passed to the constructor.
-    pub actual: usize,
-    /// The term that caused the error.
-    pub term: Term,
-    /// The constructor that is applied to the wrong number of arguments.
-    pub constructor: SymbolName,
-}
-
-/// There is an error within a field of a constructor.
-#[derive(Debug, Error)]
-#[error(
-    "invalid field `{name}` (index {index}) of constructor `{constructor}` in term:\n```\n{term}\n```"
-)]
-pub struct FieldError {
-    /// The original error in the field.
-    #[source]
-    pub error: AnyError,
-    /// The index of the field within the constructor's parameter list.
-    pub index: usize,
-    /// The name of the field.
-    pub name: VarName,
-    /// The name of the constructor.
-    pub constructor: SymbolName,
-    /// The constructor application that caused the error.
-    pub term: Term,
-}
-
-/// A particular term constructor was expected.
-#[derive(Debug, Error)]
-#[error("expected constructor `{constructor}` but got term:\n```\n{term}\n```")]
-pub struct ConstructorError {
-    /// The constructor that was expected.
-    pub constructor: SymbolName,
-    /// The term that caused the error.
-    pub term: Term,
-}
-
+/// Macro to create a view type for a term constructor.
 #[macro_export]
 macro_rules! term_view_ctr {
     (
@@ -526,9 +439,11 @@ macro_rules! term_view_ctr {
 
         impl From<$ident> for $crate::terms::Term {
             fn from(value: $ident) -> Self {
-                $crate::terms::Term::new_apply(
-                    &$ident::CTR_NAME,
-                    &[$(value.$field_name.into()),*],
+                $crate::terms::Term::new(
+                    $crate::terms::TermKind::Apply(
+                        &$ident::CTR_NAME,
+                        &[$(value.$field_name.into()),*],
+                    )
                 )
             }
         }
@@ -559,7 +474,9 @@ macro_rules! term_view_ctr {
             fn from(_: $ident) -> Self {
                 static TERM: ::once_cell::sync::Lazy<$crate::terms::Term> =
                     ::once_cell::sync::Lazy::new(|| {
-                        $crate::terms::Term::new_apply_static(&$ident::CTR_NAME, &[])
+                        $crate::terms::Term::new(
+                            $crate::terms::TermKind::Apply(&$ident::CTR_NAME, &[])
+                        )
                     });
                 TERM.clone()
             }
