@@ -12,6 +12,12 @@ pub struct DynamicTopoSort {
     reverse_graph: HashMap<NodeIndex, Vec<NodeIndex>>, // Adjacency list: incoming edges
 }
 
+impl Default for DynamicTopoSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DynamicTopoSort {
     /// Creates an empty `DynamicTopoSort` instance.
     pub fn new() -> Self {
@@ -31,8 +37,8 @@ impl DynamicTopoSort {
         let pos = self.order.len();
         self.order.push(node);
         self.node_to_pos.insert(node, pos);
-        self.graph.entry(node).or_insert_with(Vec::new);
-        self.reverse_graph.entry(node).or_insert_with(Vec::new);
+        self.graph.entry(node).or_default();
+        self.reverse_graph.entry(node).or_default();
     }
 
     /// Adds an edge and updates the topological order, returning an error if a cycle is created.
@@ -40,14 +46,11 @@ impl DynamicTopoSort {
         if !self.node_to_pos.contains_key(&from) || !self.node_to_pos.contains_key(&to) {
             return Err("Node not found in graph");
         }
-        if self.graph.get(&from).map_or(false, |v| v.contains(&to)) {
+        if self.graph.get(&from).is_some_and(|v| v.contains(&to)) {
             return Ok(());
         }
-        self.graph.entry(from).or_insert_with(Vec::new).push(to);
-        self.reverse_graph
-            .entry(to)
-            .or_insert_with(Vec::new)
-            .push(from);
+        self.graph.entry(from).or_default().push(to);
+        self.reverse_graph.entry(to).or_default().push(from);
         if self.would_create_cycle(to, from) {
             self.graph.get_mut(&from).unwrap().retain(|&n| n != to);
             self.reverse_graph
@@ -240,7 +243,7 @@ impl DynamicTopoSort {
     }
     /// Placeholder: Maps a port to its node.
     fn port_to_node(&self, _port: PortIndex) -> Option<NodeIndex> {
-        None 
+        None
     }
 
     /// Checks if `start` can reach any input within position bounds, going outside `nodes`.
@@ -285,6 +288,12 @@ impl DynamicTopoSort {
 /// A dynamic topological convex checker for portgraphs.
 pub struct DynamicTopoConvexChecker {
     topo_sort: DynamicTopoSort,
+}
+
+impl Default for DynamicTopoConvexChecker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DynamicTopoConvexChecker {
