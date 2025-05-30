@@ -11,12 +11,30 @@ fn main() {
         CliArgs::Validate(args) => run_validate(args),
         CliArgs::GenExtensions(args) => args.run_dump(&hugr::std_extensions::STD_REG),
         CliArgs::Mermaid(args) => run_mermaid(args),
-        CliArgs::External(_) => {
-            // TODO: Implement support for external commands.
-            // Running `hugr COMMAND` would look for `hugr-COMMAND` in the path
-            // and run it.
-            eprintln!("External commands are not supported yet.");
-            std::process::exit(1);
+        CliArgs::External(args) => {
+            // External subcommand support: invoke `hugr-<subcommand>`
+            if args.is_empty() {
+                eprintln!("No external subcommand specified.");
+                std::process::exit(1);
+            }
+            let subcmd = args[0].to_string_lossy();
+            let exe = format!("hugr-{}", subcmd);
+            let rest: Vec<_> = args[1..].iter().map(|s| s.to_string_lossy().to_string()).collect();
+            match std::process::Command::new(&exe).args(&rest).status() {
+                Ok(status) => {
+                    if !status.success() {
+                        std::process::exit(status.code().unwrap_or(1));
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    eprintln!("error: no such subcommand: '{}'.\nCould not find '{}' in PATH.", subcmd, exe);
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("error: failed to invoke '{}': {}", exe, e);
+                    std::process::exit(1);
+                }
+            }
         }
         _ => {
             eprintln!("Unknown command");
