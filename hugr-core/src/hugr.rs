@@ -332,8 +332,10 @@ impl Hugr {
                 self.hierarchy.swap_nodes(pg_target, pg_source);
                 rekey(source, target);
 
-                if source.into_portgraph() == self.entrypoint {
+                if source.into_portgraph() == new_entrypoint {
                     new_entrypoint = target.into_portgraph();
+                } else if target.into_portgraph() == new_entrypoint {
+                    new_entrypoint = source.into_portgraph();
                 }
             }
         }
@@ -650,6 +652,7 @@ pub(crate) mod test {
 
         h.canonicalize_nodes(|_, _| ());
         let [dfg] = find_dfgs(&h).try_into().unwrap();
-        assert_ne!(h.entrypoint(), dfg); // OOOPS
+        // This was failing, https://github.com/CQCL/hugr/issues/2262:
+        assert_eq!(h.entrypoint(), dfg);
     }
 }
