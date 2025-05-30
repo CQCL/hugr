@@ -67,6 +67,7 @@ enum TermData {
     Tuple(Term),
     TupleConcat(Term),
     Var(Var),
+    Func(Term, Node),
 }
 
 impl TermData {
@@ -84,6 +85,7 @@ impl TermData {
                 (TermData::TupleConcat(item_types.clone()), tuples)
             }
             TermKind::Var(var) => (TermData::Var(var.clone()), &[]),
+            TermKind::Func(signature, node) => (TermData::Func(signature.clone(), node), &[]),
         }
     }
 }
@@ -154,6 +156,7 @@ impl Term {
             TermData::Tuple(item_types) => TermKind::Tuple(item_types, self.0.slice()),
             TermData::TupleConcat(item_types) => TermKind::TupleConcat(item_types, self.0.slice()),
             TermData::Var(var) => TermKind::Var(var),
+            TermData::Func(signature, node) => TermKind::Func(signature, *node),
         }
     }
 
@@ -302,6 +305,10 @@ impl From<&Term> for ast::Term {
             TermKind::List(_, _) | TermKind::ListConcat(_, _) => {
                 ast::Term::List(ListIter::new(value).map(ast::SeqPart::from).collect())
             }
+            TermKind::Func(_, _) => {
+                // TODO: Do we want to display regions somehow?
+                ast::Term::Wildcard
+            }
         }
     }
 }
@@ -331,6 +338,7 @@ pub enum TermKind<'a> {
     Tuple(&'a Term, &'a [Term]),
     TupleConcat(&'a Term, &'a [Term]),
     Var(&'a Var),
+    Func(&'a Term, Node),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
