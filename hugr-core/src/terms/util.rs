@@ -1,5 +1,5 @@
 //! Utility types to view and construct terms.
-use std::{collections::VecDeque, iter::FusedIterator};
+use std::iter::FusedIterator;
 
 use hugr_model::v0::ast;
 
@@ -78,7 +78,36 @@ impl<const N: usize> From<ListPrefix<N>> for Term {
 
 impl<const N: usize> View for ListPrefix<N> {
     fn view(term: &Term) -> Result<Self, ViewError> {
-        todo!()
+        let mut parts = ListIter::new(term);
+        let item_type = parts.item_type().clone();
+        let mut prefix: [Term; N] = std::array::from_fn(|_| Term::default());
+        let mut index = 0;
+
+        for part in &mut parts {
+            match part {
+                ListPart::Item(term) => {
+                    let item = match prefix.get_mut(index) {
+                        Some(item) => item,
+                        None => break,
+                    };
+                    *item = term;
+                    index += 1;
+                }
+                ListPart::Splice(term) => match term.get() {
+                    TermKind::Wildcard => return Err(ViewError::Uninferred),
+                    TermKind::Var(_) => return Err(ViewError::Variable),
+                    _ => return Err(ViewError::Mismatch),
+                },
+            }
+        }
+
+        let rest = parts.remaining();
+
+        Ok(Self {
+            item_type,
+            prefix,
+            rest,
+        })
     }
 }
 
@@ -145,6 +174,10 @@ pub struct ListIter {
     item_type: Term,
 }
 
+// TODO: It might be better for performance if `ListIter` allowed for
+// some inline capacity in the `items` and `stack` fields to avoid
+// allocating in common cases.
+
 impl ListIter {
     /// Create a new iterator from the given term.
     pub fn new(term: &Term) -> Self {
@@ -170,6 +203,12 @@ impl ListIter {
     /// Returns the type of the items in the list.
     pub fn item_type(&self) -> &Term {
         &self.item_type
+    }
+
+    /// Create a term for the remaining list.
+    pub fn remaining(self) -> Term {
+        let item_type = self.item_type.clone();
+        list_from_parts(self, item_type)
     }
 }
 
@@ -210,3 +249,8 @@ impl Iterator for ListIter {
 }
 
 impl FusedIterator for ListIter {}
+
+/// Build a list term from a sequence of [`ListPart`]s.
+pub fn list_from_parts(iter: impl IntoIterator<Item = ListPart>, item_type: Term) -> Term {
+    todo!()
+}
