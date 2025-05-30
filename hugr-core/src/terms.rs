@@ -12,7 +12,7 @@ use crate::Node;
 
 pub mod core;
 mod errors;
-// pub mod util;
+pub mod util;
 
 /// A term in the static language that is used to parameterise `Hugr`s.
 ///
