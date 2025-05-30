@@ -90,6 +90,7 @@ use thiserror::Error;
 use crate::extension::SignatureError;
 use crate::extension::simple_op::OpLoadError;
 use crate::hugr::ValidationError;
+use crate::hugr::hugrmut::DefnInsertionError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
 use crate::types::Type;
@@ -176,6 +177,16 @@ pub enum BuildError {
         /// Missing node
         node: Node,
     },
+
+    /// From [Container::add_hugr_with_wires_defns]
+    #[error{"In inserting Hugr: {0}"}]
+    HugrInsertionError(#[from] DefnInsertionError<Node>),
+
+    /// From [Container::add_hugr_view_with_wires_defns].
+    /// Note that because the type of node in the [DefnInsertionError] depends
+    /// upon the view being inserted, we convert the error to a string here.
+    #[error("In inserting HugrView: {0}")]
+    HugrViewInsertionError(String),
 
     /// Wire not found in Hugr
     #[error("Wire not found in Hugr: {0}.")]

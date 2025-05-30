@@ -1,6 +1,7 @@
 //! Low-level interface for modifying a HUGR.
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::fmt::Display;
 use std::sync::Arc;
 
 use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
@@ -183,6 +184,15 @@ pub trait HugrMut: HugrMutInternals {
     /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will be copied
     /// under the Module root of this Hugr - see [Self::insert_hugr_with_defns].
     ///
+    /// Note there are two cases here which produce an invalid Hugr:
+    /// 1. if `other.entrypoint() == other.module_root()` as this will insert a second
+    ///    [`OpType::Module`] into `self`. The recommended way to insert a Hugr without
+    ///    its root is to set the entrypoint to a child of the root.
+    /// 2. If `other.entrypoint()` is a node inside (not itself) a `FuncDefn`, and
+    ///    contains a (recursive) [`OpType::Call`] (or `LoadFunction`) to that ancestor
+    ///    FuncDefn. In such a case, the containing FuncDefn will not be inserted, so the
+    ///    `Call` will have no callee.
+    ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
@@ -195,7 +205,9 @@ pub trait HugrMut: HugrMutInternals {
                 n = other.get_parent(n).unwrap()
             }
         };
+
         self.insert_hugr_with_defns(root, other, children)
+            .expect("Construction of `children` should ensure no possibility of DefnInsertionError")
     }
 
     /// Insert another Hugr into this one, copying the entrypoint-subtree under the specified
@@ -214,7 +226,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Self::Node,
         other: Hugr,
         children: HashSet<Node>,
-    ) -> InsertionResult<Node, Self::Node>;
+    ) -> Result<InsertionResult<Node, Self::Node>, DefnInsertionError<Node>>;
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
     /// This will result in an invalid Hugr (with disconnected edges) if there are any
@@ -233,6 +245,7 @@ pub trait HugrMut: HugrMutInternals {
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
         self.insert_from_view_with_defns(root, other, HashSet::new())
+            .expect("No defns being inserted so no possibility of error")
     }
 
     /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
@@ -242,18 +255,19 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Errors
     ///
-    /// If `children` are not `children` of the root of `other`; or any node in `other`
-    /// is reachable in the hierarchy from both `other` and a node in `children`.
+    /// If `children` are not `children` of the root of `other`; or if the subtrees
+    /// rooted at `other.entrypoint()` and each node in `children` are not all disjoint.
     ///
     /// # Panics
     ///
     /// If `parent` is not in the graph.
+    #[allow(clippy::type_complexity)]
     fn insert_from_view_with_defns<H: HugrView>(
         &mut self,
         parent: Self::Node,
         other: &H,
         children: HashSet<H::Node>,
-    ) -> InsertionResult<H::Node, Self::Node>;
+    ) -> Result<InsertionResult<H::Node, Self::Node>, DefnInsertionError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///
@@ -458,8 +472,8 @@ impl HugrMut for Hugr {
         parent: Self::Node,
         mut other: Hugr,
         children: HashSet<Node>,
-    ) -> InsertionResult<Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, parent, &other, children);
+    ) -> Result<InsertionResult<Node, Self::Node>, DefnInsertionError<Node>> {
+        let node_map = insert_hugr_internal(self, parent, &other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, taking them from the other graph.
@@ -473,10 +487,10 @@ impl HugrMut for Hugr {
             let meta = other.metadata.take(node_pg);
             self.metadata.set(new_node_pg, meta);
         }
-        InsertionResult {
+        Ok(InsertionResult {
             inserted_entrypoint: node_map[&other.entrypoint()],
             node_map,
-        }
+        })
     }
 
     fn insert_from_view_with_defns<H: HugrView>(
@@ -484,8 +498,8 @@ impl HugrMut for Hugr {
         parent: Self::Node,
         other: &H,
         children: HashSet<H::Node>,
-    ) -> InsertionResult<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, parent, other, children);
+    ) -> Result<InsertionResult<H::Node, Self::Node>, DefnInsertionError<H::Node>> {
+        let node_map = insert_hugr_internal(self, parent, other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, copying them from the other graph.
@@ -501,10 +515,10 @@ impl HugrMut for Hugr {
                     .set(new_node.into_portgraph(), Some(meta.clone()));
             }
         }
-        InsertionResult {
+        Ok(InsertionResult {
             inserted_entrypoint: node_map[&other.entrypoint()],
             node_map,
-        }
+        })
     }
 
     fn insert_subgraph<H: HugrView>(
@@ -584,25 +598,61 @@ impl HugrMut for Hugr {
     }
 }
 
+/// An error from [HugrMut::insert_hugr_with_defns] or [HugrMut::insert_from_view_with_defns]
+/// caused by one of the module-children requested to insert.
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum DefnInsertionError<N: Display> {
+    /// Module-children were requested in addition to the module entrypoint
+    #[error(
+        "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (entrypoint == module_root)"
+    )]
+    ChildOfEntrypoint(N),
+    /// A module-child requested contained (or was) the entrypoint
+    #[error("Requested to insert module-child {_0} but this contains the entrypoint")]
+    ChildContainsEntrypoint(N),
+    /// A module-child requested was not a child of the module root
+    #[error("{_0} was not a child of the module root")]
+    NotChildOfRoot(N),
+}
+
 fn insert_hugr_internal<H: HugrView>(
     hugr: &mut Hugr,
     parent: Node,
     other: &H,
     children: HashSet<H::Node>,
-) -> HashMap<H::Node, Node> {
+) -> Result<HashMap<H::Node, Node>, DefnInsertionError<H::Node>> {
+    if other.entrypoint() == other.module_root() {
+        if let Some(c) = children.iter().next() {
+            return Err(DefnInsertionError::ChildOfEntrypoint(*c));
+        }
+    } else {
+        let mut on = Some(other.entrypoint());
+        while let Some(n) = on {
+            if children.contains(&n) {
+                return Err(DefnInsertionError::ChildContainsEntrypoint(n));
+            }
+            on = other.get_parent(n);
+        }
+        for &c in children.iter() {
+            if other.get_parent(c) != Some(other.module_root()) {
+                return Err(DefnInsertionError::NotChildOfRoot(c));
+            }
+        }
+    }
     let nodes = children
         .iter()
         .copied()
         .chain(std::iter::once(other.entrypoint()))
         .flat_map(|n| other.descendants(n));
     let hugr_root = hugr.module_root();
-    insert_hugr_nodes(hugr, &other, nodes, |&n| {
+    Ok(insert_hugr_nodes(hugr, &other, nodes, |&n| {
         if n == other.entrypoint() {
             Some(parent)
         } else {
             children.contains(&n).then_some(hugr_root)
         }
-    })
+    }))
 }
 
 /// Internal implementation of `insert_hugr`, `insert_view`, and
@@ -821,14 +871,18 @@ mod test {
             );
 
             let mut h = simple_dfg_hugr();
-            h.insert_from_view_with_defns(h.entrypoint(), &insert, mod_children.clone());
+            h.insert_from_view_with_defns(h.entrypoint(), &insert, mod_children.clone())
+                .unwrap();
             check_insertion(h, call1, call2);
 
             let mut h = simple_dfg_hugr();
-            h.insert_hugr_with_defns(h.entrypoint(), insert, mod_children);
+            h.insert_hugr_with_defns(h.entrypoint(), insert, mod_children)
+                .unwrap();
             check_insertion(h, call1, call2);
         }
     }
+
+    // ALAN TODO test errors inserting illegal children
 
     fn check_insertion(h: Hugr, call1_ok: bool, call2_ok: bool) {
         if call1_ok && call2_ok {
