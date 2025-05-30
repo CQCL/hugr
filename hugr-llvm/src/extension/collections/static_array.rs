@@ -394,6 +394,7 @@ impl<SAC: StaticArrayCodegen + 'static> CodegenExtension for StaticArrayCodegenE
 mod test {
     use super::*;
     use float_types::float64_type;
+    use hugr_core::builder::DataflowHugr;
     use hugr_core::extension::prelude::ConstUsize;
     use hugr_core::ops::OpType;
     use hugr_core::ops::Value;
@@ -459,7 +460,7 @@ mod test {
             ]))
             .finish(|mut builder| {
                 let a = builder.add_load_value(value);
-                builder.finish_with_outputs([a]).unwrap()
+                builder.finish_hugr_with_outputs([a]).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }
@@ -512,7 +513,7 @@ mod test {
                     }
                     cond.finish_sub_container().unwrap().outputs_arr()
                 };
-                builder.finish_with_outputs([out]).unwrap()
+                builder.finish_hugr_with_outputs([out]).unwrap()
             });
 
         exec_ctx.add_extensions(|ceb| {
@@ -534,7 +535,7 @@ mod test {
                 let arr = builder
                     .add_load_value(StaticArrayValue::try_new("empty", usize_t(), vec![]).unwrap());
                 let len = builder.add_static_array_len(usize_t(), arr).unwrap();
-                builder.finish_with_outputs([len]).unwrap()
+                builder.finish_hugr_with_outputs([len]).unwrap()
             });
 
         exec_ctx.add_extensions(|ceb| {
@@ -574,7 +575,7 @@ mod test {
                 let len = builder
                     .add_static_array_len(inner_arr_ty, outer_arr)
                     .unwrap();
-                builder.finish_with_outputs([len]).unwrap()
+                builder.finish_hugr_with_outputs([len]).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }

@@ -217,7 +217,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
 
 #[cfg(test)]
 mod test {
-    use hugr_core::builder::{Dataflow, DataflowSubContainer, SubContainer};
+    use hugr_core::builder::{Dataflow, DataflowHugr, SubContainer};
     use hugr_core::extension::ExtensionRegistry;
     use hugr_core::extension::prelude::{self, bool_t};
     use hugr_core::ops::Value;
@@ -279,7 +279,7 @@ mod test {
                 cfg_builder.branch(&b1, 1, &exit_block).unwrap();
                 let cfg = cfg_builder.finish_sub_container().unwrap();
                 let [cfg_out] = cfg.outputs_arr();
-                builder.finish_with_outputs([cfg_out]).unwrap()
+                builder.finish_hugr_with_outputs([cfg_out]).unwrap()
             });
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         check_emission!(hugr, llvm_ctx);
@@ -395,7 +395,7 @@ mod test {
                         .unwrap()
                         .outputs_arr()
                 };
-                builder.finish_with_outputs([outer_cfg_out]).unwrap()
+                builder.finish_hugr_with_outputs([outer_cfg_out]).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }

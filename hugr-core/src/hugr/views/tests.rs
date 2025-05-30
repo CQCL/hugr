@@ -4,7 +4,8 @@ use rstest::{fixture, rstest};
 use crate::{
     Hugr, HugrView,
     builder::{
-        BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig,
+        BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, HugrBuilder,
+        endo_sig, inout_sig,
     },
     extension::prelude::qb_t,
     ops::{
@@ -183,8 +184,9 @@ fn test_dataflow_ports_only() {
 
     let mut dfg = DFGBuilder::new(endo_sig(bool_t())).unwrap();
     let local_and = {
-        let local_and = dfg
-            .define_function("and", Signature::new(vec![bool_t(); 2], vec![bool_t()]))
+        let mut mb = dfg.module_root_builder();
+        let local_and = mb
+            .define_function("and", Signature::new(vec![bool_t(); 2], bool_t()))
             .unwrap();
         let first_input = local_and.input().out_wire(0);
         local_and.finish_with_outputs([first_input]).unwrap()

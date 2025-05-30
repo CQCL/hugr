@@ -1141,6 +1141,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 #[cfg(test)]
 mod test {
     use anyhow::Result;
+    use hugr_core::builder::DataflowHugr;
     use hugr_core::extension::prelude::{ConstError, UnwrapBuilder, error_type};
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
@@ -1242,7 +1243,9 @@ mod test {
                     .unwrap()
                     .outputs();
                 let processed_outputs = process(&mut hugr_builder, outputs).unwrap();
-                hugr_builder.finish_with_outputs(processed_outputs).unwrap()
+                hugr_builder
+                    .finish_hugr_with_outputs(processed_outputs)
+                    .unwrap()
             })
     }
 
@@ -1578,7 +1581,7 @@ mod test {
                     .add_dataflow_op(iu_to_s, [unsigned])
                     .unwrap()
                     .outputs_arr();
-                hugr_builder.finish_with_outputs([signed]).unwrap()
+                hugr_builder.finish_hugr_with_outputs([signed]).unwrap()
             });
         let act = int_exec_ctx.exec_hugr_i64(hugr, "main");
         assert_eq!(act, val as i64);
@@ -1605,7 +1608,7 @@ mod test {
                     .add_dataflow_op(make_int_op("iadd", log_width), [unsigned, num])
                     .unwrap()
                     .outputs_arr();
-                hugr_builder.finish_with_outputs([res]).unwrap()
+                hugr_builder.finish_hugr_with_outputs([res]).unwrap()
             });
         let act = int_exec_ctx.exec_hugr_u64(hugr, "main");
         assert_eq!(act, (val as u64) + 42);

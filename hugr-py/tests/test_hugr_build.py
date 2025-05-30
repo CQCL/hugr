@@ -278,6 +278,19 @@ def test_mono_function(direct_call: bool) -> None:
     validate(mod.hugr)
 
 
+def test_function_dfg() -> None:
+    d = Dfg(tys.Qubit)
+
+    f_id = d.module_root_builder().define_function("id", [tys.Qubit])
+    f_id.set_outputs(f_id.input_node[0])
+
+    (q,) = d.inputs()
+    call = d.call(f_id, q)
+    d.set_outputs(call)
+
+    validate(d.hugr)
+
+
 def test_recursive_function(snapshot) -> None:
     mod = Module()
 

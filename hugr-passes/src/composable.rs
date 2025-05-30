@@ -223,8 +223,7 @@ mod test {
     use std::convert::Infallible;
 
     use hugr_core::builder::{
-        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        ModuleBuilder,
+        Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
     };
     use hugr_core::extension::prelude::{ConstUsize, MakeTuple, UnpackTuple, bool_t, usize_t};
     use hugr_core::hugr::hugrmut::HugrMut;

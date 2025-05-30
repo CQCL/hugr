@@ -890,7 +890,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
 
 #[cfg(test)]
 mod test {
-    use hugr_core::builder::Container as _;
+    use hugr_core::builder::{DataflowHugr, HugrBuilder};
     use hugr_core::extension::prelude::either_type;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::STD_REG;
@@ -934,7 +934,7 @@ mod test {
                 build_all_array_ops(builder.dfg_builder_endo([]).unwrap())
                     .finish_sub_container()
                     .unwrap();
-                builder.finish_sub_container().unwrap()
+                builder.finish_hugr().unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -953,7 +953,7 @@ mod test {
                 let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
                 let (_, arr) = builder.add_array_get(usize_t(), 2, arr, us1).unwrap();
                 builder.add_array_discard(usize_t(), 2, arr).unwrap();
-                builder.finish_with_outputs([]).unwrap()
+                builder.finish_hugr_with_outputs([]).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -973,7 +973,7 @@ mod test {
                 let (arr1, arr2) = builder.add_array_clone(usize_t(), 2, arr).unwrap();
                 builder.add_array_discard(usize_t(), 2, arr1).unwrap();
                 builder.add_array_discard(usize_t(), 2, arr2).unwrap();
-                builder.finish_with_outputs([]).unwrap()
+                builder.finish_hugr_with_outputs([]).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -990,7 +990,7 @@ mod test {
             .finish(|mut builder| {
                 let vs = vec![ConstUsize::new(1).into(), ConstUsize::new(2).into()];
                 let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), vs));
-                builder.finish_with_outputs([arr]).unwrap()
+                builder.finish_hugr_with_outputs([arr]).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1049,7 +1049,7 @@ mod test {
                     }
                     builder.finish_sub_container().unwrap().out_wire(0)
                 };
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1154,7 +1154,7 @@ mod test {
                         .unwrap();
                     conditional.finish_sub_container().unwrap().out_wire(0)
                 };
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1261,7 +1261,7 @@ mod test {
                     conditional.finish_sub_container().unwrap().out_wire(0)
                 };
                 builder.add_array_discard(int_ty.clone(), 2, arr).unwrap();
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1318,7 +1318,7 @@ mod test {
                 builder
                     .add_array_discard(int_ty.clone(), 2, arr_clone)
                     .unwrap();
-                builder.finish_with_outputs([elem]).unwrap()
+                builder.finish_hugr_with_outputs([elem]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1388,7 +1388,7 @@ mod test {
                         arr,
                     )
                     .unwrap();
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1420,7 +1420,8 @@ mod test {
             .with_outs(int_ty.clone())
             .with_extensions(exec_registry())
             .finish(|mut builder| {
-                let mut func = builder
+                let mut mb = builder.module_root_builder();
+                let mut func = mb
                     .define_function("foo", Signature::new(vec![], vec![int_ty.clone()]))
                     .unwrap();
                 let v = func.add_load_value(ConstInt::new_u(6, value).unwrap());
@@ -1441,7 +1442,7 @@ mod test {
                 builder
                     .add_array_discard(int_ty.clone(), size, arr)
                     .unwrap();
-                builder.finish_with_outputs([elem]).unwrap()
+                builder.finish_hugr_with_outputs([elem]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1474,7 +1475,8 @@ mod test {
                     .add_new_array(int_ty.clone(), new_array_args)
                     .unwrap();
 
-                let mut func = builder
+                let mut mb = builder.module_root_builder();
+                let mut func = mb
                     .define_function(
                         "foo",
                         Signature::new(vec![int_ty.clone()], vec![int_ty.clone()]),
@@ -1512,7 +1514,7 @@ mod test {
                 builder
                     .add_array_discard_empty(int_ty.clone(), arr)
                     .unwrap();
-                builder.finish_with_outputs([r]).unwrap()
+                builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
@@ -1544,7 +1546,8 @@ mod test {
                     .add_new_array(int_ty.clone(), new_array_args)
                     .unwrap();
 
-                let mut func = builder
+                let mut mb = builder.module_root_builder();
+                let mut func = mb
                     .define_function(
                         "foo",
                         Signature::new(
@@ -1568,7 +1571,7 @@ mod test {
                     .unwrap()
                     .outputs_arr();
                 builder.add_array_discard(Type::UNIT, size, arr).unwrap();
-                builder.finish_with_outputs([sum]).unwrap()
+                builder.finish_hugr_with_outputs([sum]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
