@@ -84,21 +84,13 @@ impl<const N: usize> View for ListPrefix<N> {
         let mut index = 0;
 
         for part in &mut parts {
-            match part {
-                ListPart::Item(term) => {
-                    let item = match prefix.get_mut(index) {
-                        Some(item) => item,
-                        None => break,
-                    };
-                    *item = term;
-                    index += 1;
-                }
-                ListPart::Splice(term) => match term.get() {
-                    TermKind::Wildcard => return Err(ViewError::Uninferred),
-                    TermKind::Var(_) => return Err(ViewError::Variable),
-                    _ => return Err(ViewError::Mismatch),
-                },
-            }
+            let item = Term::try_from(part)?;
+            let item_slot = match prefix.get_mut(index) {
+                Some(item_slot) => item_slot,
+                None => break,
+            };
+            *item_slot = item;
+            index += 1;
         }
 
         let rest = parts.remaining();
@@ -134,18 +126,10 @@ impl<const N: usize> View for ListExact<N> {
         let mut index = 0;
 
         for part in parts {
-            match part {
-                ListPart::Item(term) => {
-                    let item = items.get_mut(index).ok_or(ViewError::Mismatch)?;
-                    *item = term;
-                    index += 1;
-                }
-                ListPart::Splice(term) => match term.get() {
-                    TermKind::Wildcard => return Err(ViewError::Uninferred),
-                    TermKind::Var(_) => return Err(ViewError::Variable),
-                    _ => return Err(ViewError::Mismatch),
-                },
-            }
+            let item = Term::try_from(part)?;
+            let item_slot = items.get_mut(index).ok_or(ViewError::Mismatch)?;
+            *item_slot = item;
+            index += 1;
         }
 
         Ok(Self { item_type, items })
@@ -163,6 +147,21 @@ impl From<ListPart> for ast::SeqPart {
         match value {
             ListPart::Item(term) => Self::Item(term.into()),
             ListPart::Splice(term) => Self::Splice(term.into()),
+        }
+    }
+}
+
+impl TryFrom<ListPart> for Term {
+    type Error = ViewError;
+
+    fn try_from(value: ListPart) -> Result<Self, Self::Error> {
+        match value {
+            ListPart::Item(term) => Ok(term),
+            ListPart::Splice(term) => match term.get() {
+                TermKind::Wildcard => Err(ViewError::Uninferred),
+                TermKind::Var(_) => Err(ViewError::Variable),
+                _ => Err(ViewError::Mismatch),
+            },
         }
     }
 }
@@ -253,4 +252,124 @@ impl FusedIterator for ListIter {}
 /// Build a list term from a sequence of [`ListPart`]s.
 pub fn list_from_parts(iter: impl IntoIterator<Item = ListPart>, item_type: Term) -> Term {
     todo!()
+}
+
+/// Build a list term from a sequence of items.
+pub fn list_from_items(iter: impl IntoIterator<Item = Term>, item_type: Term) -> Term {
+    // TODO: Without any allocation?
+    let items: Vec<_> = iter.into_iter().collect();
+    Term::new(TermKind::List(&item_type, &items))
+}
+
+/// An adt with only unit variants.
+///
+/// # Examples
+///
+/// ```
+/// # use hugr_core::terms::Term;
+/// # use hugr_core::terms::util::UnitSumType;
+/// assert_eq!(
+///     Term::from(UnitSumType { size: 0 }).to_string(),
+///     "(core.adt [])"
+/// );
+/// assert_eq!(
+///     Term::from(UnitSumType { size: 3 }).to_string(),
+///     "(core.adt [[] [] []])"
+/// );
+/// ```
+#[derive(Debug, Clone)]
+pub struct UnitSumType {
+    /// The number of unit variants.
+    pub size: u8,
+}
+
+impl From<UnitSumType> for Term {
+    fn from(value: UnitSumType) -> Self {
+        let unit = list_from_items([], core::Type.into());
+        let variants = list_from_items((0..value.size).map(|_| unit.clone()), Term::default());
+        Term::from(core::Adt { variants })
+    }
+}
+
+impl View for UnitSumType {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        let core::Adt { variants } = term.view()?;
+        let mut size = 0u8;
+
+        for variant in ListIter::new(&variants) {
+            let variant = Term::try_from(variant)?;
+            let _ = ListExact::<0>::view(&variant)?;
+            size = size.checked_add(1).ok_or(ViewError::Mismatch)?;
+        }
+
+        Ok(Self { size })
+    }
+}
+
+/// The runtime boolean type: the adt with two unit variants.
+///
+/// # Examples
+///
+/// ```
+/// # use hugr_core::terms::Term;
+/// # use hugr_core::terms::util::BoolType;
+/// assert_eq!(
+///     Term::from(BoolType).to_string(),
+///     "(core.adt [[] []])"
+/// );
+/// ```
+#[derive(Debug, Clone)]
+pub struct BoolType;
+
+impl From<BoolType> for Term {
+    fn from(_: BoolType) -> Self {
+        // TODO: This can be a static term instead.
+        UnitSumType { size: 2 }.into()
+    }
+}
+
+impl View for BoolType {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        let UnitSumType { size } = term.view()?;
+
+        if size != 2 {
+            return Err(ViewError::Mismatch);
+        }
+
+        Ok(Self)
+    }
+}
+
+/// The runtime unit type: the adt with no variants.
+///
+/// # Examples
+///
+/// ```
+/// # use hugr_core::terms::Term;
+/// # use hugr_core::terms::util::UnitType;
+/// assert_eq!(
+///     Term::from(UnitType).to_string(),
+///     "(core.adt [])"
+/// );
+/// ```
+#[derive(Debug, Clone)]
+pub struct UnitType;
+
+impl From<UnitType> for Term {
+    fn from(_: UnitType) -> Self {
+        // TODO: This can be a static term instead.
+        UnitSumType { size: 0 }.into()
+    }
+}
+
+impl View for UnitType {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        let UnitSumType { size } = term.view()?;
+
+        if size != 0 {
+            return Err(ViewError::Mismatch);
+        }
+
+        Ok(Self)
+    }
 }

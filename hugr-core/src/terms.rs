@@ -43,7 +43,7 @@ const _: () = assert!(std::mem::size_of::<Term>() == std::mem::size_of::<usize>(
 
 impl Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self, f)
+        Display::fmt(&ast::Term::from(self), f)
     }
 }
 
@@ -101,6 +101,10 @@ struct TermHeader {
     /// terms are not equal.
     hash: u64,
 
+    // TODO: Flags field instead of bools
+    /// Whether the term contains any variables (derived).
+    has_vars: bool,
+
     /// The constant-sized part without derived data.
     data: TermData,
 }
@@ -115,7 +119,24 @@ impl TermHeader {
             hasher.finish()
         };
 
-        Self { data, hash }
+        let has_vars = {
+            let mut has_vars = match data {
+                TermData::Var(_) => true,
+                _ => false,
+            };
+
+            for term in terms {
+                has_vars = has_vars || term.has_vars();
+            }
+
+            has_vars
+        };
+
+        Self {
+            data,
+            hash,
+            has_vars,
+        }
     }
 }
 
@@ -240,6 +261,16 @@ impl Term {
         });
 
         Ok(args)
+    }
+
+    /// Whether the term contains any variables.
+    ///
+    /// This method uses cached information and does not traverse the term. It
+    /// can therefore be used as an optimisation to short circuit
+    /// transformations that do not affect terms without variables.
+    #[inline]
+    pub fn has_vars(&self) -> bool {
+        self.0.header.has_vars
     }
 }
 
