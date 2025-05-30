@@ -1,0 +1,29 @@
+[package]
+name = "hugr-persistent"
+version = "0.1.0"
+rust-version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[[test]]
+name = "persistent_walker_example"
+
+[dependencies]
+relrc = { workspace = true, features = ["petgraph"] }
+hugr-core.path = "../hugr-core"
+delegate.workspace = true
+derive_more.workspace = true
+itertools.workspace = true
+petgraph.workspace = true
+portgraph.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+lazy_static.workspace = true
+semver.workspace = true
