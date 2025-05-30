@@ -15,13 +15,13 @@ from typing_extensions import Self
 
 from hugr import ops, tys, val
 from hugr.build.base import ParentBuilder
-from hugr.build.function import Module
 from hugr.exceptions import NoSiblingAncestor
 from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from hugr.build.function import Module
     from hugr.hugr.node_port import Node, OutPort, PortOffset, ToNode, Wire
     from hugr.tys import TypeParam, TypeRow
 
@@ -38,7 +38,7 @@ class DataflowError(Exception):
 @dataclass()
 class DefinitionBuilder(Generic[OpVar]):
     """Base class for builders that can define constants, and allow access
-       to the `ModuleBuilder` for declaring/defining functions and aliases.
+       to the `Module` for declaring/defining functions and aliases.
 
     As this class may be a root node, it does not extend `ParentBuilder`.
     """
@@ -46,6 +46,11 @@ class DefinitionBuilder(Generic[OpVar]):
     hugr: Hugr[OpVar]
 
     def module_root_builder(self) -> Module:
+        """Allows access to the `Module` at the root of the Hugr
+        (outside the scope of this builder, perhaps outside the entrypoint).
+        """
+        from hugr.build.function import Module  # Avoid circular import
+
         return Module(self.hugr)
 
     def add_const(self, value: val.Value, parent: ToNode | None = None) -> Node:
