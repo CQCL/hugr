@@ -9,6 +9,7 @@ use smol_str::SmolStr;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
+use util::ListIter;
 
 use crate::Node;
 
@@ -40,21 +41,9 @@ pub struct Term(ThinArc<TermHeader, Term>);
 /// Assert that [`Term`] is the same size as a pointer.
 const _: () = assert!(std::mem::size_of::<Term>() == std::mem::size_of::<usize>());
 
-impl From<Term> for ast::Term {
-    fn from(value: Term) -> Self {
-        Self::from(value.get())
-    }
-}
-
-impl From<&Term> for ast::Term {
-    fn from(value: &Term) -> Self {
-        Self::from(value.get())
-    }
-}
-
 impl Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.get(), f)
+        Display::fmt(&self, f)
     }
 }
 
@@ -281,6 +270,42 @@ impl From<SmolStr> for Term {
     }
 }
 
+impl From<Term> for ast::Term {
+    fn from(value: Term) -> Self {
+        ast::Term::from(&value)
+    }
+}
+
+impl From<&Term> for ast::Term {
+    fn from(value: &Term) -> Self {
+        match value.get() {
+            TermKind::Wildcard => ast::Term::Wildcard,
+            TermKind::Apply(symbol, args) => {
+                let symbol = symbol.clone();
+                let args = args.iter().map(ast::Term::from).collect();
+                ast::Term::Apply(symbol, args)
+            }
+            TermKind::Literal(literal) => ast::Term::Literal(literal.clone()),
+            TermKind::Var(var) => ast::Term::Var(var.name().clone()),
+            TermKind::Tuple(_, items) => ast::Term::Tuple(
+                items
+                    .iter()
+                    .map(|item| ast::SeqPart::Item(item.into()))
+                    .collect(),
+            ),
+            TermKind::TupleConcat(_, lists) => ast::Term::Tuple(
+                lists
+                    .iter()
+                    .map(|list| ast::SeqPart::Splice(list.into()))
+                    .collect(),
+            ),
+            TermKind::List(_, _) | TermKind::ListConcat(_, _) => {
+                ast::Term::List(ListIter::new(value).map(ast::SeqPart::from).collect())
+            }
+        }
+    }
+}
+
 /// The default [`Term`] is a wildcard term.
 ///
 /// ```
@@ -306,52 +331,6 @@ pub enum TermKind<'a> {
     Tuple(&'a Term, &'a [Term]),
     TupleConcat(&'a Term, &'a [Term]),
     Var(&'a Var),
-}
-
-impl From<TermKind<'_>> for ast::Term {
-    fn from(value: TermKind<'_>) -> Self {
-        match value {
-            TermKind::Wildcard => ast::Term::Wildcard,
-            TermKind::Apply(symbol, args) => {
-                let symbol = symbol.clone();
-                let args = args.iter().map(ast::Term::from).collect();
-                ast::Term::Apply(symbol, args)
-            }
-            TermKind::Literal(literal) => ast::Term::Literal(literal.clone()),
-            TermKind::Var(var) => ast::Term::Var(var.name().clone()),
-            TermKind::Tuple(_, items) => ast::Term::Tuple(
-                items
-                    .iter()
-                    .map(|item| ast::SeqPart::Item(item.into()))
-                    .collect(),
-            ),
-            TermKind::TupleConcat(_, lists) => ast::Term::Tuple(
-                lists
-                    .iter()
-                    .map(|list| ast::SeqPart::Splice(list.into()))
-                    .collect(),
-            ),
-            TermKind::List(_, items) => ast::Term::List(
-                items
-                    .iter()
-                    .map(|item| ast::SeqPart::Item(item.into()))
-                    .collect(),
-            ),
-            TermKind::ListConcat(_, lists) => ast::Term::List(
-                lists
-                    .iter()
-                    .map(|list| ast::SeqPart::Splice(list.into()))
-                    .collect(),
-            ),
-        }
-    }
-}
-
-impl Display for TermKind<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let term: ast::Term = self.clone().into();
-        Display::fmt(&term, f)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

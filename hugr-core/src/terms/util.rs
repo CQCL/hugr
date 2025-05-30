@@ -1,4 +1,8 @@
 //! Utility types to view and construct terms.
+use std::{collections::VecDeque, iter::FusedIterator};
+
+use hugr_model::v0::ast;
+
 use super::{Term, TermKind, View, ViewError, core};
 
 /// The signature of a tail loop region.
@@ -95,6 +99,114 @@ impl<const N: usize> From<ListExact<N>> for Term {
 
 impl<const N: usize> View for ListExact<N> {
     fn view(term: &Term) -> Result<Self, ViewError> {
-        todo!()
+        let parts = ListIter::new(term);
+        let item_type = parts.item_type().clone();
+        let mut items: [Term; N] = std::array::from_fn(|_| Term::default());
+        let mut index = 0;
+
+        for part in parts {
+            match part {
+                ListPart::Item(term) => {
+                    let item = items.get_mut(index).ok_or(ViewError::Mismatch)?;
+                    *item = term;
+                    index += 1;
+                }
+                ListPart::Splice(term) => match term.get() {
+                    TermKind::Wildcard => return Err(ViewError::Uninferred),
+                    TermKind::Var(_) => return Err(ViewError::Variable),
+                    _ => return Err(ViewError::Mismatch),
+                },
+            }
+        }
+
+        Ok(Self { item_type, items })
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum ListPart {
+    Item(Term),
+    Splice(Term),
+}
+
+impl From<ListPart> for ast::SeqPart {
+    fn from(value: ListPart) -> Self {
+        match value {
+            ListPart::Item(term) => Self::Item(term.into()),
+            ListPart::Splice(term) => Self::Splice(term.into()),
+        }
+    }
+}
+
+/// Iterator over the [`ListPart`]s of a list term.
+pub struct ListIter {
+    items: Vec<Term>,
+    stack: Vec<Term>,
+    item_type: Term,
+}
+
+impl ListIter {
+    /// Create a new iterator from the given term.
+    pub fn new(term: &Term) -> Self {
+        match term.get() {
+            TermKind::List(item_type, items) => Self {
+                items: items.iter().rev().cloned().collect(),
+                stack: vec![],
+                item_type: item_type.clone(),
+            },
+            TermKind::ListConcat(item_type, lists) => Self {
+                items: vec![],
+                stack: lists.iter().rev().cloned().collect(),
+                item_type: item_type.clone(),
+            },
+            _ => Self {
+                items: vec![],
+                stack: vec![term.clone()],
+                item_type: Term::default(),
+            },
+        }
+    }
+
+    /// Returns the type of the items in the list.
+    pub fn item_type(&self) -> &Term {
+        &self.item_type
+    }
+}
+
+impl Iterator for ListIter {
+    type Item = ListPart;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(item) = self.items.pop() {
+                return Some(ListPart::Item(item));
+            };
+
+            let list = self.stack.pop()?;
+
+            match list.get() {
+                TermKind::List(_, items) => {
+                    self.items.extend(items.iter().rev().cloned());
+                }
+                TermKind::ListConcat(_, lists) => {
+                    self.stack.extend(lists.iter().rev().cloned());
+                }
+                _ => return Some(ListPart::Splice(list)),
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let min = self.items.len();
+
+        let max = if self.stack.is_empty() {
+            Some(self.items.len())
+        } else {
+            None
+        };
+
+        (min, max)
+    }
+}
+
+impl FusedIterator for ListIter {}
