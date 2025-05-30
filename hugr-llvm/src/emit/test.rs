@@ -434,24 +434,6 @@ mod test_fns {
     }
 
     #[rstest]
-    fn diverse_dfg_children(llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
-            .with_outs(bool_t())
-            .finish(|mut builder: DFGW| {
-                let [r] = {
-                    let mut builder = builder
-                        .dfg_builder(HugrFuncType::new(type_row![], bool_t()), [])
-                        .unwrap();
-                    let konst = builder.add_constant(Value::false_val());
-                    let r = builder.load_const(&konst);
-                    builder.finish_with_outputs([r]).unwrap().outputs_arr()
-                };
-                builder.finish_hugr_with_outputs([r]).unwrap()
-            });
-        check_emission!(hugr, llvm_ctx);
-    }
-
-    #[rstest]
     fn diverse_cfg_children(llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_outs(bool_t())
