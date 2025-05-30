@@ -167,11 +167,7 @@ pub use insta;
 macro_rules! check_emission {
     // Call the macro with a snapshot name.
     ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {{
-        let root =
-            $crate::utils::fat::FatExt::fat_root::<$crate::emit::test::hugr_core::ops::Module>(
-                &$hugr,
-            )
-            .unwrap();
+        let root = $crate::utils::fat::FatExt::fat_root(&$hugr).unwrap();
         let emission =
             $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr()).unwrap();
 
