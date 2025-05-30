@@ -1232,6 +1232,7 @@ dependencies = [
  "predicates",
  "rstest",
  "serde_json",
+  "tempfile",
 ]
 
 [[package]]
