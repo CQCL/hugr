@@ -164,12 +164,12 @@ impl<'a> From<&'a RelRc<CommitData, ()>> for &'a Commit {
 ///
 /// ## Supported access and mutation
 ///
-/// [`PersistentHugr`] implements [`crate::HugrView`], so that it can used as
+/// [`PersistentHugr`] implements [`HugrView`], so that it can used as
 /// a drop-in substitute for a Hugr wherever read-only access is required. It
-/// does not implement [`HugrMut`](crate::hugr::HugrMut), however. Mutations
-/// must be performed by applying patches (see [`PatchVerification`] and
-/// [`Patch`]). Currently, only [`SimpleReplacement`] patches are supported. You
-/// can use [`Self::add_replacement`] to add a patch to `self`, or use the
+/// does not implement [`HugrMut`](hugr_core::hugr::hugrmut::HugrMut), however.
+/// Mutations must be performed by applying patches (see [`PatchVerification`]
+/// and [`Patch`]). Currently, only [`SimpleReplacement`] patches are supported.
+/// You can use [`Self::add_replacement`] to add a patch to `self`, or use the
 /// aforementioned patch traits.
 ///
 /// ## Patches, commits and history
@@ -320,7 +320,7 @@ impl PersistentHugr {
     ///
     /// This operation may be expensive and should be avoided in
     /// performance-critical paths. For read-only views into the data, rely
-    /// instead on the [`crate::HugrView`] implementation when possible.
+    /// instead on the [`HugrView`] implementation when possible.
     pub fn to_hugr(&self) -> Hugr {
         self.apply_all().0
     }

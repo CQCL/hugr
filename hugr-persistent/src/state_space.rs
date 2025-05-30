@@ -1,3 +1,5 @@
+//! Store of commit histories for a [`PersistentHugr`].
+
 use std::collections::{BTreeSet, VecDeque};
 
 use delegate::delegate;
@@ -131,7 +133,7 @@ impl CommitStateSpace {
     /// Returns an [`InvalidCommit::NonUniqueBase`] error if the commit is a
     /// base commit and does not coincide with the existing base commit.
     pub fn try_add_commit(&mut self, commit: Commit) -> Result<CommitId, InvalidCommit> {
-        let is_base = commit.as_relrc().ptr_eq(&self.base_commit().as_relrc());
+        let is_base = commit.as_relrc().ptr_eq(self.base_commit().as_relrc());
         if !is_base && matches!(commit.value(), CommitData::Base(_)) {
             return Err(InvalidCommit::NonUniqueBase(2));
         }

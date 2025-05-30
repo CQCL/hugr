@@ -1,9 +1,9 @@
 //! Persistent data structure for HUGR mutations.
 //!
 //! This crate provides a persistent data structure [`PersistentHugr`] that
-//! implements [`crate::HugrView`]; mutations to the data are stored
-//! persistently as a set of [`Commit`]s along with the dependencies between the
-//! commits.
+//! implements [`HugrView`](hugr_core::HugrView); mutations to the data are
+//! stored persistently as a set of [`Commit`]s along with the dependencies
+//! between the commits.
 //!
 //! As a result of persistency, the entire mutation history of a HUGR can be
 //! traversed and references to previous versions of the data remain valid even
@@ -23,23 +23,25 @@
 //! simultaneously. A [`PersistentHugr`] on the other hand always corresponds to
 //! a subgraph of a [`CommitStateSpace`] that is guaranteed to contain only
 //! non-overlapping, compatible commits. By applying all commits in a
-//! [`PersistentHugr`], we can materialize a [`Hugr`]. Traversing the
-//! materialized HUGR is equivalent to using the [`crate::HugrView`]
-//! implementation of the corresponding [`PersistentHugr`].
+//! [`PersistentHugr`], we can materialize a [`Hugr`](hugr_core::Hugr).
+//! Traversing the materialized HUGR is equivalent to using the
+//! [`HugrView`](hugr_core::HugrView) implementation of the corresponding
+//! [`PersistentHugr`].
 //!
 //! ## Summary of data types
 //!
-//! - [`Commit`] A modification to a [`Hugr`] (currently a
-//!   [`SimpleReplacement`]) that forms the atomic unit of change for a
-//!   [`PersistentHugr`] (like a commit in git). This is a reference-counted
-//!   value that is cheap to clone and will be freed when the last reference is
-//!   dropped.
-//! - [`PersistentHugr`] A data structure that implements [`crate::HugrView`]
-//!   and can be used as a drop-in replacement for a [`crate::Hugr`] for
-//!   read-only access and mutations through the [`PatchVerification`] and
-//!   [`Patch`] traits. Mutations are stored as a history of commits. Unlike
-//!   [`CommitStateSpace`], it maintains the invariant that all contained
-//!   commits are compatible with eachother.
+//! - [`Commit`] A modification to a [`Hugr`](hugr_core::Hugr) (currently a
+//!   [`SimpleReplacement`](hugr_core::SimpleReplacement)) that forms the atomic
+//!   unit of change for a [`PersistentHugr`] (like a commit in git). This is a
+//!   reference-counted value that is cheap to clone and will be freed when the
+//!   last reference is dropped.
+//! - [`PersistentHugr`] A data structure that implements
+//!   [`HugrView`][hugr_core::HugrView] and can be used as a drop-in replacement
+//!   for a [`Hugr`][hugr_core::Hugr] for read-only access and mutations through
+//!   the [`PatchVerification`](hugr_core::hugr::patch::PatchVerification) and
+//!   [`Patch`](hugr_core::hugr::Patch) traits. Mutations are stored as a
+//!   history of commits. Unlike [`CommitStateSpace`], it maintains the
+//!   invariant that all contained commits are compatible with eachother.
 //! - [`CommitStateSpace`] Stores commits, recording the dependencies between
 //!   them. Includes the base HUGR and any number of possibly incompatible
 //!   (overlapping) commits. Unlike a [`PersistentHugr`], a state space can
@@ -59,16 +61,17 @@
 //!
 //! To obtain a [`PersistentHugr`] from your state space, use
 //! [`CommitStateSpace::try_extract_hugr`]. A [`PersistentHugr`] can always be
-//! materialized into a [`Hugr`] type using [`PersistentHugr::to_hugr`].
+//! materialized into a [`Hugr`][hugr_core::Hugr] type using
+//! [`PersistentHugr::to_hugr`].
 
-mod hugr;
 mod parents_view;
+mod persistent_hugr;
 mod resolver;
-mod state_space;
+pub mod state_space;
 mod trait_impls;
 pub mod walker;
 
-pub use hugr::{Commit, PersistentHugr};
+pub use persistent_hugr::{Commit, PersistentHugr};
 pub use resolver::PointerEqResolver;
 pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
 pub use walker::{PinnedWire, Walker};
@@ -76,7 +79,7 @@ pub use walker::{PinnedWire, Walker};
 /// A replacement operation that can be applied to a [`PersistentHugr`].
 pub type PersistentReplacement = hugr_core::SimpleReplacement<PatchNode>;
 
-use hugr::find_conflicting_node;
+use persistent_hugr::find_conflicting_node;
 use state_space::CommitData;
 
 #[cfg(test)]

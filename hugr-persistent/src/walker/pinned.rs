@@ -12,7 +12,7 @@ use super::Walker;
 /// A wire in the current HUGR of a [`Walker`] with some of its endpoints
 /// pinned.
 ///
-/// Just like a normal HUGR [`Wire`](crate::Wire), a [`PinnedWire`] has
+/// Just like a normal HUGR [`Wire`](hugr_core::Wire), a [`PinnedWire`] has
 /// endpoints: the ports that are linked together by the wire.  A [`PinnedWire`]
 /// however distinguishes itself in that each of its ports is specified either
 /// as "pinned" or "unpinned". A port is pinned if and only if the node it is

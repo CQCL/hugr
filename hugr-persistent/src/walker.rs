@@ -44,11 +44,12 @@
 //! 5. Once exploration is complete (e.g. a pattern was fully matched), the
 //!    walker can be converted into a [`PersistentHugr`] instance using
 //!    [`Walker::into_persistent_hugr`]. The matched nodes and ports can then be
-//!    used to create a [`SiblingSubgraph`](crate::hugr::views::SiblingSubgraph)
-//!    object, which can then be used to create new
-//!    [`SimpleReplacement`](crate::SimpleReplacement) instances---and possibly
-//!    in turn be added to the commit state space and the exploration of the
-//!    state space restarted!
+//!    used to create a
+//!    [`SiblingSubgraph`](hugr_core::hugr::views::SiblingSubgraph) object,
+//!    which can then be used to create new
+//!    [`SimpleReplacement`](hugr_core::SimpleReplacement) instances---and
+//!    possibly in turn be added to the commit state space and the exploration
+//!    of the state space restarted!
 //!
 //! This approach allows efficiently finding patterns across many potential
 //! versions of the graph simultaneously, without having to materialize
@@ -192,17 +193,17 @@ impl<'a> Walker<'a> {
     ///
     /// To understand how Walkers are expanded, it is useful to understand how
     /// in a walker, the HUGR graph is partitioned into two parts:
-    ///  - a subgraph made of pinned nodes: this part of the HUGR is frozen: it cannot be
-    ///    modified by further expansions the Walker.
+    ///  - a subgraph made of pinned nodes: this part of the HUGR is frozen: it
+    ///    cannot be modified by further expansions the Walker.
     ///  - the complement subgraph: the unpinned part of the HUGR has not been
-    ///    explored yet. Multiple alternative HUGRs can be obtained depending
-    ///    on which commits are selected.
+    ///    explored yet. Multiple alternative HUGRs can be obtained depending on
+    ///    which commits are selected.
     ///
     /// To every walker thus corresponds a space of possible HUGRs that can be
-    /// obtained, depending on which commits are selected and which further nodes
-    /// are pinned. The expansion of a walker returns a set of walkers, which
-    /// together cover the same space of possible HUGRs, each having a different
-    /// additional node pinned.
+    /// obtained, depending on which commits are selected and which further
+    /// nodes are pinned. The expansion of a walker returns a set of
+    /// walkers, which together cover the same space of possible HUGRs, each
+    /// having a different additional node pinned.
     ///
     /// Return an iterator over all possible [`Walker`]s that can be created by
     /// pinning exactly one additional node connected to `wire`. Each returned

@@ -282,7 +282,7 @@ impl HugrView for PersistentHugr {
     }
 
     fn extensions(&self) -> &ExtensionRegistry {
-        &self.base_hugr().extensions()
+        self.base_hugr().extensions()
     }
 
     fn extract_hugr(
