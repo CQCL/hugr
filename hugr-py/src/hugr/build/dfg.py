@@ -15,6 +15,7 @@ from typing_extensions import Self
 
 from hugr import ops, tys, val
 from hugr.build.base import ParentBuilder
+from hugr.build.function import Module
 from hugr.exceptions import NoSiblingAncestor
 from hugr.hugr import Hugr
 
@@ -36,12 +37,16 @@ class DataflowError(Exception):
 
 @dataclass()
 class DefinitionBuilder(Generic[OpVar]):
-    """Base class for builders that can define functions, constants, and aliases.
+    """Base class for builders that can define constants, and allow access
+       to the `ModuleBuilder` for declaring/defining functions and aliases.
 
     As this class may be a root node, it does not extend `ParentBuilder`.
     """
 
     hugr: Hugr[OpVar]
+
+    def module_root_builder(self) -> Module:
+        return Module(self.hugr)
 
     def add_const(self, value: val.Value, parent: ToNode | None = None) -> Node:
         """Add a static constant to the graph.
