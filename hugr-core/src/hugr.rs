@@ -497,6 +497,7 @@ pub(crate) mod test {
     use crate::test_file;
     use cool_asserts::assert_matches;
     use portgraph::LinkView;
+    use rstest::rstest;
 
     /// Check that two HUGRs are equivalent, up to node renumbering.
     pub(crate) fn check_hugr_equality(lhs: &Hugr, rhs: &Hugr) {
@@ -611,5 +612,26 @@ pub(crate) mod test {
             None,
         );
         assert_matches!(&hugr, Ok(_));
+    }
+
+    #[rstest]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    #[case(test_file!("hugr-1.hugr"))]
+    #[case(test_file!("hugr-3.hugr"))]
+    fn canonicalize_entrypoint(#[case] file: &str) {
+        let hugr = Hugr::load(
+            BufReader::new(File::open(file).unwrap()),
+            None,
+        ).unwrap();
+        hugr.validate().unwrap();
+
+        for n in hugr.nodes() {
+            let mut h2 = hugr.clone();
+            h2.set_entrypoint(n);
+            if h2.validate().is_ok() {
+                h2.canonicalize_nodes(|_,_| {});
+                assert_eq!(hugr.get_optype(n), h2.entrypoint_optype());
+            }
+        }
     }
 }
