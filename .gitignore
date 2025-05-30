@@ -18,7 +18,6 @@ proptest-regressions/
 # Devenv
 .devenv*
 devenv.local.nix
-.envrc
 
 # Coverage report
 lcov.info
@@ -41,6 +40,7 @@ htmlcov/
 .venv
 env/
 venv/
+.envrc
 
 # ruff
 .ruff_cache
