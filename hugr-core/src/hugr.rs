@@ -496,15 +496,17 @@ pub(crate) mod test {
 
     use super::*;
 
-    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::envelope::{EnvelopeError, PackageEncodingError};
     use crate::extension::prelude::bool_t;
     use crate::ops::OpaqueOp;
-    use crate::ops::handle::{FuncID, NodeHandle};
+    use crate::ops::handle::NodeHandle;
     use crate::test_file;
     use crate::types::Signature;
     use cool_asserts::assert_matches;
+    use itertools::Either;
     use portgraph::LinkView;
+    use rstest::rstest;
 
     /// Check that two HUGRs are equivalent, up to node renumbering.
     pub(crate) fn check_hugr_equality(lhs: &Hugr, rhs: &Hugr) {
@@ -620,41 +622,52 @@ pub(crate) mod test {
         assert_matches!(&hugr, Ok(_));
     }
 
-    #[test]
-    fn canonicalize_nodes() {
+    fn hugr_failing_2262() -> Hugr {
         let sig = Signature::new(vec![bool_t(); 2], bool_t());
         let mut mb = ModuleBuilder::new();
         let mut fa = mb.define_function("a", sig.clone()).unwrap();
-        // Recursive call requires getting the handle from builder
-        let f_id = FuncID::<true>::from(fa.container_node());
         let mut dfg = fa.dfg_builder(sig.clone(), fa.input_wires()).unwrap();
-        let call = dfg.call(&f_id, &[], dfg.input_wires()).unwrap();
+        // Add Call node - without a static target as we'll create that later
+        let call_op = ops::Call::try_new(sig.clone().into(), []).unwrap();
+        let call = dfg.add_dataflow_op(call_op, dfg.input_wires()).unwrap();
         let dfg = dfg.finish_with_outputs(call.outputs()).unwrap();
-        let fa = fa.finish_with_outputs(dfg.outputs()).unwrap();
+        fa.finish_with_outputs(dfg.outputs()).unwrap();
         let fb = mb.define_function("b", sig).unwrap();
         let [fst, _] = fb.input_wires_arr();
         let fb = fb.finish_with_outputs([fst]).unwrap();
-        let mut h = mb.finish_hugr().unwrap();
-        h.set_entrypoint(dfg.node());
+        let mut h = mb.hugr().clone();
+
+        h.set_entrypoint(dfg.node()); // Entrypoint unused, but to highlight failing case
         let static_in = h.get_optype(call.node()).static_input_port().unwrap();
         let static_out = h.get_optype(fb.node()).static_output_port().unwrap();
-        assert_eq!(
-            h.single_linked_output(call.node(), static_in)
-                .map(|(n, _p)| n),
-            Some(fa.node())
-        );
+        assert_eq!(h.single_linked_output(call.node(), static_in), None);
         h.disconnect(call.node(), static_in);
         h.connect(fb.node(), static_out, call.node(), static_in);
+        h
+    }
 
-        fn find_dfgs(h: &Hugr) -> Vec<Node> {
-            h.nodes().filter(|n| h.get_optype(*n).is_dfg()).collect()
+    #[rstest]
+    // Opening files is not supported in (isolated) miri
+    #[cfg_attr(not(miri), case(Either::Left(test_file!("hugr-1.hugr"))))]
+    #[cfg_attr(not(miri), case(Either::Left(test_file!("hugr-3.hugr"))))]
+    // Next was failing, https://github.com/CQCL/hugr/issues/2262:
+    #[case(Either::Right(hugr_failing_2262()))]
+    fn canonicalize_entrypoint(#[case] file_or_hugr: Either<&str, Hugr>) {
+        let hugr = match file_or_hugr {
+            Either::Left(file) => {
+                Hugr::load(BufReader::new(File::open(file).unwrap()), None).unwrap()
+            }
+            Either::Right(hugr) => hugr,
+        };
+        hugr.validate().unwrap();
+
+        for n in hugr.nodes() {
+            let mut h2 = hugr.clone();
+            h2.set_entrypoint(n);
+            if h2.validate().is_ok() {
+                h2.canonicalize_nodes(|_, _| {});
+                assert_eq!(hugr.get_optype(n), h2.entrypoint_optype());
+            }
         }
-        assert_eq!(find_dfgs(&h), [dfg.node()]);
-        assert_eq!(h.entrypoint(), dfg.node());
-
-        h.canonicalize_nodes(|_, _| ());
-        let [dfg] = find_dfgs(&h).try_into().unwrap();
-        // This was failing, https://github.com/CQCL/hugr/issues/2262:
-        assert_eq!(h.entrypoint(), dfg);
     }
 }
