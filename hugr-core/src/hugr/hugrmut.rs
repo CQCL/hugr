@@ -181,7 +181,7 @@ pub trait HugrMut: HugrMutInternals {
     /// Insert (the entrypoint-subtree) of another hugr into this one, under a given parent node.
     /// Unless `other.entrypoint() == other.module_root()`, then any children of
     /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will be copied
-    /// under the Module root of this Hugr - see [Self:insert_hugr_with_defns].
+    /// under the Module root of this Hugr - see [Self::insert_hugr_with_defns].
     ///
     /// # Panics
     ///
@@ -218,12 +218,15 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
     /// This will result in an invalid Hugr (with disconnected edges) if there are any
-    /// nonlocal (including [EdgeKind::Constant] / [EdgeKind::Function]) edges into the
-    /// entrypoint-subtree. (See [Self::insert_from_view_with_defns].)
+    /// nonlocal edges (including [Const] / [Function]) into the entrypoint-subtree.
+    /// (See [Self::insert_from_view_with_defns].)
     ///
     /// # Panics
     ///
     /// If `parent` is not in the graph.
+    ///
+    /// [Const]: crate::types::EdgeKind::Const
+    /// [Function]: crate::types::EdgeKind::Function
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
