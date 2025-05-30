@@ -1,6 +1,5 @@
 use crate::extension::prelude::MakeTuple;
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
@@ -10,7 +9,7 @@ use crate::{Extension, IncomingPort, Node, OutgoingPort};
 use std::iter;
 use std::sync::Arc;
 
-use super::{BuilderWiringError, FunctionBuilder, ModuleBuilder};
+use super::{BuilderWiringError, ModuleBuilder};
 use super::{
     CircuitBuilder,
     handle::{BuildHandle, Outputs},
@@ -22,7 +21,7 @@ use crate::{
 };
 
 use crate::extension::ExtensionRegistry;
-use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
+use crate::types::{Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -81,37 +80,6 @@ pub trait Container {
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, constant: impl Into<ops::Const>) -> ConstID {
         self.add_child_node(constant.into()).into()
-    }
-
-    /// Add a [`ops::FuncDefn`] node beneath the module root of the Hugr
-    /// and return a builder to define the function body graph.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`ops::FuncDefn`] node.
-    #[deprecated(note = "Use module_root_builder on the outermost builder")]
-    fn define_function(
-        &mut self,
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        // Temporarily add the FuncDefn inside this container (invalid!), then move it
-        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
-        let root = self.hugr().module_root();
-        self.hugr_mut().set_parent(f_node, root);
-
-        // Add the extensions used by the function types.
-        self.use_extensions(
-            body.used_extensions().unwrap_or_else(|e| {
-                panic!("Build-time signatures should have valid extensions. {e}")
-            }),
-        );
-
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
-        Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
     /// Insert a HUGR as a child of the container.
