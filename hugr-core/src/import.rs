@@ -20,6 +20,10 @@ use crate::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
     },
+    terms::{
+        Term, TermKind,
+        util::{ListPart, list_from_parts},
+    },
     types::{
         CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
         Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow, type_param::TypeParam,
@@ -134,6 +138,7 @@ pub fn import_hugr(
         local_vars: FxHashMap::default(),
         custom_name_cache: FxHashMap::default(),
         region_scope: table::RegionId::default(),
+        terms: (0..module.terms.len()).map(|_| None).collect(),
     };
 
     ctx.import_root()?;
@@ -169,6 +174,8 @@ struct Context<'a> {
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 
     region_scope: table::RegionId,
+
+    terms: Vec<Option<Term>>,
 }
 
 impl<'a> Context<'a> {
@@ -1612,6 +1619,55 @@ impl<'a> Context<'a> {
     ) -> Result<[table::TermId; N], ImportError> {
         self.match_symbol(term_id, name)?
             .ok_or(table::ModelError::TypeError(term_id).into())
+    }
+
+    fn import_term(&mut self, term_id: table::TermId) -> Result<Term, ImportError> {
+        match self.terms.get(term_id.index()) {
+            None => return Err(table::ModelError::TermNotFound(term_id).into()),
+            Some(Some(term)) => return Ok(term.clone()),
+            Some(None) => {}
+        }
+
+        // TODO: Use this to detect cycles.
+        self.terms[term_id.index()] = Some(Term::default());
+
+        let term = match self.get_term(term_id)? {
+            table::Term::Wildcard => Term::default(),
+            table::Term::Var(var_id) => todo!(),
+            table::Term::Apply(node_id, args) => {
+                let symbol = model::SymbolName::new(self.get_symbol_name(*node_id)?);
+                // TODO: Do this without an additional allocation, ideally.
+                let args: Vec<_> = args
+                    .iter()
+                    .map(|arg| self.import_term(*arg))
+                    .collect::<Result<_, _>>()?;
+                Term::new(TermKind::Apply(&symbol, &args))
+            }
+            table::Term::List(parts) => {
+                // TODO: Do this without an additional allocation, ideally.
+                let parts: Vec<_> = parts
+                    .iter()
+                    .map(|part| self.import_term_list_part(part))
+                    .collect::<Result<_, _>>()?;
+                list_from_parts(parts, Term::default())
+            }
+            table::Term::Literal(literal) => literal.clone().into(),
+            table::Term::Func(region_id) => todo!(),
+            table::Term::Tuple(seq_parts) => todo!(),
+        };
+
+        self.terms[term_id.index()] = Some(term.clone());
+        Ok(term)
+    }
+
+    fn import_term_list_part(
+        &mut self,
+        seq_part: &table::SeqPart,
+    ) -> Result<ListPart, ImportError> {
+        Ok(match seq_part {
+            table::SeqPart::Item(item) => ListPart::Item(self.import_term(*item)?),
+            table::SeqPart::Splice(list) => ListPart::Splice(self.import_term(*list)?),
+        })
     }
 }
 
