@@ -10,7 +10,7 @@ from hugr.build.dfg import DefinitionBuilder, Function
 from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
-    from hugr.hugr.node_port import Node, ToNode
+    from hugr.hugr.node_port import Node
     from hugr.tys import PolyFuncType, Type, TypeBound, TypeParam, TypeRow
 
 __all__ = ["Function", "Module"]
@@ -28,8 +28,8 @@ class Module(DefinitionBuilder[ops.Module]):
 
     hugr: Hugr[ops.Module]
 
-    def __init__(self) -> None:
-        self.hugr = Hugr(ops.Module())
+    def __init__(self, hugr: Hugr | None = None) -> None:
+        self.hugr = Hugr(ops.Module()) if hugr is None else hugr
 
     def define_main(self, input_types: TypeRow) -> Function:
         """Define the 'main' function in the module. See :meth:`define_function`."""
@@ -41,7 +41,6 @@ class Module(DefinitionBuilder[ops.Module]):
         input_types: TypeRow,
         output_types: TypeRow | None = None,
         type_params: list[TypeParam] | None = None,
-        parent: ToNode | None = None,
     ) -> Function:
         """Start building a function definition in the graph.
 
@@ -56,9 +55,8 @@ class Module(DefinitionBuilder[ops.Module]):
         Returns:
             The new function builder.
         """
-        parent_node = parent or self.hugr.entrypoint
         parent_op = ops.FuncDefn(name, input_types, type_params or [])
-        func = Function.new_nested(parent_op, self.hugr, parent_node)
+        func = Function.new_nested(parent_op, self.hugr, self.hugr.module_root)
         if output_types is not None:
             func.declare_outputs(output_types)
         return func
@@ -82,14 +80,13 @@ class Module(DefinitionBuilder[ops.Module]):
         """
         return self.hugr.add_node(ops.FuncDecl(name, signature), self.hugr.entrypoint)
 
-    def add_alias_defn(self, name: str, ty: Type, parent: ToNode | None = None) -> Node:
+    def add_alias_defn(self, name: str, ty: Type) -> Node:
         """Add a type alias definition."""
-        parent_node = parent or self.hugr.entrypoint
-        return self.hugr.add_node(ops.AliasDefn(name, ty), parent_node)
+        return self.hugr.add_node(ops.AliasDefn(name, ty), self.hugr.module_root)
 
     def add_alias_decl(self, name: str, bound: TypeBound) -> Node:
         """Add a type alias declaration."""
-        return self.hugr.add_node(ops.AliasDecl(name, bound), self.hugr.entrypoint)
+        return self.hugr.add_node(ops.AliasDecl(name, bound), self.hugr.module_root)
 
     @property
     def metadata(self) -> dict[str, object]:
