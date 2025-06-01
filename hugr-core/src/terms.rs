@@ -41,6 +41,9 @@ pub struct Term(ThinArc<TermHeader, Term>);
 /// Assert that [`Term`] is the same size as a pointer.
 const _: () = assert!(std::mem::size_of::<Term>() == std::mem::size_of::<usize>());
 
+/// Assert that `Option<Term>` is also the same size as a pointer.
+const _: () = assert!(std::mem::size_of::<Option<Term>>() == std::mem::size_of::<usize>());
+
 impl Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&ast::Term::from(self), f)
@@ -555,4 +558,97 @@ macro_rules! term_view_ctr {
             }
         }
     };
+}
+
+#[derive(Debug, Clone)]
+pub enum Transform {
+    Replace(Term),
+    Recurse,
+    Skip,
+}
+
+impl Term {
+    pub fn transform<E>(
+        &self,
+        mut f: impl FnMut(&Term) -> Result<Transform, E>,
+    ) -> Result<Self, E> {
+        fn run<E>(
+            term: &Term,
+            f: &mut impl FnMut(&Term) -> Result<Transform, E>,
+        ) -> Result<Term, E> {
+            match f(term)? {
+                Transform::Replace(term) => return Ok(term),
+                Transform::Recurse => {}
+                Transform::Skip => return Ok(term.clone()),
+            }
+
+            Ok(match term.get() {
+                TermKind::Wildcard => term.clone(),
+                TermKind::Literal(_) => term.clone(),
+                TermKind::Var(_) => term.clone(),
+                TermKind::Apply(symbol, args) => {
+                    let args: Vec<_> = args
+                        .iter()
+                        .map(|arg| run(arg, f))
+                        .collect::<Result<_, _>>()?;
+                    Term::new(TermKind::Apply(symbol, &args))
+                }
+                TermKind::List(item_type, items) => {
+                    let item_type = run(item_type, f)?;
+                    let items: Vec<_> = items
+                        .iter()
+                        .map(|item| run(item, f))
+                        .collect::<Result<_, _>>()?;
+                    Term::new(TermKind::List(&item_type, &items))
+                }
+                TermKind::ListConcat(item_type, lists) => {
+                    let item_type = run(item_type, f)?;
+                    let lists: Vec<_> = lists
+                        .iter()
+                        .map(|list| run(list, f))
+                        .collect::<Result<_, _>>()?;
+                    Term::new(TermKind::ListConcat(&item_type, &lists))
+                }
+                TermKind::Tuple(item_types, items) => {
+                    let item_types = run(item_types, f)?;
+                    let items: Vec<_> = items
+                        .iter()
+                        .map(|item| run(item, f))
+                        .collect::<Result<_, _>>()?;
+                    Term::new(TermKind::Tuple(&item_types, &items))
+                }
+                TermKind::TupleConcat(item_types, tuples) => {
+                    let item_types = run(item_types, f)?;
+                    let tuples: Vec<_> = tuples
+                        .iter()
+                        .map(|tuple| run(tuple, f))
+                        .collect::<Result<_, _>>()?;
+                    Term::new(TermKind::TupleConcat(&item_types, &tuples))
+                }
+                TermKind::Func(term, node) => todo!(),
+            })
+        }
+
+        run(self, &mut f)
+    }
+}
+
+/// Error in [`Term::substitute`].
+#[derive(Debug, Clone, Error)]
+pub enum SubstituteError {
+    #[error("unknown variable {0:?}")]
+    UnknownVar(Var),
+}
+
+impl Term {
+    pub fn substitute(&self, substitution: &[Term]) -> Result<Self, SubstituteError> {
+        self.transform(|term| match term.get() {
+            TermKind::Var(var) => match substitution.get(var.index() as usize) {
+                Some(term) => Ok(Transform::Replace(term.clone())),
+                None => Err(SubstituteError::UnknownVar(var.clone())),
+            },
+            _ if term.has_vars() => Ok(Transform::Recurse),
+            _ => Ok(Transform::Skip),
+        })
+    }
 }
