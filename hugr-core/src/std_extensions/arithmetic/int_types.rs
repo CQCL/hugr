@@ -4,6 +4,7 @@ use std::num::NonZeroU64;
 use std::sync::{Arc, Weak};
 
 use crate::ops::constant::ValueName;
+use crate::terms::{Term, TermKind, View, ViewError};
 use crate::types::TypeName;
 use crate::{
     Extension,
@@ -14,6 +15,7 @@ use crate::{
         type_param::{TypeArg, TypeArgError, TypeParam},
     },
 };
+use hugr_model::v0::SymbolName;
 use lazy_static::lazy_static;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
@@ -176,6 +178,29 @@ impl ConstInt {
                 self.value as i64 - (1i64 << width)
             }
         }
+    }
+}
+
+impl View for ConstInt {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        let [log_width, value] = term.view_apply(&SymbolName::new_static(Self::CTR_NAME))?;
+        let log_width: u64 = log_width.view()?;
+        let value = value.view()?;
+
+        if log_width > u8::MAX as u64 {
+            return Err(ViewError::Mismatch);
+        }
+
+        Self::new_u(log_width as u8, value).map_err(|_| ViewError::Mismatch)
+    }
+}
+
+impl From<ConstInt> for Term {
+    fn from(value: ConstInt) -> Self {
+        let symbol = SymbolName::new_static(ConstInt::CTR_NAME);
+        let log_width = Term::from(value.log_width() as u64);
+        let value = Term::from(value.value);
+        Term::new(TermKind::Apply(&symbol, &[log_width, value]))
     }
 }
 

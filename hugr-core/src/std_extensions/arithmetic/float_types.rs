@@ -3,6 +3,7 @@
 use std::sync::{Arc, Weak};
 
 use crate::ops::constant::{TryHash, ValueName};
+use crate::terms::{Term, TermKind, View, ViewError};
 use crate::types::TypeName;
 use crate::{
     Extension,
@@ -10,6 +11,7 @@ use crate::{
     ops::constant::CustomConst,
     types::{CustomType, Type, TypeBound},
 };
+use hugr_model::v0::SymbolName;
 use lazy_static::lazy_static;
 
 /// The extension identifier.
@@ -98,6 +100,22 @@ impl CustomConst for ConstF64 {
 
     fn equal_consts(&self, _: &dyn CustomConst) -> bool {
         false
+    }
+}
+
+impl View for ConstF64 {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        let [value] = term.view_apply(&SymbolName::new_static(Self::CTR_NAME))?;
+        let value = value.view()?;
+        Ok(Self { value })
+    }
+}
+
+impl From<ConstF64> for Term {
+    fn from(value: ConstF64) -> Self {
+        let value = value.value.into();
+        let symbol = SymbolName::new_static(ConstF64::CTR_NAME);
+        Term::new(TermKind::Apply(&symbol, &[value]))
     }
 }
 
