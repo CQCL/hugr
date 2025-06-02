@@ -709,6 +709,7 @@ pub enum ValidationError<N: HugrNode> {
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError<N>),
     /// There are errors in the extension deltas.
+    #[deprecated(note="Never returned since hugr-core-v0.20.0")]
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
     /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference.
