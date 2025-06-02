@@ -72,9 +72,12 @@ impl<const N: usize> From<ListPrefix<N>> for Term {
             item_type: value.item_type.clone(),
             items: value.prefix,
         });
+        let type_ = Term::from(core::List {
+            item_type: value.item_type.clone(),
+        });
         Term::new(
             TermKind::ListConcat(&value.item_type, &[prefix, value.rest]),
-            Term::default(),
+            type_,
         )
     }
 }
@@ -117,10 +120,10 @@ pub struct ListExact<const N: usize> {
 
 impl<const N: usize> From<ListExact<N>> for Term {
     fn from(value: ListExact<N>) -> Self {
-        Term::new(
-            TermKind::List(&value.item_type, &value.items),
-            Term::default(),
-        )
+        let type_ = Term::from(core::List {
+            item_type: value.item_type.clone(),
+        });
+        Term::new(TermKind::List(&value.item_type, &value.items), type_)
     }
 }
 

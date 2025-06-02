@@ -531,7 +531,7 @@ pub enum ViewError {
 #[macro_export]
 macro_rules! term_view_ctr {
     (
-        $name:expr;
+        $name:expr; $type_:expr;
         $(#[$attr:meta])*
         $vis:vis struct $ident:ident {
             $($(#[$field_meta:meta])* pub $field_name:ident: $field_type:ty,)*
@@ -563,14 +563,14 @@ macro_rules! term_view_ctr {
                         &$ident::CTR_NAME,
                         &[$(value.$field_name.into()),*],
                     ),
-                    $crate::terms::Term::default(),
+                    $crate::terms::Term::from($type_)
                 )
             }
         }
     };
 
     (
-        $name:expr;
+        $name:expr; $type_:expr;
         $(#[$attr:meta])*
         $vis:vis struct $ident:ident;
     ) => {
@@ -596,7 +596,7 @@ macro_rules! term_view_ctr {
                     ::once_cell::sync::Lazy::new(|| {
                         $crate::terms::Term::new(
                             $crate::terms::TermKind::Apply(&$ident::CTR_NAME, &[]),
-                            $crate::terms::Term::default(),
+                            $crate::terms::Term::from($type_)
                         )
                     });
                 TERM.clone()
