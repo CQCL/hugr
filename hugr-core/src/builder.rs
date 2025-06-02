@@ -90,7 +90,7 @@ use thiserror::Error;
 use crate::extension::SignatureError;
 use crate::extension::simple_op::OpLoadError;
 use crate::hugr::ValidationError;
-use crate::hugr::hugrmut::DefnInsertionError;
+use crate::hugr::hugrmut::InsertDefnError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
 use crate::types::Type;
@@ -180,10 +180,10 @@ pub enum BuildError {
 
     /// From [Container::add_hugr_with_wires_defns]
     #[error{"In inserting Hugr: {0}"}]
-    HugrInsertionError(#[from] DefnInsertionError<Node>),
+    HugrInsertionError(#[from] InsertDefnError<Node>),
 
     /// From [Container::add_hugr_view_with_wires_defns].
-    /// Note that because the type of node in the [DefnInsertionError] depends
+    /// Note that because the type of node in the [InsertDefnError] depends
     /// upon the view being inserted, we convert the error to a string here.
     #[error("In inserting HugrView: {0}")]
     HugrViewInsertionError(String),

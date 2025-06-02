@@ -207,7 +207,7 @@ pub trait HugrMut: HugrMutInternals {
         };
 
         self.insert_hugr_with_defns(root, other, children)
-            .expect("Construction of `children` should ensure no possibility of DefnInsertionError")
+            .expect("Construction of `children` should ensure no possibility of InsertDefnError")
     }
 
     /// Insert another Hugr into this one, copying the entrypoint-subtree under the specified
@@ -226,7 +226,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Self::Node,
         other: Hugr,
         children: HashSet<Node>,
-    ) -> Result<InsertionResult<Node, Self::Node>, DefnInsertionError<Node>>;
+    ) -> Result<InsertionResult<Node, Self::Node>, InsertDefnError<Node>>;
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
     /// This will result in an invalid Hugr (with disconnected edges) if there are any
@@ -267,7 +267,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Self::Node,
         other: &H,
         children: HashSet<H::Node>,
-    ) -> Result<InsertionResult<H::Node, Self::Node>, DefnInsertionError<H::Node>>;
+    ) -> Result<InsertionResult<H::Node, Self::Node>, InsertDefnError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///
@@ -472,7 +472,7 @@ impl HugrMut for Hugr {
         parent: Self::Node,
         mut other: Hugr,
         children: HashSet<Node>,
-    ) -> Result<InsertionResult<Node, Self::Node>, DefnInsertionError<Node>> {
+    ) -> Result<InsertionResult<Node, Self::Node>, InsertDefnError<Node>> {
         let node_map = insert_hugr_internal(self, parent, &other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
@@ -498,7 +498,7 @@ impl HugrMut for Hugr {
         parent: Self::Node,
         other: &H,
         children: HashSet<H::Node>,
-    ) -> Result<InsertionResult<H::Node, Self::Node>, DefnInsertionError<H::Node>> {
+    ) -> Result<InsertionResult<H::Node, Self::Node>, InsertDefnError<H::Node>> {
         let node_map = insert_hugr_internal(self, parent, other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
@@ -602,7 +602,7 @@ impl HugrMut for Hugr {
 /// caused by one of the module-children requested to insert.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[non_exhaustive]
-pub enum DefnInsertionError<N: Display> {
+pub enum InsertDefnError<N: Display> {
     /// Module-children were requested in addition to the module entrypoint
     #[error(
         "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (entrypoint == module_root)"
@@ -621,22 +621,22 @@ fn insert_hugr_internal<H: HugrView>(
     parent: Node,
     other: &H,
     children: HashSet<H::Node>,
-) -> Result<HashMap<H::Node, Node>, DefnInsertionError<H::Node>> {
+) -> Result<HashMap<H::Node, Node>, InsertDefnError<H::Node>> {
     if other.entrypoint() == other.module_root() {
         if let Some(c) = children.iter().next() {
-            return Err(DefnInsertionError::ChildOfEntrypoint(*c));
+            return Err(InsertDefnError::ChildOfEntrypoint(*c));
         }
     } else {
         let mut on = Some(other.entrypoint());
         while let Some(n) = on {
             if children.contains(&n) {
-                return Err(DefnInsertionError::ChildContainsEntrypoint(n));
+                return Err(InsertDefnError::ChildContainsEntrypoint(n));
             }
             on = other.get_parent(n);
         }
         for &c in children.iter() {
             if other.get_parent(c) != Some(other.module_root()) {
-                return Err(DefnInsertionError::NotChildOfRoot(c));
+                return Err(InsertDefnError::NotChildOfRoot(c));
             }
         }
     }
