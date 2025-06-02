@@ -154,10 +154,7 @@ class FixedHugr:
     hugr: Hugr
 
     def _to_serial(self) -> ext_s.FixedHugr:
-        from hugr.package import EnvelopeConfig, make_envelope_str
-
-        envelope = make_envelope_str(self.hugr, EnvelopeConfig.TEXT)
-        return ext_s.FixedHugr(extensions=self.extensions, hugr=envelope)
+        return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr.to_str())
 
 
 @dataclass
