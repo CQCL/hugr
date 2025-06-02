@@ -67,10 +67,14 @@ class TypeDef(ConfiguredBaseModel):
 
 class FixedHugr(ConfiguredBaseModel):
     extensions: ExtensionSet
-    hugr: Any
+    hugr: str
 
     def deserialize(self) -> ext.FixedHugr:
-        return ext.FixedHugr(extensions=self.extensions, hugr=self.hugr)
+        from hugr.envelope import read_envelope_str
+
+        pkg = read_envelope_str(self.hugr)
+        assert len(pkg.modules) == 1, "FixedHugr should contain exactly one module"
+        return ext.FixedHugr(extensions=self.extensions, hugr=pkg.modules[0])
 
 
 class OpDef(ConfiguredBaseModel, populate_by_name=True):
