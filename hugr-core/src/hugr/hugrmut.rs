@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::Display;
 use std::sync::Arc;
 
+use itertools::Either;
 use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
@@ -648,12 +649,15 @@ fn insert_hugr_internal<H: HugrView>(
             return Err(InsertDefnError::ChildOfEntrypoint(*c));
         }
     } else {
-        let mut on = Some(other.entrypoint());
-        while let Some(n) = on {
-            if children.contains_key(&n) {
-                return Err(InsertDefnError::ChildContainsEntrypoint(n));
+        let mut n = other.entrypoint();
+        if children.contains_key(&n) {
+            return Err(InsertDefnError::ChildContainsEntrypoint(n));
+        }
+        while let Some(p) = other.get_parent(n) {
+            if children.get(&p) == Some(&InsertDefnMode::Add) {
+                return Err(InsertDefnError::ChildContainsEntrypoint(p));
             }
-            on = other.get_parent(n);
+            n = p
         }
         for &c in children.keys() {
             if other.get_parent(c) != Some(other.module_root()) {
@@ -661,19 +665,42 @@ fn insert_hugr_internal<H: HugrView>(
             }
         }
     }
+    // In fact we'll copy all `children`, but only including subtrees
+    // for children that should be `Add`ed. This ensures we copy
+    // edges from any of those children to any other copied nodes.
     let nodes = children
-        .keys()
-        .copied()
-        .chain(std::iter::once(other.entrypoint()))
-        .flat_map(|n| other.descendants(n));
+        .iter()
+        .flat_map(|(&ch, m)| match m {
+            InsertDefnMode::Add => Either::Left(other.descendants(ch)),
+            InsertDefnMode::Replace(_) => Either::Right(std::iter::once(ch)),
+        })
+        .chain(other.entry_descendants());
     let hugr_root = hugr.module_root();
-    Ok(insert_hugr_nodes(hugr, &other, nodes, |&n| {
+    let mut node_map = insert_hugr_nodes(hugr, &other, nodes, |&n| {
         if n == other.entrypoint() {
             Some(parent)
         } else {
             children.contains_key(&n).then_some(hugr_root)
         }
-    }))
+    });
+    // Now enact any `Replace`s, removing the copied children
+    for (ch, m) in children {
+        let InsertDefnMode::Replace(replace_with) = m else {
+            continue;
+        };
+        let copy = node_map.insert(ch, replace_with).unwrap();
+        let outport = hugr.get_optype(replace_with).static_output_port();
+
+        let static_targets = hugr.static_targets(copy).map_or(vec![], Vec::from_iter);
+        for (target, inport) in static_targets {
+            hugr.disconnect(target, inport);
+            hugr.connect(replace_with, outport.unwrap(), target, inport);
+        }
+        // There should not have been any outputs other than static edges
+        debug_assert!(hugr.all_linked_inputs(copy).next().is_none());
+        hugr.remove_node(copy);
+    }
+    Ok(node_map)
 }
 
 /// Internal implementation of `insert_hugr`, `insert_view`, and
