@@ -312,37 +312,37 @@ impl Hugr {
             v.extend(self.canonical_order(self.module_root()));
             v
         };
-        let mut new_entrypoint = self.entrypoint;
+        let mut new_entrypoint = None;
 
         // Permute the nodes in the graph to match the order.
         //
         // Invariant: All the elements before `position` are in the correct place.
         for position in 0..ordered.len() {
-            let target = portgraph::NodeIndex::new(position);
-            // Find the element's location. If it originally came from a previous position
-            // then it has been swapped somewhere else, so we follow the permutation chain.
+            let pg_target = portgraph::NodeIndex::new(position);
             let mut source: Node = ordered[position];
 
+            // The (old) entrypoint appears exactly once in `ordered`:
             if source.into_portgraph() == self.entrypoint {
-                new_entrypoint = target;
+                let old = new_entrypoint.replace(pg_target);
+                debug_assert!(old.is_none());
             }
 
+            // Find the element's current location. If it originally came from an earlier
+            // position then it has been swapped somewhere else, so follow the permutation chain.
             while position > source.index() {
                 source = ordered[source.index()];
             }
 
-            let target: Node = target.into();
-            if target != source {
-                let pg_target = target.into_portgraph();
-                let pg_source = source.into_portgraph();
+            let pg_source = source.into_portgraph();
+            if pg_target != pg_source {
                 self.graph.swap_nodes(pg_target, pg_source);
                 self.op_types.swap(pg_target, pg_source);
                 self.hierarchy.swap_nodes(pg_target, pg_source);
-                rekey(source, target);
+                rekey(source, pg_target.into());
             }
         }
         self.module_root = portgraph::NodeIndex::new(0);
-        self.entrypoint = new_entrypoint;
+        self.entrypoint = new_entrypoint.unwrap();
 
         // Finish by compacting the copy nodes.
         // The operation nodes will be left in place.
