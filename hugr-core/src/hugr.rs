@@ -318,14 +318,20 @@ impl Hugr {
         //
         // Invariant: All the elements before `position` are in the correct place.
         for position in 0..ordered.len() {
+            let target = portgraph::NodeIndex::new(position);
             // Find the element's location. If it originally came from a previous position
             // then it has been swapped somewhere else, so we follow the permutation chain.
             let mut source: Node = ordered[position];
+
+            if source.into_portgraph() == self.entrypoint {
+                new_entrypoint = target;
+            }
+
             while position > source.index() {
                 source = ordered[source.index()];
             }
 
-            let target: Node = portgraph::NodeIndex::new(position).into();
+            let target: Node = target.into();
             if target != source {
                 let pg_target = target.into_portgraph();
                 let pg_source = source.into_portgraph();
@@ -333,12 +339,6 @@ impl Hugr {
                 self.op_types.swap(pg_target, pg_source);
                 self.hierarchy.swap_nodes(pg_target, pg_source);
                 rekey(source, target);
-
-                if source.into_portgraph() == new_entrypoint {
-                    new_entrypoint = target.into_portgraph();
-                } else if target.into_portgraph() == new_entrypoint {
-                    new_entrypoint = source.into_portgraph();
-                }
             }
         }
         self.module_root = portgraph::NodeIndex::new(0);
