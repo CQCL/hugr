@@ -604,6 +604,9 @@ impl HugrMut for Hugr {
 #[non_exhaustive]
 pub enum InsertDefnError<N: Display> {
     /// Module-children were requested in addition to the module entrypoint
+    // ALAN is this worth bothering with as a separate case? Inserting a hugr
+    // whose entrypoint is the module is a strange case, as you'll get two Module
+    // nodes in the target Hugr!
     #[error(
         "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (entrypoint == module_root)"
     )]
@@ -848,7 +851,7 @@ mod test {
     }
 
     #[test]
-    fn test_insert_hugr() {
+    fn test_insert_with_defns() {
         let mut h = simple_dfg_hugr();
         let (insert, _, _) = inserted_defn_decl();
 
@@ -881,8 +884,6 @@ mod test {
             check_insertion(h, call1, call2);
         }
     }
-
-    // ALAN TODO test errors inserting illegal children
 
     fn check_insertion(h: Hugr, call1_ok: bool, call2_ok: bool) {
         if call1_ok && call2_ok {
@@ -918,6 +919,41 @@ mod test {
         });
         assert_eq!(tgt2.is_some(), call2_ok);
         assert_eq!(h.static_source(call2), tgt2);
+    }
+
+    #[test]
+    fn bad_insert_with_defns() {
+        let backup = simple_dfg_hugr();
+        let mut h = backup.clone();
+
+        let (insert, defn, decl) = inserted_defn_decl();
+        let (defn, decl) = (defn.node(), decl.node());
+
+        let epp = insert.get_parent(insert.entrypoint()).unwrap();
+        let r = h.insert_from_view_with_defns(h.entrypoint(), &insert, HashSet::from([epp]));
+        assert_eq!(
+            r.err().unwrap(),
+            InsertDefnError::ChildContainsEntrypoint(epp)
+        );
+        assert_eq!(h, backup);
+
+        let [inp, _] = insert.get_io(defn).unwrap();
+        let r = h.insert_from_view_with_defns(h.entrypoint(), &insert, HashSet::from([inp]));
+        assert_eq!(r.err().unwrap(), InsertDefnError::NotChildOfRoot(inp));
+        assert_eq!(h, backup);
+
+        let mut insert = insert;
+        insert.set_entrypoint(defn);
+        let r = h.insert_from_view_with_defns(h.module_root(), &insert, HashSet::from([defn]));
+        assert_eq!(
+            r.err().unwrap(),
+            InsertDefnError::ChildContainsEntrypoint(defn)
+        );
+
+        assert_eq!(h, backup);
+        insert.set_entrypoint(insert.module_root());
+        let r = h.insert_hugr_with_defns(h.module_root(), insert, HashSet::from([decl]));
+        assert_eq!(r.err().unwrap(), InsertDefnError::ChildOfEntrypoint(decl));
     }
 
     // (End) tests of insert_{hugr,from_view}(_with_defns) ====================================
