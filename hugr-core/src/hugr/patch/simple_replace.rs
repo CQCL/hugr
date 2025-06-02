@@ -649,7 +649,7 @@ pub(in crate::hugr::patch) mod test {
     use crate::hugr::patch::{BoundaryPort, HostPort, PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
-    use crate::ops::OpTag;
+    use crate::ops::{FuncDefn, OpTag};
     use crate::ops::OpTrait;
     use crate::ops::handle::NodeHandle;
     use crate::std_extensions::logic::LogicOp;
@@ -1037,6 +1037,33 @@ pub(in crate::hugr::patch) mod test {
 
         assert_eq!(hugr.validate(), Ok(()));
         assert_eq!(hugr.entry_descendants().count(), 3);
+    }
+
+    /// Replace the NOT gates in `dfg_hugr_copy_bools` with one call to a trivial
+    /// identity function (copying its output)
+    #[rstest]
+    fn test_replace_with_function(dfg_hugr_copy_bools: (Hugr, Vec<Node>)) {
+        let replacement = {
+            let mut dfb = DFGBuilder::new(Signature::new(bool_t(), vec![bool_t(); 2])).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let fb = mb.define_function("my_id", Signature::new_endo(bool_t())).unwrap();
+            let [inp] = fb.input_wires_arr();
+            let f_id = fb.finish_with_outputs([inp]).unwrap();
+            let [b] = dfb.call(f_id.handle(), &[], dfb.input_wires()).unwrap().outputs_arr();
+            dfb.finish_hugr_with_outputs([b,b]).unwrap()
+        };
+        let (mut subject,matched) = dfg_hugr_copy_bools;
+        let subgraph = SiblingSubgraph::try_from_nodes(matched, &subject).unwrap();
+        subject.apply_patch(SimpleReplacement {subgraph, replacement}).unwrap();
+        subject.validate().unwrap();
+        let func_body: [Node; 3] = subject.children(subject.entrypoint()).collect_array().unwrap(); 
+        assert_eq!(func_body.map(|n| subject.get_optype(n).tag()), [OpTag::Input, OpTag::Output, OpTag::FnCall]);
+        let mut funcs: HashSet<_> = subject.children(subject.module_root()).collect();
+        let removed = funcs.remove(&subject.get_parent(subject.entrypoint()).unwrap());
+        assert!(removed);
+        let [new_func] = funcs.into_iter().collect_array().unwrap();
+        assert_eq!(subject.get_optype(new_func).as_func_defn().map(FuncDefn::func_name), Some(&"my_id".to_string()));
+        assert_eq!(subject.static_targets(new_func).unwrap().collect_vec(), [(func_body[2], 1.into())]);
     }
 
     /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting
