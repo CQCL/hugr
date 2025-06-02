@@ -182,8 +182,8 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert (the entrypoint-subtree) of another hugr into this one, under a given parent node.
     /// Unless `other.entrypoint() == other.module_root()`, then any children of
-    /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will be copied
-    /// under the Module root of this Hugr - see [Self::insert_hugr_with_defns].
+    /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will also be
+    /// inserted under the Module root of this Hugr - see [Self::insert_hugr_with_defns].
     ///
     /// Note there are two cases here which produce an invalid Hugr:
     /// 1. if `other.entrypoint() == other.module_root()` as this will insert a second
@@ -215,13 +215,15 @@ pub trait HugrMut: HugrMutInternals {
             .expect("Construction of `children` should ensure no possibility of InsertDefnError")
     }
 
-    /// Insert another Hugr into this one, copying the entrypoint-subtree under the specified
-    /// 'parent', and any number of other subtrees under the Module root.
+    /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
+    /// specified `parent` in this Hugr, and `children` of the Module root of `other`
+    /// are either inserted with their subtrees or linked according to their [InsertDefnMode].
     ///
     /// # Errors
     ///
-    /// If `children` are not `children` of the root of `other`; or any node in `other`
-    /// is reachable in the hierarchy from both `other` and a node in `children`.
+    /// * If `children` are not `children` of the root of `other`
+    /// * If `other`s entrypoint is among `children`, or descends from an element
+    ///   of `children` with [InsertDefnMode::Add]
     ///
     /// # Panics
     ///
@@ -254,14 +256,15 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
-    /// is placed under the specified `parent` of this; each element of `children`,
-    /// which must be a child of `other.root()`, will be copied to beneath the Module
-    /// root of this HugrMut.
+    /// is copied under the specified `parent` of this; each element of `children`,
+    /// which must be a child of `other.module_root()`, will be copied with its subtree,
+    /// or linked according to its [InsertDefnMode].
     ///
     /// # Errors
     ///
-    /// If `children` are not `children` of the root of `other`; or if the subtrees
-    /// rooted at `other.entrypoint()` and each node in `children` are not all disjoint.
+    /// * If `children` are not `children` of the root of `other`
+    /// * If `other`s entrypoint is among `children`, or descends from an element
+    ///   of `children` with [InsertDefnMode::Add]
     ///
     /// # Panics
     ///
