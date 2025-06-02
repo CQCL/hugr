@@ -199,7 +199,7 @@ impl Hugr {
         self.store_with_exts(writer, config, &EMPTY_REG)
     }
 
-    /// Store the HUGR an Envelope.
+    /// Store the HUGR in an Envelope.
     ///
     /// The Envelope will embed the definitions of the extensions in the
     /// `extensions` registry. Any other extension used in the HUGR definition

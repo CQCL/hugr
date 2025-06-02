@@ -16,8 +16,8 @@ use crate::std_extensions::STD_REG;
 /// storing it as a string.
 ///
 /// Note that only PRELUDE extensions are used to decode the package's content.
-/// When serializing a HUGR, any additional extensions required to load the
-/// it are embedded in the envelope. Packages should manually add any required
+/// When serializing a HUGR, any additional extensions required to load it are
+/// embedded in the envelope. Packages should manually add any required
 /// extensions before serializing.
 ///
 /// # Examples
