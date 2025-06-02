@@ -329,6 +329,7 @@ mod test {
         ));
     }
 
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[test]
     fn test_map_io_duplicate_output() {
         // Create a DFG with 1 input and 1 output
@@ -360,6 +361,7 @@ mod test {
         assert_snapshot!(dfg_hugr.mermaid_string());
     }
 
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[test]
     fn test_map_io_cx_gate() {
         // Create a DFG with 2 inputs and 2 outputs for a CX gate
@@ -419,6 +421,7 @@ mod test {
         assert_snapshot!(dfg_hugr.mermaid_string());
     }
 
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[test]
     fn test_map_io_cycle_3qb() {
         // Create a DFG with 3 inputs and 3 outputs: CX[0, 1] and empty 2nd qubit
@@ -478,6 +481,7 @@ mod test {
         assert_snapshot!(dfg_hugr.mermaid_string());
     }
 
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[test]
     fn test_map_io_recursive() {
         use crate::builder::ModuleBuilder;

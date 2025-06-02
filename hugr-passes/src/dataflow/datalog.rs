@@ -90,12 +90,13 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached).
-    /// As a shortcut, for Hugrs whose root is a [`FuncDefn`](OpType::FuncDefn),
-    /// [CFG](OpType::CFG), [DFG](OpType::DFG), [Conditional](OpType::Conditional)
-    /// or [`TailLoop`] only (that is: *not* [Module](OpType::Module),
+    /// As a shortcut, for Hugrs whose [HugrView::entrypoint] is a
+    /// [`FuncDefn`](OpType::FuncDefn), [CFG](OpType::CFG), [DFG](OpType::DFG),
+    /// [Conditional](OpType::Conditional) or [`TailLoop`](OpType::TailLoop) only
+    /// (that is: *not* [Module](OpType::Module),
     /// [`DataflowBlock`](OpType::DataflowBlock) or [Case](OpType::Case)),
-    /// `in_values` may provide initial values for the root-node inputs,
-    ///  equivalent to calling `prepopulate_inputs` with the root node.
+    /// `in_values` may provide initial values for the entrypoint-node inputs,
+    ///  equivalent to calling `prepopulate_inputs` with the entrypoint node.
     ///
     /// The context passed in allows interpretation of leaf operations.
     ///
@@ -107,13 +108,13 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         context: impl DFContext<V, Node = H::Node>,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> AnalysisResults<V, H> {
-        let root = self.0.entrypoint();
-        if self.0.get_optype(root).is_module() {
+        if self.0.entrypoint_optype().is_module() {
             assert!(
                 in_values.into_iter().next().is_none(),
                 "No inputs possible for Module"
             );
         } else {
+            let ep = self.0.entrypoint();
             let mut p = in_values.into_iter().peekable();
             // We must provide some inputs to the root so that they are Top rather than Bottom.
             // (However, this test will fail for DataflowBlock or Case roots, i.e. if no
@@ -121,8 +122,8 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
             // values for even these nodes in self.1 and then convert to actual Wire values
             // (outputs from the Input node) before we run_datalog, but we would need to have
             // a separate store of output-wire values in self to keep prepopulate_wire working.)
-            if p.peek().is_some() || !self.1.contains_key(&root) {
-                self.prepopulate_inputs(root, p).unwrap();
+            if p.peek().is_some() || !self.1.contains_key(&ep) {
+                self.prepopulate_inputs(ep, p).unwrap();
             }
         }
         run_datalog(
