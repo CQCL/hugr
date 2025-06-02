@@ -691,16 +691,17 @@ fn insert_hugr_internal<H: HugrView>(
         let InsertDefnMode::Replace(replace_with) = m else {
             continue;
         };
-        let copy = node_map.insert(ch, replace_with).unwrap();
-        let outport = hugr.get_optype(replace_with).static_output_port();
+        let copy = node_map.remove(&ch).unwrap();
 
-        let static_targets = hugr.static_targets(copy).map_or(vec![], Vec::from_iter);
-        for (target, inport) in static_targets {
+        // Node types in `hugr` are not reliable here (and it is not easy to tell
+        // which edges from `other` have been copied).
+        let targets = hugr.all_linked_inputs(copy).collect::<Vec<_>>();
+        for (target, inport) in targets {
+            let (src_node, outport) = hugr.single_linked_output(target, inport).unwrap();
+            debug_assert_eq!(src_node, copy);
             hugr.disconnect(target, inport);
-            hugr.connect(replace_with, outport.unwrap(), target, inport);
+            hugr.connect(replace_with, outport, target, inport);
         }
-        // There should not have been any outputs other than static edges
-        debug_assert!(hugr.all_linked_inputs(copy).next().is_none());
         hugr.remove_node(copy);
     }
     Ok(node_map)
@@ -967,6 +968,56 @@ mod test {
         });
         assert_eq!(tgt2.is_some(), call2_ok);
         assert_eq!(h.static_source(call2), tgt2);
+    }
+
+    #[test]
+    fn insert_with_defns_replace() {
+        let (insert, defn, decl) = inserted_defn_decl();
+        let mut chmap = HashMap::from([defn.node(), decl.node()].map(|n| (n, InsertDefnMode::Add)));
+        let (h, res) = {
+            let mut h = simple_dfg_hugr();
+            let res = h
+                .insert_from_view_with_defns(h.entrypoint(), &insert, chmap.clone())
+                .unwrap();
+            (h, res)
+        };
+        h.validate().unwrap();
+        let num_nodes = h.num_nodes();
+        let num_ep_nodes = h.descendants(res.inserted_entrypoint).count();
+        let [inserted_defn, inserted_decl] =
+            [defn.node(), decl.node()].map(|n| *res.node_map.get(&n).unwrap());
+
+        // No reason we can't add the decl again, or replace the defn with the decl,
+        // but here we'll limit to the "interesting" (likely) cases
+        for decl_replacement in [inserted_defn, inserted_decl] {
+            let decl_mode = InsertDefnMode::Replace(decl_replacement);
+            chmap.insert(decl.node(), decl_mode);
+            for defn_mode in [InsertDefnMode::Add, InsertDefnMode::Replace(inserted_defn)] {
+                chmap.insert(defn.node(), defn_mode);
+                let mut h = h.clone();
+                h.insert_hugr_with_defns(h.entrypoint(), insert.clone(), chmap.clone())
+                    .unwrap();
+                h.validate().unwrap();
+                if defn_mode != InsertDefnMode::Add {
+                    assert_eq!(h.num_nodes(), num_nodes + num_ep_nodes);
+                }
+                assert_eq!(
+                    h.children(h.module_root()).count(),
+                    3 + (defn_mode == InsertDefnMode::Add) as usize
+                );
+                let expected_defn_uses = 1
+                    + (defn_mode == InsertDefnMode::Replace(inserted_defn)) as usize
+                    + (decl_replacement == inserted_defn) as usize;
+                assert_eq!(
+                    h.static_targets(inserted_defn).unwrap().count(),
+                    expected_defn_uses
+                );
+                assert_eq!(
+                    h.static_targets(inserted_decl).unwrap().count(),
+                    1 + (decl_replacement == inserted_decl) as usize
+                );
+            }
+        }
     }
 
     #[test]
