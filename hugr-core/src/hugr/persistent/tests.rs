@@ -144,6 +144,68 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
     SimpleReplacement::try_new(subgraph, hugr, replacement_hugr).unwrap()
 }
 
+/// Creates a state space with 4 commits on top of the base hugr `simple_hugr`:
+///
+/// ```
+///    ┌─────────┐
+/// ───┤ (0) NOT ├─┐    ┌─────────┐
+///    └─────────┘ └────┤         │
+///    ┌─────────┐      │ (2) AND ├───
+/// ───┤ (1) NOT ├──────┤         │
+///    └─────────┘      └─────────┘
+/// ```
+///
+/// Note that for the sake of these tests, we do not care about the semantics of
+/// the rewrites. Unlike real-world use cases, the LHS and RHS here are not
+/// functionally equivalent.
+/// The state space will contain the following commits:
+///
+/// ```
+/// [commit1]
+///    ┌─────────┐                ┌─────────┐     ┌─────────┐
+/// ───┤ (0) NOT ├───    -->   ───┤ (3) NOT ├─────┤ (4) NOT ├──────
+///    └─────────┘                └─────────┘     └─────────┘
+///
+/// [commit2]
+///    ┌─────────┐
+/// ───┤ (4) NOT ├─┐    ┌─────────┐                  ┌─────────┐
+///    └─────────┘ └────┤         │             ─────┤         │
+///                     │ (2) AND ├───    -->        │ (5) XOR ├───
+/// ────────────────────┤         │             ─────┤         │
+///                     └─────────┘                  └─────────┘
+///
+/// [commit3]
+///    ┌─────────┐
+/// ───┤ (0) NOT ├─┐    ┌─────────┐                  ┌─────────┐
+///    └─────────┘ └────┤         │             ─────┤         │
+///                     │ (2) AND ├───    -->        │ (6) XOR ├───
+/// ────────────────────┤         │             ─────┤         │
+///                     └─────────┘                  └─────────┘
+///
+/// [commit4]
+///    ┌─────────┐                ┌─────────┐     ┌─────────┐
+/// ───┤ (1) NOT ├───    -->   ───┤ (7) NOT ├─────┤ (8) NOT ├──────
+///    └─────────┘                └─────────┘     └─────────┘
+/// ```
+///
+/// Viewed as a history of commits, the commits' hierarchy is as follows
+///
+/// ```
+///                                 base
+///                               /   |   \
+///                              /    |    \
+///                             /     |     \
+///                            /      |      \
+///                        commit1 commit3 commit4
+///                           |
+///                           |
+///                           |
+///                        commit2
+/// ```
+/// where
+/// - `commit1` and `commit2` are incompatible with `commit3`
+/// - `commit1` and `commit2` are disjoint with `commit4` (i.e. compatible),
+/// - `commit2` depends on `commit1`
 #[fixture]
 pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
     let (base_hugr, [not0_node, not1_node, _and_node]) = simple_hugr();

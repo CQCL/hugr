@@ -65,6 +65,9 @@ mod parents_view;
 mod resolver;
 mod state_space;
 mod trait_impls;
+pub mod walker;
+
+pub use walker::{PinnedWire, Walker};
 
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
@@ -75,8 +78,8 @@ use delegate::delegate;
 use derive_more::derive::From;
 use itertools::{Either, Itertools};
 use relrc::RelRc;
-use state_space::{CommitData, CommitId};
-pub use state_space::{CommitStateSpace, InvalidCommit, PatchNode};
+use state_space::CommitData;
+pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
 
 pub use resolver::PointerEqResolver;
 
@@ -279,6 +282,14 @@ impl PersistentHugr {
         Self { state_space }
     }
 
+    /// Create a [`PersistentHugr`] from a single commit and its ancestors.
+    // This always defines a valid `PersistentHugr` as the ancestors of a commit
+    // are guaranteed to be compatible with each other.
+    pub fn from_commit(commit: Commit) -> Self {
+        let state_space = CommitStateSpace::try_from_commits([commit]).expect("commit is valid");
+        Self { state_space }
+    }
+
     /// Create a [`PersistentHugr`] from a list of commits.
     ///
     /// `Self` will correspond to the HUGR obtained by applying the patches of
@@ -473,12 +484,6 @@ impl PersistentHugr {
         loop {
             let commit_id = out_node.0;
 
-            let is_input = || {
-                let Some(repl) = self.replacement(commit_id) else {
-                    return false;
-                };
-                repl.get_replacement_io()[0] == out_node.1
-            };
             if let Some(deleted_by) = self.find_deleting_commit(out_node) {
                 (out_node, out_port) = self
                     .state_space
@@ -494,7 +499,10 @@ impl PersistentHugr {
                         })
                         .expect("out_node is connected to output node (which is never deleted)")
                 };
-            } else if is_input() {
+            } else if self
+                .replacement(commit_id)
+                .is_some_and(|repl| repl.get_replacement_io()[0] == out_node.1)
+            {
                 // out_node is an input node
                 (out_node, out_port) = self
                     .as_state_space()
@@ -560,24 +568,24 @@ impl PersistentHugr {
             // incoming ports are of interest to us if
             //  (i) they are connected to the output of a replacement (then there will be a
             //      linked port in a parent commit), or
-            //  (ii) they are deleted by a child commit and is not the same as the out_node
+            //  (ii) they are deleted by a child commit and are not equal to the out_node
             //      (then there will be a linked port in a child commit)
-            let (is_linked_to_output, deleted_by_child): (IteratorNonEmpty, BTreeSet<_>) = hugr
+            let is_linked_to_output = curr_repl_out.is_some_and(|curr_repl_out| {
+                hugr.linked_inputs(out_node.1, out_port)
+                    .any(|(in_node, _)| in_node == curr_repl_out)
+            });
+
+            let deleted_by_child: BTreeSet<_> = hugr
                 .linked_inputs(out_node.1, out_port)
+                .filter(|(in_node, _)| Some(in_node) != curr_repl_out.as_ref())
                 .filter_map(|(in_node, _)| {
-                    if Some(in_node) == curr_repl_out {
-                        // Flag that we have found a link to output
-                        Some(Either::Left(()))
-                    } else {
-                        let other_deleted_by =
-                            self.find_deleting_commit(PatchNode(commit_id, in_node))?;
-                        // (out_node, out_port) -> (in_node, in_port) is a boundary edge
-                        // into the child commit `other_deleted_by`
-                        (Some(other_deleted_by) != out_deleted_by)
-                            .then_some(Either::Right(other_deleted_by))
-                    }
+                    self.find_deleting_commit(PatchNode(commit_id, in_node))
+                        .filter(|other_deleted_by|
+                                // (out_node, out_port) -> (in_node, in_port) is a boundary edge
+                                // into the child commit `other_deleted_by`
+                                (Some(other_deleted_by) != out_deleted_by.as_ref()))
                 })
-                .partition_map(|x| x);
+                .collect();
 
             // Convert an incoming port to the unique outgoing port that it is linked to
             let to_outgoing_port = |(PatchNode(commit_id, in_node), in_port)| {
@@ -588,7 +596,7 @@ impl PersistentHugr {
                 (PatchNode(commit_id, out_node), out_port)
             };
 
-            if is_linked_to_output.0 {
+            if is_linked_to_output {
                 // Traverse boundary to parent(s)
                 let new_ins = self
                     .as_state_space()
@@ -752,34 +760,5 @@ fn find_conflicting_node<'a>(
     })
 }
 
-/// A wrapper around a boolean that implements `Extend<V>`. The boolean
-/// is true if a non-empty iterator was appended to `self`.
-#[derive(Debug, Copy, Clone, Default)]
-struct IteratorNonEmpty(bool);
-
-impl<V> Extend<V> for IteratorNonEmpty {
-    fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
-        self.0 |= iter.into_iter().next().is_some();
-    }
-}
-
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod test_iterator_non_empty {
-    use super::IteratorNonEmpty;
-
-    use rstest::rstest;
-
-    #[rstest]
-    #[case(vec![])]
-    #[case(vec![1])]
-    #[case(vec![1, 2, 3])]
-    fn test_extend(#[case] input: Vec<i32>) {
-        let expected = !input.is_empty();
-        let mut res = IteratorNonEmpty::default();
-        res.extend(input);
-        assert_eq!(res.0, expected);
-    }
-}
