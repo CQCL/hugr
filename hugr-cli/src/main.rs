@@ -27,11 +27,11 @@ fn main() {
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    eprintln!("error: no such subcommand: '{}'.\nCould not find '{}' in PATH.", subcmd, exe);
+                    eprintln!("error: no such subcommand: '{subcmd}'.\nCould not find '{exe}' in PATH.");
                     std::process::exit(1);
                 }
                 Err(e) => {
-                    eprintln!("error: failed to invoke '{}': {}", exe, e);
+                    eprintln!("error: failed to invoke '{exe}': {e}");
                     std::process::exit(1);
                 }
             }

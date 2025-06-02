@@ -18,6 +18,7 @@ fn test_missing_external_command() {
 }
 
 #[test]
+#[cfg_attr(not(unix), ignore = "Dummy program supported on Unix-like systems")]
 fn test_external_command_invocation() {
     // Create a dummy external command in a temp dir
     let tempdir = TempDir::new().unwrap();
