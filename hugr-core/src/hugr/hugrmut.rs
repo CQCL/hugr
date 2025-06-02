@@ -229,7 +229,7 @@ pub trait HugrMut: HugrMutInternals {
         &mut self,
         parent: Self::Node,
         other: Hugr,
-        children: HashMap<Node, InsertDefnMode>,
+        children: HashMap<Node, InsertDefnMode<Self::Node>>,
     ) -> Result<InsertionResult<Node, Self::Node>, InsertDefnError<Node>>;
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
@@ -270,7 +270,7 @@ pub trait HugrMut: HugrMutInternals {
         &mut self,
         parent: Self::Node,
         other: &H,
-        children: HashMap<H::Node, InsertDefnMode>,
+        children: HashMap<H::Node, InsertDefnMode<Self::Node>>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, InsertDefnError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
@@ -606,10 +606,14 @@ impl HugrMut for Hugr {
 /// as to how to insert a child of the module root from the inserted Hugr.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum InsertDefnMode {
+pub enum InsertDefnMode<N = Node> {
     /// Add the module child to the Module root of the target Hugr,
     /// with its subtree of the hierarchy
     Add,
+    /// Do not copy the module child into the target Hugr, but do
+    /// copy all edges from it, changing their source to the specified
+    /// node already existing in the target
+    Replace(N),
 }
 
 /// An error from an [InsertDefnMode] passed to [HugrMut::insert_hugr_with_defns]
@@ -971,7 +975,7 @@ mod test {
             &insert,
             HashMap::from([(
                 defn,
-                InsertDefnMode::Add
+                InsertDefnMode::Replace(h.get_parent(h.entrypoint()).unwrap()),
             )]),
         );
         assert_eq!(
