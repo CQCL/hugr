@@ -19,7 +19,10 @@ fn main() {
             }
             let subcmd = args[0].to_string_lossy();
             let exe = format!("hugr-{}", subcmd);
-            let rest: Vec<_> = args[1..].iter().map(|s| s.to_string_lossy().to_string()).collect();
+            let rest: Vec<_> = args[1..]
+                .iter()
+                .map(|s| s.to_string_lossy().to_string())
+                .collect();
             match std::process::Command::new(&exe).args(&rest).status() {
                 Ok(status) => {
                     if !status.success() {
@@ -27,7 +30,9 @@ fn main() {
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    eprintln!("error: no such subcommand: '{subcmd}'.\nCould not find '{exe}' in PATH.");
+                    eprintln!(
+                        "error: no such subcommand: '{subcmd}'.\nCould not find '{exe}' in PATH."
+                    );
                     std::process::exit(1);
                 }
                 Err(e) => {
