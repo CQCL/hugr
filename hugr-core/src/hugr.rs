@@ -307,10 +307,12 @@ impl Hugr {
     /// preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
         // Generate the ordered list of nodes
-        let mut ordered = Vec::with_capacity(self.num_nodes());
-        let root = self.module_root();
+        let ordered = {
+            let mut v = Vec::with_capacity(self.num_nodes());
+            v.extend(self.canonical_order(self.module_root()));
+            v
+        };
         let mut new_entrypoint = self.entrypoint;
-        ordered.extend(self.canonical_order(root));
 
         // Permute the nodes in the graph to match the order.
         //
