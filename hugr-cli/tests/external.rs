@@ -5,6 +5,7 @@ use assert_cmd::Command;
 use predicates::str::contains;
 use std::env;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use tempfile::TempDir;
 
@@ -24,7 +25,8 @@ fn test_external_command_invocation() {
     let tempdir = TempDir::new().unwrap();
     let bin_path = tempdir.path().join("hugr-dummy");
     fs::write(&bin_path, b"#!/bin/sh\necho dummy called: $@\nexit 42\n").unwrap();
-    let mut perms = fs::metadata(&bin_path).unwrap().permissions();
+    let perms = fs::metadata(&bin_path).unwrap().permissions();
+    #[cfg(unix)]
     perms.set_mode(0o755);
     fs::set_permissions(&bin_path, perms).unwrap();
 

@@ -69,7 +69,10 @@ fn test_doesnt_exist(mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("No such file or directory"));
+        // clap now prints something like:
+        //   error: Invalid value for [INPUT]: Could not open "foobar": (os error 2)
+        // so just look for "Could not open"
+        .stderr(contains("Could not open"));
 }
 
 #[rstest]
