@@ -1,12 +1,12 @@
 use crate::extension::prelude::MakeTuple;
-use crate::hugr::hugrmut::InsertionResult;
+use crate::hugr::hugrmut::{InsertDefnMode, InsertionResult};
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
 use crate::utils::collect_array;
 use crate::{Extension, IncomingPort, Node, OutgoingPort};
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::iter;
 use std::sync::Arc;
 
@@ -228,7 +228,7 @@ pub trait Dataflow: Container {
         &mut self,
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
-        defns: HashSet<Node>,
+        defns: HashMap<Node, InsertDefnMode>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let parent = self.container_node();
         let node = self
@@ -263,7 +263,7 @@ pub trait Dataflow: Container {
         &mut self,
         hugr: &H,
         input_wires: impl IntoIterator<Item = Wire>,
-        defns: HashSet<H::Node>,
+        defns: HashMap<H::Node, InsertDefnMode>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let parent = self.container_node();
         let node = self
