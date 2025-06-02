@@ -32,7 +32,7 @@ use crate::extension::resolution::{
     ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
     resolve_op_types_extensions,
 };
-use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::extension::{EMPTY_REG, ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::package::Package;
@@ -150,7 +150,13 @@ impl Hugr {
         self.graph.reserve(nodes, ports);
     }
 
-    /// Read a Package from a HUGR envelope.
+    /// Read a HUGR from an Envelope.
+    ///
+    /// To load a HUGR, all the extensions used in its definition must be
+    /// available. The Envelope may include some of the extensions, but any
+    /// additional extensions must be provided in the `extensions` parameter. If
+    /// `extensions` is `None`, the default [`crate::std_extensions::STD_REG`]
+    /// is used.
     pub fn load(
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
@@ -162,10 +168,16 @@ impl Hugr {
         }
     }
 
-    /// Read a Package from a HUGR envelope encoded in a string.
+    /// Read a HUGR from an Envelope encoded in a string.
     ///
-    /// Note that not all envelopes are valid strings. In the general case,
-    /// it is recommended to use `Package::load` with a bytearray instead.
+    /// Note that not all Envelopes are valid strings. In the general case,
+    /// it is recommended to use [`Hugr::load`] with a bytearray instead.
+    ///
+    /// To load a HUGR, all the extensions used in its definition must be
+    /// available. The Envelope may include some of the extensions, but any
+    /// additional extensions must be provided in the `extensions` parameter. If
+    /// `extensions` is `None`, the default [`crate::std_extensions::STD_REG`]
+    /// is used.
     pub fn load_str(
         envelope: impl AsRef<str>,
         extensions: Option<&ExtensionRegistry>,
@@ -173,21 +185,62 @@ impl Hugr {
         Self::load(envelope.as_ref().as_bytes(), extensions)
     }
 
-    /// Store the Package in a HUGR envelope.
+    /// Store the HUGR in an Envelope.
+    ///
+    /// The Envelope will not include any extension definition, and will require
+    /// an adequate [`ExtensionRegistry`] to be loaded (see [`Hugr::load`]).
+    /// Use [`Hugr::store_with_exts`] to include additional extensions in the
+    /// Envelope.
     pub fn store(
         &self,
         writer: impl io::Write,
         config: EnvelopeConfig,
     ) -> Result<(), EnvelopeError> {
-        envelope::write_envelope_impl(writer, [self], &self.extensions, config)
+        self.store_with_exts(writer, config, &EMPTY_REG)
     }
 
-    /// Store the Package in a HUGR envelope encoded in a string.
+    /// Store the HUGR an Envelope.
     ///
-    /// Note that not all envelopes are valid strings. In the general case,
-    /// it is recommended to use `Package::store` with a bytearray instead.
+    /// The Envelope will embed the definitions of the extensions in the
+    /// `extensions` registry. Any other extension used in the HUGR definition
+    /// must be passed to [`Hugr::load`] to load back the HUGR.
+    pub fn store_with_exts(
+        &self,
+        writer: impl io::Write,
+        config: EnvelopeConfig,
+        extensions: &ExtensionRegistry,
+    ) -> Result<(), EnvelopeError> {
+        envelope::write_envelope_impl(writer, [self], extensions, config)
+    }
+
+    /// Store the HUGR in an Envelope encoded in a string.
+    ///
+    /// Note that not all Envelopes are valid strings. In the general case,
+    /// it is recommended to use [`Hugr::store`] with a bytearray instead.
     /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
+    ///
+    /// The Envelope will not include any extension definition, and will require
+    /// an adequate [`ExtensionRegistry`] to be loaded (see [`Hugr::load_str`]).
+    /// Use [`Hugr::store_str_with_exts`] to include additional extensions in the
+    /// Envelope.
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
+        self.store_str_with_exts(config, &EMPTY_REG)
+    }
+
+    /// Store the HUGR in an Envelope encoded in a string.
+    ///
+    /// Note that not all Envelopes are valid strings. In the general case,
+    /// it is recommended to use [`Hugr::store_str`] with a bytearray instead.
+    /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
+    ///
+    /// The Envelope will embed the definitions of the extensions in the
+    /// `extensions` registry. Any other extension used in the HUGR definition
+    /// must be passed to [`Hugr::load_str`] to load back the HUGR.
+    pub fn store_str_with_exts(
+        &self,
+        config: EnvelopeConfig,
+        extensions: &ExtensionRegistry,
+    ) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {
                 format: config.format,
@@ -195,7 +248,7 @@ impl Hugr {
         }
 
         let mut buf = Vec::new();
-        self.store(&mut buf, config)?;
+        self.store_with_exts(&mut buf, config, extensions)?;
         Ok(String::from_utf8(buf).expect("Envelope is valid utf8"))
     }
 
