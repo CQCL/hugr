@@ -1,32 +1,51 @@
 //! Term views for the `core` extension.
-//!
-//! # Examples
-//!
-//! ```
-//! # use hugr_core::terms::{Term, TermKind};
-//! # use hugr_core::terms::core::Fn;
-//! let term = Term::from(Fn {
-//!     inputs: Term::default(),
-//!     outputs: Term::default(),
-//! });
-//!
-//! assert_eq!(term.to_string(), "(core.fn _ _)");
-//! ```
-//!
-//! ```
-//! # use hugr_model::v0::SymbolName;
-//! # use hugr_core::terms::{Term, TermKind};
-//! # use hugr_core::terms::core::Fn;
-//! let view: Fn = Term::new(TermKind::Apply(&Fn::CTR_NAME, &[]))
-//!     .view()
-//!     .unwrap();
-//!
-//! assert_eq!(view.inputs, Term::default());
-//! assert_eq!(view.outputs, Term::default());
-//! ```
 
-use super::Term;
-use crate::term_view_ctr;
+use hugr_model::v0::SymbolName;
+use once_cell::sync::Lazy;
+use servo_arc::ThinArc;
+
+use super::{Term, View, ViewError};
+use crate::{
+    term_view_ctr,
+    terms::{TermData, TermHeader},
+};
+
+/// `core.static`: The type of static types.
+///
+/// The type of `core.static` is `core.static` itself:
+/// ```
+/// # use hugr_core::terms::core::Static;
+/// # use hugr_core::terms::Term;
+/// assert_eq!(Term::from(Static).type_(), Term::from(Static));
+/// ```
+pub struct Static;
+
+impl Static {
+    /// The name of the type constructor.
+    pub const CTR_NAME: SymbolName = SymbolName::new_static("core.static");
+}
+
+impl From<Static> for Term {
+    fn from(_: Static) -> Self {
+        static STATIC: Lazy<Term> = Lazy::new(|| {
+            Term(ThinArc::from_header_and_iter_alloc(
+                |layout| unsafe { std::alloc::alloc(layout) },
+                TermHeader::new(TermData::Apply(Static::CTR_NAME), None, &[]),
+                std::iter::empty(),
+                0,
+                true,
+            ))
+        });
+        STATIC.clone()
+    }
+}
+
+impl View for Static {
+    fn view(term: &Term) -> Result<Self, ViewError> {
+        let [] = term.view_apply(&Self::CTR_NAME)?;
+        Ok(Self)
+    }
+}
 
 term_view_ctr! {
     "core.fn";
@@ -46,12 +65,6 @@ term_view_ctr! {
         /// The runtime type of the constant.
         pub r#type: Term,
     }
-}
-
-term_view_ctr! {
-    "core.static";
-    /// `core.static`: The type of static types.
-    pub struct Static;
 }
 
 term_view_ctr! {

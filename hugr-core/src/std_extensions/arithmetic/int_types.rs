@@ -200,7 +200,10 @@ impl From<ConstInt> for Term {
         let symbol = SymbolName::new_static(ConstInt::CTR_NAME);
         let log_width = Term::from(value.log_width() as u64);
         let value = Term::from(value.value);
-        Term::new(TermKind::Apply(&symbol, &[log_width, value]))
+        Term::new(
+            TermKind::Apply(&symbol, &[log_width, value]),
+            Term::default(),
+        )
     }
 }
 

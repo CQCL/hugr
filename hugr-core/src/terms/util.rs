@@ -39,10 +39,13 @@ impl From<LoopRegionSignature> for Term {
             items: [value.just_inputs.clone(), value.just_outputs.clone()],
         });
         let adt = Term::from(core::Adt { variants });
-        let inputs = Term::new(TermKind::ListConcat(
-            &Term::default(),
-            &[value.just_inputs.clone(), value.rest.clone()],
-        ));
+        let inputs = Term::new(
+            TermKind::ListConcat(
+                &Term::default(),
+                &[value.just_inputs.clone(), value.rest.clone()],
+            ),
+            Term::default(),
+        );
         let outputs = Term::from(ListPrefix {
             item_type: Term::default(),
             prefix: [adt],
@@ -69,10 +72,10 @@ impl<const N: usize> From<ListPrefix<N>> for Term {
             item_type: value.item_type.clone(),
             items: value.prefix,
         });
-        Term::new(TermKind::ListConcat(
-            &value.item_type,
-            &[prefix, value.rest],
-        ))
+        Term::new(
+            TermKind::ListConcat(&value.item_type, &[prefix, value.rest]),
+            Term::default(),
+        )
     }
 }
 
@@ -114,7 +117,10 @@ pub struct ListExact<const N: usize> {
 
 impl<const N: usize> From<ListExact<N>> for Term {
     fn from(value: ListExact<N>) -> Self {
-        Term::new(TermKind::List(&value.item_type, &value.items))
+        Term::new(
+            TermKind::List(&value.item_type, &value.items),
+            Term::default(),
+        )
     }
 }
 
@@ -258,7 +264,7 @@ pub fn list_from_parts(iter: impl IntoIterator<Item = ListPart>, item_type: Term
 pub fn list_from_items(iter: impl IntoIterator<Item = Term>, item_type: Term) -> Term {
     // TODO: Without any allocation?
     let items: Vec<_> = iter.into_iter().collect();
-    Term::new(TermKind::List(&item_type, &items))
+    Term::new(TermKind::List(&item_type, &items), Term::default())
 }
 
 /// An adt with only unit variants.

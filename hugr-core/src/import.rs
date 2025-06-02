@@ -1641,7 +1641,7 @@ impl<'a> Context<'a> {
                     .iter()
                     .map(|arg| self.import_term(*arg))
                     .collect::<Result<_, _>>()?;
-                Term::new(TermKind::Apply(&symbol, &args))
+                Term::new(TermKind::Apply(&symbol, &args), Term::default())
             }
             table::Term::List(parts) => {
                 // TODO: Do this without an additional allocation, ideally.

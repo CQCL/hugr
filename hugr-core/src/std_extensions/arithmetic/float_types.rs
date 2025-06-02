@@ -115,7 +115,7 @@ impl From<ConstF64> for Term {
     fn from(value: ConstF64) -> Self {
         let value = value.value.into();
         let symbol = SymbolName::new_static(ConstF64::CTR_NAME);
-        Term::new(TermKind::Apply(&symbol, &[value]))
+        Term::new(TermKind::Apply(&symbol, &[value]), Term::default())
     }
 }
 

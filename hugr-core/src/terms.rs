@@ -110,14 +110,18 @@ struct TermHeader {
 
     /// The constant-sized part without derived data.
     data: TermData,
+
+    /// The type of this term.
+    type_: Option<Term>,
 }
 
 impl TermHeader {
     /// Creates a new term header by computing the derived information.
-    pub fn new(data: TermData, terms: &[Term]) -> Self {
+    pub fn new(data: TermData, type_: Option<Term>, terms: &[Term]) -> Self {
         let hash = {
             let mut hasher = FxHasher::default();
             data.hash(&mut hasher);
+            type_.hash(&mut hasher);
             terms.hash(&mut hasher);
             hasher.finish()
         };
@@ -138,6 +142,7 @@ impl TermHeader {
         Self {
             data,
             hash,
+            type_,
             has_vars,
         }
     }
@@ -145,10 +150,10 @@ impl TermHeader {
 
 impl Term {
     /// Create a new [`Term`].
-    pub fn new(term: TermKind) -> Self {
+    pub fn new(term: TermKind, type_: Term) -> Self {
         let (data, terms) = TermData::split(term);
         Self(ThinArc::from_header_and_iter(
-            TermHeader::new(data, terms),
+            TermHeader::new(data, Some(type_), terms),
             terms.iter().cloned(),
         ))
     }
@@ -157,11 +162,11 @@ impl Term {
     ///
     /// Terms created with this method will never be deallocated. This is useful
     /// for [`Term`]s that are known at Rust compile time.
-    pub fn new_static(term: TermKind) -> Self {
+    pub fn new_static(term: TermKind, type_: Term) -> Self {
         let (data, terms) = TermData::split(term);
         Self(ThinArc::from_header_and_iter_alloc(
             |layout| unsafe { std::alloc::alloc(layout) },
-            TermHeader::new(data, terms),
+            TermHeader::new(data, Some(type_), terms),
             terms.iter().cloned(),
             terms.len(),
             true,
@@ -212,7 +217,10 @@ impl Term {
     ///
     /// let arg0 = Term::from(0u64);
     /// let arg1 = Term::from(1u64);
-    /// let term = Term::new(TermKind::Apply(&this, &[arg0.clone(), arg1.clone()]));
+    /// let term = Term::new(
+    ///     TermKind::Apply(&this, &[arg0.clone(), arg1.clone()]),
+    ///     Term::default()
+    /// );
     ///
     /// assert_eq!(term.view_apply(&this), Ok([arg0.clone(), arg1.clone()]));
     /// assert_eq!(term.view_apply::<2>(&that), Err(ViewError::Mismatch));
@@ -227,7 +235,7 @@ impl Term {
     /// # use hugr_model::v0::SymbolName;
     /// let symbol = SymbolName::new_static("symbol");
     /// let arg = Term::from(42u64);
-    /// let too_few = Term::new(TermKind::Apply(&symbol, &[arg.clone()]));
+    /// let too_few = Term::new(TermKind::Apply(&symbol, &[arg.clone()]), Term::default());
     /// assert_eq!(too_few.view_apply(&symbol), Ok([Term::default(), arg]));
     /// ```
     ///
@@ -237,7 +245,7 @@ impl Term {
     /// # use hugr_model::v0::SymbolName;
     /// let symbol = SymbolName::new_static("symbol");
     /// let args = [Term::from(0u64), Term::from(1u64), Term::from(2u64)];
-    /// let too_many = Term::new(TermKind::Apply(&symbol, &args));
+    /// let too_many = Term::new(TermKind::Apply(&symbol, &args), Term::default());
     /// assert_eq!(too_many.view_apply::<2>(&symbol), Err(ViewError::Mismatch));
     /// ```
     pub fn view_apply<const N: usize>(&self, symbol: &SymbolName) -> Result<[Term; N], ViewError> {
@@ -275,35 +283,61 @@ impl Term {
     pub fn has_vars(&self) -> bool {
         self.0.header.has_vars
     }
+
+    /// Returns the type of the term.
+    pub fn type_(&self) -> Term {
+        match &self.0.header.type_ {
+            Some(type_) => type_.clone(),
+            None if self == &Term::from(core::Static) => Term::from(core::Static),
+            None => Term::default(),
+        }
+    }
 }
 
 impl From<Literal> for Term {
     fn from(value: Literal) -> Self {
-        Term::new(TermKind::Literal(&value))
+        match value {
+            Literal::Str(value) => value.into(),
+            Literal::Nat(value) => value.into(),
+            Literal::Bytes(value) => value.into(),
+            Literal::Float(value) => value.into(),
+        }
     }
 }
 
 impl From<u64> for Term {
     fn from(value: u64) -> Self {
-        Literal::Nat(value).into()
+        Term::new(TermKind::Literal(&Literal::Nat(value)), core::Nat.into())
     }
 }
 
 impl From<f64> for Term {
     fn from(value: f64) -> Self {
-        Literal::Float(OrderedFloat(value)).into()
+        OrderedFloat(value).into()
     }
 }
 
 impl From<OrderedFloat<f64>> for Term {
     fn from(value: OrderedFloat<f64>) -> Self {
-        Literal::Float(value).into()
+        Term::new(
+            TermKind::Literal(&Literal::Float(value)),
+            core::Float.into(),
+        )
     }
 }
 
 impl From<SmolStr> for Term {
     fn from(value: SmolStr) -> Self {
-        Literal::Str(value).into()
+        Term::new(TermKind::Literal(&Literal::Str(value)), core::Str.into())
+    }
+}
+
+impl From<std::sync::Arc<[u8]>> for Term {
+    fn from(value: std::sync::Arc<[u8]>) -> Self {
+        Term::new(
+            TermKind::Literal(&Literal::Bytes(value)),
+            core::Bytes.into(),
+        )
     }
 }
 
@@ -352,10 +386,19 @@ impl From<&Term> for ast::Term {
 /// ```
 /// # use hugr_core::terms::{Term, TermKind};
 /// assert_eq!(Term::default().get(), TermKind::Wildcard);
+/// assert_eq!(Term::default().type_(), Term::default());
 /// ```
 impl Default for Term {
     fn default() -> Self {
-        static WILDCARD: Lazy<Term> = Lazy::new(|| Term::new_static(TermKind::Wildcard));
+        static WILDCARD: Lazy<Term> = Lazy::new(|| {
+            Term(ThinArc::from_header_and_iter_alloc(
+                |layout| unsafe { std::alloc::alloc(layout) },
+                TermHeader::new(TermData::Wildcard, None, &[]),
+                std::iter::empty(),
+                0,
+                true,
+            ))
+        });
         WILDCARD.clone()
     }
 }
@@ -401,7 +444,7 @@ impl Var {
 
 impl From<Var> for Term {
     fn from(value: Var) -> Self {
-        Term::new(TermKind::Var(&value))
+        Term::new(TermKind::Var(&value), Term::default())
     }
 }
 
@@ -519,7 +562,8 @@ macro_rules! term_view_ctr {
                     $crate::terms::TermKind::Apply(
                         &$ident::CTR_NAME,
                         &[$(value.$field_name.into()),*],
-                    )
+                    ),
+                    $crate::terms::Term::default(),
                 )
             }
         }
@@ -551,7 +595,8 @@ macro_rules! term_view_ctr {
                 static TERM: ::once_cell::sync::Lazy<$crate::terms::Term> =
                     ::once_cell::sync::Lazy::new(|| {
                         $crate::terms::Term::new(
-                            $crate::terms::TermKind::Apply(&$ident::CTR_NAME, &[])
+                            $crate::terms::TermKind::Apply(&$ident::CTR_NAME, &[]),
+                            $crate::terms::Term::default(),
                         )
                     });
                 TERM.clone()
@@ -582,16 +627,18 @@ impl Term {
                 Transform::Skip => return Ok(term.clone()),
             }
 
+            let type_ = run(&term.type_(), f)?;
+
             Ok(match term.get() {
                 TermKind::Wildcard => term.clone(),
                 TermKind::Literal(_) => term.clone(),
-                TermKind::Var(_) => term.clone(),
+                TermKind::Var(var) => Term::new(TermKind::Var(var), type_),
                 TermKind::Apply(symbol, args) => {
                     let args: Vec<_> = args
                         .iter()
                         .map(|arg| run(arg, f))
                         .collect::<Result<_, _>>()?;
-                    Term::new(TermKind::Apply(symbol, &args))
+                    Term::new(TermKind::Apply(symbol, &args), type_)
                 }
                 TermKind::List(item_type, items) => {
                     let item_type = run(item_type, f)?;
@@ -599,7 +646,7 @@ impl Term {
                         .iter()
                         .map(|item| run(item, f))
                         .collect::<Result<_, _>>()?;
-                    Term::new(TermKind::List(&item_type, &items))
+                    Term::new(TermKind::List(&item_type, &items), type_)
                 }
                 TermKind::ListConcat(item_type, lists) => {
                     let item_type = run(item_type, f)?;
@@ -607,7 +654,7 @@ impl Term {
                         .iter()
                         .map(|list| run(list, f))
                         .collect::<Result<_, _>>()?;
-                    Term::new(TermKind::ListConcat(&item_type, &lists))
+                    Term::new(TermKind::ListConcat(&item_type, &lists), type_)
                 }
                 TermKind::Tuple(item_types, items) => {
                     let item_types = run(item_types, f)?;
@@ -615,7 +662,7 @@ impl Term {
                         .iter()
                         .map(|item| run(item, f))
                         .collect::<Result<_, _>>()?;
-                    Term::new(TermKind::Tuple(&item_types, &items))
+                    Term::new(TermKind::Tuple(&item_types, &items), type_)
                 }
                 TermKind::TupleConcat(item_types, tuples) => {
                     let item_types = run(item_types, f)?;
@@ -623,7 +670,7 @@ impl Term {
                         .iter()
                         .map(|tuple| run(tuple, f))
                         .collect::<Result<_, _>>()?;
-                    Term::new(TermKind::TupleConcat(&item_types, &tuples))
+                    Term::new(TermKind::TupleConcat(&item_types, &tuples), type_)
                 }
                 TermKind::Func(term, node) => todo!(),
             })
