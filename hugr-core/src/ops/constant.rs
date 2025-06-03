@@ -198,8 +198,8 @@ impl From<Sum> for SerialSum {
 
 mod inner {
     #![allow(deprecated)] // serde-generated code refers to the deprecated Value::Function
+    use super::{AsStringEnvelope, Hugr, OpaqueValue, Sum};
     use serde_with::serde_as;
-    use super::{Hugr, OpaqueValue, Sum, AsStringEnvelope};
 
     #[serde_as]
     #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -1,7 +1,9 @@
 //! Callbacks for use with [`ReplaceTypes::replace_consts_parametrized`]
 //! and [`DelegatingLinearizer::register_callback`](super::DelegatingLinearizer::register_callback)
 
-use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig};
+use hugr_core::builder::{
+    DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, endo_sig, inout_sig,
+};
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
 use hugr_core::ops::constant::CustomConst;
 use hugr_core::ops::{OpTrait, OpType, Tag};
@@ -110,25 +112,27 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if num_outports == 0 {
-        // "Simple" discard - first map each element to unit (via type-specific discard):
-        let map_fn = {
-            let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), Type::UNIT)).unwrap();
-            let [to_discard] = dfb.input_wires_arr();
-            lin.copy_discard_op(ty, 0)?
-                .add(&mut dfb, [to_discard])
-                .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?;
-            let ret = dfb.add_load_value(Value::unary_unit_sum());
-            dfb.finish_hugr_with_outputs([ret]).unwrap()
-        };
-        // Now array.scan that over the input array to get an array of unit (which can be discarded)
-        let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
-        let in_type = AK::ty(*n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
+            let in_type = AK::ty(*n, ty.clone());
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
+            // "Simple" discard - first map each element to unit (via type-specific discard):
+            let map_fn = {
+                let mut mb = dfb.module_root_builder();
+                let mut fb = mb
+                    .define_function("discard_elem", inout_sig(ty.clone(), Type::UNIT))
+                    .unwrap();
+                let [to_discard] = fb.input_wires_arr();
+                lin.copy_discard_op(ty, 0)?
+                    .add(&mut fb, [to_discard])
+                    .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?;
+                let ret = fb.add_load_value(Value::unary_unit_sum());
+                fb.finish_with_outputs([ret]).unwrap()
+            };
+            // Now array.scan that over the input array to get an array of unit (which can be discarded)
+            let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
+
             let [in_array] = dfb.input_wires_arr();
-            let map_fn = dfb.add_load_value(Value::Function {
-                hugr: Box::new(map_fn),
-            });
+            let map_fn = dfb.load_func(map_fn.handle(), &[]).unwrap();
             // scan has one output, an array of unit, so just ignore/discard that
             let unit_arr = dfb
                 .add_dataflow_op(array_scan, [in_array, map_fn])
