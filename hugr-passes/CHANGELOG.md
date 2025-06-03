@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.0...hugr-passes-v0.20.1) - 2025-06-03
+
+### Bug Fixes
+
+- Dataflow analysis produces unsound results on Hugrs with entrypoint ([#2255](https://github.com/CQCL/hugr/pull/2255))
+
+### New Features
+
+- LocalizeEdges pass ([#2237](https://github.com/CQCL/hugr/pull/2237))
+
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.15.4...hugr-passes-v0.20.0) - 2025-05-14
 
 ### New Features
