@@ -106,6 +106,7 @@ impl From<Value> for FoldVal {
     fn from(value: Value) -> Self {
         match value {
             Value::Extension { e } => FoldVal::Extension(e),
+            #[allow(deprecated)] // remove when Value::Function removed
             Value::Function { .. } => FoldVal::Unknown,
             Value::Sum(Sum {
                 tag,

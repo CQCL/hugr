@@ -169,6 +169,8 @@ impl<N: HugrNode> AsConcrete<ValueHandle<N>, N> for Value {
             } => Value::Extension {
                 e: Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone()),
             },
+            #[allow(deprecated)]
+            // When we remove Value::Function, have to change `leaf` to be OpaqueValue only
             ValueHandle::Unhashable {
                 leaf: Either::Right(hugr),
                 ..

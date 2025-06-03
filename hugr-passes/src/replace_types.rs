@@ -516,6 +516,7 @@ impl ReplaceTypes {
                     false
                 }
             }),
+            #[allow(deprecated)] // remove when Value::Function removed
             Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
