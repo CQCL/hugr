@@ -20,6 +20,7 @@ from hugr._serialization.tys import (
     Variable,
 )
 from hugr.envelope import EnvelopeConfig
+from tests.conftest import validate
 
 EXAMPLE = r"""
 {
@@ -109,6 +110,9 @@ def test_extension():
     assert Extension.model_validate_json(dumped_json) == ext
     hugr_ext = ext.deserialize()
     assert hugr_ext.from_json(hugr_ext.to_json()) == hugr_ext
+    from hugr.package import Package as HugrPackage
+
+    validate(HugrPackage([], [hugr_ext]))
 
 
 def test_package():
@@ -135,3 +139,5 @@ def test_package():
         hugr_package.from_bytes(hugr_package.to_bytes(EnvelopeConfig.TEXT))
         == hugr_package
     )
+
+    validate(package.deserialize())
