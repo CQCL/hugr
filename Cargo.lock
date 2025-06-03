@@ -1323,6 +1323,7 @@ name = "hugr-passes"
 version = "0.20.0"
 dependencies = [
  "ascent",
+ "delegate",
  "derive_more 1.0.0",
  "hugr-core",
  "itertools 0.14.0",
