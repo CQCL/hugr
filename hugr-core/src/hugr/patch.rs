@@ -6,6 +6,7 @@ pub mod inline_dfg;
 pub mod insert_cut;
 pub mod insert_identity;
 pub mod outline_cfg;
+pub mod peel_loop;
 mod port_types;
 pub mod replace;
 pub mod simple_replace;
