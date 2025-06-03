@@ -1,16 +1,14 @@
-use std::fmt::Formatter;
-
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 
 use crate::ops::Value;
-use crate::ops::constant::{OpaqueValue, Sum};
+use crate::ops::constant::{CustomConst, OpaqueValue, Sum};
 use crate::types::{SumType, TypeArg};
 use crate::{IncomingPort, Node, OutgoingPort, PortIndex};
 
 /// Representation of values used for constant folding.
 /// See [ConstFold], which is used as `dyn` so we cannot parametrize by [HugrNode]
 // Should we be non-exhaustive??
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum FoldVal {
     /// Value is unknown, must assume that it could be anything
     #[default]
@@ -29,6 +27,52 @@ pub enum FoldVal {
     Extension(OpaqueValue),
     /// A function pointer loaded from a [FuncDefn](crate::ops::FuncDefn) or `FuncDecl`
     LoadedFunction(Node, Vec<TypeArg>), // Deliberately skipping Function(Box<Hugr>) ATM
+}
+
+impl<T> From<T> for FoldVal
+where
+    T: CustomConst,
+{
+    fn from(value: T) -> Self {
+        Self::Extension(value.into())
+    }
+}
+
+impl FoldVal {
+    /// Returns a constant "false" value, i.e. the first variant of Sum((), ()).
+    pub const fn false_val() -> Self {
+        Self::Sum {
+            tag: 0,
+            sum_type: SumType::Unit { size: 2 },
+            items: vec![],
+        }
+    }
+
+    /// Returns a constant "true" value, i.e. the second variant of Sum((), ()).
+    pub const fn true_val() -> Self {
+        Self::Sum {
+            tag: 1,
+            sum_type: SumType::Unit { size: 2 },
+            items: vec![],
+        }
+    }
+
+    /// Returns a constant boolean - either [Self::false_val] or [Self::true_val]
+    pub const fn from_bool(b: bool) -> Self {
+        if b {
+            Self::true_val()
+        } else {
+            Self::false_val()
+        }
+    }
+
+    /// Extract the specified type of [CustomConst] fro this instance, if it is one
+    pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
+        let Self::Extension(e) = self else {
+            return None;
+        };
+        e.value().downcast_ref()
+    }
 }
 
 impl TryFrom<FoldVal> for Value {
@@ -108,6 +152,7 @@ pub trait ConstFold: Send + Sync {
             .enumerate()
             .filter_map(|(p, fv)| Some((p.into(), fv.try_into().ok()?)))
             .collect::<Vec<_>>();
+        #[allow(deprecated)] // remove this when fold is removed
         let outs = self.fold(type_args, &consts);
         for (p, v) in outs.unwrap_or_default() {
             outputs[p.index()] = v.into();
@@ -117,6 +162,7 @@ pub trait ConstFold: Send + Sync {
     /// Given type arguments `type_args` and
     /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s,
     /// try to evaluate the operation.
+    #[deprecated(note = "Use fold2")]
     fn fold(
         &self,
         type_args: &[TypeArg],

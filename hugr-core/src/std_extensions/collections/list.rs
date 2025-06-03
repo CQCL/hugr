@@ -387,13 +387,12 @@ impl ListOpInst {
 mod test {
     use rstest::rstest;
 
-    use crate::PortIndex;
     use crate::extension::prelude::{
-        const_fail_tuple, const_none, const_ok_tuple, const_some_tuple,
+        ConstUsize, const_fail_tuple, const_none, const_ok_tuple, const_some_tuple, qb_t, usize_t,
     };
-    use crate::ops::OpTrait;
     use crate::{
-        extension::prelude::{ConstUsize, qb_t, usize_t},
+        extension::FoldVal,
+        ops::OpTrait,
         std_extensions::arithmetic::float_types::{ConstF64, float64_type},
         types::TypeRow,
     };
@@ -513,29 +512,23 @@ mod test {
     #[case::insert_invalid(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(52), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(Type::UNIT.into(), vec![TestVal::Elem(99)])])]
     #[case::length(ListOp::length, &[TestVal::List(vec![77,88,42])], &[TestVal::Elem(3)])]
     fn list_fold(#[case] op: ListOp, #[case] inputs: &[TestVal], #[case] outputs: &[TestVal]) {
-        let consts: Vec<_> = inputs
+        let inputs: Vec<_> = inputs
             .iter()
-            .enumerate()
-            .map(|(i, x)| (i.into(), x.to_value()))
+            .map(TestVal::to_value)
+            .map(FoldVal::from)
             .collect();
 
-        let res = op
-            .with_type(usize_t())
+        let mut actual = vec![FoldVal::Unknown; outputs.len()];
+
+        op.with_type(usize_t())
             .to_extension_op()
             .unwrap()
-            .constant_fold(&consts)
-            .unwrap();
+            .constant_fold2(&inputs, &mut actual);
 
-        for (i, expected) in outputs.iter().enumerate() {
-            let expected = expected.to_value();
-            let res_val = res
-                .iter()
-                .find(|(port, _)| port.index() == i)
-                .unwrap()
-                .1
-                .clone();
+        for (act, expected) in actual.into_iter().zip_eq(outputs) {
+            let expected = expected.to_value().into();
 
-            assert_eq!(res_val, expected);
+            assert_eq!(act, expected);
         }
     }
 }

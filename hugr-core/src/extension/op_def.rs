@@ -466,11 +466,13 @@ impl OpDef {
     /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
     /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s.
     #[must_use]
+    #[deprecated(note = "use constant_fold2")]
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],
         consts: &[(IncomingPort, Value)],
     ) -> ConstFoldResult {
+        #[allow(deprecated)] // we are in deprecated function, remove at same time
         (self.constant_folder.as_ref())?.fold(type_args, consts)
     }
 

@@ -96,7 +96,9 @@ impl ExtensionOp {
 
     /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
     #[must_use]
+    #[deprecated(note = "use constant_fold2")]
     pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Value)]) -> ConstFoldResult {
+        #[allow(deprecated)] // in deprecated function, remove at same time
         self.def().constant_fold(self.args(), consts)
     }
 
