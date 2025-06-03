@@ -16,7 +16,6 @@ in
     # otherwise a linker error ocurs on rust packages
     packages = [
       pkgs.just
-      pkgs.llvmPackages_16.libllvm
       pkgs.graphviz
       pkgs.cargo-insta
       pkgs.capnproto
@@ -24,14 +23,8 @@ in
       # These are required for hugr-llvm to be able to link to llvm.
       pkgs.libffi
       pkgs.libxml2
-    ] ++ lib.optionals
-      pkgs.stdenv.isDarwin
-      (with pkgs.darwin.apple_sdk; [
-        frameworks.CoreServices
-        frameworks.CoreFoundation
-        # added for json schema validation tests
-        frameworks.SystemConfiguration
-      ]);
+      pkgs.ncurses
+    ];
 
     env = {
       "LLVM_SYS_${cfg.llvmVersion}0_PREFIX" = "${pkgs."llvmPackages_${cfg.llvmVersion}".libllvm.dev}";

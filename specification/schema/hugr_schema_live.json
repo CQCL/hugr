@@ -555,7 +555,8 @@
                     "type": "array"
                 },
                 "hugr": {
-                    "title": "Hugr"
+                    "title": "Hugr",
+                    "type": "string"
                 }
             },
             "required": [

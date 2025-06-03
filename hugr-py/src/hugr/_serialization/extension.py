@@ -67,10 +67,11 @@ class TypeDef(ConfiguredBaseModel):
 
 class FixedHugr(ConfiguredBaseModel):
     extensions: ExtensionSet
-    hugr: Any
+    hugr: str
 
     def deserialize(self) -> ext.FixedHugr:
-        return ext.FixedHugr(extensions=self.extensions, hugr=self.hugr)
+        hugr = Hugr.from_str(self.hugr)
+        return ext.FixedHugr(extensions=self.extensions, hugr=hugr)
 
 
 class OpDef(ConfiguredBaseModel, populate_by_name=True):
