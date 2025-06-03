@@ -16,7 +16,9 @@ use crate::std_extensions::STD_REG;
 /// storing it as a string.
 ///
 /// Note that only PRELUDE extensions are used to decode the package's content.
-/// Additional extensions should be included in the serialized envelope.
+/// When serializing a HUGR, any additional extensions required to load it are
+/// embedded in the envelope. Packages should manually add any required
+/// extensions before serializing.
 ///
 /// # Examples
 ///
@@ -186,8 +188,20 @@ macro_rules! impl_serde_as_string_envelope {
             where
                 S: serde::Serializer,
             {
+                // Include any additional extension required to load the HUGR in the envelope.
+                let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
+                let mut extra_extensions = $crate::extension::ExtensionRegistry::default();
+                for ext in $crate::hugr::views::HugrView::extensions(source).iter() {
+                    if !extensions.contains(ext.name()) {
+                        extra_extensions.register_updated(ext.clone());
+                    }
+                }
+
                 let str = source
-                    .store_str($crate::envelope::EnvelopeConfig::text())
+                    .store_str_with_exts(
+                        $crate::envelope::EnvelopeConfig::text(),
+                        &extra_extensions,
+                    )
                     .map_err(serde::ser::Error::custom)?;
                 serializer.collect_str(&str)
             }

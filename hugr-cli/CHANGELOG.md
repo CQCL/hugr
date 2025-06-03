@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.0...hugr-cli-v0.20.1) - 2025-06-03
+
+### New Features
+
+- support external subcommands via PATH ([#1343](https://github.com/CQCL/hugr/pull/1343)) ([#2278](https://github.com/CQCL/hugr/pull/2278))
+
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.15.4...hugr-cli-v0.20.0) - 2025-05-14
 
 ### New Features

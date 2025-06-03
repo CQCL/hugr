@@ -110,8 +110,8 @@ class TypeDef(ExtensionObject):
         >>> td = TypeDef(
         ...     name="MyType",
         ...     description="A type definition.",
-        ...     params=[tys.TypeTypeParam(tys.Bool)],
-        ...     bound=ExplicitBound(tys.TypeBound.Copyable),
+        ...     params=[tys.TypeTypeParam(tys.TypeBound.Copyable)],
+        ...     bound=FromParamsBound([0]),
         ... )
         >>> td.name
         'MyType'
@@ -154,7 +154,7 @@ class FixedHugr:
     hugr: Hugr
 
     def _to_serial(self) -> ext_s.FixedHugr:
-        return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr)
+        return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr.to_str())
 
 
 @dataclass

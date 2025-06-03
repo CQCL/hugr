@@ -6,7 +6,7 @@ use hugr_core::{
     hugr::{
         self,
         internal::HugrInternals,
-        views::{ExtractionResult, render::RenderConfig},
+        views::{ExtractionResult, render},
     },
     ops::OpType,
 };
@@ -197,7 +197,8 @@ impl HugrView for ParentsView<'_> {
         unimplemented!()
     }
 
-    fn mermaid_string_with_config(&self, _config: RenderConfig<Self::Node>) -> String {
+    #[allow(deprecated)]
+    fn mermaid_string_with_config(&self, _config: render::RenderConfig<Self::Node>) -> String {
         unimplemented!()
     }
 
