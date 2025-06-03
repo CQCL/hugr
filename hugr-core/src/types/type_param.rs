@@ -79,14 +79,14 @@ pub enum TypeParam {
     },
     /// Argument is a [`TypeArg::String`].
     String,
-    /// Argument is a [`TypeArg::Sequence`]. A list of indeterminate size containing
+    /// Argument is a [`TypeArg::List`]. A list of indeterminate size containing
     /// parameters all of the (same) specified element type.
     #[display("List[{param}]")]
     List {
         /// The [`TypeParam`] describing each element of the list.
         param: Box<TypeParam>,
     },
-    /// Argument is a [`TypeArg::Sequence`]. A tuple of parameters.
+    /// Argument is a [`TypeArg::Tuple`]. A tuple of parameters.
     #[display("Tuple[{}]", params.iter().map(std::string::ToString::to_string).join(", "))]
     Tuple {
         /// The [`TypeParam`]s contained in the tuple.

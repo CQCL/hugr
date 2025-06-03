@@ -175,7 +175,7 @@ pub fn bool_t() -> Type {
 /// Name of the prelude panic operation.
 ///
 /// This operation can have any input and any output wires; it is instantiated
-/// with two [`TypeArg::Sequence`]s representing these. The first input to the
+/// with two [`TypeArg::List`]s representing these. The first input to the
 /// operation is always an error type; the remaining inputs correspond to the
 /// first sequence of types in its instantiation; the outputs correspond to the
 /// second sequence of types in its instantiation. Note that the inputs and
@@ -189,7 +189,7 @@ pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 /// Name of the prelude exit operation.
 ///
 /// This operation can have any input and any output wires; it is instantiated
-/// with two [`TypeArg::Sequence`]s representing these. The first input to the
+/// with two [`TypeArg::List`]s representing these. The first input to the
 /// operation is always an error type; the remaining inputs correspond to the
 /// first sequence of types in its instantiation; the outputs correspond to the
 /// second sequence of types in its instantiation. Note that the inputs and
