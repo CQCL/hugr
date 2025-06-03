@@ -45,6 +45,7 @@ pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
 }
 
 impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
+    /// Create a new [`MermaidFormatter`] from a [`RenderConfig`].
     #[allow(deprecated)]
     pub fn from_render_config(config: RenderConfig<H::Node>, hugr: &'h H) -> Self {
         let node_labels = if config.node_indices {
@@ -61,6 +62,7 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
         }
     }
 
+    /// Create a new [`MermaidFormatter`] for the given [`Hugr`].
     pub fn new(hugr: &'h H) -> Self {
         Self {
             hugr,
@@ -71,18 +73,22 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
         }
     }
 
+    /// The entrypoint to highlight in the rendered graph.
     pub fn entrypoint(&self) -> Option<H::Node> {
         self.entrypoint
     }
 
+    /// The rendering style of the node labels.
     pub fn node_labels(&self) -> &NodeLabel<H::Node> {
         &self.node_labels
     }
 
+    /// Whether to show port offsets on edges.
     pub fn port_offsets(&self) -> bool {
         self.port_offsets_in_edges
     }
 
+    /// Whether to show type labels on edges.
     pub fn type_labels(&self) -> bool {
         self.type_labels_in_edges
     }
@@ -111,6 +117,7 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
         self
     }
 
+    /// Render the graph into a Mermaid string.
     pub fn finish(self) -> String
     where
         H: HugrView,
@@ -118,10 +125,10 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
         self.hugr.mermaid_string_with_formatter(self)
     }
 
-    pub(crate) fn with_hugr<'a, NewH: HugrInternals<Node = H::Node>>(
+    pub(crate) fn with_hugr<NewH: HugrInternals<Node = H::Node>>(
         self,
-        hugr: &'a NewH,
-    ) -> MermaidFormatter<'a, NewH> {
+        hugr: &NewH,
+    ) -> MermaidFormatter<'_, NewH> {
         let MermaidFormatter {
             hugr: _,
             node_labels,
@@ -395,19 +402,20 @@ mod tests {
             .nodes()
             .map(|n| (n, format!("node_{}", n.index())))
             .collect();
-        let config = MermaidFormatter {
-            node_labels: NodeLabel::Custom(node_labels),
-            ..Default::default()
-        };
+        let config = h
+            .mermaid_format()
+            .with_node_labels(NodeLabel::Custom(node_labels));
         insta::assert_snapshot!(h.mermaid_string_with_formatter(config));
     }
 
     #[test]
     fn convert_full_render_config_to_render_config() {
-        let config: MermaidFormatter = MermaidFormatter {
-            node_labels: NodeLabel::Custom(HashMap::new()),
-            ..Default::default()
-        };
-        assert!(RenderConfig::try_from(config).is_err());
+        let h = simple_dfg_hugr();
+        let config: MermaidFormatter =
+            MermaidFormatter::new(&h).with_node_labels(NodeLabel::Custom(HashMap::new()));
+        #[allow(deprecated)]
+        {
+            assert!(RenderConfig::try_from(config).is_err());
+        }
     }
 }

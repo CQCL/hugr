@@ -268,7 +268,7 @@ impl HugrView for PersistentHugr {
                 // rekey labels to the extracted HUGR node IDs
                 let labels = labels
                     .iter()
-                    .map(|(k, v)| (node_map[&k], v.clone()))
+                    .map(|(k, v)| (node_map[k], v.clone()))
                     .collect();
                 NodeLabel::Custom(labels)
             }

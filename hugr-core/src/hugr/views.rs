@@ -16,7 +16,6 @@ use std::collections::HashMap;
 pub use self::petgraph::PetgraphWrapper;
 #[allow(deprecated)]
 use self::render::{MermaidFormatter, RenderConfig};
-use proptest::test_runner::Config;
 pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
