@@ -78,8 +78,6 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      - name: Install z3
-        run: sudo apt-get -y install z3
       - name: Run clippy
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
       - name: Build docs
@@ -162,8 +160,6 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      - name: Install z3
-        run: sudo apt-get -y install z3
       - name: Build with all features
         run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
@@ -357,8 +353,6 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      - name: Install z3
-        run: sudo apt-get -y install z3
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
