@@ -6,7 +6,7 @@ use crate::hugr::patch::simple_replace::serial::SerialSimpleReplacement;
 /// Serialized format for [`PersistentReplacement`]
 pub type SerialPersistentReplacement<H> = SerialSimpleReplacement<H, PatchNode>;
 
-/// Serialized format for [`CommitData`]
+/// Serialized format for CommitData
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SerialCommitData<H> {
     /// Base commit containing a Hugr
