@@ -233,4 +233,26 @@ mod test {
         assert_matches!(build_result, Ok(_));
         Ok(())
     }
+    #[test]
+    fn many_call() -> Result<(), BuildError> {
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+
+            let f_id =
+                module_builder.declare("foo", Signature::new_endo(vec![usize_t()]).into())?;
+
+            let mut f_build =
+                module_builder.define_function("bar", Signature::new_endo(vec![usize_t()]))?;
+            let mut call = f_build.call(&f_id, &[], f_build.input_wires())?;
+            for i in 0..u16::MAX {
+                println!("Iteration {i}");
+                call = f_build.call(&f_id, &[], call.outputs())?;
+            }
+
+            f_build.finish_with_outputs(call.outputs())?;
+            module_builder.finish_hugr()
+        };
+        assert_matches!(build_result, Ok(_));
+        Ok(())
+    }
 }
