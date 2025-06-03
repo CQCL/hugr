@@ -170,6 +170,12 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+      - name: Build hugr-persistent
+        if: ${{ needs.changes.outputs.rust == 'true'}}
+        run: cargo test -p hugr-persistent --verbose --no-run
+      - name: Tests hugr-persistent
+        if: ${{ needs.changes.outputs.rust == 'true'}}
+        run: cargo test -p hugr-persistent --verbose
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -355,6 +361,7 @@ jobs:
           cargo llvm-cov --no-report  --no-default-features --doctests
           cargo llvm-cov --no-report  --all-features --doctests
           cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
+          cargo llvm-cov --no-report  -p hugr-persistent --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io

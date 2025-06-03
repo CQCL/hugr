@@ -4,14 +4,15 @@
 
 use itertools::Either;
 
-use crate::{Direction, IncomingPort, OutgoingPort, Port, hugr::persistent::PatchNode};
+use crate::PatchNode;
+use hugr_core::{Direction, IncomingPort, OutgoingPort, Port};
 
 use super::Walker;
 
 /// A wire in the current HUGR of a [`Walker`] with some of its endpoints
 /// pinned.
 ///
-/// Just like a normal HUGR [`Wire`](crate::Wire), a [`PinnedWire`] has
+/// Just like a normal HUGR [`Wire`](hugr_core::Wire), a [`PinnedWire`] has
 /// endpoints: the ports that are linked together by the wire.  A [`PinnedWire`]
 /// however distinguishes itself in that each of its ports is specified either
 /// as "pinned" or "unpinned". A port is pinned if and only if the node it is
@@ -137,7 +138,7 @@ impl PinnedWire {
 
     /// Get all unpinned ports of the wire, optionally filtering to only those
     /// in the given direction.
-    pub(super) fn unpinned_ports(
+    pub(crate) fn unpinned_ports(
         &self,
         dir: impl Into<Option<Direction>>,
     ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {

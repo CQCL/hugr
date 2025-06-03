@@ -498,24 +498,21 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Map the host nodes in `self` according to `node_map`.
     ///
     /// `node_map` must map nodes in the current HUGR of the subgraph to
-    /// its equivalent nodes in some `new_hugr`.
+    /// its equivalent nodes in some `new_host`.
     ///
     /// This converts a replacement that acts on nodes of type `HostNode` to
-    /// a replacement that acts on `new_hugr`, with nodes of type `N`.
-    ///
-    /// This does not check convexity. It is up to the caller to ensure that
-    /// the mapped replacement obtained from this applies on a convex subgraph
-    /// of the new HUGR.
-    pub(crate) fn map_host_nodes<N: HugrNode>(
+    /// a replacement that acts on `new_host`, with nodes of type `N`.
+    pub fn map_host_nodes<N: HugrNode>(
         &self,
         node_map: impl Fn(HostNode) -> N,
-    ) -> SimpleReplacement<N> {
+        new_host: &impl HugrView<Node = N>,
+    ) -> Result<SimpleReplacement<N>, InvalidReplacement> {
         let Self {
             subgraph,
             replacement,
         } = self;
         let subgraph = subgraph.map_nodes(node_map);
-        SimpleReplacement::new_unchecked(subgraph, replacement.clone())
+        SimpleReplacement::try_new(subgraph, new_host, replacement.clone())
     }
 }
 

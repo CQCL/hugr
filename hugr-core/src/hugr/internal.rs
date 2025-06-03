@@ -390,6 +390,22 @@ impl HugrMutInternals for Hugr {
     }
 }
 
+impl Hugr {
+    /// Consumes the HUGR and return a flat portgraph view of the region rooted
+    /// at `parent`.
+    #[inline]
+    pub fn into_region_portgraph(
+        self,
+        parent: Node,
+    ) -> portgraph::view::FlatRegion<'static, MultiPortGraph> {
+        let root = parent.into_portgraph();
+        let Self {
+            graph, hierarchy, ..
+        } = self;
+        portgraph::view::FlatRegion::new_without_root(graph, hierarchy, root)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{

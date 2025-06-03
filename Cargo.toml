@@ -11,6 +11,7 @@ members = [
     "hugr-model",
     "hugr-llvm",
     "hugr-py",
+    "hugr-persistent",
 ]
 default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
