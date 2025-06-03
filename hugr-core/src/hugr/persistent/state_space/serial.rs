@@ -119,7 +119,7 @@ mod tests {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, From, Into)]
-    pub struct WrappedHugr {
+    struct WrappedHugr {
         #[serde_as(as = "AsStringEnvelope")]
         pub hugr: Hugr,
     }
