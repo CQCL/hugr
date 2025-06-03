@@ -6,16 +6,18 @@ use std::sync::{Arc, Weak};
 
 use serde_with::serde_as;
 
+use crate::envelope::serde_with::AsStringEnvelope;
+use crate::ops::{OpName, OpNameRef, Value};
+use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
+use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
+use crate::{Hugr, IncomingPort};
+
+use super::const_fold::FoldVal;
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
     SignatureError,
 };
 
-use crate::Hugr;
-use crate::envelope::serde_with::AsStringEnvelope;
-use crate::ops::{OpName, OpNameRef};
-use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
-use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
 
 /// Trait necessary for binary computations of `OpDef` signature
@@ -467,9 +469,23 @@ impl OpDef {
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Value)],
+        consts: &[(IncomingPort, Value)],
     ) -> ConstFoldResult {
         (self.constant_folder.as_ref())?.fold(type_args, consts)
+    }
+
+    /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
+    /// [FoldVal] values for each input, and update the outputs, which should be
+    /// initialised to [FoldVal::Unknown].
+    pub fn constant_fold2(
+        &self,
+        type_args: &[TypeArg],
+        inputs: Vec<FoldVal>,
+        outputs: &mut [FoldVal],
+    ) {
+        if let Some(cf) = self.constant_folder.as_ref() {
+            cf.fold2(type_args, inputs, outputs)
+        }
     }
 
     /// Returns a reference to the signature function of this [`OpDef`].

@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use hugr_core::core::HugrNode;
+use hugr_core::extension::FoldVal;
 use hugr_core::ops::Value;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::types::ConstTypeError;
@@ -183,6 +184,37 @@ impl<N: HugrNode> AsConcrete<ValueHandle<N>, N> for Value {
 
     fn from_func(func: LoadedFunction<N>) -> Result<Self, crate::dataflow::LoadedFunction<N>> {
         Err(func)
+    }
+}
+
+impl AsConcrete<ValueHandle<Node>, Node> for FoldVal {
+    type ValErr = Infallible;
+
+    type SumErr = Infallible;
+
+    fn from_value(val: ValueHandle<Node>) -> Result<Self, Self::ValErr> {
+        Ok(match val {
+            ValueHandle::Hashable(HashedConst { val, .. })
+            | ValueHandle::Unhashable {
+                leaf: Either::Left(val),
+                ..
+            } => FoldVal::Extension(Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone())),
+            _ => FoldVal::Unknown,
+        })
+    }
+
+    fn from_sum(sum: Sum<Self>) -> Result<Self, Self::SumErr> {
+        let Sum { tag, values, st } = sum;
+        Ok(Self::Sum {
+            tag,
+            sum_type: st,
+            items: values,
+        })
+    }
+
+    fn from_func(func: LoadedFunction<Node>) -> Result<Self, LoadedFunction<Node>> {
+        let LoadedFunction { func_node, args } = func;
+        Ok(FoldVal::LoadedFunction(func_node, args))
     }
 }
 

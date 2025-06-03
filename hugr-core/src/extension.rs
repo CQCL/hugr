@@ -33,7 +33,7 @@ pub mod resolution;
 pub mod simple_op;
 mod type_def;
 
-pub use const_fold::{ConstFold, ConstFoldResult, Folder, fold_out_row};
+pub use const_fold::{ConstFold, ConstFoldResult, FoldVal, Folder, fold_out_row};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,
