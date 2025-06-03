@@ -154,7 +154,7 @@ class FixedHugr:
     hugr: Hugr
 
     def _to_serial(self) -> ext_s.FixedHugr:
-        return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr)
+        return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr.to_str())
 
 
 @dataclass

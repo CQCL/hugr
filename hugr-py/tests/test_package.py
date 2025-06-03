@@ -1,5 +1,7 @@
 from hugr import tys
+from hugr.build import Dfg
 from hugr.build.function import Module
+from hugr.ext import Extension, FixedHugr, OpDef, OpDefSig, Version
 from hugr.package import (
     FuncDeclPointer,
     FuncDefnPointer,
@@ -43,3 +45,21 @@ def test_package():
 
     main = m.to_executable_package()
     assert main.entry_point_node == f_main.to_node()
+
+
+def test_lower_func():
+    hugr = Dfg(tys.Qubit)
+    hugr.set_outputs(hugr.input_node[0])
+
+    ext = Extension("dummy", Version(0, 1, 0))
+    ext.add_op_def(
+        OpDef(
+            "dummy_op",
+            OpDefSig(tys.FunctionType.endo([tys.Qubit])),
+            lower_funcs=[FixedHugr([], hugr.hugr)],
+        )
+    )
+
+    pkg = Package([hugr.hugr], [ext])
+
+    validate(pkg)
