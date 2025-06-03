@@ -89,7 +89,7 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
         );
 
         for i in 0..num_iter_outputs {
-            h.connect(cond_n, i, dfg, i);
+            h.connect(dfg, i, cond_n, i);
         }
         let cond = h.get_optype(cond_n).as_conditional().unwrap();
         let case_in_rows = [0, 1].map(|i| cond.case_input_row(i).unwrap());
@@ -142,4 +142,91 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
     /// Failure only occurs if the node is not a [TailLoop].
     /// (Any later failure means an invalid Hugr and `panic`.)
     const UNCHANGED_ON_FAILURE: bool = true;
+}
+
+#[cfg(test)]
+mod test {
+    use itertools::Itertools;
+
+    use super::{PeelTailLoop, PeelTailLoopError};
+    use crate::builder::test::simple_dfg_hugr;
+    use crate::builder::{Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder};
+    use crate::extension::prelude::{bool_t, usize_t};
+    use crate::ops::{OpTag, OpTrait, handle::NodeHandle};
+    use crate::types::{Signature, Type, TypeRow};
+    use crate::{HugrView, hugr::HugrMut};
+
+    #[test]
+    fn bad_peel() {
+        let backup = simple_dfg_hugr();
+        let opty = backup.entrypoint_optype().clone();
+        assert!(!opty.is_tail_loop());
+        let mut h = backup.clone();
+        let r = h.apply_patch(PeelTailLoop::new(h.entrypoint()));
+        assert_eq!(
+            r,
+            Err(PeelTailLoopError::NotTailLoop(backup.entrypoint(), opty))
+        );
+        assert_eq!(h, backup);
+    }
+
+    #[test]
+    fn peel_loop() {
+        let mut fb =
+            FunctionBuilder::new("main", Signature::new(vec![bool_t(), usize_t()], usize_t()))
+                .unwrap();
+        let helper = fb
+            .module_root_builder()
+            .declare(
+                "helper",
+                Signature::new(
+                    vec![bool_t(), usize_t()],
+                    vec![Type::new_sum([vec![bool_t()], vec![]]), usize_t()],
+                )
+                .into(),
+            )
+            .unwrap();
+        let [b, u] = fb.input_wires_arr();
+        let (tl, call) = {
+            let mut tlb = fb
+                .tail_loop_builder([(bool_t(), b)], [(usize_t(), u)], TypeRow::new())
+                .unwrap();
+            let [b, u] = tlb.input_wires_arr();
+            let c = tlb.call(&helper, &[], [b, u]).unwrap();
+            let [pred, other] = c.outputs_arr();
+            (tlb.finish_with_outputs(pred, [other]).unwrap(), c.node())
+        };
+        let mut h = fb.finish_hugr_with_outputs(tl.outputs()).unwrap();
+
+        h.apply_patch(PeelTailLoop::new(tl.node())).unwrap();
+        h.validate().unwrap();
+        let tags = |n| {
+            let mut v = Vec::new();
+            let mut o = Some(n);
+            while let Some(n) = o {
+                v.push(h.get_optype(n).tag());
+                o = h.get_parent(n);
+            }
+            v
+        };
+        assert_eq!(
+            h.nodes()
+                .filter(|n| h.get_optype(*n).is_tail_loop())
+                .collect_vec(),
+            [tl.node()]
+        );
+        use OpTag::*;
+        assert_eq!(
+            tags(call),
+            [FnCall, TailLoop, Case, Conditional, FuncDefn, ModuleRoot]
+        );
+        let [c1, c2] = h
+            .all_linked_inputs(helper.node())
+            .map(|(n, _p)| n)
+            .collect_array()
+            .unwrap();
+        assert!([c1, c2].contains(&call));
+        let other = if call == c1 { c2 } else { c1 };
+        assert_eq!(tags(other), [FnCall, Dfg, FuncDefn, ModuleRoot]);
+    }
 }
