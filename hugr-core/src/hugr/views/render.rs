@@ -7,15 +7,17 @@ use portgraph::render::{EdgeStyle, NodeStyle, PortStyle, PresentationStyle};
 use portgraph::{LinkView, MultiPortGraph, NodeIndex, PortIndex, PortView};
 
 use crate::core::HugrNode;
+use crate::hugr::internal::HugrInternals;
 use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
 /// Reduced configuration for rendering a HUGR graph.
 ///
-/// Additional options are available in the [`FullRenderConfig`] struct.
+/// Additional options are available in the [`MermaidFormatter`] struct.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+#[deprecated(note = "Use `MermaidFormatter` instead")]
 pub struct RenderConfig<N = Node> {
     /// Show the node index in the graph nodes.
     pub node_indices: bool,
@@ -29,30 +31,110 @@ pub struct RenderConfig<N = Node> {
 
 /// Configuration for rendering a HUGR graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct FullRenderConfig<N: HugrNode = Node> {
+pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
+    /// The HUGR to render.
+    hugr: &'h H,
     /// How to display the node indices.
-    pub node_labels: NodeLabel<N>,
+    node_labels: NodeLabel<H::Node>,
     /// Show port offsets in the graph edges.
-    pub port_offsets_in_edges: bool,
+    port_offsets_in_edges: bool,
     /// Show type labels on edges.
-    pub type_labels_in_edges: bool,
+    type_labels_in_edges: bool,
     /// A node to highlight as the graph entrypoint.
-    pub entrypoint: Option<N>,
+    entrypoint: Option<H::Node>,
 }
 
-impl<N: HugrNode> From<RenderConfig<N>> for FullRenderConfig<N> {
-    fn from(config: RenderConfig<N>) -> Self {
+impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
+    #[allow(deprecated)]
+    pub fn from_render_config(config: RenderConfig<H::Node>, hugr: &'h H) -> Self {
         let node_labels = if config.node_indices {
             NodeLabel::Numeric
         } else {
             NodeLabel::None
         };
         Self {
+            hugr,
             node_labels,
             port_offsets_in_edges: config.port_offsets_in_edges,
             type_labels_in_edges: config.type_labels_in_edges,
             entrypoint: config.entrypoint,
+        }
+    }
+
+    pub fn new(hugr: &'h H) -> Self {
+        Self {
+            hugr,
+            node_labels: NodeLabel::Numeric,
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+            entrypoint: None,
+        }
+    }
+
+    pub fn entrypoint(&self) -> Option<H::Node> {
+        self.entrypoint
+    }
+
+    pub fn node_labels(&self) -> &NodeLabel<H::Node> {
+        &self.node_labels
+    }
+
+    pub fn port_offsets(&self) -> bool {
+        self.port_offsets_in_edges
+    }
+
+    pub fn type_labels(&self) -> bool {
+        self.type_labels_in_edges
+    }
+
+    /// Set the node labels style.
+    pub fn with_node_labels(mut self, node_labels: NodeLabel<H::Node>) -> Self {
+        self.node_labels = node_labels;
+        self
+    }
+
+    /// Set whether to show port offsets in edges.
+    pub fn with_port_offsets(mut self, show: bool) -> Self {
+        self.port_offsets_in_edges = show;
+        self
+    }
+
+    /// Set whether to show type labels in edges.
+    pub fn with_type_labels(mut self, show: bool) -> Self {
+        self.type_labels_in_edges = show;
+        self
+    }
+
+    /// Set the entrypoint node to highlight.
+    pub fn with_entrypoint(mut self, entrypoint: impl Into<Option<H::Node>>) -> Self {
+        self.entrypoint = entrypoint.into();
+        self
+    }
+
+    pub fn finish(self) -> String
+    where
+        H: HugrView,
+    {
+        self.hugr.mermaid_string_with_formatter(self)
+    }
+
+    pub(crate) fn with_hugr<'a, NewH: HugrInternals<Node = H::Node>>(
+        self,
+        hugr: &'a NewH,
+    ) -> MermaidFormatter<'a, NewH> {
+        let MermaidFormatter {
+            hugr: _,
+            node_labels,
+            port_offsets_in_edges,
+            type_labels_in_edges,
+            entrypoint,
+        } = self;
+        MermaidFormatter {
+            hugr,
+            node_labels,
+            port_offsets_in_edges,
+            type_labels_in_edges,
+            entrypoint,
         }
     }
 }
@@ -66,10 +148,11 @@ pub enum UnsupportedRenderConfig {
     CustomNodeLabels,
 }
 
-impl<N: HugrNode> TryFrom<FullRenderConfig<N>> for RenderConfig<N> {
+#[allow(deprecated)]
+impl<'h, H: HugrInternals + ?Sized> TryFrom<MermaidFormatter<'h, H>> for RenderConfig<H::Node> {
     type Error = UnsupportedRenderConfig;
 
-    fn try_from(value: FullRenderConfig<N>) -> Result<Self, Self::Error> {
+    fn try_from(value: MermaidFormatter<'h, H>) -> Result<Self, Self::Error> {
         if matches!(value.node_labels, NodeLabel::Custom(_)) {
             return Err(UnsupportedRenderConfig::CustomNodeLabels);
         }
@@ -80,6 +163,56 @@ impl<N: HugrNode> TryFrom<FullRenderConfig<N>> for RenderConfig<N> {
             type_labels_in_edges: value.type_labels_in_edges,
             entrypoint: value.entrypoint,
         })
+    }
+}
+
+macro_rules! impl_mermaid_formatter_from {
+    ($t:ty, $($lifetime:tt)?) => {
+        impl<'h, $($lifetime,)? H: HugrView> From<MermaidFormatter<'h, $t>> for MermaidFormatter<'h, H> {
+            fn from(value: MermaidFormatter<'h, $t>) -> Self {
+                let MermaidFormatter {
+                    hugr,
+                    node_labels,
+                    port_offsets_in_edges,
+                    type_labels_in_edges,
+                    entrypoint,
+                } = value;
+                MermaidFormatter {
+                    hugr,
+                    node_labels,
+                    port_offsets_in_edges,
+                    type_labels_in_edges,
+                    entrypoint,
+                }
+            }
+        }
+    };
+}
+
+impl_mermaid_formatter_from!(&'hh H, 'hh);
+impl_mermaid_formatter_from!(&'hh mut H, 'hh);
+impl_mermaid_formatter_from!(std::rc::Rc<H>,);
+impl_mermaid_formatter_from!(std::sync::Arc<H>,);
+impl_mermaid_formatter_from!(Box<H>,);
+
+impl<'h, H: HugrView + ToOwned> From<MermaidFormatter<'h, std::borrow::Cow<'_, H>>>
+    for MermaidFormatter<'h, H>
+{
+    fn from(value: MermaidFormatter<'h, std::borrow::Cow<'_, H>>) -> Self {
+        let MermaidFormatter {
+            hugr,
+            node_labels,
+            port_offsets_in_edges,
+            type_labels_in_edges,
+            entrypoint,
+        } = value;
+        MermaidFormatter {
+            hugr,
+            node_labels,
+            port_offsets_in_edges,
+            type_labels_in_edges,
+            entrypoint,
+        }
     }
 }
 
@@ -95,6 +228,7 @@ pub enum NodeLabel<N: HugrNode = Node> {
     Custom(HashMap<N, String>),
 }
 
+#[allow(deprecated)]
 impl<N> Default for RenderConfig<N> {
     fn default() -> Self {
         Self {
@@ -106,23 +240,11 @@ impl<N> Default for RenderConfig<N> {
     }
 }
 
-impl<N: HugrNode> Default for FullRenderConfig<N> {
-    fn default() -> Self {
-        Self {
-            node_labels: NodeLabel::Numeric,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-            entrypoint: None,
-        }
-    }
-}
-
 /// Formatter method to compute a node style.
 pub(in crate::hugr) fn node_style<'a>(
     h: &'a Hugr,
-    config: impl Into<FullRenderConfig>,
+    formatter: MermaidFormatter<'a>,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
-    let config = config.into();
     fn node_name(h: &Hugr, n: NodeIndex) -> String {
         match h.get_optype(n.into()) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
@@ -134,9 +256,9 @@ pub(in crate::hugr) fn node_style<'a>(
     let mut entrypoint_style = PresentationStyle::default();
     entrypoint_style.stroke = Some("#832561".to_string());
     entrypoint_style.stroke_width = Some("3px".to_string());
-    let entrypoint = config.entrypoint.map(Node::into_portgraph);
+    let entrypoint = formatter.entrypoint.map(Node::into_portgraph);
 
-    match config.node_labels {
+    match formatter.node_labels {
         NodeLabel::Numeric => Box::new(move |n| {
             if Some(n) == entrypoint {
                 NodeStyle::boxed(format!(
@@ -206,18 +328,17 @@ pub(in crate::hugr) fn port_style(h: &Hugr) -> Box<dyn FnMut(PortIndex) -> PortS
 
 /// Formatter method to compute an edge style.
 #[allow(clippy::type_complexity)]
-pub(in crate::hugr) fn edge_style(
-    h: &Hugr,
-    config: impl Into<FullRenderConfig>,
+pub(in crate::hugr) fn edge_style<'a>(
+    h: &'a Hugr,
+    config: MermaidFormatter<'_>,
 ) -> Box<
     dyn FnMut(
             <MultiPortGraph as LinkView>::LinkEndpoint,
             <MultiPortGraph as LinkView>::LinkEndpoint,
         ) -> EdgeStyle
-        + '_,
+        + 'a,
 > {
     let graph = &h.graph;
-    let config = config.into();
     Box::new(move |src, tgt| {
         let src_node = graph.port_node(src).unwrap();
         let src_optype = h.get_optype(src_node.into());
@@ -274,16 +395,16 @@ mod tests {
             .nodes()
             .map(|n| (n, format!("node_{}", n.index())))
             .collect();
-        let config = FullRenderConfig {
+        let config = MermaidFormatter {
             node_labels: NodeLabel::Custom(node_labels),
             ..Default::default()
         };
-        insta::assert_snapshot!(h.mermaid_string_with_full_config(config));
+        insta::assert_snapshot!(h.mermaid_string_with_formatter(config));
     }
 
     #[test]
     fn convert_full_render_config_to_render_config() {
-        let config: FullRenderConfig = FullRenderConfig {
+        let config: MermaidFormatter = MermaidFormatter {
             node_labels: NodeLabel::Custom(HashMap::new()),
             ..Default::default()
         };

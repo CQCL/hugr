@@ -10,7 +10,7 @@ use crate::{
         internal::HugrInternals,
         views::{
             ExtractionResult,
-            render::{self, FullRenderConfig, NodeLabel, RenderConfig},
+            render::{self, MermaidFormatter, NodeLabel},
         },
     },
 };
@@ -242,39 +242,44 @@ impl HugrView for PersistentHugr {
             .flat_map(move |port| self.linked_ports(node, port).map(|(opp_node, _)| opp_node))
     }
 
-    fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_config(RenderConfig {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-            entrypoint: Some(self.entrypoint()),
-        })
+    #[allow(deprecated)]
+    fn mermaid_string_with_config(&self, config: render::RenderConfig<Self::Node>) -> String {
+        self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }
 
-    fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String {
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
         // Extract a concrete HUGR for displaying
         let (hugr, node_map) = self.apply_all();
 
         // Render the extracted HUGR but map the node indices back to the
         // original patch node IDs
-        let entrypoint = config.entrypoint.map(|n| node_map[&n]);
-        let node_labels = if config.node_indices {
-            let node_labels_map: HashMap<_, _> = node_map
-                .into_iter()
-                .map(|(k, v)| (v, format!("{:?}", k)))
-                .collect();
-            NodeLabel::Custom(node_labels_map)
-        } else {
-            NodeLabel::None
+        let entrypoint = formatter.entrypoint().map(|n| node_map[&n]);
+        let node_labels = match formatter.node_labels() {
+            NodeLabel::None => NodeLabel::None,
+            NodeLabel::Numeric => {
+                // replace node labels with patch node IDs
+                let node_labels_map: HashMap<_, _> = node_map
+                    .into_iter()
+                    .map(|(k, v)| (v, format!("{:?}", k)))
+                    .collect();
+                NodeLabel::Custom(node_labels_map)
+            }
+            NodeLabel::Custom(labels) => {
+                // rekey labels to the extracted HUGR node IDs
+                let labels = labels
+                    .iter()
+                    .map(|(k, v)| (node_map[&k], v.clone()))
+                    .collect();
+                NodeLabel::Custom(labels)
+            }
         };
 
         // Map config accordingly
-        let config = FullRenderConfig {
-            entrypoint,
-            node_labels,
-            port_offsets_in_edges: config.port_offsets_in_edges,
-            type_labels_in_edges: config.type_labels_in_edges,
-        };
+        let config = MermaidFormatter::new(&hugr)
+            .with_entrypoint(entrypoint)
+            .with_node_labels(node_labels)
+            .with_port_offsets(formatter.port_offsets())
+            .with_type_labels(formatter.type_labels());
 
         hugr.graph
             .mermaid_format()
@@ -341,19 +346,15 @@ mod tests {
             .try_extract_hugr([commit1, commit2, commit4])
             .unwrap();
 
-        let mermaid_str = hugr.mermaid_string_with_config(RenderConfig {
-            node_indices: false,
-            entrypoint: Some(hugr.entrypoint()),
-            ..Default::default()
-        });
+        let mermaid_str = hugr
+            .mermaid_format()
+            .with_node_labels(NodeLabel::None)
+            .finish();
         let extracted_hugr = hugr.to_hugr();
         let exp_str = extracted_hugr
-            .mermaid_string_with_config(RenderConfig {
-                node_indices: false,
-                entrypoint: Some(extracted_hugr.entrypoint()),
-                ..Default::default()
-            })
-            .to_string();
+            .mermaid_format()
+            .with_node_labels(NodeLabel::None)
+            .finish();
 
         assert_eq!(mermaid_str, exp_str);
     }
