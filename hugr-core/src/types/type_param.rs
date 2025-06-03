@@ -171,7 +171,7 @@ pub enum TypeArg {
         /// The string value for the parameter.
         arg: String,
     },
-    /// Instance of [TypeParam::List] defined by a sequence of elements of the same type.
+    /// Instance of [`TypeParam::List`] defined by a sequence of elements of the same type.
     #[display("[{}]", {
         use itertools::Itertools as _;
         elems.iter().map(|t|t.to_string()).join(",")
@@ -180,7 +180,7 @@ pub enum TypeArg {
         /// List of elements
         elems: Vec<TypeArg>,
     },
-    /// Instance of [TypeParam::Tuple] defined by a sequence of elements of varying type.
+    /// Instance of [`TypeParam::Tuple`] defined by a sequence of elements of varying type.
     #[display("({})", {
         use itertools::Itertools as _;
         elems.iter().map(std::string::ToString::to_string).join(",")
