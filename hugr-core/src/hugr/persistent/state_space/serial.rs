@@ -80,7 +80,7 @@ impl CommitStateSpace {
     }
 
     /// Create a serialized format from a reference to [`CommitStateSpace`]
-    pub fn to_serial<'a, H>(&'a self) -> SerialCommitStateSpace<H>
+    pub fn to_serial<H>(&self) -> SerialCommitStateSpace<H>
     where
         H: From<Hugr>,
     {
