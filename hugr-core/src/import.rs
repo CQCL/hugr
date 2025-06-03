@@ -1015,6 +1015,14 @@ impl<'a> Context<'a> {
             return Ok(TypeParam::String);
         }
 
+        if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
+            return Ok(TypeParam::Bytes);
+        }
+
+        if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
+            return Ok(TypeParam::Float);
+        }
+
         if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
             return Ok(TypeParam::max_nat());
         }
@@ -1194,11 +1202,11 @@ impl<'a> Context<'a> {
                 Ok(TypeArg::BoundedNat { n: *value })
             }
 
-            table::Term::Literal(model::Literal::Bytes(_)) => {
-                Err(error_unsupported!("`(bytes ..)` as `TypeArg`"))
-            }
-            table::Term::Literal(model::Literal::Float(_)) => {
-                Err(error_unsupported!("float literal as `TypeArg`"))
+            table::Term::Literal(model::Literal::Bytes(value)) => Ok(TypeArg::Bytes {
+                value: value.clone(),
+            }),
+            table::Term::Literal(model::Literal::Float(value)) => {
+                Ok(TypeArg::Float { value: *value })
             }
             table::Term::Func { .. } => Err(error_unsupported!("function constant as `TypeArg`")),
 

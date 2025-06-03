@@ -863,7 +863,10 @@ impl<'a> Context<'a> {
             TypeArg::Type { ty } => self.export_type(ty),
             TypeArg::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
             TypeArg::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
+            TypeArg::Float { value } => self.make_term(model::Literal::Float(*value).into()),
+            TypeArg::Bytes { value } => self.make_term(model::Literal::Bytes(value.clone()).into()),
             TypeArg::List { elems } => {
+                // For now we assume that the sequence is meant to be a list.
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
@@ -973,6 +976,8 @@ impl<'a> Context<'a> {
             // This ignores the bound on the natural for now.
             TypeParam::BoundedNat { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
             TypeParam::String => self.make_term_apply(model::CORE_STR_TYPE, &[]),
+            TypeParam::Bytes => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
+            TypeParam::Float => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
             TypeParam::List { param } => {
                 let item_type = self.export_type_param(param, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])

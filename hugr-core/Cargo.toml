@@ -65,6 +65,8 @@ typetag = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
 relrc = { workspace = true, features = ["petgraph", "serde"] }
+ordered-float = { workspace = true, features = ["serde"] }
+base64.workspace = true
 
 [dev-dependencies]
 rstest = { workspace = true }

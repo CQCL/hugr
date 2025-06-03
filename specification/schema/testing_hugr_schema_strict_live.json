@@ -130,6 +130,19 @@
             "title": "BoundedNatParam",
             "type": "object"
         },
+        "BytesParam": {
+            "additionalProperties": false,
+            "properties": {
+                "tp": {
+                    "const": "Bytes",
+                    "default": "Bytes",
+                    "title": "Tp",
+                    "type": "string"
+                }
+            },
+            "title": "BytesParam",
+            "type": "object"
+        },
         "CFG": {
             "additionalProperties": false,
             "description": "A dataflow node which is defined by a child CFG.",
@@ -564,6 +577,19 @@
                 "hugr"
             ],
             "title": "FixedHugr",
+            "type": "object"
+        },
+        "FloatParam": {
+            "additionalProperties": false,
+            "properties": {
+                "tp": {
+                    "const": "Float",
+                    "default": "Float",
+                    "title": "Tp",
+                    "type": "string"
+                }
+            },
+            "title": "FloatParam",
             "type": "object"
         },
         "FromParamsBound": {
@@ -1781,6 +1807,8 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
+                    "Bytes": "#/$defs/BytesParam",
+                    "Float": "#/$defs/FloatParam",
                     "List": "#/$defs/ListParam",
                     "String": "#/$defs/StringParam",
                     "Tuple": "#/$defs/TupleParam",
@@ -1797,6 +1825,12 @@
                 },
                 {
                     "$ref": "#/$defs/StringParam"
+                },
+                {
+                    "$ref": "#/$defs/FloatParam"
+                },
+                {
+                    "$ref": "#/$defs/BytesParam"
                 },
                 {
                     "$ref": "#/$defs/ListParam"

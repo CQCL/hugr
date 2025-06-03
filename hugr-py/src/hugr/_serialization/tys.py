@@ -7,6 +7,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import (
+    Base64Bytes,
     BaseModel,
     ConfigDict,
     Field,
@@ -94,6 +95,20 @@ class StringParam(BaseTypeParam):
         return tys.StringParam()
 
 
+class BytesParam(BaseTypeParam):
+    tp: Literal["Bytes"] = "Bytes"
+
+    def deserialize(self) -> tys.BytesParam:
+        return tys.BytesParam()
+
+
+class FloatParam(BaseTypeParam):
+    tp: Literal["Float"] = "Float"
+
+    def deserialize(self) -> tys.FloatParam:
+        return tys.FloatParam()
+
+
 class ListParam(BaseTypeParam):
     tp: Literal["List"] = "List"
     param: TypeParam
@@ -114,7 +129,13 @@ class TypeParam(RootModel):
     """A type parameter."""
 
     root: Annotated[
-        TypeTypeParam | BoundedNatParam | StringParam | ListParam | TupleParam,
+        TypeTypeParam
+        | BoundedNatParam
+        | StringParam
+        | FloatParam
+        | BytesParam
+        | ListParam
+        | TupleParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
@@ -156,6 +177,22 @@ class StringArg(BaseTypeArg):
 
     def deserialize(self) -> tys.StringArg:
         return tys.StringArg(value=self.arg)
+
+
+class FloatArg(BaseTypeArg):
+    tya: Literal["Float"] = "Float"
+    value: float
+
+    def deserialize(self) -> tys.FloatArg:
+        return tys.FloatArg(value=self.value)
+
+
+class BytesArg(BaseTypeArg):
+    tya: Literal["Bytes"] = "Bytes"
+    value: Base64Bytes
+
+    def deserialize(self) -> tys.BytesArg:
+        return tys.BytesArg(value=bytes(self.value))
 
 
 class ListArg(BaseTypeArg):
