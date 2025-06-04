@@ -51,6 +51,7 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
         self.verify(h)?; // Now we know we have a TailLoop.
         let op = h.get_optype(self.0);
         let order_inport = op.other_input_port().unwrap();
+        let order_outport = op.other_output_port().unwrap();
         let tl = op.as_tail_loop().unwrap();
         let Signature {
             input: loop_in,
@@ -132,8 +133,9 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
                 h.connect(cond_n, outport, tgt_n, tgt_p);
             }
             h.disconnect(self.0, outport);
-            // Note this also creates an Order edge from TailLoop -> Case.Output if the loop had any Order successors
-            h.connect(self.0, outport, o, outport.index());
+            if outport != order_outport {
+                h.connect(self.0, outport, o, outport.index());
+            }
         }
         Ok(())
     }
@@ -147,14 +149,17 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
 mod test {
     use itertools::Itertools;
 
-    use super::{PeelTailLoop, PeelTailLoopError};
     use crate::builder::test::simple_dfg_hugr;
-    use crate::builder::{Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder};
+    use crate::builder::{
+        Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+    };
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::ops::{OpTag, OpTrait, handle::NodeHandle};
+    use crate::ops::{OpTag, OpTrait, Tag, TailLoop, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_types::INT_TYPES;
     use crate::types::{Signature, Type, TypeRow};
     use crate::{HugrView, hugr::HugrMut};
+
+    use super::{PeelTailLoop, PeelTailLoopError};
 
     #[test]
     fn bad_peel() {
@@ -204,15 +209,6 @@ mod test {
 
         h.apply_patch(PeelTailLoop::new(tl.node())).unwrap();
         h.validate().unwrap();
-        let tags = |n| {
-            let mut v = Vec::new();
-            let mut o = Some(n);
-            while let Some(n) = o {
-                v.push(h.get_optype(n).tag());
-                o = h.get_parent(n);
-            }
-            v
-        };
         assert_eq!(
             h.nodes()
                 .filter(|n| h.get_optype(*n).is_tail_loop())
@@ -221,7 +217,7 @@ mod test {
         );
         use OpTag::*;
         assert_eq!(
-            tags(call),
+            tags(&h, call),
             [FnCall, TailLoop, Case, Conditional, FuncDefn, ModuleRoot]
         );
         let [c1, c2] = h
@@ -231,6 +227,76 @@ mod test {
             .unwrap();
         assert!([c1, c2].contains(&call));
         let other = if call == c1 { c2 } else { c1 };
-        assert_eq!(tags(other), [FnCall, Dfg, FuncDefn, ModuleRoot]);
+        assert_eq!(tags(&h, other), [FnCall, Dfg, FuncDefn, ModuleRoot]);
+    }
+
+    fn tags<H: HugrView>(h: &H, n: H::Node) -> Vec<OpTag> {
+        let mut v = Vec::new();
+        let mut o = Some(n);
+        while let Some(n) = o {
+            v.push(h.get_optype(n).tag());
+            o = h.get_parent(n);
+        }
+        v
+    }
+
+    #[test]
+    fn peel_loop_order_output() {
+        let i16_t = || INT_TYPES[4].clone();
+        let mut fb =
+            FunctionBuilder::new("main", Signature::new(vec![i16_t(), bool_t()], i16_t())).unwrap();
+
+        let [i, b] = fb.input_wires_arr();
+        let tl = {
+            let mut tlb = fb
+                .tail_loop_builder([(i16_t(), i), (bool_t(), b)], [], i16_t().into())
+                .unwrap();
+            let [i, _b] = tlb.input_wires_arr();
+            // This loop only goes round once. However, we do not expect this to affect
+            // peeling: *dataflow analysis* can tell us that the conditional will always
+            // take one Case (that does not contain the TailLoop), we do not do that here.
+            let [cont] = tlb
+                .add_dataflow_op(
+                    Tag::new(
+                        TailLoop::BREAK_TAG,
+                        tlb.loop_signature().unwrap().control_variants().into(),
+                    ),
+                    [i],
+                )
+                .unwrap()
+                .outputs_arr();
+            tlb.finish_with_outputs(cont, []).unwrap()
+        };
+        let [i2] = tl.outputs_arr();
+        // Create a DFG (no inputs, one output) that reads the result of the TailLoop via an 'ext` edge
+        let dfg = fb
+            .dfg_builder(Signature::new(vec![], i16_t()), [])
+            .unwrap()
+            .finish_with_outputs([i2])
+            .unwrap();
+        let mut h = fb.finish_hugr_with_outputs(dfg.outputs()).unwrap();
+        let tl = tl.node();
+
+        h.apply_patch(PeelTailLoop::new(tl)).unwrap();
+        h.validate().unwrap();
+        {
+            use OpTag::*;
+            assert_eq!(
+                tags(&h, tl),
+                [TailLoop, Case, Conditional, FuncDefn, ModuleRoot]
+            );
+        }
+        let [out_n] = h.output_neighbours(tl).collect_array().unwrap();
+        assert!(h.get_optype(out_n).is_output());
+        assert_eq!(h.get_parent(tl), h.get_parent(out_n));
+        let [c] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_conditional())
+            .collect_array()
+            .unwrap();
+        assert_eq!(
+            h.output_neighbours(c).sorted().collect_vec(),
+            [dfg.node(), h.get_io(dfg.node()).unwrap()[1]]
+        );
     }
 }
