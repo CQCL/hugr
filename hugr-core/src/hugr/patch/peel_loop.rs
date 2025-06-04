@@ -49,8 +49,9 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
     type Outcome = ();
     fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a TailLoop.
-        let tl = h.get_optype(self.0).as_tail_loop().unwrap();
-
+        let op = h.get_optype(self.0);
+        let order_inport = op.other_input_port().unwrap();
+        let tl = op.as_tail_loop().unwrap();
         let Signature {
             input: loop_in,
             output: loop_out,
@@ -122,10 +123,15 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
         for inport in h.node_inputs(self.0).collect::<Vec<_>>() {
             for (src_n, src_p) in h.linked_outputs(self.0, inport).collect::<Vec<_>>() {
                 h.connect(src_n, src_p, dfg, inport);
+                if inport == order_inport {
+                    // ALAN is inport the right port here?
+                    h.connect(src_n, src_p, cond_n, inport);
+                }
             }
             h.disconnect(self.0, inport);
-            // Note this also creates an Order edge from Case.Input -> TailLoop if the loop had any Order predecessors
-            h.connect(i, inport.index(), self.0, inport);
+            if inport != order_inport {
+                h.connect(i, inport.index(), self.0, inport);
+            }
         }
         // Outputs from original TailLoop come from Conditional; TailLoop outputs go to Case(.Output)
         for outport in h.node_outputs(self.0).collect::<Vec<_>>() {
@@ -153,6 +159,7 @@ mod test {
     use crate::builder::{Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::ops::{OpTag, OpTrait, handle::NodeHandle};
+    use crate::std_extensions::arithmetic::int_types::INT_TYPES;
     use crate::types::{Signature, Type, TypeRow};
     use crate::{HugrView, hugr::HugrMut};
 
@@ -171,28 +178,32 @@ mod test {
     }
 
     #[test]
-    fn peel_loop() {
-        let mut fb =
-            FunctionBuilder::new("main", Signature::new(vec![bool_t(), usize_t()], usize_t()))
-                .unwrap();
+    fn peel_loop_incoming_edges() {
+        let i32_t = || INT_TYPES[5].clone();
+        let mut fb = FunctionBuilder::new(
+            "main",
+            Signature::new(vec![bool_t(), usize_t(), i32_t()], usize_t()),
+        )
+        .unwrap();
         let helper = fb
             .module_root_builder()
             .declare(
                 "helper",
                 Signature::new(
-                    vec![bool_t(), usize_t()],
+                    vec![bool_t(), usize_t(), i32_t()],
                     vec![Type::new_sum([vec![bool_t()], vec![]]), usize_t()],
                 )
                 .into(),
             )
             .unwrap();
-        let [b, u] = fb.input_wires_arr();
+        let [b, u, i] = fb.input_wires_arr();
         let (tl, call) = {
             let mut tlb = fb
                 .tail_loop_builder([(bool_t(), b)], [(usize_t(), u)], TypeRow::new())
                 .unwrap();
             let [b, u] = tlb.input_wires_arr();
-            let c = tlb.call(&helper, &[], [b, u]).unwrap();
+            // Static edge from FuncDecl, and 'ext' edge from function Input:
+            let c = tlb.call(&helper, &[], [b, u, i]).unwrap();
             let [pred, other] = c.outputs_arr();
             (tlb.finish_with_outputs(pred, [other]).unwrap(), c.node())
         };
