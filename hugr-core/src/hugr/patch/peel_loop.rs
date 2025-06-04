@@ -3,9 +3,11 @@
 use derive_more::{Display, Error};
 
 use crate::core::HugrNode;
-use crate::ops::{Case, Conditional, DFG, DataflowOpTrait, Input, OpType, Output, TailLoop};
+use crate::ops::{
+    Case, Conditional, DFG, DataflowOpTrait, Input, OpTrait, OpType, Output, TailLoop,
+};
 use crate::types::Signature;
-use crate::{HugrView, Node, PortIndex};
+use crate::{Direction, HugrView, Node};
 
 use super::{HugrMut, PatchHugrMut, PatchVerification};
 
@@ -48,96 +50,68 @@ impl<N: HugrNode> PatchVerification for PeelTailLoop<N> {
 impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
     type Outcome = ();
     fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<(), Self::Error> {
-        self.verify(h)?; // Now we know we have a TailLoop.
-        let op = h.get_optype(self.0);
-        let order_inport = op.other_input_port().unwrap();
-        let order_outport = op.other_output_port().unwrap();
-        let tl = op.as_tail_loop().unwrap();
+        self.verify(h)?; // Now we know we have a TailLoop!
+        let signature = h
+            .get_optype(self.0)
+            .dataflow_signature()
+            .unwrap()
+            .into_owned();
+        // Replace the TailLoop with a DFG - this maintains all external connections
+        let OpType::TailLoop(tl) = h.replace_op(self.0, DFG { signature }) else {
+            panic!("Wasn't a TailLoop ?!")
+        };
+        let sum_rows = Vec::from(tl.control_variants());
+        let rest = tl.rest.clone();
         let Signature {
             input: loop_in,
             output: loop_out,
         } = tl.signature().into_owned();
-        let sum_rows = Vec::from(tl.control_variants());
-        let rest = tl.rest.clone();
-        let iter_outputs = tl.body_output_row().into_owned();
-        let num_iter_outputs = iter_outputs.len();
-        let dfg = h.add_node_before(
-            self.0,
-            DFG {
-                signature: Signature::new(loop_in, iter_outputs),
-            },
-        );
 
-        h.copy_descendants(self.0, dfg, None);
+        // Copy the DFG (ex-TailLoop) children into a new TailLoop *before* we add any more
+        let new_loop = h.add_node_after(self.0, tl); // Temporary parent
+        h.copy_descendants(self.0, new_loop, None);
 
-        let cond_n = h.add_node_after(
-            dfg,
-            Conditional {
-                sum_rows,
-                other_inputs: rest,
-                outputs: loop_out.clone(),
-            },
-        );
-        debug_assert_eq!(
-            h.signature(dfg).unwrap().output_types(),
-            h.signature(cond_n).unwrap().input_types()
-        );
-
-        for i in 0..num_iter_outputs {
-            h.connect(dfg, i, cond_n, i);
-        }
-        let cond = h.get_optype(cond_n).as_conditional().unwrap();
+        // Add conditional inside DFG.
+        let [_, dfg_out] = h.get_io(self.0).unwrap();
+        let cond = Conditional {
+            sum_rows,
+            other_inputs: rest,
+            outputs: loop_out.clone(),
+        };
         let case_in_rows = [0, 1].map(|i| cond.case_input_row(i).unwrap());
-        // Stop borrowing `cond` as it borrows `h`
+        // This preserves all edges from the end of the loop body to the conditional:
+        h.replace_op(dfg_out, cond);
+        let cond_n = dfg_out;
+        h.add_ports(cond_n, Direction::Outgoing, loop_out.len() as isize + 1);
+        let dfg_out = h.add_node_before(
+            cond_n,
+            Output {
+                types: loop_out.clone(),
+            },
+        );
+        for p in 0..loop_out.len() {
+            h.connect(cond_n, p, dfg_out, p)
+        }
+
+        // Now wire up the internals of the Conditional
         let cases = case_in_rows.map(|in_row| {
-            let n = h.add_node_with_parent(
-                cond_n,
-                Case {
-                    signature: Signature::new(in_row.clone(), loop_out.clone()),
-                },
-            );
+            let signature = Signature::new(in_row.clone(), loop_out.clone());
+            let n = h.add_node_with_parent(cond_n, Case { signature });
             h.add_node_with_parent(n, Input { types: in_row });
-            h.add_node_with_parent(
-                n,
-                Output {
-                    types: loop_out.clone(),
-                },
-            );
+            let types = loop_out.clone();
+            h.add_node_with_parent(n, Output { types });
             n
         });
 
-        let [i, o] = h.get_io(cases[TailLoop::BREAK_TAG]).unwrap();
+        h.set_parent(new_loop, cases[TailLoop::CONTINUE_TAG]);
+        let [ctn_in, ctn_out] = h.get_io(cases[TailLoop::CONTINUE_TAG]).unwrap();
+        let [brk_in, brk_out] = h.get_io(cases[TailLoop::BREAK_TAG]).unwrap();
         for p in 0..loop_out.len() {
-            h.connect(i, p, o, p);
+            h.connect(brk_in, p, brk_out, p);
+            h.connect(new_loop, p, ctn_out, p)
         }
-
-        h.set_parent(self.0, cases[TailLoop::CONTINUE_TAG]);
-        let [i, o] = h.get_io(cases[TailLoop::CONTINUE_TAG]).unwrap();
-        // Inputs to original TailLoop are fed to DFG; TailLoop now takes inputs from Case(.Input)
-        for inport in h.node_inputs(self.0).collect::<Vec<_>>() {
-            let cond_inport = (inport == order_inport)
-                .then_some(h.get_optype(cond_n).other_input_port().unwrap());
-            for (src_n, src_p) in h.linked_outputs(self.0, inport).collect::<Vec<_>>() {
-                h.connect(src_n, src_p, dfg, inport);
-                // Order edges for nonlocal edges must go to both Conditional & DFG (siblings)
-                if let Some(inport) = cond_inport {
-                    h.connect(src_n, src_p, cond_n, inport);
-                }
-            }
-            h.disconnect(self.0, inport);
-            if inport != order_inport {
-                h.connect(i, inport.index(), self.0, inport);
-            }
-        }
-        // Outputs from original TailLoop come from Conditional; TailLoop outputs go to Case(.Output)
-        for outport in h.node_outputs(self.0).collect::<Vec<_>>() {
-            for (tgt_n, tgt_p) in h.linked_inputs(self.0, outport).collect::<Vec<_>>() {
-                h.connect(cond_n, outport, tgt_n, tgt_p);
-            }
-            h.disconnect(self.0, outport);
-            if outport != order_outport {
-                h.connect(self.0, outport, o, outport.index());
-            }
+        for p in 0..loop_in.len() {
+            h.connect(ctn_in, p, new_loop, p);
         }
         Ok(())
     }
@@ -215,17 +189,15 @@ mod test {
 
         h.apply_patch(PeelTailLoop::new(tl.node())).unwrap();
         h.validate().unwrap();
+
         assert_eq!(
             h.nodes()
                 .filter(|n| h.get_optype(*n).is_tail_loop())
-                .collect_vec(),
-            [tl.node()]
+                .count(),
+            1
         );
         use OpTag::*;
-        assert_eq!(
-            tags(&h, call),
-            [FnCall, TailLoop, Case, Conditional, FuncDefn, ModuleRoot]
-        );
+        assert_eq!(tags(&h, call), [FnCall, Dfg, FuncDefn, ModuleRoot]);
         let [c1, c2] = h
             .all_linked_inputs(helper.node())
             .map(|(n, _p)| n)
@@ -233,7 +205,18 @@ mod test {
             .unwrap();
         assert!([c1, c2].contains(&call));
         let other = if call == c1 { c2 } else { c1 };
-        assert_eq!(tags(&h, other), [FnCall, Dfg, FuncDefn, ModuleRoot]);
+        assert_eq!(
+            tags(&h, other),
+            [
+                FnCall,
+                TailLoop,
+                Case,
+                Conditional,
+                Dfg,
+                FuncDefn,
+                ModuleRoot
+            ]
+        );
     }
 
     fn tags<H: HugrView>(h: &H, n: H::Node) -> Vec<OpTag> {
@@ -285,24 +268,20 @@ mod test {
 
         h.apply_patch(PeelTailLoop::new(tl)).unwrap();
         h.validate().unwrap();
+        let [tl] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_tail_loop())
+            .collect_array()
+            .unwrap();
         {
             use OpTag::*;
             assert_eq!(
                 tags(&h, tl),
-                [TailLoop, Case, Conditional, FuncDefn, ModuleRoot]
+                [TailLoop, Case, Conditional, Dfg, FuncDefn, ModuleRoot]
             );
         }
         let [out_n] = h.output_neighbours(tl).collect_array().unwrap();
         assert!(h.get_optype(out_n).is_output());
         assert_eq!(h.get_parent(tl), h.get_parent(out_n));
-        let [c] = h
-            .nodes()
-            .filter(|n| h.get_optype(*n).is_conditional())
-            .collect_array()
-            .unwrap();
-        assert_eq!(
-            h.output_neighbours(c).sorted().collect_vec(),
-            [dfg.node(), h.get_io(dfg.node()).unwrap()[1]]
-        );
     }
 }
