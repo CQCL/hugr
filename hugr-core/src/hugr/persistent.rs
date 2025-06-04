@@ -760,5 +760,12 @@ fn find_conflicting_node<'a>(
     })
 }
 
+pub mod serial {
+    //! Serialization formats of [`CommitStateSpace`](super::CommitStateSpace)
+    //! and related types
+    #[doc(inline)]
+    pub use super::state_space::serial::*;
+}
+
 #[cfg(test)]
 mod tests;

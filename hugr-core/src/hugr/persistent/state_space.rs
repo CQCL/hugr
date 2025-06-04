@@ -16,11 +16,15 @@ use crate::{
     ops::OpType,
 };
 
+pub mod serial;
+
 /// A copyable handle to a [`Commit`] vertex within a [`CommitStateSpace`]
 pub type CommitId = relrc::NodeId;
 
 /// A HUGR node within a commit of the commit state space
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
+#[derive(
+    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct PatchNode(pub CommitId, pub Node);
 
 impl std::fmt::Display for PatchNode {
