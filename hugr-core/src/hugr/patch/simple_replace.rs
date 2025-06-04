@@ -17,6 +17,8 @@ use thiserror::Error;
 use super::inline_dfg::InlineDFGError;
 use super::{BoundaryPort, HostPort, PatchHugrMut, PatchVerification, ReplacementPort};
 
+pub mod serial;
+
 /// Specification of a simple replacement operation.
 ///
 /// # Type parameters
