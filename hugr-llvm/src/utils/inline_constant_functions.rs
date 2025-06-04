@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Remove pass when Value::Function is removed
 use hugr_core::{
     HugrView, Node, NodeIndex as _,
     hugr::{hugrmut::HugrMut, internal::HugrMutInternals},
@@ -24,7 +25,6 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
             let Some(konst) = hugr.get_optype(n).as_const() else {
                 continue;
             };
-            #[allow(deprecated)] // Remove pass when Value::Function is removed
             let Value::Function { hugr } = konst.value() else {
                 continue;
             };
