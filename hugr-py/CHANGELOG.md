@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.12.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.1...hugr-py-v0.12.2) (2025-06-03)
+
+
+### Bug Fixes
+
+* use envelopes for `FixedHugr` encoding ([#2283](https://github.com/CQCL/hugr/issues/2283)) ([2c8cbb9](https://github.com/CQCL/hugr/commit/2c8cbb99bc74d5d43956b5f75c89f17748b5ee39)), closes [#2282](https://github.com/CQCL/hugr/issues/2282)
+
+
+### Performance Improvements
+
+* **py:** mutable `Node` to avoid linear update cost ([#2288](https://github.com/CQCL/hugr/issues/2288)) ([84fb200](https://github.com/CQCL/hugr/commit/84fb2002dc835f6b98ceb95bd80a7bcff9eecdd8))
+
+
+### Documentation
+
+* **py:** fix `TypeDef` example ([#2268](https://github.com/CQCL/hugr/issues/2268)) ([ede8e7b](https://github.com/CQCL/hugr/commit/ede8e7b087591303038ecc5b449bb85bf39c948b))
+
 ## [0.12.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.0...hugr-py-v0.12.1) (2025-05-20)
 
 

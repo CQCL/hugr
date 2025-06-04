@@ -57,6 +57,12 @@ impl Package {
     }
 
     /// Read a Package from a HUGR envelope.
+    ///
+    /// To load a Package, all the extensions used in its definition must be
+    /// available. The Envelope may include some of the extensions, but any
+    /// additional extensions must be provided in the `extensions` parameter. If
+    /// `extensions` is `None`, the default [`crate::std_extensions::STD_REG`]
+    /// is used.
     pub fn load(
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
@@ -70,6 +76,12 @@ impl Package {
     ///
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::load` with a bytearray instead.
+    ///
+    /// To load a Package, all the extensions used in its definition must be
+    /// available. The Envelope may include some of the extensions, but any
+    /// additional extensions must be provided in the `extensions` parameter. If
+    /// `extensions` is `None`, the default [`crate::std_extensions::STD_REG`]
+    /// is used.
     pub fn load_str(
         envelope: impl AsRef<str>,
         extensions: Option<&ExtensionRegistry>,
@@ -78,6 +90,10 @@ impl Package {
     }
 
     /// Store the Package in a HUGR envelope.
+    ///
+    /// The Envelope will embed the definitions of the extensions in
+    /// [`Package::extensions`]. Any other extension used in the definition must
+    /// be passed to [`Package::load`] to load back the package.
     pub fn store(
         &self,
         writer: impl io::Write,
@@ -91,6 +107,10 @@ impl Package {
     /// Note that not all envelopes are valid strings. In the general case,
     /// it is recommended to use `Package::store` with a bytearray instead.
     /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
+    ///
+    /// The Envelope will embed the definitions of the extensions in
+    /// [`Package::extensions`]. Any other extension used in the definition must
+    /// be passed to [`Package::load_str`] to load back the package.
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         if !config.format.ascii_printable() {
             return Err(EnvelopeError::NonASCIIFormat {
