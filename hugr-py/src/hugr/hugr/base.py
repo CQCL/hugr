@@ -98,7 +98,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     """The core HUGR datastructure.
 
     Args:
-        entrypoint_op: The operation for the entrypoint node. Defaults to a Module.
+        entrypoint_op: The operation for the entrypoint node. Defaults to a Module
+        (which will then also be the root).
 
     Examples:
         >>> h = Hugr()

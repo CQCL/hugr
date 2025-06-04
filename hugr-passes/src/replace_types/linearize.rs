@@ -816,12 +816,11 @@ mod test {
         let backup = dfb.finish_hugr().unwrap();
 
         let mut lower_discard_to_call = ReplaceTypes::default();
-        // The `copy_fn` here is just any random node, we don't use it
         lower_discard_to_call
             .linearizer()
             .register_simple(
                 lin_ct.clone(),
-                NodeTemplate::Call(backup.entrypoint(), vec![]),
+                NodeTemplate::Call(backup.entrypoint(), vec![]), // Arbitrary, unused
                 NodeTemplate::Call(discard_fn, vec![]),
             )
             .unwrap();
@@ -842,8 +841,7 @@ mod test {
         );
         let r = lower_discard_to_call.run(&mut backup.clone());
         // Note the error (or success) can be quite fragile, according to what the `discard_fn`
-        // Node points at in the (hidden here) inner Hugr inside the Value::Function built by
-        // the array linearization helper.
+        // Node points at in the (hidden here) inner Hugr built by the array linearization helper.
         assert!(matches!(
             r,
             Err(ReplaceTypesError::LinearizeError(

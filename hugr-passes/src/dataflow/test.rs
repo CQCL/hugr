@@ -554,7 +554,6 @@ fn test_module() {
 #[case(pv_true(), pv_true())]
 fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
     let b2b = || Signature::new_endo(bool_t());
-
     let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
 
     let [id1, id2] = ["id1", "[id2]"].map(|name| {
