@@ -1,7 +1,9 @@
 //! Callbacks for use with [`ReplaceTypes::replace_consts_parametrized`]
 //! and [`DelegatingLinearizer::register_callback`](super::DelegatingLinearizer::register_callback)
 
-use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig};
+use hugr_core::builder::{
+    DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, endo_sig, inout_sig,
+};
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
 use hugr_core::ops::constant::CustomConst;
 use hugr_core::ops::{OpTrait, OpType, Tag};
@@ -110,25 +112,27 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if num_outports == 0 {
-        // "Simple" discard - first map each element to unit (via type-specific discard):
-        let map_fn = {
-            let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), Type::UNIT)).unwrap();
-            let [to_discard] = dfb.input_wires_arr();
-            lin.copy_discard_op(ty, 0)?
-                .add(&mut dfb, [to_discard])
-                .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?;
-            let ret = dfb.add_load_value(Value::unary_unit_sum());
-            dfb.finish_hugr_with_outputs([ret]).unwrap()
-        };
-        // Now array.scan that over the input array to get an array of unit (which can be discarded)
-        let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
-        let in_type = AK::ty(*n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
+            let in_type = AK::ty(*n, ty.clone());
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
+            // "Simple" discard - first map each element to unit (via type-specific discard):
+            let map_fn = {
+                let mut mb = dfb.module_root_builder();
+                let mut fb = mb
+                    .define_function("discard_elem", inout_sig(ty.clone(), Type::UNIT))
+                    .unwrap();
+                let [to_discard] = fb.input_wires_arr();
+                lin.copy_discard_op(ty, 0)?
+                    .add(&mut fb, [to_discard])
+                    .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?;
+                let ret = fb.add_load_value(Value::unary_unit_sum());
+                fb.finish_with_outputs([ret]).unwrap()
+            };
+            // Now array.scan that over the input array to get an array of unit (which can be discarded)
+            let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
+
             let [in_array] = dfb.input_wires_arr();
-            let map_fn = dfb.add_load_value(Value::Function {
-                hugr: Box::new(map_fn),
-            });
+            let map_fn = dfb.load_func(map_fn.handle(), &[]).unwrap();
             // scan has one output, an array of unit, so just ignore/discard that
             let unit_arr = dfb
                 .add_dataflow_op(array_scan, [in_array, map_fn])
@@ -153,14 +157,17 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     let option_ty = Type::from(option_sty.clone());
     let arrays_of_none = {
         let fn_none = {
-            let mut dfb = DFGBuilder::new(inout_sig(vec![], option_ty.clone())).unwrap();
-            let none = dfb
+            let mut mb = dfb.module_root_builder();
+            let mut fb = mb
+                .define_function("mk_none", inout_sig(vec![], option_ty.clone()))
+                .unwrap();
+            let none = fb
                 .add_dataflow_op(Tag::new(0, vec![type_row![], ty.clone().into()]), [])
                 .unwrap();
-            dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
+            fb.finish_with_outputs(none.outputs()).unwrap()
         };
         let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), *n); num_new];
-        let fn_none = dfb.add_load_value(Value::function(fn_none).unwrap());
+        let fn_none = dfb.load_func(fn_none.handle(), &[]).unwrap();
         repeats
             .into_iter()
             .map(|rpt| {
@@ -177,18 +184,21 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];
         io.extend(vec![option_array.clone(); num_new]);
-        let mut dfb = DFGBuilder::new(endo_sig(io)).unwrap();
-        let mut inputs = dfb.input_wires();
+        let mut mb = dfb.module_root_builder();
+        let mut fb = mb
+            .define_function(format!("copy{num_outports}"), endo_sig(io))
+            .unwrap();
+        let mut inputs = fb.input_wires();
         let elem = inputs.next().unwrap();
         let idx = inputs.next().unwrap();
         let opt_arrays = inputs.collect::<Vec<_>>();
-        let [idx_usz] = dfb
+        let [idx_usz] = fb
             .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
             .unwrap()
             .outputs_arr();
         let mut copies = lin
             .copy_discard_op(ty, num_outports)?
-            .add(&mut dfb, [elem])
+            .add(&mut fb, [elem])
             .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?
             .outputs();
         let copy0 = copies.next().unwrap(); // We'll return this directly
@@ -203,32 +213,32 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .into_iter()
             .zip_eq(copies)
             .map(|(opt_array, copy1)| {
-                let [tag] = dfb
+                let [tag] = fb
                     .add_dataflow_op(Tag::new(1, vec![type_row![], ty.clone().into()]), [copy1])
                     .unwrap()
                     .outputs_arr();
-                let [set_result] = dfb
+                let [set_result] = fb
                     .add_dataflow_op(set_op.clone(), [opt_array, idx_usz, tag])
                     .unwrap()
                     .outputs_arr();
                 // set should always be successful
-                let [none, opt_array] = dfb
+                let [none, opt_array] = fb
                     .build_unwrap_sum(1, either_st.clone(), set_result)
                     .unwrap();
                 //the removed element is an option, which should always be none (and thus discardable)
-                let [] = dfb
+                let [] = fb
                     .build_unwrap_sum(0, SumType::new_option(ty.clone()), none)
                     .unwrap();
                 opt_array
             })
             .collect::<Vec<_>>(); // stop borrowing dfb
 
-        let cst1 = dfb.add_load_value(ConstInt::new_u(6, 1).unwrap());
-        let [new_idx] = dfb
+        let cst1 = fb.add_load_value(ConstInt::new_u(6, 1).unwrap());
+        let [new_idx] = fb
             .add_dataflow_op(IntOpDef::iadd.with_log_width(6), [idx, cst1])
             .unwrap()
             .outputs_arr();
-        dfb.finish_hugr_with_outputs([copy0, new_idx].into_iter().chain(opt_arrays))
+        fb.finish_with_outputs([copy0, new_idx].into_iter().chain(opt_arrays))
             .unwrap()
     };
     let [in_array] = dfb.input_wires_arr();
@@ -241,7 +251,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         *n,
     );
 
-    let copy_elem = dfb.add_load_value(Value::function(copy_elem).unwrap());
+    let copy_elem = dfb.load_func(copy_elem.handle(), &[]).unwrap();
     let cst0 = dfb.add_load_value(ConstInt::new_u(6, 0).unwrap());
 
     let mut outs = dfb
@@ -259,15 +269,20 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 
     //3. Scan each array-of-options, 'unwrapping' each element into a non-option
     let unwrap_elem = {
-        let mut dfb =
-            DFGBuilder::new(inout_sig(Type::from(option_ty.clone()), ty.clone())).unwrap();
+        let mut mb = dfb.module_root_builder();
+        let mut dfb = mb
+            .define_function(
+                "unwrap",
+                inout_sig(Type::from(option_ty.clone()), ty.clone()),
+            )
+            .unwrap();
         let [opt] = dfb.input_wires_arr();
         let [val] = dfb.build_unwrap_sum(1, option_sty.clone(), opt).unwrap();
-        dfb.finish_hugr_with_outputs([val]).unwrap()
+        dfb.finish_with_outputs([val]).unwrap()
     };
 
     let unwrap_scan = GenericArrayScan::<AK>::new(option_ty.clone(), ty.clone(), vec![], *n);
-    let unwrap_elem = dfb.add_load_value(Value::function(unwrap_elem).unwrap());
+    let unwrap_elem = dfb.load_func(unwrap_elem.handle(), &[]).unwrap();
 
     let out_arrays = std::iter::once(out_array1)
         .chain(opt_arrays.map(|opt_array| {

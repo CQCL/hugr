@@ -1,30 +1,19 @@
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
-use crate::extension::OpDef;
-use crate::extension::SignatureFunc;
+use crate::Extension;
 use crate::extension::prelude::usize_custom_t;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{ConstFold, ExtensionId};
-use crate::ops::ExtensionOp;
-use crate::ops::OpName;
+use crate::extension::{ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc};
+use crate::ops::{ExtensionOp, OpName};
 use crate::type_row;
-use crate::types::FuncValueType;
-
-use crate::types::Type;
-
-use crate::extension::SignatureError;
-
-use crate::types::PolyFuncTypeRV;
-
-use crate::Extension;
-use crate::types::type_param::TypeArg;
+use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::{FuncValueType, PolyFuncTypeRV, Type};
 
 use super::PRELUDE;
 use super::{ConstUsize, PRELUDE_ID};
-use crate::types::type_param::TypeParam;
 
 /// Name of the operation for loading generic `BoundedNat` parameters.
 pub static LOAD_NAT_OP_ID: OpName = OpName::new_inline("load_nat");
@@ -161,10 +150,11 @@ impl HasConcrete for LoadNatDef {
 #[cfg(test)]
 mod tests {
     use crate::{
-        HugrView, OutgoingPort,
+        HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+        extension::FoldVal,
         extension::prelude::{ConstUsize, usize_t},
-        ops::{OpType, constant},
+        ops::OpType,
         type_row,
         types::TypeArg,
     };
@@ -201,10 +191,10 @@ mod tests {
         let optype: OpType = op.into();
 
         if let OpType::ExtensionOp(ext_op) = optype {
-            let result = ext_op.constant_fold(&[]);
-            let exp_port: OutgoingPort = 0.into();
-            let exp_val: constant::Value = ConstUsize::new(5).into();
-            assert_eq!(result, Some(vec![(exp_port, exp_val)]));
+            let mut out = [FoldVal::Unknown];
+            ext_op.constant_fold2(&[], &mut out);
+            let exp_val: FoldVal = ConstUsize::new(5).into();
+            assert_eq!(out, [exp_val])
         } else {
             panic!()
         }

@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Remove pass when Value::Function is removed
 use hugr_core::{
     HugrView, Node, NodeIndex as _,
     hugr::{hugrmut::HugrMut, internal::HugrMutInternals},
