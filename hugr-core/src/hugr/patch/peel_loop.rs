@@ -56,31 +56,24 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
             input: loop_in,
             output: loop_out,
         } = tl.signature().into_owned();
+        let sum_rows = Vec::from(tl.control_variants());
+        let rest = tl.rest.clone();
         let iter_outputs = tl.body_output_row().into_owned();
         let num_iter_outputs = iter_outputs.len();
         let dfg = h.add_node_before(
             self.0,
             DFG {
-                signature: Signature::new(loop_in, iter_outputs.clone()),
+                signature: Signature::new(loop_in, iter_outputs),
             },
         );
 
         h.copy_descendants(self.0, dfg, None);
 
-        let mut other_inputs = iter_outputs;
-        let sum_rows = other_inputs
-            .remove(0)
-            .as_sum()
-            .unwrap()
-            .variants()
-            .map(|r| r.clone().try_into().unwrap())
-            .collect();
-
         let cond_n = h.add_node_after(
             dfg,
             Conditional {
                 sum_rows,
-                other_inputs: other_inputs.into(),
+                other_inputs: rest,
                 outputs: loop_out.clone(),
             },
         );
